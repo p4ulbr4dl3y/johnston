@@ -130,12 +130,13 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Command Suggestions Popup - Matches Input Field Margins & Width Exactly */
+/* Command Suggestions Popup - 100% Identical Position & Width to Input */
 #command-suggestions {
     display: none;
+    width: 100%;
     height: auto;
     max-height: 8;
-    margin: 0 3 0 3;
+    margin: 0 0 1 0;
     padding: 0 1;
     border: round #313244;
     background: #181825;
