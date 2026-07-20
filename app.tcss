@@ -43,12 +43,10 @@ Screen {
     margin-top: 1;
     padding: 0 1;
     color: #a1a1aa;
-    border-left: solid #27272a;
 }
 
 .thinking-active {
     color: #00ffd1;
-    border-left: solid #00ffd1;
 }
 
 .thinking-header {
@@ -68,27 +66,22 @@ Screen {
     height: auto;
     margin-top: 1;
     padding: 0 1;
-    border-left: solid #00ffd1;
     color: #e4e4e7;
 }
 
 .tool-create {
-    border-left: solid #10b981;
     color: #a7f3d0;
 }
 
 .tool-read {
-    border-left: solid #3b82f6;
     color: #bfdbfe;
 }
 
 .tool-edit {
-    border-left: solid #f59e0b;
     color: #fde68a;
 }
 
 .tool-bash {
-    border-left: solid #a855f7;
     color: #e9d5ff;
 }
 
