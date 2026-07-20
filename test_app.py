@@ -1,8 +1,7 @@
 import asyncio
 from app import TUIChatApp
-from widgets.chat_view import ChatView
+from widgets.chat_view import ChatView, BotMessage
 from widgets.chat_input import ChatInput
-from widgets.command_suggestions import CommandSuggestions
 
 async def test_chat_app_flow():
     app = TUIChatApp()
@@ -10,27 +9,21 @@ async def test_chat_app_flow():
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()
         
-        suggestions = app.query_one("#command-suggestions", CommandSuggestions)
-        assert not suggestions.display
+        # 1. Отправляем запрос на создание и запуск
+        chat_input.load_text("создай новый файл и запусти тест")
+        await pilot.press("enter")
+        await pilot.pause(2.0)
         
-        # Симулируем посимвольное нажатие клавиш: '/', 'r', 'e'
-        await pilot.press("slash")
-        await pilot.pause(0.1)
-        assert suggestions.display
-        print("✓ Suggestions displayed when typing '/' key")
+        chat_view = app.query_one(ChatView)
+        bot_msgs = [c for c in chat_view.children if isinstance(c, BotMessage)]
+        assert len(bot_msgs) == 1
         
-        await pilot.press("r")
-        await pilot.press("e")
-        await pilot.pause(0.1)
-        assert suggestions.display
-        print("✓ Suggestions updated when typing '/re'")
+        content = bot_msgs[0].content
+        print("Bot content output:\n", content)
         
-        # Нажимаем Tab -> автодополнение до "/resume"
-        await pilot.press("tab")
-        await pilot.pause(0.1)
-        assert chat_input.text == "/resume"
-        assert not suggestions.display
-        print("✓ Tab key autocompleted '/re' to '/resume'")
+        assert "● Create(" in content
+        assert "● Bash(" in content
+        print("✓ Agent tool calls (Create, Bash) rendered successfully!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
