@@ -7,7 +7,7 @@ from textual.widgets import Select
 
 from provider_manager import ProviderManager
 from session_manager import SessionManager
-from widgets.chat_view import ChatView
+from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget, ToolCallWidget
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen
@@ -51,25 +51,37 @@ class TUIChatApp(App):
         for child in list(chat_view.children):
             child.remove()
 
-        # Восстановление истории сообщений в UI
+        # Восстановление полной истории элементов в UI (user, bot, thinking, tool)
         saved_ui_msgs = session_data.get("ui_messages", [])
         for msg in saved_ui_msgs:
             mtype = msg.get("type")
-            text = msg.get("text", "")
             if mtype == "user":
+                text = msg.get("text", "")
                 self.run_worker(chat_view.add_user_message(text))
             elif mtype == "bot":
+                text = msg.get("text", "")
                 async def add_bot(txt=text):
                     bm = await chat_view.add_bot_message()
                     bm.content = txt
                 self.run_worker(add_bot())
+            elif mtype == "thinking":
+                dur = msg.get("duration", 0.0)
+                txt = msg.get("text", "")
+                async def add_thinking(duration=dur, content=txt):
+                    tw = await chat_view.add_thinking_widget()
+                    tw.finish_thinking(duration, content)
+                self.run_worker(add_thinking())
+            elif mtype == "tool":
+                ttype = msg.get("tool_type", "")
+                target = msg.get("target", "")
+                self.run_worker(chat_view.add_tool_call(ttype, target))
 
         # Восстановление контекста агента
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
 
     def save_current_session(self) -> None:
-        """Сохранение состояния сессии в ~/.tui/projects/<project>/sessions (только если есть сообщения)"""
+        """Сохранение полного состояния элементов UI в ~/.tui/projects/<project>/sessions"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
         
@@ -83,10 +95,22 @@ class TUIChatApp(App):
 
         ui_messages = []
         for child in chat_view.children:
-            if hasattr(child, "raw_text"):
+            if isinstance(child, UserMessage):
                 ui_messages.append({"type": "user", "text": child.raw_text})
-            elif hasattr(child, "content") and getattr(child, "content", None):
+            elif isinstance(child, BotMessage):
                 ui_messages.append({"type": "bot", "text": child.content})
+            elif isinstance(child, ThinkingWidget):
+                ui_messages.append({
+                    "type": "thinking",
+                    "duration": getattr(child, "duration_seconds", 0.0),
+                    "text": getattr(child, "thinking_text", "")
+                })
+            elif isinstance(child, ToolCallWidget):
+                ui_messages.append({
+                    "type": "tool",
+                    "tool_type": getattr(child, "tool_type", ""),
+                    "target": getattr(child, "target", "")
+                })
 
         agent_history = getattr(self.agent, "history", [])
         
