@@ -24,16 +24,7 @@ class TUIChatApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
-            yield Input(placeholder="Написать...", id="message-input")
-
-    async def on_mount(self) -> None:
-        """Приветствие"""
-        chat_view = self.query_one(ChatView)
-        welcome_msg = await chat_view.add_bot_message()
-        welcome_msg.content = (
-            "Привет. Введи текст и нажми `Enter`.\n"
-            "`Ctrl+C` или `Esc` — выход."
-        )
+            yield Input(placeholder="Написать сообщение...", id="message-input")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Отправка по Enter"""
