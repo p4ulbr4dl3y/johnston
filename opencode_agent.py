@@ -2,6 +2,7 @@ import asyncio
 import os
 import time
 import json
+import difflib
 from typing import AsyncGenerator, Tuple, Dict, Any
 from openai import AsyncOpenAI
 
@@ -98,8 +99,27 @@ def resolve_project_path(raw_path: str) -> str:
         
     return os.path.normpath(path)
 
-async def execute_tool(name: str, args: dict) -> str:
-    """Локальное выполнение инструментов Read, Create, Edit, Bash"""
+def generate_diff(path: str, new_content: str) -> str:
+    """Генерирует гитоподобный дифф изменений"""
+    if not os.path.exists(path):
+        lines = new_content.splitlines(keepends=True)
+        return "".join(f"+ {l}" for l in lines)
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            old_content = f.read()
+        diff = difflib.unified_diff(
+            old_content.splitlines(keepends=True),
+            new_content.splitlines(keepends=True),
+            fromfile=f"a/{os.path.basename(path)}",
+            tofile=f"b/{os.path.basename(path)}",
+            n=3
+        )
+        return "".join(diff)
+    except Exception as e:
+        return f"Ошибка сравнения: {e}"
+
+async def execute_tool(name: str, args: dict) -> Tuple[str, str]:
+    """Локальное выполнение инструментов. Возвращает (ответ_для_модели, результат_для_интерфейса)"""
     try:
         if name == "Read":
             raw_path = args.get("path", "")
@@ -107,12 +127,13 @@ async def execute_tool(name: str, args: dict) -> str:
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
-                    if len(content) > 4000:
-                        content = content[:4000] + "\n... [содержимое обрезано]"
-                    return content
-            return f"Ошибка: файл '{path}' не найден."
+                agent_content = content
+                if len(content) > 4000:
+                    agent_content = content[:4000] + "\n... [содержимое обрезано]"
+                return agent_content, "" # Read - ничего
+            return f"Ошибка: файл '{path}' не найден.", ""
 
-        elif name in ("Create", "Edit"):
+        elif name == "Create":
             raw_path = args.get("path", "")
             path = resolve_project_path(raw_path)
             content = args.get("content", "")
@@ -120,7 +141,23 @@ async def execute_tool(name: str, args: dict) -> str:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             rel_path = os.path.relpath(path, os.getcwd())
-            return f"Успешно: файл '{rel_path}' сохранен ({len(content)} байт)."
+            agent_msg = f"Успешно: файл '{rel_path}' создан ({len(content)} байт)."
+            return agent_msg, content # Create - содержимое
+
+        elif name == "Edit":
+            raw_path = args.get("path", "")
+            path = resolve_project_path(raw_path)
+            content = args.get("content", "")
+            
+            # Строим дифф перед записью
+            diff_str = generate_diff(path, content)
+            
+            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+            rel_path = os.path.relpath(path, os.getcwd())
+            agent_msg = f"Успешно: файл '{rel_path}' сохранен ({len(content)} байт)."
+            return agent_msg, diff_str # Edit - диффы в гите
 
         elif name == "Bash":
             cmd = args.get("command", "")
@@ -132,14 +169,18 @@ async def execute_tool(name: str, args: dict) -> str:
             )
             stdout, stderr = await p.communicate()
             res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
-            if len(res) > 3000:
-                res = res[:3000] + "\n... [вывод обрезан]"
-            return res if res.strip() else "Команда выполнена без вывода."
+            output = res if res.strip() else "Команда выполнена без вывода."
+            
+            agent_output = output
+            if len(output) > 3000:
+                agent_output = output[:3000] + "\n... [вывод обрезан]"
+            return agent_output, output # Bash - вывод команды
 
     except Exception as err:
-        return f"Ошибка выполнения инструмента {name}: {err}"
+        err_str = f"Ошибка выполнения инструмента {name}: {err}"
+        return err_str, err_str
     
-    return "Неизвестный инструмент."
+    return "Неизвестный инструмент.", ""
 
 
 class OpenCodeAgent:
@@ -299,13 +340,13 @@ class OpenCodeAgent:
 
                     yield ("tool", t_name, target)
 
-                    tool_result = await execute_tool(t_name, args)
-                    yield ("tool_result", tool_result, "")
+                    agent_res, ui_res = await execute_tool(t_name, args)
+                    yield ("tool_result", ui_res, "")
 
                     messages.append({
                         "role": "tool",
                         "tool_call_id": t_id,
-                        "content": tool_result
+                        "content": agent_res
                     })
 
             self.history.append({"role": "user", "content": user_text})

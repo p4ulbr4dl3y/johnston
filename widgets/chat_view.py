@@ -3,6 +3,7 @@ from textual.containers import VerticalScroll, Vertical
 from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
 from textual import events
+import os
 
 class UserMessage(Static):
     """Сообщение пользователя"""
@@ -120,19 +121,33 @@ class ToolCallWidget(Vertical):
             self.set_result(self.result_text)
 
     def set_result(self, result_text: str) -> None:
-        self.result_text = result_text
-        lang = "bash" if self.tool_type == "Bash" else ""
-        formatted_md = f"```{lang}\n{self.result_text}\n```" if self.result_text else "*(нет вывода)*"
-        self.md_widget.update(formatted_md)
+        self.result_text = result_text.strip()
+        self.render_header()
+        
+        if self.result_text:
+            if self.tool_type == "Bash":
+                formatted_md = f"```bash\n{self.result_text}\n```"
+            elif self.tool_type == "Edit":
+                formatted_md = f"```diff\n{self.result_text}\n```"
+            elif self.tool_type == "Create":
+                ext = os.path.splitext(self.target)[1].lstrip(".")
+                formatted_md = f"```{ext}\n{self.result_text}\n```"
+            else:
+                formatted_md = self.result_text
+            self.md_widget.update(formatted_md)
 
     def render_header(self) -> None:
-        arrow = "▼ " if self.is_expanded else "▶ "
-        self.header_label.update(f"{arrow}[bold]{self.icon_name}[/bold]({self.target})")
+        if self.result_text:
+            arrow = "▼ " if self.is_expanded else "▶ "
+            self.header_label.update(f"{arrow}[bold]{self.icon_name}[/bold]({self.target})")
+        else:
+            self.header_label.update(f"  [bold]{self.icon_name}[/bold]({self.target})")
 
     def toggle_expand(self) -> None:
-        self.is_expanded = not self.is_expanded
-        self.render_header()
-        self.md_widget.display = self.is_expanded
+        if self.result_text:
+            self.is_expanded = not self.is_expanded
+            self.render_header()
+            self.md_widget.display = self.is_expanded
 
     def on_click(self, event: events.Click) -> None:
         self.toggle_expand()
