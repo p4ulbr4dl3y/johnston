@@ -168,7 +168,7 @@ class ToolCallWidget(Vertical):
             arrow = "▼ " if self.is_expanded else "▶ "
             self.header_label.update(f"{arrow}[bold]{self.icon_name}[/bold]({self.target})")
         else:
-            self.header_label.update(f"  [bold]{self.icon_name}[/bold]({self.target})")
+            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
     def toggle_expand(self) -> None:
         if self.result_text:

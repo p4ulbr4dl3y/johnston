@@ -41,7 +41,6 @@ Screen {
     width: 100%;
     height: auto;
     margin-top: 1;
-    padding: 0 1;
     color: #a1a1aa;
 }
 
@@ -65,7 +64,6 @@ Screen {
     width: 100%;
     height: auto;
     margin-top: 1;
-    padding: 0 1;
     color: #e4e4e7;
 }
 

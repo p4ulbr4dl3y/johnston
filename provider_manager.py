@@ -238,6 +238,7 @@ class Agent:
                     yield ("tool", t_name, target)
 
                     tool_result = await execute_tool(t_name, args)
+                    yield ("tool_result", tool_result, "")
 
                     messages.append({
                         "role": "tool",
