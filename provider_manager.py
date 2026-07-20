@@ -257,33 +257,6 @@ class Agent:
             yield ("bot_text", error_msg, "")
 '''
 
-DEFAULT_MOCK_CONTENT = '''"""
-Mock Agent Provider
-"""
-import asyncio
-from typing import AsyncGenerator, Tuple
-
-NAME = "Mock Agent (Симулятор)"
-KEY = "mock"
-DESCRIPTION = "Локальный симулятор работы агента"
-
-class Agent:
-    def __init__(self):
-        self.history = []
-
-    def clear_history(self):
-        self.history.clear()
-
-    async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        yield ("thinking_start", f"**Анализ запроса:** «{user_text.strip()}»", "")
-        await asyncio.sleep(0.5)
-        yield ("thinking_end", "0.5", "Запрос обработан локальным Mock-агентом.")
-        await asyncio.sleep(0.2)
-        yield ("tool", "Read", "/Users/yegor/tui/app.py")
-        await asyncio.sleep(0.2)
-        yield ("bot_text", f"Это симулированный ответ Mock-агента на: **{user_text}**", "")
-'''
-
 class ProviderManager:
     def __init__(self):
         self.ensure_config_dir()
@@ -295,11 +268,6 @@ class ProviderManager:
         if not os.path.exists(opencode_file):
             with open(opencode_file, "w", encoding="utf-8") as f:
                 f.write(DEFAULT_OPENCODE_CONTENT.strip())
-
-        mock_file = os.path.join(PROVIDERS_DIR, "mock.py")
-        if not os.path.exists(mock_file):
-            with open(mock_file, "w", encoding="utf-8") as f:
-                f.write(DEFAULT_MOCK_CONTENT.strip())
 
         if not os.path.exists(CONFIG_FILE):
             self.set_active_provider_key("opencode")
