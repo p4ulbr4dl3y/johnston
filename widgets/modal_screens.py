@@ -4,7 +4,7 @@ from textual.containers import Vertical
 from textual.widgets import OptionList, Markdown
 
 class HelpScreen(ModalScreen[None]):
-    """Модальное окно справки (/help) с рендерингом Markdown"""
+    """Модальное окно справки (/help)"""
     
     BINDINGS = [
         ("escape", "close", "Закрыть"),
@@ -16,7 +16,7 @@ class HelpScreen(ModalScreen[None]):
             yield Markdown(
                 "### 💡 **Справка по командам**\n\n"
                 "* `/help` — Открыть эту справку\n"
-                "* `/resume` — Откат истории чата к выбранному сообщению\n\n"
+                "* `/rewind` — Откат истории чата к выбранному сообщению\n\n"
                 "**Горячие клавиши:**\n"
                 "* `Enter` — Отправить сообщение\n"
                 "* `Ctrl+Enter` / `Shift+Enter` — Перенос строки\n"
@@ -29,8 +29,8 @@ class HelpScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class ResumeScreen(ModalScreen[int]):
-    """Модальное окно отката истории (/resume) с рендерингом Markdown и выбором по Enter"""
+class RewindScreen(ModalScreen[int]):
+    """Модальное окно отката истории (/rewind)"""
 
     BINDINGS = [("escape", "cancel", "Отмена")]
 

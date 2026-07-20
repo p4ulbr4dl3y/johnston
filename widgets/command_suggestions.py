@@ -2,11 +2,11 @@ from textual.widgets import OptionList
 
 COMMANDS = [
     ("/help", "Help and keybindings"),
-    ("/resume", "Rollback chat history to a message"),
+    ("/rewind", "Rollback chat history to a message"),
 ]
 
 class CommandSuggestions(OptionList):
-    """Выпадающее меню подсказок в стиле OpenCode / Claude CLI (оранжевая плашка, 2 колонки)"""
+    """Выпадающее меню подсказок слэш-команд (/help, /rewind)"""
     
     can_focus = False
 
@@ -23,7 +23,6 @@ class CommandSuggestions(OptionList):
         for cmd, desc in COMMANDS:
             if cmd.startswith(cleaned):
                 matched_cmds.append(cmd)
-                # Команда слева (16 символов), описание справа
                 formatted_line = f"{cmd:<14} {desc}"
                 self.add_option(formatted_line)
 
