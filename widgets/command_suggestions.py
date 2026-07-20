@@ -3,6 +3,7 @@ from textual.widgets import OptionList
 COMMANDS = [
     ("/help", "Help and keybindings"),
     ("/rewind", "Rollback chat history to a message"),
+    ("/resume", "Resume a saved session"),
 ]
 
 class CommandSuggestions(OptionList):
