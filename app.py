@@ -187,12 +187,13 @@ class TUIChatApp(App):
         self.generate_ai_response(user_text)
 
     @work(exclusive=True, thread=False)
-    async def generate_ai_response(self, user_text: str) -> None:
+    async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Потоковая генерация ответа с поддержкой отмены по Esc"""
         chat_view = self.query_one(ChatView)
         
-        await chat_view.add_user_message(user_text)
-        self.save_current_session()
+        if show_in_ui:
+            await chat_view.add_user_message(user_text)
+            self.save_current_session()
         
         thinking_widget = None
         current_tool_widget = None
@@ -236,7 +237,7 @@ class TUIChatApp(App):
         """Вызывается при завершении фоновой bash команды"""
         self.notify(f"Background command completed (TID: {task_id})")
         msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
-        self.generate_ai_response(msg)
+        self.generate_ai_response(msg, show_in_ui=False)
 
 def main():
     TUIChatApp().run()
