@@ -9,35 +9,43 @@ async def test_chat_app_flow():
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()
         
-        # Отправляем первое сообщение
-        chat_input.load_text("Первый запрос")
+        # Отправляем 2 сообщения
+        chat_input.load_text("Сообщение 1")
         await pilot.press("enter")
-        await pilot.pause(0.5)
+        await pilot.pause(0.2)
         
-        # Отправляем второе сообщение
-        chat_input.load_text("Второй запрос")
+        chat_input.load_text("Сообщение 2")
         await pilot.press("enter")
-        await pilot.pause(0.5)
+        await pilot.pause(0.2)
         
-        # Нажимаем Вверх -> должен загрузиться "Второй запрос"
+        # Проверяем зацикливание Вверх (Up)
+        # 1. Up -> "Сообщение 2"
         await pilot.press("up")
-        assert chat_input.text == "Второй запрос"
-        print("✓ Up arrow recalled latest prompt: 'Второй запрос'")
+        assert chat_input.text == "Сообщение 2"
         
-        # Еще раз Вверх -> должен загрузиться "Первый запрос"
+        # 2. Up -> "Сообщение 1"
         await pilot.press("up")
-        assert chat_input.text == "Первый запрос"
-        print("✓ Up arrow recalled earlier prompt: 'Первый запрос'")
+        assert chat_input.text == "Сообщение 1"
         
-        # Нажимаем Вниз -> возврат к "Второй запрос"
-        await pilot.press("down")
-        assert chat_input.text == "Второй запрос"
-        print("✓ Down arrow navigated forward to 'Второй запрос'")
+        # 3. Up на самом первом элементе -> Зацикливание к черновику (пустая строка)
+        await pilot.press("up")
+        assert chat_input.text == ""
+        print("✓ Up arrow looped back to draft cleanly!")
         
-        # Нажимаем Вниз -> возврат к черновику (пустой строке)
+        # 4. Up снова -> "Сообщение 2"
+        await pilot.press("up")
+        assert chat_input.text == "Сообщение 2"
+        
+        # Проверяем зацикливание Вниз (Down)
+        # Находясь на "Сообщение 2", прессы Вниз:
+        # Down -> Черновик ""
         await pilot.press("down")
         assert chat_input.text == ""
-        print("✓ Down arrow returned to empty draft")
+        
+        # Down на черновике -> Зацикливание к "Сообщение 1"
+        await pilot.press("down")
+        assert chat_input.text == "Сообщение 1"
+        print("✓ Down arrow looped from draft to oldest prompt cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())

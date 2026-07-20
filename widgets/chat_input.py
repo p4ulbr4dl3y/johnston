@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с историей запросов (Стрелки Вверх/Вниз)"""
+    """Поле ввода с зацикленной историей запросов (Стрелки Вверх/Вниз)"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -53,28 +53,42 @@ class ChatInput(TextArea):
             self.app.exit()
             return
 
-        # Навигация по истории запросов: Стрелка Вверх
+        # Зацикленная навигация Вверх
         if event.key == "up" and self.cursor_location[0] == 0:
-            if self.prompt_history_index > 0:
+            if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
                     self.prompt_draft = self.text
-                self.prompt_history_index -= 1
-                self.load_text(self.prompt_history[self.prompt_history_index])
+                
+                if self.prompt_history_index == 0:
+                    # Зацикливание: с самого верха в самый низ (к черновику)
+                    self.prompt_history_index = len(self.prompt_history)
+                    self.load_text(self.prompt_draft)
+                else:
+                    self.prompt_history_index -= 1
+                    self.load_text(self.prompt_history[self.prompt_history_index])
+                
                 lines = self.text.split("\n")
                 self.move_cursor((len(lines) - 1, len(lines[-1])))
                 event.prevent_default()
                 event.stop()
                 return
 
-        # Навигация по истории запросов: Стрелка Вниз
+        # Зацикленная навигация Вниз
         lines = self.text.split("\n")
         if event.key == "down" and self.cursor_location[0] == len(lines) - 1:
-            if self.prompt_history_index < len(self.prompt_history):
-                self.prompt_history_index += 1
+            if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
-                    self.load_text(self.prompt_draft)
+                    # Зацикливание: с самого низа в самый верх (к первому сообщению)
+                    self.prompt_draft = self.text
+                    self.prompt_history_index = 0
+                    self.load_text(self.prompt_history[0])
                 else:
-                    self.load_text(self.prompt_history[self.prompt_history_index])
+                    self.prompt_history_index += 1
+                    if self.prompt_history_index == len(self.prompt_history):
+                        self.load_text(self.prompt_draft)
+                    else:
+                        self.load_text(self.prompt_history[self.prompt_history_index])
+                
                 lines = self.text.split("\n")
                 self.move_cursor((len(lines) - 1, len(lines[-1])))
                 event.prevent_default()
