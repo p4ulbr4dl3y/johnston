@@ -137,13 +137,13 @@ class ToolCallWidget(Vertical):
             lines = self.result_text.splitlines()
             for line in lines:
                 if line.startswith("+"):
-                    t.append(line + "\n", style="#a6e3a1 on #14241d")
+                    t.append(line + "\n", style="#10b981 on #022c22")
                 elif line.startswith("-"):
-                    t.append(line + "\n", style="#f38ba8 on #2c161a")
+                    t.append(line + "\n", style="#ef4444 on #450a0a")
                 elif line.startswith("@@"):
-                    t.append(line + "\n", style="#89b4fa")
+                    t.append(line + "\n", style="#00ffd1")
                 else:
-                    t.append(line + "\n", style="#a6adc8")
+                    t.append(line + "\n", style="#a1a1aa")
             self.diff_widget.update(t)
             
             if self.is_expanded:
