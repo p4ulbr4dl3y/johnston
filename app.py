@@ -99,7 +99,8 @@ class TUIChatApp(App):
             elif mtype == "tool":
                 ttype = msg.get("tool_type", "")
                 target = msg.get("target", "")
-                self.run_worker(chat_view.add_tool_call(ttype, target))
+                rtext = msg.get("result_text", "")
+                self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext))
 
         # Восстановление контекста агента
         if hasattr(self.agent, "history"):
@@ -135,7 +136,8 @@ class TUIChatApp(App):
                 ui_messages.append({
                     "type": "tool",
                     "tool_type": getattr(child, "tool_type", ""),
-                    "target": getattr(child, "target", "")
+                    "target": getattr(child, "target", ""),
+                    "result_text": getattr(child, "result_text", "")
                 })
 
         agent_history = getattr(self.agent, "history", [])
@@ -283,6 +285,7 @@ class TUIChatApp(App):
         self.save_current_session()
         
         thinking_widget = None
+        current_tool_widget = None
         bot_msg = None
         
         try:
@@ -295,8 +298,11 @@ class TUIChatApp(App):
                         thinking_widget.finish_thinking(duration, val2)
                     thinking_widget = None
                 elif event_type == "tool":
-                    await chat_view.add_tool_call(val1, val2)
+                    current_tool_widget = await chat_view.add_tool_call(val1, val2)
                     bot_msg = None
+                elif event_type == "tool_result":
+                    if current_tool_widget:
+                        current_tool_widget.set_result(val1)
                 elif event_type == "bot_chunk":
                     if bot_msg is None:
                         bot_msg = await chat_view.add_bot_message()

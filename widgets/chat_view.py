@@ -12,6 +12,7 @@ class UserMessage(Static):
         self.raw_text = content
         super().__init__(content, classes="user-msg")
 
+
 class BotMessage(Vertical):
     """Сообщение ИИ с полным рендерингом Markdown"""
     can_focus = False
@@ -86,26 +87,56 @@ class ThinkingWidget(Vertical):
             event.stop()
 
 
-class ToolCallWidget(Static):
-    """Отдельный виджет вызова инструмента (Create, Read, Edit, Bash)"""
+class ToolCallWidget(Vertical):
+    """Отдельный разворачиваемый виджет вызова инструмента (Create, Read, Edit, Bash)"""
     can_focus = False
 
-    def __init__(self, tool_type: str, target: str):
+    def __init__(self, tool_type: str, target: str, result_text: str = ""):
+        super().__init__(classes=f"tool-call tool-{tool_type.lower()}")
         self.tool_type = tool_type
         self.target = target
-        
+        self.result_text = result_text
+        self.is_expanded = False
+
         icons = {
             "Create": "✨ Create",
             "Read": "📖 Read",
             "Edit": "📝 Edit",
             "Bash": "⚡ Bash"
         }
-        header = icons.get(tool_type, f"● {tool_type}")
+        self.icon_name = icons.get(tool_type, f"● {tool_type}")
         
-        super().__init__(
-            f"[bold]{header}[/bold]({target})",
-            classes=f"tool-call tool-{tool_type.lower()}"
-        )
+        self.header_label = Label("", classes="tool-header")
+        self.md_widget = Markdown("")
+
+    def compose(self) -> ComposeResult:
+        yield self.header_label
+        yield self.md_widget
+
+    def on_mount(self) -> None:
+        self.md_widget.display = False
+        self.render_header()
+        if self.result_text:
+            self.set_result(self.result_text)
+
+    def set_result(self, result_text: str) -> None:
+        self.result_text = result_text
+        lang = "bash" if self.tool_type == "Bash" else ""
+        formatted_md = f"```{lang}\n{self.result_text}\n```" if self.result_text else "*(нет вывода)*"
+        self.md_widget.update(formatted_md)
+
+    def render_header(self) -> None:
+        arrow = "▼ " if self.is_expanded else "▶ "
+        self.header_label.update(f"{arrow}**{self.icon_name}**({self.target})")
+
+    def toggle_expand(self) -> None:
+        self.is_expanded = not self.is_expanded
+        self.render_header()
+        self.md_widget.display = self.is_expanded
+
+    def on_click(self, event: events.Click) -> None:
+        self.toggle_expand()
+        event.stop()
 
 
 class ChatView(VerticalScroll):
@@ -130,8 +161,8 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=True)
         return widget
 
-    async def add_tool_call(self, tool_type: str, target: str) -> ToolCallWidget:
-        widget = ToolCallWidget(tool_type, target)
+    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "") -> ToolCallWidget:
+        widget = ToolCallWidget(tool_type, target, result_text=result_text)
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget
