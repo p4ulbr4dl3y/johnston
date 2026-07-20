@@ -26,9 +26,7 @@ class TUIChatApp(App):
         self.pm = ProviderManager()
         self.sm = SessionManager()
         self.agent = self.pm.create_active_agent()
-        
-        active_sid = self.sm.get_active_session_id()
-        self.current_session_id = active_sid if active_sid else self.sm.generate_session_id()
+        self.current_session_id = self.sm.generate_session_id()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -37,10 +35,8 @@ class TUIChatApp(App):
             yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
-        """Загрузка активной сессии и мгновенный фокус при старте"""
+        """Мгновенный фокус при старте (чистый новый диалог)"""
         self.query_one("#message-input", ChatInput).focus()
-        if self.sm.load_session(self.current_session_id):
-            self.load_session_ui(self.current_session_id)
 
     def load_session_ui(self, session_id: str) -> None:
         """Загрузка состояния сессии в UI и в историю агента"""
