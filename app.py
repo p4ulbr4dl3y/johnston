@@ -135,8 +135,7 @@ class TUIChatApp(App):
         if user_text.lower() == "/new":
             self.current_session_id = self.sm.generate_session_id()
             chat_view = self.query_one(ChatView)
-            for child in list(chat_view.children):
-                child.remove()
+            self.run_worker(chat_view.remove_children())
             if hasattr(self.agent, "clear_history"):
                 self.agent.clear_history()
             elif hasattr(self.agent, "history"):
