@@ -29,10 +29,11 @@ class ChatInput(TextArea):
         self._on_input_change()
 
     def update_height(self) -> None:
-        """Динамический расчет высоты от 3 до 10 строк"""
+        """Динамический расчет высоты от 2 до 8 строк"""
         lines = len(self.text.split("\n"))
-        target_height = max(3, min(lines + 2, 10))
-        if self.styles.height.value != target_height:
+        target_height = max(2, min(lines + 1, 8))
+        h = self.styles.height
+        if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height
 
     def update_suggestions(self) -> None:

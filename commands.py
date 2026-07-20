@@ -144,8 +144,15 @@ async def handle_slash_command(app, command_text: str) -> bool:
     parts = command_text.strip().split(maxsplit=1)
     cmd_name = parts[0].lower()
     
-    if cmd_name in COMMAND_REGISTRY:
-        cmd_instance = COMMAND_REGISTRY[cmd_name]()
+    # Нормализация кириллических омоглифов в латиницу (для исключения ошибок раскладки)
+    homoglyphs = {
+        'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h', 
+        'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'
+    }
+    normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
+    
+    if normalized_name in COMMAND_REGISTRY:
+        cmd_instance = COMMAND_REGISTRY[normalized_name]()
         await cmd_instance.execute(app)
         return True
     return False
