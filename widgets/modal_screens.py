@@ -1,36 +1,33 @@
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical, Horizontal
-from textual.widgets import Label, Button, OptionList
+from textual.widgets import Label, Button, OptionList, Markdown
 from textual import events
 
 class HelpScreen(ModalScreen[None]):
-    """Модальное окно справки (/help)"""
+    """Модальное окно справки (/help) с полным рендерингом Markdown"""
     
-    BINDINGS = [("escape", "close", "Закрыть")]
+    BINDINGS = [
+        ("escape", "close", "Закрыть"),
+        ("enter", "close", "Закрыть"),
+    ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Label("💡 **Справка по командам**", classes="modal-title")
-            yield Label(
-                "• `/help` — Открыть эту справку\n"
-                "• `/resume` — Откат истории чата к выбранному сообщению\n\n"
+            yield Markdown(
+                "### 💡 **Справка по командам**\n\n"
+                "* `/help` — Открыть эту справку\n"
+                "* `/resume` — Откат истории чата к выбранному сообщению\n\n"
                 "**Горячие клавиши:**\n"
-                "• `Enter` — Отправить сообщение\n"
-                "• `Ctrl+Enter` / `Shift+Enter` — Перенос строки\n"
-                "• `↑ / ↓` — Навигация по истории запросов (зацикленная)\n"
-                "• `Ctrl+C` / `Esc` — Выход из приложения",
-                classes="modal-body"
+                "* `Enter` — Отправить сообщение\n"
+                "* `Ctrl+Enter` / `Shift+Enter` — Перенос строки\n"
+                "* `↑ / ↓` — Навигация по истории запросов (зацикленная)\n"
+                "* `Ctrl+C` / `Esc` — Выход из приложения",
+                classes="modal-markdown"
             )
-            with Horizontal(classes="modal-buttons"):
-                yield Button("Понятно", id="btn-close", variant="primary")
 
     def action_close(self) -> None:
         self.dismiss(None)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-close":
-            self.dismiss(None)
 
 
 class ResumeScreen(ModalScreen[int]):
