@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с неразрывным перманентным фокусом и поддержкой комбинаций выхода"""
+    """Поле ввода с историей запросов (Стрелки Вверх/Вниз)"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -11,12 +11,17 @@ class ChatInput(TextArea):
             super().__init__()
             self.value = value
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prompt_history: list[str] = []
+        self.prompt_history_index: int = 0
+        self.prompt_draft: str = ""
+
     def on_mount(self) -> None:
         self.focus()
         self.update_height()
 
     def on_blur(self, event: events.Blur) -> None:
-        """Если фокус потерян, мгновенно возвращаем его обратно"""
         self.call_after_refresh(self.focus)
 
     def watch_text(self, new_text: str) -> None:
@@ -33,19 +38,55 @@ class ChatInput(TextArea):
         if self.styles.height.value != target_height:
             self.styles.height = target_height
 
+    def add_to_history(self, text: str) -> None:
+        """Сохранение отправленного сообщения в историю запросов"""
+        if text and (not self.prompt_history or self.prompt_history[-1] != text):
+            self.prompt_history.append(text)
+        self.prompt_history_index = len(self.prompt_history)
+        self.prompt_draft = ""
+
     def _on_key(self, event: events.Key) -> None:
-        # Проверяем горячие клавиши выхода (Ctrl+C, Ctrl+Q, Esc)
+        # Горячие клавиши выхода (Ctrl+C, Ctrl+Q, Esc)
         if event.key in ("ctrl+c", "ctrl+q", "escape"):
             event.prevent_default()
             event.stop()
             self.app.exit()
             return
 
+        # Навигация по истории запросов: Стрелка Вверх
+        if event.key == "up" and self.cursor_location[0] == 0:
+            if self.prompt_history_index > 0:
+                if self.prompt_history_index == len(self.prompt_history):
+                    self.prompt_draft = self.text
+                self.prompt_history_index -= 1
+                self.load_text(self.prompt_history[self.prompt_history_index])
+                lines = self.text.split("\n")
+                self.move_cursor((len(lines) - 1, len(lines[-1])))
+                event.prevent_default()
+                event.stop()
+                return
+
+        # Навигация по истории запросов: Стрелка Вниз
+        lines = self.text.split("\n")
+        if event.key == "down" and self.cursor_location[0] == len(lines) - 1:
+            if self.prompt_history_index < len(self.prompt_history):
+                self.prompt_history_index += 1
+                if self.prompt_history_index == len(self.prompt_history):
+                    self.load_text(self.prompt_draft)
+                else:
+                    self.load_text(self.prompt_history[self.prompt_history_index])
+                lines = self.text.split("\n")
+                self.move_cursor((len(lines) - 1, len(lines[-1])))
+                event.prevent_default()
+                event.stop()
+                return
+
         if event.key == "enter":
             # Enter без Ctrl -> отправка
             event.prevent_default()
             event.stop()
             text = self.text
+            self.add_to_history(text)
             self.load_text("")
             self.post_message(self.Submitted(text))
         elif event.key in ("ctrl+enter", "ctrl+j", "shift+enter"):
