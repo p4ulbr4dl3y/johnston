@@ -1,17 +1,17 @@
 from textual.widgets import OptionList
 
 COMMANDS = [
-    ("/help", "💡 Открыть справку по командам"),
-    ("/resume", "↺ Откат истории чата к выборанному сообщению"),
+    ("/help", "Help and keybindings"),
+    ("/resume", "Rollback chat history to a message"),
 ]
 
 class CommandSuggestions(OptionList):
-    """Выпадающее меню автодополнения слэш-команд"""
+    """Выпадающее меню подсказок в стиле OpenCode / Claude CLI (оранжевая плашка, 2 колонки)"""
     
     can_focus = False
 
     def update_query(self, text: str) -> list[str]:
-        """Обновление списка совпадений по текущему тексту"""
+        """Обновление списка совпадений с форматированием в две колонки"""
         self.clear_options()
         
         cleaned = text.strip().lower()
@@ -23,7 +23,9 @@ class CommandSuggestions(OptionList):
         for cmd, desc in COMMANDS:
             if cmd.startswith(cleaned):
                 matched_cmds.append(cmd)
-                self.add_option(f"{cmd}  —  {desc}")
+                # Команда слева (16 символов), описание справа
+                formatted_line = f"{cmd:<14} {desc}"
+                self.add_option(formatted_line)
 
         if matched_cmds:
             self.display = True
