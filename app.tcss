@@ -23,6 +23,7 @@ Screen {
 /* User Message */
 .user-msg {
     width: 100%;
+    height: auto;
     margin-top: 1;
     color: #89b4fa;
 }
@@ -30,34 +31,47 @@ Screen {
 /* Bot Message Container */
 .bot-msg {
     width: 100%;
+    height: auto;
     margin-top: 1;
     color: #cdd6f4;
 }
 
 .bot-label {
-    margin-bottom: 0;
+    height: auto;
+    margin: 0;
+    padding: 0;
 }
 
-/* Markdown Compact Layout */
+/* Strict Height Auto & Zero Margin for Markdown Elements */
 Markdown {
+    width: 100%;
+    height: auto;
     margin: 0;
     padding: 0;
 }
 
 MarkdownParagraph {
+    height: auto;
     margin: 0;
+    padding: 0;
 }
 
 MarkdownBlock {
+    height: auto;
     margin: 0;
+    padding: 0;
 }
 
 Markdown BulletList {
+    height: auto;
     margin: 0;
+    padding: 0;
 }
 
 Markdown OrderedList {
+    height: auto;
     margin: 0;
+    padding: 0;
 }
 
 /* Input Bar */
