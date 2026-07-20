@@ -4,12 +4,15 @@ from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
 
 class UserMessage(Static):
-    """Сообщение пользователя с поддержкой Rich markup ([bold]Вы:[/...])"""
+    """Сообщение пользователя"""
+    can_focus = False
+
     def __init__(self, content: str):
         super().__init__(f"[bold blue]Вы:[/] {content}", classes="user-msg")
 
 class BotMessage(Vertical):
-    """Сообщение ИИ без лишних отступов"""
+    """Сообщение ИИ"""
+    can_focus = False
     content = reactive("")
 
     def __init__(self, persona_name: str = "ИИ"):
@@ -25,7 +28,8 @@ class BotMessage(Vertical):
 
 
 class ChatView(VerticalScroll):
-    """Скроллируемый поток чата"""
+    """Скроллируемый поток чата بدون фокусировки"""
+    can_focus = False
 
     async def add_user_message(self, text: str) -> UserMessage:
         msg = UserMessage(text)

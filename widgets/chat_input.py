@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с динамическим расширением вверх и сужением при стирании строк"""
+    """Поле ввода с неразрывным перманентным фокусом"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -12,7 +12,12 @@ class ChatInput(TextArea):
             self.value = value
 
     def on_mount(self) -> None:
+        self.focus()
         self.update_height()
+
+    def on_blur(self, event: events.Blur) -> None:
+        """Если фокус потерян, мгновенно возвращаем его обратно"""
+        self.call_after_refresh(self.focus)
 
     def watch_text(self, new_text: str) -> None:
         self.update_height()
@@ -43,5 +48,4 @@ class ChatInput(TextArea):
             self.insert("\n")
             self.update_height()
         else:
-            # При стирании (Backspace/Delete) и любом вводе обновляем высоту
             self.call_after_refresh(self.update_height)

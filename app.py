@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual import work
+from textual import events, work
 
 from mock_agent import MockAgent
 from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат с многострочным вводом"""
+    """Минималистичный TUI чат с вечным фокусом на вводе"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -27,11 +27,15 @@ class TUIChatApp(App):
             yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
-        """Поле ввода всегда в фокусе при старте"""
+        """Мгновенный фокус при старте"""
+        self.query_one("#message-input", ChatInput).focus()
+
+    def on_click(self, event: events.Click) -> None:
+        """Любой клик мыши возвращает фокус в инпут"""
         self.query_one("#message-input", ChatInput).focus()
 
     def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Отправка текста при Enter"""
+        """Отправка текста и возврат фокуса"""
         user_text = event.value.strip()
         if not user_text:
             return
