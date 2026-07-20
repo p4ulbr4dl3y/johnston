@@ -2,15 +2,16 @@
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
+from textual.widgets import Select
 
-from opencode_agent import OpenCodeAgent
+from provider_manager import ProviderManager
 from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, RewindScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат со слэш-командами /help и /rewind и агентом OpenCode Go"""
+    """Минималистичный TUI чат с гибкой конфигурацией провайдеров из ~/.tui"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -21,7 +22,8 @@ class TUIChatApp(App):
 
     def __init__(self):
         super().__init__()
-        self.agent = OpenCodeAgent()
+        self.pm = ProviderManager()
+        self.agent = self.pm.create_active_agent()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -36,6 +38,13 @@ class TUIChatApp(App):
     def on_click(self, event: events.Click) -> None:
         """Любой клик мыши возвращает фокус в инпут"""
         self.query_one("#message-input", ChatInput).focus()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        """Переключение провайдера агента из конфига ~/.tui"""
+        if event.value and isinstance(event.value, str) and event.value != "none":
+            self.pm.set_active_provider_key(event.value)
+            self.agent = self.pm.create_active_agent()
+            self.notify(f"Агент переключен: {event.value}")
 
     def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Обработка ввода и слэш-команд (/help, /rewind)"""
@@ -62,6 +71,8 @@ class TUIChatApp(App):
             def on_rewind_selected(selected_idx: int | None) -> None:
                 if selected_idx is not None and selected_idx >= 0:
                     chat_view.rollback_to(selected_idx)
+                    if hasattr(self.agent, "clear_history"):
+                        self.agent.clear_history()
                     self.notify("История успешно откачена!")
                 self.query_one("#message-input", ChatInput).focus()
 
@@ -72,7 +83,7 @@ class TUIChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Потоковая генерация ответа через агент OpenCode Go"""
+        """Потоковая генерация ответа через текущего агента провайдера"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
