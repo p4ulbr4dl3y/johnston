@@ -12,6 +12,7 @@ class TUIChatApp(App):
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
+        ("ctrl+c", "quit", "Выход"),
         ("ctrl+q", "quit", "Выход"),
         ("escape", "quit", "Выход"),
     ]
@@ -31,7 +32,7 @@ class TUIChatApp(App):
         welcome_msg = await chat_view.add_bot_message()
         welcome_msg.content = (
             "Привет. Введи текст и нажми `Enter`.\n"
-            "`Esc` — выход."
+            "`Ctrl+C` или `Esc` — выход."
         )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
