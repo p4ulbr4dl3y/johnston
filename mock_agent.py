@@ -34,7 +34,7 @@ class MockAgent:
             self.persona_key = persona_key
 
     def _generate_tool_calls(self, user_text: str) -> list[str]:
-        """Генерация вызовов инструментов в формате пользователя"""
+        """Генерация вызовов инструментов"""
         text_lower = user_text.lower()
         tools = []
         
@@ -50,7 +50,6 @@ class MockAgent:
         if any(w in text_lower for w in ["запусти", "тест", "bash", "run", "коммит", "git"]):
             tools.append("● Bash(.venv/bin/python test_app.py)")
 
-        # Если явных ключевых слов нет, генерируем стандартный набор вызовов
         if not tools:
             tools = [
                 "● Read(/Users/yegor/tui/app.py)",
@@ -61,20 +60,24 @@ class MockAgent:
         return tools
 
     async def stream_response(self, user_text: str) -> AsyncGenerator[str, None]:
-        """Имитация потокового ответа агента с вызовом инструментов"""
+        """Потоковая генерация ответа с гарантей переноса строк между инструментами"""
         tools = self._generate_tool_calls(user_text)
-        tool_section = "\n".join(tools)
+        
+        # Разделяем двойным переносом строк (\n\n), чтобы Markdown не склеивал в одну строку
+        tool_section = "\n\n".join(tools)
         
         reply_templates = [
-            f"Выполняю задачу:\n\n{tool_section}\n\nВсе действия завершены успешно! Результат готов.",
-            f"Анализирую запрос:\n\n{tool_section}\n\nИзменения внесены и проверены автотестами.",
+            f"Выполняю задачу:\n\n{tool_section}\n\nВсе действия завершены успешно!",
+            f"Анализирую проект:\n\n{tool_section}\n\nИзменения внесены и проверены.",
             f"Запускаю обработку:\n\n{tool_section}\n\nКод обновлен, ошибки не обнаружены."
         ]
         
         full_text = random.choice(reply_templates)
         
-        # Разбиваем на слова/токены для асинхронной анимации
-        tokens = full_text.split(" ")
-        for i, token in enumerate(tokens):
-            yield token + (" " if i < len(tokens) - 1 else "")
-            await asyncio.sleep(random.uniform(0.02, 0.06))
+        # Стримим фрагментами, сохраняя переносы строк
+        for paragraph in full_text.split("\n\n"):
+            tokens = paragraph.split(" ")
+            for i, token in enumerate(tokens):
+                yield token + (" " if i < len(tokens) - 1 else "")
+                await asyncio.sleep(random.uniform(0.02, 0.05))
+            yield "\n\n"
