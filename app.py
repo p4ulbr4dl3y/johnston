@@ -32,9 +32,9 @@ class TUIChatApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
-            yield StatusFooter(id="status-footer")
             yield CommandSuggestions(id="command-suggestions")
             yield ChatInput(id="message-input", show_line_numbers=False)
+            yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
         """Мгновенный фокус при старте и обновление строки состояния"""
