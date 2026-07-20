@@ -1,11 +1,10 @@
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
-from textual.containers import Vertical, Horizontal
-from textual.widgets import Label, Button, OptionList, Markdown
-from textual import events
+from textual.containers import Vertical
+from textual.widgets import OptionList, Markdown
 
 class HelpScreen(ModalScreen[None]):
-    """Модальное окно справки (/help) с полным рендерингом Markdown"""
+    """Модальное окно справки (/help) с рендерингом Markdown"""
     
     BINDINGS = [
         ("escape", "close", "Закрыть"),
@@ -31,7 +30,7 @@ class HelpScreen(ModalScreen[None]):
 
 
 class ResumeScreen(ModalScreen[int]):
-    """Модальное окно отката истории (/resume)"""
+    """Модальное окно отката истории (/resume) с рендерингом Markdown и выбором по Enter"""
 
     BINDINGS = [("escape", "cancel", "Отмена")]
 
@@ -41,32 +40,18 @@ class ResumeScreen(ModalScreen[int]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Label("↺ **Выберите сообщение для отката**", classes="modal-title")
+            yield Markdown("### ↺ **Выберите сообщение для отката**", classes="modal-markdown")
             
             options = [
-                f"{i+1}. {text[:45]}..." if len(text) > 45 else f"{i+1}. {text}"
+                f"{i+1}. {text[:50]}..." if len(text) > 50 else f"{i+1}. {text}"
                 for i, (_, text) in enumerate(self.user_messages)
             ]
             yield OptionList(*options, id="resume-option-list")
-            
-            with Horizontal(classes="modal-buttons"):
-                yield Button("Откатить", id="btn-confirm", variant="primary")
-                yield Button("Отмена", id="btn-cancel")
 
     def action_cancel(self) -> None:
         self.dismiss(-1)
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-cancel":
-            self.dismiss(-1)
-        elif event.button.id == "btn-confirm":
-            option_list = self.query_one("#resume-option-list", OptionList)
-            if option_list.highlighted is not None:
-                selected_idx = self.user_messages[option_list.highlighted][0]
-                self.dismiss(selected_idx)
-            else:
-                self.dismiss(-1)
-
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Выбор элемента по Enter или клику"""
         selected_idx = self.user_messages[event.option_index][0]
         self.dismiss(selected_idx)
