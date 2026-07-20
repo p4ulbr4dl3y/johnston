@@ -101,6 +101,11 @@ Markdown OrderedList {
     background: #181825;
 }
 
+/* Notifications (Toast) at Top Right */
+ToastRack {
+    align: right top;
+}
+
 /* Modal Dialog Styles (/help & /resume) */
 ModalScreen {
     align: center middle;
