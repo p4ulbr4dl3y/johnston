@@ -12,7 +12,7 @@ class SessionManager:
     def __init__(self, project_path: Optional[str] = None):
         if not project_path:
             project_path = os.getcwd()
-        self.project_path = os.path.abspath(project_path)
+        self.project_path = os.path.realpath(os.path.abspath(project_path))
         
         path_hash = hashlib.md5(self.project_path.encode("utf-8")).hexdigest()[:8]
         folder_name = os.path.basename(self.project_path) or "root"
@@ -42,7 +42,7 @@ class SessionManager:
                 try:
                     with open(filepath, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                        ui_msgs = data.get("ui_messages", [])
+                        ui_msgs = data.get("ui_messages") or data.get("messages") or []
                         
                         # Если сессия пустая — удаляем мусорный файл
                         if not ui_msgs:
@@ -80,7 +80,7 @@ class SessionManager:
             return
 
         filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
-        ui_msgs = data.get("ui_messages", [])
+        ui_msgs = data.get("ui_messages") or data.get("messages") or []
 
         # Не сохраняем пустые сессии, а если файл существовал — удаляем
         if not ui_msgs:

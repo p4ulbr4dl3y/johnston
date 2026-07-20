@@ -188,6 +188,7 @@ class TUIChatApp(App):
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
+        self.save_current_session()
         
         thinking_widget = None
         bot_msg = None
