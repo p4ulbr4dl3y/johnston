@@ -36,12 +36,6 @@ Screen {
     color: #cdd6f4;
 }
 
-.bot-label {
-    height: auto;
-    margin: 0;
-    padding: 0;
-}
-
 /* Distinct Tool Call Widget Styling */
 .tool-call {
     width: 100%;

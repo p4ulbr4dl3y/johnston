@@ -1,18 +1,18 @@
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll, Vertical
-from textual.widgets import Static, Markdown, Label
+from textual.widgets import Static, Markdown
 from textual.reactive import reactive
 
 class UserMessage(Static):
-    """Сообщение пользователя"""
+    """Сообщение пользователя (без подписи 'Вы:')"""
     can_focus = False
 
     def __init__(self, content: str):
         self.raw_text = content
-        super().__init__(f"[bold blue]Вы:[/] {content}", classes="user-msg")
+        super().__init__(content, classes="user-msg")
 
 class BotMessage(Vertical):
-    """Сообщение ИИ"""
+    """Сообщение ИИ (без подписи 'ИИ:')"""
     can_focus = False
     content = reactive("")
 
@@ -21,7 +21,6 @@ class BotMessage(Vertical):
         self.md_widget = Markdown("")
 
     def compose(self) -> ComposeResult:
-        yield Label("✦ [bold green]ИИ:[/]", classes="bot-label")
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
@@ -29,7 +28,7 @@ class BotMessage(Vertical):
 
 
 class ToolCallWidget(Static):
-    """Красивый отдельный виджет вызова инструмента (Create, Read, Edit, Bash)"""
+    """Отдельный виджет вызова инструмента (Create, Read, Edit, Bash)"""
     can_focus = False
 
     def __init__(self, tool_type: str, target: str):
@@ -44,7 +43,6 @@ class ToolCallWidget(Static):
         }
         header = icons.get(tool_type, f"● {tool_type}")
         
-        # Формат: ● ToolType(target)
         super().__init__(
             f"[bold]{header}[/bold]({target})",
             classes=f"tool-call tool-{tool_type.lower()}"
@@ -68,7 +66,6 @@ class ChatView(VerticalScroll):
         return msg
 
     async def add_tool_call(self, tool_type: str, target: str) -> ToolCallWidget:
-        """Добавление отдельного красивого виджета вызова инструмента"""
         widget = ToolCallWidget(tool_type, target)
         await self.mount(widget)
         self.scroll_end(animate=True)
