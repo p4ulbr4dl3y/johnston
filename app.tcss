@@ -150,6 +150,13 @@ Markdown OrderedList {
     padding: 0;
 }
 
+MarkdownFence {
+    background: #18181b;
+    margin: 1 0;
+    padding: 1 2;
+    border-left: solid #27272a;
+}
+
 /* Command Suggestions Popup - Square Solid Dark Border */
 #command-suggestions {
     display: none;
