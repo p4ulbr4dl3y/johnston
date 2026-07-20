@@ -9,11 +9,12 @@ from provider_manager import ProviderManager
 from session_manager import SessionManager
 from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget, ToolCallWidget
 from widgets.chat_input import ChatInput
+from widgets.status_footer import StatusFooter
 from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат с конфигурацией провайдеров и изолированными сессиями по проектам"""
+    """Минималистичный TUI чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
 
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
     BINDINGS = [
@@ -31,12 +32,24 @@ class TUIChatApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
+            yield StatusFooter(id="status-footer")
             yield CommandSuggestions(id="command-suggestions")
             yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
-        """Мгновенный фокус при старте (чистый новый диалог)"""
+        """Мгновенный фокус при старте и обновление строки состояния"""
         self.query_one("#message-input", ChatInput).focus()
+        self.refresh_status_footer()
+
+    def refresh_status_footer(self) -> None:
+        """Обновление строки провайдера, модели и сессии внизу чата"""
+        try:
+            footer = self.query_one("#status-footer", StatusFooter)
+            pkey = self.pm.get_active_provider_key()
+            model_name = getattr(self.agent, "model", "")
+            footer.update_status(provider_key=pkey, model_name=model_name, session_id=self.current_session_id)
+        except Exception:
+            pass
 
     def load_session_ui(self, session_id: str) -> None:
         """Загрузка состояния сессии в UI и в историю агента"""
@@ -80,13 +93,14 @@ class TUIChatApp(App):
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
 
+        self.refresh_status_footer()
+
     def save_current_session(self) -> None:
         """Сохранение полного состояния элементов UI в ~/.tui/projects/<project>/sessions"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
         
         if not user_msgs:
-            # Если сообщений нет — удаляем запись с диска
             self.sm.save_session(self.current_session_id, {"ui_messages": []})
             return
 
@@ -121,6 +135,7 @@ class TUIChatApp(App):
             "agent_history": agent_history
         }
         self.sm.save_session(self.current_session_id, session_data)
+        self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
         """Любой клик мыши возвращает фокус в инпут"""
@@ -135,10 +150,11 @@ class TUIChatApp(App):
                 sess = self.sm.load_session(self.current_session_id)
                 if sess:
                     self.agent.history = sess.get("agent_history", [])
+            self.refresh_status_footer()
             self.notify(f"Агент переключен: {event.value}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Обработка ввода и слэш-команд (/help, /new, /rewind, /resume)"""
+        """Обработка ввода и слэш-команд (/help, /new, /provider, /models, /rewind, /resume)"""
         user_text = event.value.strip()
         if not user_text:
             return
@@ -160,6 +176,7 @@ class TUIChatApp(App):
                 self.agent.clear_history()
             elif hasattr(self.agent, "history"):
                 self.agent.history = []
+            self.refresh_status_footer()
             self.notify("Создан новый диалог!")
             return
 
@@ -174,6 +191,7 @@ class TUIChatApp(App):
                 if selected_key:
                     self.pm.set_active_provider_key(selected_key)
                     self.agent = self.pm.create_active_agent()
+                    self.refresh_status_footer()
                     self.notify(f"Провайдер переключен: {selected_key}")
                 self.query_one("#message-input", ChatInput).focus()
 
@@ -195,6 +213,7 @@ class TUIChatApp(App):
                 if selected_model:
                     if hasattr(self.agent, "model"):
                         self.agent.model = selected_model
+                    self.refresh_status_footer()
                     self.notify(f"Модель переключена: {selected_model}")
                 self.query_one("#message-input", ChatInput).focus()
 
@@ -243,7 +262,7 @@ class TUIChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Потоковая генерация ответа с автосохранением в сессию"""
+        """Потоковая генерация ответа с поддержкой отмены по Esc"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
