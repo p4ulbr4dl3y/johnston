@@ -6,9 +6,10 @@ from textual import events, work
 from mock_agent import MockAgent
 from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
+from widgets.modal_screens import HelpScreen, ResumeScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат с вечным фокусом на вводе"""
+    """Минималистичный TUI чат со слэш-командами /help и /resume"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -35,13 +36,36 @@ class TUIChatApp(App):
         self.query_one("#message-input", ChatInput).focus()
 
     def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Отправка текста и возврат фокуса"""
+        """Обработка ввода и слэш-команд (/help, /resume)"""
         user_text = event.value.strip()
         if not user_text:
             return
             
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
+
+        # Слэш-команда /help
+        if user_text.lower() == "/help":
+            self.push_screen(HelpScreen())
+            return
+
+        # Слэш-команда /resume
+        if user_text.lower() == "/resume":
+            chat_view = self.query_one(ChatView)
+            user_msgs = chat_view.get_user_messages()
+            if not user_msgs:
+                self.notify("История пуста: нет сообщений для отката", severity="warning")
+                return
+
+            def on_resume_selected(selected_idx: int | None) -> None:
+                if selected_idx is not None and selected_idx >= 0:
+                    chat_view.rollback_to(selected_idx)
+                    self.notify("История успешно откачена!")
+                self.query_one("#message-input", ChatInput).focus()
+
+            self.push_screen(ResumeScreen(user_msgs), callback=on_resume_selected)
+            return
+
         self.generate_ai_response(user_text)
 
     @work(exclusive=True, thread=False)

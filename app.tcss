@@ -90,3 +90,50 @@ Markdown OrderedList {
     border: round #585b70;
     background: #181825;
 }
+
+/* Modal Dialog Styles (/help & /resume) */
+ModalScreen {
+    align: center middle;
+    background: rgba(13, 14, 21, 0.7);
+}
+
+#modal-dialog {
+    width: 64;
+    height: auto;
+    max-height: 85%;
+    padding: 1 2;
+    border: round #89b4fa;
+    background: #181825;
+}
+
+.modal-title {
+    width: 100%;
+    text-align: center;
+    color: #89b4fa;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.modal-body {
+    width: 100%;
+    color: #cdd6f4;
+    margin-bottom: 1;
+}
+
+#resume-option-list {
+    height: 8;
+    margin-bottom: 1;
+    border: round #313244;
+    background: #11111b;
+}
+
+.modal-buttons {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    margin-top: 1;
+}
+
+.modal-buttons Button {
+    margin-left: 1;
+}

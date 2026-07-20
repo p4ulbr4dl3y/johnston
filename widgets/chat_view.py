@@ -8,6 +8,7 @@ class UserMessage(Static):
     can_focus = False
 
     def __init__(self, content: str):
+        self.raw_text = content
         super().__init__(f"[bold blue]Вы:[/] {content}", classes="user-msg")
 
 class BotMessage(Vertical):
@@ -28,7 +29,7 @@ class BotMessage(Vertical):
 
 
 class ChatView(VerticalScroll):
-    """Скроллируемый поток чата بدون фокусировки"""
+    """Скроллируемый поток чата с поддержкой отката"""
     can_focus = False
 
     async def add_user_message(self, text: str) -> UserMessage:
@@ -42,3 +43,17 @@ class ChatView(VerticalScroll):
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
+
+    def get_user_messages(self) -> list[tuple[int, str]]:
+        """Возвращает список (индекс_в_дереве, текст) всех сообщений пользователя"""
+        result = []
+        for idx, child in enumerate(self.children):
+            if isinstance(child, UserMessage):
+                result.append((idx, child.raw_text))
+        return result
+
+    def rollback_to(self, target_index: int) -> None:
+        """Удаляет сообщения после выбранного элемента"""
+        children = list(self.children)
+        for child in children[target_index + 1:]:
+            child.remove()
