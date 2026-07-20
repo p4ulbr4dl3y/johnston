@@ -36,7 +36,7 @@ Screen {
     color: #cdd6f4;
 }
 
-/* ThinkingWidget Styling */
+/* ThinkingWidget Styling & Embedded Markdown */
 .thinking-widget {
     width: 100%;
     height: auto;
@@ -50,6 +50,17 @@ Screen {
 .thinking-active {
     color: #f9e2af;
     border-left: solid #f9e2af;
+}
+
+.thinking-header {
+    height: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.thinking-widget Markdown {
+    margin-top: 1;
+    color: #a6adc8;
 }
 
 /* Distinct Tool Call Widget Styling */

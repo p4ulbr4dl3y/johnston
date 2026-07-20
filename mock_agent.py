@@ -34,10 +34,14 @@ class MockAgent:
             self.persona_key = persona_key
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        """Многошаговая генерация: думание -> инструмент -> текст -> новое думание -> инструмент -> итог"""
+        """Генерация цепочки действий с форматированием Markdown в рассуждениях и ответах"""
         
-        # 1. Первичное думание
-        t1_details = f"Анализирую запрос «{user_text.strip()}» и проверяю структуру файлов..."
+        # 1. Первичное думание с Markdown (списки, жирный текст)
+        t1_details = (
+            f"**Анализ запроса:** «{user_text.strip()}»\n\n"
+            "* **Шаг 1**: Проверка структуры проекта\n"
+            "* **Шаг 2**: Подготовка конфигурации `Textual`"
+        )
         yield ("thinking_start", t1_details, "")
         
         t0 = asyncio.get_running_loop().time()
@@ -45,16 +49,27 @@ class MockAgent:
         dt1 = asyncio.get_running_loop().time() - t0
         yield ("thinking_end", f"{dt1:.1f}", t1_details)
         
-        # 2. Первое действие
+        # 2. Инструмент Read
         yield ("tool", "Read", "/Users/yegor/tui/app.py")
         await asyncio.sleep(0.25)
         
-        # 3. Текстовый комментарий агента в процессе
-        yield ("bot_text", "Файл `app.py` изучен. Перехожу к подготовке изменений.", "")
+        # 3. Текст ИИ с Markdown (цитаты, инлайн-код)
+        msg1 = (
+            "Файл `app.py` изучен.\n\n"
+            "> *Ключевые компоненты:* `TUIChatApp`, `ChatView`, `ThinkingWidget`"
+        )
+        yield ("bot_text", msg1, "")
         await asyncio.sleep(0.3)
         
-        # 4. Вторичное думание
-        t2_details = "Расчет стилей, проверка зависимостей и подготовка тестового скрипта..."
+        # 4. Вторичное думание с кодом на Python в Markdown
+        t2_details = (
+            "**Вторичный анализ кода:**\n\n"
+            "```python\n"
+            "# Проверка стилей\n"
+            "styles.margin = (0, 0)\n"
+            "styles.height = 'auto'\n"
+            "```"
+        )
         yield ("thinking_start", t2_details, "")
         
         t1 = asyncio.get_running_loop().time()
@@ -62,11 +77,16 @@ class MockAgent:
         dt2 = asyncio.get_running_loop().time() - t1
         yield ("thinking_end", f"{dt2:.1f}", t2_details)
         
-        # 5. Выполнение остальных инструментов
+        # 5. Инструменты Edit и Bash
         yield ("tool", "Edit", "/Users/yegor/tui/app.tcss")
         await asyncio.sleep(0.25)
         yield ("tool", "Bash", ".venv/bin/python test_app.py")
         await asyncio.sleep(0.25)
         
-        # 6. Финальный ответ
-        yield ("outro", "Все проверки выполнены успешно! Изменения применены.", "")
+        # 6. Финальный ответ ИИ с Markdown
+        msg2 = (
+            "Все проверки **успешно пройдены**!\n\n"
+            "* Код отформатирован\n"
+            "* `Markdown` отрендерен во всех блоках"
+        )
+        yield ("outro", msg2, "")

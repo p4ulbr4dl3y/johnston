@@ -1,6 +1,6 @@
 from textual.app import ComposeResult
 from textual.containers import VerticalScroll, Vertical
-from textual.widgets import Static, Markdown
+from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
 from textual import events
 
@@ -13,7 +13,7 @@ class UserMessage(Static):
         super().__init__(content, classes="user-msg")
 
 class BotMessage(Vertical):
-    """Сообщение ИИ"""
+    """Сообщение ИИ с полным рендерингом Markdown"""
     can_focus = False
     content = reactive("")
 
@@ -28,27 +28,35 @@ class BotMessage(Vertical):
         self.md_widget.update(new_content)
 
 
-class ThinkingWidget(Static):
-    """Виджет думания со спиннером и кликабельным разворачиванием"""
+class ThinkingWidget(Vertical):
+    """Виджет думания с поддержкой Markdown при разворачивании"""
     can_focus = False
 
     def __init__(self, thinking_text: str = "Анализ запроса..."):
+        super().__init__(classes="thinking-widget thinking-active")
         self.thinking_text = thinking_text
         self.duration_seconds = 0.0
         self.is_thinking = True
         self.is_expanded = False
         self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_idx = 0
-        super().__init__("⠋ Thinking...", classes="thinking-widget thinking-active")
+        
+        self.header_label = Label("⠋ Thinking...", classes="thinking-header")
+        self.md_widget = Markdown("")
+
+    def compose(self) -> ComposeResult:
+        yield self.header_label
+        yield self.md_widget
 
     def on_mount(self) -> None:
+        self.md_widget.display = False
         self.set_interval(0.08, self.animate_spinner)
 
     def animate_spinner(self) -> None:
         if self.is_thinking:
             self.spinner_idx = (self.spinner_idx + 1) % len(self.spinner_frames)
             frame = self.spinner_frames[self.spinner_idx]
-            self.update(f"{frame} Thinking...")
+            self.header_label.update(f"{frame} Thinking...")
 
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
@@ -56,15 +64,18 @@ class ThinkingWidget(Static):
         if thinking_content:
             self.thinking_text = thinking_content
         self.remove_class("thinking-active")
+        self.md_widget.update(self.thinking_text)
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
         self.is_expanded = False
-        self.update(f"▶ Thought for {self.duration_seconds:.1f} sec")
+        self.header_label.update(f"▶ Thought for {self.duration_seconds:.1f} sec")
+        self.md_widget.display = False
 
     def render_expanded(self) -> None:
         self.is_expanded = True
-        self.update(f"▼ Thought for {self.duration_seconds:.1f} sec\n\n[dim]{self.thinking_text}[/dim]")
+        self.header_label.update(f"▼ Thought for {self.duration_seconds:.1f} sec")
+        self.md_widget.display = True
 
     def on_click(self, event: events.Click) -> None:
         if not self.is_thinking:
