@@ -8,7 +8,7 @@ from mock_agent import MockAgent
 from widgets.chat_view import ChatView
 
 class TUIChatApp(App):
-    """Супер-чистый TUI чат"""
+    """Супер-чистый TUI чат с автофокусом"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -26,13 +26,18 @@ class TUIChatApp(App):
             yield ChatView(id="chat-view")
             yield Input(placeholder="Написать сообщение...", id="message-input")
 
+    def on_mount(self) -> None:
+        """Поле ввода всегда в фокусе при старте"""
+        self.query_one("#message-input", Input).focus()
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Отправка по Enter"""
+        """Отправка по Enter и фокус остается в поле ввода"""
         user_text = event.value.strip()
         if not user_text:
             return
             
         event.input.value = ""
+        event.input.focus()
         self.generate_ai_response(user_text)
 
     @work(exclusive=True, thread=False)
