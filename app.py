@@ -1,4 +1,5 @@
 import os
+import asyncio
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
@@ -116,7 +117,7 @@ class TUIChatApp(App):
                     self.agent.history = sess.get("agent_history", [])
             self.notify(f"Агент переключен: {event.value}")
 
-    def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+    async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Обработка ввода и слэш-команд (/help, /new, /rewind, /resume)"""
         user_text = event.value.strip()
         if not user_text:
@@ -134,7 +135,7 @@ class TUIChatApp(App):
         if user_text.lower() == "/new":
             self.current_session_id = self.sm.generate_session_id()
             chat_view = self.query_one(ChatView)
-            self.run_worker(chat_view.remove_children())
+            await chat_view.remove_children()
             if hasattr(self.agent, "clear_history"):
                 self.agent.clear_history()
             elif hasattr(self.agent, "history"):
@@ -193,26 +194,36 @@ class TUIChatApp(App):
         thinking_widget = None
         bot_msg = None
         
-        async for event_type, val1, val2 in self.agent.stream_steps(user_text):
-            if event_type == "thinking_start":
-                thinking_widget = await chat_view.add_thinking_widget(val1)
-            elif event_type == "thinking_end":
-                if thinking_widget:
-                    duration = float(val1)
-                    thinking_widget.finish_thinking(duration, val2)
-                thinking_widget = None
-            elif event_type == "tool":
-                await chat_view.add_tool_call(val1, val2)
-                bot_msg = None
-            elif event_type == "bot_chunk":
-                if bot_msg is None:
-                    bot_msg = await chat_view.add_bot_message()
-                bot_msg.content += val1
-            elif event_type in ("bot_text", "outro"):
-                if bot_msg is None:
-                    bot_msg = await chat_view.add_bot_message()
-                bot_msg.content = val1
-                bot_msg = None
+        try:
+            async for event_type, val1, val2 in self.agent.stream_steps(user_text):
+                if event_type == "thinking_start":
+                    thinking_widget = await chat_view.add_thinking_widget(val1)
+                elif event_type == "thinking_end":
+                    if thinking_widget:
+                        duration = float(val1)
+                        thinking_widget.finish_thinking(duration, val2)
+                    thinking_widget = None
+                elif event_type == "tool":
+                    await chat_view.add_tool_call(val1, val2)
+                    bot_msg = None
+                elif event_type == "bot_chunk":
+                    if bot_msg is None:
+                        bot_msg = await chat_view.add_bot_message()
+                    bot_msg.content += val1
+                elif event_type in ("bot_text", "outro"):
+                    if bot_msg is None:
+                        bot_msg = await chat_view.add_bot_message()
+                    bot_msg.content = val1
+                    bot_msg = None
+        except asyncio.CancelledError:
+            if thinking_widget:
+                thinking_widget.finish_thinking(0.0, "Генерация остановлена (Esc).")
+            if bot_msg:
+                bot_msg.content += " *(прервано)*"
+            self.notify("Ответ агента прерван (Esc)", severity="warning")
+            raise
+        finally:
+            self.save_current_session()
 
 def main():
     TUIChatApp().run()

@@ -65,6 +65,16 @@ class ChatInput(TextArea):
             self.app.exit()
             return
 
+        # Отмена активной генерации агента по Escape
+        if event.key == "escape":
+            active_workers = [w for w in self.app.workers if w.is_running]
+            if active_workers:
+                for w in active_workers:
+                    w.cancel()
+                event.prevent_default()
+                event.stop()
+                return
+
         # Нажатие Tab для автодополнения слэш-команды
         if event.key == "tab":
             try:
