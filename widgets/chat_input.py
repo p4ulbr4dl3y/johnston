@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с неразрывным перманентным фокусом"""
+    """Поле ввода с неразрывным перманентным фокусом и поддержкой комбинаций выхода"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -34,6 +34,13 @@ class ChatInput(TextArea):
             self.styles.height = target_height
 
     def _on_key(self, event: events.Key) -> None:
+        # Проверяем горячие клавиши выхода (Ctrl+C, Ctrl+Q, Esc)
+        if event.key in ("ctrl+c", "ctrl+q", "escape"):
+            event.prevent_default()
+            event.stop()
+            self.app.exit()
+            return
+
         if event.key == "enter":
             # Enter без Ctrl -> отправка
             event.prevent_default()
