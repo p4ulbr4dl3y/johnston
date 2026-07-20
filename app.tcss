@@ -217,9 +217,10 @@ ModalScreen {
     margin-bottom: 1;
 }
 
-#resume-option-list {
-    height: 8;
-    margin-bottom: 1;
+#modal-dialog OptionList {
+    height: 10;
+    max-height: 12;
+    margin-top: 1;
     border: round #313244;
     background: #11111b;
 }
