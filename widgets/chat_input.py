@@ -58,8 +58,8 @@ class ChatInput(TextArea):
         self.prompt_draft = ""
 
     def _on_key(self, event: events.Key) -> None:
-        # Горячие клавиши выхода (Ctrl+C, Ctrl+Q, Esc)
-        if event.key in ("ctrl+c", "ctrl+q", "escape"):
+        # Горячие клавиши выхода (Ctrl+C, Ctrl+Q)
+        if event.key in ("ctrl+c", "ctrl+q"):
             event.prevent_default()
             event.stop()
             self.app.exit()
