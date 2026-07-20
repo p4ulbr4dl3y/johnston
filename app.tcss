@@ -74,10 +74,11 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Multi-line ChatInput Styling */
+/* Dynamic Auto-Expanding ChatInput */
 #message-input {
     width: 100%;
-    height: 4;
+    min-height: 3;
+    max-height: 10;
     margin: 0 0 1 0;
     padding: 0 1;
     border: round #313244;
