@@ -9,7 +9,7 @@ PERSONAS = {
     "opencode": {
         "name": "⚡ OpenCode (DeepSeek v4 Flash)",
         "description": "Настоящий агент OpenCode Go (DeepSeek v4 Flash) с инструментами Read, Create, Edit, Bash",
-        "system": "Ты инженер-разработчик. Тебе доступны инструменты Read, Create, Edit, Bash. Используй их при необходимости анализировать файлы, изменять код или выполнять команды."
+        "system": "Ты инженер-разработчик. Тебе доступны инструменты Read, Create, Edit, Bash. Создавай и редактируй файлы в текущем проекте."
     }
 }
 
@@ -29,11 +29,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Read",
-            "description": "Прочитать файл из файловой системы",
+            "description": "Прочитать файл из текущего проекта",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Путь к файлу"}
+                    "path": {"type": "string", "description": "Относительный или абсолютный путь к файлу"}
                 },
                 "required": ["path"]
             }
@@ -43,7 +43,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Create",
-            "description": "Создать новый файл",
+            "description": "Создать новый файл в текущем проекте",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -58,7 +58,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Edit",
-            "description": "Изменить или перезаписать файл",
+            "description": "Изменить или перезаписать файл в текущем проекте",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -73,7 +73,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Bash",
-            "description": "Выполнить bash команду в терминале",
+            "description": "Выполнить bash команду в текущем проекте",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -85,11 +85,25 @@ TOOLS = [
     }
 ]
 
+def resolve_project_path(raw_path: str) -> str:
+    """Приводит путь к текущей рабочей директории проекта, предотвращая запись в / (root)"""
+    path = os.path.expanduser(raw_path)
+    cwd = os.path.realpath(os.getcwd())
+    
+    if not os.path.isabs(path):
+        return os.path.normpath(os.path.join(cwd, path))
+    
+    if path.startswith('/') and not path.startswith(cwd) and not path.startswith('/Users') and not path.startswith('/tmp') and not path.startswith('/private'):
+        return os.path.normpath(os.path.join(cwd, path.lstrip('/')))
+        
+    return os.path.normpath(path)
+
 async def execute_tool(name: str, args: dict) -> str:
     """Локальное выполнение инструментов Read, Create, Edit, Bash"""
     try:
         if name == "Read":
-            path = os.path.expanduser(args.get("path", ""))
+            raw_path = args.get("path", "")
+            path = resolve_project_path(raw_path)
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
@@ -99,17 +113,20 @@ async def execute_tool(name: str, args: dict) -> str:
             return f"Ошибка: файл '{path}' не найден."
 
         elif name in ("Create", "Edit"):
-            path = os.path.expanduser(args.get("path", ""))
+            raw_path = args.get("path", "")
+            path = resolve_project_path(raw_path)
             content = args.get("content", "")
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
-            return f"Успешно: файл '{path}' сохранен ({len(content)} байт)."
+            rel_path = os.path.relpath(path, os.getcwd())
+            return f"Успешно: файл '{rel_path}' сохранен ({len(content)} байт)."
 
         elif name == "Bash":
             cmd = args.get("command", "")
             p = await asyncio.create_subprocess_shell(
                 cmd,
+                cwd=os.getcwd(),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
@@ -160,7 +177,11 @@ class OpenCodeAgent:
         """
         Генерирует поток сообщений для TUI ChatView с поддержкой инструментов Read, Create, Edit, Bash.
         """
-        system_prompt = PERSONAS.get(self.persona_key, PERSONAS["opencode"])["system"]
+        cwd = os.path.realpath(os.getcwd())
+        system_prompt = (
+            PERSONAS.get(self.persona_key, PERSONAS["opencode"])["system"] +
+            f"\nТекущая рабочая директория проекта: {cwd}. Все файлы создавай относительно этой директории."
+        )
         messages = [{"role": "system", "content": system_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
         t0 = time.time()
@@ -182,7 +203,6 @@ class OpenCodeAgent:
                 tool_calls_dict = {}
 
                 async for chunk in response:
-                    # Подсчет использования токенов
                     if getattr(chunk, "usage", None) and chunk.usage:
                         p_tok = chunk.usage.prompt_tokens or 0
                         c_tok = chunk.usage.completion_tokens or 0
@@ -272,7 +292,11 @@ class OpenCodeAgent:
                     except Exception:
                         args = {}
 
-                    target = args.get("path") or args.get("command") or t_name
+                    raw_target = args.get("path") or args.get("command") or t_name
+                    target = raw_target
+                    if args.get("path"):
+                        target = os.path.relpath(resolve_project_path(args["path"]), os.getcwd())
+
                     yield ("tool", t_name, target)
 
                     tool_result = await execute_tool(t_name, args)
