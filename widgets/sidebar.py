@@ -1,7 +1,7 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical, Container
 from textual.widgets import Label, Button, OptionList, Select, Static
-from mock_agent import PERSONAS
+from opencode_agent import PERSONAS
 
 class Sidebar(Vertical):
     """Боковая панель с навигацией и настройками"""

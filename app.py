@@ -3,14 +3,14 @@ from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
 
-from mock_agent import MockAgent
+from opencode_agent import OpenCodeAgent
 from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, RewindScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат со слэш-командами /help и /rewind"""
+    """Минималистичный TUI чат со слэш-командами /help и /rewind и агентом OpenCode Go"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -21,7 +21,7 @@ class TUIChatApp(App):
 
     def __init__(self):
         super().__init__()
-        self.agent = MockAgent(persona_key="assistant")
+        self.agent = OpenCodeAgent()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -72,12 +72,14 @@ class TUIChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Чередование мышления, вызова инструментов и текста от ИИ"""
+        """Потоковая генерация ответа через агент OpenCode Go"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
         
         thinking_widget = None
+        bot_msg = None
+        
         async for event_type, val1, val2 in self.agent.stream_steps(user_text):
             if event_type == "thinking_start":
                 thinking_widget = await chat_view.add_thinking_widget(val1)
@@ -85,11 +87,19 @@ class TUIChatApp(App):
                 if thinking_widget:
                     duration = float(val1)
                     thinking_widget.finish_thinking(duration, val2)
+                thinking_widget = None
             elif event_type == "tool":
                 await chat_view.add_tool_call(val1, val2)
+                bot_msg = None
+            elif event_type == "bot_chunk":
+                if bot_msg is None:
+                    bot_msg = await chat_view.add_bot_message()
+                bot_msg.content += val1
             elif event_type in ("bot_text", "outro"):
-                bot_msg = await chat_view.add_bot_message()
+                if bot_msg is None:
+                    bot_msg = await chat_view.add_bot_message()
                 bot_msg.content = val1
+                bot_msg = None
 
 if __name__ == "__main__":
     TUIChatApp().run()
