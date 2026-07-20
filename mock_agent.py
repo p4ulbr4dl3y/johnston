@@ -60,14 +60,29 @@ class MockAgent:
         return tools
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        """Асинхронные шаги выполнения агента (сообщения и вызовы инструментов)"""
+        """Асинхронные шаги выполнения агента (мышление, вызовы инструментов, ответ)"""
         tools = self._generate_tools(user_text)
         
-        yield ("intro", "Выполняю задачу...", "")
-        await asyncio.sleep(0.15)
+        thinking_details = (
+            f"Анализ запроса: «{user_text.strip()}»\n"
+            "• Проверка зависимостей и архитектуры проекта\n"
+            "• Выбор оптимальных инструментов для выполнения задачи"
+        )
         
+        # 1. Начало думания со спиннером
+        yield ("thinking_start", thinking_details, "")
+        
+        start_time = asyncio.get_running_loop().time()
+        await asyncio.sleep(1.8)
+        elapsed = asyncio.get_running_loop().time() - start_time
+        
+        # 2. Завершение думания (переход к Thought for N sec)
+        yield ("thinking_end", f"{elapsed:.1f}", thinking_details)
+        
+        # 3. Выполнение инструментов
         for tool_type, target in tools:
             yield ("tool", tool_type, target)
             await asyncio.sleep(0.25)
             
+        # 4. Финальный ответ
         yield ("outro", "Все действия завершены успешно!", "")

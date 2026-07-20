@@ -36,6 +36,22 @@ Screen {
     color: #cdd6f4;
 }
 
+/* ThinkingWidget Styling */
+.thinking-widget {
+    width: 100%;
+    height: auto;
+    margin-top: 1;
+    padding: 0 1;
+    color: #a6adc8;
+    background: #11111b;
+    border-left: solid #585b70;
+}
+
+.thinking-active {
+    color: #f9e2af;
+    border-left: solid #f9e2af;
+}
+
 /* Distinct Tool Call Widget Styling */
 .tool-call {
     width: 100%;

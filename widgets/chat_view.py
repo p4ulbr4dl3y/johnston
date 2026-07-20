@@ -2,9 +2,10 @@ from textual.app import ComposeResult
 from textual.containers import VerticalScroll, Vertical
 from textual.widgets import Static, Markdown
 from textual.reactive import reactive
+from textual import events
 
 class UserMessage(Static):
-    """Сообщение пользователя (без подписи 'Вы:')"""
+    """Сообщение пользователя"""
     can_focus = False
 
     def __init__(self, content: str):
@@ -12,7 +13,7 @@ class UserMessage(Static):
         super().__init__(content, classes="user-msg")
 
 class BotMessage(Vertical):
-    """Сообщение ИИ (без подписи 'ИИ:')"""
+    """Сообщение ИИ"""
     can_focus = False
     content = reactive("")
 
@@ -25,6 +26,53 @@ class BotMessage(Vertical):
 
     def watch_content(self, new_content: str) -> None:
         self.md_widget.update(new_content)
+
+
+class ThinkingWidget(Static):
+    """Виджет думания со спиннером и кликабельным разворачиванием"""
+    can_focus = False
+
+    def __init__(self, thinking_text: str = "Анализ запроса..."):
+        self.thinking_text = thinking_text
+        self.duration_seconds = 0.0
+        self.is_thinking = True
+        self.is_expanded = False
+        self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.spinner_idx = 0
+        super().__init__("⠋ Thinking...", classes="thinking-widget thinking-active")
+
+    def on_mount(self) -> None:
+        self.set_interval(0.08, self.animate_spinner)
+
+    def animate_spinner(self) -> None:
+        if self.is_thinking:
+            self.spinner_idx = (self.spinner_idx + 1) % len(self.spinner_frames)
+            frame = self.spinner_frames[self.spinner_idx]
+            self.update(f"{frame} Thinking...")
+
+    def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
+        self.is_thinking = False
+        self.duration_seconds = duration
+        if thinking_content:
+            self.thinking_text = thinking_content
+        self.remove_class("thinking-active")
+        self.render_collapsed()
+
+    def render_collapsed(self) -> None:
+        self.is_expanded = False
+        self.update(f"▶ Thought for {self.duration_seconds:.1f} sec")
+
+    def render_expanded(self) -> None:
+        self.is_expanded = True
+        self.update(f"▼ Thought for {self.duration_seconds:.1f} sec\n\n[dim]{self.thinking_text}[/dim]")
+
+    def on_click(self, event: events.Click) -> None:
+        if not self.is_thinking:
+            if self.is_expanded:
+                self.render_collapsed()
+            else:
+                self.render_expanded()
+            event.stop()
 
 
 class ToolCallWidget(Static):
@@ -64,6 +112,12 @@ class ChatView(VerticalScroll):
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
+
+    async def add_thinking_widget(self, thinking_text: str = "Анализ запроса...") -> ThinkingWidget:
+        widget = ThinkingWidget(thinking_text)
+        await self.mount(widget)
+        self.scroll_end(animate=True)
+        return widget
 
     async def add_tool_call(self, tool_type: str, target: str) -> ToolCallWidget:
         widget = ToolCallWidget(tool_type, target)
