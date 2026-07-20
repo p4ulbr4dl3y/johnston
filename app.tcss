@@ -1,132 +1,61 @@
-/* Main Layout Styles */
+/* Ultra-Minimalist Modern TCSS */
 
 Screen {
-    layout: horizontal;
-    background: $surface;
+    background: #0d0e15;
+    padding: 0;
+    margin: 0;
 }
 
-/* Sidebar Styles */
-Sidebar {
-    width: 32;
-    height: 100%;
-    background: $surface-darken-1;
-    border-right: heavy $accent;
-    padding: 1 1;
-}
-
-#sidebar-title {
-    text-align: center;
+#app-container {
     width: 100%;
-    margin-bottom: 1;
-    color: $accent;
-    text-style: bold;
-}
-
-#new-chat-container {
-    height: auto;
-    margin-bottom: 1;
-}
-
-#btn-new-chat {
-    width: 100%;
-}
-
-.section-label {
-    margin-top: 1;
-    margin-bottom: 0;
-    color: $text-muted;
-    text-style: bold;
-}
-
-#session-list {
-    height: 10;
-    margin-bottom: 1;
-    border: round $primary;
-}
-
-#persona-select {
-    margin-bottom: 1;
-}
-
-#sidebar-info {
-    margin-top: 1;
-    padding: 1;
-    border: dashed $accent;
-    height: auto;
-    background: $surface-darken-2;
-}
-
-.info-title {
-    color: $accent;
-}
-
-#info-text {
-    color: $text-muted;
-}
-
-/* Main Workspace Area */
-#main-container {
-    width: 1fr;
     height: 100%;
     layout: vertical;
-}
-
-#chat-header {
-    height: 3;
-    content-align: center middle;
-    background: $surface-darken-1;
-    border-bottom: solid $primary;
-    text-style: bold;
-    color: $text;
+    background: #0d0e15;
 }
 
 #chat-view {
     height: 1fr;
-    padding: 1 2;
-    background: $surface;
+    padding: 1 3;
+    background: #0d0e15;
+    scrollbar-size: 1 1;
 }
 
-/* Message Bubbles */
-
+/* User Message Bubble */
 .user-bubble {
     align-horizontal: right;
-    width: 75%;
+    max-width: 80%;
     margin: 1 0;
     padding: 1 2;
-    background: #2ac3de 20%;
-    border: round #2ac3de;
-    color: $text;
+    background: #2563eb 15%;
+    border: round #3b82f6;
+    color: #f8fafc;
 }
 
+/* Bot Message Bubble */
 .bot-bubble {
     align-horizontal: left;
-    width: 85%;
+    max-width: 85%;
     margin: 1 0;
     padding: 1 2;
-    background: $surface-darken-1;
-    border: round $accent;
+    background: #181825;
+    border: round #313244;
 }
 
 .bot-author {
-    color: $accent;
+    color: #89b4fa;
     text-style: bold;
     margin-bottom: 1;
 }
 
-/* Input Bar Container */
-#input-container {
-    height: auto;
-    layout: horizontal;
-    padding: 1 2;
-    background: $surface-darken-1;
-    border-top: solid $primary;
-}
-
+/* Bottom Input Bar */
 #message-input {
-    width: 1fr;
-    margin-right: 1;
+    margin: 1 3 1 3;
+    padding: 0 1;
+    border: round #45475a;
+    background: #1e1e2e;
+    color: #cdd6f4;
 }
 
-#btn-send {
-    width: 12;
+#message-input:focus {
+    border: round #89b4fa;
 }

@@ -4,12 +4,12 @@ from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
 
 class UserBubble(Static):
-    """Сообщение пользователя"""
+    """Минималистичное сообщение пользователя"""
     def __init__(self, content: str):
         super().__init__(content, classes="user-bubble")
 
 class BotBubble(Vertical):
-    """Сообщение ИИ с поддержкой Markdown и динамического обновления при стриминге"""
+    """Минималистичное сообщение ИИ"""
     content = reactive("")
 
     def __init__(self, persona_name: str = "ИИ"):
@@ -18,7 +18,7 @@ class BotBubble(Vertical):
         self.md_widget = Markdown("")
 
     def compose(self) -> ComposeResult:
-        yield Label(f"✨ {self.persona_name}", classes="bot-author")
+        yield Label("✦ ИИ", classes="bot-author")
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
@@ -26,7 +26,7 @@ class BotBubble(Vertical):
 
 
 class ChatView(VerticalScroll):
-    """Область отображения истории чата"""
+    """Лента чата"""
 
     async def add_user_message(self, text: str) -> UserBubble:
         bubble = UserBubble(text)
