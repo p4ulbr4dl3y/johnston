@@ -12,7 +12,7 @@ from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат с гибкой конфигурацией провайдеров и системой сессий из ~/.tui"""
+    """Минималистичный TUI чат с конфигурацией провайдеров и изолированными сессиями по проектам"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -26,7 +26,9 @@ class TUIChatApp(App):
         self.pm = ProviderManager()
         self.sm = SessionManager()
         self.agent = self.pm.create_active_agent()
-        self.current_session_id = self.sm.get_active_session_id()
+        
+        active_sid = self.sm.get_active_session_id()
+        self.current_session_id = active_sid if active_sid else self.sm.generate_session_id()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -37,7 +39,8 @@ class TUIChatApp(App):
     def on_mount(self) -> None:
         """Загрузка активной сессии и мгновенный фокус при старте"""
         self.query_one("#message-input", ChatInput).focus()
-        self.load_session_ui(self.current_session_id)
+        if self.sm.load_session(self.current_session_id):
+            self.load_session_ui(self.current_session_id)
 
     def load_session_ui(self, session_id: str) -> None:
         """Загрузка состояния сессии в UI и в историю агента"""
@@ -69,15 +72,18 @@ class TUIChatApp(App):
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
 
-    def save_current_session(self, user_text: str = None, bot_text: str = None) -> None:
-        """Сохранение состояния сессии на диск в ~/.tui/sessions"""
+    def save_current_session(self) -> None:
+        """Сохранение состояния сессии в ~/.tui/projects/<project>/sessions (только если есть сообщения)"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
         
-        title = "Новый диалог"
-        if user_msgs:
-            first_msg = user_msgs[0][1]
-            title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
+        if not user_msgs:
+            # Если сообщений нет — удаляем запись с диска
+            self.sm.save_session(self.current_session_id, {"ui_messages": []})
+            return
+
+        first_msg = user_msgs[0][1]
+        title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
 
         ui_messages = []
         for child in chat_view.children:
@@ -112,7 +118,7 @@ class TUIChatApp(App):
             self.notify(f"Агент переключен: {event.value}")
 
     def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Обработка ввода и слэш-команд (/help, /rewind, /resume)"""
+        """Обработка ввода и слэш-команд (/help, /new, /rewind, /resume)"""
         user_text = event.value.strip()
         if not user_text:
             return
@@ -125,11 +131,17 @@ class TUIChatApp(App):
             self.push_screen(HelpScreen())
             return
 
-        # Слэш-команда /new
+        # Слэш-команда /new — сброс без создания немедленного файла на диске
         if user_text.lower() == "/new":
-            new_sid = self.sm.create_session("Новый диалог")
-            self.load_session_ui(new_sid)
-            self.notify("Создана новая сессия!")
+            self.current_session_id = self.sm.generate_session_id()
+            chat_view = self.query_one(ChatView)
+            for child in list(chat_view.children):
+                child.remove()
+            if hasattr(self.agent, "clear_history"):
+                self.agent.clear_history()
+            elif hasattr(self.agent, "history"):
+                self.agent.history = []
+            self.notify("Создан новый диалог!")
             return
 
         # Слэш-команда /rewind
@@ -145,6 +157,8 @@ class TUIChatApp(App):
                     chat_view.rollback_to(selected_idx)
                     if hasattr(self.agent, "clear_history"):
                         self.agent.clear_history()
+                    elif hasattr(self.agent, "history"):
+                        self.agent.history = []
                     self.save_current_session()
                     self.notify("История успешно откачена!")
                 self.query_one("#message-input", ChatInput).focus()
@@ -156,7 +170,7 @@ class TUIChatApp(App):
         if user_text.lower() == "/resume":
             sessions = self.sm.list_sessions()
             if not sessions:
-                self.notify("Нет сохраненных сессий для возобновления", severity="warning")
+                self.notify("Нет сохраненных сессий в текущем проекте", severity="warning")
                 return
 
             def on_resume_selected(selected_sid: str) -> None:
