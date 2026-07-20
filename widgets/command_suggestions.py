@@ -1,13 +1,7 @@
 from textual.widgets import OptionList
+from commands import COMMAND_REGISTRY
 
-COMMANDS = [
-    ("/help", "Help and keybindings"),
-    ("/new", "Start a new chat session"),
-    ("/provider", "Switch AI provider"),
-    ("/models", "Switch model for active provider"),
-    ("/rewind", "Rollback chat history to a message"),
-    ("/resume", "Resume a saved session"),
-]
+COMMANDS = [(name, cmd.description) for name, cmd in COMMAND_REGISTRY.items()]
 
 class CommandSuggestions(OptionList):
     """Выпадающее меню подсказок слэш-команд (/help, /rewind)"""

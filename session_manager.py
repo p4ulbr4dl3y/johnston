@@ -4,9 +4,7 @@ import time
 import uuid
 import hashlib
 from typing import List, Dict, Any, Optional
-
-CONFIG_DIR = os.path.expanduser("~/.tui")
-PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")
+from config import CONFIG_DIR, PROJECTS_DIR
 
 class SessionManager:
     def __init__(self, project_path: Optional[str] = None):

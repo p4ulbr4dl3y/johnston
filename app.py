@@ -11,7 +11,7 @@ from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget,
 from widgets.chat_input import ChatInput
 from widgets.status_footer import StatusFooter
 from widgets.command_suggestions import CommandSuggestions
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen
+from commands import handle_slash_command
 
 class TUIChatApp(App):
     """Минималистичный TUI чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
@@ -176,102 +176,10 @@ class TUIChatApp(App):
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        # Слэш-команда /help
-        if user_text.lower() == "/help":
-            self.push_screen(HelpScreen())
-            return
-
-        # Слэш-команда /new — сброс без создания немедленного файла на диске
-        if user_text.lower() == "/new":
-            for w in [w for w in self.workers if w.is_running]:
-                w.cancel()
-            self.current_session_id = self.sm.generate_session_id()
-            chat_view = self.query_one(ChatView)
-            await chat_view.remove_children()
-            if hasattr(self.agent, "clear_history"):
-                self.agent.clear_history()
-            elif hasattr(self.agent, "history"):
-                self.agent.history = []
-            self.refresh_status_footer()
-            self.notify("Создан новый диалог!")
-            return
-
-        # Слэш-команда /provider
-        if user_text.lower() == "/provider":
-            providers = self.pm.load_providers()
-            if not providers:
-                self.notify("Нет доступных провайдеров", severity="warning")
-                return
-
-            def on_provider_selected(selected_key: str) -> None:
-                if selected_key:
-                    self.pm.set_active_provider_key(selected_key)
-                    self.agent = self.pm.create_active_agent()
-                    self.refresh_status_footer()
-                    self.notify(f"Провайдер переключен: {selected_key}")
-                self.query_one("#message-input", ChatInput).focus()
-
-            self.push_screen(ProviderScreen(providers), callback=on_provider_selected)
-            return
-
-        # Слэш-команда /models
-        if user_text.lower() == "/models":
-            active_key = self.pm.get_active_provider_key()
-            self.notify(f"Загрузка моделей для {active_key}...")
-            models = await self.pm.fetch_models_for_provider(active_key)
-            if not models:
-                self.notify("Не удалось получить список моделей", severity="warning")
-                return
-            
-            curr_model = getattr(self.agent, "model", "")
-            
-            def on_model_selected(selected_model: str) -> None:
-                if selected_model:
-                    if hasattr(self.agent, "model"):
-                        self.agent.model = selected_model
-                    self.refresh_status_footer()
-                    self.notify(f"Модель переключена: {selected_model}")
-                self.query_one("#message-input", ChatInput).focus()
-
-            self.push_screen(ModelScreen(models, curr_model), callback=on_model_selected)
-            return
-
-        # Слэш-команда /rewind
-        if user_text.lower() == "/rewind":
-            chat_view = self.query_one(ChatView)
-            user_msgs = chat_view.get_user_messages()
-            if not user_msgs:
-                self.notify("История пуста: нет сообщений для отката", severity="warning")
-                return
-
-            def on_rewind_selected(selected_idx: int | None) -> None:
-                if selected_idx is not None and selected_idx >= 0:
-                    chat_view.rollback_to(selected_idx)
-                    if hasattr(self.agent, "clear_history"):
-                        self.agent.clear_history()
-                    elif hasattr(self.agent, "history"):
-                        self.agent.history = []
-                    self.save_current_session()
-                    self.notify("История успешно откачена!")
-                self.query_one("#message-input", ChatInput).focus()
-
-            self.push_screen(RewindScreen(user_msgs), callback=on_rewind_selected)
-            return
-
-        # Слэш-команда /resume
-        if user_text.lower() == "/resume":
-            sessions = self.sm.list_sessions()
-            if not sessions:
-                self.notify("Нет сохраненных сессий в текущем проекте", severity="warning")
-                return
-
-            def on_resume_selected(selected_sid: str) -> None:
-                if selected_sid:
-                    self.load_session_ui(selected_sid)
-                    self.notify(f"Сессия возобновлена: {selected_sid}")
-                self.query_one("#message-input", ChatInput).focus()
-
-            self.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
+        if user_text.startswith("/"):
+            processed = await handle_slash_command(self, user_text)
+            if not processed:
+                self.notify("Неизвестная команда", severity="warning")
             return
 
         self.generate_ai_response(user_text)

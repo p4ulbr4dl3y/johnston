@@ -4,11 +4,7 @@ import time
 import importlib.util
 import shutil
 from typing import Dict, Any, Type
-
-CONFIG_DIR = os.path.expanduser("~/.tui")
-PROVIDERS_DIR = os.path.join(CONFIG_DIR, "providers")
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
-
+from config import CONFIG_DIR, PROVIDERS_DIR, CONFIG_FILE
 DEFAULT_OPENCODE_CONTENT = '''"""
 OpenCode Go Provider configuration with Read, Create, Edit, Bash tools support
 """
