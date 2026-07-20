@@ -42,12 +42,24 @@ class TUIChatApp(App):
         self.refresh_status_footer()
 
     def refresh_status_footer(self) -> None:
-        """Обновление строки провайдера, модели и сессии внизу чата"""
+        """Обновление строки директории, провайдера, модели, контекста, токенов и стоимости"""
         try:
             footer = self.query_one("#status-footer", StatusFooter)
             pkey = self.pm.get_active_provider_key()
             model_name = getattr(self.agent, "model", "")
-            footer.update_status(provider_key=pkey, model_name=model_name, session_id=self.current_session_id)
+            
+            metrics = {}
+            if hasattr(self.agent, "get_metrics"):
+                metrics = self.agent.get_metrics()
+
+            footer.update_status(
+                provider_key=pkey,
+                model_name=model_name,
+                directory=os.path.basename(os.path.realpath(os.getcwd())),
+                total_tokens=metrics.get("total_tokens", 0),
+                context_window=metrics.get("context", "128k"),
+                cost_usd=metrics.get("cost_usd", 0.0)
+            )
         except Exception:
             pass
 
@@ -169,6 +181,8 @@ class TUIChatApp(App):
 
         # Слэш-команда /new — сброс без создания немедленного файла на диске
         if user_text.lower() == "/new":
+            for w in [w for w in self.workers if w.is_running]:
+                w.cancel()
             self.current_session_id = self.sm.generate_session_id()
             chat_view = self.query_one(ChatView)
             await chat_view.remove_children()

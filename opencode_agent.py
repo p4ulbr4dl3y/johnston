@@ -17,6 +17,13 @@ OPENCODE_BASE_URL = "https://opencode.ai/zen/go/v1"
 DEFAULT_MODEL = "deepseek-v4-flash"
 DEFAULT_API_KEY = "sk-placeholder"
 
+MODEL_INFO = {
+    "deepseek-v4-flash": {"context": "128k", "prompt_cost": 0.15, "completion_cost": 0.60},
+    "deepseek-v4-pro": {"context": "128k", "prompt_cost": 0.27, "completion_cost": 1.10},
+    "qwen3.7-max": {"context": "128k", "prompt_cost": 0.40, "completion_cost": 1.20},
+    "glm-5": {"context": "128k", "prompt_cost": 0.50, "completion_cost": 1.00},
+}
+
 TOOLS = [
     {
         "type": "function",
@@ -125,6 +132,9 @@ class OpenCodeAgent:
         self.persona_key = persona_key
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=OPENCODE_BASE_URL)
         self.history = []
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_cost = 0.0
 
     def set_persona(self, persona_key: str):
         if persona_key in PERSONAS:
@@ -132,6 +142,19 @@ class OpenCodeAgent:
 
     def clear_history(self):
         self.history.clear()
+        self.total_prompt_tokens = 0
+        self.total_completion_tokens = 0
+        self.total_cost = 0.0
+
+    def get_metrics(self) -> dict:
+        info = MODEL_INFO.get(self.model, {"context": "128k"})
+        return {
+            "total_tokens": self.total_prompt_tokens + self.total_completion_tokens,
+            "prompt_tokens": self.total_prompt_tokens,
+            "completion_tokens": self.total_completion_tokens,
+            "cost_usd": self.total_cost,
+            "context": info.get("context", "128k")
+        }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         """
@@ -149,7 +172,8 @@ class OpenCodeAgent:
                     model=self.model,
                     messages=messages,
                     tools=TOOLS,
-                    stream=True
+                    stream=True,
+                    stream_options={"include_usage": True}
                 )
 
                 thinking_text = ""
@@ -158,6 +182,17 @@ class OpenCodeAgent:
                 tool_calls_dict = {}
 
                 async for chunk in response:
+                    # Подсчет использования токенов
+                    if getattr(chunk, "usage", None) and chunk.usage:
+                        p_tok = chunk.usage.prompt_tokens or 0
+                        c_tok = chunk.usage.completion_tokens or 0
+                        self.total_prompt_tokens += p_tok
+                        self.total_completion_tokens += c_tok
+                        
+                        info = MODEL_INFO.get(self.model, {"prompt_cost": 0.20, "completion_cost": 0.80})
+                        cost = (p_tok * info.get("prompt_cost", 0.20) + c_tok * info.get("completion_cost", 0.80)) / 1_000_000
+                        self.total_cost += cost
+
                     if not chunk.choices:
                         continue
                     
@@ -207,11 +242,9 @@ class OpenCodeAgent:
                     dt = time.time() - t0
                     yield ("thinking_end", f"{dt:.1f}", thinking_text)
 
-                # Если инструментов не вызывалось — завершаем цикл
                 if not tool_calls_dict:
                     break
 
-                # Формируем сообщение assistant с вызовами инструментов
                 assistant_tool_msg = {
                     "role": "assistant",
                     "content": current_text or None,
@@ -229,7 +262,6 @@ class OpenCodeAgent:
                 }
                 messages.append(assistant_tool_msg)
 
-                # Выполняем каждый инструмент и отправляем результаты обратно в модель
                 for tc in tool_calls_dict.values():
                     t_id = tc["id"]
                     t_name = tc["name"]
