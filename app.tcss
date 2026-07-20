@@ -74,18 +74,18 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Input Bar - Height 1 to remove top/bottom extra lines */
+/* Input Bar - Evenly Proportioned Height 3 with Border */
 #message-input {
     width: 100%;
-    height: 1;
+    height: 3;
     margin: 0 0 1 0;
-    padding: 0 3;
-    border: none;
-    background: #0d0e15;
+    padding: 0 2;
+    border: round #313244;
+    background: #181825;
     color: #cdd6f4;
 }
 
 #message-input:focus {
-    border: none;
-    background: #0d0e15;
+    border: round #585b70;
+    background: #181825;
 }
