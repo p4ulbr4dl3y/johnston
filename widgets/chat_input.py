@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с динамическим авто-расширением вверх от 3 до 10 строк"""
+    """Поле ввода с динамическим расширением вверх и сужением при стирании строк"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -22,10 +22,11 @@ class ChatInput(TextArea):
         self.update_height()
 
     def update_height(self) -> None:
-        """Динамический расчет высоты по числу строк"""
+        """Динамический расчет высоты от 3 до 10 строк"""
         lines = len(self.text.split("\n"))
         target_height = max(3, min(lines + 2, 10))
-        self.styles.height = target_height
+        if self.styles.height.value != target_height:
+            self.styles.height = target_height
 
     def _on_key(self, event: events.Key) -> None:
         if event.key == "enter":
@@ -41,3 +42,6 @@ class ChatInput(TextArea):
             event.stop()
             self.insert("\n")
             self.update_height()
+        else:
+            # При стирании (Backspace/Delete) и любом вводе обновляем высоту
+            self.call_after_refresh(self.update_height)

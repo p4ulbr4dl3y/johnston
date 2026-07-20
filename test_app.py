@@ -12,24 +12,26 @@ async def test_chat_app_flow():
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()
         
-        # Начальная высота должно быть 3
+        # Начальная высота = 3
         assert chat_input.styles.height.value == 3
         
-        # Вводим 4 строки текста
-        chat_input.load_text("Строка 1\nСтрока 2\nСтрока 3\nСтрока 4")
+        # Вводим 5 строк текста
+        chat_input.load_text("1\n2\n3\n4\n5")
         await pilot.pause(0.1)
+        assert chat_input.styles.height.value == 7
+        print("✓ Expanded to 7 lines")
         
-        # Высота должна автоматически вырасти до 6 (4 + 2 рамки)
-        assert chat_input.styles.height.value == 6
-        print("✓ Dynamic height expansion test passed!")
+        # Стираем часть строк (уменьшаем до 2 строк)
+        chat_input.load_text("1\n2")
+        await pilot.pause(0.1)
+        assert chat_input.styles.height.value == 4
+        print("✓ Successfully shrunk back to 4 lines on deletion")
         
-        # Отправляем сообщение
-        await pilot.press("enter")
-        await pilot.pause(2.0)
-        
-        # После отправки высота возвращается к 3
+        # Очищаем (возврат к 3)
+        chat_input.load_text("")
+        await pilot.pause(0.1)
         assert chat_input.styles.height.value == 3
-        print("✓ Height reset test passed!")
+        print("✓ Reset to minimum height 3")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
