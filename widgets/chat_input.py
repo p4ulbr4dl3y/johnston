@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с зацикленной историей запросов (Стрелки Вверх/Вниз)"""
+    """Поле ввода с подсказками слэш-команд и автодополнением по Tab"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -26,10 +26,12 @@ class ChatInput(TextArea):
 
     def watch_text(self, new_text: str) -> None:
         self.update_height()
+        self.update_suggestions(new_text)
 
     def load_text(self, text: str) -> None:
         super().load_text(text)
         self.update_height()
+        self.update_suggestions(text)
 
     def update_height(self) -> None:
         """Динамический расчет высоты от 3 до 10 строк"""
@@ -37,6 +39,16 @@ class ChatInput(TextArea):
         target_height = max(3, min(lines + 2, 10))
         if self.styles.height.value != target_height:
             self.styles.height = target_height
+
+    def update_suggestions(self, text: str) -> None:
+        """Обновление списка подсказок слэш-команд"""
+        if self.app:
+            try:
+                from widgets.command_suggestions import CommandSuggestions
+                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions.update_query(text)
+            except Exception:
+                pass
 
     def add_to_history(self, text: str) -> None:
         """Сохранение отправленного сообщения в историю запросов"""
@@ -53,14 +65,50 @@ class ChatInput(TextArea):
             self.app.exit()
             return
 
-        # Зацикленная навигация Вверх
+        # Нажатие Tab для автодополнения слэш-команды
+        if event.key == "tab":
+            try:
+                from widgets.command_suggestions import CommandSuggestions, COMMANDS
+                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                if suggestions.display and suggestions.highlighted is not None:
+                    matched_cmds = [cmd for cmd, _ in COMMANDS if cmd.startswith(self.text.strip().lower())]
+                    if suggestions.highlighted < len(matched_cmds):
+                        chosen_cmd = matched_cmds[suggestions.highlighted]
+                        self.load_text(chosen_cmd)
+                        lines = self.text.split("\n")
+                        self.move_cursor((len(lines) - 1, len(lines[-1])))
+                        suggestions.display = False
+                        event.prevent_default()
+                        event.stop()
+                        return
+            except Exception:
+                pass
+
+        # Обработка подсказок при навигации стрелками
+        try:
+            from widgets.command_suggestions import CommandSuggestions
+            suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+            if suggestions.display:
+                if event.key == "up":
+                    suggestions.action_cursor_up()
+                    event.prevent_default()
+                    event.stop()
+                    return
+                elif event.key == "down":
+                    suggestions.action_cursor_down()
+                    event.prevent_default()
+                    event.stop()
+                    return
+        except Exception:
+            pass
+
+        # Зацикленная навигация по истории запросов: Вверх
         if event.key == "up" and self.cursor_location[0] == 0:
             if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
                     self.prompt_draft = self.text
                 
                 if self.prompt_history_index == 0:
-                    # Зацикливание: с самого верха в самый низ (к черновику)
                     self.prompt_history_index = len(self.prompt_history)
                     self.load_text(self.prompt_draft)
                 else:
@@ -73,12 +121,11 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Зацикленная навигация Вниз
+        # Зацикленная навигация по истории запросов: Вниз
         lines = self.text.split("\n")
         if event.key == "down" and self.cursor_location[0] == len(lines) - 1:
             if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
-                    # Зацикливание: с самого низа в самый верх (к первому сообщению)
                     self.prompt_draft = self.text
                     self.prompt_history_index = 0
                     self.load_text(self.prompt_history[0])
@@ -99,6 +146,15 @@ class ChatInput(TextArea):
             # Enter без Ctrl -> отправка
             event.prevent_default()
             event.stop()
+            
+            # Скрываем подсказки
+            try:
+                from widgets.command_suggestions import CommandSuggestions
+                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions.display = False
+            except Exception:
+                pass
+
             text = self.text
             self.add_to_history(text)
             self.load_text("")

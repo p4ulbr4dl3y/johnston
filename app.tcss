@@ -74,6 +74,16 @@ Markdown OrderedList {
     padding: 0;
 }
 
+/* Slash Command Suggestions Popup */
+#command-suggestions {
+    display: none;
+    height: auto;
+    max-height: 6;
+    margin: 0 3 0 3;
+    border: round #89b4fa;
+    background: #181825;
+}
+
 /* Dynamic Auto-Expanding ChatInput */
 #message-input {
     width: 100%;

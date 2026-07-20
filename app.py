@@ -6,10 +6,11 @@ from textual import events, work
 from mock_agent import MockAgent
 from widgets.chat_view import ChatView
 from widgets.chat_input import ChatInput
+from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, ResumeScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат со слэш-командами /help и /resume"""
+    """Минималистичный TUI чат с подсказками слэш-команд"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -25,6 +26,7 @@ class TUIChatApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
+            yield CommandSuggestions(id="command-suggestions")
             yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
