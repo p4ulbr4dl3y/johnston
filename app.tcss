@@ -15,7 +15,7 @@ Screen {
 
 #chat-view {
     height: 1fr;
-    padding: 1 3;
+    padding: 1 3 0 3;
     background: #0d0e15;
     scrollbar-size: 1 1;
 }
@@ -74,9 +74,12 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Input Bar - Completely Borderless */
+/* Input Bar - Perfectly Aligned & Seamless Background */
 #message-input {
-    margin: 0 3 1 3;
+    width: 100%;
+    height: 3;
+    margin: 0;
+    padding: 0 3;
     border: none;
     background: #0d0e15;
     color: #cdd6f4;
