@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+import os
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
@@ -14,7 +14,7 @@ from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen
 class TUIChatApp(App):
     """Минималистичный TUI чат с конфигурацией провайдеров и изолированными сессиями по проектам"""
 
-    CSS_PATH = "app.tcss"
+    CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
     BINDINGS = [
         ("ctrl+c", "quit", "Выход"),
         ("ctrl+q", "quit", "Выход"),
@@ -215,7 +215,8 @@ class TUIChatApp(App):
                 bot_msg.content = val1
                 bot_msg = None
 
-        self.save_current_session()
+def main():
+    TUIChatApp().run()
 
 if __name__ == "__main__":
-    TUIChatApp().run()
+    main()

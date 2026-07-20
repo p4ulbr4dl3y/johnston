@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tui-chat"
+version = "0.1.0"
+description = "Textual AI TUI Chat Application"
+requires-python = ">=3.10"
+dependencies = [
+    "textual>=8.0.0",
+    "openai>=1.0.0",
+    "httpx>=0.25.0",
+    "markdown-it-py",
+    "linkify-it-py",
+    "mdit-py-plugins",
+]
+
+[project.scripts]
+tui = "app:main"
+tui-chat = "app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
