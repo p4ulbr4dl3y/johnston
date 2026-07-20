@@ -10,7 +10,7 @@ from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, ResumeScreen
 
 class TUIChatApp(App):
-    """Минималистичный TUI чат с визуализацией думания (Thinking/Thought for N sec)"""
+    """Минималистичный TUI чат с гибким чередованием думания, текста и тулов"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -72,7 +72,7 @@ class TUIChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Пошаговая генерация: thinking -> tools -> outro"""
+        """Чередование мышления, вызова инструментов и текста от ИИ"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
@@ -87,7 +87,7 @@ class TUIChatApp(App):
                     thinking_widget.finish_thinking(duration, val2)
             elif event_type == "tool":
                 await chat_view.add_tool_call(val1, val2)
-            elif event_type == "outro":
+            elif event_type in ("bot_text", "outro"):
                 bot_msg = await chat_view.add_bot_message()
                 bot_msg.content = val1
 
