@@ -14,7 +14,7 @@ class HelpScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown(
-                "### 💡 **Command Help**\n\n"
+                "### **Command Help**\n\n"
                 "* `/help` — Open this help\n"
                 "* `/new` — Start a new chat session\n"
                 "* `/provider` — Switch AI provider\n"
@@ -72,10 +72,10 @@ class ResumeScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 📁 **Select session to resume (/resume)**", classes="modal-markdown")
+            yield Markdown("### **Select session to resume (/resume)**", classes="modal-markdown")
             
             options = [
-                f"💬 {s['title']} ({s['message_count']} msgs)"
+                f"{s['title']} ({s['message_count']} msgs)"
                 for s in self.sessions
             ]
             yield OptionList(*options, id="resume-session-option-list")
@@ -102,10 +102,10 @@ class ProviderScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 🔌 **Select AI provider (/provider)**", classes="modal-markdown")
+            yield Markdown("### **Select AI provider (/provider)**", classes="modal-markdown")
             
             options = [
-                f"⚡ {p['name']}" + (f" — {p['description']}" if p.get('description') else "")
+                f"{p['name']}" + (f" — {p['description']}" if p.get('description') else "")
                 for p in self.providers_list
             ]
             yield OptionList(*options, id="provider-option-list")
@@ -133,7 +133,7 @@ class ModelScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 🤖 **Select provider model (/models)**", classes="modal-markdown")
+            yield Markdown("### **Select provider model (/models)**", classes="modal-markdown")
             
             options = [
                 f"{'▶ ' if m == self.current_model else '  '}{m}"

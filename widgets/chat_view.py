@@ -100,10 +100,10 @@ class ToolCallWidget(Vertical):
         self.is_expanded = False
 
         icons = {
-            "Create": "✨ Create",
-            "Read": "📖 Read",
-            "Edit": "📝 Edit",
-            "Bash": "⚡ Bash"
+            "Create": "Create",
+            "Read": "Read",
+            "Edit": "Edit",
+            "Bash": "Bash"
         }
         self.icon_name = icons.get(tool_type, f"● {tool_type}")
         

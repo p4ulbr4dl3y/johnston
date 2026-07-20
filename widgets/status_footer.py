@@ -17,12 +17,12 @@ class StatusFooter(Static):
         if not directory:
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
-        dir_text = f"📁 {directory}"
-        prov_text = f"⚡ {provider_key}" if provider_key else "⚡ default"
-        model_text = f"🤖 {model_name}" if model_name else ""
-        context_text = f"🧠 {context_window}" if context_window else ""
-        tokens_text = f"🪙 {total_tokens:,} tok"
-        cost_text = f"💲 ${cost_usd:.4f}"
+        dir_text = f"Dir: {directory}"
+        prov_text = f"Provider: {provider_key}" if provider_key else "Provider: default"
+        model_text = f"Model: {model_name}" if model_name else ""
+        context_text = f"Context: {context_window}" if context_window else ""
+        tokens_text = f"Tokens: {total_tokens:,} tok"
+        cost_text = f"Cost: ${cost_usd:.4f}"
 
         parts = [dir_text, prov_text]
         if model_text:

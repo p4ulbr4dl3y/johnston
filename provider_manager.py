@@ -249,7 +249,7 @@ class Agent:
             self.history.append({"role": "assistant", "content": full_assistant_text})
 
         except Exception as err:
-            error_msg = f"❌ **OpenCode API Error:** `{err}`"
+            error_msg = f"**OpenCode API Error:** `{err}`"
             yield ("bot_text", error_msg, "")
 '''
 
