@@ -42,6 +42,41 @@ Screen {
     padding: 0;
 }
 
+/* Distinct Tool Call Widget Styling */
+.tool-call {
+    width: 100%;
+    height: auto;
+    margin-top: 1;
+    padding: 0 1;
+    background: #181825;
+    border-left: solid #89b4fa;
+    color: #cdd6f4;
+}
+
+.tool-create {
+    border-left: solid #a6e3a1;
+    background: #14241d;
+    color: #a6e3a1;
+}
+
+.tool-read {
+    border-left: solid #89b4fa;
+    background: #172038;
+    color: #89b4fa;
+}
+
+.tool-edit {
+    border-left: solid #f9e2af;
+    background: #2b2519;
+    color: #f9e2af;
+}
+
+.tool-bash {
+    border-left: solid #cba6f7;
+    background: #231b30;
+    color: #cba6f7;
+}
+
 /* Strict Height Auto & Zero Margin for Markdown Elements */
 Markdown {
     width: 100%;

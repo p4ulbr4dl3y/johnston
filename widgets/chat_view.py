@@ -28,8 +28,31 @@ class BotMessage(Vertical):
         self.md_widget.update(new_content)
 
 
+class ToolCallWidget(Static):
+    """Красивый отдельный виджет вызова инструмента (Create, Read, Edit, Bash)"""
+    can_focus = False
+
+    def __init__(self, tool_type: str, target: str):
+        self.tool_type = tool_type
+        self.target = target
+        
+        icons = {
+            "Create": "✨ Create",
+            "Read": "📖 Read",
+            "Edit": "📝 Edit",
+            "Bash": "⚡ Bash"
+        }
+        header = icons.get(tool_type, f"● {tool_type}")
+        
+        # Формат: ● ToolType(target)
+        super().__init__(
+            f"[bold]{header}[/bold]({target})",
+            classes=f"tool-call tool-{tool_type.lower()}"
+        )
+
+
 class ChatView(VerticalScroll):
-    """Скроллируемый поток чата с поддержкой отката"""
+    """Скроллируемый поток чата"""
     can_focus = False
 
     async def add_user_message(self, text: str) -> UserMessage:
@@ -44,8 +67,14 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=True)
         return msg
 
+    async def add_tool_call(self, tool_type: str, target: str) -> ToolCallWidget:
+        """Добавление отдельного красивого виджета вызова инструмента"""
+        widget = ToolCallWidget(tool_type, target)
+        await self.mount(widget)
+        self.scroll_end(animate=True)
+        return widget
+
     def get_user_messages(self) -> list[tuple[int, str]]:
-        """Возвращает список (индекс_в_дереве, текст) всех сообщений пользователя"""
         result = []
         for idx, child in enumerate(self.children):
             if isinstance(child, UserMessage):
@@ -53,7 +82,6 @@ class ChatView(VerticalScroll):
         return result
 
     def rollback_to(self, target_index: int) -> None:
-        """Удаляет сообщения после выбранного элемента"""
         children = list(self.children)
         for child in children[target_index + 1:]:
             child.remove()
