@@ -1,4 +1,4 @@
-/* Ultra-Minimalist Modern TCSS */
+/* Clean Text Stream TCSS */
 
 Screen {
     background: #0d0e15;
@@ -20,42 +20,34 @@ Screen {
     scrollbar-size: 1 1;
 }
 
-/* User Message Bubble */
-.user-bubble {
-    align-horizontal: right;
-    max-width: 80%;
-    margin: 1 0;
-    padding: 1 2;
-    background: #2563eb 15%;
-    border: round #3b82f6;
-    color: #f8fafc;
-}
-
-/* Bot Message Bubble */
-.bot-bubble {
-    align-horizontal: left;
-    max-width: 85%;
-    margin: 1 0;
-    padding: 1 2;
-    background: #181825;
-    border: round #313244;
-}
-
-.bot-author {
+/* User Message - Clean Text */
+.user-msg {
+    width: 100%;
+    margin: 1 0 0 0;
     color: #89b4fa;
-    text-style: bold;
-    margin-bottom: 1;
 }
 
-/* Bottom Input Bar */
+/* Bot Message - Clean Text */
+.bot-msg {
+    width: 100%;
+    margin: 1 0;
+    color: #cdd6f4;
+}
+
+.bot-label {
+    color: #a6e3a1;
+    text-style: bold;
+}
+
+/* Input Bar - Minimal Prompt Line */
 #message-input {
-    margin: 1 3 1 3;
-    padding: 0 1;
-    border: round #45475a;
-    background: #1e1e2e;
+    margin: 0 3 1 3;
+    border: none;
+    border-top: solid #313244;
+    background: #0d0e15;
     color: #cdd6f4;
 }
 
 #message-input:focus {
-    border: round #89b4fa;
+    border-top: solid #89b4fa;
 }

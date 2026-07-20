@@ -3,22 +3,21 @@ from textual.containers import VerticalScroll, Vertical
 from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
 
-class UserBubble(Static):
-    """Минималистичное сообщение пользователя"""
+class UserMessage(Static):
+    """Сообщение пользователя без рамок"""
     def __init__(self, content: str):
-        super().__init__(content, classes="user-bubble")
+        super().__init__(f"**Вы:** {content}", classes="user-msg")
 
-class BotBubble(Vertical):
-    """Минималистичное сообщение ИИ"""
+class BotMessage(Vertical):
+    """Сообщение ИИ без рамок"""
     content = reactive("")
 
     def __init__(self, persona_name: str = "ИИ"):
-        super().__init__(classes="bot-bubble")
-        self.persona_name = persona_name
+        super().__init__(classes="bot-msg")
         self.md_widget = Markdown("")
 
     def compose(self) -> ComposeResult:
-        yield Label("✦ ИИ", classes="bot-author")
+        yield Label("✦ **ИИ:**", classes="bot-label")
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
@@ -26,16 +25,16 @@ class BotBubble(Vertical):
 
 
 class ChatView(VerticalScroll):
-    """Лента чата"""
+    """Чистый поток чата без бабблов"""
 
-    async def add_user_message(self, text: str) -> UserBubble:
-        bubble = UserBubble(text)
-        await self.mount(bubble)
+    async def add_user_message(self, text: str) -> UserMessage:
+        msg = UserMessage(text)
+        await self.mount(msg)
         self.scroll_end(animate=True)
-        return bubble
+        return msg
 
-    async def add_bot_message(self, persona_name: str = "ИИ") -> BotBubble:
-        bubble = BotBubble(persona_name=persona_name)
-        await self.mount(bubble)
+    async def add_bot_message(self, persona_name: str = "ИИ") -> BotMessage:
+        msg = BotMessage(persona_name=persona_name)
+        await self.mount(msg)
         self.scroll_end(animate=True)
-        return bubble
+        return msg
