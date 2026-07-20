@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label
 from textual import events, work
 
 from mock_agent import MockAgent
@@ -11,7 +10,7 @@ from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import HelpScreen, ResumeScreen
 
 class TUIChatApp(App):
-    """TUI чат в стиле OpenCode CLI с синим акцентом слева и персиковым выделением подсказок"""
+    """Минималистичный TUI чат со слэш-командами и подсказками"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -28,9 +27,7 @@ class TUIChatApp(App):
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
             yield CommandSuggestions(id="command-suggestions")
-            with Vertical(id="input-container"):
-                yield ChatInput(id="message-input", show_line_numbers=False)
-                yield Label("[bold #3b82f6]Build[/bold #3b82f6] [dim]·[/dim] [bold #e0e0e0]Mock AI Agent[/bold #e0e0e0] [dim]Textual TUI[/dim]", id="input-status-bar")
+            yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
         """Мгновенный фокус при старте"""
@@ -75,7 +72,7 @@ class TUIChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Пошаговая генерация ответа"""
+        """Чередование мышления, вызова инструментов и текста от ИИ"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)
