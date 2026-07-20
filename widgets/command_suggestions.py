@@ -2,6 +2,7 @@ from textual.widgets import OptionList
 
 COMMANDS = [
     ("/help", "Help and keybindings"),
+    ("/new", "Start a new chat session"),
     ("/rewind", "Rollback chat history to a message"),
     ("/resume", "Resume a saved session"),
 ]

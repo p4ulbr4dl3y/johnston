@@ -125,6 +125,13 @@ class TUIChatApp(App):
             self.push_screen(HelpScreen())
             return
 
+        # Слэш-команда /new
+        if user_text.lower() == "/new":
+            new_sid = self.sm.create_session("Новый диалог")
+            self.load_session_ui(new_sid)
+            self.notify("Создана новая сессия!")
+            return
+
         # Слэш-команда /rewind
         if user_text.lower() == "/rewind":
             chat_view = self.query_one(ChatView)

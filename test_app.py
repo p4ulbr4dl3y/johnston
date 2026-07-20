@@ -54,5 +54,13 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, ResumeScreen)
         print("✓ ResumeScreen tests passed cleanly!")
 
+        # 5. Проверяем /new
+        chat_input.load_text("/new")
+        await pilot.press("enter")
+        await pilot.pause(0.5)
+        chat_view = app.query_one(ChatView)
+        assert len(list(chat_view.children)) == 0
+        print("✓ /new command tests passed cleanly!")
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
