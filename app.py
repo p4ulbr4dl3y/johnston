@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input
 from textual import work
 
 from mock_agent import MockAgent
 from widgets.chat_view import ChatView
+from widgets.chat_input import ChatInput
 
 class TUIChatApp(App):
-    """Супер-чистый TUI чат с автофокусом"""
+    """Минималистичный TUI чат с многострочным вводом"""
 
     CSS_PATH = "app.tcss"
     BINDINGS = [
@@ -24,25 +24,25 @@ class TUIChatApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
-            yield Input(placeholder="Написать сообщение...", id="message-input")
+            yield ChatInput(id="message-input", show_line_numbers=False)
 
     def on_mount(self) -> None:
         """Поле ввода всегда в фокусе при старте"""
-        self.query_one("#message-input", Input).focus()
+        self.query_one("#message-input", ChatInput).focus()
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Отправка по Enter и фокус остается в поле ввода"""
+    def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+        """Отправка текста при Enter"""
         user_text = event.value.strip()
         if not user_text:
             return
             
-        event.input.value = ""
-        event.input.focus()
+        chat_input = self.query_one("#message-input", ChatInput)
+        chat_input.focus()
         self.generate_ai_response(user_text)
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str) -> None:
-        """Стриминг ответа"""
+        """Стриминг ответа ИИ"""
         chat_view = self.query_one(ChatView)
         
         await chat_view.add_user_message(user_text)

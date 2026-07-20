@@ -74,12 +74,12 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Input Bar - Evenly Proportioned Height 3 with Border */
+/* Multi-line ChatInput Styling */
 #message-input {
     width: 100%;
-    height: 3;
+    height: 4;
     margin: 0 0 1 0;
-    padding: 0 2;
+    padding: 0 1;
     border: round #313244;
     background: #181825;
     color: #cdd6f4;
