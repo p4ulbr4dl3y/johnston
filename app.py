@@ -27,6 +27,7 @@ class TUIChatApp(App):
         self.pm = ProviderManager()
         self.sm = SessionManager()
         self.agent = self.pm.create_active_agent()
+        self.agent.app = self
         self.current_session_id = self.sm.generate_session_id()
 
     def compose(self) -> ComposeResult:
@@ -160,6 +161,7 @@ class TUIChatApp(App):
         if event.value and isinstance(event.value, str) and event.value != "none":
             self.pm.set_active_provider_key(event.value)
             self.agent = self.pm.create_active_agent()
+            self.agent.app = self
             if hasattr(self.agent, "history"):
                 sess = self.sm.load_session(self.current_session_id)
                 if sess:
@@ -229,6 +231,12 @@ class TUIChatApp(App):
             raise
         finally:
             self.save_current_session()
+
+    def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
+        """Вызывается при завершении фоновой bash команды"""
+        self.notify(f"Background command completed (TID: {task_id})")
+        msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
+        self.generate_ai_response(msg)
 
 def main():
     TUIChatApp().run()

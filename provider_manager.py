@@ -86,7 +86,7 @@ TOOLS = [
     }
 ]
 
-async def execute_tool(name: str, args: dict) -> str:
+async def execute_tool(name: str, args: dict, app=None) -> str:
     """Local execution of tools Read, Create, Edit, Bash"""
     try:
         if name == "Read":
@@ -114,11 +114,32 @@ async def execute_tool(name: str, args: dict) -> str:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            stdout, stderr = await p.communicate()
-            res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
-            if len(res) > 3000:
-                res = res[:3000] + "\\n... [output truncated]"
-            return res if res.strip() else "Command executed with no output."
+            try:
+                stdout, stderr = await asyncio.wait_for(p.communicate(), timeout=5.0)
+                res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
+                if len(res) > 3000:
+                    res = res[:3000] + "\\n... [output truncated]"
+                return res if res.strip() else "Command executed with no output."
+            except asyncio.TimeoutError:
+                if app:
+                    task_id = f"bash_{int(time.time())}"
+                    async def wait_for_background_task(proc, command_str, tid, application):
+                        stdout_bytes, stderr_bytes = await proc.communicate()
+                        out_res = stdout_bytes.decode("utf-8", errors="replace") + stderr_bytes.decode("utf-8", errors="replace")
+                        if len(out_res) > 3000:
+                            out_res = out_res[:3000] + "\\n... [output truncated]"
+                        out_res = out_res if out_res.strip() else "Command executed with no output."
+                        application.on_background_bash_completed(tid, command_str, out_res)
+                    
+                    asyncio.create_task(wait_for_background_task(p, cmd, task_id, app))
+                    app.notify(f"Command sent to background (TID: {task_id})")
+                    return f"[Background Task ID: {task_id}] Bash command is running in the background. I must wait for its completion. Do not run any other tools until notified."
+                else:
+                    stdout, stderr = await p.communicate()
+                    res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
+                    if len(res) > 3000:
+                        res = res[:3000] + "\\n... [output truncated]"
+                    return res if res.strip() else "Command executed with no output."
 
     except Exception as err:
         return f"Error executing tool {name}: {err}"
@@ -237,7 +258,7 @@ class Agent:
                     target = args.get("path") or args.get("command") or t_name
                     yield ("tool", t_name, target)
 
-                    tool_result = await execute_tool(t_name, args)
+                    tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
                     yield ("tool_result", tool_result, "")
 
                     messages.append({

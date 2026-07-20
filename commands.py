@@ -52,6 +52,7 @@ class ProviderCommand(BaseCommand):
             if selected_key:
                 app.pm.set_active_provider_key(selected_key)
                 app.agent = app.pm.create_active_agent()
+                app.agent.app = app
                 app.refresh_status_footer()
                 app.notify(f"Provider switched: {selected_key}")
             app.query_one("#message-input", ChatInput).focus()
