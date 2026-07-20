@@ -109,13 +109,16 @@ class ToolCallWidget(Vertical):
         
         self.header_label = Label("", classes="tool-header")
         self.md_widget = Markdown("")
+        self.diff_widget = Static("", classes="tool-diff-view")
 
     def compose(self) -> ComposeResult:
         yield self.header_label
         yield self.md_widget
+        yield self.diff_widget
 
     def on_mount(self) -> None:
         self.md_widget.display = False
+        self.diff_widget.display = False
         self.render_header()
         if self.result_text:
             self.set_result(self.result_text)
@@ -124,17 +127,41 @@ class ToolCallWidget(Vertical):
         self.result_text = result_text.strip()
         self.render_header()
         
-        if self.result_text:
+        if not self.result_text:
+            return
+
+        if self.tool_type == "Edit":
+            # Красивый гитоподобный дифф с цветными полосами
+            from rich.text import Text
+            t = Text()
+            lines = self.result_text.splitlines()
+            for line in lines:
+                if line.startswith("+"):
+                    t.append(line + "\n", style="#a6e3a1 on #14241d")
+                elif line.startswith("-"):
+                    t.append(line + "\n", style="#f38ba8 on #2c161a")
+                elif line.startswith("@@"):
+                    t.append(line + "\n", style="#89b4fa")
+                else:
+                    t.append(line + "\n", style="#a6adc8")
+            self.diff_widget.update(t)
+            
+            if self.is_expanded:
+                self.diff_widget.display = True
+                self.md_widget.display = False
+        else:
             if self.tool_type == "Bash":
                 formatted_md = f"```bash\n{self.result_text}\n```"
-            elif self.tool_type == "Edit":
-                formatted_md = f"```diff\n{self.result_text}\n```"
             elif self.tool_type == "Create":
                 ext = os.path.splitext(self.target)[1].lstrip(".")
                 formatted_md = f"```{ext}\n{self.result_text}\n```"
             else:
                 formatted_md = self.result_text
             self.md_widget.update(formatted_md)
+            
+            if self.is_expanded:
+                self.md_widget.display = True
+                self.diff_widget.display = False
 
     def render_header(self) -> None:
         if self.result_text:
@@ -147,7 +174,12 @@ class ToolCallWidget(Vertical):
         if self.result_text:
             self.is_expanded = not self.is_expanded
             self.render_header()
-            self.md_widget.display = self.is_expanded
+            if self.tool_type == "Edit":
+                self.diff_widget.display = self.is_expanded
+                self.md_widget.display = False
+            else:
+                self.md_widget.display = self.is_expanded
+                self.diff_widget.display = False
 
     def on_click(self, event: events.Click) -> None:
         self.toggle_expand()

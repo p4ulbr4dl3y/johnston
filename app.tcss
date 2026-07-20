@@ -109,6 +109,15 @@ Screen {
     color: #cdd6f4;
 }
 
+.tool-diff-view {
+    width: 100%;
+    height: auto;
+    margin-top: 1;
+    padding: 0 1;
+    background: #11111b;
+    color: #cdd6f4;
+}
+
 /* Strict Height Auto & Zero Margin for Markdown Elements */
 Markdown {
     width: 100%;
