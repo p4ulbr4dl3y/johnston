@@ -3,7 +3,7 @@ from textual.message import Message
 from textual import events
 
 class ChatInput(TextArea):
-    """Поле ввода с подсказками слэш-команд и автодополнением по Tab"""
+    """Поле ввода с реактивными подсказками при реальном вводе символов"""
 
     class Submitted(Message):
         """Событие отправки текста"""
@@ -24,14 +24,9 @@ class ChatInput(TextArea):
     def on_blur(self, event: events.Blur) -> None:
         self.call_after_refresh(self.focus)
 
-    def watch_text(self, new_text: str) -> None:
-        self.update_height()
-        self.update_suggestions(new_text)
-
     def load_text(self, text: str) -> None:
         super().load_text(text)
-        self.update_height()
-        self.update_suggestions(text)
+        self._on_input_change()
 
     def update_height(self) -> None:
         """Динамический расчет высоты от 3 до 10 строк"""
@@ -40,15 +35,20 @@ class ChatInput(TextArea):
         if self.styles.height.value != target_height:
             self.styles.height = target_height
 
-    def update_suggestions(self, text: str) -> None:
+    def update_suggestions(self) -> None:
         """Обновление списка подсказок слэш-команд"""
         if self.app:
             try:
                 from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
-                suggestions.update_query(text)
-            except Exception:
+                suggestions.update_query(self.text)
+            except Exception as e:
                 pass
+
+    def _on_input_change(self) -> None:
+        """Вызывается при любом изменении текста в инпуте"""
+        self.update_height()
+        self.update_suggestions()
 
     def add_to_history(self, text: str) -> None:
         """Сохранение отправленного сообщения в историю запросов"""
@@ -84,7 +84,7 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
-        # Обработка подсказок при навигации стрелками
+        # Обработка навигации в меню подсказок по стрелкам
         try:
             from widgets.command_suggestions import CommandSuggestions
             suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
@@ -143,7 +143,6 @@ class ChatInput(TextArea):
                 return
 
         if event.key == "enter":
-            # Enter без Ctrl -> отправка
             event.prevent_default()
             event.stop()
             
@@ -160,10 +159,10 @@ class ChatInput(TextArea):
             self.load_text("")
             self.post_message(self.Submitted(text))
         elif event.key in ("ctrl+enter", "ctrl+j", "shift+enter"):
-            # Ctrl+Enter / Shift+Enter -> перенос строки
             event.prevent_default()
             event.stop()
             self.insert("\n")
-            self.update_height()
+            self._on_input_change()
         else:
-            self.call_after_refresh(self.update_height)
+            # На ЛЮБОЕ нажатие клавиши вызываем перерасчет после рефреша
+            self.call_after_refresh(self._on_input_change)

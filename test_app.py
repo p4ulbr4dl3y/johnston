@@ -13,23 +13,24 @@ async def test_chat_app_flow():
         suggestions = app.query_one("#command-suggestions", CommandSuggestions)
         assert not suggestions.display
         
-        # 1. Печатаем "/" -> подсказки активируются
-        chat_input.load_text("/")
+        # Симулируем посимвольное нажатие клавиш: '/', 'r', 'e'
+        await pilot.press("slash")
         await pilot.pause(0.1)
         assert suggestions.display
-        print("✓ Suggestions displayed when typing '/'")
+        print("✓ Suggestions displayed when typing '/' key")
         
-        # 2. Печатаем "/h" -> фильтрация до /help
-        chat_input.load_text("/h")
+        await pilot.press("r")
+        await pilot.press("e")
         await pilot.pause(0.1)
         assert suggestions.display
+        print("✓ Suggestions updated when typing '/re'")
         
-        # 3. Нажимаем Tab -> автодополнение до "/help"
+        # Нажимаем Tab -> автодополнение до "/resume"
         await pilot.press("tab")
         await pilot.pause(0.1)
-        assert chat_input.text == "/help"
+        assert chat_input.text == "/resume"
         assert not suggestions.display
-        print("✓ Tab key autocompleted '/h' to '/help'")
+        print("✓ Tab key autocompleted '/re' to '/resume'")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
