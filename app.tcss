@@ -130,7 +130,7 @@ Markdown OrderedList {
     padding: 0;
 }
 
-/* Command Suggestions Popup - Zero Bottom Margin to Touch Input Directly */
+/* Command Suggestions Popup */
 #command-suggestions {
     display: none;
     width: 100%;
@@ -153,12 +153,12 @@ Markdown OrderedList {
     text-style: bold;
 }
 
-/* Dynamic Auto-Expanding ChatInput */
+/* Dynamic Auto-Expanding ChatInput - Zero Margins to Sit Flush at Bottom */
 #message-input {
     width: 100%;
     min-height: 3;
     max-height: 10;
-    margin: 0 0 1 0;
+    margin: 0;
     padding: 0 1;
     border: round #313244;
     background: #181825;
