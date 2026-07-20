@@ -23,7 +23,7 @@ class HelpScreen(ModalScreen[None]):
                 "* `Enter` — Отправить сообщение\n"
                 "* `Ctrl+Enter` / `Shift+Enter` — Перенос строки\n"
                 "* `↑ / ↓` — Навигация по истории запросов (зацикленная)\n"
-                "* `Ctrl+C` / `Esc` — Выход из приложения",
+                "* `Ctrl+C` / `Ctrl+Q` — Выход из приложения",
                 classes="modal-markdown"
             )
 

@@ -18,7 +18,6 @@ class TUIChatApp(App):
     BINDINGS = [
         ("ctrl+c", "quit", "Выход"),
         ("ctrl+q", "quit", "Выход"),
-        ("escape", "quit", "Выход"),
     ]
 
     def __init__(self):
