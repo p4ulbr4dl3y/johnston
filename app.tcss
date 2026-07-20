@@ -1,0 +1,132 @@
+/* Main Layout Styles */
+
+Screen {
+    layout: horizontal;
+    background: $surface;
+}
+
+/* Sidebar Styles */
+Sidebar {
+    width: 32;
+    height: 100%;
+    background: $surface-darken-1;
+    border-right: heavy $accent;
+    padding: 1 1;
+}
+
+#sidebar-title {
+    text-align: center;
+    width: 100%;
+    margin-bottom: 1;
+    color: $accent;
+    text-style: bold;
+}
+
+#new-chat-container {
+    height: auto;
+    margin-bottom: 1;
+}
+
+#btn-new-chat {
+    width: 100%;
+}
+
+.section-label {
+    margin-top: 1;
+    margin-bottom: 0;
+    color: $text-muted;
+    text-style: bold;
+}
+
+#session-list {
+    height: 10;
+    margin-bottom: 1;
+    border: round $primary;
+}
+
+#persona-select {
+    margin-bottom: 1;
+}
+
+#sidebar-info {
+    margin-top: 1;
+    padding: 1;
+    border: dashed $accent;
+    height: auto;
+    background: $surface-darken-2;
+}
+
+.info-title {
+    color: $accent;
+}
+
+#info-text {
+    color: $text-muted;
+}
+
+/* Main Workspace Area */
+#main-container {
+    width: 1fr;
+    height: 100%;
+    layout: vertical;
+}
+
+#chat-header {
+    height: 3;
+    content-align: center middle;
+    background: $surface-darken-1;
+    border-bottom: solid $primary;
+    text-style: bold;
+    color: $text;
+}
+
+#chat-view {
+    height: 1fr;
+    padding: 1 2;
+    background: $surface;
+}
+
+/* Message Bubbles */
+
+.user-bubble {
+    align-horizontal: right;
+    width: 75%;
+    margin: 1 0;
+    padding: 1 2;
+    background: #2ac3de 20%;
+    border: round #2ac3de;
+    color: $text;
+}
+
+.bot-bubble {
+    align-horizontal: left;
+    width: 85%;
+    margin: 1 0;
+    padding: 1 2;
+    background: $surface-darken-1;
+    border: round $accent;
+}
+
+.bot-author {
+    color: $accent;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+/* Input Bar Container */
+#input-container {
+    height: auto;
+    layout: horizontal;
+    padding: 1 2;
+    background: $surface-darken-1;
+    border-top: solid $primary;
+}
+
+#message-input {
+    width: 1fr;
+    margin-right: 1;
+}
+
+#btn-send {
+    width: 12;
+}
