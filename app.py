@@ -10,7 +10,7 @@ from session_manager import SessionManager
 from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget, ToolCallWidget
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen
+from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen
 
 class TUIChatApp(App):
     """Минималистичный TUI чат с конфигурацией провайдеров и изолированными сессиями по проектам"""
@@ -161,6 +161,44 @@ class TUIChatApp(App):
             elif hasattr(self.agent, "history"):
                 self.agent.history = []
             self.notify("Создан новый диалог!")
+            return
+
+        # Слэш-команда /provider
+        if user_text.lower() == "/provider":
+            providers = self.pm.load_providers()
+            if not providers:
+                self.notify("Нет доступных провайдеров", severity="warning")
+                return
+
+            def on_provider_selected(selected_key: str) -> None:
+                if selected_key:
+                    self.pm.set_active_provider_key(selected_key)
+                    self.agent = self.pm.create_active_agent()
+                    self.notify(f"Провайдер переключен: {selected_key}")
+                self.query_one("#message-input", ChatInput).focus()
+
+            self.push_screen(ProviderScreen(providers), callback=on_provider_selected)
+            return
+
+        # Слэш-команда /models
+        if user_text.lower() == "/models":
+            active_key = self.pm.get_active_provider_key()
+            self.notify(f"Загрузка моделей для {active_key}...")
+            models = await self.pm.fetch_models_for_provider(active_key)
+            if not models:
+                self.notify("Не удалось получить список моделей", severity="warning")
+                return
+            
+            curr_model = getattr(self.agent, "model", "")
+            
+            def on_model_selected(selected_model: str) -> None:
+                if selected_model:
+                    if hasattr(self.agent, "model"):
+                        self.agent.model = selected_model
+                    self.notify(f"Модель переключена: {selected_model}")
+                self.query_one("#message-input", ChatInput).focus()
+
+            self.push_screen(ModelScreen(models, curr_model), callback=on_model_selected)
             return
 
         # Слэш-команда /rewind

@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import importlib.util
 import shutil
 from typing import Dict, Any, Type
@@ -362,3 +363,57 @@ class ProviderManager:
             return providers[first_key]["module"].Agent()
         else:
             raise RuntimeError("Нет доступных провайдеров в ~/.tui/providers/")
+
+    async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> list[str]:
+        """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""
+        CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
+
+        # 1. Проверяем файл кеша
+        if not force_refresh and os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    age = time.time() - cdata.get("updated_at", 0)
+                    if age < 86400 and cdata.get("models"):
+                        return cdata["models"]
+            except Exception:
+                pass
+
+        # 2. Запрашиваем модели через HTTP API провайдера
+        providers = self.load_providers()
+        if provider_key not in providers:
+            return []
+
+        mod = providers[provider_key]["module"]
+        base_url = getattr(mod, "BASE_URL", None)
+        api_key = getattr(mod, "API_KEY", None)
+
+        models = []
+        if base_url:
+            import httpx
+            models_url = f"{base_url.rstrip('/')}/models"
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(models_url, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models = [m["id"] for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
+            except Exception as e:
+                print(f"Ошибка получения моделей {provider_key}: {e}")
+
+        # Фолбэк на дефолтную модель
+        if not models and hasattr(mod, "MODEL"):
+            models = [mod.MODEL]
+
+        # Записываем в кеш
+        if models:
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump({"updated_at": time.time(), "models": models}, f, indent=2)
+            except Exception as e:
+                print(f"Ошибка записи кеша моделей: {e}")
+
+        return models
