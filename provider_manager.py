@@ -17,24 +17,24 @@ from openai import AsyncOpenAI
 
 NAME = "OpenCode Go (DeepSeek v4 Flash)"
 KEY = "opencode"
-DESCRIPTION = "Настоящий агент OpenCode Go (DeepSeek v4 Flash) с поддержкой инструментов Read, Create, Edit, Bash"
+DESCRIPTION = "OpenCode Go agent (DeepSeek v4 Flash) with Read, Create, Edit, and Bash tools"
 
 BASE_URL = "https://opencode.ai/zen/go/v1"
 MODEL = "deepseek-v4-flash"
 API_KEY = "sk-placeholder"
 
-SYSTEM_PROMPT = "Ты инженер-разработчик. Тебе доступны инструменты Read, Create, Edit, Bash. Используй их для просмотра, создания и изменения файлов, а также выполнения терминальных команд."
+SYSTEM_PROMPT = "You are a software engineer. You have tools: Read, Create, Edit, Bash. Use them to read, create, or edit files and run terminal commands in the current workspace."
 
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "Read",
-            "description": "Прочитать файл из файловой системы",
+            "description": "Read file from the filesystem",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Путь к файлу"}
+                    "path": {"type": "string", "description": "Path to file"}
                 },
                 "required": ["path"]
             }
@@ -44,12 +44,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Create",
-            "description": "Создать новый файл",
+            "description": "Create a new file",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Путь к файлу"},
-                    "content": {"type": "string", "description": "Содержимое файла"}
+                    "path": {"type": "string", "description": "Path to file"},
+                    "content": {"type": "string", "description": "File content"}
                 },
                 "required": ["path", "content"]
             }
@@ -59,12 +59,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Edit",
-            "description": "Изменить или перезаписать файл",
+            "description": "Modify or overwrite a file",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Путь к файлу"},
-                    "content": {"type": "string", "description": "Новое содержимое файла"}
+                    "path": {"type": "string", "description": "Path to file"},
+                    "content": {"type": "string", "description": "New file content"}
                 },
                 "required": ["path", "content"]
             }
@@ -74,11 +74,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Bash",
-            "description": "Выполнить bash команду в терминале",
+            "description": "Run bash command in terminal",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Команда bash"}
+                    "command": {"type": "string", "description": "Bash command"}
                 },
                 "required": ["command"]
             }
@@ -87,7 +87,7 @@ TOOLS = [
 ]
 
 async def execute_tool(name: str, args: dict) -> str:
-    """Локальное выполнение инструментов Read, Create, Edit, Bash"""
+    """Local execution of tools Read, Create, Edit, Bash"""
     try:
         if name == "Read":
             path = os.path.expanduser(args.get("path", ""))
@@ -95,9 +95,9 @@ async def execute_tool(name: str, args: dict) -> str:
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
                     if len(content) > 4000:
-                        content = content[:4000] + "\\n... [содержимое обрезано]"
+                        content = content[:4000] + "\\n... [content truncated]"
                     return content
-            return f"Ошибка: файл '{path}' не найден."
+            return f"Error: file '{path}' not found."
 
         elif name in ("Create", "Edit"):
             path = os.path.expanduser(args.get("path", ""))
@@ -105,7 +105,7 @@ async def execute_tool(name: str, args: dict) -> str:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
-            return f"Успешно: файл '{path}' сохранен ({len(content)} байт)."
+            return f"Success: file '{path}' saved ({len(content)} bytes)."
 
         elif name == "Bash":
             cmd = args.get("command", "")
@@ -117,13 +117,13 @@ async def execute_tool(name: str, args: dict) -> str:
             stdout, stderr = await p.communicate()
             res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
             if len(res) > 3000:
-                res = res[:3000] + "\\n... [вывод обрезан]"
-            return res if res.strip() else "Команда выполнена без вывода."
+                res = res[:3000] + "\\n... [output truncated]"
+            return res if res.strip() else "Command executed with no output."
 
     except Exception as err:
-        return f"Ошибка выполнения инструмента {name}: {err}"
+        return f"Error executing tool {name}: {err}"
     
-    return "Неизвестный инструмент."
+    return "Unknown tool."
 
 
 class Agent:
@@ -167,7 +167,7 @@ class Agent:
                     if reasoning_delta:
                         if not is_thinking:
                             is_thinking = True
-                            yield ("thinking_start", "Размышление над ответами...", "")
+                            yield ("thinking_start", "Thinking...", "")
                         thinking_text += reasoning_delta
 
                     if delta.content:
@@ -249,7 +249,7 @@ class Agent:
             self.history.append({"role": "assistant", "content": full_assistant_text})
 
         except Exception as err:
-            error_msg = f"❌ **Ошибка OpenCode API:** `{err}`"
+            error_msg = f"❌ **OpenCode API Error:** `{err}`"
             yield ("bot_text", error_msg, "")
 '''
 
@@ -297,7 +297,7 @@ class ProviderManager:
                                 "file": filepath
                             }
                 except Exception as e:
-                    print(f"Ошибка загрузки провайдера {filename}: {e}")
+                    print(f"Error loading provider {filename}: {e}")
 
         return providers
 
@@ -326,7 +326,7 @@ class ProviderManager:
             first_key = list(providers.keys())[0]
             return providers[first_key]["module"].Agent()
         else:
-            raise RuntimeError("Нет доступных провайдеров в ~/.tui/providers/")
+            raise RuntimeError("No available providers in ~/.tui/providers/")
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> list[str]:
         """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""
@@ -366,7 +366,7 @@ class ProviderManager:
                         data = resp.json()
                         models = [m["id"] for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
             except Exception as e:
-                print(f"Ошибка получения моделей {provider_key}: {e}")
+                print(f"Error fetching models for {provider_key}: {e}")
 
         # Фолбэк на дефолтную модель
         if not models and hasattr(mod, "MODEL"):
@@ -378,6 +378,6 @@ class ProviderManager:
                 with open(cache_path, "w", encoding="utf-8") as f:
                     json.dump({"updated_at": time.time(), "models": models}, f, indent=2)
             except Exception as e:
-                print(f"Ошибка записи кеша моделей: {e}")
+                print(f"Error writing models cache: {e}")
 
         return models

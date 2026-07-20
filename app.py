@@ -18,8 +18,8 @@ class TUIChatApp(App):
 
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
     BINDINGS = [
-        ("ctrl+c", "quit", "Выход"),
-        ("ctrl+q", "quit", "Выход"),
+        ("ctrl+c", "quit", "Exit"),
+        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self):
@@ -165,7 +165,7 @@ class TUIChatApp(App):
                 if sess:
                     self.agent.history = sess.get("agent_history", [])
             self.refresh_status_footer()
-            self.notify(f"Агент переключен: {event.value}")
+            self.notify(f"Agent switched: {event.value}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Обработка ввода и слэш-команд (/help, /new, /provider, /models, /rewind, /resume)"""
@@ -179,7 +179,7 @@ class TUIChatApp(App):
         if user_text.startswith("/"):
             processed = await handle_slash_command(self, user_text)
             if not processed:
-                self.notify("Неизвестная команда", severity="warning")
+                self.notify("Unknown command", severity="warning")
             return
 
         self.generate_ai_response(user_text)
@@ -222,10 +222,10 @@ class TUIChatApp(App):
                     bot_msg = None
         except asyncio.CancelledError:
             if thinking_widget:
-                thinking_widget.finish_thinking(0.0, "Генерация остановлена (Esc).")
+                thinking_widget.finish_thinking(0.0, "Generation stopped (Esc).")
             if bot_msg:
-                bot_msg.content += " *(прервано)*"
-            self.notify("Ответ агента прерван (Esc)", severity="warning")
+                bot_msg.content += " *(interrupted)*"
+            self.notify("Agent response interrupted (Esc)", severity="warning")
             raise
         finally:
             self.save_current_session()

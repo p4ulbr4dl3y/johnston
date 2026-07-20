@@ -4,29 +4,29 @@ from textual.containers import Vertical
 from textual.widgets import OptionList, Markdown
 
 class HelpScreen(ModalScreen[None]):
-    """Модальное окно справки (/help)"""
+    """Modal help screen (/help)"""
     
     BINDINGS = [
-        ("escape", "close", "Закрыть"),
-        ("enter", "close", "Закрыть"),
+        ("escape", "close", "Close"),
+        ("enter", "close", "Close"),
     ]
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown(
-                "### 💡 **Справка по командам**\n\n"
-                "* `/help` — Открыть эту справку\n"
-                "* `/new` — Создать новый диалог (сессию)\n"
-                "* `/provider` — Переключить провайдера агента\n"
-                "* `/models` — Переключить модель текущего провайдера\n"
-                "* `/rewind` — Откат истории чата к выбранному сообщению\n"
-                "* `/resume` — Переключение и возобновление диалогов из сессий\n\n"
-                "**Горячие клавиши:**\n"
-                "* `Enter` — Отправить сообщение\n"
-                "* `Ctrl+Enter` / `Shift+Enter` — Перенос строки\n"
-                "* `↑ / ↓` — Навигация по истории запросов (зацикленная)\n"
-                "* `Esc` — Прервать генерацию ответа\n"
-                "* `Ctrl+C` / `Ctrl+Q` — Выход из приложения",
+                "### 💡 **Command Help**\n\n"
+                "* `/help` — Open this help\n"
+                "* `/new` — Start a new chat session\n"
+                "* `/provider` — Switch AI provider\n"
+                "* `/models` — Switch active provider model\n"
+                "* `/rewind` — Rollback chat history to a selected message\n"
+                "* `/resume` — Switch and resume saved session dialogs\n\n"
+                "**Hotkeys:**\n"
+                "* `Enter` — Send message\n"
+                "* `Ctrl+Enter` / `Shift+Enter` — Insert new line\n"
+                "* `↑ / ↓` — History navigation (looping)\n"
+                "* `Esc` — Cancel response generation\n"
+                "* `Ctrl+C` / `Ctrl+Q` — Exit application",
                 classes="modal-markdown"
             )
 
@@ -35,9 +35,9 @@ class HelpScreen(ModalScreen[None]):
 
 
 class RewindScreen(ModalScreen[int]):
-    """Модальное окно отката истории (/rewind)"""
+    """Modal rollback screen (/rewind)"""
 
-    BINDINGS = [("escape", "cancel", "Отмена")]
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self, user_messages: list[tuple[int, str]]):
         super().__init__()
@@ -45,7 +45,7 @@ class RewindScreen(ModalScreen[int]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### ↺ **Выберите сообщение для отката**", classes="modal-markdown")
+            yield Markdown("### ↺ **Select message to rollback to**", classes="modal-markdown")
             
             options = [
                 f"{i+1}. {text[:50]}..." if len(text) > 50 else f"{i+1}. {text}"
@@ -62,9 +62,9 @@ class RewindScreen(ModalScreen[int]):
 
 
 class ResumeScreen(ModalScreen[str]):
-    """Модальное окно возобновления/выбора сессии (/resume)"""
+    """Modal session resume screen (/resume)"""
 
-    BINDINGS = [("escape", "cancel", "Отмена")]
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self, sessions: list[dict]):
         super().__init__()
@@ -72,10 +72,10 @@ class ResumeScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 📁 **Выберите сессию для возобновления (/resume)**", classes="modal-markdown")
+            yield Markdown("### 📁 **Select session to resume (/resume)**", classes="modal-markdown")
             
             options = [
-                f"💬 {s['title']} ({s['message_count']} сообщ.)"
+                f"💬 {s['title']} ({s['message_count']} msgs)"
                 for s in self.sessions
             ]
             yield OptionList(*options, id="resume-session-option-list")
@@ -92,9 +92,9 @@ class ResumeScreen(ModalScreen[str]):
 
 
 class ProviderScreen(ModalScreen[str]):
-    """Модальное окно выбора провайдера (/provider)"""
+    """Modal provider selection screen (/provider)"""
 
-    BINDINGS = [("escape", "cancel", "Отмена")]
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self, providers: dict):
         super().__init__()
@@ -102,7 +102,7 @@ class ProviderScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 🔌 **Выберите провайдера агента (/provider)**", classes="modal-markdown")
+            yield Markdown("### 🔌 **Select AI provider (/provider)**", classes="modal-markdown")
             
             options = [
                 f"⚡ {p['name']}" + (f" — {p['description']}" if p.get('description') else "")
@@ -122,9 +122,9 @@ class ProviderScreen(ModalScreen[str]):
 
 
 class ModelScreen(ModalScreen[str]):
-    """Модальное окно выбора модели (/models)"""
+    """Modal model selection screen (/models)"""
 
-    BINDINGS = [("escape", "cancel", "Отмена")]
+    BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self, models: list[str], current_model: str = ""):
         super().__init__()
@@ -133,7 +133,7 @@ class ModelScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### 🤖 **Выберите модель провайдера (/models)**", classes="modal-markdown")
+            yield Markdown("### 🤖 **Select provider model (/models)**", classes="modal-markdown")
             
             options = [
                 f"{'▶ ' if m == self.current_model else '  '}{m}"

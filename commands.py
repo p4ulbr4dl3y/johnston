@@ -35,7 +35,7 @@ class NewCommand(BaseCommand):
         elif hasattr(app.agent, "history"):
             app.agent.history = []
         app.refresh_status_footer()
-        app.notify("Создан новый диалог!")
+        app.notify("New chat session created!")
 
 
 class ProviderCommand(BaseCommand):
@@ -45,7 +45,7 @@ class ProviderCommand(BaseCommand):
     async def execute(self, app) -> None:
         providers = app.pm.load_providers()
         if not providers:
-            app.notify("Нет доступных провайдеров", severity="warning")
+            app.notify("No available providers", severity="warning")
             return
 
         def on_provider_selected(selected_key: str) -> None:
@@ -53,7 +53,7 @@ class ProviderCommand(BaseCommand):
                 app.pm.set_active_provider_key(selected_key)
                 app.agent = app.pm.create_active_agent()
                 app.refresh_status_footer()
-                app.notify(f"Провайдер переключен: {selected_key}")
+                app.notify(f"Provider switched: {selected_key}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ProviderScreen(providers), callback=on_provider_selected)
@@ -65,10 +65,10 @@ class ModelsCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         active_key = app.pm.get_active_provider_key()
-        app.notify(f"Загрузка моделей для {active_key}...")
+        app.notify(f"Loading models for {active_key}...")
         models = await app.pm.fetch_models_for_provider(active_key)
         if not models:
-            app.notify("Не удалось получить список моделей", severity="warning")
+            app.notify("Failed to fetch models", severity="warning")
             return
         
         curr_model = getattr(app.agent, "model", "")
@@ -78,7 +78,7 @@ class ModelsCommand(BaseCommand):
                 if hasattr(app.agent, "model"):
                     app.agent.model = selected_model
                 app.refresh_status_footer()
-                app.notify(f"Модель переключена: {selected_model}")
+                app.notify(f"Model switched: {selected_model}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(models, curr_model), callback=on_model_selected)
@@ -92,7 +92,7 @@ class RewindCommand(BaseCommand):
         chat_view = app.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
         if not user_msgs:
-            app.notify("История пуста: нет сообщений для отката", severity="warning")
+            app.notify("History is empty: no messages to rollback", severity="warning")
             return
 
         def on_rewind_selected(selected_idx: int | None) -> None:
@@ -103,7 +103,7 @@ class RewindCommand(BaseCommand):
                 elif hasattr(app.agent, "history"):
                     app.agent.history = []
                 app.save_current_session()
-                app.notify("История успешно откачена!")
+                app.notify("History successfully rolled back!")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(RewindScreen(user_msgs), callback=on_rewind_selected)
@@ -116,13 +116,13 @@ class ResumeCommand(BaseCommand):
     async def execute(self, app) -> None:
         sessions = app.sm.list_sessions()
         if not sessions:
-            app.notify("Нет сохраненных сессий в текущем проекте", severity="warning")
+            app.notify("No saved sessions in this project", severity="warning")
             return
 
         def on_resume_selected(selected_sid: str) -> None:
             if selected_sid:
                 app.load_session_ui(selected_sid)
-                app.notify(f"Сессия возобновлена: {selected_sid}")
+                app.notify(f"Session resumed: {selected_sid}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)

@@ -22,7 +22,7 @@ async def test_chat_app_flow():
         print("✓ HelpScreen tests passed")
 
         # 2. Сообщения пользователя
-        for msg in ["Первое сообщение", "Второе сообщение", "Третье сообщение"]:
+        for msg in ["First message", "Second message", "Third message"]:
             chat_input.load_text(msg)
             await pilot.press("enter")
             await pilot.pause(0.5)
@@ -40,7 +40,7 @@ async def test_chat_app_flow():
         chat_view = app.query_one(ChatView)
         user_msgs = [c for c in chat_view.children if isinstance(c, UserMessage)]
         assert len(user_msgs) == 1
-        assert user_msgs[0].raw_text == "Первое сообщение"
+        assert user_msgs[0].raw_text == "First message"
         print("✓ RewindScreen tests passed cleanly!")
 
         # 4. Проверяем /resume

@@ -19,7 +19,7 @@ class BotMessage(Vertical):
     can_focus = False
     content = reactive("")
 
-    def __init__(self, persona_name: str = "ИИ"):
+    def __init__(self, persona_name: str = "AI"):
         super().__init__(classes="bot-msg")
         self.md_widget = Markdown("")
 
@@ -34,7 +34,7 @@ class ThinkingWidget(Vertical):
     """Виджет думания с поддержкой Markdown при разворачивании"""
     can_focus = False
 
-    def __init__(self, thinking_text: str = "Анализ запроса..."):
+    def __init__(self, thinking_text: str = "Thinking..."):
         super().__init__(classes="thinking-widget thinking-active")
         self.thinking_text = thinking_text
         self.duration_seconds = 0.0
@@ -196,13 +196,13 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=True)
         return msg
 
-    async def add_bot_message(self, persona_name: str = "ИИ") -> BotMessage:
+    async def add_bot_message(self, persona_name: str = "AI") -> BotMessage:
         msg = BotMessage(persona_name=persona_name)
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
 
-    async def add_thinking_widget(self, thinking_text: str = "Анализ запроса...") -> ThinkingWidget:
+    async def add_thinking_widget(self, thinking_text: str = "Thinking...") -> ThinkingWidget:
         widget = ThinkingWidget(thinking_text)
         await self.mount(widget)
         self.scroll_end(animate=True)

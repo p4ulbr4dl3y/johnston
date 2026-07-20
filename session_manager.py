@@ -49,13 +49,13 @@ class SessionManager:
                             
                         sessions.append({
                             "id": data.get("id", filename[:-5]),
-                            "title": data.get("title", "Без названия"),
+                            "title": data.get("title", "Untitled"),
                             "created_at": data.get("created_at", 0),
                             "updated_at": data.get("updated_at", 0),
                             "message_count": len(ui_msgs)
                         })
                 except Exception as e:
-                    print(f"Ошибка чтения сессии {filename}: {e}")
+                    print(f"Error reading session {filename}: {e}")
 
         sessions.sort(key=lambda s: s["updated_at"], reverse=True)
         return sessions
@@ -69,7 +69,7 @@ class SessionManager:
                 with open(filepath, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                print(f"Ошибка загрузки сессии {session_id}: {e}")
+                print(f"Error loading session {session_id}: {e}")
         return None
 
     def save_session(self, session_id: str, data: Dict[str, Any]):
