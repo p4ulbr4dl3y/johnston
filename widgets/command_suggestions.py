@@ -7,6 +7,7 @@ class CommandSuggestions(OptionList):
     """Выпадающее меню подсказок слэш-команд (/help, /rewind)"""
     
     can_focus = False
+    ALLOW_SELECT = False
 
     def update_query(self, text: str) -> list[str]:
         """Обновление списка совпадений с форматированием в две колонки"""

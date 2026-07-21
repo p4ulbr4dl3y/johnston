@@ -1,5 +1,17 @@
 import os
 import asyncio
+from textual.widget import Widget
+
+def _new_allow_select(self) -> bool:
+    node = self
+    while node is not None:
+        if not getattr(node, "ALLOW_SELECT", True):
+            return False
+        node = node.parent
+    return True
+
+Widget.allow_select = property(_new_allow_select)
+
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work

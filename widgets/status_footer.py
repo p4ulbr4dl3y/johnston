@@ -4,6 +4,7 @@ from textual.widgets import Static
 class StatusFooter(Static):
     """Информационная строка состояния под чатом (директория, провайдер, модель, контекст, токены, стоимость)"""
     can_focus = False
+    ALLOW_SELECT = False
 
     def update_status(
         self,

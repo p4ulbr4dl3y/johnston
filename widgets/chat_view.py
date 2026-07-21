@@ -48,6 +48,7 @@ class BotMessage(Vertical):
 class ThinkingWidget(Vertical):
     """Виджет думания с поддержкой Markdown при разворачивании"""
     can_focus = False
+    ALLOW_SELECT = False
 
     def __init__(self, thinking_text: str = "Thinking..."):
         super().__init__(classes="thinking-widget thinking-active")
@@ -93,6 +94,7 @@ class ThinkingWidget(Vertical):
 class ToolCallWidget(Vertical):
     """Отдельный разворачиваемый виджет вызова инструмента (Create, Read, Edit, Bash)"""
     can_focus = False
+    ALLOW_SELECT = False
 
     def __init__(self, tool_type: str, target: str, result_text: str = ""):
         super().__init__(classes=f"tool-call tool-{tool_type.lower()}")
