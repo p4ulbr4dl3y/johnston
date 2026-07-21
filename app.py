@@ -168,6 +168,18 @@ class TUIChatApp(App):
         """Любой клик мыши возвращает фокус в инпут"""
         self.query_one("#message-input", ChatInput).focus()
 
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        """При отпускании мыши копирует выделенный фрагмент и сбрасывает выделение"""
+        selected_text = self.screen.get_selected_text()
+        if selected_text:
+            try:
+                self.copy_to_clipboard(selected_text)
+                self.notify("Selected text copied to clipboard!")
+            except Exception as e:
+                self.notify(f"Copy failed: {e}", severity="error")
+            finally:
+                self.screen.clear_selection()
+
     def on_select_changed(self, event: Select.Changed) -> None:
         """Переключение провайдера агента из конфига ~/.tui"""
         if event.value and isinstance(event.value, str) and event.value != "none":
