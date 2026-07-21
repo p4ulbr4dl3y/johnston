@@ -52,6 +52,16 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             content = f.read()
         self.assertEqual(content, "line1\nline_two\nline3")
 
+    async def test_read_line_range_pagination(self):
+        file_path = os.path.join(self.test_dir, "range_test.txt")
+        await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
+
+        res_read = await execute_tool("Read", {"path": file_path, "start_line": 2, "end_line": 3})
+        self.assertIn("Lines 2-3", res_read)
+        self.assertIn("2 | line2", res_read)
+        self.assertIn("3 | line3", res_read)
+        self.assertNotIn("line1", res_read)
+
     async def test_edit_missing_text(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
         await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3"})
@@ -62,6 +72,25 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             "new_string": "replacement"
         })
         self.assertIn("Error", res_edit)
+
+    async def test_edit_ambiguous_occurrences(self):
+        file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
+        await execute_tool("Create", {"path": file_path, "content": "duplicate\nmiddle\nduplicate"})
+
+        res_edit = await execute_tool("Edit", {
+            "path": file_path,
+            "old_string": "duplicate",
+            "new_string": "replacement"
+        })
+        self.assertIn("matches 2 occurrences", res_edit)
+
+    async def test_list_dir_tool(self):
+        os.makedirs(os.path.join(self.test_dir, "folder_a"))
+        await execute_tool("Create", {"path": os.path.join(self.test_dir, "file_b.txt"), "content": "data"})
+
+        res_listdir = await execute_tool("ListDir", {"path": self.test_dir})
+        self.assertIn("[DIR]  folder_a/", res_listdir)
+        self.assertIn("[FILE] file_b.txt", res_listdir)
 
     async def test_glob_tool(self):
         os.makedirs(os.path.join(self.test_dir, "subdir"))
