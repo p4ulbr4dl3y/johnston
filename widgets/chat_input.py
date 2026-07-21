@@ -49,14 +49,32 @@ class ChatInput(TextArea):
             self.styles.height = target_height
 
     def update_suggestions(self) -> None:
-        """Обновление списка подсказок слэш-команд"""
+        """Обновление списка подсказок слэш-команд и файлов"""
         if self.app:
             try:
                 from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
-                suggestions.update_query(self.text)
+                row, col = self.cursor_location
+                line_str = self.document.get_line(row)
+                suggestions.update_query(self.text, line_str, col)
             except Exception:
                 pass
+
+    def apply_file_suggestion(self, chosen_file: str, at_start_idx: int) -> None:
+        """Вставляет выбранный путь к файлу после символа @"""
+        row, col = self.cursor_location
+        line_str = self.document.get_line(row)
+        before = line_str[:at_start_idx]
+        after = line_str[col:]
+        inserted = f"@{chosen_file} "
+        new_line = before + inserted + after
+
+        lines = self.text.split("\n")
+        lines[row] = new_line
+        self.load_text("\n".join(lines))
+
+        new_col = at_start_idx + len(inserted)
+        self.move_cursor((row, new_col))
 
     def _on_input_change(self) -> None:
         """Вызывается при любом изменении текста в инпуте"""
@@ -66,8 +84,57 @@ class ChatInput(TextArea):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
 
+    IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
+
+    def format_pasted_file_path(self, pasted_text: str) -> str:
+        """Автоматически форматирует вставленные пути к файлам (@file или [Image #N])"""
+        import os
+        lines = pasted_text.strip().splitlines()
+        if not lines:
+            return pasted_text
+
+        new_lines = []
+        modified = False
+
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                new_lines.append(line)
+                continue
+
+            if stripped.startswith("@"):
+                path_part = stripped[1:]
+                clean = path_part.strip("'\"").replace("\\ ", " ")
+                expanded = os.path.expanduser(clean)
+                ext = os.path.splitext(clean)[1].lower()
+                if ext in self.IMAGE_EXTENSIONS and os.path.exists(expanded):
+                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
+                    tag = f"[Image #{img_count}]"
+                    self.pasted_texts[tag] = stripped
+                    line = tag
+                    modified = True
+            else:
+                clean = stripped.strip("'\"").replace("\\ ", " ")
+                expanded = os.path.expanduser(clean)
+                if (stripped.startswith("/") or stripped.startswith("~/") or stripped.startswith("file://") or os.path.exists(expanded)):
+                    ext = os.path.splitext(clean)[1].lower()
+                    if ext in self.IMAGE_EXTENSIONS:
+                        img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
+                        tag = f"[Image #{img_count}]"
+                        self.pasted_texts[tag] = f"@{stripped}"
+                        line = tag
+                    else:
+                        line = f"@{stripped}"
+                    modified = True
+
+            new_lines.append(line)
+
+        if modified:
+            return "\n".join(new_lines)
+        return pasted_text
+
     def on_paste(self, event: events.Paste) -> None:
-        pasted_text = event.text
+        pasted_text = self.format_pasted_file_path(event.text)
         lines = pasted_text.splitlines()
         if len(lines) > self.PASTE_LINE_THRESHOLD:
             event.prevent_default()
@@ -78,7 +145,10 @@ class ChatInput(TextArea):
             self.insert(tag)
             self._on_input_change()
         else:
-            self.call_after_refresh(self._on_input_change)
+            event.prevent_default()
+            event.stop()
+            self.insert(pasted_text)
+            self._on_input_change()
 
     def add_to_history(self, text: str) -> None:
         """Сохранение отправленного сообщения в историю запросов"""
@@ -140,22 +210,30 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Нажатие Tab для автодополнения слэш-команды
+        # Нажатие Tab для автодополнения слэш-команды или файла
         if event.key == "tab":
             try:
-                from widgets.command_suggestions import COMMANDS, CommandSuggestions
+                from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
-                    matched_cmds = [cmd for cmd, _ in COMMANDS if cmd.startswith(self.text.strip().lower())]
-                    if suggestions.highlighted < len(matched_cmds):
-                        chosen_cmd = matched_cmds[suggestions.highlighted]
-                        self.load_text(chosen_cmd)
-                        lines = self.text.split("\n")
-                        self.move_cursor((len(lines) - 1, len(lines[-1])))
-                        suggestions.display = False
-                        event.prevent_default()
-                        event.stop()
-                        return
+                    if suggestions.mode == "command":
+                        if suggestions.highlighted < len(suggestions.current_matched):
+                            chosen_cmd = suggestions.current_matched[suggestions.highlighted]
+                            self.load_text(chosen_cmd)
+                            lines = self.text.split("\n")
+                            self.move_cursor((len(lines) - 1, len(lines[-1])))
+                            suggestions.display = False
+                            event.prevent_default()
+                            event.stop()
+                            return
+                    elif suggestions.mode == "file":
+                        if suggestions.highlighted < len(suggestions.current_matched):
+                            chosen_file = suggestions.current_matched[suggestions.highlighted]
+                            self.apply_file_suggestion(chosen_file, suggestions.at_start_idx)
+                            suggestions.display = False
+                            event.prevent_default()
+                            event.stop()
+                            return
             except Exception:
                 pass
 

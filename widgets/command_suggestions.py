@@ -1,35 +1,130 @@
+import os
+
 from textual.widgets import OptionList
 
 from commands import COMMAND_REGISTRY
 
 COMMANDS = [(name, cmd.description) for name, cmd in COMMAND_REGISTRY.items()]
 
+
 class CommandSuggestions(OptionList):
-    """Выпадающее меню подсказок слэш-команд (/help, /rewind)"""
+    """Выпадающее меню подсказок слэш-команд (/help, /rewind) и прикрепления файлов (@file)"""
 
     can_focus = False
-    ALLOW_SELECT = False
+    ALLOW_SELECT = True
 
-    def update_query(self, text: str) -> list[str]:
-        """Обновление списка совпадений с форматированием в две колонки"""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.mode: str | None = None  # "command" или "file"
+        self.current_matched: list[str] = []
+        self.at_start_idx: int = -1
+
+    def get_workspace_files(self) -> list[str]:
+        """Получение списка относительных путей файлов в текущем проекте"""
+        files_list = []
+        cwd = os.getcwd()
+        ignore_dirs = {
+            ".git", ".venv", "venv", "__pycache__", ".johnston",
+            "node_modules", ".mypy_cache", ".pytest_cache", ".idea",
+            ".vscode", "build", "dist", ".gemini", ".next", ".cache"
+        }
+        try:
+            for root, dirs, files in os.walk(cwd):
+                dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+                rel_dir = os.path.relpath(root, cwd)
+                for f in files:
+                    if f.startswith(".") or f.endswith(".pyc"):
+                        continue
+                    rel_path = f if rel_dir == "." else os.path.join(rel_dir, f)
+                    files_list.append(rel_path.replace("\\", "/"))
+                    if len(files_list) >= 1000:
+                        break
+                if len(files_list) >= 1000:
+                    break
+        except Exception:
+            pass
+        return sorted(files_list)
+
+    def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
+        """Обновление списка совпадений с форматированием для /команд и @файлов"""
         self.clear_options()
+        self.mode = None
+        self.current_matched = []
+        self.at_start_idx = -1
 
-        cleaned = text.strip().lower()
-        if not cleaned.startswith("/") or " " in cleaned:
+        if not full_text:
             self.display = False
             return []
 
-        matched_cmds = []
-        for cmd, desc in COMMANDS:
-            if cmd.startswith(cleaned):
-                matched_cmds.append(cmd)
-                formatted_line = f"{cmd:<14} {desc}"
-                self.add_option(formatted_line)
+        # 1. Проверка на слэш-команду в начале ввода
+        cleaned = full_text.strip().lower()
+        if cleaned.startswith("/") and " " not in cleaned:
+            self.mode = "command"
+            matched_cmds = []
+            for cmd, desc in COMMANDS:
+                if cmd.startswith(cleaned):
+                    matched_cmds.append(cmd)
+                    formatted_line = f"{cmd:<14} {desc}"
+                    self.add_option(formatted_line)
 
-        if matched_cmds:
-            self.display = True
-            self.highlighted = 0
-        else:
-            self.display = False
+            self.current_matched = matched_cmds
+            if matched_cmds:
+                self.display = True
+                self.highlighted = 0
+            else:
+                self.display = False
+            return matched_cmds
 
-        return matched_cmds
+        # 2. Проверка на ввод @файла
+        check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
+        at_idx = check_text.rfind("@")
+        if at_idx != -1:
+            if at_idx == 0 or check_text[at_idx - 1] in " \t\n":
+                query_part = check_text[at_idx + 1:]
+                if " " not in query_part and "\n" not in query_part:
+                    self.mode = "file"
+                    self.at_start_idx = at_idx
+                    query_lower = query_part.lower()
+                    files = self.get_workspace_files()
+                    matched_files = []
+                    for f in files:
+                        if not query_lower or query_lower in f.lower():
+                            matched_files.append(f)
+                            formatted_line = f"@{f:<45} File"
+                            self.add_option(formatted_line)
+                            if len(matched_files) >= 50:
+                                break
+
+                    self.current_matched = matched_files
+                    if matched_files:
+                        self.display = True
+                        self.highlighted = 0
+                    else:
+                        self.display = False
+                    return matched_files
+
+        self.display = False
+        return []
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Клик мыши по пункту подсказки"""
+        event.stop()
+        if not self.app or not self.current_matched or self.highlighted is None:
+            return
+        if self.highlighted < len(self.current_matched):
+            try:
+                from widgets.chat_input import ChatInput
+                chat_input = self.app.query_one("#message-input", ChatInput)
+                if self.mode == "command":
+                    chosen_cmd = self.current_matched[self.highlighted]
+                    chat_input.load_text(chosen_cmd)
+                    lines = chat_input.text.split("\n")
+                    chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+                elif self.mode == "file":
+                    chosen_file = self.current_matched[self.highlighted]
+                    chat_input.apply_file_suggestion(chosen_file, self.at_start_idx)
+                self.display = False
+                chat_input.focus()
+            except Exception:
+                pass
+

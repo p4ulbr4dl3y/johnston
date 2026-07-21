@@ -206,9 +206,12 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Фолбэк на дефолтную модель
-        if not models and hasattr(mod, "MODEL"):
-            models = [mod.MODEL]
+        # Фолбэк на список моделей из модуля или дефолтную модель
+        if not models:
+            if hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
+                models = mod.MODELS
+            elif hasattr(mod, "MODEL"):
+                models = [mod.MODEL]
 
         # Записываем в кеш
         if models:
