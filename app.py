@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import os
 
@@ -298,37 +297,8 @@ class TUIChatApp(App):
         msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
         self.generate_ai_response(msg, show_in_ui=False)
 
-async def run_cli_prompt(prompt_text: str) -> None:
-    from core.provider_manager import ProviderManager
-    pm = ProviderManager()
-    agent = pm.create_active_agent()
-    print(f"Running prompt: {prompt_text}\n")
-
-    async for event_type, val1, val2 in agent.stream_steps(prompt_text):
-        if event_type == "thinking_start":
-            print("Thinking...", end="", flush=True)
-        elif event_type == "thinking_end":
-            print(f" ({val1}s)")
-        elif event_type == "tool":
-            print(f"⚙ Tool: {val1}({val2})")
-        elif event_type == "tool_result":
-            res_preview = val1[:150] + "..." if len(val1) > 150 else val1
-            print(f"↳ Result: {res_preview.strip()}")
-        elif event_type in ("bot_text", "outro"):
-            print(f"\nResponse:\n{val1}\n")
-
-    metrics = agent.get_metrics()
-    print(f"Tokens: {metrics.get('total_tokens', 0):,} tok | Context: {metrics.get('context', '128k')}")
-
 def main():
-    parser = argparse.ArgumentParser(description="TUI Chat AI Agent")
-    parser.add_argument("-p", "--prompt", type=str, help="Run single prompt in non-interactive CLI mode")
-    args, unknown = parser.parse_known_args()
-
-    if args.prompt:
-        asyncio.run(run_cli_prompt(args.prompt))
-    else:
-        TUIChatApp().run()
+    TUIChatApp().run()
 
 if __name__ == "__main__":
     main()
