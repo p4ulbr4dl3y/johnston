@@ -39,16 +39,17 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             yield OptionList(*self.filtered_options, id="modal-option-list")
 
     def on_mount(self) -> None:
+        opt_list = self.query_one("#modal-option-list", OptionList)
+        if self.default_value in self.raw_items:
+            try:
+                opt_list.highlighted = self.raw_items.index(self.default_value)
+            except Exception:
+                pass
+
         if self.show_search:
             self.query_one("#modal-search-input", Input).focus()
         else:
-            opt_list = self.query_one("#modal-option-list", OptionList)
             opt_list.focus()
-            if self.default_value in self.raw_items:
-                try:
-                    opt_list.highlighted = self.raw_items.index(self.default_value)
-                except Exception:
-                    pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
         query_raw = event.value.strip().lower()
