@@ -19,7 +19,8 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
 
     def test_supports_vision(self):
         from core.models_catalog import catalog
-        self.assertTrue(catalog.supports_vision("clinepass", "cline-pass/deepseek-v4-flash"))
+        self.assertTrue(catalog.supports_vision("clinepass", "cline-pass/mimo-v2.5"))
+        self.assertFalse(catalog.supports_vision("clinepass", "cline-pass/deepseek-v4-flash"))
         self.assertTrue(catalog.supports_vision("openrouter", "gpt-4o"))
         self.assertFalse(catalog.supports_vision("custom", "text-only-model-v1"))
 

@@ -132,7 +132,7 @@ class ModelsCatalog:
         # 1. Известные ключи и семейства моделей с поддержкой зрячести (Vision / Multimodal)
         vision_keywords = {
             "gpt-4o", "gpt-4-vision", "claude-3", "gemini", "vision", "omni",
-            "qwen", "glm", "kimi", "mimo", "minimax", "deepseek-v4", "nemotron"
+            "qwen", "glm", "kimi", "mimo", "minimax", "nemotron"
         }
         for kw in vision_keywords:
             if kw in m_lower:
