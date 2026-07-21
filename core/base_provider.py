@@ -60,6 +60,15 @@ class BaseAgent:
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools()
 
+        # Automatic context compaction when history exceeds threshold (75% of context_limit)
+        threshold = int(getattr(self, "context_limit", 32000) * 0.75)
+        if len(self.history) > 4 and estimate_tokens(self.history) > threshold:
+            yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
+            try:
+                await self.compact_history()
+            except Exception as compact_err:
+                yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
+
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
         t0 = time.time()
 

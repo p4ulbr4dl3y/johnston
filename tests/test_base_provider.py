@@ -158,6 +158,32 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(success)
         self.assertIn("too short", msg)
 
+    async def test_auto_compaction_trigger(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        agent.history = [
+            {"role": "user", "content": "a" * 200},
+            {"role": "assistant", "content": "b" * 200},
+            {"role": "user", "content": "c" * 200},
+            {"role": "assistant", "content": "d" * 200},
+            {"role": "user", "content": "e" * 200},
+        ]
+        compacted = False
+        async def mock_compact():
+            nonlocal compacted
+            compacted = True
+            return True, "compacted"
+
+        with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
+            mock_limit.return_value = 100
+            with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
+                mock_comp.return_value = (True, "compacted")
+                try:
+                    async for _ in agent.stream_steps("trigger"):
+                        pass
+                except Exception:
+                    pass
+                mock_comp.assert_called_once()
+
     async def test_manage_task_tool(self):
         class DummyApp:
             background_tasks = []
