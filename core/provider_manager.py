@@ -183,6 +183,7 @@ class ProviderManager:
 
         models = []
         model_limits = {}
+        vision_models = []
         if base_url:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -203,6 +204,11 @@ class ProviderManager:
                                 )
                                 if ctx_len and isinstance(ctx_len, (int, float)):
                                     model_limits[m_id] = int(ctx_len)
+
+                                arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+                                input_mods = arch.get("input_modalities") or m.get("input_modalities") or m.get("modalities") or []
+                                if "image" in input_mods or "vision" in input_mods:
+                                    vision_models.append(m_id)
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
@@ -217,7 +223,7 @@ class ProviderManager:
         if models:
             try:
                 with open(cache_path, "w", encoding="utf-8") as f:
-                    json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits}, f, indent=2)
+                    json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models}, f, indent=2)
             except Exception as e:
                 print(f"Error writing models cache: {e}")
 

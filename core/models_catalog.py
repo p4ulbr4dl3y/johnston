@@ -126,19 +126,20 @@ class ModelsCatalog:
         return 128000
 
     def supports_vision(self, provider_id: str, model_id: str) -> bool:
-        """Проверяет, поддерживает ли модель обработку изображений (Vision)"""
-        m_lower = model_id.lower()
+        """Проверяет, поддерживает ли модель обработку изображений (Vision) через input_modalities API или кэш"""
+        # 1. Проверяем кеш моделей провайдера (~/.johnston/cache/models_{provider_id}.json)
+        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    vision_models = cdata.get("vision_models")
+                    if isinstance(vision_models, list) and vision_models:
+                        return model_id in vision_models
+            except Exception:
+                pass
 
-        # 1. Известные ключи и семейства моделей с поддержкой зрячести (Vision / Multimodal)
-        vision_keywords = {
-            "gpt-4o", "gpt-4-vision", "claude-3", "gemini", "vision", "omni",
-            "qwen", "glm", "kimi", "mimo", "minimax", "nemotron"
-        }
-        for kw in vision_keywords:
-            if kw in m_lower:
-                return True
-
-        # 2. Проверка данных из models.dev кеша
+        # 2. Проверяем данные из models.dev кеша по architecture.input_modalities
         data = self._data
         if data and isinstance(data, dict):
             for p_info in data.values():
@@ -146,9 +147,22 @@ class ModelsCatalog:
                     models = p_info.get("models", {})
                     if model_id in models:
                         m = models[model_id]
-                        modalities = m.get("modalities") or m.get("input_modalities") or []
-                        if "image" in modalities or "vision" in modalities:
-                            return True
+                        arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+                        modalities = arch.get("input_modalities") or m.get("input_modalities") or m.get("modalities") or []
+                        if isinstance(modalities, list):
+                            if "image" in modalities or "vision" in modalities:
+                                return True
+                            return False
+
+        # 3. Эвристический запасной вариант по ключевым словам семейства модели
+        m_lower = model_id.lower()
+        vision_keywords = {
+            "gpt-4o", "gpt-4-vision", "claude-3", "gemini", "vision", "omni",
+            "qwen", "glm", "kimi", "mimo", "minimax", "nemotron"
+        }
+        for kw in vision_keywords:
+            if kw in m_lower:
+                return True
 
         return False
 
