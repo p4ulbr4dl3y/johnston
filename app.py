@@ -67,7 +67,13 @@ class TUIChatApp(App):
             if hasattr(self.agent, "get_metrics"):
                 metrics = self.agent.get_metrics()
 
-            active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])
+            from skill_manager import SkillManager
+            from mcp_manager import get_mcp_manager
+
+            skills_count = len(SkillManager().list_skills())
+            mcp_servers = get_mcp_manager().load_servers()
+            mcp_total = len(mcp_servers)
+            mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
 
             footer.update_status(
                 provider_key=pkey,
@@ -77,7 +83,10 @@ class TUIChatApp(App):
                 total_tokens=metrics.get("total_tokens", 0),
                 context_window=metrics.get("context", "128k"),
                 context_limit=metrics.get("context_limit", 128000),
-                cost_usd=metrics.get("cost_usd", 0.0)
+                cost_usd=metrics.get("cost_usd", 0.0),
+                skills_count=skills_count,
+                mcp_active=mcp_active,
+                mcp_total=mcp_total
             )
         except Exception:
             pass

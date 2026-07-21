@@ -17,7 +17,10 @@ class StatusFooter(Static):
         total_tokens: int = 0,
         context_window: str = "128k",
         context_limit: int = 128000,
-        cost_usd: float = 0.0
+        cost_usd: float = 0.0,
+        skills_count: int = 0,
+        mcp_active: int = 0,
+        mcp_total: int = 0
     ) -> None:
         if not directory:
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
@@ -31,8 +34,14 @@ class StatusFooter(Static):
             left_1_parts.append(model_text)
         left_1 = "  │  ".join(left_1_parts)
 
-        # Строка 1 Справа: Фоновые задачи
-        right_1 = f"Tasks: {active_bg_tasks} bg"
+        # Строка 1 Справа: Скиллы, MCP и Фоновые задачи
+        right_1_parts = [f"Skills: {skills_count}"]
+        if mcp_total > 0:
+            right_1_parts.append(f"MCP: {mcp_active}/{mcp_total} on")
+        else:
+            right_1_parts.append("MCP: 0")
+        right_1_parts.append(f"Tasks: {active_bg_tasks} bg")
+        right_1 = "  │  ".join(right_1_parts)
 
         # Строка 2 Слева: Прогресс контекста
         pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
