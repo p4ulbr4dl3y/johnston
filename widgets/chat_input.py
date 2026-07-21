@@ -87,7 +87,42 @@ class ChatInput(TextArea):
         self.prompt_history_index = len(self.prompt_history)
         self.prompt_draft = ""
 
+    def _handle_tag_deletion(self, event_key: str) -> bool:
+        """Атомарное удаление блока [Pasted text #N +X lines] при нажатии Backspace или Delete"""
+        if not self.pasted_texts or not self.selection.is_empty:
+            return False
+
+        row, col = self.cursor_location
+        line_str = self.document.get_line(row)
+
+        for tag in list(self.pasted_texts.keys()):
+            start_col = line_str.find(tag)
+            while start_col != -1:
+                end_col = start_col + len(tag)
+                if event_key == "backspace" and start_col < col <= end_col:
+                    self.delete((row, start_col), (row, end_col))
+                    self.move_cursor((row, start_col))
+                    self.pasted_texts.pop(tag, None)
+                    self._on_input_change()
+                    return True
+                elif event_key == "delete" and start_col <= col < end_col:
+                    self.delete((row, start_col), (row, end_col))
+                    self.move_cursor((row, start_col))
+                    self.pasted_texts.pop(tag, None)
+                    self._on_input_change()
+                    return True
+                start_col = line_str.find(tag, start_col + 1)
+
+        return False
+
     def _on_key(self, event: events.Key) -> None:
+        # Атомарное удаление блока вставки по Backspace/Delete
+        if event.key in ("backspace", "delete"):
+            if self._handle_tag_deletion(event.key):
+                event.prevent_default()
+                event.stop()
+                return
+
         # Горячие клавиши выхода (Ctrl+C, Ctrl+Q)
         if event.key in ("ctrl+c", "ctrl+q"):
             event.prevent_default()

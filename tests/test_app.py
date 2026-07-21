@@ -110,7 +110,13 @@ async def test_chat_app_flow():
         await pilot.pause(0.1)
         assert "[Pasted text #1 +15 lines]" in chat_input.text
         assert chat_input.get_full_text() == "hello\n" * 15
-        print("✓ Long paste collapse tests passed cleanly!")
+        # 12. Проверяем атомарное удаление блока вставки по Backspace
+        chat_input.move_cursor((0, len(chat_input.text)))
+        await pilot.press("backspace")
+        await pilot.pause(0.1)
+        assert chat_input.text == ""
+        assert chat_input.pasted_texts == {}
+        print("✓ Atomic tag deletion tests passed cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
