@@ -9,7 +9,10 @@ class StatusFooter(Static):
     ALLOW_SELECT = False
 
     def on_mount(self) -> None:
-        self.update_status(provider_key="")
+        if hasattr(self.app, "refresh_status_footer"):
+            self.app.refresh_status_footer()
+        else:
+            self.update_status(provider_key="")
 
     def update_status(
         self,

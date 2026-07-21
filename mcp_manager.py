@@ -162,6 +162,11 @@ def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
     global _mcp_manager_instance
     if _mcp_manager_instance is None:
         _mcp_manager_instance = MCPManager(project_dir=project_dir)
+    elif project_dir:
+        real_p = os.path.realpath(project_dir)
+        if _mcp_manager_instance.project_dir != real_p:
+            _mcp_manager_instance.project_dir = real_p
+            _mcp_manager_instance.project_file = os.path.join(real_p, PROJECT_MCP_FILE)
     return _mcp_manager_instance
 
 class MCPManager:
@@ -183,6 +188,8 @@ class MCPManager:
         Loads global and project MCP servers.
         Project servers override global servers with the same key.
         """
+        curr_proj_dir = os.path.realpath(self.project_dir or os.getcwd())
+        self.project_file = os.path.join(curr_proj_dir, PROJECT_MCP_FILE)
         servers: Dict[str, Dict[str, Any]] = {}
 
         # 1. Load global
@@ -191,9 +198,10 @@ class MCPManager:
                 with open(self.global_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     for k, v in data.get("mcpServers", {}).items():
-                        v["name"] = k
-                        v["scope"] = "global"
-                        servers[k] = v
+                        v_copy = dict(v)
+                        v_copy["name"] = k
+                        v_copy["scope"] = "global"
+                        servers[k] = v_copy
             except Exception:
                 pass
 
@@ -203,9 +211,10 @@ class MCPManager:
                 with open(self.project_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     for k, v in data.get("mcpServers", {}).items():
-                        v["name"] = k
-                        v["scope"] = "project"
-                        servers[k] = v
+                        v_copy = dict(v)
+                        v_copy["name"] = k
+                        v_copy["scope"] = "project"
+                        servers[k] = v_copy
             except Exception:
                 pass
 
