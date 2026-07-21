@@ -13,6 +13,7 @@ from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
 from tools.task import TaskTool
+from tools.view_image import ViewImageTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -27,6 +28,7 @@ TOOL_CLASSES = [
     ManageTaskTool,
     PlanExitTool,
     TaskTool,
+    ViewImageTool,
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}

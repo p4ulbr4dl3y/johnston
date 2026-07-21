@@ -29,6 +29,11 @@ class ReadTool(BaseTool):
         if not os.path.exists(path):
             return f"Error: file '{path}' not found."
 
+        ext = os.path.splitext(path)[1].lower()
+        if ext in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}:
+            from tools.view_image import ViewImageTool
+            return await ViewImageTool().execute(args, app)
+
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 lines = f.readlines()
