@@ -17,10 +17,14 @@ class UserMessage(Static):
         if getattr(self.app, "selection_copy_active", False):
             return
         try:
-            self.app.copy_to_clipboard(self.raw_text)
-            self.app.notify("User message copied to clipboard!")
+            chat_input = self.app.query_one("#message-input")
+            chat_input.load_text(self.raw_text)
+            chat_input.focus()
+            lines = chat_input.text.split("\n")
+            chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+            self.app.notify("Message loaded into input field!")
         except Exception as e:
-            self.app.notify(f"Copy failed: {e}", severity="error")
+            self.app.notify(f"Load failed: {e}", severity="error")
 
 
 class BotMessage(Vertical):
@@ -43,10 +47,14 @@ class BotMessage(Vertical):
             return
         try:
             if self.content:
-                self.app.copy_to_clipboard(self.content)
-                self.app.notify("AI message copied to clipboard!")
+                chat_input = self.app.query_one("#message-input")
+                chat_input.load_text(self.content)
+                chat_input.focus()
+                lines = chat_input.text.split("\n")
+                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+                self.app.notify("Message loaded into input field!")
         except Exception as e:
-            self.app.notify(f"Copy failed: {e}", severity="error")
+            self.app.notify(f"Load failed: {e}", severity="error")
 
 
 class ThinkingWidget(Vertical):
