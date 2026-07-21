@@ -13,10 +13,14 @@ async def run_linter(path: str) -> str:
     errors = []
 
     if ext == ".py":
-        if shutil.which("ruff"):
+        if shutil.which("uv"):
+            output = await _exec_cmd(["uv", "run", "ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
+        elif shutil.which("ruff"):
             output = await _exec_cmd(["ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
-            if output:
-                errors.append(output)
+        else:
+            output = None
+        if output:
+            errors.append(output)
 
     elif ext in (".ts", ".tsx", ".js", ".jsx", ".json"):
         if shutil.which("biome"):
