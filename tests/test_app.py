@@ -97,7 +97,11 @@ async def test_chat_app_flow():
         await pilot.press("shift+tab")
         await pilot.pause(0.2)
         assert getattr(app.agent, "mode", "build") == "build"
-        print("✓ Shift+Tab mode toggle tests passed cleanly!")
+        # 10. Проверяем авто-расширение высоты инпута при вставке многострочного текста
+        chat_input.insert("line1\nline2\nline3\nline4")
+        await pilot.pause(0.1)
+        assert chat_input.styles.height.value == 5
+        print("✓ Multiline input auto-expand tests passed cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())

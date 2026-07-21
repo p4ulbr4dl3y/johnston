@@ -52,6 +52,12 @@ class ChatInput(TextArea):
         self.update_height()
         self.update_suggestions()
 
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        self._on_input_change()
+
+    def on_paste(self, event: events.Paste) -> None:
+        self.call_after_refresh(self._on_input_change)
+
     def add_to_history(self, text: str) -> None:
         """Сохранение отправленного сообщения в историю запросов"""
         if text and (not self.prompt_history or self.prompt_history[-1] != text):
