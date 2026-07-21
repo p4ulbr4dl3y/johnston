@@ -25,18 +25,27 @@ BASE_URL = "https://opencode.ai/zen/go/v1"
 MODEL = "deepseek-v4-flash"
 API_KEY = "sk-placeholder"
 
-SYSTEM_PROMPT = "You are a software engineer. You have tools: Read, Create, Edit, Bash. Use them to read, create, or edit files and run terminal commands in the current workspace."
+SYSTEM_PROMPT = """You write code.
+Tools: Read, Create, Edit, Bash, Glob, Grep, AskUser.
+Rules:
+- Read: Read file path.
+- Create: Write new file.
+- Edit: Replace unique block of text (old_string) with new_string in existing file. Must match indentation.
+- Bash: Run command. Runs in background if >5s.
+- Glob: Search file paths by pattern.
+- Grep: Search text inside files by regex.
+- AskUser: Ask question to user."""
 
 TOOLS = [
     {
         "type": "function",
         "function": {
             "name": "Read",
-            "description": "Read file content",
+            "description": "Read file content.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"}
+                    "path": {"type": "string", "description": "Absolute path"}
                 },
                 "required": ["path"]
             }
@@ -46,11 +55,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Create",
-            "description": "Create new file or overwrite existing file",
+            "description": "Create new file.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"},
+                    "path": {"type": "string", "description": "Absolute path"},
                     "content": {"type": "string", "description": "File content"}
                 },
                 "required": ["path", "content"]
@@ -61,14 +70,15 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Edit",
-            "description": "Edit existing file (overwrites the whole file)",
+            "description": "Replace text block (old_string) with new_string.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"},
-                    "content": {"type": "string", "description": "New file content"}
+                    "path": {"type": "string", "description": "Absolute path"},
+                    "old_string": {"type": "string", "description": "Exact text to replace"},
+                    "new_string": {"type": "string", "description": "Replacement text"}
                 },
-                "required": ["path", "content"]
+                "required": ["path", "old_string", "new_string"]
             }
         }
     },
@@ -76,13 +86,55 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Bash",
-            "description": "Execute a terminal bash command",
+            "description": "Run terminal command. >5s runs in background.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Bash command"}
+                    "command": {"type": "string", "description": "Command"}
                 },
                 "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Glob",
+            "description": "Search file paths by pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern (e.g. **/*.py)"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Grep",
+            "description": "Search text inside files by regex.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "AskUser",
+            "description": "Ask question to user.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "Question text"}
+                },
+                "required": ["question"]
             }
         }
     }

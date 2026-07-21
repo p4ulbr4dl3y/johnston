@@ -18,13 +18,43 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
                     return content
             return f"Error: file '{path}' not found."
 
-        elif name in ("Create", "Edit"):
+        elif name == "Create":
             path = os.path.expanduser(args.get("path", ""))
             content = args.get("content", "")
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             return f"Success: file '{path}' saved ({len(content)} bytes)."
+
+        elif name == "Edit":
+            path = os.path.expanduser(args.get("path", ""))
+            old_string = args.get("old_string", "")
+            new_string = args.get("new_string", "")
+            if not os.path.exists(path):
+                return f"Error: file '{path}' not found."
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception as e:
+                return f"Error reading file '{path}': {e}"
+            if old_string not in content:
+                return f"Error: exact block of text (old_string) not found in '{path}'. Make sure it matches exactly (including leading whitespace/indentation)."
+            new_content = content.replace(old_string, new_string, 1)
+            try:
+                os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+            except Exception as e:
+                return f"Error writing file '{path}': {e}"
+            import difflib
+            diff_lines = list(difflib.unified_diff(
+                content.splitlines(),
+                new_content.splitlines(),
+                fromfile=path + " (old)",
+                tofile=path + " (new)",
+                lineterm=""
+            ))
+            return "\n".join(diff_lines)
 
         elif name == "Bash":
             cmd = args.get("command", "")
@@ -59,6 +89,86 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
                     if len(res) > 3000:
                         res = res[:3000] + "\n... [output truncated]"
                     return res if res.strip() else "Command executed with no output."
+
+        elif name == "Glob":
+            pattern = args.get("pattern", "*")
+            ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".tui", ".gemini"}
+            root_dir = os.getcwd()
+            matches = []
+            import fnmatch
+            for root, dirs, files in os.walk(root_dir):
+                dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, root_dir)
+                    if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(file, pattern):
+                        matches.append(rel_path)
+                        if len(matches) >= 100:
+                            break
+                if len(matches) >= 100:
+                    break
+            if not matches:
+                return "No files found matching the pattern."
+            return "\n".join(matches)
+
+        elif name == "Grep":
+            pattern = args.get("pattern", "")
+            if not pattern:
+                return "Error: pattern is required."
+            ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".tui", ".gemini"}
+            ignore_extensions = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz", ".db", ".sqlite", ".pyc"}
+            import re
+            try:
+                regex = re.compile(pattern, re.IGNORECASE)
+            except Exception as e:
+                return f"Error compiling regex '{pattern}': {e}"
+            root_dir = os.getcwd()
+            results = []
+            for root, dirs, files in os.walk(root_dir):
+                dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+                for file in files:
+                    ext = os.path.splitext(file)[1].lower()
+                    if ext in ignore_extensions:
+                        continue
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, root_dir)
+                    try:
+                        with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                            for line_num, line in enumerate(f, 1):
+                                if regex.search(line):
+                                    clean_line = line.strip()
+                                    if len(clean_line) > 150:
+                                        clean_line = clean_line[:150] + "..."
+                                    results.append(f"{rel_path}:{line_num}: {clean_line}")
+                                    if len(results) >= 50:
+                                        break
+                    except Exception:
+                        pass
+                    if len(results) >= 50:
+                        break
+                if len(results) >= 50:
+                    break
+            if not results:
+                return "No matches found."
+            return "\n".join(results)
+
+        elif name == "AskUser":
+            question = args.get("question", "")
+            if app:
+                from widgets.modal_screens import AskUserScreen
+                screen = AskUserScreen(question)
+                try:
+                    loop = asyncio.get_running_loop()
+                    future = loop.create_future()
+                    def on_dismiss(result):
+                        if not future.done():
+                            future.set_result(result)
+                    app.push_screen(screen, callback=on_dismiss)
+                    answer = await future
+                    return answer if answer else "No answer provided."
+                except Exception as e:
+                    return f"Error prompting user: {e}"
+            return "Error: App instance not available to ask user."
 
     except Exception as err:
         return f"Error executing tool {name}: {err}"
@@ -100,8 +210,11 @@ class BaseAgent:
                 thinking_started = False
 
                 async for chunk in response:
-                    if hasattr(chunk.choices[0], "delta") and hasattr(chunk.choices[0].delta, "reasoning_content"):
-                        reasoning = chunk.choices[0].delta.reasoning_content
+                    if not chunk.choices:
+                        continue
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "reasoning_content"):
+                        reasoning = choice.delta.reasoning_content
                         if reasoning:
                             if not thinking_started:
                                 yield ("thinking_start", "Thinking...", "")
@@ -109,7 +222,7 @@ class BaseAgent:
                             active_thought += reasoning
                             yield ("thinking_delta", active_thought, "")
 
-                    delta = chunk.choices[0].delta
+                    delta = choice.delta
                     if delta.content:
                         if thinking_started:
                             dt = time.time() - t0
@@ -172,7 +285,7 @@ class BaseAgent:
                     except Exception:
                         args = {}
 
-                    target = args.get("path") or args.get("command") or t_name
+                    target = args.get("path") or args.get("command") or args.get("question") or t_name
                     yield ("tool", t_name, target)
 
                     tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))

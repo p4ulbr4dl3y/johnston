@@ -2,7 +2,7 @@ from typing import TypeVar, Generic
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown
+from textual.widgets import OptionList, Markdown, Input
 
 T = TypeVar("T")
 
@@ -130,3 +130,29 @@ class ModelScreen(BaseSelectionScreen[str]):
             items=models,
             default_value=""
         )
+
+
+class AskUserScreen(ModalScreen[str]):
+    """Modal screen for AskUser tool to prompt user for input"""
+    
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, question: str):
+        super().__init__()
+        self.question = question
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            yield Markdown(f"### **Question from Agent:**\n\n{self.question}", classes="modal-markdown")
+            yield Input(placeholder="Type your answer and press Enter...", id="ask-user-input")
+
+    def on_mount(self) -> None:
+        self.query_one("#ask-user-input").focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value)
+
+    def action_cancel(self) -> None:
+        self.dismiss("")

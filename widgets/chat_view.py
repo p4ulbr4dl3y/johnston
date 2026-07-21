@@ -71,21 +71,8 @@ class ThinkingWidget(Vertical):
 
     def render_collapsed(self) -> None:
         self.is_expanded = False
-        self.header_label.update(f"▶ Thought for {self.duration_seconds:.1f} sec")
+        self.header_label.update(f"Thought for {self.duration_seconds:.1f} sec")
         self.md_widget.display = False
-
-    def render_expanded(self) -> None:
-        self.is_expanded = True
-        self.header_label.update(f"▼ Thought for {self.duration_seconds:.1f} sec")
-        self.md_widget.display = True
-
-    def on_click(self, event: events.Click) -> None:
-        if not self.is_thinking:
-            if self.is_expanded:
-                self.render_collapsed()
-            else:
-                self.render_expanded()
-            event.stop()
 
 
 class ToolCallWidget(Vertical):
@@ -164,26 +151,7 @@ class ToolCallWidget(Vertical):
                 self.diff_widget.display = False
 
     def render_header(self) -> None:
-        if self.result_text:
-            arrow = "▼ " if self.is_expanded else "▶ "
-            self.header_label.update(f"{arrow}[bold]{self.icon_name}[/bold]({self.target})")
-        else:
-            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
-
-    def toggle_expand(self) -> None:
-        if self.result_text:
-            self.is_expanded = not self.is_expanded
-            self.render_header()
-            if self.tool_type == "Edit":
-                self.diff_widget.display = self.is_expanded
-                self.md_widget.display = False
-            else:
-                self.md_widget.display = self.is_expanded
-                self.diff_widget.display = False
-
-    def on_click(self, event: events.Click) -> None:
-        self.toggle_expand()
-        event.stop()
+        self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
 
 class ChatView(VerticalScroll):
