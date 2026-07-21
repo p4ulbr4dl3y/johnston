@@ -87,14 +87,19 @@ class BaseAgent:
                     if not chunk.choices:
                         continue
                     choice = chunk.choices[0]
-                    if hasattr(choice, "delta") and hasattr(choice.delta, "reasoning_content"):
-                        reasoning = choice.delta.reasoning_content
-                        if reasoning:
-                            if not thinking_started:
-                                yield ("thinking_start", "Thinking...", "")
-                                thinking_started = True
-                            active_thought += reasoning
-                            yield ("thinking_delta", active_thought, "")
+                    delta = choice.delta
+                    reasoning = (
+                        getattr(delta, "reasoning_content", None)
+                        or getattr(delta, "reasoning", None)
+                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
+                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
+                    )
+                    if reasoning:
+                        if not thinking_started:
+                            yield ("thinking_start", "Thinking...", "")
+                            thinking_started = True
+                        active_thought += reasoning
+                        yield ("thinking_delta", active_thought, "")
 
                     delta = choice.delta
                     if delta.content:
