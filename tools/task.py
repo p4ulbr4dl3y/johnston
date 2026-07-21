@@ -13,6 +13,23 @@ class TaskTool(BaseTool):
         "Use subagent_type='explore' for quick codebase searches, or 'general' for multi-step tasks. "
         "Set background=true to run asynchronously without waiting."
     )
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Task",
+            "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {"type": "string", "description": "Task prompt for the subagent"},
+                    "description": {"type": "string", "description": "Short (3-5 words) description"},
+                    "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
+                    "background": {"type": "boolean", "description": "Run asynchronously in background"}
+                },
+                "required": ["prompt", "description"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)

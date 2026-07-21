@@ -9,6 +9,22 @@ from tools.linter import run_linter
 class EditTool(BaseTool):
     name = "Edit"
     description = "Replace text block (old_string) with new_string."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Edit",
+            "description": "Replace exact text block in file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"},
+                    "old_string": {"type": "string", "description": "Exact text block to replace"},
+                    "new_string": {"type": "string", "description": "Replacement text block"}
+                },
+                "required": ["path", "old_string", "new_string"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = os.path.expanduser(args.get("path", ""))

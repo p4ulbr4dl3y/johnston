@@ -8,6 +8,21 @@ from tools.base import BaseTool
 class GlobTool(BaseTool):
     name = "Glob"
     description = "Search file paths by pattern."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Glob",
+            "description": "Search file paths matching glob pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern (e.g. *.py)"},
+                    "path": {"type": "string", "description": "Directory path (defaults to cwd)"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         pattern = args.get("pattern", "*")

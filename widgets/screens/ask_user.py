@@ -5,32 +5,6 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Markdown, OptionList
 
 
-class AskUserScreen(ModalScreen[str]):
-    """Modal screen for AskUser tool to prompt user for input"""
-    ALLOW_SELECT = False
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
-    ]
-
-    def __init__(self, question: str):
-        super().__init__()
-        self.question = question
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Question from Agent:**\n\n{self.question}", classes="modal-markdown")
-            yield Input(placeholder="Type your answer and press Enter...", id="ask-user-input")
-
-    def on_mount(self) -> None:
-        self.query_one("#ask-user-input").focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value)
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
-
-
 class QuestionScreen(ModalScreen[dict]):
     """Модальное окно для выбора вариантов или текстового ввода без кнопок"""
     ALLOW_SELECT = False

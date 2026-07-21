@@ -8,6 +8,21 @@ from tools.linter import run_linter
 class CreateTool(BaseTool):
     name = "Create"
     description = "Create new file."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Create",
+            "description": "Create new file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"},
+                    "content": {"type": "string", "description": "Full file content"}
+                },
+                "required": ["path", "content"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = os.path.expanduser(args.get("path", ""))

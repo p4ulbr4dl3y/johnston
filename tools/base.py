@@ -6,6 +6,7 @@ from tools.context import ToolContext
 class BaseTool:
     name: str = ""
     description: str = ""
+    schema: Dict[str, Any] = None
 
     def _ensure_context(self, ctx_or_app: Any) -> ToolContext:
         if isinstance(ctx_or_app, ToolContext):

@@ -7,6 +7,20 @@ from tools.base import BaseTool
 class ReadTool(BaseTool):
     name = "Read"
     description = "Read file content."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Read",
+            "description": "Read file content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"}
+                },
+                "required": ["path"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = os.path.expanduser(args.get("path", ""))

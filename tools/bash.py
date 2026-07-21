@@ -9,6 +9,20 @@ from tools.base import BaseTool
 class BashTool(BaseTool):
     name = "Bash"
     description = "Run terminal command. >5s runs in background."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Bash",
+            "description": "Run terminal command.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Terminal command"}
+                },
+                "required": ["command"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)

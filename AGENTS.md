@@ -88,6 +88,14 @@ class Agent(BaseAgent):
    class MyCustomTool(BaseTool):
        name = "MyToolName"
        description = "What this tool does"
+       schema = {
+           "type": "function",
+           "function": {
+               "name": "MyToolName",
+               "description": "What this tool does",
+               "parameters": { ... }
+           }
+       }
 
        async def execute(self, args: dict, app=None) -> str:
            ctx = self._ensure_context(app)
@@ -95,7 +103,7 @@ class Agent(BaseAgent):
            return "Result string"
    ```
 2. Зарегистрируйте класс в `TOOL_CLASSES` внутри [tools/registry.py](file:///Users/yegor/tui/tools/registry.py).
-3. Добавьте описание схемы инструмента в массив `TOOLS` нужного провайдера в `~/.johnston/providers/`.
+3. Схема инструмента подтягивается автоматически через `get_default_tools()`. Переопределять `TOOLS` вручную в конфигах провайдеров не требуется!
 
 ---
 

@@ -6,6 +6,14 @@ from tools.base import BaseTool
 class PlanExitTool(BaseTool):
     name = "PlanExit"
     description = "Signal that planning phase is complete and request switching to build mode to implement the plan."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "PlanExit",
+            "description": "Signal that planning phase is complete and request switching to build mode to implement the plan.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)

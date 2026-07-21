@@ -29,6 +29,10 @@ TOOL_CLASSES = [
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
 
+
+def get_default_tools() -> list[Dict[str, Any]]:
+    return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
+
 async def execute_tool(name: str, args: dict, app: Any = None, context: Any = None) -> str:
     tool_cls = REGISTRY.get(name)
     if tool_cls:

@@ -2,33 +2,9 @@ import os
 from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
+from tools.plan_exit import PlanExitTool
+from tools.task import TaskTool
 
-PLAN_EXIT_TOOL_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "PlanExit",
-        "description": "Signal that planning phase is complete and request switching to build mode to implement the plan.",
-        "parameters": {"type": "object", "properties": {}}
-    }
-}
-
-TASK_TOOL_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "Task",
-        "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "prompt": {"type": "string", "description": "Task prompt for the subagent"},
-                "description": {"type": "string", "description": "Short (3-5 words) description"},
-                "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
-                "background": {"type": "boolean", "description": "Run asynchronously in background"}
-            },
-            "required": ["prompt", "description"]
-        }
-    }
-}
 
 class PromptBuilder:
     """Формирует скомпонованный системный промпт и набор инструментов с учетом MCP, Skills и режима (Plan/Build)"""
@@ -75,9 +51,9 @@ class PromptBuilder:
 
         if self.mode == "plan":
             if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
-                all_tools.append(PLAN_EXIT_TOOL_SCHEMA)
+                all_tools.append(PlanExitTool.schema)
 
         if not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
-            all_tools.append(TASK_TOOL_SCHEMA)
+            all_tools.append(TaskTool.schema)
 
         return all_tools

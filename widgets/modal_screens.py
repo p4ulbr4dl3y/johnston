@@ -1,4 +1,4 @@
-from widgets.screens.ask_user import AskUserScreen, ConfirmScreen, QuestionScreen
+from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
@@ -10,7 +10,6 @@ from widgets.screens.skills import SkillsScreen
 from widgets.screens.tasks import TasksListScreen
 
 __all__ = [
-    "AskUserScreen",
     "QuestionScreen",
     "ConfirmScreen",
     "BaseSelectionScreen",

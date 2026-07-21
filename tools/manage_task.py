@@ -6,6 +6,20 @@ from tools.base import BaseTool
 class ManageTaskTool(BaseTool):
     name = "ManageTask"
     description = "Manage background tasks. Actions: 'list' (list running tasks), 'status' (get task status and recent output log), 'kill' (cancel/terminate background task)."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "ManageTask",
+            "description": "Manage background tasks. Actions: 'list' (list running tasks), 'status' (get task status and recent output log), 'kill' (cancel/terminate background task).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "description": "Action: 'list', 'status', or 'kill'"},
+                    "task_id": {"type": "string", "description": "Target background task ID"}
+                }
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)

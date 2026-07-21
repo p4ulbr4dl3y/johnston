@@ -8,6 +8,21 @@ from tools.base import BaseTool
 class GrepTool(BaseTool):
     name = "Grep"
     description = "Search text inside files by regex."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "Grep",
+            "description": "Search text inside files matching regex pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern"},
+                    "path": {"type": "string", "description": "Directory path (defaults to cwd)"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         pattern = args.get("pattern", "")
