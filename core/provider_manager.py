@@ -86,21 +86,74 @@ class ProviderManager:
         return "opencode"
 
     def set_active_provider_key(self, key: str):
-        data = {"active_provider": key}
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        data["active_provider"] = key
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def set_provider_model(self, key: str, model_name: str):
+        """Сохраняет выбранную модель для провайдера в конфиг и в .py файл провайдера"""
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        if "provider_models" not in data:
+            data["provider_models"] = {}
+        data["provider_models"][key] = model_name
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        provider_path = os.path.join(PROVIDERS_DIR, f"{key}.py")
+        if os.path.exists(provider_path):
+            try:
+                with open(provider_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                new_lines = []
+                for line in lines:
+                    if line.startswith("MODEL ="):
+                        new_lines.append(f'MODEL = "{model_name}"\n')
+                    else:
+                        new_lines.append(line)
+                with open(provider_path, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+            except Exception as e:
+                print(f"Error updating model in provider file {key}.py: {e}")
 
     def create_active_agent(self):
         providers = self.load_providers()
         active_key = self.get_active_provider_key()
 
+        target_provider = None
         if active_key in providers:
-            return providers[active_key]["module"].Agent()
+            target_provider = providers[active_key]
         elif providers:
             first_key = list(providers.keys())[0]
-            return providers[first_key]["module"].Agent()
+            target_provider = providers[first_key]
         else:
             raise RuntimeError("No available providers in ~/.johnston/providers/")
+
+        agent = target_provider["module"].Agent()
+
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    p_models = cdata.get("provider_models", {})
+                    if active_key in p_models:
+                        agent.model = p_models[active_key]
+            except Exception:
+                pass
+
+        return agent
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""

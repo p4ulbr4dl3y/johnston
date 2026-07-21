@@ -91,6 +91,7 @@ class ModelsCommand(BaseCommand):
             if selected_model:
                 if hasattr(app.agent, "model"):
                     app.agent.model = selected_model
+                app.pm.set_provider_model(active_key, selected_model)
                 app.refresh_status_footer()
                 app.notify(f"Model switched: {selected_model}")
             app.query_one("#message-input", ChatInput).focus()
