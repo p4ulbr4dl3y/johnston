@@ -9,21 +9,34 @@ from tools.base import BaseTool, resolve_path
 
 
 async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:
-    """Отправляет изображение фолбэк-модели с поддержкой Vision и возвращает текстовое описание"""
+    """Отправляет изображение фолбэк-модели с поддержкой Vision (по умолчанию cline-pass/mimo-v2.5)"""
     from core.provider_manager import ProviderManager
     pm = getattr(app, "pm", None) or ProviderManager()
     providers = pm.load_providers()
 
+    PREFERRED_PROVIDER_KEY = "clinepass"
+    PREFERRED_VISION_MODEL = "cline-pass/mimo-v2.5"
+
     fallback_agent = None
-    for pkey, pinfo in providers.items():
+    if PREFERRED_PROVIDER_KEY in providers:
         try:
-            mod = pinfo["module"]
+            mod = providers[PREFERRED_PROVIDER_KEY]["module"]
             agent_inst = mod.Agent()
-            if catalog.supports_vision(pkey, agent_inst.model):
-                fallback_agent = agent_inst
-                break
+            agent_inst.model = PREFERRED_VISION_MODEL
+            fallback_agent = agent_inst
         except Exception:
             pass
+
+    if not fallback_agent:
+        for pkey, pinfo in providers.items():
+            try:
+                mod = pinfo["module"]
+                agent_inst = mod.Agent()
+                if catalog.supports_vision(pkey, agent_inst.model):
+                    fallback_agent = agent_inst
+                    break
+            except Exception:
+                pass
 
     if not fallback_agent:
         return f"Error: No vision-capable model available to analyze image '{image_path}'."
