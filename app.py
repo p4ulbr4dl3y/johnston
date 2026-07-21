@@ -41,6 +41,7 @@ class TUIChatApp(App):
         self.agent = self.pm.create_active_agent()
         self.agent.app = self
         self.current_session_id = self.sm.generate_session_id()
+        self.selection_copy_active = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -173,12 +174,17 @@ class TUIChatApp(App):
         selected_text = self.screen.get_selected_text()
         if selected_text:
             try:
+                self.selection_copy_active = True
                 self.copy_to_clipboard(selected_text)
                 self.notify("Selected text copied to clipboard!")
             except Exception as e:
                 self.notify(f"Copy failed: {e}", severity="error")
             finally:
                 self.screen.clear_selection()
+                async def reset_flag():
+                    await asyncio.sleep(0.05)
+                    self.selection_copy_active = False
+                asyncio.create_task(reset_flag())
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """Переключение провайдера агента из конфига ~/.tui"""

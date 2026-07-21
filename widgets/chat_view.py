@@ -14,6 +14,8 @@ class UserMessage(Static):
         super().__init__(content, classes="user-msg")
 
     def on_click(self, event: events.Click) -> None:
+        if getattr(self.app, "selection_copy_active", False):
+            return
         try:
             self.app.copy_to_clipboard(self.raw_text)
             self.app.notify("User message copied to clipboard!")
@@ -37,6 +39,8 @@ class BotMessage(Vertical):
         self.md_widget.update(new_content)
 
     def on_click(self, event: events.Click) -> None:
+        if getattr(self.app, "selection_copy_active", False):
+            return
         try:
             if self.content:
                 self.app.copy_to_clipboard(self.content)
@@ -126,6 +130,8 @@ class ToolCallWidget(Vertical):
         self.render_header()
 
     def on_click(self, event: events.Click) -> None:
+        if getattr(self.app, "selection_copy_active", False):
+            return
         try:
             if self.result_text:
                 self.app.copy_to_clipboard(self.result_text)
