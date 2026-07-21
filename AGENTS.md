@@ -8,10 +8,11 @@
 
 ```mermaid
 graph TD
-    PM[ProviderManager] -->|Загрузка .py конфигураций| P[Providers ~/.tui/providers/]
-    PM -->|Создание агента| Agent[BaseAgent]
+    PM[ProviderManager core/provider_manager.py] -->|Загрузка .py конфигураций| P[Providers ~/.tui/providers/]
+    PM -->|Создание агента| Agent[BaseAgent core/base_provider.py]
+    Agent -->|Сборка промптов| PB[PromptBuilder core/prompt_builder.py]
     Agent -->|Запросы через OpenAI API| LLM[LLM API / OpenCode / Custom]
-    Agent -->|Вызов инструментов| Tools[tools/registry.py]
+    Agent -->|Вызов инструментов с ToolContext| Tools[tools/registry.py]
 ```
 
 ---
@@ -19,11 +20,14 @@ graph TD
 ## 1. Провайдеры (Providers)
 
 Каждый провайдер описывается отдельным `.py` файлом в директории `~/.tui/providers/`.
-При старте приложения `ProviderManager` динамически импортирует эти файлы.
+При старте приложения `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/tui/core/provider_manager.py)) динамически импортирует эти файлы. По умолчанию использует шаблон [templates/opencode_provider.py.template](file:///Users/yegor/tui/templates/opencode_provider.py.template).
 
 ### Пример конфигурации провайдера (`~/.tui/providers/opencode.py`):
 ```python
-from base_provider import BaseAgent
+try:
+    from core.base_provider import BaseAgent
+except ImportError:
+    from base_provider import BaseAgent
 
 NAME = "OpenCode Go (DeepSeek v4 Flash)"
 KEY = "opencode"
@@ -52,16 +56,18 @@ class Agent(BaseAgent):
             model=model,
             base_url=base_url,
             system_prompt=SYSTEM_PROMPT,
-            tools=TOOLS
+            tools=TOOLS,
+            provider_key=KEY
         )
 ```
 
 ---
 
-## 2. Базовый класс агента (`BaseAgent`)
+## 2. Базовый класс агента (`BaseAgent`) и `PromptBuilder`
 
-Определен в [base_provider.py](file:///Users/yegor/tui/base_provider.py).
+Определен в [core/base_provider.py](file:///Users/yegor/tui/core/base_provider.py).
 * Использует асинхронный клиент `openai.AsyncOpenAI`.
+* Делегирует динамическую сборку промптов и схем инструментов в `PromptBuilder` ([core/prompt_builder.py](file:///Users/yegor/tui/core/prompt_builder.py)) с учетом активных MCP, навыков (Skills) и режима (Plan/Build).
 * Реализует метод `stream_steps(user_text)`:
   * Получает поток токенов (chunks) от модели.
   * Парсит мыслительные цепочки (reasoning/thinking) и выводит их в UI.
@@ -69,21 +75,23 @@ class Agent(BaseAgent):
 
 ---
 
-## 3. Выполнение Инструментов (Tools)
+## 3. Выполнение Инструментов (Tools) и `ToolContext`
 
 Инструменты изолированы в директории [tools/](file:///Users/yegor/tui/tools/).
-Все доступные инструменты регистрируются в [tools/registry.py](file:///Users/yegor/tui/tools/registry.py).
+Все доступные инструменты регистрируются в [tools/registry.py](file:///Users/yegor/tui/tools/registry.py). Изоляция UI от бизнес-логики обеспечивается объектом `ToolContext` ([tools/context.py](file:///Users/yegor/tui/tools/context.py)).
 
 ### Как добавить новый инструмент:
 1. Создайте файл `tools/my_tool.py`, унаследовав `BaseTool`:
    ```python
    from tools.base import BaseTool
-   
+
    class MyCustomTool(BaseTool):
        name = "MyToolName"
        description = "What this tool does"
-       
+
        async def execute(self, args: dict, app=None) -> str:
+           ctx = self._ensure_context(app)
+           ctx.notify("Executing tool...")
            return "Result string"
    ```
 2. Зарегистрируйте класс в `TOOL_CLASSES` внутри [tools/registry.py](file:///Users/yegor/tui/tools/registry.py).
@@ -114,3 +122,17 @@ class Agent(BaseAgent):
   * `background`: `false` (синхронное ожидание результата в `<task_result>`) или `true` (фоновое асинхронное исполнение с авто-уведомлением в чате по финишу).
 * **Изоляция**: субагент запускается в изолированном контексте `BaseAgent` без рекурсивного доступа к инструменту `Task`.
 
+---
+
+## 6. Тестирование и Линтинг
+
+Все юнит-тесты изолированы в директории [tests/](file:///Users/yegor/tui/tests/).
+
+* **Запуск тестов**:
+  ```bash
+  uv run python -m unittest discover -s tests
+  ```
+* **Запуск линтера**:
+  ```bash
+  uv run ruff check .
+  ```
