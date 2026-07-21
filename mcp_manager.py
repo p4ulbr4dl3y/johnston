@@ -247,3 +247,65 @@ class MCPManager:
             del self.clients[name]
 
         return not new_disabled
+
+    def get_active_tools(self) -> List[Dict[str, Any]]:
+        """
+        Connects to all enabled MCP servers and returns their tools in OpenAI function format.
+        """
+        tools: List[Dict[str, Any]] = []
+        servers = self.load_servers()
+
+        for s in servers:
+            if s.get("disabled", False):
+                continue
+            name = s["name"]
+            cmd = s.get("command")
+            args = s.get("args") or []
+            env = s.get("env")
+            cwd = s.get("cwd")
+
+            if not cmd:
+                continue
+
+            full_cmd = [cmd] + args if isinstance(cmd, str) else list(cmd) + args
+
+            client = self.clients.get(name)
+            if not client:
+                client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+                if client.start():
+                    self.clients[name] = client
+                else:
+                    continue
+
+            for t in client.tools:
+                t_name = t.get("name")
+                if not t_name:
+                    continue
+
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": t_name,
+                        "description": t.get("description", ""),
+                        "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
+                    },
+                    "_mcp_server": name,
+                    "_mcp_tool_name": t_name
+                })
+
+        return tools
+
+    def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+        """
+        Executes an MCP tool call by name across active MCP clients.
+        """
+        active_tools = self.get_active_tools()
+        for t in active_tools:
+            fn = t.get("function", {})
+            if fn.get("name") == tool_name:
+                server_name = t.get("_mcp_server")
+                orig_tool_name = t.get("_mcp_tool_name")
+                client = self.clients.get(server_name)
+                if client:
+                    return client.call_tool(orig_tool_name, arguments)
+        return None

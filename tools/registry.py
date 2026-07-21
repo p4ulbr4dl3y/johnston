@@ -24,10 +24,16 @@ REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
 
 async def execute_tool(name: str, args: dict, app=None) -> str:
     tool_cls = REGISTRY.get(name)
-    if not tool_cls:
-        return f"Unknown tool: {name}"
-    try:
-        tool_inst = tool_cls()
-        return await tool_inst.execute(args, app)
-    except Exception as e:
-        return f"Error executing tool {name}: {e}"
+    if tool_cls:
+        try:
+            tool_inst = tool_cls()
+            return await tool_inst.execute(args, app)
+        except Exception as e:
+            return f"Error executing tool {name}: {e}"
+
+    from mcp_manager import MCPManager
+    mcp_res = MCPManager().call_tool(name, args)
+    if mcp_res is not None:
+        return mcp_res
+
+    return f"Unknown tool: {name}"

@@ -49,6 +49,13 @@ class BaseAgent:
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
 
+        from mcp_manager import MCPManager
+        mcp_tools = MCPManager().get_active_tools()
+        clean_mcp_tools = [
+            {"type": t["type"], "function": t["function"]} for t in mcp_tools
+        ]
+        all_tools = (self.tools or []) + clean_mcp_tools
+
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
         t0 = time.time()
@@ -63,7 +70,7 @@ class BaseAgent:
                     response = await self.client.chat.completions.create(
                         model=self.model,
                         messages=messages,
-                        tools=self.tools,
+                        tools=all_tools if all_tools else None,
                         stream=True,
                         stream_options={"include_usage": True}
                     )
@@ -71,7 +78,7 @@ class BaseAgent:
                     response = await self.client.chat.completions.create(
                         model=self.model,
                         messages=messages,
-                        tools=self.tools,
+                        tools=all_tools if all_tools else None,
                         stream=True
                     )
 
