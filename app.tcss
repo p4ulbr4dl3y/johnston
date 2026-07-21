@@ -224,10 +224,37 @@ OptionList > .option-list--option-blur-highlighted {
     background: transparent;
 }
 
-/* Notifications (Toast) Docked Top Right */
+/* Notifications (Toast) Docked Top Right - Monochrome Slate */
 ToastRack {
     dock: top;
     align: right top;
+}
+
+Toast {
+    background: #18181b;
+    color: #f4f4f5;
+    border-left: solid #ffffff;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+Toast.-information {
+    background: #18181b;
+    color: #f4f4f5;
+    border-left: solid #ffffff;
+}
+
+Toast.-warning {
+    background: #18181b;
+    color: #f4f4f5;
+    border-left: solid #a1a1aa;
+}
+
+Toast.-error {
+    background: #18181b;
+    color: #ffffff;
+    border-left: solid #ffffff;
 }
 
 /* Modal Dialog Styles - Pure Dark Glassmorphism Effect */
