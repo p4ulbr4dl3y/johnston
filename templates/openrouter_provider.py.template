@@ -1,0 +1,161 @@
+"""
+OpenRouter Provider configuration with Read, Create, Edit, Bash tools support
+"""
+try:
+    from core.base_provider import BaseAgent
+except ImportError:
+    from base_provider import BaseAgent
+
+
+NAME = "OpenRouter"
+KEY = "openrouter"
+DESCRIPTION = "OpenRouter multi-model AI agent with tools support"
+
+BASE_URL = "https://openrouter.ai/api/v1"
+MODEL = "openai/gpt-4o-mini"
+API_KEY = "sk-placeholder"
+
+SYSTEM_PROMPT = """You write code.
+Tools: Read, Create, Edit, Bash, Glob, Grep, AskUser.
+Rules:
+- Read: Read file path.
+- Create: Write new file.
+- Edit: Replace unique block of text (old_string) with new_string in existing file. Must match indentation.
+- Bash: Run command. Runs in background if >5s.
+- Glob: Search file paths by pattern.
+- Grep: Search text inside files by regex.
+- AskUser: Ask question to user."""
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "Read",
+            "description": "Read file content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Create",
+            "description": "Create new file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"},
+                    "content": {"type": "string", "description": "Full file content"}
+                },
+                "required": ["path", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Edit",
+            "description": "Replace exact text block in file.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path"},
+                    "old_string": {"type": "string", "description": "Exact text block to replace"},
+                    "new_string": {"type": "string", "description": "Replacement text block"}
+                },
+                "required": ["path", "old_string", "new_string"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Bash",
+            "description": "Run terminal command.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Terminal command"}
+                },
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Glob",
+            "description": "Search file paths matching glob pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern (e.g. *.py)"},
+                    "path": {"type": "string", "description": "Directory path (defaults to cwd)"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Grep",
+            "description": "Search text inside files matching regex pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern"},
+                    "path": {"type": "string", "description": "Directory path (defaults to cwd)"}
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "AskUser",
+            "description": "Ask question to user. Can ask single text question, or a list of questions with pre-defined options and write-ins.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "Single question text"},
+                    "questions": {
+                        "type": "array",
+                        "description": "List of questions with pre-defined options",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "num_text": {"type": "string", "description": "Header text (e.g. ### Question 1/3)"},
+                                "question_text": {"type": "string", "description": "Main question"},
+                                "options": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of selectable options"
+                                }
+                            },
+                            "required": ["question_text"]
+                        }
+                    }
+                }
+            }
+        }
+    }
+]
+
+
+class Agent(BaseAgent):
+    def __init__(self, api_key: str = API_KEY, model: str = MODEL, base_url: str = BASE_URL):
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            system_prompt=SYSTEM_PROMPT,
+            tools=TOOLS,
+            provider_key=KEY
+        )
