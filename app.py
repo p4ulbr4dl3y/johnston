@@ -242,20 +242,24 @@ class JohnstonChatApp(App):
 
         self.generate_ai_response(user_text)
 
-    def prepare_prompt_with_attachments(self, user_text: str) -> str:
-        """Поиск @path/to/file в user_text и прикрепление содержимого существующих файлов"""
+    def prepare_prompt_with_attachments(self, user_text: str):
+        """Поиск @path/to/file и прямых путей в user_text и прикрепление текстовых файлов и картинок"""
+        import base64
+        import mimetypes
         import re
-        pattern = r'@(?:"([^"]+)"|\'([^\']+)\'|([^\s]+))'
+
+        pattern = r'@(?:"([^"]+)"|\'([^\']+)\'|([^\s]+))|(?:^|\s)(/(?:\\ |\S)+|~/(?:\\ |\S)+|file://(?:\\ |\S)+)'
         matches = re.findall(pattern, user_text)
         if not matches:
             return user_text
 
-        attachments = []
+        text_attachments = []
+        image_parts = []
         cwd = os.getcwd()
         seen = set()
 
-        for m1, m2, m3 in matches:
-            raw_path = m1 or m2 or m3
+        for m1, m2, m3, m4 in matches:
+            raw_path = m1 or m2 or m3 or m4
             clean_path = raw_path.replace("\\ ", " ").rstrip(".,!?:;)]}")
             if not clean_path or clean_path in seen:
                 continue
@@ -268,27 +272,34 @@ class JohnstonChatApp(App):
                 try:
                     ext = os.path.splitext(full_path)[1].lower()
                     if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"):
-                        import base64
-                        import mimetypes
                         mime_type, _ = mimetypes.guess_type(full_path)
                         if not mime_type or not mime_type.startswith("image/"):
                             mime_type = f"image/{ext.lstrip('.')}" if ext in (".png", ".jpeg", ".gif", ".webp") else "image/png"
                         with open(full_path, "rb") as img_f:
                             b64_data = base64.b64encode(img_f.read()).decode("utf-8")
                         b64_url = f"data:{mime_type};base64,{b64_data}"
-                        attachments.append(f"--- Attached Image File: {clean_path} ---\nPath: {full_path}\nDataURL: {b64_url}")
+                        image_parts.append({
+                            "type": "image_url",
+                            "image_url": {"url": b64_url}
+                        })
+                        text_attachments.append(f"--- Attached Image File: {clean_path} ---")
                     else:
                         with open(full_path, "r", encoding="utf-8", errors="replace") as f:
                             content = f.read()
                         if len(content) > 50000:
                             content = content[:50000] + "\n... [content truncated]"
-                        attachments.append(f"--- Attached File: {clean_path} ---\n{content}")
+                        text_attachments.append(f"--- Attached File: {clean_path} ---\n{content}")
                 except Exception as e:
                     print(f"Error reading attached file {clean_path}: {e}")
 
-        if attachments:
-            return user_text + "\n\n" + "\n\n".join(attachments)
-        return user_text
+        final_text = user_text
+        if text_attachments:
+            final_text = user_text + "\n\n" + "\n\n".join(text_attachments)
+
+        if image_parts:
+            return [{"type": "text", "text": final_text}] + image_parts
+
+        return final_text
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
