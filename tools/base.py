@@ -28,6 +28,18 @@ def resolve_path(path_str: str | None = None) -> str:
     return os.path.abspath(os.path.expanduser(path_str))
 
 
+def truncate_output(text: str, max_chars: int = 8000, hint: str = "") -> str:
+    """Truncates text safely if it exceeds max_chars, appending an actionable hint for the LLM."""
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
+    footer = f"\n... [Output truncated at {max_chars} chars."
+    if hint:
+        footer += f" {hint}"
+    footer += "]"
+    return truncated + footer
+
+
 class BaseTool:
     name: str = ""
     description: str = ""

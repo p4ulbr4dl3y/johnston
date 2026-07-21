@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from tools.base import IGNORE_DIRS, BaseTool, resolve_path
+from tools.base import IGNORE_DIRS, BaseTool, resolve_path, truncate_output
 
 
 class ListDirTool(BaseTool):
@@ -54,6 +54,7 @@ class ListDirTool(BaseTool):
             if not result:
                 return f"Directory '{path}' is empty."
 
-            return f"=== Directory contents of {path} ===\n" + "\n".join(result)
+            header = f"=== Directory contents of {path} ===\n"
+            return truncate_output(header + "\n".join(result), max_chars=8000, hint="Use Glob or Grep to search specific subdirectories.")
         except Exception as e:
             return f"Error listing directory '{path}': {e}"

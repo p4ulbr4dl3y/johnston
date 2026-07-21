@@ -216,5 +216,16 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.background_tasks), 1)
         self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
 
+    def test_truncate_output_helper(self):
+        from tools.base import truncate_output
+        short_text = "hello"
+        self.assertEqual(truncate_output(short_text, max_chars=10), "hello")
+
+        long_text = "a" * 100
+        truncated = truncate_output(long_text, max_chars=10, hint="Use line ranges.")
+        self.assertTrue(truncated.startswith("aaaaaaaaaa"))
+        self.assertIn("Output truncated at 10 chars. Use line ranges.", truncated)
+
+
 if __name__ == "__main__":
     unittest.main()

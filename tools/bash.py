@@ -3,7 +3,7 @@ import time
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask
-from tools.base import BaseTool
+from tools.base import BaseTool, truncate_output
 
 
 class BashTool(BaseTool):
@@ -41,9 +41,9 @@ class BashTool(BaseTool):
             if hasattr(task, "read_task") and task.read_task:
                 await task.read_task
             res = "".join(task.output)
-            if len(res) > 3000:
-                res = res[:3000] + "\n... [output truncated]"
-            return res if res.strip() else "Command executed with no output."
+            if not res.strip():
+                return "Command executed with no output."
+            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
         except asyncio.TimeoutError:
             if ctx.app:
                 task.is_background = True
@@ -55,6 +55,6 @@ class BashTool(BaseTool):
                 if hasattr(task, "read_task") and task.read_task:
                     await task.read_task
                 res = "".join(task.output)
-                if len(res) > 3000:
-                    res = res[:3000] + "\n... [output truncated]"
-                return res if res.strip() else "Command executed with no output."
+                if not res.strip():
+                    return "Command executed with no output."
+                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")

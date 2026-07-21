@@ -2,7 +2,7 @@ import fnmatch
 import os
 from typing import Any, Dict
 
-from tools.base import IGNORE_DIRS, BaseTool, resolve_path
+from tools.base import IGNORE_DIRS, BaseTool, resolve_path, truncate_output
 
 
 class GlobTool(BaseTool):
@@ -41,4 +41,4 @@ class GlobTool(BaseTool):
                 break
         if not matches:
             return "No files found matching the pattern."
-        return "\n".join(matches)
+        return truncate_output("\n".join(matches), max_chars=8000, hint="Refine pattern or path argument if needed.")

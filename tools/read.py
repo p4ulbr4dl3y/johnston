@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool, resolve_path
+from tools.base import BaseTool, resolve_path, truncate_output
 
 
 class ReadTool(BaseTool):
@@ -45,8 +45,6 @@ class ReadTool(BaseTool):
                 return f"=== Lines {s_idx+1}-{min(e_idx, len(lines))} of {len(lines)} in {path} ===\n{content}"
 
             content = "".join(lines)
-            if len(content) > 8000:
-                return content[:8000] + f"\n... [truncated. File has {len(lines)} lines. Use start_line/end_line to read more]"
-            return content
+            return truncate_output(content, max_chars=8000, hint=f"File has {len(lines)} lines. Use start_line/end_line to read specific ranges.")
         except Exception as e:
             return f"Error reading file '{path}': {e}"

@@ -2,7 +2,7 @@ import os
 import re
 from typing import Any, Dict
 
-from tools.base import IGNORE_DIRS, IGNORE_EXTENSIONS, BaseTool, resolve_path
+from tools.base import IGNORE_DIRS, IGNORE_EXTENSIONS, BaseTool, resolve_path, truncate_output
 
 
 class GrepTool(BaseTool):
@@ -61,4 +61,4 @@ class GrepTool(BaseTool):
                 break
         if not results:
             return "No matches found."
-        return "\n".join(results)
+        return truncate_output("\n".join(results), max_chars=8000, hint="Refine pattern or subfolder path argument if needed.")
