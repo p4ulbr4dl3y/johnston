@@ -2,7 +2,7 @@ import os
 import re
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import IGNORE_DIRS, IGNORE_EXTENSIONS, BaseTool, resolve_path
 
 
 class GrepTool(BaseTool):
@@ -28,34 +28,18 @@ class GrepTool(BaseTool):
         pattern = args.get("pattern", "")
         if not pattern:
             return "Error: pattern is required."
-        ignore_dirs = {
-            ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
-            ".johnston", ".gemini", "dist", "build", "out", "target",
-            "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
-            ".ruff_cache", ".idea", ".vscode"
-        }
-        ignore_extensions = {
-            ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
-            ".pdf", ".zip", ".tar", ".gz", ".7z", ".rar",
-            ".db", ".sqlite", ".sqlite3", ".pyc", ".pyo",
-            ".woff", ".woff2", ".ttf", ".eot", ".otf",
-            ".mp3", ".mp4", ".mov", ".avi", ".mkv", ".wav",
-            ".so", ".dylib", ".dll", ".exe", ".bin", ".o", ".a", ".out",
-            ".ds_store"
-        }
         try:
             regex = re.compile(pattern, re.IGNORECASE)
         except Exception as e:
             return f"Error compiling regex '{pattern}': {e}"
 
-        target_path = args.get("path")
-        root_dir = os.path.abspath(os.path.expanduser(target_path)) if target_path else os.getcwd()
+        root_dir = resolve_path(args.get("path"))
         results = []
         for root, dirs, files in os.walk(root_dir):
-            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
             for file in files:
                 ext = os.path.splitext(file)[1].lower()
-                if ext in ignore_extensions:
+                if ext in IGNORE_EXTENSIONS:
                     continue
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, root_dir)

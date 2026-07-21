@@ -1,14 +1,7 @@
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool
-
-IGNORE_DIRS = {
-    ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
-    ".johnston", ".gemini", "dist", "build", "out", "target",
-    "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
-    ".ruff_cache", ".idea", ".vscode"
-}
+from tools.base import IGNORE_DIRS, BaseTool, resolve_path
 
 
 class ListDirTool(BaseTool):
@@ -29,8 +22,7 @@ class ListDirTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        target_path = args.get("path")
-        path = os.path.abspath(os.path.expanduser(target_path)) if target_path else os.getcwd()
+        path = resolve_path(args.get("path"))
 
         if not os.path.exists(path):
             return f"Error: path '{path}' does not exist."

@@ -2,7 +2,7 @@ import fnmatch
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import IGNORE_DIRS, BaseTool, resolve_path
 
 
 class GlobTool(BaseTool):
@@ -26,17 +26,10 @@ class GlobTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         pattern = args.get("pattern", "*")
-        ignore_dirs = {
-            ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
-            ".johnston", ".gemini", "dist", "build", "out", "target",
-            "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
-            ".ruff_cache", ".idea", ".vscode"
-        }
-        target_path = args.get("path")
-        root_dir = os.path.abspath(os.path.expanduser(target_path)) if target_path else os.getcwd()
+        root_dir = resolve_path(args.get("path"))
         matches = []
         for root, dirs, files in os.walk(root_dir):
-            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+            dirs[:] = [d for d in dirs if d not in IGNORE_DIRS and not d.startswith(".")]
             for file in files:
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, root_dir)
