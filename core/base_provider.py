@@ -24,9 +24,15 @@ class BaseAgent:
         self.tokens_input = 0
         self.tokens_output = 0
         self.total_tokens = 0
-        self.context_limit = catalog.get_context_limit(self.provider_key, self.model)
-        self.context_window = get_context_window(self.provider_key, self.model)
         self.mode = "build"
+
+    @property
+    def context_limit(self) -> int:
+        return catalog.get_context_limit(self.provider_key, self.model)
+
+    @property
+    def context_window(self) -> str:
+        return get_context_window(self.provider_key, self.model)
 
     def clear_history(self):
         self.history.clear()
@@ -39,8 +45,8 @@ class BaseAgent:
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
-            "context": getattr(self, "context_window", "128k"),
-            "context_limit": getattr(self, "context_limit", 128000),
+            "context": self.context_window,
+            "context_limit": self.context_limit,
             "cost_usd": getattr(self, "cost_usd", 0.0)
         }
 
