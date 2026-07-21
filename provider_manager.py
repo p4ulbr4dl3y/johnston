@@ -128,13 +128,29 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "AskUser",
-            "description": "Ask question to user.",
+            "description": "Ask question to user. Can ask single text question, or a list of questions with pre-defined options and write-ins.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "question": {"type": "string", "description": "Question text"}
-                },
-                "required": ["question"]
+                    "question": {"type": "string", "description": "Single text question to ask."},
+                    "questions": {
+                        "type": "array",
+                        "description": "List of questions to ask sequentially in a wizard.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "num_text": {"type": "string", "description": "Header text (e.g. 'Question 1/2')"},
+                                "question_text": {"type": "string", "description": "The actual question text"},
+                                "options": {
+                                    "type": "array",
+                                    "description": "List of pre-defined options",
+                                    "items": {"type": "string"}
+                                }
+                            },
+                            "required": ["question_text"]
+                        }
+                    }
+                }
             }
         }
     }
