@@ -177,15 +177,65 @@ class SkillsCommand(BaseCommand):
                 app.generate_ai_response(f"Load and apply the skill '{s_name}'.", show_in_ui=True)
             app.query_one("#message-input", ChatInput).focus()
 
-        app.push_screen(SkillsScreen(), callback=on_skill_selected)
-
-
 class MCPCommand(BaseCommand):
     name = "/mcp"
     description = "Manage MCP servers (toggle enabled/disabled)"
 
     async def execute(self, app) -> None:
         app.push_screen(MCPScreen())
+
+
+INIT_PROMPT_TEMPLATE = """Create or update `AGENTS.md` for this repository.
+
+The goal is a compact instruction file that helps future AI sessions avoid mistakes and ramp up quickly. Every line should answer: "Would an agent likely miss this without help?" If not, leave it out.
+
+## How to investigate
+Read the highest-value sources first:
+- `README*`, root manifests, workspace config, lockfiles
+- build, test, lint, formatter, typecheck, and codegen config
+- CI workflows and pre-commit / task runner config
+- existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`)
+
+If architecture is still unclear after reading config and docs, inspect representative code files to find real entrypoints and boundaries.
+
+## Writing rules
+Include only high-signal, repo-specific guidance such as:
+- exact commands and shortcuts the agent would otherwise guess wrong
+- architecture notes that are not obvious from filenames
+- conventions that differ from language or framework defaults
+
+When in doubt, omit. Prefer short sections and bullets.
+If `AGENTS.md` already exists, improve it in place rather than rewriting blindly."""
+
+class InitCommand(BaseCommand):
+    name = "/init"
+    description = "Guided AGENTS.md project setup"
+
+    async def execute(self, app) -> None:
+        app.notify("Initializing AGENTS.md guide for this project...")
+        app.generate_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
+
+
+class CompactCommand(BaseCommand):
+    name = "/compact"
+    description = "Compact session conversation history with AI summary"
+
+    async def execute(self, app) -> None:
+        if not hasattr(app, "agent") or not app.agent:
+            app.notify("No active agent found", severity="error")
+            return
+
+        app.notify("Compacting conversation context...")
+        if hasattr(app.agent, "compact_history"):
+            success, msg = await app.agent.compact_history()
+            if success:
+                app.notify(msg)
+                if hasattr(app, "refresh_status_footer"):
+                    app.refresh_status_footer()
+            else:
+                app.notify(msg, severity="warning")
+        else:
+            app.notify("Active agent does not support context compaction", severity="warning")
 
 
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
@@ -199,6 +249,8 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         TasksCommand,
         SkillsCommand,
         MCPCommand,
+        InitCommand,
+        CompactCommand,
     ]
 }
 

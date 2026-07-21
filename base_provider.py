@@ -206,3 +206,52 @@ class BaseAgent:
         except Exception as err:
             error_msg = f"**OpenCode API Error:** `{err}`"
             yield ("bot_text", error_msg, "")
+
+    async def compact_history(self) -> Tuple[bool, str]:
+        """
+        Compacts the conversation history using an AI summary prompt.
+        Leaves the most recent 2 messages intact, and replaces older history with a summary.
+        Returns (success, message_text).
+        """
+        if len(self.history) <= 4:
+            return False, "History is too short to compact (<= 4 messages)"
+
+        recent_tail = self.history[-2:]
+        history_to_compact = self.history[:-2]
+
+        compaction_prompt = (
+            "You are an anchored context summarization assistant for coding sessions.\n\n"
+            "Summarize the conversation history given in the messages into a concise summary.\n"
+            "Preserve:\n"
+            "1. Key goals and user constraints\n"
+            "2. Important technical facts, decisions, and file paths\n"
+            "3. Progress made and pending next steps\n\n"
+            "Do NOT answer the conversation. Do NOT mention that you are summarizing.\n"
+            "Respond in the same language as the conversation."
+        )
+
+        compact_messages = [
+            {"role": "system", "content": compaction_prompt}
+        ] + history_to_compact + [
+            {"role": "user", "content": "Generate the context summary now based on the above history."}
+        ]
+
+        try:
+            res = await self.client.chat.completions.create(
+                model=self.model,
+                messages=compact_messages,
+                stream=False
+            )
+            summary_text = res.choices[0].message.content or ""
+            if not summary_text.strip():
+                return False, "Failed to generate summary"
+
+            new_history = [
+                {"role": "user", "content": f"[Context Summary of earlier conversation]:\n{summary_text}"},
+                {"role": "assistant", "content": "Understood. Proceeding with summarized context."}
+            ] + recent_tail
+
+            self.history = new_history
+            return True, f"History compacted successfully (summary size: {len(summary_text)} chars)"
+        except Exception as e:
+            return False, f"Compaction error: {e}"

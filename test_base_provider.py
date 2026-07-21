@@ -89,5 +89,20 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_bash = await execute_tool("Bash", {"command": "echo 'hello bash'"})
         self.assertEqual(res_bash.strip(), "hello bash")
 
+    def test_init_and_compact_commands_registered(self):
+        from commands import COMMAND_REGISTRY
+        self.assertIn("/init", COMMAND_REGISTRY)
+        self.assertIn("/compact", COMMAND_REGISTRY)
+
+    async def test_compact_history_short(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        agent.history = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hello"}
+        ]
+        success, msg = await agent.compact_history()
+        self.assertFalse(success)
+        self.assertIn("too short", msg)
+
 if __name__ == "__main__":
     unittest.main()
