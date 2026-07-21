@@ -125,6 +125,33 @@ class ModelsCatalog:
 
         return 128000
 
+    def supports_vision(self, provider_id: str, model_id: str) -> bool:
+        """Проверяет, поддерживает ли модель обработку изображений (Vision)"""
+        m_lower = model_id.lower()
+
+        # 1. Известные ключи и семейства моделей с поддержкой зрячести (Vision / Multimodal)
+        vision_keywords = {
+            "gpt-4o", "gpt-4-vision", "claude-3", "gemini", "vision", "omni",
+            "qwen", "glm", "kimi", "mimo", "minimax", "deepseek-v4", "nemotron"
+        }
+        for kw in vision_keywords:
+            if kw in m_lower:
+                return True
+
+        # 2. Проверка данных из models.dev кеша
+        data = self._data
+        if data and isinstance(data, dict):
+            for p_info in data.values():
+                if isinstance(p_info, dict):
+                    models = p_info.get("models", {})
+                    if model_id in models:
+                        m = models[model_id]
+                        modalities = m.get("modalities") or m.get("input_modalities") or []
+                        if "image" in modalities or "vision" in modalities:
+                            return True
+
+        return False
+
 
 catalog = ModelsCatalog()
 

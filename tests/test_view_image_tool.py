@@ -17,6 +17,12 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
         res_nonexistent = await read_tool.execute({"path": "nonexistent_image.png"})
         self.assertIn("not found", res_nonexistent)
 
+    def test_supports_vision(self):
+        from core.models_catalog import catalog
+        self.assertTrue(catalog.supports_vision("clinepass", "cline-pass/deepseek-v4-flash"))
+        self.assertTrue(catalog.supports_vision("openrouter", "gpt-4o"))
+        self.assertFalse(catalog.supports_vision("custom", "text-only-model-v1"))
+
 
 if __name__ == "__main__":
     unittest.main()
