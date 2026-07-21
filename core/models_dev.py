@@ -16,19 +16,21 @@ CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_dev.json")
 CACHE_TTL = 86400  # 24 hours
 
 DEFAULT_MODEL_LIMITS: Dict[str, int] = {
-    "deepseek-v4-flash": 1000000,
-    "deepseek-v4-pro": 1000000,
-    "deepseek-v4": 1000000,
-    "deepseek-chat": 1000000,
-    "deepseek-reasoner": 1000000,
+    "deepseek": 1000000,
     "gpt-4o": 128000,
-    "gpt-4o-mini": 128000,
-    "claude-3-5-sonnet": 200000,
-    "claude-3-7-sonnet": 200000,
-    "claude-3-opus": 200000,
-    "gemini-2.5-pro": 1000000,
-    "gemini-2.5-flash": 1000000,
-    "minimax-m3": 128000,
+    "gpt-4": 128000,
+    "claude-3": 200000,
+    "claude": 200000,
+    "gemini": 1000000,
+    "minimax": 128000,
+    "kimi": 200000,
+    "moonshot": 200000,
+    "nemotron": 1000000,
+    "grok": 1000000,
+    "qwen": 128000,
+    "glm": 128000,
+    "mistral": 128000,
+    "llama": 128000,
 }
 
 def format_context_tokens(tokens: int) -> str:
@@ -103,7 +105,7 @@ class ModelsDevCatalog:
                         if isinstance(limit, (int, float)):
                             return int(limit)
 
-        model_clean = model_id.split("/")[-1].lower()
+        model_clean = model_id.lower()
         for key, val in DEFAULT_MODEL_LIMITS.items():
             if key in model_clean:
                 return val
