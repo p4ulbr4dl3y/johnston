@@ -18,6 +18,7 @@ class TestMCPManager(unittest.TestCase):
 
     def test_global_and_project_mcp_servers(self):
         mm = MCPManager(project_dir=self.test_dir)
+        mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
 
         # Write global MCP server
         with open(mm.global_file, "w", encoding="utf-8") as f:

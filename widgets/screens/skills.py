@@ -16,7 +16,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.skills = self.sm.list_skills()
         self.options = []
         for s in self.skills:
-            scope_tag = f"[{s['scope'].upper()}]"
+            scope_tag = rf"\[{s['scope'].upper()}]"
             desc = f" — {s['description']}" if s['description'] else ""
             self.options.append(f"{scope_tag} {s['name']}{desc}")
 

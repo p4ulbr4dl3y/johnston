@@ -34,8 +34,8 @@ class MCPScreen(ModalScreen[None]):
 
         for s in self.servers:
             disabled = s.get("disabled", False)
-            status_tag = "[OFF]" if disabled else "[ON]"
-            scope_tag = f"[{s['scope'].upper()}]"
+            status_tag = r"\[OFF]" if disabled else r"\[ON]"
+            scope_tag = rf"\[{s['scope'].upper()}]"
             cmd_info = s.get("url") or s.get("command") or ""
             if isinstance(cmd_info, list):
                 cmd_info = " ".join(cmd_info)
