@@ -88,8 +88,8 @@ class TUIChatApp(App):
                 mcp_active=mcp_active,
                 mcp_total=mcp_total
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Error refreshing status footer: {e}")
 
     def load_session_ui(self, session_id: str) -> None:
         """Загрузка состояния сессии в UI и в историю агента"""

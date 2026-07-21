@@ -8,6 +8,9 @@ class StatusFooter(Static):
     can_focus = False
     ALLOW_SELECT = False
 
+    def on_mount(self) -> None:
+        self.update_status(provider_key="")
+
     def update_status(
         self,
         provider_key: str,
