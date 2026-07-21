@@ -86,13 +86,7 @@ class ToolCallWidget(Vertical):
         self.result_text = result_text
         self.is_expanded = False
 
-        icons = {
-            "Create": "Create",
-            "Read": "Read",
-            "Edit": "Edit",
-            "Bash": "Bash"
-        }
-        self.icon_name = icons.get(tool_type, f"● {tool_type}")
+        self.icon_name = tool_type
         
         self.header_label = Label("", classes="tool-header")
         self.md_widget = Markdown("")
