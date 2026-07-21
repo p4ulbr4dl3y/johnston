@@ -44,8 +44,8 @@ class BaseAgent:
         }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        from mcp_manager import MCPManager
-        mcp_mgr = MCPManager()
+        from mcp_manager import get_mcp_manager
+        mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_active_tools()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
 
@@ -180,9 +180,13 @@ class BaseAgent:
                     except Exception:
                         args = {}
 
-                    target = args.get("path") or args.get("command") or args.get("question")
+                    target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                     if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
                         target = args["questions"][0].get("question_text", "")
+                    if not target:
+                        str_args = [str(v) for v in args.values() if isinstance(v, (str, int, float)) and v]
+                        if str_args:
+                            target = str_args[0]
                     if not target:
                         target = t_name
                     yield ("tool", t_name, target)

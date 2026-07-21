@@ -75,14 +75,17 @@ class MCPProcessClient:
         if not self.process or not self.process.stdout:
             return None
         
-        # Read stdout line
-        line = self.process.stdout.readline()
-        if not line:
-            return None
-        try:
-            return json.loads(line)
-        except Exception:
-            return None
+        while True:
+            line = self.process.stdout.readline()
+            if not line:
+                return None
+            line_str = line.strip()
+            if not line_str.startswith("{"):
+                continue
+            try:
+                return json.loads(line_str)
+            except Exception:
+                continue
 
     def _initialize(self) -> bool:
         self.req_id += 1
@@ -152,6 +155,14 @@ class MCPProcessClient:
 
         return "\n".join(output_parts) or "Success (empty response)"
 
+
+_mcp_manager_instance: Optional["MCPManager"] = None
+
+def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
+    global _mcp_manager_instance
+    if _mcp_manager_instance is None:
+        _mcp_manager_instance = MCPManager(project_dir=project_dir)
+    return _mcp_manager_instance
 
 class MCPManager:
     def __init__(self, project_dir: Optional[str] = None):

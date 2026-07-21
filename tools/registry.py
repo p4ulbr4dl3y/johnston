@@ -31,8 +31,8 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
         except Exception as e:
             return f"Error executing tool {name}: {e}"
 
-    from mcp_manager import MCPManager
-    mcp_res = MCPManager().call_tool(name, args)
+    from mcp_manager import get_mcp_manager
+    mcp_res = get_mcp_manager().call_tool(name, args)
     if mcp_res is not None:
         return mcp_res
 
