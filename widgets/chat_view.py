@@ -1,6 +1,3 @@
-import os
-
-from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.reactive import reactive
@@ -14,19 +11,6 @@ class UserMessage(Static):
     def __init__(self, content: str):
         self.raw_text = content
         super().__init__(content, classes="user-msg")
-
-    def on_click(self, event: events.Click) -> None:
-        if getattr(self.app, "selection_copy_active", False):
-            return
-        try:
-            chat_input = self.app.query_one("#message-input")
-            chat_input.load_text(self.raw_text)
-            chat_input.focus()
-            lines = chat_input.text.split("\n")
-            chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
-            self.app.notify("Message loaded into input field!")
-        except Exception as e:
-            self.app.notify(f"Load failed: {e}", severity="error")
 
 
 class BotMessage(Vertical):
@@ -43,20 +27,6 @@ class BotMessage(Vertical):
 
     def watch_content(self, new_content: str) -> None:
         self.md_widget.update(new_content)
-
-    def on_click(self, event: events.Click) -> None:
-        if getattr(self.app, "selection_copy_active", False):
-            return
-        try:
-            if self.content:
-                chat_input = self.app.query_one("#message-input")
-                chat_input.load_text(self.content)
-                chat_input.focus()
-                lines = chat_input.text.split("\n")
-                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
-                self.app.notify("Message loaded into input field!")
-        except Exception as e:
-            self.app.notify(f"Load failed: {e}", severity="error")
 
 
 class ThinkingWidget(Vertical):
@@ -105,7 +75,7 @@ class ThinkingWidget(Vertical):
 
 
 class ToolCallWidget(Vertical):
-    """Отдельный разворачиваемый виджет вызова инструмента (Create, Read, Edit, Bash)"""
+    """Виджет вызова инструмента (Create, Read, Edit, Bash)"""
     can_focus = False
     ALLOW_SELECT = False
 
@@ -117,75 +87,18 @@ class ToolCallWidget(Vertical):
         self.tool_type = tool_type
         self.target = target
         self.result_text = result_text
-        self.is_expanded = False
-
         self.icon_name = tool_type
-
         self.header_label = Label("", classes="tool-header")
-        self.md_widget = Markdown("")
-        self.diff_widget = Static("", classes="tool-diff-view")
 
     def compose(self) -> ComposeResult:
         yield self.header_label
-        yield self.md_widget
-        yield self.diff_widget
 
     def on_mount(self) -> None:
-        self.md_widget.display = False
-        self.diff_widget.display = False
         self.render_header()
-        if self.result_text:
-            self.set_result(self.result_text)
 
     def set_result(self, result_text: str) -> None:
         self.result_text = result_text.strip()
         self.render_header()
-
-    def on_click(self, event: events.Click) -> None:
-        if getattr(self.app, "selection_copy_active", False):
-            return
-        try:
-            if self.result_text:
-                self.app.copy_to_clipboard(self.result_text)
-                self.app.notify(f"{self.tool_type} result copied to clipboard!")
-        except Exception as e:
-            self.app.notify(f"Copy failed: {e}", severity="error")
-
-        if not self.result_text:
-            return
-
-        if self.tool_type == "Edit":
-            # Красивый гитоподобный дифф с цветными полосами
-            from rich.text import Text
-            t = Text()
-            lines = self.result_text.splitlines()
-            for line in lines:
-                if line.startswith("+"):
-                    t.append(line + "\n", style="#10b981 on #022c22")
-                elif line.startswith("-"):
-                    t.append(line + "\n", style="#ef4444 on #450a0a")
-                elif line.startswith("@@"):
-                    t.append(line + "\n", style="#ffffff")
-                else:
-                    t.append(line + "\n", style="#a1a1aa")
-            self.diff_widget.update(t)
-
-            if self.is_expanded:
-                self.diff_widget.display = True
-                self.md_widget.display = False
-        else:
-            if self.tool_type == "Bash":
-                formatted_md = f"```bash\n{self.result_text}\n```"
-            elif self.tool_type == "Create":
-                ext = os.path.splitext(self.target)[1].lstrip(".")
-                formatted_md = f"```{ext}\n{self.result_text}\n```"
-            else:
-                formatted_md = self.result_text
-            self.md_widget.update(formatted_md)
-
-            if self.is_expanded:
-                self.md_widget.display = True
-                self.diff_widget.display = False
 
     def render_header(self) -> None:
         self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")

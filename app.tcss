@@ -1,4 +1,13 @@
-/* Monochrome Slate Style - Clean Slate & Pure White Accent */
+/* Selection Style - Inverse Pure White */
+Screen > .screen--selection {
+    background: #ffffff;
+    color: #09090b;
+}
+
+TextArea > .text-area--selection {
+    background: #ffffff;
+    color: #09090b;
+}
 
 Screen {
     background: #09090b;
@@ -6,15 +15,15 @@ Screen {
     margin: 0;
     scrollbar-size: 1 1;
     scrollbar-color: #a1a1aa #27272a;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 * {
     scrollbar-size: 1 1;
     scrollbar-color: #a1a1aa #27272a;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 #app-container {
@@ -29,9 +38,9 @@ Screen {
     padding: 1 3 1 3;
     background: #09090b;
     scrollbar-size: 1 1;
-    scrollbar-color: #a1a1aa #18181b;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 WelcomeWidget {
@@ -173,6 +182,7 @@ MarkdownFence {
     margin: 1 0;
     padding: 0 2;
     border-left: solid #3f3f46;
+    scrollbar-size: 0 0;
 }
 
 /* OptionList Base Styles */
@@ -238,6 +248,11 @@ OptionList > .option-list--option-blur-highlighted {
 
 #message-input > .text-area--cursor-line {
     background: transparent;
+}
+
+#message-input > .text-area--selection {
+    background: #ffffff;
+    color: #09090b;
 }
 
 /* Notifications (Toast) Docked Top Right - Monochrome Slate */

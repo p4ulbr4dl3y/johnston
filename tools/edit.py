@@ -3,6 +3,7 @@ import os
 from typing import Any, Dict
 
 from tools.base import BaseTool
+from tools.linter import run_linter
 
 
 class EditTool(BaseTool):
@@ -37,4 +38,6 @@ class EditTool(BaseTool):
             tofile=path + " (new)",
             lineterm=""
         ))
-        return "\n".join(diff_lines)
+        diff_output = "\n".join(diff_lines)
+        linter_output = await run_linter(path)
+        return diff_output + linter_output

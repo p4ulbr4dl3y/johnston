@@ -44,7 +44,7 @@ class PromptBuilder:
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
 
-        sys_prompt = self.base_system_prompt
+        sys_prompt = f"{self.base_system_prompt}\n\nCurrent working directory: {os.getcwd()}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if mcp_snippet:
