@@ -51,18 +51,27 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                     pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        query = event.value.strip().lower()
-        if not query:
+        query_raw = event.value.strip().lower()
+        if not query_raw:
             self.filtered_items = list(self.raw_items)
             self.filtered_options = list(self.raw_options)
         else:
-            filtered = [
-                (opt, item)
-                for opt, item in zip(self.raw_options, self.raw_items)
-                if query in str(item).lower() or query in opt.lower()
-            ]
-            self.filtered_options = [f[0] for f in filtered]
-            self.filtered_items = [f[1] for f in filtered]
+            tokens = query_raw.split()
+            scored_matches = []
+            for opt, item in zip(self.raw_options, self.raw_items):
+                target_str = (str(item) + " " + opt).lower()
+                if all(t in target_str for t in tokens):
+                    score = 0
+                    if query_raw in target_str:
+                        score += 100
+                    for t in tokens:
+                        if target_str.startswith(t) or f"/{t}" in target_str or f"-{t}" in target_str or f":{t}" in target_str:
+                            score += 10
+                    scored_matches.append((score, opt, item))
+
+            scored_matches.sort(key=lambda x: x[0], reverse=True)
+            self.filtered_options = [m[1] for m in scored_matches]
+            self.filtered_items = [m[2] for m in scored_matches]
 
         opt_list = self.query_one("#modal-option-list", OptionList)
         opt_list.clear_options()

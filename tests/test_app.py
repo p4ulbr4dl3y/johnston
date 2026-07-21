@@ -70,7 +70,7 @@ async def test_chat_app_flow():
         await pilot.press("enter")
         await pilot.pause(0.5)
         assert isinstance(app.screen, ModelScreen)
-        await pilot.press("d", "e", "e", "p")
+        await pilot.press("d", "e", "e", "p", "space", "f", "l", "a", "s", "h")
         await pilot.pause(0.2)
         assert len(app.screen.filtered_items) > 0
         await pilot.press("escape")
