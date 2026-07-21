@@ -54,5 +54,6 @@ class StatusFooter(Static):
 
         grid.add_row(left_1, right_1)
         grid.add_row(left_2, right_2)
+        grid.add_row("", "")
 
         self.update(grid)
