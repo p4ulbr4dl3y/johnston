@@ -5,16 +5,16 @@ Screen {
     padding: 0;
     margin: 0;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #09090b;
-    scrollbar-color-hover: #a1a1aa #18181b;
-    scrollbar-color-active: #ffffff #27272a;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-active: #ffffff #3f3f46;
 }
 
 * {
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #09090b;
-    scrollbar-color-hover: #a1a1aa #18181b;
-    scrollbar-color-active: #ffffff #27272a;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-active: #ffffff #3f3f46;
 }
 
 #app-container {
@@ -29,9 +29,9 @@ Screen {
     padding: 1 3 1 3;
     background: #09090b;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #09090b;
-    scrollbar-color-hover: #a1a1aa #18181b;
-    scrollbar-color-active: #ffffff #27272a;
+    scrollbar-color: #a1a1aa #18181b;
+    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-active: #ffffff #3f3f46;
 }
 
 WelcomeWidget {
@@ -180,7 +180,9 @@ OptionList {
     background: #18181b;
     color: #a1a1aa;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #18181b;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-active: #ffffff #3f3f46;
 }
 
 OptionList > .option-list--option-highlighted,
@@ -319,7 +321,9 @@ ModalScreen {
     border: solid #27272a;
     background: #09090b;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #09090b;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-active: #ffffff #3f3f46;
 }
 
 #modal-dialog OptionList > .option-list--option-highlighted,
