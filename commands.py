@@ -98,14 +98,31 @@ class RewindCommand(BaseCommand):
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
-                chat_view.rollback_to(selected_idx)
+                # Находим исходный текст сообщения, до которого откатываемся
+                msg_text = ""
+                for idx, text in user_msgs:
+                    if idx == selected_idx:
+                        msg_text = text
+                        break
+                
+                # Откатываем чат до позиции непосредственно перед выбранным сообщением
+                chat_view.rollback_to(selected_idx - 1)
+                
                 if hasattr(app.agent, "clear_history"):
                     app.agent.clear_history()
                 elif hasattr(app.agent, "history"):
                     app.agent.history = []
+                
                 app.save_current_session()
-                app.notify("History successfully rolled back!")
-            app.query_one("#message-input", ChatInput).focus()
+                
+                # Загружаем текст в поле ввода
+                chat_input = app.query_one("#message-input")
+                chat_input.load_text(msg_text)
+                lines = chat_input.text.split("\n")
+                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+                
+                app.notify("Chat rolled back! Message loaded into input field.")
+            app.query_one("#message-input").focus()
 
         app.push_screen(RewindScreen(user_msgs), callback=on_rewind_selected)
 
