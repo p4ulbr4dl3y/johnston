@@ -79,7 +79,7 @@ async def test_chat_app_flow():
         await pilot.press("enter")
         await pilot.pause(0.5)
         chat_view = app.query_one(ChatView)
-        assert len(list(chat_view.children)) == 0
+        assert len(chat_view.get_user_messages()) == 0
         print("✓ /new command tests passed cleanly!")
 
         # 8. Проверяем /tasks

@@ -138,6 +138,8 @@ class JohnstonChatApp(App):
                 rtext = msg.get("result_text", "")
                 self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext))
 
+        chat_view.check_welcome()
+
         # Восстановление контекста агента
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])

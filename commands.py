@@ -42,6 +42,7 @@ class NewCommand(BaseCommand):
         app.current_session_id = app.sm.generate_session_id()
         chat_view = app.query_one(ChatView)
         await chat_view.remove_children()
+        chat_view.check_welcome()
         if hasattr(app.agent, "clear_history"):
             app.agent.clear_history()
         elif hasattr(app.agent, "history"):

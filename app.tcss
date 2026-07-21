@@ -20,6 +20,19 @@ Screen {
     scrollbar-size: 1 1;
 }
 
+WelcomeWidget {
+    width: 100%;
+    height: 100%;
+    align: center middle;
+    content-align: center middle;
+}
+
+#welcome-logo {
+    text-align: center;
+    color: #27272a;
+    text-style: bold;
+}
+
 /* User Message - Neon Mint Highlight */
 .user-msg {
     width: 100%;

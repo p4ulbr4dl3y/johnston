@@ -191,29 +191,67 @@ class ToolCallWidget(Vertical):
         self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
 
+class WelcomeWidget(Vertical):
+    """Приветствие по центру главного экрана"""
+    can_focus = False
+
+    def compose(self) -> ComposeResult:
+        banner_text = (
+            "   _       _                 _                 \n"
+            "  (_)     | |               | |                \n"
+            "   _  ___ | |__  _ __  ___ _| |_ ___  _ __     \n"
+            "  | |/ _ \\| '_ \\| '_ \\/ __|_   _/ _ \\| '_ \\    \n"
+            "  | | (_) | | | | | | \\__ \\ | || (_) | | | |   \n"
+            "  | |\\___/|_| |_|_| |_|___/  \\__\\___/|_| |_|   \n"
+            " /_/                                           "
+        )
+        yield Static(banner_text, id="welcome-logo")
+
+
 class ChatView(VerticalScroll):
     """Скроллируемый поток чата"""
     can_focus = False
 
+    def on_mount(self) -> None:
+        self.check_welcome()
+
+    def clear_welcome(self) -> None:
+        for w in self.query(WelcomeWidget):
+            w.remove()
+
+    def check_welcome(self) -> None:
+        msg_children = [c for c in self.children if not isinstance(c, WelcomeWidget)]
+        welcome = list(self.query(WelcomeWidget))
+        if not msg_children:
+            if not welcome:
+                self.mount(WelcomeWidget())
+        else:
+            for w in welcome:
+                w.remove()
+
     async def add_user_message(self, text: str) -> UserMessage:
+        self.clear_welcome()
         msg = UserMessage(text)
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
 
     async def add_bot_message(self) -> BotMessage:
+        self.clear_welcome()
         msg = BotMessage()
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
 
     async def add_thinking_widget(self, thinking_text: str = "Thinking...") -> ThinkingWidget:
+        self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget
 
     async def add_tool_call(self, tool_type: str, target: str, result_text: str = "") -> ToolCallWidget:
+        self.clear_welcome()
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq)
         await self.mount(widget)
@@ -231,3 +269,4 @@ class ChatView(VerticalScroll):
         children = list(self.children)
         for child in children[target_index + 1:]:
             child.remove()
+        self.check_welcome()
