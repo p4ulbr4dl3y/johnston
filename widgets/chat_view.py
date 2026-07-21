@@ -13,6 +13,13 @@ class UserMessage(Static):
         self.raw_text = content
         super().__init__(content, classes="user-msg")
 
+    def on_click(self, event: events.Click) -> None:
+        try:
+            self.app.clipboard = self.raw_text
+            self.app.notify("User message copied to clipboard!")
+        except Exception as e:
+            self.app.notify(f"Copy failed: {e}", severity="error")
+
 
 class BotMessage(Vertical):
     """Сообщение ИИ с полным рендерингом Markdown"""
@@ -28,6 +35,14 @@ class BotMessage(Vertical):
 
     def watch_content(self, new_content: str) -> None:
         self.md_widget.update(new_content)
+
+    def on_click(self, event: events.Click) -> None:
+        try:
+            if self.content:
+                self.app.clipboard = self.content
+                self.app.notify("AI message copied to clipboard!")
+        except Exception as e:
+            self.app.notify(f"Copy failed: {e}", severity="error")
 
 
 class ThinkingWidget(Vertical):
@@ -107,6 +122,14 @@ class ToolCallWidget(Vertical):
     def set_result(self, result_text: str) -> None:
         self.result_text = result_text.strip()
         self.render_header()
+
+    def on_click(self, event: events.Click) -> None:
+        try:
+            if self.result_text:
+                self.app.clipboard = self.result_text
+                self.app.notify(f"{self.tool_type} result copied to clipboard!")
+        except Exception as e:
+            self.app.notify(f"Copy failed: {e}", severity="error")
         
         if not self.result_text:
             return
