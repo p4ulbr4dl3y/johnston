@@ -98,10 +98,19 @@ async def test_chat_app_flow():
         await pilot.pause(0.2)
         assert getattr(app.agent, "mode", "build") == "build"
         # 10. Проверяем авто-расширение высоты инпута при вставке многострочного текста
+        chat_input.load_text("")
         chat_input.insert("line1\nline2\nline3\nline4")
         await pilot.pause(0.1)
         assert chat_input.styles.height.value == 5
-        print("✓ Multiline input auto-expand tests passed cleanly!")
+
+        # 11. Проверяем сворачивание длинного текста при paste (> 10 строк)
+        chat_input.load_text("")
+        from textual import events
+        chat_input.on_paste(events.Paste("hello\n" * 15))
+        await pilot.pause(0.1)
+        assert "[Pasted text #1 +15 lines]" in chat_input.text
+        assert chat_input.get_full_text() == "hello\n" * 15
+        print("✓ Long paste collapse tests passed cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())

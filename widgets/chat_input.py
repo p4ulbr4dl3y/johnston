@@ -12,11 +12,14 @@ class ChatInput(TextArea):
             super().__init__()
             self.value = value
 
+    PASTE_LINE_THRESHOLD = 10
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.prompt_history: list[str] = []
         self.prompt_history_index: int = 0
         self.prompt_draft: str = ""
+        self.pasted_texts: dict[str, str] = {}
 
     def on_mount(self) -> None:
         self.focus()
@@ -26,8 +29,16 @@ class ChatInput(TextArea):
         self.call_after_refresh(self.focus)
 
     def load_text(self, text: str) -> None:
+        self.pasted_texts.clear()
         super().load_text(text)
         self._on_input_change()
+
+    def get_full_text(self) -> str:
+        text = self.text
+        for tag, raw_val in self.pasted_texts.items():
+            if tag in text:
+                text = text.replace(tag, raw_val)
+        return text
 
     def update_height(self) -> None:
         """Динамический расчет высоты от 2 до 8 строк"""
@@ -56,7 +67,18 @@ class ChatInput(TextArea):
         self._on_input_change()
 
     def on_paste(self, event: events.Paste) -> None:
-        self.call_after_refresh(self._on_input_change)
+        pasted_text = event.text
+        lines = pasted_text.splitlines()
+        if len(lines) > self.PASTE_LINE_THRESHOLD:
+            event.prevent_default()
+            event.stop()
+            idx = len(self.pasted_texts) + 1
+            tag = f"[Pasted text #{idx} +{len(lines)} lines]"
+            self.pasted_texts[tag] = pasted_text
+            self.insert(tag)
+            self._on_input_change()
+        else:
+            self.call_after_refresh(self._on_input_change)
 
     def add_to_history(self, text: str) -> None:
         """Сохранение отправленного сообщения в историю запросов"""
@@ -185,7 +207,8 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
-            text = self.text
+            text = self.get_full_text()
+            self.pasted_texts.clear()
             self.add_to_history(text)
             self.load_text("")
             self.post_message(self.Submitted(text))
