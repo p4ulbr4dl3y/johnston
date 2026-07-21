@@ -1,4 +1,4 @@
-/* Modern Dark Tech Style - Black, Grey & Neon Mint Accent */
+/* Monochrome Slate Style - Clean Slate & Pure White Accent */
 
 Screen {
     background: #09090b;
@@ -33,12 +33,13 @@ WelcomeWidget {
     text-style: bold;
 }
 
-/* User Message - Neon Mint Highlight */
+/* User Message - Pure White Accent */
 .user-msg {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: #00ffd1;
+    color: #ffffff;
+    text-style: bold;
 }
 
 /* Bot Message Container - Off-white Text */
@@ -46,19 +47,20 @@ WelcomeWidget {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: #f3f4f6;
+    color: #f4f4f5;
 }
 
-/* ThinkingWidget Styling - Sleek Dark Grey */
+/* ThinkingWidget Styling - Subtle Zinc */
 .thinking-widget {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: #a1a1aa;
+    color: #71717a;
 }
 
 .thinking-active {
-    color: #00ffd1;
+    color: #ffffff;
+    text-style: bold;
 }
 
 .thinking-header {
@@ -72,12 +74,12 @@ WelcomeWidget {
     color: #a1a1aa;
 }
 
-/* Tool Call Widget Styling - Subtle Dark Grey cards with colored left borders */
+/* Tool Call Widget Styling - Monochrome Slate cards */
 .tool-call {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: #e4e4e7;
+    color: #a1a1aa;
 }
 
 .tool-sequential {
@@ -85,19 +87,19 @@ WelcomeWidget {
 }
 
 .tool-create {
-    color: #a7f3d0;
+    color: #e4e4e7;
 }
 
 .tool-read {
-    color: #bfdbfe;
+    color: #a1a1aa;
 }
 
 .tool-edit {
-    color: #fde68a;
+    color: #e4e4e7;
 }
 
 .tool-bash {
-    color: #e9d5ff;
+    color: #d4d4d8;
 }
 
 .tool-header {
@@ -156,7 +158,7 @@ MarkdownFence {
     background: #18181b;
     margin: 1 0;
     padding: 0 2;
-    border-left: solid #27272a;
+    border-left: solid #3f3f46;
 }
 
 /* Command Suggestions Popup - Square Solid Dark Border */
@@ -177,7 +179,7 @@ MarkdownFence {
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted {
-    background: #00ffd1;
+    background: #ffffff;
     color: #09090b;
     text-style: bold;
 }
@@ -191,7 +193,7 @@ MarkdownFence {
     padding: 0 1 1 1;
     border: none;
     background: #18181b;
-    color: #f3f4f6;
+    color: #f4f4f5;
 }
 
 #message-input:focus {
@@ -212,7 +214,7 @@ ToastRack {
 /* Modal Dialog Styles - Pure Dark Glassmorphism Effect */
 ModalScreen {
     align: center middle;
-    background: rgba(9, 9, 11, 0.8);
+    background: rgba(9, 9, 11, 0.85);
 }
 
 #modal-dialog {
@@ -220,14 +222,14 @@ ModalScreen {
     height: auto;
     max-height: 85%;
     padding: 1 2;
-    border: none;
+    border: solid #27272a;
     background: #18181b;
 }
 
 .modal-title {
     width: 100%;
     text-align: center;
-    color: #00ffd1;
+    color: #ffffff;
     text-style: bold;
     margin-bottom: 1;
 }
@@ -246,7 +248,7 @@ ModalScreen {
 
 .modal-markdown MarkdownHeader {
     text-align: center;
-    color: #00ffd1;
+    color: #ffffff;
     margin-bottom: 1;
 }
 
@@ -259,7 +261,7 @@ ModalScreen {
 }
 
 #modal-dialog OptionList > .option-list--option-highlighted {
-    background: #00ffd1;
+    background: #ffffff;
     color: #09090b;
     text-style: bold;
 }
@@ -268,11 +270,11 @@ ModalScreen {
     margin-top: 1;
     background: #09090b;
     border: solid #27272a;
-    color: #f3f4f6;
+    color: #f4f4f5;
 }
 
 #write-in-input:focus {
-    border: solid #00ffd1;
+    border: solid #ffffff;
 }
 
 .modal-buttons {

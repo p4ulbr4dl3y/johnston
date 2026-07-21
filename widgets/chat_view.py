@@ -165,7 +165,7 @@ class ToolCallWidget(Vertical):
                 elif line.startswith("-"):
                     t.append(line + "\n", style="#ef4444 on #450a0a")
                 elif line.startswith("@@"):
-                    t.append(line + "\n", style="#00ffd1")
+                    t.append(line + "\n", style="#ffffff")
                 else:
                     t.append(line + "\n", style="#a1a1aa")
             self.diff_widget.update(t)

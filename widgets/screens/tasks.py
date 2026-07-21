@@ -65,7 +65,7 @@ class TasksListScreen(ModalScreen[None]):
 
         opt_list.clear_options()
         for t in self.app.background_tasks:
-            status = "[#00ffd1]Running[/#00ffd1]" if t.is_running else "[#71717a]Finished[/#71717a]"
+            status = "[#ffffff]Running[/#ffffff]" if t.is_running else "[#71717a]Finished[/#71717a]"
             opt_list.add_option(f"{t.task_id} | {status} | {t.command}")
 
         if current_highlighted is not None and current_highlighted < len(self.app.background_tasks):
