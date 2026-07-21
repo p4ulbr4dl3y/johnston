@@ -1,7 +1,8 @@
 from typing import Dict, Type
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen
+from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen, SkillsScreen
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
+from skill_manager import SkillManager
 
 class BaseCommand:
     """Базовый класс для слэш-команд"""
@@ -157,6 +158,27 @@ class TasksCommand(BaseCommand):
         app.push_screen(TasksListScreen())
 
 
+class SkillsCommand(BaseCommand):
+    name = "/skills"
+    description = "Browse and activate available skills"
+
+    async def execute(self, app) -> None:
+        sm = SkillManager()
+        skills = sm.list_skills()
+        if not skills:
+            app.notify("No available skills found (~/.tui/skills/ or .tui/skills/)", severity="warning")
+            return
+
+        def on_skill_selected(selected_skill: dict | None) -> None:
+            if selected_skill:
+                s_name = selected_skill["name"]
+                app.notify(f"Activating skill: {s_name}")
+                app.generate_ai_response(f"Load and apply the skill '{s_name}'.", show_in_ui=True)
+            app.query_one("#message-input", ChatInput).focus()
+
+        app.push_screen(SkillsScreen(), callback=on_skill_selected)
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -165,7 +187,8 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         ModelsCommand,
         RewindCommand,
         ResumeCommand,
-        TasksCommand
+        TasksCommand,
+        SkillsCommand,
     ]
 }
 

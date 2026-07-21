@@ -65,5 +65,9 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         res_missing = await tool.execute({"name": "nonexistent"})
         self.assertIn("Error: Unable to load skill", res_missing)
 
+    def test_skills_command_registered(self):
+        from commands import COMMAND_REGISTRY
+        self.assertIn("/skills", COMMAND_REGISTRY)
+
 if __name__ == "__main__":
     unittest.main()
