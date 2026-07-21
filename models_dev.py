@@ -14,10 +14,11 @@ CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_dev.json")
 CACHE_TTL = 86400  # 24 hours
 
 DEFAULT_MODEL_LIMITS: Dict[str, int] = {
-    "deepseek-v4-flash": 128000,
-    "deepseek-v4-pro": 128000,
-    "deepseek-chat": 128000,
-    "deepseek-reasoner": 128000,
+    "deepseek-v4-flash": 1000000,
+    "deepseek-v4-pro": 1000000,
+    "deepseek-v4": 1000000,
+    "deepseek-chat": 1000000,
+    "deepseek-reasoner": 1000000,
     "gpt-4o": 128000,
     "gpt-4o-mini": 128000,
     "claude-3-5-sonnet": 200000,
@@ -31,7 +32,9 @@ DEFAULT_MODEL_LIMITS: Dict[str, int] = {
 def format_context_tokens(tokens: int) -> str:
     if tokens >= 1_000_000:
         val = tokens / 1_000_000
-        return f"{val:.1f}M" if val % 1 != 0 else f"{int(val)}M"
+        if round(val, 1) == 1.0 or val % 1 == 0:
+            return "1M"
+        return f"{val:.1f}M"
     elif tokens >= 1_000:
         val = tokens / 1_000
         if val >= 100 or val % 1 == 0:

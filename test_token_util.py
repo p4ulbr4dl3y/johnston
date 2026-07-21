@@ -46,7 +46,7 @@ class TestTokenUtil(unittest.TestCase):
         self.assertEqual(format_context_tokens(1000000), "1M")
 
         ctx = get_context_window("opencode", "deepseek-v4-flash")
-        self.assertEqual(ctx, "128k")
+        self.assertEqual(ctx, "1M")
 
         ctx_sonnet = get_context_window("anthropic", "claude-3-5-sonnet")
         self.assertEqual(ctx_sonnet, "200k")
