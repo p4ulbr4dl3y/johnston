@@ -67,12 +67,16 @@ class TUIChatApp(App):
             if hasattr(self.agent, "get_metrics"):
                 metrics = self.agent.get_metrics()
 
+            active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])
+
             footer.update_status(
                 provider_key=pkey,
                 model_name=model_name,
                 directory=os.path.basename(os.path.realpath(os.getcwd())),
+                active_bg_tasks=active_bg_tasks,
                 total_tokens=metrics.get("total_tokens", 0),
                 context_window=metrics.get("context", "128k"),
+                context_limit=metrics.get("context_limit", 128000),
                 cost_usd=metrics.get("cost_usd", 0.0)
             )
         except Exception:
@@ -120,6 +124,9 @@ class TUIChatApp(App):
         # Восстановление контекста агента
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
+            self.agent.tokens_input = session_data.get("tokens_input", 0)
+            self.agent.tokens_output = session_data.get("tokens_output", 0)
+            self.agent.total_tokens = session_data.get("total_tokens", 0)
 
         self.refresh_status_footer()
 
@@ -161,7 +168,10 @@ class TUIChatApp(App):
             "id": self.current_session_id,
             "title": title,
             "ui_messages": ui_messages,
-            "agent_history": agent_history
+            "agent_history": agent_history,
+            "tokens_input": getattr(self.agent, "tokens_input", 0),
+            "tokens_output": getattr(self.agent, "tokens_output", 0),
+            "total_tokens": getattr(self.agent, "total_tokens", 0)
         }
         self.sm.save_session(self.current_session_id, session_data)
         self.refresh_status_footer()

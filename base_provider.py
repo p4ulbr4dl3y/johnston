@@ -6,20 +6,41 @@ from openai import AsyncOpenAI
 
 from background_task import BackgroundTask
 from tools.registry import execute_tool
+from token_util import estimate_tokens, parse_usage
+from models_dev import get_context_window, catalog
 
 class BaseAgent:
-    def __init__(self, api_key: str, model: str, base_url: str, system_prompt: str, tools: List[Dict[str, Any]]):
+    def __init__(self, api_key: str, model: str, base_url: str, system_prompt: str, tools: List[Dict[str, Any]], provider_key: str = "opencode"):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
         self.system_prompt = system_prompt
         self.tools = tools
+        self.provider_key = provider_key
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
         self.history = []
         self.app = None
+        self.tokens_input = 0
+        self.tokens_output = 0
+        self.total_tokens = 0
+        self.context_limit = catalog.get_context_limit(self.provider_key, self.model)
+        self.context_window = get_context_window(self.provider_key, self.model)
 
     def clear_history(self):
         self.history.clear()
+        self.tokens_input = 0
+        self.tokens_output = 0
+        self.total_tokens = 0
+
+    def get_metrics(self) -> Dict[str, Any]:
+        return {
+            "total_tokens": self.total_tokens,
+            "tokens_input": self.tokens_input,
+            "tokens_output": self.tokens_output,
+            "context": getattr(self, "context_window", "128k"),
+            "context_limit": getattr(self, "context_limit", 128000),
+            "cost_usd": getattr(self, "cost_usd", 0.0)
+        }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         messages = [{"role": "system", "content": self.system_prompt}] + self.history + [{"role": "user", "content": user_text}]
@@ -29,18 +50,33 @@ class BaseAgent:
 
         try:
             while True:
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=self.tools,
-                    stream=True
-                )
+                prompt_tokens_est = estimate_tokens(messages)
+                step_usage = None
+
+                try:
+                    response = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        tools=self.tools,
+                        stream=True,
+                        stream_options={"include_usage": True}
+                    )
+                except Exception:
+                    response = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        tools=self.tools,
+                        stream=True
+                    )
 
                 tool_calls_dict = {}
                 active_thought = ""
                 thinking_started = False
 
                 async for chunk in response:
+                    if getattr(chunk, "usage", None):
+                        step_usage = parse_usage(chunk.usage)
+
                     if not chunk.choices:
                         continue
                     choice = chunk.choices[0]
@@ -79,6 +115,16 @@ class BaseAgent:
                                     tool_calls_dict[idx]["name"] = tc.function.name
                                 if tc.function.arguments:
                                     tool_calls_dict[idx]["arguments"] += tc.function.arguments
+
+                if step_usage and step_usage.get("total_tokens", 0) > 0:
+                    self.tokens_input += step_usage["prompt_tokens"]
+                    self.tokens_output += step_usage["completion_tokens"]
+                    self.total_tokens += step_usage["total_tokens"]
+                else:
+                    output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
+                    self.tokens_input += prompt_tokens_est
+                    self.tokens_output += output_tokens_est
+                    self.total_tokens += (prompt_tokens_est + output_tokens_est)
 
                 if thinking_started:
                     dt = time.time() - t0
