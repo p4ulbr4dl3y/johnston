@@ -1,5 +1,5 @@
 from typing import Dict, Type
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen
+from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 
@@ -146,6 +146,17 @@ class ResumeCommand(BaseCommand):
         app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
 
 
+class TasksCommand(BaseCommand):
+    name = "/tasks"
+    description = "Manage background tasks"
+
+    async def execute(self, app) -> None:
+        if not app.background_tasks:
+            app.notify("No active background tasks", severity="warning")
+            return
+        app.push_screen(TasksListScreen())
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -153,7 +164,8 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         ProviderCommand,
         ModelsCommand,
         RewindCommand,
-        ResumeCommand
+        ResumeCommand,
+        TasksCommand
     ]
 }
 

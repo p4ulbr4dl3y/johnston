@@ -61,31 +61,27 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
             p = await asyncio.create_subprocess_shell(
                 cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.STDOUT
             )
             try:
-                stdout, stderr = await asyncio.wait_for(p.communicate(), timeout=5.0)
-                res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
+                stdout_bytes, _ = await asyncio.wait_for(p.communicate(), timeout=5.0)
+                res = stdout_bytes.decode("utf-8", errors="replace")
                 if len(res) > 3000:
                     res = res[:3000] + "\n... [output truncated]"
                 return res if res.strip() else "Command executed with no output."
             except asyncio.TimeoutError:
                 if app:
                     task_id = f"bash_{int(time.time())}"
-                    async def wait_for_background_task(proc, command_str, tid, application):
-                        stdout_bytes, stderr_bytes = await proc.communicate()
-                        out_res = stdout_bytes.decode("utf-8", errors="replace") + stderr_bytes.decode("utf-8", errors="replace")
-                        if len(out_res) > 3000:
-                            out_res = out_res[:3000] + "\n... [output truncated]"
-                        out_res = out_res if out_res.strip() else "Command executed with no output."
-                        application.on_background_bash_completed(tid, command_str, out_res)
+                    task = BackgroundTask(task_id, cmd, p)
+                    if hasattr(app, "background_tasks"):
+                        app.background_tasks.append(task)
                     
-                    asyncio.create_task(wait_for_background_task(p, cmd, task_id, app))
+                    task.start_reading(app, app.on_background_bash_completed)
                     app.notify(f"Command sent to background (TID: {task_id})")
                     return f"[Background Task ID: {task_id}] Bash command is running in the background. I must wait for its completion. Do not run any other tools until notified."
                 else:
-                    stdout, stderr = await p.communicate()
-                    res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
+                    stdout_bytes, _ = await p.communicate()
+                    res = stdout_bytes.decode("utf-8", errors="replace")
                     if len(res) > 3000:
                         res = res[:3000] + "\n... [output truncated]"
                     return res if res.strip() else "Command executed with no output."
@@ -245,6 +241,53 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
         return f"Error executing tool {name}: {err}"
     
     return "Unknown tool."
+
+
+class BackgroundTask:
+    """Управление фоновым bash-процессом с построчным чтением вывода в реальном времени"""
+    def __init__(self, task_id: str, command: str, process):
+        self.task_id = task_id
+        self.command = command
+        self.process = process
+        self.output = []
+        self.is_running = True
+
+    def start_reading(self, app, on_completed_cb):
+        async def _read():
+            try:
+                while True:
+                    line = await self.process.stdout.readline()
+                    if not line:
+                        break
+                    self.output.append(line.decode("utf-8", errors="replace"))
+            except Exception:
+                pass
+            finally:
+                self.is_running = False
+                if self.process:
+                    try:
+                        await self.process.wait()
+                    except Exception:
+                        pass
+                
+                # Формируем итоговый результат
+                out_res = "".join(self.output)
+                if len(out_res) > 3000:
+                    out_res = out_res[:3000] + "\n... [output truncated]"
+                out_res = out_res if out_res.strip() else "Command executed with no output."
+                on_completed_cb(self.task_id, self.command, out_res)
+
+        asyncio.create_task(_read())
+
+    async def kill(self):
+        if self.is_running and self.process:
+            try:
+                self.process.terminate()
+                await self.process.wait()
+            except Exception:
+                pass
+        self.is_running = False
+        self.output.append("\n[Task terminated by user]\n")
 
 
 class BaseAgent:

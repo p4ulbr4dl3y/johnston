@@ -42,6 +42,7 @@ class TUIChatApp(App):
         self.agent.app = self
         self.current_session_id = self.sm.generate_session_id()
         self.selection_copy_active = False
+        self.background_tasks = []
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -268,6 +269,16 @@ class TUIChatApp(App):
         self.notify(f"Background command completed (TID: {task_id})")
         msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
         self.generate_ai_response(msg, show_in_ui=False)
+
+    async def on_unmount(self) -> None:
+        """Принудительно гасим все фоновые процессы при закрытии приложения"""
+        if hasattr(self, "background_tasks"):
+            for task in self.background_tasks:
+                if task.is_running:
+                    try:
+                        await task.kill()
+                    except Exception:
+                        pass
 
 def main():
     TUIChatApp().run()

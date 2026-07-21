@@ -2,7 +2,7 @@ import asyncio
 from app import TUIChatApp
 from widgets.chat_view import ChatView, UserMessage
 from widgets.chat_input import ChatInput
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen
+from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen
 
 async def test_chat_app_flow():
     app = TUIChatApp()
@@ -79,6 +79,13 @@ async def test_chat_app_flow():
         chat_view = app.query_one(ChatView)
         assert len(list(chat_view.children)) == 0
         print("✓ /new command tests passed cleanly!")
+
+        # 8. Проверяем /tasks
+        chat_input.load_text("/tasks")
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        assert not isinstance(app.screen, TasksListScreen)
+        print("✓ /tasks command tests passed cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
