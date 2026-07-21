@@ -1,7 +1,37 @@
+from typing import TypeVar, Generic
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical
 from textual.widgets import OptionList, Markdown
+
+T = TypeVar("T")
+
+class BaseSelectionScreen(ModalScreen[T], Generic[T]):
+    """Базовый класс для модальных окон выбора с OptionList"""
+    
+    BINDINGS = [("escape", "cancel", "Cancel")]
+    
+    def __init__(self, title: str, options: list[str], items: list[T], default_value: T):
+        super().__init__()
+        self.title = title
+        self.options = options
+        self.items = items
+        self.default_value = default_value
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            yield Markdown(self.title, classes="modal-markdown")
+            yield OptionList(*self.options)
+
+    def action_cancel(self) -> None:
+        self.dismiss(self.default_value)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if 0 <= event.option_index < len(self.items):
+            self.dismiss(self.items[event.option_index])
+        else:
+            self.dismiss(self.default_value)
+
 
 class HelpScreen(ModalScreen[None]):
     """Modal help screen (/help)"""
@@ -34,119 +64,69 @@ class HelpScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
-class RewindScreen(ModalScreen[int]):
+class RewindScreen(BaseSelectionScreen[int]):
     """Modal rollback screen (/rewind)"""
 
-    BINDINGS = [("escape", "cancel", "Cancel")]
-
     def __init__(self, user_messages: list[tuple[int, str]]):
-        super().__init__()
-        self.user_messages = user_messages
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### ↺ **Select message to rollback to**", classes="modal-markdown")
-            
-            options = [
-                f"{i+1}. {text[:50]}..." if len(text) > 50 else f"{i+1}. {text}"
-                for i, (_, text) in enumerate(self.user_messages)
-            ]
-            yield OptionList(*options, id="rewind-option-list")
-
-    def action_cancel(self) -> None:
-        self.dismiss(-1)
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        selected_idx = self.user_messages[event.option_index][0]
-        self.dismiss(selected_idx)
+        options = [
+            f"{i+1}. {text[:50]}..." if len(text) > 50 else f"{i+1}. {text}"
+            for i, (_, text) in enumerate(user_messages)
+        ]
+        items = [idx for idx, _ in user_messages]
+        super().__init__(
+            title="### ↺ **Select message to rollback to**",
+            options=options,
+            items=items,
+            default_value=-1
+        )
 
 
-class ResumeScreen(ModalScreen[str]):
+class ResumeScreen(BaseSelectionScreen[str]):
     """Modal session resume screen (/resume)"""
 
-    BINDINGS = [("escape", "cancel", "Cancel")]
-
     def __init__(self, sessions: list[dict]):
-        super().__init__()
-        self.sessions = sessions
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Select session to resume (/resume)**", classes="modal-markdown")
-            
-            options = [
-                f"{s['title']} ({s['message_count']} msgs)"
-                for s in self.sessions
-            ]
-            yield OptionList(*options, id="resume-session-option-list")
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.sessions):
-            selected_session_id = self.sessions[event.option_index]["id"]
-            self.dismiss(selected_session_id)
-        else:
-            self.dismiss("")
+        options = [
+            f"{s['title']} ({s['message_count']} msgs)"
+            for s in sessions
+        ]
+        items = [s["id"] for s in sessions]
+        super().__init__(
+            title="### **Select session to resume (/resume)**",
+            options=options,
+            items=items,
+            default_value=""
+        )
 
 
-class ProviderScreen(ModalScreen[str]):
+class ProviderScreen(BaseSelectionScreen[str]):
     """Modal provider selection screen (/provider)"""
 
-    BINDINGS = [("escape", "cancel", "Cancel")]
-
     def __init__(self, providers: dict):
-        super().__init__()
-        self.providers_list = list(providers.values())
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Select AI provider (/provider)**", classes="modal-markdown")
-            
-            options = [
-                f"{p['name']}" + (f" — {p['description']}" if p.get('description') else "")
-                for p in self.providers_list
-            ]
-            yield OptionList(*options, id="provider-option-list")
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.providers_list):
-            selected_key = self.providers_list[event.option_index]["key"]
-            self.dismiss(selected_key)
-        else:
-            self.dismiss("")
+        providers_list = list(providers.values())
+        options = [
+            f"{p['name']}" + (f" — {p['description']}" if p.get('description') else "")
+            for p in providers_list
+        ]
+        items = [p["key"] for p in providers_list]
+        super().__init__(
+            title="### **Select AI provider (/provider)**",
+            options=options,
+            items=items,
+            default_value=""
+        )
 
 
-class ModelScreen(ModalScreen[str]):
+class ModelScreen(BaseSelectionScreen[str]):
     """Modal model selection screen (/models)"""
 
-    BINDINGS = [("escape", "cancel", "Cancel")]
-
     def __init__(self, models: list[str], current_model: str = ""):
-        super().__init__()
-        self.models = models
-        self.current_model = current_model
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Select provider model (/models)**", classes="modal-markdown")
-            
-            options = [
-                f"{'▶ ' if m == self.current_model else '  '}{m}"
-                for m in self.models
-            ]
-            yield OptionList(*options, id="model-option-list")
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.models):
-            selected_model = self.models[event.option_index]
-            self.dismiss(selected_model)
-        else:
-            self.dismiss("")
+        options = [
+            f"{'▶ ' if m == current_model else '  '}{m}"
+            for m in models
+        ]
+        super().__init__(
+            title="### **Select provider model (/models)**",
+            options=options,
+            items=models,
+            default_value=""
+        )
