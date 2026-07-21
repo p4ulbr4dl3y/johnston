@@ -26,7 +26,12 @@ class GlobTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         pattern = args.get("pattern", "*")
-        ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".johnston", ".gemini"}
+        ignore_dirs = {
+            ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
+            ".johnston", ".gemini", "dist", "build", "out", "target",
+            "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
+            ".ruff_cache", ".idea", ".vscode"
+        }
         target_path = args.get("path")
         root_dir = os.path.abspath(os.path.expanduser(target_path)) if target_path else os.getcwd()
         matches = []

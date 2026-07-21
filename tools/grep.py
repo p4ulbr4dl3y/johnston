@@ -28,8 +28,21 @@ class GrepTool(BaseTool):
         pattern = args.get("pattern", "")
         if not pattern:
             return "Error: pattern is required."
-        ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".johnston", ".gemini"}
-        ignore_extensions = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz", ".db", ".sqlite", ".pyc"}
+        ignore_dirs = {
+            ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
+            ".johnston", ".gemini", "dist", "build", "out", "target",
+            "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
+            ".ruff_cache", ".idea", ".vscode"
+        }
+        ignore_extensions = {
+            ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
+            ".pdf", ".zip", ".tar", ".gz", ".7z", ".rar",
+            ".db", ".sqlite", ".sqlite3", ".pyc", ".pyo",
+            ".woff", ".woff2", ".ttf", ".eot", ".otf",
+            ".mp3", ".mp4", ".mov", ".avi", ".mkv", ".wav",
+            ".so", ".dylib", ".dll", ".exe", ".bin", ".o", ".a", ".out",
+            ".ds_store"
+        }
         try:
             regex = re.compile(pattern, re.IGNORECASE)
         except Exception as e:
