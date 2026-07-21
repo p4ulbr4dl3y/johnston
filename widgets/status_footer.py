@@ -3,6 +3,7 @@ import os
 from rich.table import Table
 from textual.widgets import Static
 
+from core.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 
 
@@ -76,20 +77,20 @@ class StatusFooter(Static):
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
         # Строка 1: Окружение и Режим
-        dir_text = f"Dir: [#f4f4f5]{directory}[/#f4f4f5]"
-        prov_text = f"Provider: [#f4f4f5]{provider_key}[/#f4f4f5]" if provider_key else "Provider: [#f4f4f5]default[/#f4f4f5]"
-        model_text = f"Model: [#f4f4f5]{model_name}[/#f4f4f5]" if model_name else ""
+        dir_text = f"Dir: [{THEME_SECONDARY}]{directory}[/{THEME_SECONDARY}]"
+        prov_text = f"Provider: [{THEME_SECONDARY}]{provider_key}[/{THEME_SECONDARY}]" if provider_key else f"Provider: [{THEME_SECONDARY}]default[/{THEME_SECONDARY}]"
+        model_text = f"Model: [{THEME_SECONDARY}]{model_name}[/{THEME_SECONDARY}]" if model_name else ""
         left_1_parts = [dir_text, prov_text]
         if model_text:
             left_1_parts.append(model_text)
         left_1 = "  │  ".join(left_1_parts)
-        right_1 = f"Mode: [bold #ffffff][{agent_mode.upper()}][/bold #ffffff]"
+        right_1 = f"Mode: [bold {THEME_PRIMARY}][{agent_mode.upper()}][/bold {THEME_PRIMARY}]"
 
         # Строка 2: Скиллы, MCP и Задачи/Субагенты
-        skills_text = f"Skills: [#f4f4f5]{skills_count}[/#f4f4f5]"
-        mcp_text = f"MCP: [#f4f4f5]{mcp_active}/{mcp_total} on[/#f4f4f5]" if mcp_total > 0 else "MCP: [#f4f4f5]0[/#f4f4f5]"
+        skills_text = f"Skills: [{THEME_SECONDARY}]{skills_count}[/{THEME_SECONDARY}]"
+        mcp_text = f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total} on[/{THEME_SECONDARY}]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
         left_2 = f"{skills_text}  │  {mcp_text}"
-        right_2 = f"Tasks: [#f4f4f5]{active_bg_tasks} bg[/#f4f4f5]  │  Subagents: [#f4f4f5]{subagents_active}/{subagents_total}[/#f4f4f5]"
+        right_2 = f"Tasks: [{THEME_SECONDARY}]{active_bg_tasks} bg[/{THEME_SECONDARY}]  │  Subagents: [{THEME_SECONDARY}]{subagents_active}/{subagents_total}[/{THEME_SECONDARY}]"
 
         # Строка 3: Прогресс контекста, Токены и Стоимость
         pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
@@ -98,10 +99,10 @@ class StatusFooter(Static):
         filled = int(round((pct / 100) * bar_len))
         bar_str = "█" * filled + "░" * (bar_len - filled)
         used_formatted = format_context_tokens(total_tokens)
-        left_3 = f"Context: [#e4e4e7][{bar_str}][/#e4e4e7] [#f4f4f5]{pct:.1f}% ({used_formatted}/{context_window})[/#f4f4f5]"
+        left_3 = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
 
-        tokens_text = f"Tokens: [#f4f4f5]{total_tokens:,} tok[/#f4f4f5]"
-        cost_text = f"Cost: [#f4f4f5]${cost_usd:.4f}[/#f4f4f5]"
+        tokens_text = f"Tokens: [{THEME_SECONDARY}]{total_tokens:,} tok[/{THEME_SECONDARY}]"
+        cost_text = f"Cost: [{THEME_SECONDARY}]${cost_usd:.4f}[/{THEME_SECONDARY}]"
         right_3 = f"{tokens_text}  │  {cost_text}"
 
         grid = Table.grid(expand=True)

@@ -3,6 +3,8 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList, RichLog
 
+from core.config import THEME_MUTED, THEME_PRIMARY
+
 
 class TaskConsoleScreen(ModalScreen[None]):
     """Модальный экран для просмотра вывода конкретной таски в реальном времени"""
@@ -67,7 +69,7 @@ class TasksListScreen(ModalScreen[None]):
 
         opt_list.clear_options()
         for t in self.app.background_tasks:
-            status = "[#ffffff]Running[/#ffffff]" if t.is_running else "[#71717a]Finished[/#71717a]"
+            status = f"[{THEME_PRIMARY}]Running[/{THEME_PRIMARY}]" if t.is_running else f"[{THEME_MUTED}]Finished[/{THEME_MUTED}]"
             opt_list.add_option(f"{t.task_id} | {status} | {t.command}")
 
         if current_highlighted is not None and current_highlighted < len(self.app.background_tasks):
