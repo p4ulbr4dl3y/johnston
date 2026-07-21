@@ -39,8 +39,8 @@ async def test_chat_app_flow():
         
         chat_view = app.query_one(ChatView)
         user_msgs = [c for c in chat_view.children if isinstance(c, UserMessage)]
-        assert len(user_msgs) == 0
-        assert chat_input.text == "First message"
+        assert len(user_msgs) == 2
+        assert chat_input.text == "Third message"
         print("✓ RewindScreen tests passed cleanly!")
 
         # 4. Проверяем /resume

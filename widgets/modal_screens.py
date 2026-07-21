@@ -24,6 +24,15 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             yield Markdown(self.title, classes="modal-markdown")
             yield OptionList(*self.options)
 
+    def on_mount(self) -> None:
+        opt_list = self.query_one(OptionList)
+        opt_list.focus()
+        if self.default_value in self.items:
+            try:
+                opt_list.highlighted = self.items.index(self.default_value)
+            except Exception:
+                pass
+
     def action_cancel(self) -> None:
         self.dismiss(self.default_value)
 
@@ -70,15 +79,16 @@ class RewindScreen(BaseSelectionScreen[int]):
 
     def __init__(self, user_messages: list[tuple[int, str]]):
         options = [
-            f"{i+1}. {text[:50]}..." if len(text) > 50 else f"{i+1}. {text}"
-            for i, (_, text) in enumerate(user_messages)
+            f"{text[:50]}..." if len(text) > 50 else text
+            for _, text in user_messages
         ]
         items = [idx for idx, _ in user_messages]
+        default_val = items[-1] if items else -1
         super().__init__(
             title="### ↺ **Select message to rollback to**",
             options=options,
             items=items,
-            default_value=-1
+            default_value=default_val
         )
 
 
