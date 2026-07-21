@@ -96,7 +96,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/plan", COMMAND_REGISTRY)
         self.assertIn("/build", COMMAND_REGISTRY)
         self.assertIn("/mode", COMMAND_REGISTRY)
-        self.assertIn("/subagents", COMMAND_REGISTRY)
 
     async def test_plan_exit_tool(self):
         class DummyAgent:

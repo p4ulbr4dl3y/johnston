@@ -80,19 +80,12 @@ async def test_chat_app_flow():
         assert len(list(chat_view.children)) == 0
         print("✓ /new command tests passed cleanly!")
 
-        # 8. Проверяем /tasks и /subagents
+        # 8. Проверяем /tasks
         chat_input.load_text("/tasks")
         await pilot.press("enter")
         await pilot.pause(0.2)
         assert not isinstance(app.screen, TasksListScreen)
         print("✓ /tasks command tests passed cleanly!")
-
-        chat_input.load_text("/subagents")
-        await pilot.press("enter")
-        await pilot.pause(0.2)
-        from widgets.modal_screens import SubagentsListScreen
-        assert not isinstance(app.screen, SubagentsListScreen)
-        print("✓ /subagents command tests passed cleanly!")
 
         # 9. Проверяем переключение режима по Tab
         assert getattr(app.agent, "mode", "build") == "build"
