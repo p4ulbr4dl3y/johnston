@@ -15,7 +15,7 @@ class UserMessage(Static):
 
     def on_click(self, event: events.Click) -> None:
         try:
-            self.app.clipboard = self.raw_text
+            self.app.copy_to_clipboard(self.raw_text)
             self.app.notify("User message copied to clipboard!")
         except Exception as e:
             self.app.notify(f"Copy failed: {e}", severity="error")
@@ -39,7 +39,7 @@ class BotMessage(Vertical):
     def on_click(self, event: events.Click) -> None:
         try:
             if self.content:
-                self.app.clipboard = self.content
+                self.app.copy_to_clipboard(self.content)
                 self.app.notify("AI message copied to clipboard!")
         except Exception as e:
             self.app.notify(f"Copy failed: {e}", severity="error")
@@ -126,7 +126,7 @@ class ToolCallWidget(Vertical):
     def on_click(self, event: events.Click) -> None:
         try:
             if self.result_text:
-                self.app.clipboard = self.result_text
+                self.app.copy_to_clipboard(self.result_text)
                 self.app.notify(f"{self.tool_type} result copied to clipboard!")
         except Exception as e:
             self.app.notify(f"Copy failed: {e}", severity="error")
