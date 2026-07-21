@@ -113,7 +113,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                 pass
 
     def action_cancel(self) -> None:
-        self.dismiss(self.default_value)
+        self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_items):
