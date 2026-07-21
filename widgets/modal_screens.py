@@ -7,3 +7,4 @@ from widgets.screens.model import ModelScreen
 from widgets.screens.ask_user import AskUserScreen, QuestionScreen, ConfirmScreen
 from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
 from widgets.screens.skills import SkillsScreen
+from widgets.screens.mcp import MCPScreen

@@ -1,8 +1,9 @@
 from typing import Dict, Type
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen, SkillsScreen
+from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen, SkillsScreen, MCPScreen
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 from skill_manager import SkillManager
+from mcp_manager import MCPManager
 
 class BaseCommand:
     """Базовый класс для слэш-команд"""
@@ -179,6 +180,14 @@ class SkillsCommand(BaseCommand):
         app.push_screen(SkillsScreen(), callback=on_skill_selected)
 
 
+class MCPCommand(BaseCommand):
+    name = "/mcp"
+    description = "Manage MCP servers (toggle enabled/disabled)"
+
+    async def execute(self, app) -> None:
+        app.push_screen(MCPScreen())
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -189,6 +198,7 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         ResumeCommand,
         TasksCommand,
         SkillsCommand,
+        MCPCommand,
     ]
 }
 
