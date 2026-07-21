@@ -356,7 +356,11 @@ class BaseAgent:
                     except Exception:
                         args = {}
 
-                    target = args.get("path") or args.get("command") or args.get("question") or t_name
+                    target = args.get("path") or args.get("command") or args.get("question")
+                    if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
+                        target = args["questions"][0].get("question_text", "")
+                    if not target:
+                        target = t_name
                     yield ("tool", t_name, target)
 
                     tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))

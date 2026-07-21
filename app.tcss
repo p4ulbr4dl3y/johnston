@@ -241,6 +241,23 @@ ModalScreen {
     background: #09090b;
 }
 
+#modal-dialog OptionList > .option-list--option-highlighted {
+    background: #00ffd1;
+    color: #09090b;
+    text-style: bold;
+}
+
+#write-in-input {
+    margin-top: 1;
+    background: #09090b;
+    border: solid #27272a;
+    color: #f3f4f6;
+}
+
+#write-in-input:focus {
+    border: solid #00ffd1;
+}
+
 .modal-buttons {
     width: 100%;
     height: auto;
