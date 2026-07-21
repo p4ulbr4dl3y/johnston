@@ -40,7 +40,8 @@ class ReadTool(BaseTool):
                 s_idx = max(0, (start or 1) - 1)
                 e_idx = end if end is not None else len(lines)
                 sliced = lines[s_idx:e_idx]
-                content = "".join(sliced)
+                formatted_lines = [f"{s_idx + i + 1:5d} | {line}" for i, line in enumerate(sliced)]
+                content = "".join(formatted_lines)
                 return f"=== Lines {s_idx+1}-{min(e_idx, len(lines))} of {len(lines)} in {path} ===\n{content}"
 
             content = "".join(lines)

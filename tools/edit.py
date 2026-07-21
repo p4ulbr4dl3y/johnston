@@ -37,8 +37,12 @@ class EditTool(BaseTool):
                 content = f.read()
         except Exception as e:
             return f"Error reading file '{path}': {e}"
-        if old_string not in content:
+        count = content.count(old_string)
+        if count == 0:
             return f"Error: exact block of text (old_string) not found in '{path}'. Make sure it matches exactly (including leading whitespace/indentation)."
+        if count > 1:
+            return f"Error: old_string matches {count} occurrences in '{path}'. Include more surrounding lines to make old_string unique."
+
         new_content = content.replace(old_string, new_string, 1)
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
