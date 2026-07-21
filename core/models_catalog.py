@@ -1,6 +1,6 @@
 """
-Models.dev API catalog integration for Johnston.
-Fetches model context limits and metadata from https://models.dev/api.json with local caching.
+AI Model Catalog and Context Limit Manager for Johnston.
+Fetches model context limits dynamically from provider APIs, models.dev fallback, or defaults.
 """
 import json
 import os
@@ -33,6 +33,7 @@ DEFAULT_MODEL_LIMITS: Dict[str, int] = {
     "llama": 128000,
 }
 
+
 def format_context_tokens(tokens: int) -> str:
     if tokens >= 1_000_000:
         val = tokens / 1_000_000
@@ -46,7 +47,8 @@ def format_context_tokens(tokens: int) -> str:
         return f"{val:.1f}k"
     return str(tokens)
 
-class ModelsDevCatalog:
+
+class ModelsCatalog:
     def __init__(self):
         self._data: Optional[Dict[str, Any]] = None
         self.load_cache()
@@ -123,7 +125,9 @@ class ModelsDevCatalog:
 
         return 128000
 
-catalog = ModelsDevCatalog()
+
+catalog = ModelsCatalog()
+
 
 def get_context_window(provider_id: str, model_id: str) -> str:
     limit = catalog.get_context_limit(provider_id, model_id)

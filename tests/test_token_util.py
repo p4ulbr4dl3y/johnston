@@ -41,8 +41,8 @@ class TestTokenUtil(unittest.TestCase):
         agent.clear_history()
         self.assertEqual(agent.get_metrics()["total_tokens"], 0)
 
-    def test_models_dev_context_window(self):
-        from core.models_dev import format_context_tokens, get_context_window
+    def test_models_catalog_context_window(self):
+        from core.models_catalog import format_context_tokens, get_context_window
         self.assertEqual(format_context_tokens(128000), "128k")
         self.assertEqual(format_context_tokens(200000), "200k")
         self.assertEqual(format_context_tokens(1000000), "1M")

@@ -3,7 +3,7 @@ import os
 from rich.table import Table
 from textual.widgets import Static
 
-from core.models_dev import format_context_tokens
+from core.models_catalog import format_context_tokens
 
 
 class StatusFooter(Static):

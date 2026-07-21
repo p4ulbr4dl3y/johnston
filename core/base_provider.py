@@ -4,7 +4,7 @@ from typing import Any, AsyncGenerator, Dict, List, Tuple
 
 from openai import AsyncOpenAI
 
-from core.models_dev import catalog, get_context_window
+from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import PromptBuilder
 from core.token_util import estimate_tokens, parse_usage
 from tools.registry import execute_tool
