@@ -1,24 +1,16 @@
 import os
 import asyncio
-from textual.widget import Widget
-
-def _new_allow_select(self) -> bool:
-    node = self
-    while node is not None:
-        if not getattr(node, "ALLOW_SELECT", True):
-            return False
-        node = node.parent
-    return True
-
-Widget.allow_select = property(_new_allow_select)
-
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
 from textual.widgets import Select
 
-from provider_manager import ProviderManager
-from session_manager import SessionManager
+from widgets.patch import apply_textual_patches
+apply_textual_patches()
+
+
+from core.provider_manager import ProviderManager
+from core.session_manager import SessionManager
 from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget, ToolCallWidget
 from widgets.chat_input import ChatInput
 from widgets.status_footer import StatusFooter
@@ -76,8 +68,8 @@ class TUIChatApp(App):
             if hasattr(self.agent, "get_metrics"):
                 metrics = self.agent.get_metrics()
 
-            from skill_manager import SkillManager
-            from mcp_manager import get_mcp_manager
+            from core.skill_manager import SkillManager
+            from core.mcp_manager import get_mcp_manager
 
             skills_count = len(SkillManager().list_skills())
             mcp_servers = get_mcp_manager().load_servers()
@@ -305,7 +297,7 @@ class TUIChatApp(App):
 import argparse
 
 async def run_cli_prompt(prompt_text: str) -> None:
-    from provider_manager import ProviderManager
+    from core.provider_manager import ProviderManager
     pm = ProviderManager()
     agent = pm.create_active_agent()
     print(f"Running prompt: {prompt_text}\n")

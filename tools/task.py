@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from typing import Any, Dict
 from tools.base import BaseTool
+from core.background_task import BackgroundSubagent
 
 class TaskTool(BaseTool):
     name = "Task"
@@ -12,6 +13,7 @@ class TaskTool(BaseTool):
     )
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
         subagent_type = args.get("subagent_type", "general").strip().lower()
@@ -20,12 +22,10 @@ class TaskTool(BaseTool):
         if not prompt:
             return "Error: 'prompt' argument is required for Task tool."
 
-        if not app or not hasattr(app, "pm"):
+        subagent = ctx.create_agent()
+        if not subagent:
             return "Error: No application context available to spawn subagent."
-
-        # Создаем изолированного агента
-        subagent = app.pm.create_active_agent()
-        subagent.app = app
+        subagent.app = ctx.app
 
         # Отключаем возможность повторного вызова Task (защита от рекурсии)
         original_tools = getattr(subagent, "tools", []) or []
@@ -55,31 +55,21 @@ class TaskTool(BaseTool):
                 except Exception as err:
                     full_text = f"[Subagent error: {err}]"
                 finally:
-                    if hasattr(app, "background_tasks"):
-                        for t in app.background_tasks:
-                            if getattr(t, "task_id", "") == task_id:
-                                t.is_running = False
-                    if hasattr(app, "refresh_status_footer"):
-                        app.refresh_status_footer()
+                    for t in ctx.background_tasks:
+                        if getattr(t, "task_id", "") == task_id:
+                            t.is_running = False
+                    ctx.refresh_status()
 
                     msg = (
                         f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
                         f"<task_result>\n{full_text.strip() or 'Completed with no text output.'}\n</task_result>"
                     )
-                    if hasattr(app, "generate_ai_response"):
-                        app.generate_ai_response(msg, show_in_ui=False)
+                    ctx.trigger_ai_response(msg)
 
             bg_task = asyncio.create_task(_run_bg())
-
-            from background_task import BackgroundSubagent
             bg_obj = BackgroundSubagent(task_id, description, bg_task)
-            if hasattr(app, "background_tasks"):
-                app.background_tasks.append(bg_obj)
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-
-            if hasattr(app, "notify"):
-                app.notify(f"Subagent launched in background (ID: {task_id})")
+            ctx.add_background_task(bg_obj)
+            ctx.notify(f"Subagent launched in background (ID: {task_id})")
 
             return (
                 f"Subagent '{description}' launched in background (Task ID: {task_id}). "

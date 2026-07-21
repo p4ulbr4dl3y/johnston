@@ -7,9 +7,10 @@ class AskUserTool(BaseTool):
     description = "Ask question to user. Can ask single text question, or a list of questions with pre-defined options and write-ins."
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         questions_list = args.get("questions")
         question = args.get("question", "")
-        if app:
+        if ctx.app:
             try:
                 if questions_list and isinstance(questions_list, list):
                     from widgets.modal_screens import QuestionScreen, ConfirmScreen
@@ -35,7 +36,7 @@ class AskUserTool(BaseTool):
                             def on_dismiss(result):
                                 if not future.done():
                                     future.set_result(result)
-                            app.push_screen(screen, callback=on_dismiss)
+                            ctx.app.push_screen(screen, callback=on_dismiss)
                             res = await future
 
                             if not res or res.get("status") == "cancelled":
@@ -60,7 +61,7 @@ class AskUserTool(BaseTool):
                             def on_dismiss_confirm(result):
                                 if not future.done():
                                     future.set_result(result)
-                            app.push_screen(screen, callback=on_dismiss_confirm)
+                            ctx.app.push_screen(screen, callback=on_dismiss_confirm)
                             res = await future
 
                             if not res or res == "cancelled":
@@ -88,7 +89,7 @@ class AskUserTool(BaseTool):
                     def on_dismiss(result):
                         if not future.done():
                             future.set_result(result)
-                    app.push_screen(screen, callback=on_dismiss)
+                    ctx.app.push_screen(screen, callback=on_dismiss)
                     answer = await future
                     return answer if answer else "No answer provided."
             except Exception as e:

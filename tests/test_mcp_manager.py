@@ -3,7 +3,7 @@ import tempfile
 import shutil
 import unittest
 import json
-from mcp_manager import MCPManager
+from core.mcp_manager import MCPManager
 from commands import COMMAND_REGISTRY
 
 class TestMCPManager(unittest.TestCase):

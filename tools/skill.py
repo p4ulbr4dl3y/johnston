@@ -1,6 +1,6 @@
 from typing import Any, Dict
 from tools.base import BaseTool
-from skill_manager import SkillManager
+from core.skill_manager import SkillManager
 
 class SkillTool(BaseTool):
     name = "Skill"

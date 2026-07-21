@@ -5,17 +5,17 @@ import shutil
 import json
 from unittest.mock import patch, MagicMock, AsyncMock
 
-with patch("config.CONFIG_DIR", "/dummy"), patch("config.PROVIDERS_DIR", "/dummy"), patch("config.CONFIG_FILE", "/dummy"):
-    from provider_manager import ProviderManager
+with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROVIDERS_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
+    from core.provider_manager import ProviderManager
 
 class TestProviderManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         
         # Patch config values inside provider_manager
-        self.config_dir_patcher = patch("provider_manager.CONFIG_DIR", self.test_dir)
-        self.providers_dir_patcher = patch("provider_manager.PROVIDERS_DIR", os.path.join(self.test_dir, "providers"))
-        self.config_file_patcher = patch("provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
+        self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
+        self.providers_dir_patcher = patch("core.provider_manager.PROVIDERS_DIR", os.path.join(self.test_dir, "providers"))
+        self.config_file_patcher = patch("core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
         
         self.config_dir_patcher.start()
         self.providers_dir_patcher.start()

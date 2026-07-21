@@ -5,7 +5,7 @@ Supports YAML frontmatter parsing from SKILL.md and *.md files.
 """
 import os
 from typing import Dict, List, Any, Optional, Tuple
-from config import CONFIG_DIR
+from core.config import CONFIG_DIR
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".tui", "skills")

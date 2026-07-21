@@ -4,11 +4,12 @@ import time
 from typing import AsyncGenerator, Tuple, List, Dict, Any
 from openai import AsyncOpenAI
 
-from background_task import BackgroundTask
+from core.background_task import BackgroundTask
 from tools.registry import execute_tool
-from token_util import estimate_tokens, parse_usage
-from models_dev import get_context_window, catalog
-from skill_manager import SkillManager
+from core.token_util import estimate_tokens, parse_usage
+from core.models_dev import get_context_window, catalog
+from core.prompt_builder import PromptBuilder
+
 
 class BaseAgent:
     def __init__(self, api_key: str, model: str, base_url: str, system_prompt: str, tools: List[Dict[str, Any]], provider_key: str = "opencode"):
@@ -45,65 +46,10 @@ class BaseAgent:
         }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        from mcp_manager import get_mcp_manager
-        mcp_mgr = get_mcp_manager()
-        mcp_tools = mcp_mgr.get_active_tools()
-        mcp_snippet = mcp_mgr.get_system_prompt_snippet()
-
-        skills_snippet = SkillManager().get_system_prompt_snippet()
-        sys_prompt = self.system_prompt
-        if skills_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
-        if mcp_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
-
-        clean_mcp_tools = [
-            {"type": t["type"], "function": t["function"]} for t in mcp_tools
-        ]
-        all_tools = (self.tools or []) + clean_mcp_tools
-
         agent_mode = getattr(self, "mode", "build")
-        if agent_mode == "plan":
-            sys_prompt += (
-                "\n\n[PLAN MODE ACTIVE]\n"
-                "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan. "
-                "Save your plan in '.tui/plans/plan.md'. Do NOT edit project code files directly while in Plan mode. "
-                "When the plan is ready, call the PlanExit tool to propose switching to Build mode."
-            )
-            plan_tool_schema = {
-                "type": "function",
-                "function": {
-                    "name": "PlanExit",
-                    "description": "Signal that planning phase is complete and request switching to build mode to implement the plan.",
-                    "parameters": {"type": "object", "properties": {}}
-                }
-            }
-            if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
-                all_tools.append(plan_tool_schema)
-        else:
-            local_plan = os.path.join(os.getcwd(), ".tui", "plans", "plan.md")
-            if os.path.exists(local_plan):
-                sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
-
-        task_tool_schema = {
-            "type": "function",
-            "function": {
-                "name": "Task",
-                "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "prompt": {"type": "string", "description": "Task prompt for the subagent"},
-                        "description": {"type": "string", "description": "Short (3-5 words) description"},
-                        "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
-                        "background": {"type": "boolean", "description": "Run asynchronously in background"}
-                    },
-                    "required": ["prompt", "description"]
-                }
-            }
-        }
-        if not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
-            all_tools.append(task_tool_schema)
+        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode)
+        sys_prompt = builder.build_system_prompt()
+        all_tools = builder.build_tools()
 
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 

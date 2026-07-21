@@ -1,0 +1,151 @@
+import os
+import json
+import time
+import importlib.util
+import shutil
+import sys
+import httpx
+from typing import Dict, Any, Type, List
+from core.config import CONFIG_DIR, PROVIDERS_DIR, CONFIG_FILE
+
+tui_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if tui_dir not in sys.path:
+    sys.path.insert(0, tui_dir)
+
+
+def _get_default_opencode_template() -> str:
+    template_path = os.path.join(tui_dir, "templates", "opencode_provider.py.template")
+    if os.path.exists(template_path):
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return ""
+
+class ProviderManager:
+    def __init__(self):
+        self.ensure_config_dir()
+
+    def ensure_config_dir(self):
+        os.makedirs(PROVIDERS_DIR, exist_ok=True)
+        
+        opencode_file = os.path.join(PROVIDERS_DIR, "opencode.py")
+        if not os.path.exists(opencode_file):
+            content = _get_default_opencode_template()
+            if content:
+                with open(opencode_file, "w", encoding="utf-8") as f:
+                    f.write(content.strip())
+
+        if not os.path.exists(CONFIG_FILE):
+            self.set_active_provider_key("opencode")
+
+    def load_providers(self) -> Dict[str, Any]:
+        """Динамически загружает все .py провайдеры из ~/.tui/providers/"""
+        providers = {}
+        if not os.path.exists(PROVIDERS_DIR):
+            return providers
+
+        for filename in os.listdir(PROVIDERS_DIR):
+            if filename.endswith(".py") and not filename.startswith("_"):
+                filepath = os.path.join(PROVIDERS_DIR, filename)
+                mod_name = f"tui_provider_{filename[:-3]}"
+                
+                try:
+                    spec = importlib.util.spec_from_file_location(mod_name, filepath)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        spec.loader.exec_module(module)
+                        
+                        provider_key = getattr(module, "KEY", filename[:-3])
+                        provider_name = getattr(module, "NAME", provider_key)
+                        
+                        if hasattr(module, "Agent"):
+                            providers[provider_key] = {
+                                "key": provider_key,
+                                "name": provider_name,
+                                "description": getattr(module, "DESCRIPTION", ""),
+                                "module": module,
+                                "file": filepath
+                            }
+                except Exception as e:
+                    print(f"Error loading provider {filename}: {e}")
+
+        return providers
+
+    def get_active_provider_key(self) -> str:
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("active_provider", "opencode")
+            except Exception:
+                pass
+        return "opencode"
+
+    def set_active_provider_key(self, key: str):
+        data = {"active_provider": key}
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def create_active_agent(self):
+        providers = self.load_providers()
+        active_key = self.get_active_provider_key()
+        
+        if active_key in providers:
+            return providers[active_key]["module"].Agent()
+        elif providers:
+            first_key = list(providers.keys())[0]
+            return providers[first_key]["module"].Agent()
+        else:
+            raise RuntimeError("No available providers in ~/.tui/providers/")
+
+    async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
+        """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""
+        CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
+
+        # 1. Проверяем файл кеша
+        if not force_refresh and os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    age = time.time() - cdata.get("updated_at", 0)
+                    if age < 86400 and cdata.get("models"):
+                        return cdata["models"]
+            except Exception:
+                pass
+
+        # 2. Запрашиваем модели через HTTP API провайдера
+        providers = self.load_providers()
+        if provider_key not in providers:
+            return []
+
+        mod = providers[provider_key]["module"]
+        base_url = getattr(mod, "BASE_URL", None)
+        api_key = getattr(mod, "API_KEY", None)
+
+        models = []
+        if base_url:
+            models_url = f"{base_url.rstrip('/')}/models"
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(models_url, headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models = [m["id"] for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
+            except Exception as e:
+                print(f"Error fetching models for {provider_key}: {e}")
+
+        # Фолбэк на дефолтную модель
+        if not models and hasattr(mod, "MODEL"):
+            models = [mod.MODEL]
+
+        # Записываем в кеш
+        if models:
+            try:
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump({"updated_at": time.time(), "models": models}, f, indent=2)
+            except Exception as e:
+                print(f"Error writing models cache: {e}")
+
+        return models

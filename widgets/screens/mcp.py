@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical
 from textual.widgets import OptionList, Markdown
-from mcp_manager import MCPManager
+from core.mcp_manager import MCPManager
 
 class MCPScreen(ModalScreen[None]):
     """Модальное окно выключения/включения MCP серверов"""

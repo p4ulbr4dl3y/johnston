@@ -4,7 +4,7 @@ import time
 import uuid
 import hashlib
 from typing import List, Dict, Any, Optional
-from config import CONFIG_DIR, PROJECTS_DIR
+from core.config import CONFIG_DIR, PROJECTS_DIR
 
 class SessionManager:
     def __init__(self, project_path: Optional[str] = None):

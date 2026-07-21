@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical
 from textual.widgets import OptionList, Markdown
-from skill_manager import SkillManager
+from core.skill_manager import SkillManager
 
 class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
     """Модальное окно списка доступных скиллов (глобальных и проектных)"""

@@ -7,7 +7,7 @@ import json
 import time
 import httpx
 from typing import Dict, Any, Optional
-from config import CONFIG_DIR
+from core.config import CONFIG_DIR
 
 MODELS_DEV_URL = "https://models.dev/api.json"
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_dev.json")

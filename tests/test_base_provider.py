@@ -4,7 +4,7 @@ import shutil
 import unittest
 import asyncio
 from tools.registry import execute_tool
-from base_provider import BaseAgent
+from core.base_provider import BaseAgent
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

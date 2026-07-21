@@ -9,6 +9,7 @@ class BackgroundTask:
         self.output = []
         self.is_running = True
         self.is_background = False
+        self.read_task = None
 
     def start_reading(self, app, on_completed_cb):
         async def _read():
@@ -36,7 +37,8 @@ class BackgroundTask:
                     out_res = out_res if out_res.strip() else "Command executed with no output."
                     on_completed_cb(self.task_id, self.command, out_res)
 
-        asyncio.create_task(_read())
+        self.read_task = asyncio.create_task(_read())
+        return self.read_task
 
     async def kill(self):
         if self.is_running and self.process:

@@ -8,7 +8,7 @@ import json
 import asyncio
 import subprocess
 from typing import Dict, List, Any, Optional
-from config import CONFIG_DIR
+from core.config import CONFIG_DIR
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
 PROJECT_MCP_FILE = os.path.join(".tui", "mcp.json")

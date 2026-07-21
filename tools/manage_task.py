@@ -7,13 +7,13 @@ class ManageTaskTool(BaseTool):
     description = "Manage background tasks. Actions: 'list' (list running tasks), 'status' (get task status and recent output log), 'kill' (cancel/terminate background task)."
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         action = args.get("action", "list").lower()
         task_id = args.get("task_id", "").strip()
 
-        if not app or not hasattr(app, "background_tasks"):
+        tasks = ctx.background_tasks
+        if not tasks and not ctx.app:
             return "No background task manager available."
-
-        tasks = app.background_tasks
 
         if action == "list":
             if not tasks:
@@ -48,8 +48,7 @@ class ManageTaskTool(BaseTool):
                 try:
                     t.process.kill()
                     t.is_running = False
-                    if hasattr(app, "refresh_status_footer"):
-                        app.refresh_status_footer()
+                    ctx.refresh_status()
                     return f"Task {task_id} successfully killed."
                 except Exception as e:
                     return f"Failed to kill task {task_id}: {e}"

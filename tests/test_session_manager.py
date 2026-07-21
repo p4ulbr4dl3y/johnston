@@ -4,15 +4,15 @@ import unittest
 import shutil
 from unittest.mock import patch
 
-with patch("config.CONFIG_DIR", "/dummy"), patch("config.PROJECTS_DIR", "/dummy"):
-    from session_manager import SessionManager
+with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROJECTS_DIR", "/dummy"):
+    from core.session_manager import SessionManager
 
 class TestSessionManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         # Patch PROJECTS_DIR and CONFIG_DIR for the SessionManager instance we will test
-        self.projects_dir_patcher = patch("session_manager.PROJECTS_DIR", self.test_dir)
-        self.config_dir_patcher = patch("session_manager.CONFIG_DIR", self.test_dir)
+        self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
+        self.config_dir_patcher = patch("core.session_manager.CONFIG_DIR", self.test_dir)
         self.projects_dir_patcher.start()
         self.config_dir_patcher.start()
         

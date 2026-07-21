@@ -6,11 +6,6 @@ class PlanExitTool(BaseTool):
     description = "Signal that planning phase is complete and request switching to build mode to implement the plan."
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        if app and hasattr(app, "agent"):
-            app.agent.mode = "build"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-            if hasattr(app, "notify"):
-                app.notify("Mode switched: build")
-            return "Switched to build mode. You can now edit files and run implementation commands."
-        return "Plan exit tool executed."
+        ctx = self._ensure_context(app)
+        ctx.set_agent_mode("build")
+        return "Switched to build mode. You can now edit files and run implementation commands."

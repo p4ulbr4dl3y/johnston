@@ -2,8 +2,8 @@ from typing import Dict, Type
 from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen, SkillsScreen, MCPScreen
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
-from skill_manager import SkillManager
-from mcp_manager import MCPManager
+from core.skill_manager import SkillManager
+from core.mcp_manager import MCPManager
 
 class BaseCommand:
     """Базовый класс для слэш-команд"""
