@@ -108,8 +108,11 @@ class ToolCallWidget(Vertical):
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, tool_type: str, target: str, result_text: str = ""):
-        super().__init__(classes=f"tool-call tool-{tool_type.lower()}")
+    def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False):
+        classes = f"tool-call tool-{tool_type.lower()}"
+        if is_sequential:
+            classes += " tool-sequential"
+        super().__init__(classes=classes)
         self.tool_type = tool_type
         self.target = target
         self.result_text = result_text
@@ -210,7 +213,8 @@ class ChatView(VerticalScroll):
         return widget
 
     async def add_tool_call(self, tool_type: str, target: str, result_text: str = "") -> ToolCallWidget:
-        widget = ToolCallWidget(tool_type, target, result_text=result_text)
+        is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
+        widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq)
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget

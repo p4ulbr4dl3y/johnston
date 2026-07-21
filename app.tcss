@@ -67,7 +67,7 @@ Screen {
     color: #e4e4e7;
 }
 
-.tool-call + .tool-call {
+.tool-sequential {
     margin-top: 0;
 }
 
