@@ -12,7 +12,7 @@ class RewindScreen(BaseSelectionScreen[int]):
         items = [idx for idx, _ in user_messages]
         default_val = items[-1] if items else -1
         super().__init__(
-            title="### ↺ **Select message to rollback to**",
+            title="### **Select message to rollback to**",
             options=options,
             items=items,
             default_value=default_val
