@@ -3,7 +3,6 @@ from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, Provid
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 from core.skill_manager import SkillManager
-from core.mcp_manager import MCPManager
 
 class BaseCommand:
     """Базовый класс для слэш-команд"""
@@ -176,6 +175,9 @@ class SkillsCommand(BaseCommand):
                 app.notify(f"Activating skill: {s_name}")
                 app.generate_ai_response(f"Load and apply the skill '{s_name}'.", show_in_ui=True)
             app.query_one("#message-input", ChatInput).focus()
+
+        app.push_screen(SkillsScreen(), callback=on_skill_selected)
+
 
 class MCPCommand(BaseCommand):
     name = "/mcp"

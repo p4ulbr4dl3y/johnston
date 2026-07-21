@@ -1,4 +1,3 @@
-import os
 from typing import Any, Dict
 from tools.base import BaseTool
 
@@ -44,9 +43,12 @@ class ManageTaskTool(BaseTool):
             if not matching:
                 return f"No task found with ID: {task_id}"
             t = matching[0]
-            if t.process and t.process.returncode is None:
+            if getattr(t, "is_running", False):
                 try:
-                    t.process.kill()
+                    if hasattr(t, "kill"):
+                        await t.kill()
+                    elif getattr(t, "process", None) and t.process.returncode is None:
+                        t.process.kill()
                     t.is_running = False
                     ctx.refresh_status()
                     return f"Task {task_id} successfully killed."

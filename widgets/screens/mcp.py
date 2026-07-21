@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical

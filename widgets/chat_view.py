@@ -32,7 +32,7 @@ class BotMessage(Vertical):
     can_focus = False
     content = reactive("")
 
-    def __init__(self, persona_name: str = "AI"):
+    def __init__(self):
         super().__init__(classes="bot-msg")
         self.md_widget = Markdown("")
 
@@ -67,7 +67,6 @@ class ThinkingWidget(Vertical):
         self.thinking_text = thinking_text
         self.duration_seconds = 0.0
         self.is_thinking = True
-        self.is_expanded = False
         self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_idx = 0
         
@@ -200,8 +199,8 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=True)
         return msg
 
-    async def add_bot_message(self, persona_name: str = "AI") -> BotMessage:
-        msg = BotMessage(persona_name=persona_name)
+    async def add_bot_message(self) -> BotMessage:
+        msg = BotMessage()
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg

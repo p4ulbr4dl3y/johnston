@@ -1,5 +1,6 @@
 import os
 import asyncio
+import argparse
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual import events, work
@@ -293,8 +294,6 @@ class TUIChatApp(App):
         self.notify(f"Background command completed (TID: {task_id})")
         msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
         self.generate_ai_response(msg, show_in_ui=False)
-
-import argparse
 
 async def run_cli_prompt(prompt_text: str) -> None:
     from core.provider_manager import ProviderManager

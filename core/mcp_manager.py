@@ -5,7 +5,6 @@ Supports stdio process execution with JSON-RPC 2.0.
 """
 import os
 import json
-import asyncio
 import subprocess
 from typing import Dict, List, Any, Optional
 from core.config import CONFIG_DIR

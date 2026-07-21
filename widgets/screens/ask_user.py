@@ -1,8 +1,7 @@
-import asyncio
 from textual.app import ComposeResult
 from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown, Input, Label
+from textual.widgets import OptionList, Markdown, Input
 from textual import events
 
 class AskUserScreen(ModalScreen[str]):

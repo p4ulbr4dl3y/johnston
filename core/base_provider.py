@@ -1,10 +1,8 @@
-import os
 import json
 import time
 from typing import AsyncGenerator, Tuple, List, Dict, Any
 from openai import AsyncOpenAI
 
-from core.background_task import BackgroundTask
 from tools.registry import execute_tool
 from core.token_util import estimate_tokens, parse_usage
 from core.models_dev import get_context_window, catalog
