@@ -7,6 +7,7 @@ from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.glob import GlobTool
 from tools.grep import GrepTool
+from tools.list_dir import ListDirTool
 from tools.manage_task import ManageTaskTool
 from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
@@ -20,6 +21,7 @@ TOOL_CLASSES = [
     BashTool,
     GlobTool,
     GrepTool,
+    ListDirTool,
     AskUserTool,
     SkillTool,
     ManageTaskTool,
