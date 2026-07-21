@@ -8,6 +8,7 @@ from background_task import BackgroundTask
 from tools.registry import execute_tool
 from token_util import estimate_tokens, parse_usage
 from models_dev import get_context_window, catalog
+from skill_manager import SkillManager
 
 class BaseAgent:
     def __init__(self, api_key: str, model: str, base_url: str, system_prompt: str, tools: List[Dict[str, Any]], provider_key: str = "opencode"):
@@ -43,7 +44,12 @@ class BaseAgent:
         }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        messages = [{"role": "system", "content": self.system_prompt}] + self.history + [{"role": "user", "content": user_text}]
+        skills_snippet = SkillManager().get_system_prompt_snippet()
+        sys_prompt = self.system_prompt
+        if skills_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
+
+        messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
         t0 = time.time()
         full_assistant_text = ""

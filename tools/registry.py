@@ -7,6 +7,7 @@ from tools.bash import BashTool
 from tools.glob import GlobTool
 from tools.grep import GrepTool
 from tools.ask_user import AskUserTool
+from tools.skill import SkillTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -16,6 +17,7 @@ TOOL_CLASSES = [
     GlobTool,
     GrepTool,
     AskUserTool,
+    SkillTool,
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
