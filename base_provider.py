@@ -79,7 +79,7 @@ async def execute_tool(name: str, args: dict, app=None) -> str:
                     if hasattr(app, "background_tasks"):
                         app.background_tasks.append(task)
                     app.notify(f"Command sent to background (TID: {task_id})")
-                    return f"[Background Task ID: {task_id}] Bash command is running in the background. (посмотреть таски - /tasks в панеле чата)"
+                    return f"[Background Task ID: {task_id}] Bash command is running in the background. I must wait for its completion. Do not run any other tools until notified. (посмотреть таски - /tasks в панеле чата)"
                 else:
                     await p.wait()
                     res = "".join(task.output)
