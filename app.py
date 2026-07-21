@@ -41,12 +41,8 @@ class JohnstonChatApp(App):
 
     def action_toggle_mode(self) -> None:
         """Переключение режима агента (Plan / Build)"""
-        if hasattr(self, "agent") and self.agent:
-            curr = getattr(self.agent, "mode", "build")
-            new_mode = "build" if curr == "plan" else "plan"
-            self.agent.mode = new_mode
-            self.refresh_status_footer()
-            self.notify(f"Mode switched: {new_mode.upper()}")
+        from tools.context import ToolContext
+        ToolContext(self).toggle_agent_mode()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):

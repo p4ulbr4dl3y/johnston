@@ -60,12 +60,11 @@ class BaseAgent:
         all_tools = builder.build_tools()
 
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
-
         t0 = time.time()
-        full_assistant_text = ""
 
         try:
             while True:
+                full_assistant_text = ""
                 prompt_tokens_est = estimate_tokens(messages)
                 step_usage = None
 
@@ -153,6 +152,7 @@ class BaseAgent:
                     thinking_started = False
 
                 if not tool_calls_dict:
+                    messages.append({"role": "assistant", "content": full_assistant_text})
                     yield ("bot_text", full_assistant_text, "")
                     break
 
@@ -211,8 +211,7 @@ class BaseAgent:
                         "content": tool_result
                     })
 
-            self.history.append({"role": "user", "content": user_text})
-            self.history.append({"role": "assistant", "content": full_assistant_text})
+            self.history = messages[1:]
 
         except Exception as err:
             error_msg = f"**API Error:** `{err}`"

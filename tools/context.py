@@ -32,6 +32,14 @@ class ToolContext:
             self.refresh_status()
             self.notify(f"Mode switched: {mode}")
 
+    def toggle_agent_mode(self) -> str:
+        if self.app and hasattr(self.app, "agent"):
+            curr = getattr(self.app.agent, "mode", "build")
+            new_mode = "plan" if curr == "build" else "build"
+            self.set_agent_mode(new_mode)
+            return new_mode
+        return "build"
+
     def create_agent(self) -> Any:
         if self.app and hasattr(self.app, "pm"):
             return self.app.pm.create_active_agent()
