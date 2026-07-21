@@ -1,5 +1,6 @@
 import os
 from textual.widgets import Static
+from rich.table import Table
 from models_dev import format_context_tokens
 
 class StatusFooter(Static):
@@ -31,7 +32,7 @@ class StatusFooter(Static):
         left_1 = "  │  ".join(left_1_parts)
 
         # Строка 1 Справа: Фоновые задачи
-        right_1 = f"Tasks: {active_bg_tasks} bg" if active_bg_tasks > 0 else ""
+        right_1 = f"Tasks: {active_bg_tasks} bg"
 
         # Строка 2 Слева: Прогресс контекста
         pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
@@ -47,15 +48,11 @@ class StatusFooter(Static):
         cost_text = f"Cost: ${cost_usd:.4f}"
         right_2 = f"{tokens_text}  │  {cost_text}"
 
-        line1 = self._justify(left_1, right_1)
-        line2 = self._justify(left_2, right_2)
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
 
-        self.update(f"{line1}\n{line2}")
+        grid.add_row(left_1, right_1)
+        grid.add_row(left_2, right_2)
 
-    def _justify(self, left: str, right: str) -> str:
-        if not right:
-            return left
-        # Учитываем padding (padding: 0 3 дает отступы по 3 символа слева и справа)
-        width = self.size.width - 6 if self.size and self.size.width > 6 else 100
-        padding = max(2, width - len(left) - len(right))
-        return f"{left}{' ' * padding}{right}"
+        self.update(grid)
