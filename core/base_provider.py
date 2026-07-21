@@ -221,12 +221,27 @@ class BaseAgent:
                     else:
                         tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
 
-                    yield ("tool_result", tool_result, "")
+                    tool_ui_result = tool_result
+                    tool_content = tool_result
+
+                    if isinstance(tool_result, str) and tool_result.startswith("{") and '"image_url"' in tool_result:
+                        try:
+                            t_data = json.loads(tool_result)
+                            if "image_url" in t_data:
+                                tool_ui_result = t_data.get("message", f"[Image Loaded: {t_data.get('path')}]")
+                                tool_content = [
+                                    {"type": "text", "text": tool_ui_result},
+                                    {"type": "image_url", "image_url": {"url": t_data["image_url"]}}
+                                ]
+                        except Exception:
+                            pass
+
+                    yield ("tool_result", tool_ui_result, "")
 
                     messages.append({
                         "role": "tool",
                         "tool_call_id": t_id,
-                        "content": tool_result
+                        "content": tool_content
                     })
 
             self.history = messages[1:]

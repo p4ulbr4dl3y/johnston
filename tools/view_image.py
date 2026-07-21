@@ -43,6 +43,12 @@ class ViewImageTool(BaseTool):
                 b64_data = base64.b64encode(f.read()).decode("utf-8")
 
             b64_url = f"data:{mime_type};base64,{b64_data}"
-            return f"[Image Content Loaded]\nPath: {path}\nDataURL: {b64_url}"
+            import json
+            return json.dumps({
+                "status": "success",
+                "message": f"[Image Loaded: {path}]",
+                "path": path,
+                "image_url": b64_url
+            })
         except Exception as e:
             return f"Error reading image file '{path}': {e}"
