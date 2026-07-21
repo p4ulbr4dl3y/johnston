@@ -9,10 +9,11 @@ from tools.task import TaskTool
 class PromptBuilder:
     """Формирует скомпонованный системный промпт и набор инструментов с учетом MCP, Skills и режима (Plan/Build)"""
 
-    def __init__(self, base_system_prompt: str, base_tools: List[Dict[str, Any]], mode: str = "build"):
+    def __init__(self, base_system_prompt: str, base_tools: List[Dict[str, Any]], mode: str = "build", allow_task: bool = True):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
         self.mode = mode
+        self.allow_task = allow_task
 
     def build_system_prompt(self) -> str:
         from core.mcp_manager import get_mcp_manager
@@ -53,7 +54,7 @@ class PromptBuilder:
             if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
                 all_tools.append(PlanExitTool.schema)
 
-        if not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
+        if self.allow_task and not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
             all_tools.append(TaskTool.schema)
 
         return all_tools

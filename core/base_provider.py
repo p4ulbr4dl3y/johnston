@@ -55,7 +55,8 @@ class BaseAgent:
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "build")
-        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode)
+        allow_task = getattr(self, "allow_task", True)
+        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools()
 
@@ -179,9 +180,17 @@ class BaseAgent:
                     raw_args = tc["arguments"]
 
                     try:
-                        args = json.loads(raw_args)
-                    except Exception:
-                        args = {}
+                        args = json.loads(raw_args) if raw_args.strip() else {}
+                    except Exception as json_err:
+                        tool_result = f"Error: Tool '{t_name}' received invalid JSON arguments: {json_err}. Raw arguments: {raw_args}"
+                        yield ("tool", t_name, t_name)
+                        yield ("tool_result", tool_result, "")
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": t_id,
+                            "content": tool_result
+                        })
+                        continue
 
                     target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                     if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
@@ -226,8 +235,17 @@ class BaseAgent:
         if len(self.history) <= 4:
             return False, "History is too short to compact (<= 4 messages)"
 
-        recent_tail = self.history[-2:]
-        history_to_compact = self.history[:-2]
+        split_idx = len(self.history) - 2
+        while split_idx > 0:
+            if self.history[split_idx].get("role") == "user":
+                break
+            split_idx -= 1
+
+        if split_idx <= 0:
+            split_idx = len(self.history) - 2
+
+        recent_tail = self.history[split_idx:]
+        history_to_compact = self.history[:split_idx]
 
         compaction_prompt = (
             "You are an anchored context summarization assistant for coding sessions.\n\n"

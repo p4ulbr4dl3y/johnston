@@ -47,6 +47,7 @@ class TaskTool(BaseTool):
         subagent.app = ctx.app
 
         # Отключаем возможность повторного вызова Task (защита от рекурсии)
+        subagent.allow_task = False
         original_tools = getattr(subagent, "tools", []) or []
         subagent.tools = [
             t for t in original_tools
