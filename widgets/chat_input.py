@@ -29,7 +29,8 @@ class ChatInput(TextArea):
         self.call_after_refresh(self.focus)
 
     def load_text(self, text: str) -> None:
-        self.pasted_texts.clear()
+        if not text:
+            self.pasted_texts.clear()
         super().load_text(text)
         self._on_input_change()
 
@@ -50,15 +51,15 @@ class ChatInput(TextArea):
 
     def update_suggestions(self) -> None:
         """Обновление списка подсказок слэш-команд и файлов"""
-        if self.app:
-            try:
+        try:
+            if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 row, col = self.cursor_location
                 line_str = self.document.get_line(row)
                 suggestions.update_query(self.text, line_str, col)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     def apply_file_suggestion(self, chosen_file: str, at_start_idx: int) -> None:
         """Вставляет выбранный путь к файлу после символа @"""
@@ -76,10 +77,54 @@ class ChatInput(TextArea):
         new_col = at_start_idx + len(inserted)
         self.move_cursor((row, new_col))
 
+    def auto_format_image_tags(self) -> None:
+        """Сканирует текст инпута на наличие путей к изображениям и заменяет их на [Image #N]"""
+        import os
+        import re
+
+        text = self.text
+        if not text:
+            return
+
+        pattern = r'(@?(?:/[^\s]+|~/[^\s]+|file://[^\s]+|\S+\.(?:png|jpg|jpeg|gif|webp|bmp|ico|tiff|svg)))'
+        matches = re.findall(pattern, text, flags=re.IGNORECASE)
+        if not matches:
+            return
+
+        modified = False
+        new_text = text
+
+        for raw_match in matches:
+            clean = raw_match.lstrip("@").strip("'\"").replace("\\ ", " ")
+            expanded = os.path.expanduser(clean)
+            ext = os.path.splitext(clean)[1].lower()
+
+            if ext in self.IMAGE_EXTENSIONS and (os.path.exists(expanded) or raw_match.startswith("/") or raw_match.startswith("~/") or raw_match.startswith("file://")):
+                existing_tag = None
+                for tag, val in self.pasted_texts.items():
+                    if tag.startswith("[Image #") and (val == raw_match or val == f"@{clean}" or val == f"@{raw_match.lstrip('@')}"):
+                        existing_tag = tag
+                        break
+
+                if not existing_tag:
+                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
+                    existing_tag = f"[Image #{img_count}]"
+                    self.pasted_texts[existing_tag] = f"@{clean}"
+
+                new_text = new_text.replace(raw_match, existing_tag)
+                modified = True
+
+        if modified and new_text != self.text:
+            row, col = self.cursor_location
+            self.load_text(new_text)
+            lines = new_text.split("\n")
+            self.move_cursor((min(row, len(lines) - 1), len(lines[-1])))
+
     def _on_input_change(self) -> None:
         """Вызывается при любом изменении текста в инпуте"""
         self.update_height()
         self.update_suggestions()
+        self.auto_format_image_tags()
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
