@@ -136,5 +136,55 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_list = await execute_tool("ManageTask", {"action": "list"}, app=app)
         self.assertIn("No background tasks currently active", res_list)
 
+    async def test_task_tool_foreground(self):
+        class DummySubAgent:
+            system_prompt = "system"
+            tools = []
+            async def stream_steps(self, prompt):
+                yield ("bot_text", "Subagent answer for: " + prompt, "")
+
+        class DummyPM:
+            def create_active_agent(self):
+                return DummySubAgent()
+
+        class DummyApp:
+            pm = DummyPM()
+
+        app = DummyApp()
+        res = await execute_tool("Task", {"prompt": "do research", "description": "research task"}, app=app)
+        self.assertIn("<task_result>", res)
+        self.assertIn("Subagent answer for: do research", res)
+
+    async def test_task_tool_background(self):
+        class DummySubAgent:
+            system_prompt = "system"
+            tools = []
+            async def stream_steps(self, prompt):
+                yield ("bot_text", "BG Subagent answer", "")
+
+        class DummyPM:
+            def create_active_agent(self):
+                return DummySubAgent()
+
+        class DummyApp:
+            pm = DummyPM()
+            background_tasks = []
+            notified = []
+
+            def notify(self, msg):
+                self.notified.append(msg)
+
+            def refresh_status_footer(self):
+                pass
+
+            def generate_ai_response(self, text, show_in_ui=False):
+                pass
+
+        app = DummyApp()
+        res = await execute_tool("Task", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
+        self.assertIn("launched in background", res)
+        self.assertEqual(len(app.background_tasks), 1)
+        self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
+
 if __name__ == "__main__":
     unittest.main()

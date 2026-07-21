@@ -85,6 +85,26 @@ class BaseAgent:
             if os.path.exists(local_plan):
                 sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
 
+        task_tool_schema = {
+            "type": "function",
+            "function": {
+                "name": "Task",
+                "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {"type": "string", "description": "Task prompt for the subagent"},
+                        "description": {"type": "string", "description": "Short (3-5 words) description"},
+                        "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
+                        "background": {"type": "boolean", "description": "Run asynchronously in background"}
+                    },
+                    "required": ["prompt", "description"]
+                }
+            }
+        }
+        if not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
+            all_tools.append(task_tool_schema)
+
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
         t0 = time.time()

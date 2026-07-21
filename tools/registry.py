@@ -10,6 +10,7 @@ from tools.ask_user import AskUserTool
 from tools.skill import SkillTool
 from tools.manage_task import ManageTaskTool
 from tools.plan_exit import PlanExitTool
+from tools.task import TaskTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -22,6 +23,7 @@ TOOL_CLASSES = [
     SkillTool,
     ManageTaskTool,
     PlanExitTool,
+    TaskTool,
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
