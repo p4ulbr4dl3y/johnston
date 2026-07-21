@@ -6,6 +6,7 @@ from textual.widgets import Label, Markdown, OptionList, RichLog
 
 class TaskConsoleScreen(ModalScreen[None]):
     """Модальный экран для просмотра вывода конкретной таски в реальном времени"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "back", "Back to list"),
     ]
@@ -41,6 +42,7 @@ class TaskConsoleScreen(ModalScreen[None]):
 
 class TasksListScreen(ModalScreen[None]):
     """Модальный экран со списком фоновых тасок"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Manager"),
         ("k", "kill_task", "Kill Task"),

@@ -7,6 +7,7 @@ from textual.widgets import Markdown
 class HelpScreen(ModalScreen[None]):
     """Modal help screen (/help)"""
 
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close"),
         ("enter", "close", "Close"),

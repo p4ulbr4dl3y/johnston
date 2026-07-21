@@ -7,7 +7,7 @@ from textual.widgets import Input, Markdown, OptionList
 
 class AskUserScreen(ModalScreen[str]):
     """Modal screen for AskUser tool to prompt user for input"""
-
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
     ]
@@ -33,7 +33,7 @@ class AskUserScreen(ModalScreen[str]):
 
 class QuestionScreen(ModalScreen[dict]):
     """Модальное окно для выбора вариантов или текстового ввода без кнопок"""
-
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("left", "go_back", "Back"),

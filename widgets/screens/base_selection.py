@@ -12,6 +12,7 @@ T = TypeVar("T")
 class BaseSelectionScreen(ModalScreen[T], Generic[T]):
     """Базовый класс для модальных окон выбора с OptionList"""
 
+    ALLOW_SELECT = False
     BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(

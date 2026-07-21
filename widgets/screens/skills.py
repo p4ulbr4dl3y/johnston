@@ -11,6 +11,7 @@ from core.skill_manager import SkillManager
 class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
     """Модальное окно списка доступных скиллов (глобальных и проектных)"""
 
+    ALLOW_SELECT = False
     BINDINGS = [("escape", "cancel", "Cancel")]
 
     def __init__(self):

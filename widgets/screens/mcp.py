@@ -11,6 +11,7 @@ from core.mcp_manager import MCPManager
 class MCPScreen(ModalScreen[None]):
     """Модальное окно выключения/включения MCP серверов"""
 
+    ALLOW_SELECT = False
     BINDINGS = [("escape", "cancel", "Close")]
 
     def __init__(self):
