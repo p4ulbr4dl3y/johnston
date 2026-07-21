@@ -67,6 +67,10 @@ Screen {
     color: #e4e4e7;
 }
 
+.tool-call + .tool-call {
+    margin-top: 0;
+}
+
 .tool-create {
     color: #a7f3d0;
 }
