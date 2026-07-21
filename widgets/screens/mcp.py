@@ -1,9 +1,12 @@
-from typing import Dict, Any
+from typing import Any, Dict
+
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown
+from textual.screen import ModalScreen
+from textual.widgets import Markdown, OptionList
+
 from core.mcp_manager import MCPManager
+
 
 class MCPScreen(ModalScreen[None]):
     """Модальное окно выключения/включения MCP серверов"""

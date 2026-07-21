@@ -1,7 +1,8 @@
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown, Label, RichLog
+from textual.screen import ModalScreen
+from textual.widgets import Label, Markdown, OptionList, RichLog
+
 
 class TaskConsoleScreen(ModalScreen[None]):
     """Модальный экран для просмотра вывода конкретной таски в реальном времени"""

@@ -1,7 +1,9 @@
-import os
 import difflib
+import os
 from typing import Any, Dict
+
 from tools.base import BaseTool
+
 
 class EditTool(BaseTool):
     name = "Edit"
@@ -27,7 +29,7 @@ class EditTool(BaseTool):
                 f.write(new_content)
         except Exception as e:
             return f"Error writing file '{path}': {e}"
-        
+
         diff_lines = list(difflib.unified_diff(
             content.splitlines(),
             new_content.splitlines(),

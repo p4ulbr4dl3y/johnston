@@ -1,8 +1,19 @@
 from typing import Dict, Type
-from widgets.modal_screens import HelpScreen, RewindScreen, ResumeScreen, ProviderScreen, ModelScreen, TasksListScreen, SkillsScreen, MCPScreen
+
+from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
-from core.skill_manager import SkillManager
+from widgets.modal_screens import (
+    HelpScreen,
+    MCPScreen,
+    ModelScreen,
+    ProviderScreen,
+    ResumeScreen,
+    RewindScreen,
+    SkillsScreen,
+    TasksListScreen,
+)
+
 
 class BaseCommand:
     """Базовый класс для слэш-команд"""
@@ -72,9 +83,9 @@ class ModelsCommand(BaseCommand):
         if not models:
             app.notify("Failed to fetch models", severity="warning")
             return
-        
+
         curr_model = getattr(app.agent, "model", "")
-        
+
         def on_model_selected(selected_model: str) -> None:
             if selected_model:
                 if hasattr(app.agent, "model"):
@@ -105,23 +116,23 @@ class RewindCommand(BaseCommand):
                     if idx == selected_idx:
                         msg_text = text
                         break
-                
+
                 # Откатываем чат до позиции непосредственно перед выбранным сообщением
                 chat_view.rollback_to(selected_idx - 1)
-                
+
                 if hasattr(app.agent, "clear_history"):
                     app.agent.clear_history()
                 elif hasattr(app.agent, "history"):
                     app.agent.history = []
-                
+
                 app.save_current_session()
-                
+
                 # Загружаем текст в поле ввода
                 chat_input = app.query_one("#message-input")
                 chat_input.load_text(msg_text)
                 lines = chat_input.text.split("\n")
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
-                
+
                 app.notify("Chat rolled back! Message loaded into input field.")
             app.query_one("#message-input").focus()
 
@@ -308,14 +319,14 @@ async def handle_slash_command(app, command_text: str) -> bool:
     """Выполняет команду, если она зарегистрирована. Возвращает True, если обработана."""
     parts = command_text.strip().split(maxsplit=1)
     cmd_name = parts[0].lower()
-    
+
     # Нормализация кириллических омоглифов в латиницу (для исключения ошибок раскладки)
     homoglyphs = {
-        'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h', 
+        'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h',
         'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'
     }
     normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
-    
+
     if normalized_name in COMMAND_REGISTRY:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()
         await cmd_instance.execute(app)

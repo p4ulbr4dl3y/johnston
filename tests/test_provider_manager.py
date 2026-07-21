@@ -1,9 +1,9 @@
+import json
 import os
+import shutil
 import tempfile
 import unittest
-import shutil
-import json
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROVIDERS_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
     from core.provider_manager import ProviderManager
@@ -11,16 +11,16 @@ with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROVIDERS_DIR
 class TestProviderManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        
+
         # Patch config values inside provider_manager
         self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
         self.providers_dir_patcher = patch("core.provider_manager.PROVIDERS_DIR", os.path.join(self.test_dir, "providers"))
         self.config_file_patcher = patch("core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
-        
+
         self.config_dir_patcher.start()
         self.providers_dir_patcher.start()
         self.config_file_patcher.start()
-        
+
         self.pm = ProviderManager()
 
     def tearDown(self):
@@ -64,11 +64,11 @@ class TestProviderManager(unittest.TestCase):
         }
         mock_client.get = AsyncMock(return_value=mock_resp)
         mock_client_cls.return_value.__aenter__.return_value = mock_client
-        
+
         # Test fetching models
         models = await self.pm.fetch_models_for_provider("opencode", force_refresh=True)
         self.assertEqual(models, ["model-a", "model-b"])
-        
+
         # Verify cache was written
         cache_file = os.path.join(self.test_dir, "cache", "models_opencode.json")
         self.assertTrue(os.path.exists(cache_file))

@@ -1,5 +1,6 @@
 from widgets.screens.base_selection import BaseSelectionScreen
 
+
 class ModelScreen(BaseSelectionScreen[str]):
     """Modal model selection screen (/models)"""
 

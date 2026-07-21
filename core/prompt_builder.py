@@ -1,5 +1,6 @@
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from core.skill_manager import SkillManager
 
 PLAN_EXIT_TOOL_SCHEMA = {

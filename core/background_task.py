@@ -1,5 +1,6 @@
 import asyncio
 
+
 class BackgroundTask:
     """Управление фоновым bash-процессом с построчным чтением вывода в реальном времени"""
     def __init__(self, task_id: str, command: str, process):

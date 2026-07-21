@@ -1,25 +1,27 @@
-import os
+import hashlib
 import json
+import os
 import time
 import uuid
-import hashlib
-from typing import List, Dict, Any, Optional
-from core.config import CONFIG_DIR, PROJECTS_DIR
+from typing import Any, Dict, List, Optional
+
+from core.config import CONFIG_DIR, PROJECTS_DIR  # noqa: F401
+
 
 class SessionManager:
     def __init__(self, project_path: Optional[str] = None):
         if not project_path:
             project_path = os.getcwd()
         self.project_path = os.path.realpath(os.path.abspath(project_path))
-        
+
         path_hash = hashlib.md5(self.project_path.encode("utf-8")).hexdigest()[:8]
         folder_name = os.path.basename(self.project_path) or "root"
         self.project_key = f"{folder_name}_{path_hash}"
-        
+
         self.project_dir = os.path.join(PROJECTS_DIR, self.project_key)
         self.sessions_dir = os.path.join(self.project_dir, "sessions")
         self.config_file = os.path.join(self.project_dir, "config.json")
-        
+
         self.ensure_dirs()
 
     def ensure_dirs(self):
@@ -41,12 +43,12 @@ class SessionManager:
                     with open(filepath, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         ui_msgs = data.get("ui_messages") or data.get("messages") or []
-                        
+
                         # Если сессия пустая — удаляем мусорный файл
                         if not ui_msgs:
                             os.remove(filepath)
                             continue
-                            
+
                         sessions.append({
                             "id": data.get("id", filename[:-5]),
                             "title": data.get("title", "Untitled"),
@@ -92,7 +94,7 @@ class SessionManager:
 
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-            
+
         self.set_active_session_id(session_id)
 
     def delete_session(self, session_id: str):
@@ -111,13 +113,13 @@ class SessionManager:
                         return sid
             except Exception:
                 pass
-        
+
         sessions = self.list_sessions()
         if sessions:
             sid = sessions[0]["id"]
             self.set_active_session_id(sid)
             return sid
-            
+
         return None
 
     def set_active_session_id(self, session_id: str):
@@ -128,7 +130,7 @@ class SessionManager:
                     cfg = json.load(f)
             except Exception:
                 cfg = {}
-        
+
         cfg["active_session_id"] = session_id
         with open(self.config_file, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)

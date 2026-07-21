@@ -1,5 +1,6 @@
 from widgets.screens.base_selection import BaseSelectionScreen
 
+
 class RewindScreen(BaseSelectionScreen[int]):
     """Modal rollback screen (/rewind)"""
 

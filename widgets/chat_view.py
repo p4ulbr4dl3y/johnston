@@ -1,9 +1,11 @@
-from textual.app import ComposeResult
-from textual.containers import VerticalScroll, Vertical
-from textual.widgets import Static, Markdown, Label
-from textual.reactive import reactive
-from textual import events
 import os
+
+from textual import events
+from textual.app import ComposeResult
+from textual.containers import Vertical, VerticalScroll
+from textual.reactive import reactive
+from textual.widgets import Label, Markdown, Static
+
 
 class UserMessage(Static):
     """Сообщение пользователя"""
@@ -69,7 +71,7 @@ class ThinkingWidget(Vertical):
         self.is_thinking = True
         self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_idx = 0
-        
+
         self.header_label = Label("⠋ Thinking...", classes="thinking-header")
         self.md_widget = Markdown("")
 
@@ -118,7 +120,7 @@ class ToolCallWidget(Vertical):
         self.is_expanded = False
 
         self.icon_name = tool_type
-        
+
         self.header_label = Label("", classes="tool-header")
         self.md_widget = Markdown("")
         self.diff_widget = Static("", classes="tool-diff-view")
@@ -148,7 +150,7 @@ class ToolCallWidget(Vertical):
                 self.app.notify(f"{self.tool_type} result copied to clipboard!")
         except Exception as e:
             self.app.notify(f"Copy failed: {e}", severity="error")
-        
+
         if not self.result_text:
             return
 
@@ -167,7 +169,7 @@ class ToolCallWidget(Vertical):
                 else:
                     t.append(line + "\n", style="#a1a1aa")
             self.diff_widget.update(t)
-            
+
             if self.is_expanded:
                 self.diff_widget.display = True
                 self.md_widget.display = False
@@ -180,7 +182,7 @@ class ToolCallWidget(Vertical):
             else:
                 formatted_md = self.result_text
             self.md_widget.update(formatted_md)
-            
+
             if self.is_expanded:
                 self.md_widget.display = True
                 self.diff_widget.display = False

@@ -1,10 +1,11 @@
 import os
-import tempfile
 import shutil
+import tempfile
 import unittest
-import asyncio
-from tools.registry import execute_tool
+
 from core.base_provider import BaseAgent
+from tools.registry import execute_tool
+
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -18,12 +19,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_create_and_read_tool(self):
         file_path = os.path.join(self.test_dir, "test.txt")
-        
+
         # Test Create
         res_create = await execute_tool("Create", {"path": file_path, "content": "hello world"})
         self.assertIn("Success", res_create)
         self.assertTrue(os.path.exists(file_path))
-        
+
         # Test Read
         res_read = await execute_tool("Read", {"path": file_path})
         self.assertEqual(res_read, "hello world")
@@ -36,7 +37,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_edit_tool(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
         await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3"})
-        
+
         # Test valid Edit
         res_edit = await execute_tool("Edit", {
             "path": file_path,
@@ -45,7 +46,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         })
         self.assertIn("line2", res_edit)  # check diff contains old text
         self.assertIn("line_two", res_edit)  # check diff contains new text
-        
+
         # Verify content
         with open(file_path, "r") as f:
             content = f.read()
@@ -54,7 +55,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_edit_missing_text(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
         await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3"})
-        
+
         res_edit = await execute_tool("Edit", {
             "path": file_path,
             "old_string": "missing_line",
@@ -66,7 +67,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         os.makedirs(os.path.join(self.test_dir, "subdir"))
         await execute_tool("Create", {"path": os.path.join(self.test_dir, "file1.txt"), "content": "a"})
         await execute_tool("Create", {"path": os.path.join(self.test_dir, "subdir", "file2.log"), "content": "b"})
-        
+
         # Glob txt
         res_glob = await execute_tool("Glob", {"pattern": "*.txt"})
         self.assertIn("file1.txt", res_glob)
@@ -77,7 +78,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         file2 = os.path.join(self.test_dir, "file2.txt")
         await execute_tool("Create", {"path": file1, "content": "banana apple pear"})
         await execute_tool("Create", {"path": file2, "content": "grape orange cherry"})
-        
+
         # Grep apple
         res_grep = await execute_tool("Grep", {"pattern": "apple"})
         self.assertIn("file1.txt", res_grep)

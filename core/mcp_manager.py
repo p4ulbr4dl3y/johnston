@@ -3,10 +3,11 @@ MCP (Model Context Protocol) Manager for TUI.
 Handles global (~/.tui/mcp.json) and project (.tui/mcp.json) MCP servers.
 Supports stdio process execution with JSON-RPC 2.0.
 """
-import os
 import json
+import os
 import subprocess
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from core.config import CONFIG_DIR
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
@@ -73,7 +74,7 @@ class MCPProcessClient:
     def _read_response(self, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout:
             return None
-        
+
         while True:
             line = self.process.stdout.readline()
             if not line:
@@ -234,7 +235,7 @@ class MCPManager:
         target["disabled"] = new_disabled
 
         file_to_update = self.project_file if target["scope"] == "project" and os.path.exists(self.project_file) else self.global_file
-        
+
         try:
             cfg = {"mcpServers": {}}
             if os.path.exists(file_to_update):

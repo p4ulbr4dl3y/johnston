@@ -1,5 +1,7 @@
 import unittest
+
 from core.prompt_builder import PromptBuilder
+
 
 class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_default(self):

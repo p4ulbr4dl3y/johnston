@@ -1,22 +1,25 @@
-import os
-import asyncio
 import argparse
+import asyncio
+import os
+
+from textual import events, work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
-from textual import events, work
 from textual.widgets import Select
 
 from widgets.patch import apply_textual_patches
+
 apply_textual_patches()
 
 
+from commands import handle_slash_command
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionManager
-from widgets.chat_view import ChatView, UserMessage, BotMessage, ThinkingWidget, ToolCallWidget
 from widgets.chat_input import ChatInput
-from widgets.status_footer import StatusFooter
+from widgets.chat_view import BotMessage, ChatView, ThinkingWidget, ToolCallWidget, UserMessage
 from widgets.command_suggestions import CommandSuggestions
-from commands import handle_slash_command
+from widgets.status_footer import StatusFooter
+
 
 class TUIChatApp(App):
     """Минималистичный TUI чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
@@ -64,13 +67,13 @@ class TUIChatApp(App):
             footer = self.query_one("#status-footer", StatusFooter)
             pkey = self.pm.get_active_provider_key()
             model_name = getattr(self.agent, "model", "")
-            
+
             metrics = {}
             if hasattr(self.agent, "get_metrics"):
                 metrics = self.agent.get_metrics()
 
-            from core.skill_manager import SkillManager
             from core.mcp_manager import get_mcp_manager
+            from core.skill_manager import SkillManager
 
             skills_count = len(SkillManager().list_skills())
             mcp_servers = get_mcp_manager().load_servers()
@@ -149,7 +152,7 @@ class TUIChatApp(App):
         """Сохранение полного состояния элементов UI в ~/.tui/projects/<project>/sessions"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
-        
+
         if not user_msgs:
             self.sm.save_session(self.current_session_id, {"ui_messages": []})
             return
@@ -178,7 +181,7 @@ class TUIChatApp(App):
                 })
 
         agent_history = getattr(self.agent, "history", [])
-        
+
         session_data = {
             "id": self.current_session_id,
             "title": title,
@@ -230,7 +233,7 @@ class TUIChatApp(App):
         user_text = event.value.strip()
         if not user_text:
             return
-            
+
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
@@ -246,15 +249,15 @@ class TUIChatApp(App):
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Потоковая генерация ответа с поддержкой отмены по Esc"""
         chat_view = self.query_one(ChatView)
-        
+
         if show_in_ui:
             await chat_view.add_user_message(user_text)
             self.save_current_session()
-        
+
         thinking_widget = None
         current_tool_widget = None
         bot_msg = None
-        
+
         try:
             async for event_type, val1, val2 in self.agent.stream_steps(user_text):
                 if event_type == "thinking_start":
@@ -300,10 +303,10 @@ async def run_cli_prompt(prompt_text: str) -> None:
     pm = ProviderManager()
     agent = pm.create_active_agent()
     print(f"Running prompt: {prompt_text}\n")
-    
+
     async for event_type, val1, val2 in agent.stream_steps(prompt_text):
         if event_type == "thinking_start":
-            print(f"Thinking...", end="", flush=True)
+            print("Thinking...", end="", flush=True)
         elif event_type == "thinking_end":
             print(f" ({val1}s)")
         elif event_type == "tool":

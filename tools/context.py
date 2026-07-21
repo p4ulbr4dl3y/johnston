@@ -1,4 +1,5 @@
-from typing import Any, List, Optional
+from typing import Any, List
+
 
 class ToolContext:
     """Унифицированный контекст исполнения для инструментов (изолирует UI от бизнес-логики)"""

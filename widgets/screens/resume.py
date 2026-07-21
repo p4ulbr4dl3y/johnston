@@ -1,5 +1,6 @@
 from widgets.screens.base_selection import BaseSelectionScreen
 
+
 class ResumeScreen(BaseSelectionScreen[str]):
     """Modal session resume screen (/resume)"""
 

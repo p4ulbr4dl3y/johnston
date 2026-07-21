@@ -4,7 +4,8 @@ Handles global skills (~/.tui/skills/) and project-level skills (<cwd>/.tui/skil
 Supports YAML frontmatter parsing from SKILL.md and *.md files.
 """
 import os
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
 from core.config import CONFIG_DIR
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
@@ -66,7 +67,7 @@ class SkillManager:
 
                 fm, body = parse_frontmatter(raw_content)
                 rel_dir = os.path.dirname(filepath)
-                
+
                 name = fm.get("name")
                 if not name:
                     if os.path.basename(filepath) == "SKILL.md":
@@ -79,7 +80,7 @@ class SkillManager:
 
                 desc = fm.get("description", "").strip()
                 if not desc and body:
-                    lines = [l.strip("# ").strip() for l in body.splitlines() if l.strip() and not l.startswith("#")]
+                    lines = [line.strip("# ").strip() for line in body.splitlines() if line.strip() and not line.startswith("#")]
                     desc = lines[0] if lines else ""
 
                 skills_map[name] = {

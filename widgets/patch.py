@@ -1,5 +1,6 @@
 from textual.widget import Widget
 
+
 def apply_textual_patches() -> None:
     """Применяет расширения над базом классами Textual (allow_select для вложенных виджетов)"""
     def _new_allow_select(self) -> bool:

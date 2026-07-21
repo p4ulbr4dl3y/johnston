@@ -1,11 +1,13 @@
-import os
-import json
-import time
 import importlib.util
+import json
+import os
 import sys
+import time
+from typing import Any, Dict, List
+
 import httpx
-from typing import Dict, Any, Type, List
-from core.config import CONFIG_DIR, PROVIDERS_DIR, CONFIG_FILE
+
+from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR
 
 tui_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if tui_dir not in sys.path:
@@ -25,7 +27,7 @@ class ProviderManager:
 
     def ensure_config_dir(self):
         os.makedirs(PROVIDERS_DIR, exist_ok=True)
-        
+
         opencode_file = os.path.join(PROVIDERS_DIR, "opencode.py")
         if not os.path.exists(opencode_file):
             content = _get_default_opencode_template()
@@ -46,16 +48,16 @@ class ProviderManager:
             if filename.endswith(".py") and not filename.startswith("_"):
                 filepath = os.path.join(PROVIDERS_DIR, filename)
                 mod_name = f"tui_provider_{filename[:-3]}"
-                
+
                 try:
                     spec = importlib.util.spec_from_file_location(mod_name, filepath)
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
-                        
+
                         provider_key = getattr(module, "KEY", filename[:-3])
                         provider_name = getattr(module, "NAME", provider_key)
-                        
+
                         if hasattr(module, "Agent"):
                             providers[provider_key] = {
                                 "key": provider_key,
@@ -87,7 +89,7 @@ class ProviderManager:
     def create_active_agent(self):
         providers = self.load_providers()
         active_key = self.get_active_provider_key()
-        
+
         if active_key in providers:
             return providers[active_key]["module"].Agent()
         elif providers:

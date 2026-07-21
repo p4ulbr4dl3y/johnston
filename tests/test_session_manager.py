@@ -1,7 +1,7 @@
 import os
+import shutil
 import tempfile
 import unittest
-import shutil
 from unittest.mock import patch
 
 with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROJECTS_DIR", "/dummy"):
@@ -15,7 +15,7 @@ class TestSessionManager(unittest.TestCase):
         self.config_dir_patcher = patch("core.session_manager.CONFIG_DIR", self.test_dir)
         self.projects_dir_patcher.start()
         self.config_dir_patcher.start()
-        
+
         # Initialize session manager under temporary project path
         self.project_path = os.path.join(self.test_dir, "my_project")
         os.makedirs(self.project_path, exist_ok=True)
@@ -41,7 +41,7 @@ class TestSessionManager(unittest.TestCase):
             "ui_messages": [{"type": "user", "text": "hello"}]
         }
         self.sm.save_session(sid, data)
-        
+
         loaded = self.sm.load_session(sid)
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded["ui_messages"][0]["text"], "hello")
@@ -55,7 +55,7 @@ class TestSessionManager(unittest.TestCase):
         # Saving empty session should not create file
         self.sm.save_session(sid, data)
         self.assertIsNone(self.sm.load_session(sid))
-        
+
         # If file existed and then saved empty, it should be deleted
         data_non_empty = {
             "id": sid,
@@ -63,17 +63,17 @@ class TestSessionManager(unittest.TestCase):
         }
         self.sm.save_session(sid, data_non_empty)
         self.assertIsNotNone(self.sm.load_session(sid))
-        
+
         self.sm.save_session(sid, data)
         self.assertIsNone(self.sm.load_session(sid))
 
     def test_list_sessions(self):
         sid1 = self.sm.generate_session_id()
         sid2 = self.sm.generate_session_id()
-        
+
         self.sm.save_session(sid1, {"id": sid1, "ui_messages": [{"type": "user", "text": "one"}]})
         self.sm.save_session(sid2, {"id": sid2, "ui_messages": [{"type": "user", "text": "two"}]})
-        
+
         sessions = self.sm.list_sessions()
         self.assertEqual(len(sessions), 2)
         # Check sorting (latest first)
@@ -83,14 +83,14 @@ class TestSessionManager(unittest.TestCase):
         sid = self.sm.generate_session_id()
         self.sm.save_session(sid, {"id": sid, "ui_messages": [{"type": "user", "text": "hello"}]})
         self.assertIsNotNone(self.sm.load_session(sid))
-        
+
         self.sm.delete_session(sid)
         self.assertIsNone(self.sm.load_session(sid))
 
     def test_active_session_id(self):
         sid = self.sm.generate_session_id()
         self.sm.save_session(sid, {"id": sid, "ui_messages": [{"type": "user", "text": "hello"}]})
-        
+
         self.sm.set_active_session_id(sid)
         self.assertEqual(self.sm.get_active_session_id(), sid)
 

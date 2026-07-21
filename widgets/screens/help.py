@@ -1,7 +1,8 @@
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
 from textual.containers import Vertical
+from textual.screen import ModalScreen
 from textual.widgets import Markdown
+
 
 class HelpScreen(ModalScreen[None]):
     """Modal help screen (/help)"""

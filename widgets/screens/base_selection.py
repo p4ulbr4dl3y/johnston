@@ -1,8 +1,9 @@
-from typing import TypeVar, Generic
+from typing import Generic, TypeVar
+
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown
+from textual.screen import ModalScreen
+from textual.widgets import Markdown, OptionList
 
 T = TypeVar("T")
 

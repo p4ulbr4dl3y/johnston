@@ -1,8 +1,9 @@
-from textual.app import ComposeResult
-from textual.screen import ModalScreen
-from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown, Input
 from textual import events
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Input, Markdown, OptionList
+
 
 class AskUserScreen(ModalScreen[str]):
     """Modal screen for AskUser tool to prompt user for input"""

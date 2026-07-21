@@ -2,11 +2,13 @@
 Models.dev API catalog integration for TUI.
 Fetches model context limits and metadata from https://models.dev/api.json with local caching.
 """
-import os
 import json
+import os
 import time
+from typing import Any, Dict, Optional
+
 import httpx
-from typing import Dict, Any, Optional
+
 from core.config import CONFIG_DIR
 
 MODELS_DEV_URL = "https://models.dev/api.json"

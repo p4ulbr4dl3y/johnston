@@ -1,5 +1,7 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict
+
 from tools.context import ToolContext
+
 
 class BaseTool:
     name: str = ""

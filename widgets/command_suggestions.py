@@ -1,18 +1,19 @@
 from textual.widgets import OptionList
+
 from commands import COMMAND_REGISTRY
 
 COMMANDS = [(name, cmd.description) for name, cmd in COMMAND_REGISTRY.items()]
 
 class CommandSuggestions(OptionList):
     """Выпадающее меню подсказок слэш-команд (/help, /rewind)"""
-    
+
     can_focus = False
     ALLOW_SELECT = False
 
     def update_query(self, text: str) -> list[str]:
         """Обновление списка совпадений с форматированием в две колонки"""
         self.clear_options()
-        
+
         cleaned = text.strip().lower()
         if not cleaned.startswith("/") or " " in cleaned:
             self.display = False

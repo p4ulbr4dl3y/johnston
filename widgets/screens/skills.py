@@ -1,9 +1,12 @@
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from textual.app import ComposeResult
-from textual.screen import ModalScreen
 from textual.containers import Vertical
-from textual.widgets import OptionList, Markdown
+from textual.screen import ModalScreen
+from textual.widgets import Markdown, OptionList
+
 from core.skill_manager import SkillManager
+
 
 class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
     """Модальное окно списка доступных скиллов (глобальных и проектных)"""

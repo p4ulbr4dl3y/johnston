@@ -1,7 +1,10 @@
 import os
-from textual.widgets import Static
+
 from rich.table import Table
+from textual.widgets import Static
+
 from core.models_dev import format_context_tokens
+
 
 class StatusFooter(Static):
     """Двухстрочная информационная строка состояния под чатом"""
@@ -10,8 +13,8 @@ class StatusFooter(Static):
 
     def on_mount(self) -> None:
         try:
-            from core.skill_manager import SkillManager
             from core.mcp_manager import get_mcp_manager
+            from core.skill_manager import SkillManager
 
             pm = getattr(self.app, "pm", None)
             pkey = pm.get_active_provider_key() if pm else "default"

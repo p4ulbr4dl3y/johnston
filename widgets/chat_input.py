@@ -1,6 +1,7 @@
-from textual.widgets import TextArea
-from textual.message import Message
 from textual import events
+from textual.message import Message
+from textual.widgets import TextArea
+
 
 class ChatInput(TextArea):
     """Поле ввода с реактивными подсказками при реальном вводе символов"""
@@ -43,7 +44,7 @@ class ChatInput(TextArea):
                 from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 suggestions.update_query(self.text)
-            except Exception as e:
+            except Exception:
                 pass
 
     def _on_input_change(self) -> None:
@@ -79,7 +80,7 @@ class ChatInput(TextArea):
         # Нажатие Tab для автодополнения слэш-команды или переключения режимов (Plan/Build)
         if event.key == "tab":
             try:
-                from widgets.command_suggestions import CommandSuggestions, COMMANDS
+                from widgets.command_suggestions import COMMANDS, CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
                     matched_cmds = [cmd for cmd, _ in COMMANDS if cmd.startswith(self.text.strip().lower())]
@@ -129,14 +130,14 @@ class ChatInput(TextArea):
             if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
                     self.prompt_draft = self.text
-                
+
                 if self.prompt_history_index == 0:
                     self.prompt_history_index = len(self.prompt_history)
                     self.load_text(self.prompt_draft)
                 else:
                     self.prompt_history_index -= 1
                     self.load_text(self.prompt_history[self.prompt_history_index])
-                
+
                 lines = self.text.split("\n")
                 self.move_cursor((len(lines) - 1, len(lines[-1])))
                 event.prevent_default()
@@ -157,7 +158,7 @@ class ChatInput(TextArea):
                         self.load_text(self.prompt_draft)
                     else:
                         self.load_text(self.prompt_history[self.prompt_history_index])
-                
+
                 lines = self.text.split("\n")
                 self.move_cursor((len(lines) - 1, len(lines[-1])))
                 event.prevent_default()
@@ -167,7 +168,7 @@ class ChatInput(TextArea):
         if event.key == "enter":
             event.prevent_default()
             event.stop()
-            
+
             # Скрываем подсказки
             try:
                 from widgets.command_suggestions import CommandSuggestions

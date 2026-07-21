@@ -1,8 +1,10 @@
 import asyncio
 import uuid
 from typing import Any, Dict
-from tools.base import BaseTool
+
 from core.background_task import BackgroundSubagent
+from tools.base import BaseTool
+
 
 class TaskTool(BaseTool):
     name = "Task"
@@ -41,7 +43,7 @@ class TaskTool(BaseTool):
 
         if run_in_background:
             task_id = f"subagent-{uuid.uuid4().hex[:6]}"
-            
+
             async def _run_bg():
                 full_text = ""
                 try:

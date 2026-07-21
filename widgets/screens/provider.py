@@ -1,5 +1,6 @@
 from widgets.screens.base_selection import BaseSelectionScreen
 
+
 class ProviderScreen(BaseSelectionScreen[str]):
     """Modal provider selection screen (/provider)"""
 

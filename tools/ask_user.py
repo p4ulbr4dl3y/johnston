@@ -1,6 +1,8 @@
 import asyncio
 from typing import Any, Dict
+
 from tools.base import BaseTool
+
 
 class AskUserTool(BaseTool):
     name = "AskUser"
@@ -13,7 +15,7 @@ class AskUserTool(BaseTool):
         if ctx.app:
             try:
                 if questions_list and isinstance(questions_list, list):
-                    from widgets.modal_screens import QuestionScreen, ConfirmScreen
+                    from widgets.modal_screens import ConfirmScreen, QuestionScreen
                     answers = {}
                     q_idx = 0
                     cancelled = False

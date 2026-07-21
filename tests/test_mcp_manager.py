@@ -1,10 +1,12 @@
-import os
-import tempfile
-import shutil
-import unittest
 import json
-from core.mcp_manager import MCPManager
+import os
+import shutil
+import tempfile
+import unittest
+
 from commands import COMMAND_REGISTRY
+from core.mcp_manager import MCPManager
+
 
 class TestMCPManager(unittest.TestCase):
     def setUp(self):

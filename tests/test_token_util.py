@@ -1,6 +1,8 @@
 import unittest
-from core.token_util import estimate_tokens, parse_usage
+
 from core.base_provider import BaseAgent
+from core.token_util import estimate_tokens, parse_usage
+
 
 class DummyUsage:
     def __init__(self, prompt, completion, total):
@@ -40,7 +42,7 @@ class TestTokenUtil(unittest.TestCase):
         self.assertEqual(agent.get_metrics()["total_tokens"], 0)
 
     def test_models_dev_context_window(self):
-        from core.models_dev import get_context_window, format_context_tokens
+        from core.models_dev import format_context_tokens, get_context_window
         self.assertEqual(format_context_tokens(128000), "128k")
         self.assertEqual(format_context_tokens(200000), "200k")
         self.assertEqual(format_context_tokens(1000000), "1M")

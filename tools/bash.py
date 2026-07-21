@@ -1,8 +1,10 @@
 import asyncio
 import time
 from typing import Any, Dict
-from tools.base import BaseTool
+
 from core.background_task import BackgroundTask
+from tools.base import BaseTool
+
 
 class BashTool(BaseTool):
     name = "Bash"

@@ -1,7 +1,9 @@
 import os
 import re
 from typing import Any, Dict
+
 from tools.base import BaseTool
+
 
 class GrepTool(BaseTool):
     name = "Grep"
@@ -17,7 +19,7 @@ class GrepTool(BaseTool):
             regex = re.compile(pattern, re.IGNORECASE)
         except Exception as e:
             return f"Error compiling regex '{pattern}': {e}"
-        
+
         root_dir = os.getcwd()
         results = []
         for root, dirs, files in os.walk(root_dir):
