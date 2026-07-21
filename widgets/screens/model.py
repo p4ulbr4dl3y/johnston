@@ -6,7 +6,7 @@ class ModelScreen(BaseSelectionScreen[str]):
 
     def __init__(self, models: list[str], current_model: str = ""):
         super().__init__(
-            title="### **Select provider model (/models)**",
+            title="### **Select provider model**",
             options=models,
             items=models,
             default_value=current_model if current_model in models else (models[0] if models else ""),

@@ -11,7 +11,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         ]
         items = [s["id"] for s in sessions]
         super().__init__(
-            title="### **Select session to resume (/resume)**",
+            title="### **Select session to resume**",
             options=options,
             items=items,
             default_value=""

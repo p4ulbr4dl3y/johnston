@@ -12,7 +12,7 @@ class ProviderScreen(BaseSelectionScreen[str]):
         ]
         items = [p["key"] for p in providers_list]
         super().__init__(
-            title="### **Select AI provider (/provider)**",
+            title="### **Select AI provider**",
             options=options,
             items=items,
             default_value=""
