@@ -35,6 +35,28 @@ def get_git_info() -> str:
     return ""
 
 
+def get_project_instructions_snippet() -> str:
+    """Reads AGENTS.md, CLAUDE.md, or .cursorrules from current working directory if available."""
+    cwd = os.getcwd()
+    candidates = ["AGENTS.md", "CLAUDE.md", ".cursorrules", "CONVENTIONS.md"]
+    found_snippets = []
+
+    for name in candidates:
+        filepath = os.path.join(cwd, name)
+        if os.path.isfile(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().strip()
+                if content:
+                    if len(content) > 6000:
+                        content = content[:6000] + "\n... [Project instructions truncated at 6000 chars]"
+                    found_snippets.append(f"[PROJECT INSTRUCTIONS ({name})]:\n{content}")
+            except Exception:
+                pass
+
+    return "\n\n".join(found_snippets)
+
+
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
 
 Core Principles:
@@ -77,7 +99,11 @@ class PromptBuilder:
 
         env_block = "\n".join(env_lines)
 
+        project_snippet = get_project_instructions_snippet()
+
         sys_prompt = f"{self.base_system_prompt}\n\n{env_block}"
+        if project_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if mcp_snippet:

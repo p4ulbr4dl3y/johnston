@@ -33,5 +33,10 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertNotIn("PlanExit", names)
         self.assertIn("Task", names)
 
+    def test_build_system_prompt_includes_project_instructions(self):
+        builder = PromptBuilder("System prompt test", [], mode="build")
+        sys_prompt = builder.build_system_prompt()
+        self.assertIn("[PROJECT INSTRUCTIONS (AGENTS.md)]", sys_prompt)
+
 if __name__ == "__main__":
     unittest.main()
