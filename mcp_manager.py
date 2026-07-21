@@ -309,3 +309,17 @@ class MCPManager:
                 if client:
                     return client.call_tool(orig_tool_name, arguments)
         return None
+
+    def get_system_prompt_snippet(self) -> str:
+        """
+        Returns a prompt snippet summarizing currently enabled MCP servers and their tools.
+        """
+        tools = self.get_active_tools()
+        if not tools:
+            return ""
+        lines = ["Available MCP tools in system context:"]
+        for t in tools:
+            fn = t.get("function", {})
+            desc = fn.get("description", "")
+            lines.append(f"- {fn.get('name')} (from {t.get('_mcp_server')}) — {desc}")
+        return "\n".join(lines)

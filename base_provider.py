@@ -44,13 +44,18 @@ class BaseAgent:
         }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
+        from mcp_manager import MCPManager
+        mcp_mgr = MCPManager()
+        mcp_tools = mcp_mgr.get_active_tools()
+        mcp_snippet = mcp_mgr.get_system_prompt_snippet()
+
         skills_snippet = SkillManager().get_system_prompt_snippet()
         sys_prompt = self.system_prompt
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
+        if mcp_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        from mcp_manager import MCPManager
-        mcp_tools = MCPManager().get_active_tools()
         clean_mcp_tools = [
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
         ]
