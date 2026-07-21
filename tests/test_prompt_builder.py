@@ -8,6 +8,10 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], mode="build")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("System prompt test", sys_prompt)
+        self.assertIn("Environment Metadata:", sys_prompt)
+        self.assertIn("Working Directory:", sys_prompt)
+        self.assertIn("Local Time:", sys_prompt)
+        self.assertIn("Operating System:", sys_prompt)
 
     def test_build_system_prompt_plan_mode(self):
         builder = PromptBuilder("System prompt test", [], mode="plan")

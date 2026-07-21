@@ -1,9 +1,39 @@
+import datetime
 import os
+import platform
+import subprocess
 from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
 from tools.plan_exit import PlanExitTool
 from tools.task import TaskTool
+
+
+def get_git_info() -> str:
+    """Returns current git branch and dirty working tree status safely."""
+    try:
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=1
+        ).strip()
+        status = subprocess.check_output(
+            ["git", "status", "-s"],
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=1
+        ).strip()
+        lines = [line for line in status.splitlines() if line.strip()]
+        dirty_summary = f"{len(lines)} modified/untracked file(s)" if lines else "clean working tree"
+        if branch:
+            return f"branch '{branch}' ({dirty_summary})"
+        elif lines:
+            return f"detached HEAD ({dirty_summary})"
+    except Exception:
+        pass
+    return ""
+
 
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
 
@@ -32,7 +62,22 @@ class PromptBuilder:
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
 
-        sys_prompt = f"{self.base_system_prompt}\n\nCurrent working directory: {os.getcwd()}"
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+        os_info = f"{platform.system()} {platform.release()}"
+        git_info = get_git_info()
+
+        env_lines = [
+            "Environment Metadata:",
+            f"- Working Directory: {os.getcwd()}",
+            f"- Local Time: {now_str}",
+            f"- Operating System: {os_info}"
+        ]
+        if git_info:
+            env_lines.append(f"- Git Context: {git_info}")
+
+        env_block = "\n".join(env_lines)
+
+        sys_prompt = f"{self.base_system_prompt}\n\n{env_block}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if mcp_snippet:
