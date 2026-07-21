@@ -76,7 +76,7 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Нажатие Tab для автодополнения слэш-команды
+        # Нажатие Tab для автодополнения слэш-команды или переключения режимов (Plan/Build)
         if event.key == "tab":
             try:
                 from widgets.command_suggestions import CommandSuggestions, COMMANDS
@@ -94,6 +94,17 @@ class ChatInput(TextArea):
                         return
             except Exception:
                 pass
+
+            event.prevent_default()
+            event.stop()
+            if hasattr(self.app, "agent") and self.app.agent:
+                curr = getattr(self.app.agent, "mode", "build")
+                new_mode = "build" if curr == "plan" else "plan"
+                self.app.agent.mode = new_mode
+                if hasattr(self.app, "refresh_status_footer"):
+                    self.app.refresh_status_footer()
+                self.app.notify(f"Mode switched: {new_mode.upper()}")
+            return
 
         # Обработка навигации в меню подсказок по стрелкам
         try:

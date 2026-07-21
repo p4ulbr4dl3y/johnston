@@ -26,6 +26,7 @@ class BaseAgent:
         self.total_tokens = 0
         self.context_limit = catalog.get_context_limit(self.provider_key, self.model)
         self.context_window = get_context_window(self.provider_key, self.model)
+        self.mode = "build"
 
     def clear_history(self):
         self.history.clear()
@@ -60,6 +61,29 @@ class BaseAgent:
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
         ]
         all_tools = (self.tools or []) + clean_mcp_tools
+
+        agent_mode = getattr(self, "mode", "build")
+        if agent_mode == "plan":
+            sys_prompt += (
+                "\n\n[PLAN MODE ACTIVE]\n"
+                "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan. "
+                "Save your plan in '.tui/plans/plan.md'. Do NOT edit project code files directly while in Plan mode. "
+                "When the plan is ready, call the PlanExit tool to propose switching to Build mode."
+            )
+            plan_tool_schema = {
+                "type": "function",
+                "function": {
+                    "name": "PlanExit",
+                    "description": "Signal that planning phase is complete and request switching to build mode to implement the plan.",
+                    "parameters": {"type": "object", "properties": {}}
+                }
+            }
+            if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
+                all_tools.append(plan_tool_schema)
+        else:
+            local_plan = os.path.join(os.getcwd(), ".tui", "plans", "plan.md")
+            if os.path.exists(local_plan):
+                sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
 
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
@@ -191,7 +215,15 @@ class BaseAgent:
                         target = t_name
                     yield ("tool", t_name, target)
 
-                    tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
+                    if agent_mode == "plan" and t_name in ("Edit", "Create"):
+                        f_path = args.get("path") or args.get("file") or ""
+                        if not (f_path.endswith("plan.md") or ".tui/plans" in f_path or "plans/" in f_path):
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Plan mode. Save your plan to '.tui/plans/plan.md' or call PlanExit when finished."
+                        else:
+                            tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
+                    else:
+                        tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
+
                     yield ("tool_result", tool_result, "")
 
                     messages.append({

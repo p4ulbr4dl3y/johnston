@@ -238,6 +238,51 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
+class PlanCommand(BaseCommand):
+    name = "/plan"
+    description = "Switch agent to Plan mode"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "plan"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+            app.notify("Mode switched: PLAN")
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class BuildCommand(BaseCommand):
+    name = "/build"
+    description = "Switch agent to Build mode"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "build"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+            app.notify("Mode switched: BUILD")
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class ModeCommand(BaseCommand):
+    name = "/mode"
+    description = "Toggle agent mode (PLAN / BUILD)"
+
+    async def execute(self, app) -> None:
+        if not hasattr(app, "agent") or not app.agent:
+            app.notify("No active agent", severity="error")
+            return
+
+        curr = getattr(app.agent, "mode", "build")
+        new_mode = "build" if curr == "plan" else "plan"
+        app.agent.mode = new_mode
+        if hasattr(app, "refresh_status_footer"):
+            app.refresh_status_footer()
+        app.notify(f"Mode switched: {new_mode.upper()}")
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -251,6 +296,9 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         MCPCommand,
         InitCommand,
         CompactCommand,
+        PlanCommand,
+        BuildCommand,
+        ModeCommand,
     ]
 }
 

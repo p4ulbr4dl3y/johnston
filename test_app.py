@@ -87,5 +87,15 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, TasksListScreen)
         print("✓ /tasks command tests passed cleanly!")
 
+        # 9. Проверяем переключение режима по Tab
+        assert getattr(app.agent, "mode", "build") == "build"
+        await pilot.press("tab")
+        await pilot.pause(0.2)
+        assert getattr(app.agent, "mode", "build") == "plan"
+        await pilot.press("tab")
+        await pilot.pause(0.2)
+        assert getattr(app.agent, "mode", "build") == "build"
+        print("✓ Tab mode toggle tests passed cleanly!")
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())

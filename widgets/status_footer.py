@@ -25,9 +25,12 @@ class StatusFooter(Static):
             mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
             active_bg_tasks = len([t for t in getattr(self.app, "background_tasks", []) if getattr(t, "is_running", False)])
 
+            agent_mode = getattr(agent, "mode", "build")
+
             self.update_status(
                 provider_key=pkey,
                 model_name=model_name,
+                agent_mode=agent_mode,
                 directory=os.path.basename(os.path.realpath(os.getcwd())),
                 active_bg_tasks=active_bg_tasks,
                 total_tokens=metrics.get("total_tokens", 0),
@@ -45,6 +48,7 @@ class StatusFooter(Static):
         self,
         provider_key: str,
         model_name: str = "",
+        agent_mode: str = "build",
         directory: str = "",
         active_bg_tasks: int = 0,
         total_tokens: int = 0,
@@ -62,9 +66,11 @@ class StatusFooter(Static):
         dir_text = f"Dir: {directory}"
         prov_text = f"Provider: {provider_key}" if provider_key else "Provider: default"
         model_text = f"Model: {model_name}" if model_name else ""
+        mode_text = f"Mode: [{agent_mode.upper()}]"
         left_1_parts = [dir_text, prov_text]
         if model_text:
             left_1_parts.append(model_text)
+        left_1_parts.append(mode_text)
         left_1 = "  │  ".join(left_1_parts)
 
         # Строка 1 Справа: Скиллы, MCP и Фоновые задачи

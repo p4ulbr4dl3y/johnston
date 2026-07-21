@@ -9,6 +9,7 @@ from tools.grep import GrepTool
 from tools.ask_user import AskUserTool
 from tools.skill import SkillTool
 from tools.manage_task import ManageTaskTool
+from tools.plan_exit import PlanExitTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -20,6 +21,7 @@ TOOL_CLASSES = [
     AskUserTool,
     SkillTool,
     ManageTaskTool,
+    PlanExitTool,
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}

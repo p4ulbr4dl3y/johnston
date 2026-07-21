@@ -44,6 +44,15 @@ class TUIChatApp(App):
         self.selection_copy_active = False
         self.background_tasks = []
 
+    def action_toggle_mode(self) -> None:
+        """Переключение режима агента (Plan / Build)"""
+        if hasattr(self, "agent") and self.agent:
+            curr = getattr(self.agent, "mode", "build")
+            new_mode = "build" if curr == "plan" else "plan"
+            self.agent.mode = new_mode
+            self.refresh_status_footer()
+            self.notify(f"Mode switched: {new_mode.upper()}")
+
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
@@ -74,10 +83,14 @@ class TUIChatApp(App):
             mcp_servers = get_mcp_manager().load_servers()
             mcp_total = len(mcp_servers)
             mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
+            active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])
+
+            agent_mode = getattr(self.agent, "mode", "build")
 
             footer.update_status(
                 provider_key=pkey,
                 model_name=model_name,
+                agent_mode=agent_mode,
                 directory=os.path.basename(os.path.realpath(os.getcwd())),
                 active_bg_tasks=active_bg_tasks,
                 total_tokens=metrics.get("total_tokens", 0),

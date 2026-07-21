@@ -93,6 +93,30 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         from commands import COMMAND_REGISTRY
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/compact", COMMAND_REGISTRY)
+        self.assertIn("/plan", COMMAND_REGISTRY)
+        self.assertIn("/build", COMMAND_REGISTRY)
+        self.assertIn("/mode", COMMAND_REGISTRY)
+
+    async def test_plan_exit_tool(self):
+        class DummyAgent:
+            mode = "plan"
+
+        class DummyApp:
+            agent = DummyAgent()
+            footer_refreshed = False
+            notified = None
+
+            def refresh_status_footer(self):
+                self.footer_refreshed = True
+
+            def notify(self, msg):
+                self.notified = msg
+
+        app = DummyApp()
+        res = await execute_tool("PlanExit", {}, app=app)
+        self.assertEqual(app.agent.mode, "build")
+        self.assertTrue(app.footer_refreshed)
+        self.assertIn("Switched to build mode", res)
 
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
