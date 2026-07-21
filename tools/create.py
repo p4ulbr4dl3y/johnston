@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import BaseTool, resolve_path
 from tools.linter import run_linter
 
 
@@ -12,11 +12,11 @@ class CreateTool(BaseTool):
         "type": "function",
         "function": {
             "name": "Create",
-            "description": "Create new file.",
+            "description": "Create a new file with specified content. Creates parent directories automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute path"},
+                    "path": {"type": "string", "description": "Absolute or relative file path"},
                     "content": {"type": "string", "description": "Full file content"}
                 },
                 "required": ["path", "content"]
@@ -25,7 +25,7 @@ class CreateTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        path = os.path.expanduser(args.get("path", ""))
+        path = resolve_path(args.get("path"))
         content = args.get("content", "")
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

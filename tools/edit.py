@@ -2,22 +2,22 @@ import difflib
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import BaseTool, resolve_path
 from tools.linter import run_linter
 
 
 class EditTool(BaseTool):
     name = "Edit"
-    description = "Replace text block (old_string) with new_string."
+    description = "Replace unique text block (old_string) with new_string."
     schema = {
         "type": "function",
         "function": {
             "name": "Edit",
-            "description": "Replace exact text block in file.",
+            "description": "Replace an exact, unique block of text (old_string) with new_string in an existing file. Must match exact whitespace and indentation.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute path"},
+                    "path": {"type": "string", "description": "Absolute or relative file path"},
                     "old_string": {"type": "string", "description": "Exact text block to replace"},
                     "new_string": {"type": "string", "description": "Replacement text block"}
                 },
@@ -27,7 +27,7 @@ class EditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        path = os.path.expanduser(args.get("path", ""))
+        path = resolve_path(args.get("path"))
         old_string = args.get("old_string", "")
         new_string = args.get("new_string", "")
         if not os.path.exists(path):

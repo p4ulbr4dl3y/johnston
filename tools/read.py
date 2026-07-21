@@ -1,17 +1,17 @@
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import BaseTool, resolve_path
 
 
 class ReadTool(BaseTool):
     name = "Read"
-    description = "Read file content with optional line range pagination."
+    description = "Read file content with optional 1-indexed line range pagination."
     schema = {
         "type": "function",
         "function": {
             "name": "Read",
-            "description": "Read file content. Optionally specify start_line and end_line for range reading.",
+            "description": "Read file content cleanly. Specify path, and optionally start_line and end_line for line range pagination (1-indexed).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -25,7 +25,7 @@ class ReadTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        path = os.path.expanduser(args.get("path", ""))
+        path = resolve_path(args.get("path"))
         if not os.path.exists(path):
             return f"Error: file '{path}' not found."
 

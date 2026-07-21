@@ -49,7 +49,7 @@ class BashTool(BaseTool):
                 task.is_background = True
                 ctx.add_background_task(task)
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-                return f"[Background Task ID: {task_id}] Bash command is running in the background. I must wait for its completion. Do not run any other tools until notified. (посмотреть таски - /tasks в панеле чата)"
+                return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use ManageTask to inspect active background tasks."
             else:
                 await p.wait()
                 if hasattr(task, "read_task") and task.read_task:
