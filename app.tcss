@@ -4,6 +4,17 @@ Screen {
     background: #09090b;
     padding: 0;
     margin: 0;
+    scrollbar-size: 1 1;
+    scrollbar-color: #3f3f46 #09090b;
+    scrollbar-color-hover: #a1a1aa #18181b;
+    scrollbar-color-active: #ffffff #27272a;
+}
+
+* {
+    scrollbar-size: 1 1;
+    scrollbar-color: #3f3f46 #09090b;
+    scrollbar-color-hover: #a1a1aa #18181b;
+    scrollbar-color-active: #ffffff #27272a;
 }
 
 #app-container {
@@ -18,6 +29,9 @@ Screen {
     padding: 1 3 1 3;
     background: #09090b;
     scrollbar-size: 1 1;
+    scrollbar-color: #3f3f46 #09090b;
+    scrollbar-color-hover: #a1a1aa #18181b;
+    scrollbar-color-active: #ffffff #27272a;
 }
 
 WelcomeWidget {
