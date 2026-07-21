@@ -39,7 +39,10 @@ class EditTool(BaseTool):
             return f"Error reading file '{path}': {e}"
         count = content.count(old_string)
         if count == 0:
-            return f"Error: exact block of text (old_string) not found in '{path}'. Make sure it matches exactly (including leading whitespace/indentation)."
+            return (
+                f"Error: exact block of text (old_string) not found in '{path}'. "
+                f"Make sure to call the Read tool first to inspect exact lines and indentation."
+            )
         if count > 1:
             return f"Error: old_string matches {count} occurrences in '{path}'. Include more surrounding lines to make old_string unique."
 
