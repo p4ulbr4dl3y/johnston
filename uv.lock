@@ -210,6 +210,37 @@ wheels = [
 ]
 
 [[package]]
+name = "johnston"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "httpx" },
+    { name = "linkify-it-py" },
+    { name = "markdown-it-py" },
+    { name = "mdit-py-plugins" },
+    { name = "openai" },
+    { name = "textual" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.25.0" },
+    { name = "linkify-it-py" },
+    { name = "markdown-it-py" },
+    { name = "mdit-py-plugins" },
+    { name = "openai", specifier = ">=1.0.0" },
+    { name = "textual", specifier = ">=8.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.15.22" }]
+
+[[package]]
 name = "linkify-it-py"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -502,37 +533,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/8c/69/40407dfc835517f05
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/21/99a0cdaf54eb35e77623c41b5a2c9472ee4404bba687052791fe2aba6773/tqdm-4.69.0-py3-none-any.whl", hash = "sha256:9979978912be667a6ef21fd5d8abf54e324e63d82f7f43c360792ebc2bc4e622", size = 676680, upload-time = "2026-07-17T18:09:04.172Z" },
 ]
-
-[[package]]
-name = "tui-chat"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "httpx" },
-    { name = "linkify-it-py" },
-    { name = "markdown-it-py" },
-    { name = "mdit-py-plugins" },
-    { name = "openai" },
-    { name = "textual" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.25.0" },
-    { name = "linkify-it-py" },
-    { name = "markdown-it-py" },
-    { name = "mdit-py-plugins" },
-    { name = "openai", specifier = ">=1.0.0" },
-    { name = "textual", specifier = ">=8.0.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.15.22" }]
 
 [[package]]
 name = "typing-extensions"

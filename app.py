@@ -20,8 +20,8 @@ from widgets.command_suggestions import CommandSuggestions
 from widgets.status_footer import StatusFooter
 
 
-class TUIChatApp(App):
-    """Минималистичный TUI чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
+class JohnstonChatApp(App):
+    """Минималистичный Johnston чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
 
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
     BINDINGS = [
@@ -148,7 +148,7 @@ class TUIChatApp(App):
         self.refresh_status_footer()
 
     def save_current_session(self) -> None:
-        """Сохранение полного состояния элементов UI в ~/.tui/projects/<project>/sessions"""
+        """Сохранение полного состояния элементов UI в ~/.johnston/projects/<project>/sessions"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
 
@@ -215,7 +215,7 @@ class TUIChatApp(App):
                 asyncio.create_task(reset_flag())
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Переключение провайдера агента из конфига ~/.tui"""
+        """Переключение провайдера агента из конфига ~/.johnston"""
         if event.value and isinstance(event.value, str) and event.value != "none":
             self.pm.set_active_provider_key(event.value)
             self.agent = self.pm.create_active_agent()
@@ -298,7 +298,7 @@ class TUIChatApp(App):
         self.generate_ai_response(msg, show_in_ui=False)
 
 def main():
-    TUIChatApp().run()
+    JohnstonChatApp().run()
 
 if __name__ == "__main__":
     main()

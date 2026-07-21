@@ -13,7 +13,7 @@ class GrepTool(BaseTool):
         pattern = args.get("pattern", "")
         if not pattern:
             return "Error: pattern is required."
-        ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".tui", ".gemini"}
+        ignore_dirs = {".git", "node_modules", ".venv", "__pycache__", ".johnston", ".gemini"}
         ignore_extensions = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz", ".db", ".sqlite", ".pyc"}
         try:
             regex = re.compile(pattern, re.IGNORECASE)

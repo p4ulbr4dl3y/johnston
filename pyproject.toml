@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tui-chat"
+name = "johnston"
 version = "0.1.0"
-description = "Textual AI TUI Chat Application"
+description = "Textual AI Johnston Chat Application"
 requires-python = ">=3.10"
 dependencies = [
     "textual>=8.0.0",
@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [project.scripts]
-tui = "app:main"
-tui-chat = "app:main"
+johnston = "app:main"
+johnston-chat = "app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]

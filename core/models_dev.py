@@ -1,5 +1,5 @@
 """
-Models.dev API catalog integration for TUI.
+Models.dev API catalog integration for Johnston.
 Fetches model context limits and metadata from https://models.dev/api.json with local caching.
 """
 import json

@@ -9,17 +9,17 @@ import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR
 
-tui_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 core_dir = os.path.dirname(os.path.abspath(__file__))
-if tui_dir not in sys.path:
-    sys.path.insert(0, tui_dir)
+if johnston_dir not in sys.path:
+    sys.path.insert(0, johnston_dir)
 if core_dir not in sys.path:
     sys.path.insert(0, core_dir)
 
 
 
 def _get_default_opencode_template() -> str:
-    template_path = os.path.join(tui_dir, "templates", "opencode_provider.py.template")
+    template_path = os.path.join(johnston_dir, "templates", "opencode_provider.py.template")
     if os.path.exists(template_path):
         with open(template_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -43,7 +43,7 @@ class ProviderManager:
             self.set_active_provider_key("opencode")
 
     def load_providers(self) -> Dict[str, Any]:
-        """Динамически загружает все .py провайдеры из ~/.tui/providers/"""
+        """Динамически загружает все .py провайдеры из ~/.johnston/providers/"""
         providers = {}
         if not os.path.exists(PROVIDERS_DIR):
             return providers
@@ -51,7 +51,7 @@ class ProviderManager:
         for filename in os.listdir(PROVIDERS_DIR):
             if filename.endswith(".py") and not filename.startswith("_"):
                 filepath = os.path.join(PROVIDERS_DIR, filename)
-                mod_name = f"tui_provider_{filename[:-3]}"
+                mod_name = f"johnston_provider_{filename[:-3]}"
 
                 try:
                     spec = importlib.util.spec_from_file_location(mod_name, filepath)
@@ -100,7 +100,7 @@ class ProviderManager:
             first_key = list(providers.keys())[0]
             return providers[first_key]["module"].Agent()
         else:
-            raise RuntimeError("No available providers in ~/.tui/providers/")
+            raise RuntimeError("No available providers in ~/.johnston/providers/")
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""

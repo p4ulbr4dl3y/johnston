@@ -54,11 +54,11 @@ class PromptBuilder:
             sys_prompt += (
                 "\n\n[PLAN MODE ACTIVE]\n"
                 "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan. "
-                "Save your plan in '.tui/plans/plan.md'. Do NOT edit project code files directly while in Plan mode. "
+                "Save your plan in '.johnston/plans/plan.md'. Do NOT edit project code files directly while in Plan mode. "
                 "When the plan is ready, call the PlanExit tool to propose switching to Build mode."
             )
         else:
-            local_plan = os.path.join(os.getcwd(), ".tui", "plans", "plan.md")
+            local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
             if os.path.exists(local_plan):
                 sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
 

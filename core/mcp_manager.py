@@ -1,6 +1,6 @@
 """
-MCP (Model Context Protocol) Manager for TUI.
-Handles global (~/.tui/mcp.json) and project (.tui/mcp.json) MCP servers.
+MCP (Model Context Protocol) Manager for Johnston.
+Handles global (~/.johnston/mcp.json) and project (.johnston/mcp.json) MCP servers.
 Supports stdio process execution with JSON-RPC 2.0.
 """
 import json
@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from core.config import CONFIG_DIR
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
-PROJECT_MCP_FILE = os.path.join(".tui", "mcp.json")
+PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
 
 class MCPProcessClient:
     """Stdio JSON-RPC 2.0 client for MCP servers"""
@@ -96,7 +96,7 @@ class MCPProcessClient:
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "tui", "version": "1.0.0"}
+                "clientInfo": {"name": "johnston", "version": "1.0.0"}
             }
         }
         self._send(init_req)

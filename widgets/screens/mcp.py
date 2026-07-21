@@ -32,7 +32,7 @@ class MCPScreen(ModalScreen[None]):
         opt_list.clear_options()
 
         if not self.servers:
-            opt_list.add_option("*No MCP servers configured (~/.tui/mcp.json or .tui/mcp.json)*")
+            opt_list.add_option("*No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)*")
             return
 
         for s in self.servers:

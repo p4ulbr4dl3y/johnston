@@ -182,8 +182,8 @@ class BaseAgent:
 
                     if agent_mode == "plan" and t_name in ("Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
-                        if not (f_path.endswith("plan.md") or ".tui/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Plan mode. Save your plan to '.tui/plans/plan.md' or call PlanExit when finished."
+                        if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Plan mode. Save your plan to '.johnston/plans/plan.md' or call PlanExit when finished."
                         else:
                             tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
                     else:

@@ -1,13 +1,13 @@
 import asyncio
 
-from app import TUIChatApp
+from app import JohnstonChatApp
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView, UserMessage
 from widgets.modal_screens import HelpScreen, ModelScreen, ProviderScreen, ResumeScreen, RewindScreen, TasksListScreen
 
 
 async def test_chat_app_flow():
-    app = TUIChatApp()
+    app = JohnstonChatApp()
     async with app.run_test() as pilot:
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()

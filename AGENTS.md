@@ -1,4 +1,4 @@
-# AI Agents and Providers in TUI Chat
+# AI Agents and Providers in Johnston Chat
 
 В проекте используется модульная архитектура для настройки и выполнения AI-агентов. Пользователь может переключать провайдеров и модели "на лету" прямо из интерфейса или через слэш-команды.
 
@@ -8,7 +8,7 @@
 
 ```mermaid
 graph TD
-    PM[ProviderManager core/provider_manager.py] -->|Загрузка .py конфигураций| P[Providers ~/.tui/providers/]
+    PM[ProviderManager core/provider_manager.py] -->|Загрузка .py конфигураций| P[Providers ~/.johnston/providers/]
     PM -->|Создание агента| Agent[BaseAgent core/base_provider.py]
     Agent -->|Сборка промптов| PB[PromptBuilder core/prompt_builder.py]
     Agent -->|Запросы через OpenAI API| LLM[LLM API / OpenCode / Custom]
@@ -19,10 +19,10 @@ graph TD
 
 ## 1. Провайдеры (Providers)
 
-Каждый провайдер описывается отдельным `.py` файлом в директории `~/.tui/providers/`.
+Каждый провайдер описывается отдельным `.py` файлом в директории `~/.johnston/providers/`.
 При старте приложения `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/tui/core/provider_manager.py)) динамически импортирует эти файлы. По умолчанию использует шаблон [templates/opencode_provider.py.template](file:///Users/yegor/tui/templates/opencode_provider.py.template).
 
-### Пример конфигурации провайдера (`~/.tui/providers/opencode.py`):
+### Пример конфигурации провайдера (`~/.johnston/providers/opencode.py`):
 ```python
 try:
     from core.base_provider import BaseAgent
@@ -95,14 +95,14 @@ class Agent(BaseAgent):
            return "Result string"
    ```
 2. Зарегистрируйте класс в `TOOL_CLASSES` внутри [tools/registry.py](file:///Users/yegor/tui/tools/registry.py).
-3. Добавьте описание схемы инструмента в массив `TOOLS` нужного провайдера в `~/.tui/providers/`.
+3. Добавьте описание схемы инструмента в массив `TOOLS` нужного провайдера в `~/.johnston/providers/`.
 
 ---
 
 ## 4. Режимы Plan и Build (Plan & Build Modes)
 
 Поддерживается переключение режимов функционирования агента:
-* **`plan`**: Исследовательский режим. Запрещает модификацию исходного кода (инструменты `Edit`/`Create` ограничены записью только файла `.tui/plans/plan.md`). Добавляет системную команду написать план и инструмент `PlanExit`.
+* **`plan`**: Исследовательский режим. Запрещает модификацию исходного кода (инструменты `Edit`/`Create` ограничены записью только файла `.johnston/plans/plan.md`). Добавляет системную команду написать план и инструмент `PlanExit`.
 * **`build`**: Стандартный режим исполнения. Предоставляет полный доступ к правке файлов и выполнению команд bash.
 
 ### Команды и переключение:

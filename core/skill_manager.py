@@ -1,6 +1,6 @@
 """
-Skill Manager for TUI.
-Handles global skills (~/.tui/skills/) and project-level skills (<cwd>/.tui/skills/).
+Skill Manager for Johnston.
+Handles global skills (~/.johnston/skills/) and project-level skills (<cwd>/.johnston/skills/).
 Supports YAML frontmatter parsing from SKILL.md and *.md files.
 """
 import os
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.config import CONFIG_DIR
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
-PROJECT_SKILLS_DIR_NAME = os.path.join(".tui", "skills")
+PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
 
 def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     """

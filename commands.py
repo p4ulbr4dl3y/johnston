@@ -177,7 +177,7 @@ class SkillsCommand(BaseCommand):
         sm = SkillManager()
         skills = sm.list_skills()
         if not skills:
-            app.notify("No available skills found (~/.tui/skills/ or .tui/skills/)", severity="warning")
+            app.notify("No available skills found (~/.johnston/skills/ or .johnston/skills/)", severity="warning")
             return
 
         def on_skill_selected(selected_skill: dict | None) -> None:

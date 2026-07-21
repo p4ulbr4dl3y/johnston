@@ -29,7 +29,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
             if self.options:
                 yield OptionList(*self.options)
             else:
-                yield Markdown("*No skills found in ~/.tui/skills/ or .tui/skills/*", classes="modal-body")
+                yield Markdown("*No skills found in ~/.johnston/skills/ or .johnston/skills/*", classes="modal-body")
 
     def on_mount(self) -> None:
         if self.options:
