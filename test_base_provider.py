@@ -104,5 +104,13 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(success)
         self.assertIn("too short", msg)
 
+    async def test_manage_task_tool(self):
+        class DummyApp:
+            background_tasks = []
+
+        app = DummyApp()
+        res_list = await execute_tool("ManageTask", {"action": "list"}, app=app)
+        self.assertIn("No background tasks currently active", res_list)
+
 if __name__ == "__main__":
     unittest.main()
