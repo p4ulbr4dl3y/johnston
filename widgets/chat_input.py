@@ -77,7 +77,7 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Нажатие Tab для автодополнения слэш-команды или переключения режимов (Plan/Build)
+        # Нажатие Tab для автодополнения слэш-команды
         if event.key == "tab":
             try:
                 from widgets.command_suggestions import COMMANDS, CommandSuggestions
@@ -96,6 +96,8 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
+        # Нажатие Shift+Tab для переключения режимов (Plan/Build)
+        if event.key in ("shift+tab", "backtab", "shift_tab"):
             event.prevent_default()
             event.stop()
             if hasattr(self.app, "agent") and self.app.agent:

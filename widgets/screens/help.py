@@ -26,6 +26,7 @@ class HelpScreen(ModalScreen[None]):
                 "**Hotkeys:**\n"
                 "* `Enter` — Send message\n"
                 "* `Ctrl+Enter` / `Shift+Enter` — Insert new line\n"
+                "* `Shift+Tab` — Toggle Plan / Build mode\n"
                 "* `↑ / ↓` — History navigation (looping)\n"
                 "* `Esc` — Cancel response generation\n"
                 "* `Ctrl+C` / `Ctrl+Q` — Exit application",
