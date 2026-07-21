@@ -3,17 +3,19 @@ import json
 import time
 import importlib.util
 import shutil
+import sys
 from typing import Dict, Any, Type
 from config import CONFIG_DIR, PROVIDERS_DIR, CONFIG_FILE
+
+# Add the directory containing provider_manager.py to sys.path so dynamic modules can import from it
+tui_dir = os.path.dirname(os.path.abspath(__file__))
+if tui_dir not in sys.path:
+    sys.path.insert(0, tui_dir)
+
 DEFAULT_OPENCODE_CONTENT = '''"""
 OpenCode Go Provider configuration with Read, Create, Edit, Bash tools support
 """
-import asyncio
-import os
-import time
-import json
-from typing import AsyncGenerator, Tuple
-from openai import AsyncOpenAI
+from base_provider import BaseAgent
 
 NAME = "OpenCode Go (DeepSeek v4 Flash)"
 KEY = "opencode"
@@ -30,11 +32,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Read",
-            "description": "Read file from the filesystem",
+            "description": "Read file content",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to file"}
+                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"}
                 },
                 "required": ["path"]
             }
@@ -44,11 +46,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Create",
-            "description": "Create a new file",
+            "description": "Create new file or overwrite existing file",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to file"},
+                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"},
                     "content": {"type": "string", "description": "File content"}
                 },
                 "required": ["path", "content"]
@@ -59,11 +61,11 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Edit",
-            "description": "Modify or overwrite a file",
+            "description": "Edit existing file (overwrites the whole file)",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Path to file"},
+                    "path": {"type": "string", "description": "Absolute path or path relative to home directory (~)"},
                     "content": {"type": "string", "description": "New file content"}
                 },
                 "required": ["path", "content"]
@@ -74,7 +76,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "Bash",
-            "description": "Run bash command in terminal",
+            "description": "Execute a terminal bash command",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -86,193 +88,15 @@ TOOLS = [
     }
 ]
 
-async def execute_tool(name: str, args: dict, app=None) -> str:
-    """Local execution of tools Read, Create, Edit, Bash"""
-    try:
-        if name == "Read":
-            path = os.path.expanduser(args.get("path", ""))
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    if len(content) > 4000:
-                        content = content[:4000] + "\\n... [content truncated]"
-                    return content
-            return f"Error: file '{path}' not found."
-
-        elif name in ("Create", "Edit"):
-            path = os.path.expanduser(args.get("path", ""))
-            content = args.get("content", "")
-            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
-            return f"Success: file '{path}' saved ({len(content)} bytes)."
-
-        elif name == "Bash":
-            cmd = args.get("command", "")
-            p = await asyncio.create_subprocess_shell(
-                cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            try:
-                stdout, stderr = await asyncio.wait_for(p.communicate(), timeout=5.0)
-                res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
-                if len(res) > 3000:
-                    res = res[:3000] + "\\n... [output truncated]"
-                return res if res.strip() else "Command executed with no output."
-            except asyncio.TimeoutError:
-                if app:
-                    task_id = f"bash_{int(time.time())}"
-                    async def wait_for_background_task(proc, command_str, tid, application):
-                        stdout_bytes, stderr_bytes = await proc.communicate()
-                        out_res = stdout_bytes.decode("utf-8", errors="replace") + stderr_bytes.decode("utf-8", errors="replace")
-                        if len(out_res) > 3000:
-                            out_res = out_res[:3000] + "\\n... [output truncated]"
-                        out_res = out_res if out_res.strip() else "Command executed with no output."
-                        application.on_background_bash_completed(tid, command_str, out_res)
-                    
-                    asyncio.create_task(wait_for_background_task(p, cmd, task_id, app))
-                    app.notify(f"Command sent to background (TID: {task_id})")
-                    return f"[Background Task ID: {task_id}] Bash command is running in the background. I must wait for its completion. Do not run any other tools until notified."
-                else:
-                    stdout, stderr = await p.communicate()
-                    res = stdout.decode("utf-8", errors="replace") + stderr.decode("utf-8", errors="replace")
-                    if len(res) > 3000:
-                        res = res[:3000] + "\\n... [output truncated]"
-                    return res if res.strip() else "Command executed with no output."
-
-    except Exception as err:
-        return f"Error executing tool {name}: {err}"
-    
-    return "Unknown tool."
-
-
-class Agent:
+class Agent(BaseAgent):
     def __init__(self, api_key: str = API_KEY, model: str = MODEL, base_url: str = BASE_URL):
-        self.api_key = api_key
-        self.model = model
-        self.base_url = base_url
-        self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
-        self.history = []
-
-    def clear_history(self):
-        self.history.clear()
-
-    async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + self.history + [{"role": "user", "content": user_text}]
-
-        t0 = time.time()
-        full_assistant_text = ""
-
-        try:
-            while True:
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=TOOLS,
-                    stream=True
-                )
-
-                thinking_text = ""
-                is_thinking = False
-                current_text = ""
-                tool_calls_dict = {}
-
-                async for chunk in response:
-                    if not chunk.choices:
-                        continue
-                    
-                    delta = chunk.choices[0].delta
-
-                    reasoning_delta = getattr(delta, "reasoning_content", None)
-                    if reasoning_delta:
-                        if not is_thinking:
-                            is_thinking = True
-                            yield ("thinking_start", "Thinking...", "")
-                        thinking_text += reasoning_delta
-
-                    if delta.content:
-                        if is_thinking:
-                            dt = time.time() - t0
-                            yield ("thinking_end", f"{dt:.1f}", thinking_text)
-                            is_thinking = False
-
-                        current_text += delta.content
-                        full_assistant_text += delta.content
-                        yield ("bot_chunk", delta.content, "")
-
-                    if delta.tool_calls:
-                        if is_thinking:
-                            dt = time.time() - t0
-                            yield ("thinking_end", f"{dt:.1f}", thinking_text)
-                            is_thinking = False
-
-                        for tc in delta.tool_calls:
-                            idx = tc.index
-                            if idx not in tool_calls_dict:
-                                tool_calls_dict[idx] = {
-                                    "id": tc.id or f"call_{idx}",
-                                    "name": tc.function.name or "",
-                                    "arguments": tc.function.arguments or ""
-                                }
-                            else:
-                                if tc.function.name:
-                                    tool_calls_dict[idx]["name"] += tc.function.name
-                                if tc.function.arguments:
-                                    tool_calls_dict[idx]["arguments"] += tc.function.arguments
-
-                if is_thinking:
-                    dt = time.time() - t0
-                    yield ("thinking_end", f"{dt:.1f}", thinking_text)
-
-                if not tool_calls_dict:
-                    break
-
-                assistant_tool_msg = {
-                    "role": "assistant",
-                    "content": current_text or None,
-                    "tool_calls": [
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {
-                                "name": tc["name"],
-                                "arguments": tc["arguments"]
-                            }
-                        }
-                        for tc in tool_calls_dict.values()
-                    ]
-                }
-                messages.append(assistant_tool_msg)
-
-                for tc in tool_calls_dict.values():
-                    t_id = tc["id"]
-                    t_name = tc["name"]
-                    raw_args = tc["arguments"]
-                    
-                    try:
-                        args = json.loads(raw_args)
-                    except Exception:
-                        args = {}
-
-                    target = args.get("path") or args.get("command") or t_name
-                    yield ("tool", t_name, target)
-
-                    tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
-                    yield ("tool_result", tool_result, "")
-
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": t_id,
-                        "content": tool_result
-                    })
-
-            self.history.append({"role": "user", "content": user_text})
-            self.history.append({"role": "assistant", "content": full_assistant_text})
-
-        except Exception as err:
-            error_msg = f"**OpenCode API Error:** `{err}`"
-            yield ("bot_text", error_msg, "")
+        super().__init__(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            system_prompt=SYSTEM_PROMPT,
+            tools=TOOLS
+        )
 '''
 
 class ProviderManager:
