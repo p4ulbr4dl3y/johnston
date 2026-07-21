@@ -283,6 +283,19 @@ class ModeCommand(BaseCommand):
         app.notify(f"Mode switched: {new_mode.upper()}")
 
 
+class SubagentsCommand(BaseCommand):
+    name = "/subagents"
+    description = "Manage active and finished subagent tasks"
+
+    async def execute(self, app) -> None:
+        subagents = [t for t in getattr(app, "background_tasks", []) if getattr(t, "task_id", "").startswith("subagent-")]
+        if not subagents:
+            app.notify("No active or finished subagents", severity="warning")
+            return
+        from widgets.modal_screens import SubagentsListScreen
+        app.push_screen(SubagentsListScreen())
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -292,6 +305,7 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         RewindCommand,
         ResumeCommand,
         TasksCommand,
+        SubagentsCommand,
         SkillsCommand,
         MCPCommand,
         InitCommand,
