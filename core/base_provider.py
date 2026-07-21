@@ -201,7 +201,7 @@ class BaseAgent:
             self.history.append({"role": "assistant", "content": full_assistant_text})
 
         except Exception as err:
-            error_msg = f"**OpenCode API Error:** `{err}`"
+            error_msg = f"**API Error:** `{err}`"
             yield ("bot_text", error_msg, "")
 
     async def compact_history(self) -> Tuple[bool, str]:
