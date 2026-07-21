@@ -9,10 +9,37 @@ class StatusFooter(Static):
     ALLOW_SELECT = False
 
     def on_mount(self) -> None:
-        if hasattr(self.app, "refresh_status_footer"):
-            self.app.refresh_status_footer()
-        else:
-            self.update_status(provider_key="")
+        try:
+            from skill_manager import SkillManager
+            from mcp_manager import get_mcp_manager
+
+            pm = getattr(self.app, "pm", None)
+            pkey = pm.get_active_provider_key() if pm else "default"
+            agent = getattr(self.app, "agent", None)
+            model_name = getattr(agent, "model", "")
+            metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
+
+            skills_count = len(SkillManager().list_skills())
+            mcp_servers = get_mcp_manager().load_servers()
+            mcp_total = len(mcp_servers)
+            mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
+            active_bg_tasks = len([t for t in getattr(self.app, "background_tasks", []) if getattr(t, "is_running", False)])
+
+            self.update_status(
+                provider_key=pkey,
+                model_name=model_name,
+                directory=os.path.basename(os.path.realpath(os.getcwd())),
+                active_bg_tasks=active_bg_tasks,
+                total_tokens=metrics.get("total_tokens", 0),
+                context_window=metrics.get("context", "128k"),
+                context_limit=metrics.get("context_limit", 128000),
+                cost_usd=metrics.get("cost_usd", 0.0),
+                skills_count=skills_count,
+                mcp_active=mcp_active,
+                mcp_total=mcp_total
+            )
+        except Exception:
+            self.update_status(provider_key="default")
 
     def update_status(
         self,
