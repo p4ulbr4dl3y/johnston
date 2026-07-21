@@ -76,20 +76,20 @@ class StatusFooter(Static):
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
         # Строка 1: Окружение и Режим
-        dir_text = f"Dir: {directory}"
-        prov_text = f"Provider: {provider_key}" if provider_key else "Provider: default"
-        model_text = f"Model: {model_name}" if model_name else ""
+        dir_text = f"Dir: [#f4f4f5]{directory}[/#f4f4f5]"
+        prov_text = f"Provider: [#f4f4f5]{provider_key}[/#f4f4f5]" if provider_key else "Provider: [#f4f4f5]default[/#f4f4f5]"
+        model_text = f"Model: [#f4f4f5]{model_name}[/#f4f4f5]" if model_name else ""
         left_1_parts = [dir_text, prov_text]
         if model_text:
             left_1_parts.append(model_text)
         left_1 = "  │  ".join(left_1_parts)
-        right_1 = f"Mode: [{agent_mode.upper()}]"
+        right_1 = f"Mode: [bold #ffffff][{agent_mode.upper()}][/bold #ffffff]"
 
         # Строка 2: Скиллы, MCP и Задачи/Субагенты
-        skills_text = f"Skills: {skills_count}"
-        mcp_text = f"MCP: {mcp_active}/{mcp_total} on" if mcp_total > 0 else "MCP: 0"
+        skills_text = f"Skills: [#f4f4f5]{skills_count}[/#f4f4f5]"
+        mcp_text = f"MCP: [#f4f4f5]{mcp_active}/{mcp_total} on[/#f4f4f5]" if mcp_total > 0 else "MCP: [#f4f4f5]0[/#f4f4f5]"
         left_2 = f"{skills_text}  │  {mcp_text}"
-        right_2 = f"Tasks: {active_bg_tasks} bg  │  Subagents: {subagents_active}/{subagents_total}"
+        right_2 = f"Tasks: [#f4f4f5]{active_bg_tasks} bg[/#f4f4f5]  │  Subagents: [#f4f4f5]{subagents_active}/{subagents_total}[/#f4f4f5]"
 
         # Строка 3: Прогресс контекста, Токены и Стоимость
         pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
@@ -98,10 +98,10 @@ class StatusFooter(Static):
         filled = int(round((pct / 100) * bar_len))
         bar_str = "█" * filled + "░" * (bar_len - filled)
         used_formatted = format_context_tokens(total_tokens)
-        left_3 = f"Context: [{bar_str}] {pct:.1f}% ({used_formatted}/{context_window})"
+        left_3 = f"Context: [#e4e4e7][{bar_str}][/#e4e4e7] [#f4f4f5]{pct:.1f}% ({used_formatted}/{context_window})[/#f4f4f5]"
 
-        tokens_text = f"Tokens: {total_tokens:,} tok"
-        cost_text = f"Cost: ${cost_usd:.4f}"
+        tokens_text = f"Tokens: [#f4f4f5]{total_tokens:,} tok[/#f4f4f5]"
+        cost_text = f"Cost: [#f4f4f5]${cost_usd:.4f}[/#f4f4f5]"
         right_3 = f"{tokens_text}  │  {cost_text}"
 
         grid = Table.grid(expand=True)

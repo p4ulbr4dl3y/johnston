@@ -161,6 +161,21 @@ MarkdownFence {
     border-left: solid #3f3f46;
 }
 
+/* OptionList Base Styles */
+OptionList {
+    background: #18181b;
+    color: #a1a1aa;
+    scrollbar-size: 1 1;
+    scrollbar-color: #3f3f46 #18181b;
+}
+
+OptionList > .option-list--option-highlighted,
+OptionList > .option-list--option-blur-highlighted {
+    background: #ffffff;
+    color: #09090b;
+    text-style: bold;
+}
+
 /* Command Suggestions Popup - Square Solid Dark Border */
 #command-suggestions {
     display: none;
@@ -168,7 +183,7 @@ MarkdownFence {
     height: auto;
     max-height: 8;
     margin: 0;
-    padding: 0 1;
+    padding: 0;
     border: solid #27272a;
     background: #18181b;
 }
@@ -176,9 +191,13 @@ MarkdownFence {
 #command-suggestions OptionList {
     background: #18181b;
     color: #a1a1aa;
+    border: none;
+    padding: 0;
+    scrollbar-size: 0 0;
 }
 
-#command-suggestions OptionList > .option-list--option-highlighted {
+#command-suggestions OptionList > .option-list--option-highlighted,
+#command-suggestions OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
@@ -258,9 +277,12 @@ ModalScreen {
     margin-top: 1;
     border: solid #27272a;
     background: #09090b;
+    scrollbar-size: 1 1;
+    scrollbar-color: #3f3f46 #09090b;
 }
 
-#modal-dialog OptionList > .option-list--option-highlighted {
+#modal-dialog OptionList > .option-list--option-highlighted,
+#modal-dialog OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
