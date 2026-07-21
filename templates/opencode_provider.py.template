@@ -7,13 +7,15 @@ except ImportError:
     from base_provider import BaseAgent
 
 
+import os
+
 NAME = "OpenCode Go (DeepSeek v4 Flash)"
 KEY = "opencode"
 DESCRIPTION = "OpenCode Go agent (DeepSeek v4 Flash) with Read, Create, Edit, and Bash tools"
 
 BASE_URL = "https://opencode.ai/zen/go/v1"
 MODEL = "deepseek-v4-flash"
-API_KEY = "sk-placeholder"
+API_KEY = os.getenv("OPENCODE_API_KEY", "")
 
 SYSTEM_PROMPT = """You write code.
 Tools: Read, Create, Edit, Bash, Glob, Grep, AskUser.

@@ -65,7 +65,7 @@ class TaskTool(BaseTool):
                 full_text = ""
                 try:
                     async for event_type, val1, val2 in subagent.stream_steps(prompt):
-                        if event_type in ("bot_text", "outro"):
+                        if event_type in ("bot_text", "outro", "bot_delta"):
                             full_text = val1
                         elif event_type == "bot_chunk":
                             full_text += val1
@@ -99,7 +99,7 @@ class TaskTool(BaseTool):
             full_text = ""
             try:
                 async for event_type, val1, val2 in subagent.stream_steps(prompt):
-                    if event_type in ("bot_text", "outro"):
+                    if event_type in ("bot_text", "outro", "bot_delta"):
                         full_text = val1
                     elif event_type == "bot_chunk":
                         full_text += val1

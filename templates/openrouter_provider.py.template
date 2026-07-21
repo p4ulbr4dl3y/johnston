@@ -7,13 +7,15 @@ except ImportError:
     from base_provider import BaseAgent
 
 
+import os
+
 NAME = "OpenRouter"
 KEY = "openrouter"
 DESCRIPTION = "OpenRouter multi-model AI agent with tools support"
 
 BASE_URL = "https://openrouter.ai/api/v1"
 MODEL = "openrouter/free"
-API_KEY = "sk-placeholder"
+API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 SYSTEM_PROMPT = """You write code.
 Tools: Read, Create, Edit, Bash, Glob, Grep, AskUser.

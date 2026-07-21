@@ -21,7 +21,7 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.tools = tools
         self.provider_key = provider_key
-        self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        self.client = AsyncOpenAI(api_key=self.api_key or "sk-placeholder", base_url=self.base_url)
         self.history = []
         self.app = None
         self.tokens_input = 0

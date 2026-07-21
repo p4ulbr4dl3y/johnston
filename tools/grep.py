@@ -35,7 +35,8 @@ class GrepTool(BaseTool):
         except Exception as e:
             return f"Error compiling regex '{pattern}': {e}"
 
-        root_dir = os.getcwd()
+        target_path = args.get("path")
+        root_dir = os.path.abspath(os.path.expanduser(target_path)) if target_path else os.getcwd()
         results = []
         for root, dirs, files in os.walk(root_dir):
             dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]

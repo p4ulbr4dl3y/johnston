@@ -274,10 +274,13 @@ class JohnstonChatApp(App):
                 elif event_type == "tool_result":
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)
-                elif event_type == "bot_chunk":
+                elif event_type in ("bot_chunk", "bot_delta"):
                     if bot_msg is None:
                         bot_msg = await chat_view.add_bot_message()
-                    bot_msg.content += val1
+                    if event_type == "bot_delta":
+                        bot_msg.content = val1
+                    else:
+                        bot_msg.content += val1
                 elif event_type in ("bot_text", "outro"):
                     if bot_msg is None:
                         bot_msg = await chat_view.add_bot_message()
