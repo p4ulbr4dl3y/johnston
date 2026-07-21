@@ -85,6 +85,17 @@ class ModelsDevCatalog:
         return self._data or {}
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
+        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    limits = cdata.get("model_limits", {})
+                    if model_id in limits and isinstance(limits[model_id], (int, float)):
+                        return int(limits[model_id])
+            except Exception:
+                pass
+
         data = self._data
         if data and isinstance(data, dict):
             prov = data.get(provider_id)

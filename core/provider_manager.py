@@ -182,6 +182,7 @@ class ProviderManager:
         api_key = getattr(mod, "API_KEY", None)
 
         models = []
+        model_limits = {}
         if base_url:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -190,7 +191,18 @@ class ProviderManager:
                     resp = await client.get(models_url, headers=headers, timeout=10)
                     if resp.status_code == 200:
                         data = resp.json()
-                        models = [m["id"] for m in data.get("data", []) if isinstance(m, dict) and "id" in m]
+                        for m in data.get("data", []):
+                            if isinstance(m, dict) and "id" in m:
+                                m_id = m["id"]
+                                models.append(m_id)
+                                ctx_len = (
+                                    m.get("context_length")
+                                    or (m.get("top_provider", {}) or {}).get("context_length")
+                                    or m.get("context_window")
+                                    or m.get("max_context_length")
+                                )
+                                if ctx_len and isinstance(ctx_len, (int, float)):
+                                    model_limits[m_id] = int(ctx_len)
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
@@ -202,7 +214,7 @@ class ProviderManager:
         if models:
             try:
                 with open(cache_path, "w", encoding="utf-8") as f:
-                    json.dump({"updated_at": time.time(), "models": models}, f, indent=2)
+                    json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits}, f, indent=2)
             except Exception as e:
                 print(f"Error writing models cache: {e}")
 
