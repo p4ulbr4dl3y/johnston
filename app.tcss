@@ -348,14 +348,16 @@ ModalScreen {
     text-style: bold;
 }
 
-#write-in-input {
+#write-in-input,
+#modal-search-input {
     margin-top: 1;
     background: #09090b;
     border: solid #27272a;
     color: #f4f4f5;
 }
 
-#write-in-input:focus {
+#write-in-input:focus,
+#modal-search-input:focus {
     border: solid #ffffff;
 }
 

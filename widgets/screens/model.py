@@ -13,5 +13,6 @@ class ModelScreen(BaseSelectionScreen[str]):
             title="### **Select provider model (/models)**",
             options=options,
             items=models,
-            default_value=""
+            default_value=current_model if current_model in models else (models[0] if models else ""),
+            show_search=True
         )

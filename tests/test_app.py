@@ -65,11 +65,14 @@ async def test_chat_app_flow():
         await pilot.pause(0.2)
         print("✓ ProviderScreen tests passed cleanly!")
 
-        # 6. Проверяем /models
+        # 6. Проверяем /models и поиск моделей
         chat_input.load_text("/models")
         await pilot.press("enter")
         await pilot.pause(0.5)
         assert isinstance(app.screen, ModelScreen)
+        await pilot.press("d", "e", "e", "p")
+        await pilot.pause(0.2)
+        assert len(app.screen.filtered_items) > 0
         await pilot.press("escape")
         await pilot.pause(0.2)
         print("✓ ModelScreen tests passed cleanly!")
