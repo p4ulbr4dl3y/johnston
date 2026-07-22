@@ -71,7 +71,7 @@ class TestMCPManager(unittest.TestCase):
                 self.name = name
                 self.tools = tools
             def start(self): return True
-            def call_tool(self, tool_name, args): return f"result from {self.name}:{tool_name}"
+            def call_tool(self, tool_name, args, **kwargs): return f"result from {self.name}:{tool_name}"
 
         c1 = DummyClient("serverA", [{"name": "search", "description": "s1"}])
         c2 = DummyClient("serverB", [{"name": "search", "description": "s2"}])

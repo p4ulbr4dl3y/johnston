@@ -156,7 +156,7 @@ class MCPProcessClient:
             self.tools = res["result"].get("tools", [])
         return self.tools
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> str:
+    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: float = 600.0) -> str:
         if not self.process or self.process.poll() is not None:
             if not self.start():
                 return f"Error: MCP server '{self.name}' process is not running"
@@ -173,7 +173,7 @@ class MCPProcessClient:
             }
         }
         self._send(req)
-        res = self._read_response(req_id=current_id, timeout=30.0)
+        res = self._read_response(req_id=current_id, timeout=timeout)
         if not res:
             return f"Error: No response from MCP server '{self.name}'"
         if "error" in res:
@@ -367,7 +367,7 @@ class MCPManager:
 
         return tools
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: float = 600.0) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name and namespaced server_name__tool_name formats.
@@ -389,12 +389,12 @@ class MCPManager:
                 if s_name == target_server and (o_name == target_tool or exposed_name == tool_name):
                     client = self.clients.get(s_name)
                     if client:
-                        return client.call_tool(o_name, arguments)
+                        return client.call_tool(o_name, arguments, timeout=timeout)
             else:
                 if exposed_name == tool_name or o_name == tool_name:
                     client = self.clients.get(s_name)
                     if client:
-                        return client.call_tool(o_name, arguments)
+                        return client.call_tool(o_name, arguments, timeout=timeout)
         return None
 
     def get_system_prompt_snippet(self) -> str:
