@@ -178,7 +178,44 @@ class ChatInput(TextArea):
             return "\n".join(new_lines)
         return pasted_text
 
+    def try_paste_clipboard_image(self) -> bool:
+        """Проверяет буфер обмена на наличие PNG изображения и вставляет его как [Image #N]"""
+        import os
+        import subprocess
+        import time
+
+        try:
+            cmd = "osascript -e 'get the clipboard as «class PNGf»'"
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=2)
+            if res.returncode == 0 and "«data PNGf" in res.stdout:
+                raw_hex = res.stdout.strip().split("«data PNGf")[-1].replace("»", "").strip()
+                img_bytes = bytes.fromhex(raw_hex)
+                if len(img_bytes) > 0:
+                    out_dir = os.path.expanduser("~/.johnston/temp_images")
+                    os.makedirs(out_dir, exist_ok=True)
+                    filepath = os.path.join(out_dir, f"clip_{int(time.time())}.png")
+                    with open(filepath, "wb") as f:
+                        f.write(img_bytes)
+
+                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
+                    tag = f"[Image #{img_count}]"
+                    self.pasted_texts[tag] = f"@{filepath}"
+                    self.insert(tag)
+                    self._on_input_change()
+                    if self.app:
+                        self.app.notify("Pasted image from clipboard!")
+                    return True
+        except Exception:
+            pass
+
+        return False
+
     def on_paste(self, event: events.Paste) -> None:
+        if self.try_paste_clipboard_image():
+            event.prevent_default()
+            event.stop()
+            return
+
         pasted_text = self.format_pasted_file_path(event.text)
         lines = pasted_text.splitlines()
         if len(lines) > self.PASTE_LINE_THRESHOLD:
@@ -231,6 +268,11 @@ class ChatInput(TextArea):
         return False
 
     def _on_key(self, event: events.Key) -> None:
+        if event.key in ("ctrl+v", "cmd+v", "ctrl+shift+v", "meta+v"):
+            if self.try_paste_clipboard_image():
+                event.prevent_default()
+                event.stop()
+                return
         # Атомарное удаление блока вставки по Backspace/Delete
         if event.key in ("backspace", "delete"):
             if self._handle_tag_deletion(event.key):
