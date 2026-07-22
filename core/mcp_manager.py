@@ -83,7 +83,7 @@ class MCPProcessClient:
         self.process.stdin.write(line)
         self.process.stdin.flush()
 
-    def _read_response(self, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    def _read_response(self, req_id: Optional[int] = None, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout:
             return None
 
@@ -109,7 +109,15 @@ class MCPProcessClient:
             if not line_str.startswith("{"):
                 continue
             try:
-                return json.loads(line_str)
+                data = json.loads(line_str)
+                # Ignore notifications without an id (e.g. notifications/tools/list_changed)
+                if "method" in data and "id" not in data:
+                    continue
+
+                if req_id is not None and data.get("id") != req_id:
+                    continue
+
+                return data
             except Exception:
                 continue
 
@@ -126,7 +134,7 @@ class MCPProcessClient:
             }
         }
         self._send(init_req)
-        res = self._read_response(timeout=20.0)
+        res = self._read_response(req_id=self.req_id, timeout=20.0)
         if not res or "error" in res:
             return False
 
@@ -143,7 +151,7 @@ class MCPProcessClient:
             "method": "tools/list"
         }
         self._send(req)
-        res = self._read_response(timeout=15.0)
+        res = self._read_response(req_id=self.req_id, timeout=15.0)
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
         return self.tools
@@ -154,9 +162,10 @@ class MCPProcessClient:
                 return f"Error: MCP server '{self.name}' process is not running"
 
         self.req_id += 1
+        current_id = self.req_id
         req = {
             "jsonrpc": "2.0",
-            "id": self.req_id,
+            "id": current_id,
             "method": "tools/call",
             "params": {
                 "name": tool_name,
@@ -164,7 +173,7 @@ class MCPProcessClient:
             }
         }
         self._send(req)
-        res = self._read_response(timeout=30.0)
+        res = self._read_response(req_id=current_id, timeout=30.0)
         if not res:
             return f"Error: No response from MCP server '{self.name}'"
         if "error" in res:
