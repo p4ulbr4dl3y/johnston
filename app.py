@@ -62,13 +62,13 @@ class JohnstonChatApp(App):
 
     def on_mount(self) -> None:
         """Мгновенный фокус при старте и обновление строки состояния"""
-        self.is_running = True
+        self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
 
     def on_unmount(self) -> None:
         """Очистка всех запущенных MCP-серверов и фоновых процессов при закрытии приложения"""
-        self.is_running = False
+        self.is_app_active = False
         for task in getattr(self, "background_tasks", []):
             try:
                 if hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
@@ -402,21 +402,21 @@ class JohnstonChatApp(App):
                     bot_msg.content += " *(interrupted)*"
                 except Exception:
                     pass
-            if getattr(self, "is_running", True):
+            if getattr(self, "is_app_active", True):
                 try:
                     self.notify("Agent response interrupted (Esc)", severity="warning")
                 except Exception:
                     pass
         finally:
             try:
-                if getattr(self, "is_running", True):
+                if getattr(self, "is_app_active", True):
                     self.save_current_session()
             except Exception:
                 pass
 
     def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Вызывается при завершении фоновой bash команды"""
-        if not getattr(self, "is_running", True):
+        if not getattr(self, "is_app_active", True):
             return
         try:
             self.notify(f"Background command completed (TID: {task_id})")

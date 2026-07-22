@@ -38,7 +38,7 @@ class BackgroundTask:
                     except Exception:
                         pass
 
-                if self.is_background and on_completed_cb and getattr(app, "is_running", True):
+                if self.is_background and on_completed_cb and getattr(app, "is_app_active", True):
                     try:
                         out_res = "".join(self.output)
                         if len(out_res) > 3000:
