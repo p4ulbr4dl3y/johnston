@@ -211,7 +211,9 @@ class BaseAgent:
                         elif path_val:
                             target = path_val
                         else:
-                            target = t_name
+                            target = "."
+                    elif t_name == "ListDir":
+                        target = args.get("path") or "."
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
