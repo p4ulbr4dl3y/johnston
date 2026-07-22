@@ -115,11 +115,12 @@ class PromptBuilder:
         if mode_lower == "plan":
             sys_prompt += (
                 "\n\n[PLAN MODE ACTIVE]\n"
-                "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan.\n"
+                "You are in Plan mode. Analyze the codebase, research requirements, and design a step-by-step implementation plan.\n"
                 "Guidelines:\n"
-                "1. Inspect codebase using Read, ListDir, Glob, Grep.\n"
-                "2. Save your plan in '.johnston/plans/plan.md'. Do NOT edit project source files directly while in Plan mode.\n"
-                "3. When the plan is ready, call the PlanExit tool to propose switching to Build mode."
+                "1. Perform read-only codebase exploration using Read, ListDir, Glob, Grep.\n"
+                "2. Output your complete, detailed implementation plan DIRECTLY in your chat response text. Do NOT attempt to create or edit files on disk.\n"
+                "3. Your plan should clearly cover: Goal, Proposed File Changes, and Verification Steps.\n"
+                "4. When your plan is ready, call the PlanExit tool to signal completion and request user approval to switch to Build mode for execution."
             )
         elif mode_lower == "ask":
             sys_prompt += (
@@ -174,8 +175,8 @@ class PromptBuilder:
         all_tools = list(self.base_tools) + clean_mcp_tools
 
         mode_lower = self.mode.lower()
-        if mode_lower == "ask":
-            # Filter out file modification tools in ask mode
+        if mode_lower in ("ask", "plan"):
+            # Filter out file modification tools in ask and plan modes
             all_tools = [
                 t for t in all_tools
                 if t.get("function", {}).get("name") not in ("Create", "Edit")
