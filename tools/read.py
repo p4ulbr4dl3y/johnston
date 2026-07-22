@@ -49,7 +49,8 @@ class ReadTool(BaseTool):
                 content = "".join(formatted_lines)
                 return f"=== Lines {s_idx+1}-{min(e_idx, len(lines))} of {len(lines)} in {path} ===\n{content}"
 
-            content = "".join(lines)
+            formatted_lines = [f"{i + 1:5d} | {line}" for i, line in enumerate(lines)]
+            content = "".join(formatted_lines)
             return truncate_output(content, max_chars=8000, hint=f"File has {len(lines)} lines. Use start_line/end_line to read specific ranges.")
         except Exception as e:
             return f"Error reading file '{path}': {e}"

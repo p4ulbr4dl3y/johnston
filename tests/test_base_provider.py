@@ -27,7 +27,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Read
         res_read = await execute_tool("Read", {"path": file_path})
-        self.assertEqual(res_read, "hello world")
+        self.assertIn("hello world", res_read)
 
     async def test_read_missing_file(self):
         file_path = os.path.join(self.test_dir, "missing.txt")
