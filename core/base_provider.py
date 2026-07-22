@@ -248,6 +248,11 @@ class BaseAgent:
                                 target = str_args[0]
                         if not target:
                             target = t_name
+                    if isinstance(target, str) and len(target) > 60:
+                        if "/" in target and not target.startswith('"'):
+                            target = "..." + target[-57:]
+                        else:
+                            target = target[:57] + "..."
                     yield ("tool", t_name, target)
 
                     if agent_mode == "plan" and t_name in ("Edit", "Create"):
