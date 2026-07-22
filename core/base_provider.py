@@ -253,6 +253,17 @@ class BaseAgent:
                             target = f"{act} {tid}"
                         else:
                             target = act
+                    elif t_name == "ViewImage":
+                        img_path = args.get("path") or args.get("image_path") or ""
+                        prompt_val = args.get("prompt") or ""
+                        if prompt_val and img_path:
+                            target = f'"{prompt_val}" in {img_path}'
+                        elif prompt_val:
+                            target = f'"{prompt_val}"'
+                        elif img_path:
+                            target = img_path
+                        else:
+                            target = t_name
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
