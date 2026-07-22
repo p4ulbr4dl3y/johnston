@@ -71,7 +71,10 @@ class ModelsCatalog:
         return self._data or {}
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
-        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+        cache_dir = os.path.join(CONFIG_DIR, "cache")
+
+        # 1. Проверяем кеш конкретного провайдера
+        cache_path = os.path.join(cache_dir, f"models_{provider_id}.json")
         if os.path.exists(cache_path):
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
@@ -82,6 +85,25 @@ class ModelsCatalog:
             except Exception:
                 pass
 
+        # 2. Проверяем остальные кеши провайдеров (по точной модели и по basename)
+        if os.path.exists(cache_dir):
+            try:
+                m_base = model_id.split("/")[-1].lower()
+                for fname in os.listdir(cache_dir):
+                    if fname.startswith("models_") and fname.endswith(".json") and fname != "models_dev.json":
+                        fpath = os.path.join(cache_dir, fname)
+                        with open(fpath, "r", encoding="utf-8") as f:
+                            cdata = json.load(f)
+                            limits = cdata.get("model_limits", {})
+                            if model_id in limits and isinstance(limits[model_id], (int, float)):
+                                return int(limits[model_id])
+                            for k, v in limits.items():
+                                if k.split("/")[-1].lower() == m_base and isinstance(v, (int, float)):
+                                    return int(v)
+            except Exception:
+                pass
+
+        # 3. Проверяем models.dev
         data = self._data
         if data and isinstance(data, dict):
             prov = data.get(provider_id)
