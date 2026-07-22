@@ -30,7 +30,7 @@ class BaseAgent:
         self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
-        self.mode = "build"
+        self.mode = "action"
 
     @property
     def context_limit(self) -> int:
@@ -62,7 +62,7 @@ class BaseAgent:
         }
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
-        agent_mode = getattr(self, "mode", "build")
+        agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
         sys_prompt = builder.build_system_prompt()
@@ -82,7 +82,7 @@ class BaseAgent:
 
         try:
             while True:
-                current_mode = getattr(self, "mode", "build")
+                current_mode = getattr(self, "mode", "action")
                 agent_mode = current_mode
                 builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
                 sys_prompt = builder.build_system_prompt()

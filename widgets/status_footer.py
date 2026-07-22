@@ -35,7 +35,7 @@ class StatusFooter(Static):
             subagents_active = len([t for t in subagents if getattr(t, "is_running", False)])
             subagents_total = len(subagents)
 
-            agent_mode = getattr(agent, "mode", "build")
+            agent_mode = getattr(agent, "mode", "action")
 
             self.update_status(
                 provider_key=pkey,
@@ -61,7 +61,7 @@ class StatusFooter(Static):
         self,
         provider_key: str,
         model_name: str = "",
-        agent_mode: str = "build",
+        agent_mode: str = "action",
         directory: str = "",
         active_bg_tasks: int = 0,
         subagents_active: int = 0,

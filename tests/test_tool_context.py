@@ -5,7 +5,7 @@ from tools.context import ToolContext
 
 class MockAgent:
     def __init__(self):
-        self.mode = "build"
+        self.mode = "action"
 
 class MockProviderManager:
     def create_active_agent(self):

@@ -93,13 +93,13 @@ async def test_chat_app_flow():
         print("✓ /tasks command tests passed cleanly!")
 
         # 9. Проверяем переключение режима по Shift+Tab
-        assert getattr(app.agent, "mode", "build") == "build"
+        assert getattr(app.agent, "mode", "action") == "action"
         await pilot.press("shift+tab")
         await pilot.pause(0.2)
-        assert getattr(app.agent, "mode", "build") == "plan"
+        assert getattr(app.agent, "mode", "action") == "explore"
         await pilot.press("shift+tab")
         await pilot.pause(0.2)
-        assert getattr(app.agent, "mode", "build") == "build"
+        assert getattr(app.agent, "mode", "action") == "action"
         # 10. Проверяем авто-расширение высоты инпута при вставке многострочного текста
         chat_input.load_text("")
         chat_input.insert("line1\nline2\nline3\nline4")
