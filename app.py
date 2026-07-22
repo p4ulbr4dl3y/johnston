@@ -27,6 +27,8 @@ class JohnstonChatApp(App):
     BINDINGS = [
         ("ctrl+c", "quit", "Exit"),
         ("ctrl+q", "quit", "Exit"),
+        ("shift+tab", "toggle_mode", "Toggle Mode"),
+        ("backtab", "toggle_mode", "Toggle Mode"),
     ]
 
     def __init__(self):
@@ -40,9 +42,16 @@ class JohnstonChatApp(App):
         self.background_tasks = []
 
     def action_toggle_mode(self) -> None:
-        """Переключение режима агента (Plan / Build)"""
-        from tools.context import ToolContext
-        ToolContext(self).toggle_agent_mode()
+        """Цикличное переключение режима агента (Build / Plan / Ask / Debug / Orchestrator)"""
+        if not hasattr(self, "agent") or not self.agent:
+            return
+        modes = ["build", "plan", "ask", "debug", "orchestrator"]
+        curr = getattr(self.agent, "mode", "build").lower()
+        next_idx = (modes.index(curr) + 1) % len(modes) if curr in modes else 0
+        new_mode = modes[next_idx]
+        self.agent.mode = new_mode
+        self.refresh_status_footer()
+        self.notify(f"Switched mode to: {new_mode.upper()}")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):

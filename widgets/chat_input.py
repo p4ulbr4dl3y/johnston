@@ -364,16 +364,12 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
-        # Нажатие Shift+Tab для переключения режимов (Plan/Build)
+        # Нажатие Shift+Tab для переключения режимов (Build / Plan / Ask / Debug / Orchestrator)
         if event.key in ("shift+tab", "backtab", "shift_tab"):
             event.prevent_default()
             event.stop()
-            if hasattr(self.app, "agent") and self.app.agent:
-                curr = getattr(self.app.agent, "mode", "build")
-                new_mode = "build" if curr == "plan" else "plan"
-                self.app.agent.mode = new_mode
-                if hasattr(self.app, "refresh_status_footer"):
-                    self.app.refresh_status_footer()
+            if hasattr(self.app, "action_toggle_mode"):
+                self.app.action_toggle_mode()
             return
 
         # Обработка навигации в меню подсказок по стрелкам
