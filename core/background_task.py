@@ -38,25 +38,32 @@ class BackgroundTask:
                     except Exception:
                         pass
 
-                if self.is_background and on_completed_cb:
-                    # Формируем итоговый результат
-                    out_res = "".join(self.output)
-                    if len(out_res) > 3000:
-                        out_res = out_res[:3000] + "\n... [output truncated]"
-                    out_res = out_res if out_res.strip() else "Command executed with no output."
-                    on_completed_cb(self.task_id, self.command, out_res)
+                if self.is_background and on_completed_cb and getattr(app, "is_running", True):
+                    try:
+                        out_res = "".join(self.output)
+                        if len(out_res) > 3000:
+                            out_res = out_res[:3000] + "\n... [output truncated]"
+                        out_res = out_res if out_res.strip() else "Command executed with no output."
+                        on_completed_cb(self.task_id, self.command, out_res)
+                    except Exception:
+                        pass
 
         self.read_task = asyncio.create_task(_read())
         return self.read_task
 
     async def kill(self):
-        if self.is_running and self.process:
+        self.is_running = False
+        if self.process:
             try:
                 self.process.terminate()
-                await self.process.wait()
+                await asyncio.wait_for(self.process.wait(), timeout=1.0)
             except Exception:
-                pass
-        self.is_running = False
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+        if self.read_task and not self.read_task.done():
+            self.read_task.cancel()
         self.output.append("\n[Task terminated by user]\n")
 
 

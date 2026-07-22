@@ -62,11 +62,27 @@ class JohnstonChatApp(App):
 
     def on_mount(self) -> None:
         """Мгновенный фокус при старте и обновление строки состояния"""
+        self.is_running = True
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
 
     def on_unmount(self) -> None:
-        """Очистка всех запущенных MCP-серверов при закрытии приложения"""
+        """Очистка всех запущенных MCP-серверов и фоновых процессов при закрытии приложения"""
+        self.is_running = False
+        for task in getattr(self, "background_tasks", []):
+            try:
+                if hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
+                    asyncio.create_task(task.kill())
+                elif hasattr(task, "process") and task.process:
+                    try:
+                        task.process.terminate()
+                    except Exception:
+                        pass
+                if hasattr(task, "read_task") and task.read_task:
+                    task.read_task.cancel()
+            except Exception:
+                pass
+
         try:
             from core.mcp_manager import get_mcp_manager
             get_mcp_manager().stop_all()
@@ -375,21 +391,39 @@ class JohnstonChatApp(App):
                             bot_msg = await chat_view.add_bot_message()
                         bot_msg.content = val1
                         bot_msg = None
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, RuntimeError):
             if thinking_widget:
-                thinking_widget.finish_thinking(0.0, "Generation stopped (Esc).")
+                try:
+                    thinking_widget.finish_thinking(0.0, "Generation stopped (Esc).")
+                except Exception:
+                    pass
             if bot_msg:
-                bot_msg.content += " *(interrupted)*"
-            self.notify("Agent response interrupted (Esc)", severity="warning")
-            raise
+                try:
+                    bot_msg.content += " *(interrupted)*"
+                except Exception:
+                    pass
+            if getattr(self, "is_running", True):
+                try:
+                    self.notify("Agent response interrupted (Esc)", severity="warning")
+                except Exception:
+                    pass
         finally:
-            self.save_current_session()
+            try:
+                if getattr(self, "is_running", True):
+                    self.save_current_session()
+            except Exception:
+                pass
 
     def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Вызывается при завершении фоновой bash команды"""
-        self.notify(f"Background command completed (TID: {task_id})")
-        msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
-        self.generate_ai_response(msg, show_in_ui=False)
+        if not getattr(self, "is_running", True):
+            return
+        try:
+            self.notify(f"Background command completed (TID: {task_id})")
+            msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
+            self.generate_ai_response(msg, show_in_ui=False)
+        except Exception:
+            pass
 
 def main():
     JohnstonChatApp().run()
