@@ -246,6 +246,13 @@ class BaseAgent:
                             target = f'"{desc}"'
                         else:
                             target = t_name
+                    elif t_name == "ManageTask":
+                        act = args.get("action", "list")
+                        tid = args.get("task_id", "")
+                        if tid:
+                            target = f"{act} {tid}"
+                        else:
+                            target = act
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
