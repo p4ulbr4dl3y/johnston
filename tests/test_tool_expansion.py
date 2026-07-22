@@ -1,8 +1,12 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import MagicMock
 
+from rich.console import Console
 from rich.syntax import Syntax
+from rich.text import Text
+from textual._context import active_app
 
 from widgets.chat_view import ToolCallWidget
 
@@ -11,9 +15,13 @@ class TestToolExpansion(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
+        self.mock_app = MagicMock()
+        self.mock_app.console = Console()
+        self.token = active_app.set(self.mock_app)
 
     def tearDown(self):
         self.temp_dir.cleanup()
+        active_app.reset(self.token)
 
     def test_tool_call_widget_init(self):
         widget = ToolCallWidget(
@@ -44,6 +52,30 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertFalse(widget.is_expanded)
         self.assertIn("▶", str(widget.header_label.render()))
+
+    def test_edit_tool_toggle_expand_diff(self):
+        diff_text = (
+            "--- test.py (old)\n"
+            "+++ test.py (new)\n"
+            "@@ -7,1 +9,2 @@\n"
+            "-def multiply(a, b):\n"
+            "+def multiply(a: float, b: float) -> float:\n"
+            "+    return a * b\n"
+        )
+        widget = ToolCallWidget(
+            tool_type="Edit",
+            target="test.py",
+            result_text=diff_text,
+            args={"path": "test.py", "old_string": "def multiply(a, b):", "new_string": "def multiply(a: float, b: float) -> float:\n    return a * b"}
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Text)
+        rendered_plain = content.plain
+        self.assertIn("7 - def multiply(a, b):", rendered_plain)
+        self.assertIn("9 + def multiply(a: float, b: float) -> float:", rendered_plain)
+        self.assertIn("10 +     return a * b", rendered_plain)
 
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")

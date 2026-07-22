@@ -1,10 +1,33 @@
+import difflib
 import os
+import re
+from typing import Any
 
+import pygments
+from pygments.lexers import get_lexer_by_name
+from pygments.token import Token
 from rich.syntax import Syntax
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
+
+TOKEN_COLORS = {
+    Token.Keyword: "bold #c678dd",
+    Token.Keyword.Namespace: "bold #c678dd",
+    Token.Keyword.Type: "#e5c07b",
+    Token.Name.Function: "#61afef",
+    Token.Name.Class: "#e5c07b",
+    Token.Name.Builtin: "#e5c07b",
+    Token.Name: "#f4f4f5",
+    Token.String: "#98c379",
+    Token.String.Doc: "#98c379",
+    Token.Number: "#d19a66",
+    Token.Operator: "#56b6c2",
+    Token.Punctuation: "#abb2bf",
+    Token.Comment: "#5c6370 italic",
+}
 
 
 class UserMessage(Static):
@@ -162,10 +185,152 @@ class ToolCallWidget(Vertical):
         }
         return mapping.get(ext, ext or "text")
 
+    def _lex_block_to_line_texts(self, code_lines: list[str], lexer: Any) -> list[Text]:
+        if not code_lines:
+            return []
+        if not lexer:
+            return [Text(line) for line in code_lines]
+
+        full_code = "\n".join(code_lines)
+        try:
+            tokens = pygments.lex(full_code, lexer)
+            line_texts = [Text()]
+            for tok_type, val in tokens:
+                parts = val.split("\n")
+                for idx, part in enumerate(parts):
+                    if idx > 0:
+                        line_texts.append(Text())
+                    if part:
+                        style = None
+                        curr = tok_type
+                        while curr:
+                            if curr in TOKEN_COLORS:
+                                style = TOKEN_COLORS[curr]
+                                break
+                            curr = curr.parent
+                        line_texts[-1].append(part, style=style)
+
+            while len(line_texts) < len(code_lines):
+                line_texts.append(Text())
+            return line_texts[:len(code_lines)]
+        except Exception:
+            return [Text(line) for line in code_lines]
+
+    def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
+        if "[Linter Feedback]:" in diff_text:
+            diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
+
+        lexer_name = self._guess_lexer(file_path)
+        try:
+            lexer = get_lexer_by_name(lexer_name)
+        except Exception:
+            lexer = None
+
+        lines = diff_text.splitlines()
+        formatted_lines = []
+
+        old_code_lines = []
+        new_code_lines = []
+        in_hunk = False
+        for line in lines:
+            if line.startswith("--- ") or line.startswith("+++ "):
+                continue
+            if re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line):
+                in_hunk = True
+                continue
+            if not in_hunk:
+                continue
+
+            if line.startswith("-"):
+                old_code_lines.append(line[1:])
+            elif line.startswith("+"):
+                new_code_lines.append(line[1:])
+            elif line.startswith(" "):
+                old_code_lines.append(line[1:])
+                new_code_lines.append(line[1:])
+
+        old_texts = self._lex_block_to_line_texts(old_code_lines, lexer)
+        new_texts = self._lex_block_to_line_texts(new_code_lines, lexer)
+
+        old_line = 0
+        new_line = 0
+        old_idx = 0
+        new_idx = 0
+        in_hunk = False
+
+        max_num_digits = 3
+        for line in lines:
+            h_match = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            if h_match:
+                o_val = int(h_match.group(1))
+                n_val = int(h_match.group(2))
+                max_num_digits = max(max_num_digits, len(str(o_val + 20)), len(str(n_val + 20)))
+
+        width = 120
+        try:
+            if self.app and self.app.console:
+                width = max(self.app.console.width, 100)
+        except Exception:
+            pass
+
+        for idx, line in enumerate(lines):
+            if line.startswith("--- ") or line.startswith("+++ "):
+                continue
+
+            hunk_match = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            if hunk_match:
+                old_line = int(hunk_match.group(1))
+                new_line = int(hunk_match.group(2))
+                in_hunk = True
+                continue
+
+            if not in_hunk:
+                if line.strip():
+                    formatted_lines.append(Text(line, style="dim"))
+                continue
+
+            if line.startswith("-"):
+                num_str = str(old_line).rjust(max_num_digits)
+                prefix = Text(f"{num_str} - ", style="bold #f87171 on #2c1517")
+                code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:])
+                old_idx += 1
+                full_line = prefix + code_text
+                full_line.pad_right(width)
+                full_line.stylize("on #2c1517")
+                formatted_lines.append(full_line)
+                old_line += 1
+            elif line.startswith("+"):
+                num_str = str(new_line).rjust(max_num_digits)
+                prefix = Text(f"{num_str} + ", style="bold #4ade80 on #132e22")
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                new_idx += 1
+                full_line = prefix + code_text
+                full_line.pad_right(width)
+                full_line.stylize("on #132e22")
+                formatted_lines.append(full_line)
+                new_line += 1
+            elif line.startswith(" "):
+                num_str = str(new_line).rjust(max_num_digits)
+                prefix = Text(f"{num_str}   ", style="dim #71717a")
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                old_idx += 1
+                new_idx += 1
+                full_line = prefix + code_text
+                formatted_lines.append(full_line)
+                old_line += 1
+                new_line += 1
+            elif line.startswith("\\"):
+                formatted_lines.append(Text(line, style="dim"))
+            else:
+                formatted_lines.append(Text(line, style="dim"))
+                in_hunk = False
+
+        return Text("\n").join(formatted_lines)
+
     def render_content(self) -> None:
+        file_path = self.args.get("path") or self.target
         if self.tool_type == "Create":
             content = self.args.get("content")
-            file_path = self.args.get("path") or self.target
             if content is None:
                 if file_path and os.path.isfile(file_path):
                     try:
@@ -191,6 +356,26 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(rendered)
             else:
                 self.content_widget.update(self.result_text or "(No content)")
+        elif self.tool_type == "Edit":
+            diff_text = self.result_text.strip()
+            if not diff_text or "@@" not in diff_text:
+                old_s = self.args.get("old_string", "")
+                new_s = self.args.get("new_string", "")
+                if old_s or new_s:
+                    diff_lines = list(difflib.unified_diff(
+                        old_s.splitlines(),
+                        new_s.splitlines(),
+                        fromfile=file_path,
+                        tofile=file_path,
+                        lineterm=""
+                    ))
+                    diff_text = "\n".join(diff_lines)
+
+            if diff_text:
+                formatted_diff = self._format_edit_diff(diff_text, file_path)
+                self.content_widget.update(formatted_diff)
+            else:
+                self.content_widget.update(self.result_text or "(No diff)")
         else:
             self.content_widget.update(self.result_text or "(No result)")
 

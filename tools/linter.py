@@ -13,10 +13,10 @@ async def run_linter(path: str) -> str:
     errors = []
 
     if ext == ".py":
-        if shutil.which("uv"):
-            output = await _exec_cmd(["uv", "run", "ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
-        elif shutil.which("ruff"):
+        if shutil.which("ruff"):
             output = await _exec_cmd(["ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
+        elif shutil.which("uv"):
+            output = await _exec_cmd(["uv", "run", "--no-sync", "ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
         else:
             output = None
         if output:
@@ -32,6 +32,13 @@ async def run_linter(path: str) -> str:
         return ""
 
     combined = "\n".join(errors).strip()
+    clean_lines = [
+        line for line in combined.splitlines()
+        if not any(line.strip().startswith(prefix) for prefix in (
+            "Building ", "Downloading ", "× Failed", "└─>", "Call to ", "[stderr]", "Audited "
+        ))
+    ]
+    combined = "\n".join(clean_lines).strip()
     if not combined:
         return ""
 
