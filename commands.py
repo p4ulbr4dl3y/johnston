@@ -300,12 +300,12 @@ class ModeCommand(BaseCommand):
 
 class PasteCommand(BaseCommand):
     name = "/paste"
-    description = "Paste image from clipboard into input"
+    description = "Universal paste from clipboard (text or image)"
 
     async def execute(self, app) -> None:
         chat_input = app.query_one("#message-input", ChatInput)
-        if not chat_input.try_paste_clipboard_image():
-            app.notify("No image found in clipboard", severity="warning")
+        if not chat_input.paste_universal_clipboard():
+            app.notify("Clipboard is empty", severity="warning")
         chat_input.focus()
 
 

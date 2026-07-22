@@ -210,6 +210,39 @@ class ChatInput(TextArea):
 
         return False
 
+    def paste_universal_clipboard(self) -> bool:
+        """Универсальная вставка из буфера обмена (картинка или текст)"""
+        import subprocess
+
+        # 1. Пробуем вставить картинку из буфера
+        if self.try_paste_clipboard_image():
+            return True
+
+        # 2. Если картинки нет, считываем текст из буфера обмена
+        try:
+            res = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=2)
+            if res.returncode == 0 and res.stdout:
+                text_content = res.stdout
+                pasted_text = self.format_pasted_file_path(text_content)
+                lines = pasted_text.splitlines()
+
+                if len(lines) > self.PASTE_LINE_THRESHOLD:
+                    idx = len(self.pasted_texts) + 1
+                    tag = f"[Pasted text #{idx} +{len(lines)} lines]"
+                    self.pasted_texts[tag] = pasted_text
+                    self.insert(tag)
+                else:
+                    self.insert(pasted_text)
+
+                self._on_input_change()
+                if self.app:
+                    self.app.notify("Pasted text from clipboard!")
+                return True
+        except Exception:
+            pass
+
+        return False
+
     def on_paste(self, event: events.Paste) -> None:
         if self.try_paste_clipboard_image():
             event.prevent_default()
