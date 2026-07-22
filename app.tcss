@@ -167,7 +167,7 @@ MarkdownFence {
     margin: 1 0;
     padding: 0 2;
     border-left: solid #3f3f46;
-    scrollbar-size: 1 1;
+    scrollbar-size: 0 0;
 }
 
 /* OptionList Base Styles */
