@@ -304,9 +304,7 @@ class PasteCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         chat_input = app.query_one("#message-input", ChatInput)
-        if chat_input.try_paste_clipboard_image():
-            app.notify("Pasted image from clipboard!")
-        else:
+        if not chat_input.try_paste_clipboard_image():
             app.notify("No image found in clipboard", severity="warning")
         chat_input.focus()
 
