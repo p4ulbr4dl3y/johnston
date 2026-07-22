@@ -319,10 +319,10 @@ ModalScreen {
     height: auto;
     max-height: 10;
     margin-top: 1;
-    border: solid #27272a;
-    background: #09090b;
+    border: none;
+    background: #18181b;
     scrollbar-size: 1 1;
-    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color: #3f3f46 #18181b;
     scrollbar-color-hover: #ffffff #27272a;
     scrollbar-color-active: #ffffff #3f3f46;
 }
