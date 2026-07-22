@@ -184,7 +184,11 @@ class MCPProcessClient:
         except Exception:
             pass
 
-        return "\n".join(output_parts) or "Success (empty response)"
+        output_text = "\n".join(output_parts).strip()
+        if output_text:
+            return output_text
+
+        return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
 
 
 _mcp_manager_instance: Optional["MCPManager"] = None
