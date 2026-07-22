@@ -20,7 +20,8 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str]]]):
             for p_key, p_info in models_data.items():
                 p_name = p_info.get("name", p_key)
                 for m in p_info.get("models", []):
-                    opt_label = f"[{p_name}] {m}"
+                    clean_m = m.split("/")[-1] if "/" in m else m
+                    opt_label = f"[{p_name}] {clean_m}"
                     item_val = (p_key, m)
                     options.append(opt_label)
                     items.append(item_val)
@@ -31,8 +32,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str]]]):
             if not default_val and items:
                 default_val = items[0]
         else:
-            options = list(models_data)
-            items = list(models_data)
+            for m in models_data:
+                clean_m = m.split("/")[-1] if "/" in m else m
+                options.append(clean_m)
+                items.append(m)
             default_val = current_model if current_model in items else (items[0] if items else "")
 
         super().__init__(
