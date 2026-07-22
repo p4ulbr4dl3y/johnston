@@ -77,7 +77,16 @@ class StatusFooter(Static):
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
         dir_text = f"Dir: [{THEME_SECONDARY}]{directory}[/{THEME_SECONDARY}]"
-        prov_text = f"Provider: [{THEME_SECONDARY}]{provider_key}[/{THEME_SECONDARY}]" if provider_key else f"Provider: [{THEME_SECONDARY}]default[/{THEME_SECONDARY}]"
+        pm = getattr(self.app, "pm", None)
+        provider_display = provider_key
+        if pm:
+            providers = pm.load_providers()
+            if provider_key in providers:
+                provider_display = providers[provider_key].get("name", provider_key)
+        elif provider_key:
+            provider_display = provider_key.capitalize()
+
+        prov_text = f"Provider: [{THEME_SECONDARY}]{provider_display}[/{THEME_SECONDARY}]"
         from core.models_catalog import catalog
         clean_model = catalog.get_model_display_name(provider_key, model_name)
         model_text = f"Model: [{THEME_SECONDARY}]{clean_model}[/{THEME_SECONDARY}]" if clean_model else ""
