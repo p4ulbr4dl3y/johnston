@@ -5,12 +5,12 @@ from tools.base import BaseTool
 
 class ManageTaskTool(BaseTool):
     name = "ManageTask"
-    description = "Manage background tasks. Actions: 'list' (list running tasks), 'status' (get task status and recent output log), 'kill' (cancel/terminate background task)."
+    description = "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command)."
     schema = {
         "type": "function",
         "function": {
             "name": "ManageTask",
-            "description": "Manage background tasks. Actions: 'list' (list running tasks), 'status' (get task status and recent output log), 'kill' (cancel/terminate background task).",
+            "description": "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command).",
             "parameters": {
                 "type": "object",
                 "properties": {
