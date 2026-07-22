@@ -120,7 +120,7 @@ class PromptBuilder:
                 "1. Perform read-only codebase exploration using Read, ListDir, Glob, Grep.\n"
                 "2. Output your complete, detailed implementation plan DIRECTLY in your chat response text. Do NOT attempt to create or edit files on disk.\n"
                 "3. Your plan should clearly cover: Goal, Proposed File Changes, and Verification Steps.\n"
-                "4. When your plan is ready, call the PlanExit tool to signal completion and request user approval to switch to Build mode for execution."
+                "4. Present your plan and ask the user to confirm. Call the PlanExit tool AFTER the user approves the plan (or tells you to proceed) to switch to Build mode for execution."
             )
         elif mode_lower == "ask":
             sys_prompt += (
