@@ -36,6 +36,7 @@ class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
         self._vision: List[str] = []
+        self._names: Dict[str, str] = {}
         self.load_cache()
 
     def load_cache(self) -> bool:
@@ -46,12 +47,13 @@ class ModelsCatalog:
                     if time.time() - data.get("updated_at", 0) < CACHE_TTL:
                         self._limits = data.get("model_limits", {})
                         self._vision = data.get("vision_models", [])
+                        self._names = data.get("model_names", {})
                         return True
             except Exception:
                 pass
         return False
 
-    def save_cache(self, model_limits: Dict[str, int], vision_models: list[str]):
+    def save_cache(self, model_limits: Dict[str, int], vision_models: List[str], model_names: Dict[str, str]):
         os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
         try:
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
@@ -60,6 +62,7 @@ class ModelsCatalog:
                         "updated_at": time.time(),
                         "model_limits": model_limits,
                         "vision_models": vision_models,
+                        "model_names": model_names,
                     },
                     f,
                     indent=2,
@@ -69,7 +72,8 @@ class ModelsCatalog:
 
     async def refresh(self) -> Dict[str, int]:
         model_limits: Dict[str, int] = {}
-        vision_models: list[str] = []
+        vision_models: List[str] = []
+        model_names: Dict[str, str] = {}
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(OPENROUTER_MODELS_URL, timeout=10)
@@ -78,6 +82,12 @@ class ModelsCatalog:
                     for m in data.get("data", []):
                         if isinstance(m, dict) and "id" in m:
                             m_id = m["id"]
+                            raw_name = m.get("name", "")
+                            clean_name = raw_name.split(": ", 1)[-1] if ": " in raw_name else raw_name
+                            if clean_name:
+                                model_names[m_id] = clean_name
+                                model_names[m_id.split("/")[-1].lower()] = clean_name
+
                             ctx = (
                                 m.get("context_length")
                                 or (m.get("top_provider", {}) or {}).get("context_length")
@@ -98,7 +108,8 @@ class ModelsCatalog:
 
                     self._limits = model_limits
                     self._vision = vision_models
-                    self.save_cache(model_limits, vision_models)
+                    self._names = model_names
+                    self.save_cache(model_limits, vision_models, model_names)
         except Exception as e:
             print(f"Error fetching OpenRouter models catalog: {e}")
         return self._limits
@@ -156,6 +167,26 @@ class ModelsCatalog:
                 return True
 
         return False
+
+    def get_model_display_name(self, provider_id: str, model_id: str) -> str:
+        if not model_id:
+            return ""
+
+        if not self._names:
+            self.load_cache()
+
+        if model_id in self._names:
+            return self._names[model_id]
+
+        m_base = model_id.split("/")[-1].lower()
+        if m_base in self._names:
+            return self._names[m_base]
+
+        # Красивое дефолтное форматирование без префикса организации
+        base_raw = model_id.split("/")[-1]
+        parts = base_raw.replace("_", "-").split("-")
+        capitalized = " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
+        return capitalized
 
 
 catalog = ModelsCatalog()

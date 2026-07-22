@@ -76,10 +76,10 @@ class StatusFooter(Static):
         if not directory:
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
-        # Строка 1: Окружение и Режим
         dir_text = f"Dir: [{THEME_SECONDARY}]{directory}[/{THEME_SECONDARY}]"
         prov_text = f"Provider: [{THEME_SECONDARY}]{provider_key}[/{THEME_SECONDARY}]" if provider_key else f"Provider: [{THEME_SECONDARY}]default[/{THEME_SECONDARY}]"
-        clean_model = model_name.split("/")[-1] if "/" in model_name else model_name
+        from core.models_catalog import catalog
+        clean_model = catalog.get_model_display_name(provider_key, model_name)
         model_text = f"Model: [{THEME_SECONDARY}]{clean_model}[/{THEME_SECONDARY}]" if clean_model else ""
         left_1_parts = [dir_text, prov_text]
         if model_text:

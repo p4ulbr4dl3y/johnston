@@ -13,7 +13,7 @@ KEY = "opencode"
 DESCRIPTION = "OpenCode Go agent (DeepSeek v4 Flash) with tools"
 
 BASE_URL = "https://opencode.ai/zen/go/v1"
-MODEL = "mimo-v2.5"
+MODEL = "qwen3.7-max"
 API_KEY = os.getenv("OPENCODE_API_KEY", "")
 
 try:
