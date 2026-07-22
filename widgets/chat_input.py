@@ -268,7 +268,7 @@ class ChatInput(TextArea):
         return False
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("ctrl+v", "cmd+v", "ctrl+shift+v", "meta+v"):
+        if event.key in ("ctrl+v", "cmd+v", "ctrl+shift+v", "ctrl+p", "ctrl+i", "meta+v", "super+v"):
             if self.try_paste_clipboard_image():
                 event.prevent_default()
                 event.stop()

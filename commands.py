@@ -298,6 +298,19 @@ class ModeCommand(BaseCommand):
         app.notify(f"Mode switched: {new_mode.upper()}")
 
 
+class PasteCommand(BaseCommand):
+    name = "/paste"
+    description = "Paste image from clipboard into input"
+
+    async def execute(self, app) -> None:
+        chat_input = app.query_one("#message-input", ChatInput)
+        if chat_input.try_paste_clipboard_image():
+            app.notify("Pasted image from clipboard!")
+        else:
+            app.notify("No image found in clipboard", severity="warning")
+        chat_input.focus()
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -314,6 +327,7 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         PlanCommand,
         BuildCommand,
         ModeCommand,
+        PasteCommand,
     ]
 }
 
