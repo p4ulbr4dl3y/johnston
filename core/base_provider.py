@@ -26,6 +26,8 @@ class BaseAgent:
         self.app = None
         self.tokens_input = 0
         self.tokens_output = 0
+        self.tokens_cache_read = 0
+        self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
         self.mode = "build"
@@ -42,6 +44,8 @@ class BaseAgent:
         self.history.clear()
         self.tokens_input = 0
         self.tokens_output = 0
+        self.tokens_cache_read = 0
+        self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
 
@@ -50,6 +54,8 @@ class BaseAgent:
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
+            "tokens_cache_read": getattr(self, "tokens_cache_read", 0),
+            "context_used": getattr(self, "last_context_tokens", 0),
             "context": self.context_window,
             "context_limit": self.context_limit,
             "cost_usd": getattr(self, "cost_usd", 0.0)
@@ -164,14 +170,20 @@ class BaseAgent:
                 if step_usage and step_usage.get("total_tokens", 0) > 0:
                     in_tok = step_usage["prompt_tokens"]
                     out_tok = step_usage["completion_tokens"]
+                    cache_read_tok = step_usage.get("cache_read_tokens", 0)
+                    uncached_in = max(0, in_tok - cache_read_tok)
+
                     self.tokens_input += in_tok
                     self.tokens_output += out_tok
+                    self.tokens_cache_read += cache_read_tok
+                    self.last_context_tokens = in_tok
                     self.total_tokens += step_usage["total_tokens"]
-                    self.cost_usd += (in_tok * p_prompt + out_tok * p_comp)
+                    self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * 0.1) + out_tok * p_comp)
                 else:
                     output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
                     self.tokens_input += prompt_tokens_est
                     self.tokens_output += output_tokens_est
+                    self.last_context_tokens = prompt_tokens_est
                     self.total_tokens += (prompt_tokens_est + output_tokens_est)
                     self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
 

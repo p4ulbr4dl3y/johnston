@@ -45,6 +45,7 @@ class StatusFooter(Static):
                 active_bg_tasks=active_bg_tasks,
                 subagents_active=subagents_active,
                 subagents_total=subagents_total,
+                context_used=metrics.get("context_used", 0),
                 total_tokens=metrics.get("total_tokens", 0),
                 context_window=metrics.get("context", "128k"),
                 context_limit=metrics.get("context_limit", 128000),
@@ -65,6 +66,7 @@ class StatusFooter(Static):
         active_bg_tasks: int = 0,
         subagents_active: int = 0,
         subagents_total: int = 0,
+        context_used: int = 0,
         total_tokens: int = 0,
         context_window: str = "128k",
         context_limit: int = 128000,
@@ -103,7 +105,8 @@ class StatusFooter(Static):
             row1_left = " • ".join(row1_left_parts)
             row1_right = f"[{THEME_SECONDARY}]MCP:{mcp_active}[/{THEME_SECONDARY}]" if mcp_total > 0 else ""
 
-            pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
+            ctx_val = context_used if context_used > 0 else total_tokens
+            pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
             row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/{THEME_SECONDARY}]"
@@ -135,12 +138,13 @@ class StatusFooter(Static):
             row1_right = "  •  ".join(row1_right_parts)
 
             # Строка 2: Слева (Контекст), Справа (Токены • Стоимость • Активность)
-            pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
+            ctx_val = context_used if context_used > 0 else total_tokens
+            pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             bar_len = 8
             filled = int(round((pct / 100) * bar_len))
             bar_str = "█" * filled + "░" * (bar_len - filled)
-            used_formatted = format_context_tokens(total_tokens)
+            used_formatted = format_context_tokens(ctx_val)
 
             pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
             row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"

@@ -25,17 +25,23 @@ def estimate_tokens(input_val: Any) -> int:
 
 def parse_usage(usage: Any) -> Dict[str, int]:
     """
-    Extract token counts from API usage object if available.
+    Extract token counts from API usage object if available, including cache details.
     """
     if not usage:
-        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cache_read_tokens": 0}
 
     prompt = getattr(usage, "prompt_tokens", 0) or 0
     completion = getattr(usage, "completion_tokens", 0) or 0
     total = getattr(usage, "total_tokens", 0) or (prompt + completion)
 
+    cache_read = 0
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    if prompt_details:
+        cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
+
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": total,
+        "cache_read_tokens": cache_read,
     }
