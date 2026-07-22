@@ -27,6 +27,7 @@ class BaseAgent:
         self.tokens_input = 0
         self.tokens_output = 0
         self.total_tokens = 0
+        self.cost_usd = 0.0
         self.mode = "build"
 
     @property
@@ -42,6 +43,7 @@ class BaseAgent:
         self.tokens_input = 0
         self.tokens_output = 0
         self.total_tokens = 0
+        self.cost_usd = 0.0
 
     def get_metrics(self) -> Dict[str, Any]:
         return {
@@ -146,15 +148,23 @@ class BaseAgent:
                                 if tc.function.arguments:
                                     tool_calls_dict[idx]["arguments"] += tc.function.arguments
 
+                pricing = catalog.get_model_pricing(self.provider_key, self.model)
+                p_prompt = pricing.get("prompt", 0.0)
+                p_comp = pricing.get("completion", 0.0)
+
                 if step_usage and step_usage.get("total_tokens", 0) > 0:
-                    self.tokens_input += step_usage["prompt_tokens"]
-                    self.tokens_output += step_usage["completion_tokens"]
+                    in_tok = step_usage["prompt_tokens"]
+                    out_tok = step_usage["completion_tokens"]
+                    self.tokens_input += in_tok
+                    self.tokens_output += out_tok
                     self.total_tokens += step_usage["total_tokens"]
+                    self.cost_usd += (in_tok * p_prompt + out_tok * p_comp)
                 else:
                     output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
                     self.tokens_input += prompt_tokens_est
                     self.tokens_output += output_tokens_est
                     self.total_tokens += (prompt_tokens_est + output_tokens_est)
+                    self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
 
                 if thinking_started:
                     dt = time.time() - t0

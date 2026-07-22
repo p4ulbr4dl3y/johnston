@@ -39,6 +39,7 @@ class ModelsCatalog:
         self._limits: Dict[str, int] = {}
         self._vision: List[str] = []
         self._names: Dict[str, str] = {}
+        self._pricing: Dict[str, Dict[str, float]] = {}
         self.load_cache()
 
     def load_cache(self) -> bool:
@@ -50,12 +51,19 @@ class ModelsCatalog:
                         self._limits = data.get("model_limits", {})
                         self._vision = data.get("vision_models", [])
                         self._names = data.get("model_names", {})
+                        self._pricing = data.get("model_pricing", {})
                         return True
             except Exception:
                 pass
         return False
 
-    def save_cache(self, model_limits: Dict[str, int], vision_models: List[str], model_names: Dict[str, str]):
+    def save_cache(
+        self,
+        model_limits: Dict[str, int],
+        vision_models: List[str],
+        model_names: Dict[str, str],
+        model_pricing: Dict[str, Dict[str, float]] = None,
+    ):
         os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
         try:
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
@@ -65,6 +73,7 @@ class ModelsCatalog:
                         "model_limits": model_limits,
                         "vision_models": vision_models,
                         "model_names": model_names,
+                        "model_pricing": model_pricing or {},
                     },
                     f,
                     indent=2,
@@ -76,6 +85,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = {}
         vision_models: List[str] = []
         model_names: Dict[str, str] = {}
+        model_pricing: Dict[str, Dict[str, float]] = {}
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.get(OPENROUTER_MODELS_URL, timeout=10)
@@ -108,10 +118,19 @@ class ModelsCatalog:
                             if "image" in input_mods or "vision" in input_mods:
                                 vision_models.append(m_id)
 
+                            pricing_raw = m.get("pricing") if isinstance(m.get("pricing"), dict) else {}
+                            p_prompt = float(pricing_raw.get("prompt") or 0.0)
+                            p_comp = float(pricing_raw.get("completion") or 0.0)
+                            if p_prompt > 0 or p_comp > 0:
+                                p_item = {"prompt": p_prompt, "completion": p_comp}
+                                model_pricing[m_id] = p_item
+                                model_pricing[m_id.split("/")[-1].lower()] = p_item
+
                     self._limits = model_limits
                     self._vision = vision_models
                     self._names = model_names
-                    self.save_cache(model_limits, vision_models, model_names)
+                    self._pricing = model_pricing
+                    self.save_cache(model_limits, vision_models, model_names, model_pricing)
         except Exception as e:
             print(f"Error fetching OpenRouter models catalog: {e}")
         return self._limits
@@ -189,6 +208,30 @@ class ModelsCatalog:
         parts = base_raw.replace("_", "-").split("-")
         capitalized = " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
         return capitalized
+
+    def get_model_pricing(self, provider_id: str, model_id: str) -> Dict[str, float]:
+        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    pricing = cdata.get("model_pricing", {})
+                    if model_id in pricing and isinstance(pricing[model_id], dict):
+                        return pricing[model_id]
+            except Exception:
+                pass
+
+        if not self._pricing:
+            self.load_cache()
+
+        if model_id in self._pricing:
+            return self._pricing[model_id]
+
+        m_base = model_id.split("/")[-1].lower()
+        if m_base in self._pricing:
+            return self._pricing[m_base]
+
+        return {"prompt": 0.0, "completion": 0.0}
 
 
 catalog = ModelsCatalog()

@@ -252,6 +252,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(truncated.startswith("aaaaaaaaaa"))
         self.assertIn("Output truncated at 10 chars. Use line ranges.", truncated)
 
+    def test_agent_cost_usd_calculation(self):
+        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        self.assertEqual(agent.cost_usd, 0.0)
+        metrics = agent.get_metrics()
+        self.assertEqual(metrics["cost_usd"], 0.0)
+
+        agent.cost_usd = 0.0025
+        self.assertEqual(agent.get_metrics()["cost_usd"], 0.0025)
+
+        agent.clear_history()
+        self.assertEqual(agent.cost_usd, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

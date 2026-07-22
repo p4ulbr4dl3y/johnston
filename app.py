@@ -142,6 +142,7 @@ class JohnstonChatApp(App):
             self.agent.tokens_input = session_data.get("tokens_input", 0)
             self.agent.tokens_output = session_data.get("tokens_output", 0)
             self.agent.total_tokens = session_data.get("total_tokens", 0)
+            self.agent.cost_usd = session_data.get("cost_usd", 0.0)
 
         self.refresh_status_footer()
 
@@ -186,7 +187,8 @@ class JohnstonChatApp(App):
             "agent_history": agent_history,
             "tokens_input": getattr(self.agent, "tokens_input", 0),
             "tokens_output": getattr(self.agent, "tokens_output", 0),
-            "total_tokens": getattr(self.agent, "total_tokens", 0)
+            "total_tokens": getattr(self.agent, "total_tokens", 0),
+            "cost_usd": getattr(self.agent, "cost_usd", 0.0)
         }
         self.sm.save_session(self.current_session_id, session_data)
         self.refresh_status_footer()

@@ -85,6 +85,19 @@ class TestModelsCatalog(unittest.TestCase):
         window = get_context_window("opencode", "deepseek-v4-flash")
         self.assertIsInstance(window, str)
 
+    def test_get_model_pricing(self):
+        catalog = ModelsCatalog()
+        catalog._pricing = {
+            "openai/gpt-4o": {"prompt": 0.0000025, "completion": 0.00001}
+        }
+        pricing = catalog.get_model_pricing("openrouter", "openai/gpt-4o")
+        self.assertEqual(pricing["prompt"], 0.0000025)
+        self.assertEqual(pricing["completion"], 0.00001)
+
+        pricing_unknown = catalog.get_model_pricing("openrouter", "unknown")
+        self.assertEqual(pricing_unknown["prompt"], 0.0)
+        self.assertEqual(pricing_unknown["completion"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
