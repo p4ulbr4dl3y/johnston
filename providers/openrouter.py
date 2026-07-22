@@ -13,7 +13,7 @@ KEY = "openrouter"
 DESCRIPTION = "OpenRouter multi-model AI agent with tools"
 
 BASE_URL = "https://openrouter.ai/api/v1"
-MODEL = "openrouter/free"
+MODEL = "openai/o3-mini"
 API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 try:

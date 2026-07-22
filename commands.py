@@ -114,8 +114,8 @@ class ModelsCommand(BaseCommand):
 
         def on_model_selected(selection: tuple[str, str] | str | None) -> None:
             if selection:
-                if isinstance(selection, tuple):
-                    selected_prov, selected_model = selection
+                if isinstance(selection, (tuple, list)):
+                    selected_prov, selected_model = selection[0], selection[1]
                 else:
                     selected_prov = curr_provider
                     selected_model = selection

@@ -58,19 +58,23 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             self.filtered_items = list(self.raw_items)
             self.filtered_options = list(self.raw_options)
         else:
+            import re
             tokens = query_raw.split()
             scored_matches = []
             for opt, item in zip(self.raw_options, self.raw_items):
                 if item is None:
                     continue
                 opt_text = opt.prompt if hasattr(opt, "prompt") else str(opt)
-                target_str = (str(item) + " " + opt_text).lower()
+                raw_target = f"{item} {opt_text}".lower()
+                norm_target = re.sub(r"[^a-z0-9]+", " ", raw_target)
+                target_str = f"{raw_target} {norm_target}"
+
                 if all(t in target_str for t in tokens):
                     score = 0
                     if query_raw in target_str:
                         score += 100
                     for t in tokens:
-                        if target_str.startswith(t) or f"/{t}" in target_str or f"-{t}" in target_str or f":{t}" in target_str:
+                        if target_str.startswith(t) or f" {t}" in target_str or f"/{t}" in target_str or f"-{t}" in target_str:
                             score += 10
                     scored_matches.append((score, opt, item))
 

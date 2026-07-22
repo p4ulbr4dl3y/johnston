@@ -31,7 +31,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 for m in p_models:
                     clean_m = m.split("/")[-1] if "/" in m else m
                     opt_label = f"   {clean_m}"
-                    item_val = (p_key, m)
+                    item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
 
