@@ -326,23 +326,27 @@ class JohnstonChatApp(App):
                         thinking_widget.finish_thinking(duration, val2)
                     thinking_widget = None
                 elif event_type == "tool":
-                    current_tool_widget = await chat_view.add_tool_call(val1, val2)
+                    if bot_msg and not bot_msg.content.strip():
+                        bot_msg.remove()
                     bot_msg = None
+                    current_tool_widget = await chat_view.add_tool_call(val1, val2)
                 elif event_type == "tool_result":
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)
                 elif event_type in ("bot_chunk", "bot_delta"):
-                    if bot_msg is None:
-                        bot_msg = await chat_view.add_bot_message()
-                    if event_type == "bot_delta":
-                        bot_msg.content = val1
-                    else:
-                        bot_msg.content += val1
+                    if val1.strip():
+                        if bot_msg is None:
+                            bot_msg = await chat_view.add_bot_message()
+                        if event_type == "bot_delta":
+                            bot_msg.content = val1
+                        else:
+                            bot_msg.content += val1
                 elif event_type in ("bot_text", "outro"):
-                    if bot_msg is None:
-                        bot_msg = await chat_view.add_bot_message()
-                    bot_msg.content = val1
-                    bot_msg = None
+                    if val1.strip():
+                        if bot_msg is None:
+                            bot_msg = await chat_view.add_bot_message()
+                        bot_msg.content = val1
+                        bot_msg = None
         except asyncio.CancelledError:
             if thinking_widget:
                 thinking_widget.finish_thinking(0.0, "Generation stopped (Esc).")
