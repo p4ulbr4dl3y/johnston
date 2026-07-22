@@ -84,7 +84,7 @@ class Agent(BaseAgent):
 ## 3. Выполнение Инструментов (Tools) и `ToolContext`
 
 Инструменты изолированы в директории [tools/](file:///Users/yegor/tui/tools/).
-Все доступные инструменты регистрируются в [tools/registry.py](file:///Users/yegor/tui/tools/registry.py). Изоляция UI от бизнес-логики обеспечивается объектом `ToolContext` ([tools/context.py](file:///Users/yegor/tui/tools/context.py)). Встроенные инструменты включают: `Read`, `Create`, `Edit`, `Bash`, `Glob`, `Grep`, `ListDir`, `AskUser`, `Skill`, `ManageTask`, `PlanExit`, `Task`. Для корректной оптимизации вывода больших ответов используется утилита усечения `truncate_output`.
+Все доступные инструменты регистрируются в [tools/registry.py](file:///Users/yegor/tui/tools/registry.py). Изоляция UI от бизнес-логики обеспечивается объектом `ToolContext` ([tools/context.py](file:///Users/yegor/tui/tools/context.py)). Встроенные инструменты включают: `Read`, `Create`, `Edit`, `Bash`, `Glob`, `Grep`, `ListDir`, `AskUser`, `Skill`, `ManageTask`, `PlanExit`, `Subagent`. Для корректной оптимизации вывода больших ответов используется утилита усечения `truncate_output`.
 
 ### Как добавить новый инструмент:
 1. Создайте файл `tools/my_tool.py`, унаследовав `BaseTool`:
@@ -136,13 +136,13 @@ class Agent(BaseAgent):
 
 ---
 
-## 5. Субагенты (Subagents & Task Tool)
+## 5. Субагенты (Subagents & Subagent Tool)
 
 Проект поддерживает запуск автономных изолированных субагентов для подзадач:
-* **`TaskTool`** (`tools/task.py`): инструмент для создания субагента подзадачи.
+* **`SubagentTool`** (`tools/task.py`): инструмент для создания субагента подзадачи.
   * `subagent_type`: `"general"` (мультишаговый) или `"explore"` (быстрый поиск кода).
   * `background`: `false` (синхронное ожидание результата в `<task_result>`) или `true` (фоновое асинхронное исполнение с авто-уведомлением в чате по финишу).
-* **Изоляция**: субагент запускается в изолированном контексте `BaseAgent` без рекурсивного доступа к инструменту `Task`.
+* **Изоляция**: субагент запускается в изолированном контексте `BaseAgent` без рекурсивного доступа к инструменту `Subagent`.
 
 ---
 

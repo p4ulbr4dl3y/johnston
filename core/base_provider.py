@@ -240,6 +240,12 @@ class BaseAgent:
                             target = f'"{q_text}"'
                         else:
                             target = "AskUser"
+                    elif t_name in ("Subagent", "Task"):
+                        desc = args.get("description") or args.get("prompt") or ""
+                        if desc:
+                            target = f'"{desc}"'
+                        else:
+                            target = t_name
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:

@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
 from tools.plan_exit import PlanExitTool
-from tools.task import TaskTool
+from tools.task import SubagentTool
 
 
 def get_git_info() -> str:
@@ -138,8 +138,8 @@ class PromptBuilder:
             if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
                 all_tools.append(PlanExitTool.schema)
 
-        if self.allow_task and not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
-            all_tools.append(TaskTool.schema)
+        if self.allow_task and not any(t.get("function", {}).get("name") in ("Subagent", "Task", "task") for t in all_tools):
+            all_tools.append(SubagentTool.schema)
 
         if provider_key and model_id and not catalog.supports_vision(provider_key, model_id):
             updated_tools = []

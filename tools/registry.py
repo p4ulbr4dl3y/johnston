@@ -12,7 +12,7 @@ from tools.manage_task import ManageTaskTool
 from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
-from tools.task import TaskTool
+from tools.task import SubagentTool
 from tools.view_image import ViewImageTool
 
 TOOL_CLASSES = [
@@ -27,7 +27,7 @@ TOOL_CLASSES = [
     SkillTool,
     ManageTaskTool,
     PlanExitTool,
-    TaskTool,
+    SubagentTool,
     ViewImageTool,
 ]
 

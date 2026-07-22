@@ -6,8 +6,8 @@ from core.background_task import BackgroundSubagent
 from tools.base import BaseTool
 
 
-class TaskTool(BaseTool):
-    name = "Task"
+class SubagentTool(BaseTool):
+    name = "Subagent"
     description = (
         "Launch a subagent to perform a task. "
         "Use subagent_type='explore' for quick codebase searches, or 'general' for multi-step tasks. "
@@ -16,7 +16,7 @@ class TaskTool(BaseTool):
     schema = {
         "type": "function",
         "function": {
-            "name": "Task",
+            "name": "Subagent",
             "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
             "parameters": {
                 "type": "object",

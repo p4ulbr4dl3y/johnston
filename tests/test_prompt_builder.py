@@ -24,14 +24,14 @@ class TestPromptBuilder(unittest.TestCase):
         tools = builder.build_tools()
         names = [t["function"]["name"] for t in tools]
         self.assertIn("PlanExit", names)
-        self.assertIn("Task", names)
+        self.assertIn("Subagent", names)
 
     def test_build_tools_build_mode_no_plan_exit(self):
         builder = PromptBuilder("System prompt test", [], mode="build")
         tools = builder.build_tools()
         names = [t["function"]["name"] for t in tools]
         self.assertNotIn("PlanExit", names)
-        self.assertIn("Task", names)
+        self.assertIn("Subagent", names)
 
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], mode="build")

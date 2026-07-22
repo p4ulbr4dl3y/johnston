@@ -207,7 +207,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             pm = DummyPM()
 
         app = DummyApp()
-        res = await execute_tool("Task", {"prompt": "do research", "description": "research task"}, app=app)
+        res = await execute_tool("Subagent", {"prompt": "do research", "description": "research task"}, app=app)
         self.assertIn("<task_result>", res)
         self.assertIn("Subagent answer for: do research", res)
 
@@ -237,7 +237,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 pass
 
         app = DummyApp()
-        res = await execute_tool("Task", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
+        res = await execute_tool("Subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
         self.assertIn("launched in background", res)
         self.assertEqual(len(app.background_tasks), 1)
         self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
