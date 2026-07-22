@@ -129,7 +129,15 @@ class ToolCallWidget(Vertical):
         self.render_header()
 
     def set_result(self, result_text: str) -> None:
-        self.result_text = result_text.strip()
+        cleaned = result_text.strip()
+        if self.tool_type == "Bash":
+            if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
+                self.render_header()
+                return
+            if cleaned:
+                self.result_text = cleaned
+        else:
+            self.result_text = cleaned
         self.render_header()
         if self.is_expanded:
             self.render_content()
@@ -336,10 +344,14 @@ class ToolCallWidget(Vertical):
         return cleaned.strip()
 
     def append_bash_output(self, text: str) -> None:
-        if not self.result_text or "[Background Task ID:" in self.result_text:
-            self.result_text = text
+        cleaned_line = self._clean_bash_output(text)
+        if not cleaned_line:
+            return
+        if not self.result_text:
+            self.result_text = cleaned_line
         else:
-            self.result_text += text
+            sep = "" if self.result_text.endswith("\n") else "\n"
+            self.result_text += sep + cleaned_line
         if self.is_expanded:
             self.render_content()
 
