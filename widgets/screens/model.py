@@ -1,9 +1,11 @@
 from typing import Any, Dict, List, Tuple, Union
 
+from textual.widgets.option_list import Option
+
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
-class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str]]]):
+class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
     """Modal model selection screen (/models)"""
 
     def __init__(
@@ -12,16 +14,23 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str]]]):
         current_model: str = "",
         current_provider: str = ""
     ):
-        options: List[str] = []
-        items: List[Union[str, Tuple[str, str]]] = []
-        default_val: Union[str, Tuple[str, str]] = ""
+        options: List[Union[str, Option]] = []
+        items: List[Union[str, Tuple[str, str], None]] = []
+        default_val: Union[str, Tuple[str, str], None] = None
 
         if isinstance(models_data, dict):
             for p_key, p_info in models_data.items():
                 p_name = p_info.get("name", p_key)
-                for m in p_info.get("models", []):
+                p_models = p_info.get("models", [])
+                if not p_models:
+                    continue
+
+                options.append(Option(f"── {p_name} ──", disabled=True))
+                items.append(None)
+
+                for m in p_models:
                     clean_m = m.split("/")[-1] if "/" in m else m
-                    opt_label = f"[{p_name}] {clean_m}"
+                    opt_label = f"   {clean_m}"
                     item_val = (p_key, m)
                     options.append(opt_label)
                     items.append(item_val)
@@ -29,8 +38,9 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str]]]):
                     if p_key == current_provider and m == current_model:
                         default_val = item_val
 
-            if not default_val and items:
-                default_val = items[0]
+            valid_items = [it for it in items if it is not None]
+            if not default_val and valid_items:
+                default_val = valid_items[0]
         else:
             for m in models_data:
                 clean_m = m.split("/")[-1] if "/" in m else m

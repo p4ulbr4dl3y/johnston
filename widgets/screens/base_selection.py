@@ -61,7 +61,10 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             tokens = query_raw.split()
             scored_matches = []
             for opt, item in zip(self.raw_options, self.raw_items):
-                target_str = (str(item) + " " + opt).lower()
+                if item is None:
+                    continue
+                opt_text = opt.prompt if hasattr(opt, "prompt") else str(opt)
+                target_str = (str(item) + " " + opt_text).lower()
                 if all(t in target_str for t in tokens):
                     score = 0
                     if query_raw in target_str:
@@ -85,9 +88,11 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list = self.query_one("#modal-option-list", OptionList)
         idx = opt_list.highlighted
         if idx is not None and 0 <= idx < len(self.filtered_items):
-            self.dismiss(self.filtered_items[idx])
-        else:
-            self.dismiss(self.default_value)
+            item = self.filtered_items[idx]
+            if item is not None:
+                self.dismiss(item)
+                return
+        self.dismiss(self.default_value)
 
     def _on_key(self, event: events.Key) -> None:
         if self.show_search and event.key == "down":
@@ -118,6 +123,8 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_items):
-            self.dismiss(self.filtered_items[event.option_index])
-        else:
-            self.dismiss(self.default_value)
+            item = self.filtered_items[event.option_index]
+            if item is not None:
+                self.dismiss(item)
+                return
+        self.dismiss(self.default_value)
