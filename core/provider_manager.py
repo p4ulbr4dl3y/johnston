@@ -31,6 +31,7 @@ class ProviderManager:
 
     def ensure_config_dir(self):
         os.makedirs(PROVIDERS_DIR, exist_ok=True)
+        os.makedirs(CONFIG_DIR, exist_ok=True)
 
         opencode_file = os.path.join(PROVIDERS_DIR, "opencode.py")
         if not os.path.exists(opencode_file):
@@ -43,7 +44,7 @@ class ProviderManager:
             self.set_active_provider_key("opencode")
 
     def load_providers(self) -> Dict[str, Any]:
-        """Динамически загружает все .py провайдеры из ~/.johnston/providers/"""
+        """Динамически загружает все .py провайдеры из локальной директории providers/"""
         providers = {}
         if not os.path.exists(PROVIDERS_DIR):
             return providers
@@ -97,6 +98,32 @@ class ProviderManager:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
+    def get_api_key(self, key: str) -> str:
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    api_keys = data.get("api_keys", {})
+                    if key in api_keys and api_keys[key]:
+                        return api_keys[key]
+            except Exception:
+                pass
+        return os.getenv(f"{key.upper()}_API_KEY", "")
+
+    def set_provider_api_key(self, key: str, api_key: str):
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        if "api_keys" not in data:
+            data["api_keys"] = {}
+        data["api_keys"][key] = api_key
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
     def set_provider_model(self, key: str, model_name: str):
         """Сохраняет выбранную модель для провайдера в конфиг и в .py файл провайдера"""
         data = {}
@@ -139,9 +166,15 @@ class ProviderManager:
             first_key = list(providers.keys())[0]
             target_provider = providers[first_key]
         else:
-            raise RuntimeError("No available providers in ~/.johnston/providers/")
+            raise RuntimeError("No available providers in project providers/")
 
-        agent = target_provider["module"].Agent()
+        mod = target_provider["module"]
+        stored_key = self.get_api_key(active_key)
+        kwargs = {}
+        if stored_key:
+            kwargs["api_key"] = stored_key
+
+        agent = mod.Agent(**kwargs)
 
         if os.path.exists(CONFIG_FILE):
             try:
@@ -179,7 +212,7 @@ class ProviderManager:
 
         mod = providers[provider_key]["module"]
         base_url = getattr(mod, "BASE_URL", None)
-        api_key = getattr(mod, "API_KEY", None)
+        api_key = self.get_api_key(provider_key) or getattr(mod, "API_KEY", None)
 
         models = []
         model_limits = {}
@@ -228,3 +261,16 @@ class ProviderManager:
                 print(f"Error writing models cache: {e}")
 
         return models
+
+    async def fetch_models_grouped(self, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+        """Возвращает словари моделей, сгруппированные по провайдерам"""
+        providers = self.load_providers()
+        grouped = {}
+        for p_key, p_data in providers.items():
+            models = await self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
+            grouped[p_key] = {
+                "name": p_data["name"],
+                "models": models
+            }
+        return grouped
+

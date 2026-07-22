@@ -50,6 +50,11 @@ class TestProviderManager(unittest.TestCase):
         self.assertIsNotNone(agent)
         self.assertEqual(agent.model, "deepseek-v4-flash")
 
+    def test_api_keys(self):
+        self.assertEqual(self.pm.get_api_key("opencode"), "")
+        self.pm.set_provider_api_key("opencode", "test-key-123")
+        self.assertEqual(self.pm.get_api_key("opencode"), "test-key-123")
+
     @patch("httpx.AsyncClient")
     async def _async_test_fetch_models(self, mock_client_cls):
         # Setup mock responses for httpx

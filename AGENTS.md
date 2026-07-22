@@ -19,10 +19,10 @@ graph TD
 
 ## 1. Провайдеры (Providers)
 
-Каждый провайдер описывается отдельным `.py` файлом в директории `~/.johnston/providers/`.
-При старте приложения `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/tui/core/provider_manager.py)) динамически импортирует эти файлы. По умолчанию использует шаблон [templates/opencode_provider.py.template](file:///Users/yegor/tui/templates/opencode_provider.py.template).
+Каждый провайдер описывается отдельным `.py` файлом в локальной директории `providers/` проекта.
+При старте приложения `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/tui/core/provider_manager.py)) динамически импортирует эти файлы.
 
-### Пример конфигурации провайдера (`~/.johnston/providers/opencode.py`):
+### Пример конфигурации провайдера (`providers/opencode.py`):
 ```python
 try:
     from core.base_provider import BaseAgent
@@ -123,7 +123,8 @@ class Agent(BaseAgent):
 * `/mode` — переключить режим (`plan` <-> `build`).
 * `/compact` — выполнить принудительную компактизацию истории диалога.
 * `/init` — интерактивный запуск генерации/обновления инструкции `AGENTS.md` для текущего репозитория.
-* `/provider`, `/models` — смена активного провайдера и модели.
+* `/connect` — подключение провайдера и настройка API-ключа (`/provider` — алиас).
+* `/models` — выбор модели с группировкой по провайдерам.
 * `/skills`, `/mcp` — управление навыками и MCP-серверами.
 * `/tasks` — просмотр и управление фоновыми задачами.
 * `/rewind`, `/resume` — откат истории или возобновление сессии.

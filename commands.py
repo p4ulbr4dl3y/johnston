@@ -4,10 +4,11 @@ from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import BotMessage, ChatView
 from widgets.modal_screens import (
+    ApiKeyInputScreen,
+    ConnectProviderScreen,
     HelpScreen,
     MCPScreen,
     ModelScreen,
-    ProviderScreen,
     ResumeScreen,
     RewindScreen,
     SkillsScreen,
@@ -51,52 +52,87 @@ class NewCommand(BaseCommand):
         app.notify("New chat session created!")
 
 
-class ProviderCommand(BaseCommand):
-    name = "/provider"
-    description = "Switch AI provider"
+class ConnectCommand(BaseCommand):
+    name = "/connect"
+    description = "Connect AI provider and configure API key"
 
     async def execute(self, app) -> None:
         providers = app.pm.load_providers()
         if not providers:
-            app.notify("No available providers", severity="warning")
+            app.notify("No available providers in project providers/", severity="warning")
             return
 
-        def on_provider_selected(selected_key: str) -> None:
-            if selected_key:
-                app.pm.set_active_provider_key(selected_key)
-                app.agent = app.pm.create_active_agent()
-                app.agent.app = app
-                app.refresh_status_footer()
-                app.notify(f"Provider switched: {selected_key}")
-            app.query_one("#message-input", ChatInput).focus()
+        active_key = app.pm.get_active_provider_key()
+        configured_keys = {
+            k: app.pm.get_api_key(k) for k in providers
+        }
 
-        app.push_screen(ProviderScreen(providers), callback=on_provider_selected)
+        def on_provider_selected(selected_key: str | None) -> None:
+            if not selected_key:
+                app.query_one("#message-input", ChatInput).focus()
+                return
+
+            provider_info = providers.get(selected_key, {})
+            p_name = provider_info.get("name", selected_key)
+            curr_key = app.pm.get_api_key(selected_key)
+
+            def on_key_entered(entered_key: str | None) -> None:
+                if entered_key is not None:
+                    if entered_key:
+                        app.pm.set_provider_api_key(selected_key, entered_key)
+                    app.pm.set_active_provider_key(selected_key)
+                    app.agent = app.pm.create_active_agent()
+                    app.agent.app = app
+                    app.refresh_status_footer()
+                    app.notify(f"Connected to provider: {p_name}")
+                app.query_one("#message-input", ChatInput).focus()
+
+            app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+
+        app.push_screen(ConnectProviderScreen(providers, active_key, configured_keys), callback=on_provider_selected)
+
+
+class ProviderCommand(ConnectCommand):
+    """Алиас команды /provider на /connect"""
+    name = "/provider"
+    description = "Connect AI provider (alias for /connect)"
 
 
 class ModelsCommand(BaseCommand):
     name = "/models"
-    description = "Switch model for active provider"
+    description = "Switch model for providers"
 
     async def execute(self, app) -> None:
-        active_key = app.pm.get_active_provider_key()
-        app.notify(f"Loading models for {active_key}...")
-        models = await app.pm.fetch_models_for_provider(active_key)
-        if not models:
+        app.notify("Loading models across providers...")
+        grouped_models = await app.pm.fetch_models_grouped()
+        if not grouped_models:
             app.notify("Failed to fetch models", severity="warning")
             return
 
+        curr_provider = app.pm.get_active_provider_key()
         curr_model = getattr(app.agent, "model", "")
 
-        def on_model_selected(selected_model: str) -> None:
-            if selected_model:
+        def on_model_selected(selection: tuple[str, str] | str | None) -> None:
+            if selection:
+                if isinstance(selection, tuple):
+                    selected_prov, selected_model = selection
+                else:
+                    selected_prov = curr_provider
+                    selected_model = selection
+
+                if selected_prov != app.pm.get_active_provider_key():
+                    app.pm.set_active_provider_key(selected_prov)
+                    app.agent = app.pm.create_active_agent()
+                    app.agent.app = app
+
                 if hasattr(app.agent, "model"):
                     app.agent.model = selected_model
-                app.pm.set_provider_model(active_key, selected_model)
+                app.pm.set_provider_model(selected_prov, selected_model)
                 app.refresh_status_footer()
-                app.notify(f"Model switched: {selected_model}")
+                app.notify(f"Model switched: [{selected_prov}] {selected_model}")
             app.query_one("#message-input", ChatInput).focus()
 
-        app.push_screen(ModelScreen(models, curr_model), callback=on_model_selected)
+        app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
 
 
 class RewindCommand(BaseCommand):
@@ -346,6 +382,7 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
         NewCommand,
+        ConnectCommand,
         ProviderCommand,
         ModelsCommand,
         RewindCommand,
