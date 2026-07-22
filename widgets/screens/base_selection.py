@@ -65,27 +65,44 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         else:
             import re
             tokens = query_raw.split()
-            scored_matches = []
+            filtered_options = []
+            filtered_items = []
+
+            current_header_opt = None
+            current_header_item = None
+            current_section_matches = []
+
             for opt, item in zip(self.raw_options, self.raw_items):
                 if item is None:
-                    continue
-                opt_text = opt.prompt if hasattr(opt, "prompt") else str(opt)
-                raw_target = f"{item} {opt_text}".lower()
-                norm_target = re.sub(r"[^a-z0-9]+", " ", raw_target)
-                target_str = f"{raw_target} {norm_target}"
+                    if current_section_matches:
+                        if current_header_opt is not None:
+                            filtered_options.append(current_header_opt)
+                            filtered_items.append(current_header_item)
+                        for m_opt, m_item in current_section_matches:
+                            filtered_options.append(m_opt)
+                            filtered_items.append(m_item)
+                        current_section_matches = []
+                    current_header_opt = opt
+                    current_header_item = item
+                else:
+                    opt_text = opt.prompt if hasattr(opt, "prompt") else str(opt)
+                    raw_target = f"{item} {opt_text}".lower()
+                    norm_target = re.sub(r"[^a-z0-9]+", " ", raw_target)
+                    target_str = f"{raw_target} {norm_target}"
 
-                if all(t in target_str for t in tokens):
-                    score = 0
-                    if query_raw in target_str:
-                        score += 100
-                    for t in tokens:
-                        if target_str.startswith(t) or f" {t}" in target_str or f"/{t}" in target_str or f"-{t}" in target_str:
-                            score += 10
-                    scored_matches.append((score, opt, item))
+                    if all(t in target_str for t in tokens):
+                        current_section_matches.append((opt, item))
 
-            scored_matches.sort(key=lambda x: x[0], reverse=True)
-            self.filtered_options = [m[1] for m in scored_matches]
-            self.filtered_items = [m[2] for m in scored_matches]
+            if current_section_matches:
+                if current_header_opt is not None:
+                    filtered_options.append(current_header_opt)
+                    filtered_items.append(current_header_item)
+                for m_opt, m_item in current_section_matches:
+                    filtered_options.append(m_opt)
+                    filtered_items.append(m_item)
+
+            self.filtered_options = filtered_options
+            self.filtered_items = filtered_items
 
         opt_list = self.query_one("#modal-option-list", OptionList)
         opt_list.clear_options()
