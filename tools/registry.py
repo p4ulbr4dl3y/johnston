@@ -4,6 +4,7 @@ from typing import Any, Dict, Type
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool
 from tools.bash import BashTool
+from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.glob import GlobTool
@@ -27,6 +28,7 @@ TOOL_CLASSES = [
     ListDirTool,
     AskUserTool,
     SkillTool,
+    CallMCPTool,
     ManageTaskTool,
     SwitchToActionTool,
     PlanExitTool,

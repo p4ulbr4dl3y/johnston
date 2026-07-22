@@ -94,5 +94,47 @@ class TestMCPManager(unittest.TestCase):
         res2 = mm.call_tool("serverB__search", {})
         self.assertEqual(res2, "result from serverB:search")
 
+    def test_eager_and_lazy_mcp_servers(self):
+        mm = MCPManager(project_dir=self.test_dir)
+
+        class DummyClient:
+            def __init__(self, name, tools):
+                self.name = name
+                self.tools = tools
+            def start(self): return True
+            def call_tool(self, tool_name, args, **kwargs): return f"executed {self.name}:{tool_name}"
+
+        c1 = DummyClient("eagerServer", [{"name": "eager_tool", "description": "eager desc"}])
+        c2 = DummyClient("lazyServer", [{"name": "lazy_tool", "description": "lazy desc"}])
+        mm.clients = {"eagerServer": c1, "lazyServer": c2}
+
+        mm.load_servers = lambda: [
+            {"name": "eagerServer", "command": "python", "disabled": False, "mode": "eager"},
+            {"name": "lazyServer", "command": "python", "disabled": False, "mode": "lazy"}
+        ]
+
+        eager_tools = mm.get_active_tools(mode="eager")
+        self.assertEqual(len(eager_tools), 1)
+        self.assertEqual(eager_tools[0]["function"]["name"], "eager_tool")
+
+        lazy_tools = mm.get_active_tools(mode="lazy")
+        self.assertEqual(len(lazy_tools), 1)
+        self.assertEqual(lazy_tools[0]["function"]["name"], "lazy_tool")
+
+        all_tools = mm.get_active_tools(mode="all")
+        self.assertEqual(len(all_tools), 2)
+
+        snippet = mm.get_system_prompt_snippet()
+        self.assertIn("<mcp_servers>", snippet)
+        self.assertIn("# lazyServer (Lazy)", snippet)
+        self.assertIn("- lazy_tool - lazy desc", snippet)
+        self.assertIn("Available Eager MCP tools", snippet)
+        self.assertIn("eager_tool", snippet)
+
+        # Call lazy tool explicitly via call_tool
+        res = mm.call_tool("lazy_tool", {}, target_server="lazyServer")
+        self.assertEqual(res, "executed lazyServer:lazy_tool")
+
+
 if __name__ == "__main__":
     unittest.main()
