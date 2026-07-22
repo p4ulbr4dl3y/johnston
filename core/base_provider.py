@@ -214,6 +214,30 @@ class BaseAgent:
                             target = "."
                     elif t_name == "ListDir":
                         target = args.get("path") or "."
+                    elif t_name == "AskUser":
+                        qs = args.get("questions")
+                        if isinstance(qs, list) and qs:
+                            formatted_qs = []
+                            for q in qs:
+                                q_text = q.get("question_text") or q.get("question") or ""
+                                if q_text:
+                                    if len(q_text) > 30:
+                                        q_text = q_text[:27] + "..."
+                                    formatted_qs.append(f'"{q_text}"')
+                            if formatted_qs:
+                                res = ", ".join(formatted_qs)
+                                if len(res) > 60:
+                                    res = res[:57] + "..."
+                                target = res
+                            else:
+                                target = "AskUser"
+                        elif args.get("question"):
+                            q_text = str(args.get("question"))
+                            if len(q_text) > 50:
+                                q_text = q_text[:47] + "..."
+                            target = f'"{q_text}"'
+                        else:
+                            target = "AskUser"
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
