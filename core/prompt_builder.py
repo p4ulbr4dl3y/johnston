@@ -65,8 +65,9 @@ Core Principles:
 3. Verification: Execute verification commands or tests via Bash to verify your code changes work cleanly before concluding.
 4. Precision Edits: When using Edit, include enough surrounding context lines and match exact indentation.
 5. Clarification: Use AskUser to ask questions when user intent or design requirements are ambiguous.
-6. Subagents & Tasks: Use Subagent for background searches or subtasks, and ManageTask to monitor tasks.
-7. Concise Communication: Be direct, clear, and concise. Avoid unnecessary preamble."""
+6. Subagents: Use Subagent to launch autonomous subagents for multi-step research or codebase exploration.
+7. Background CLI Tasks: Use ManageTask to monitor, check status, or terminate background shell commands.
+8. Concise Communication: Be direct, clear, and concise. Avoid unnecessary preamble."""
 
 
 class PromptBuilder:
