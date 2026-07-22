@@ -65,6 +65,7 @@ class ThinkingWidget(Vertical):
         self.thinking_text = thinking_text
         self.duration_seconds = 0.0
         self.is_thinking = True
+        self.is_expanded = False
         self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self.spinner_idx = 0
 
@@ -91,13 +92,32 @@ class ThinkingWidget(Vertical):
         if thinking_content:
             self.thinking_text = thinking_content
         self.remove_class("thinking-active")
-        self.md_widget.update(self.thinking_text)
+        try:
+            self.md_widget.update(self.thinking_text)
+        except Exception:
+            pass
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
-        self.is_expanded = False
         self.header_label.update(f"Thought for {self.duration_seconds:.1f} sec")
-        self.md_widget.display = False
+        if not self.is_expanded:
+            self.md_widget.display = False
+
+    def on_click(self, event) -> None:
+        self.toggle_expanded()
+        event.stop()
+
+    def toggle_expanded(self) -> None:
+        self.is_expanded = not self.is_expanded
+        if self.is_expanded:
+            if self.thinking_text:
+                try:
+                    self.md_widget.update(self.thinking_text)
+                except Exception:
+                    pass
+            self.md_widget.display = True
+        else:
+            self.md_widget.display = False
 
 
 class ToolCallWidget(Vertical):

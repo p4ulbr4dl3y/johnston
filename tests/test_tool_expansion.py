@@ -140,6 +140,21 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("1 │ [/dim]a = \\[1, 2]", formatted)
         self.assertIn("2 │ [/dim]b = 'test'", formatted)
 
+    def test_thinking_widget_toggle_expand(self):
+        from widgets.chat_view import ThinkingWidget
+        tw = ThinkingWidget("Thinking about problem...")
+        tw.finish_thinking(2.5, "Detailed thought process...")
+        self.assertFalse(tw.is_expanded)
+        self.assertFalse(tw.md_widget.display)
+
+        tw.toggle_expanded()
+        self.assertTrue(tw.is_expanded)
+        self.assertTrue(tw.md_widget.display)
+
+        tw.toggle_expanded()
+        self.assertFalse(tw.is_expanded)
+        self.assertFalse(tw.md_widget.display)
+
 
 if __name__ == "__main__":
     unittest.main()

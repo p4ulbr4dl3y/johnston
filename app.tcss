@@ -89,6 +89,10 @@ WelcomeWidget {
     padding: 0;
 }
 
+.thinking-header:hover {
+    color: #ffffff;
+}
+
 .thinking-widget Markdown {
     margin-top: 1;
     color: #a1a1aa;
