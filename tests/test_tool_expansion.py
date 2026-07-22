@@ -34,7 +34,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertFalse(widget.is_expanded)
         self.assertEqual(widget.tool_type, "Create")
         self.assertEqual(widget.args["content"], "hello\nworld")
-        self.assertIn("▶", str(widget.header_label.render()))
+        self.assertIn("⚙", str(widget.header_label.render()))
 
     def test_tool_call_widget_toggle_expand_syntax(self):
         widget = ToolCallWidget(
@@ -44,14 +44,13 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
-        self.assertIn("▼", str(widget.header_label.render()))
+        self.assertIn("⚙", str(widget.header_label.render()))
         content = getattr(widget.content_widget, "_Static__content")
         self.assertIsInstance(content, Syntax)
         self.assertEqual(content.lexer.name, "Python")
 
         widget.toggle_expanded()
         self.assertFalse(widget.is_expanded)
-        self.assertIn("▶", str(widget.header_label.render()))
 
     def test_edit_tool_toggle_expand_diff(self):
         diff_text = (
@@ -76,6 +75,22 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("7 - def multiply(a, b):", rendered_plain)
         self.assertIn("9 + def multiply(a: float, b: float) -> float:", rendered_plain)
         self.assertIn("10 +     return a * b", rendered_plain)
+
+    def test_bash_tool_append_output(self):
+        widget = ToolCallWidget(
+            tool_type="Bash",
+            target="echo 'live stream'",
+            args={"command": "echo 'live stream'"}
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+
+        widget.append_bash_output("line 1\n")
+        widget.append_bash_output("line 2\n")
+
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Syntax)
+        self.assertEqual(content.code, "line 1\nline 2")
 
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")

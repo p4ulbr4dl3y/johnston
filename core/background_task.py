@@ -3,7 +3,7 @@ import asyncio
 
 class BackgroundTask:
     """Управление фоновым bash-процессом с построчным чтением вывода в реальном времени"""
-    def __init__(self, task_id: str, command: str, process):
+    def __init__(self, task_id: str, command: str, process, widget=None):
         self.task_id = task_id
         self.command = command
         self.process = process
@@ -11,6 +11,7 @@ class BackgroundTask:
         self.is_running = True
         self.is_background = False
         self.read_task = None
+        self.widget = widget
 
     def start_reading(self, app, on_completed_cb):
         async def _read():
@@ -19,7 +20,14 @@ class BackgroundTask:
                     line = await self.process.stdout.readline()
                     if not line:
                         break
-                    self.output.append(line.decode("utf-8", errors="replace"))
+                    line_str = line.decode("utf-8", errors="replace")
+                    self.output.append(line_str)
+                    if self.widget and hasattr(self.widget, "append_bash_output"):
+                        try:
+                            if getattr(self.widget, "is_mounted", True):
+                                self.widget.append_bash_output(line_str)
+                        except Exception:
+                            pass
             except Exception:
                 pass
             finally:

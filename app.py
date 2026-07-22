@@ -357,6 +357,7 @@ class JohnstonChatApp(App):
                     bot_msg = None
                     targs = val3 if isinstance(val3, dict) else {}
                     current_tool_widget = await chat_view.add_tool_call(val1, val2, args=targs)
+                    self.current_tool_widget = current_tool_widget
                 elif event_type == "tool_result":
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)

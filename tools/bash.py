@@ -54,7 +54,8 @@ class BashTool(BaseTool):
             stderr=asyncio.subprocess.STDOUT
         )
         task_id = f"bash_{int(time.time())}"
-        task = BackgroundTask(task_id, cmd, p)
+        target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
+        task = BackgroundTask(task_id, cmd, p, widget=target_widget)
         task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
 
         try:

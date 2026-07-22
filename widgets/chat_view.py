@@ -135,8 +135,7 @@ class ToolCallWidget(Vertical):
             self.render_content()
 
     def render_header(self) -> None:
-        arrow = "▼" if self.is_expanded else "▶"
-        self.header_label.update(f"{arrow} ⚙ [bold]{self.icon_name}[/bold]({self.target})")
+        self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
         self.toggle_expanded()
@@ -327,57 +326,93 @@ class ToolCallWidget(Vertical):
 
         return Text("\n").join(formatted_lines)
 
-    def render_content(self) -> None:
-        file_path = self.args.get("path") or self.target
-        if self.tool_type == "Create":
-            content = self.args.get("content")
-            if content is None:
-                if file_path and os.path.isfile(file_path):
-                    try:
-                        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                            content = f.read()
-                    except Exception:
-                        content = None
+    def _clean_bash_output(self, text: str) -> str:
+        if not text:
+            return ""
+        cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", text)
+        cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
+        cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
+        cleaned = re.sub(r"Use ManageTask to inspect[^\n]*", "", cleaned)
+        return cleaned.strip()
 
-            if content is not None:
-                lexer = self._guess_lexer(file_path)
+    def append_bash_output(self, text: str) -> None:
+        if not self.result_text or "[Background Task ID:" in self.result_text:
+            self.result_text = text
+        else:
+            self.result_text += text
+        if self.is_expanded:
+            self.render_content()
+
+    def render_content(self) -> None:
+        try:
+            file_path = self.args.get("path") or self.target
+            if self.tool_type == "Create":
+                content = self.args.get("content")
+                if content is None:
+                    if file_path and os.path.isfile(file_path):
+                        try:
+                            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                                content = f.read()
+                        except Exception:
+                            content = None
+
+                if content is not None:
+                    lexer = self._guess_lexer(file_path)
+                    try:
+                        syntax = Syntax(
+                            content,
+                            lexer,
+                            theme="one-dark",
+                            line_numbers=True,
+                            word_wrap=True,
+                            background_color="#18181b"
+                        )
+                        self.content_widget.update(syntax)
+                    except Exception:
+                        rendered = self._format_code_with_line_numbers(content)
+                        self.content_widget.update(rendered)
+                else:
+                    self.content_widget.update(self.result_text or "(No content)")
+            elif self.tool_type == "Edit":
+                diff_text = self.result_text.strip()
+                if not diff_text or "@@" not in diff_text:
+                    old_s = self.args.get("old_string", "")
+                    new_s = self.args.get("new_string", "")
+                    if old_s or new_s:
+                        diff_lines = list(difflib.unified_diff(
+                            old_s.splitlines(),
+                            new_s.splitlines(),
+                            fromfile=file_path,
+                            tofile=file_path,
+                            lineterm=""
+                        ))
+                        diff_text = "\n".join(diff_lines)
+
+                if diff_text:
+                    formatted_diff = self._format_edit_diff(diff_text, file_path)
+                    self.content_widget.update(formatted_diff)
+                else:
+                    self.content_widget.update(self.result_text or "(No diff)")
+            elif self.tool_type == "Bash":
+                output_text = self._clean_bash_output(self.result_text)
+                if not output_text.strip():
+                    output_text = "(Running command...)"
                 try:
                     syntax = Syntax(
-                        content,
-                        lexer,
+                        output_text,
+                        "bash",
                         theme="one-dark",
-                        line_numbers=True,
+                        line_numbers=False,
                         word_wrap=True,
                         background_color="#18181b"
                     )
                     self.content_widget.update(syntax)
                 except Exception:
-                    rendered = self._format_code_with_line_numbers(content)
-                    self.content_widget.update(rendered)
+                    self.content_widget.update(output_text)
             else:
-                self.content_widget.update(self.result_text or "(No content)")
-        elif self.tool_type == "Edit":
-            diff_text = self.result_text.strip()
-            if not diff_text or "@@" not in diff_text:
-                old_s = self.args.get("old_string", "")
-                new_s = self.args.get("new_string", "")
-                if old_s or new_s:
-                    diff_lines = list(difflib.unified_diff(
-                        old_s.splitlines(),
-                        new_s.splitlines(),
-                        fromfile=file_path,
-                        tofile=file_path,
-                        lineterm=""
-                    ))
-                    diff_text = "\n".join(diff_lines)
-
-            if diff_text:
-                formatted_diff = self._format_edit_diff(diff_text, file_path)
-                self.content_widget.update(formatted_diff)
-            else:
-                self.content_widget.update(self.result_text or "(No diff)")
-        else:
-            self.content_widget.update(self.result_text or "(No result)")
+                self.content_widget.update(self.result_text or "(No result)")
+        except Exception:
+            pass
 
     def _format_code_with_line_numbers(self, code: str) -> str:
         lines = code.splitlines()
