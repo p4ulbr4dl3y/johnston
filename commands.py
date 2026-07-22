@@ -103,7 +103,6 @@ class ModelsCommand(BaseCommand):
     description = "Switch model for providers"
 
     async def execute(self, app) -> None:
-        app.notify("Loading models across providers...")
         grouped_models = await app.pm.fetch_models_grouped()
         if not grouped_models:
             app.notify("Failed to fetch models", severity="warning")
@@ -298,7 +297,6 @@ class PlanCommand(BaseCommand):
             app.agent.mode = "plan"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Mode switched: PLAN")
         else:
             app.notify("No active agent", severity="error")
 
@@ -312,7 +310,6 @@ class BuildCommand(BaseCommand):
             app.agent.mode = "build"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Mode switched: BUILD")
         else:
             app.notify("No active agent", severity="error")
 
@@ -331,7 +328,6 @@ class ModeCommand(BaseCommand):
         app.agent.mode = new_mode
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()
-        app.notify(f"Mode switched: {new_mode.upper()}")
 
 
 class PasteCommand(BaseCommand):

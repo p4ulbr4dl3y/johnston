@@ -235,8 +235,6 @@ class ChatInput(TextArea):
                     self.insert(pasted_text)
 
                 self._on_input_change()
-                if self.app:
-                    self.app.notify("Pasted text from clipboard!")
                 return True
         except Exception:
             pass
@@ -367,7 +365,6 @@ class ChatInput(TextArea):
                 self.app.agent.mode = new_mode
                 if hasattr(self.app, "refresh_status_footer"):
                     self.app.refresh_status_footer()
-                self.app.notify(f"Mode switched: {new_mode.upper()}")
             return
 
         # Обработка навигации в меню подсказок по стрелкам

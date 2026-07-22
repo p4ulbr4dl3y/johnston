@@ -30,7 +30,6 @@ class ToolContext:
         if self.app and hasattr(self.app, "agent"):
             self.app.agent.mode = mode
             self.refresh_status()
-            self.notify(f"Mode switched: {mode}")
 
     def toggle_agent_mode(self) -> str:
         if self.app and hasattr(self.app, "agent"):
