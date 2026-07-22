@@ -119,9 +119,10 @@ class StatusFooter(Static):
 
         row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
 
+        cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
         row2_right_parts = [
             f"[{THEME_SECONDARY}]{total_tokens:,} tok[/{THEME_SECONDARY}]",
-            f"[{THEME_SECONDARY}]${cost_usd:.4f}[/{THEME_SECONDARY}]"
+            f"[{THEME_SECONDARY}]{cost_str}[/{THEME_SECONDARY}]"
         ]
 
         if active_bg_tasks > 0:
