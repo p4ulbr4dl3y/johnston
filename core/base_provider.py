@@ -369,6 +369,16 @@ class BaseAgent:
         recent_tail = self.history[split_idx:]
         history_to_compact = self.history[:split_idx]
 
+        # Prune oversized tool responses in old history before sending to summarizer to save tokens
+        pruned_history = []
+        for msg in history_to_compact:
+            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and len(msg["content"]) > 1500:
+                msg_copy = dict(msg)
+                msg_copy["content"] = msg_copy["content"][:1500] + "\n... [tool output truncated for compaction]"
+                pruned_history.append(msg_copy)
+            else:
+                pruned_history.append(msg)
+
         compaction_prompt = (
             "You are an anchored context summarization assistant for coding sessions.\n\n"
             "Summarize the conversation history given in the messages into a concise summary.\n"
@@ -382,7 +392,7 @@ class BaseAgent:
 
         compact_messages = [
             {"role": "system", "content": compaction_prompt}
-        ] + history_to_compact + [
+        ] + pruned_history + [
             {"role": "user", "content": "Generate the context summary now based on the above history."}
         ]
 

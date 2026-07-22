@@ -30,6 +30,14 @@ class EditTool(BaseTool):
         path = resolve_path(args.get("path"))
         old_string = args.get("old_string", "")
         new_string = args.get("new_string", "")
+        content_arg = args.get("content", "")
+
+        if not old_string and content_arg:
+            return (
+                "Error: Edit tool requires 'old_string' (exact text block) and 'new_string' (replacement block). "
+                "Do not pass full file 'content'. Specify exact 'old_string' and 'new_string' to save tokens."
+            )
+
         if not os.path.exists(path):
             return f"Error: file '{path}' not found."
         try:
