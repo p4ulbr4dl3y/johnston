@@ -108,17 +108,35 @@ class WelcomeWidget(Vertical):
     """Приветствие по центру главного экрана"""
     can_focus = False
 
+    FULL_BANNER = (
+        "   _       _                 _                 \n"
+        "  (_)     | |               | |                \n"
+        "   _  ___ | |__  _ __  ___ _| |_ ___  _ __     \n"
+        "  | |/ _ \\| '_ \\| '_ \\/ __|_   _/ _ \\| '_ \\    \n"
+        "  | | (_) | | | | | | \\__ \\ | || (_) | | | |   \n"
+        "  | |\\___/|_| |_|_| |_|___/  \\__\\___/|_| |_|   \n"
+        " /_/                                           "
+    )
+
     def compose(self) -> ComposeResult:
-        banner_text = (
-            "   _       _                 _                 \n"
-            "  (_)     | |               | |                \n"
-            "   _  ___ | |__  _ __  ___ _| |_ ___  _ __     \n"
-            "  | |/ _ \\| '_ \\| '_ \\/ __|_   _/ _ \\| '_ \\    \n"
-            "  | | (_) | | | | | | \\__ \\ | || (_) | | | |   \n"
-            "  | |\\___/|_| |_|_| |_|___/  \\__\\___/|_| |_|   \n"
-            " /_/                                           "
-        )
-        yield Static(banner_text, id="welcome-logo")
+        yield Static(self.FULL_BANNER, id="welcome-logo")
+
+    def _update_banner_for_size(self, width: int) -> None:
+        try:
+            logo = self.query_one("#welcome-logo", Static)
+            if width < 52:
+                logo.update("[bold #ffffff]johnston[/bold #ffffff]")
+            else:
+                logo.update(self.FULL_BANNER)
+        except Exception:
+            pass
+
+    def on_mount(self) -> None:
+        if self.app and self.app.size.width > 0:
+            self._update_banner_for_size(self.app.size.width)
+
+    def on_resize(self, event) -> None:
+        self._update_banner_for_size(event.size.width)
 
 
 class ChatView(VerticalScroll):

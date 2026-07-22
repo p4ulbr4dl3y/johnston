@@ -26,6 +26,9 @@ class ChatInput(TextArea):
         self.update_height()
 
     def on_blur(self, event: events.Blur) -> None:
+        from textual.screen import ModalScreen
+        if self.app and isinstance(self.app.screen, ModalScreen):
+            return
         self.call_after_refresh(self.focus)
 
     def load_text(self, text: str) -> None:
@@ -42,9 +45,9 @@ class ChatInput(TextArea):
         return text
 
     def update_height(self) -> None:
-        """Динамический расчет высоты от 2 до 8 строк"""
+        """Динамический расчет высоты от 2 до 6 строк"""
         lines = len(self.text.split("\n"))
-        target_height = max(2, min(lines + 1, 8))
+        target_height = max(2, min(lines + 1, 6))
         h = self.styles.height
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height
