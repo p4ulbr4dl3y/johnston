@@ -343,6 +343,27 @@ class ToolCallWidget(Vertical):
 
         return Text("\n").join(formatted_lines)
 
+    def _format_read_content(self, text: str, default_file_path: str) -> tuple[str, int, str]:
+        lines = text.splitlines()
+        if not lines:
+            return "", 1, default_file_path
+
+        start_line = 1
+        file_path = default_file_path
+
+        header_match = re.match(r"^===\s+Lines\s+(\d+)-\d+\s+of\s+\d+\s+in\s+([^\s=]+)", lines[0])
+        if header_match:
+            start_line = int(header_match.group(1))
+            file_path = header_match.group(2)
+            lines = lines[1:]
+
+        clean_code_lines = []
+        for line in lines:
+            cleaned_line = re.sub(r"^\s*\d+\s*\|\s?", "", line)
+            clean_code_lines.append(cleaned_line)
+
+        return "\n".join(clean_code_lines), start_line, file_path
+
     def _clean_bash_output(self, text: str) -> str:
         if not text:
             return ""
@@ -366,7 +387,7 @@ class ToolCallWidget(Vertical):
 
     def render_content(self) -> None:
         try:
-            file_path = self.args.get("path") or self.target
+            file_path = self.args.get("path") or self.args.get("file") or self.target
             if self.tool_type == "Create":
                 content = self.args.get("content")
                 if content is None:
@@ -415,28 +436,31 @@ class ToolCallWidget(Vertical):
                 else:
                     self.content_widget.update(self.result_text or "(No diff)")
             elif self.tool_type == "Read":
-                content = self.result_text
-                if not content.strip() and file_path and os.path.isfile(file_path):
+                raw_text = self.result_text
+                clean_code, start_line, fpath = self._format_read_content(raw_text, file_path)
+                if not clean_code.strip() and fpath and os.path.isfile(fpath):
                     try:
-                        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                            content = f.read()
+                        with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                            clean_code = f.read()
+                            start_line = 1
                     except Exception:
-                        content = None
+                        clean_code = ""
 
-                if content:
-                    lexer = self._guess_lexer(file_path)
+                if clean_code:
+                    lexer = self._guess_lexer(fpath)
                     try:
                         syntax = Syntax(
-                            content,
+                            clean_code,
                             lexer,
                             theme="one-dark",
                             line_numbers=True,
+                            start_line=start_line,
                             word_wrap=True,
                             background_color="#18181b"
                         )
                         self.content_widget.update(syntax)
                     except Exception:
-                        rendered = self._format_code_with_line_numbers(content)
+                        rendered = self._format_code_with_line_numbers(clean_code)
                         self.content_widget.update(rendered)
                 else:
                     self.content_widget.update(self.result_text or "(No content)")

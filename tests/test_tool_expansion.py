@@ -91,6 +91,27 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, "line 1\nline 2")
 
+    def test_read_tool_clean_rendering(self):
+        raw_read_output = (
+            "=== Lines 5-7 of 59 in test.py ===\n"
+            " 5 | def foo():\n"
+            " 6 |     return 'bar'\n"
+            " 7 | \n"
+        )
+        widget = ToolCallWidget(
+            tool_type="Read",
+            target="test.py",
+            result_text=raw_read_output,
+            args={"path": "test.py"}
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Syntax)
+        self.assertEqual(content.start_line, 5)
+        self.assertEqual(content.code, "def foo():\n    return 'bar'\n")
+
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")
         with open(file_path, "w", encoding="utf-8") as f:
