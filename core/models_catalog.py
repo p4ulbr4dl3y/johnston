@@ -1,18 +1,18 @@
 """
 AI Model Catalog and Context Limit Manager for Johnston.
-Fetches model context limits dynamically from provider APIs, models.dev fallback, or defaults.
+Fetches model context limits dynamically from provider APIs, OpenRouter catalog API, or defaults.
 """
 import json
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Dict, List
 
 import httpx
 
 from core.config import CONFIG_DIR
 
-MODELS_DEV_URL = "https://models.dev/api.json"
-CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_dev.json")
+OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "openrouter_catalog.json")
 CACHE_TTL = 86400  # 24 hours
 
 DEFAULT_CONTEXT_LIMIT = 128000
@@ -34,46 +34,79 @@ def format_context_tokens(tokens: int) -> str:
 
 class ModelsCatalog:
     def __init__(self):
-        self._data: Optional[Dict[str, Any]] = None
+        self._limits: Dict[str, int] = {}
+        self._vision: List[str] = []
         self.load_cache()
 
-    def load_cache(self) -> Optional[Dict[str, Any]]:
+    def load_cache(self) -> bool:
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     if time.time() - data.get("updated_at", 0) < CACHE_TTL:
-                        self._data = data.get("providers", {})
-                        return self._data
+                        self._limits = data.get("model_limits", {})
+                        self._vision = data.get("vision_models", [])
+                        return True
             except Exception:
                 pass
-        return None
+        return False
 
-    def save_cache(self, providers: Dict[str, Any]):
+    def save_cache(self, model_limits: Dict[str, int], vision_models: list[str]):
         os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
         try:
             with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump({"updated_at": time.time(), "providers": providers}, f, indent=2)
+                json.dump(
+                    {
+                        "updated_at": time.time(),
+                        "model_limits": model_limits,
+                        "vision_models": vision_models,
+                    },
+                    f,
+                    indent=2,
+                )
         except Exception as e:
-            print(f"Error saving models_dev cache: {e}")
+            print(f"Error saving openrouter catalog cache: {e}")
 
-    async def refresh(self) -> Dict[str, Any]:
+    async def refresh(self) -> Dict[str, int]:
+        model_limits: Dict[str, int] = {}
+        vision_models: list[str] = []
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.get(MODELS_DEV_URL, timeout=10)
+                resp = await client.get(OPENROUTER_MODELS_URL, timeout=10)
                 if resp.status_code == 200:
-                    providers = resp.json()
-                    self._data = providers
-                    self.save_cache(providers)
-                    return providers
+                    data = resp.json()
+                    for m in data.get("data", []):
+                        if isinstance(m, dict) and "id" in m:
+                            m_id = m["id"]
+                            ctx = (
+                                m.get("context_length")
+                                or (m.get("top_provider", {}) or {}).get("context_length")
+                                or m.get("context_window")
+                            )
+                            if ctx and isinstance(ctx, (int, float)):
+                                model_limits[m_id] = int(ctx)
+
+                            arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+                            input_mods = (
+                                arch.get("input_modalities")
+                                or m.get("input_modalities")
+                                or m.get("modalities")
+                                or []
+                            )
+                            if "image" in input_mods or "vision" in input_mods:
+                                vision_models.append(m_id)
+
+                    self._limits = model_limits
+                    self._vision = vision_models
+                    self.save_cache(model_limits, vision_models)
         except Exception as e:
-            print(f"Error fetching models.dev: {e}")
-        return self._data or {}
+            print(f"Error fetching OpenRouter models catalog: {e}")
+        return self._limits
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
         cache_dir = os.path.join(CONFIG_DIR, "cache")
 
-        # 1. Проверяем кеш конкретного провайдера
+        # 1. Проверяем кеш локального провайдера
         cache_path = os.path.join(cache_dir, f"models_{provider_id}.json")
         if os.path.exists(cache_path):
             try:
@@ -85,50 +118,21 @@ class ModelsCatalog:
             except Exception:
                 pass
 
-        # 2. Проверяем остальные кеши провайдеров (по точной модели и по basename)
-        if os.path.exists(cache_dir):
-            try:
-                m_base = model_id.split("/")[-1].lower()
-                for fname in os.listdir(cache_dir):
-                    if fname.startswith("models_") and fname.endswith(".json") and fname != "models_dev.json":
-                        fpath = os.path.join(cache_dir, fname)
-                        with open(fpath, "r", encoding="utf-8") as f:
-                            cdata = json.load(f)
-                            limits = cdata.get("model_limits", {})
-                            if model_id in limits and isinstance(limits[model_id], (int, float)):
-                                return int(limits[model_id])
-                            for k, v in limits.items():
-                                if k.split("/")[-1].lower() == m_base and isinstance(v, (int, float)):
-                                    return int(v)
-            except Exception:
-                pass
+        # 2. Проверяем кеш каталога OpenRouter
+        if not self._limits:
+            self.load_cache()
 
-        # 3. Проверяем models.dev
-        data = self._data
-        if data and isinstance(data, dict):
-            prov = data.get(provider_id)
-            if prov and isinstance(prov, dict):
-                models = prov.get("models", {})
-                if model_id in models:
-                    m = models[model_id]
-                    limit = m.get("limit", {}).get("context")
-                    if isinstance(limit, (int, float)):
-                        return int(limit)
+        if model_id in self._limits:
+            return self._limits[model_id]
 
-            for p_info in data.values():
-                if isinstance(p_info, dict):
-                    models = p_info.get("models", {})
-                    if model_id in models:
-                        m = models[model_id]
-                        limit = m.get("limit", {}).get("context")
-                        if isinstance(limit, (int, float)):
-                            return int(limit)
+        m_base = model_id.split("/")[-1].lower()
+        for k, v in self._limits.items():
+            if k.split("/")[-1].lower() == m_base and isinstance(v, (int, float)):
+                return int(v)
 
         return DEFAULT_CONTEXT_LIMIT
 
     def supports_vision(self, provider_id: str, model_id: str) -> bool:
-        """Проверяет, поддерживает ли модель обработку изображений (Vision) через input_modalities API или кэш"""
-        # 1. Проверяем кеш моделей провайдера (~/.johnston/cache/models_{provider_id}.json)
         cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
         if os.path.exists(cache_path):
             try:
@@ -140,29 +144,15 @@ class ModelsCatalog:
             except Exception:
                 pass
 
-        # 2. Проверяем данные из models.dev кеша по architecture.input_modalities
-        data = self._data
-        if data and isinstance(data, dict):
-            for p_info in data.values():
-                if isinstance(p_info, dict):
-                    models = p_info.get("models", {})
-                    if model_id in models:
-                        m = models[model_id]
-                        arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
-                        modalities = arch.get("input_modalities") or m.get("input_modalities") or m.get("modalities") or []
-                        if isinstance(modalities, list):
-                            if "image" in modalities or "vision" in modalities:
-                                return True
-                            return False
+        if not self._vision:
+            self.load_cache()
 
-        # 3. Эвристический запасной вариант по ключевым словам семейства модели
-        m_lower = model_id.lower()
-        vision_keywords = {
-            "gpt-4o", "gpt-4-vision", "claude-3", "gemini", "vision", "omni",
-            "qwen", "glm", "kimi", "mimo", "minimax", "nemotron"
-        }
-        for kw in vision_keywords:
-            if kw in m_lower:
+        if model_id in self._vision:
+            return True
+
+        m_base = model_id.split("/")[-1].lower()
+        for k in self._vision:
+            if k.split("/")[-1].lower() == m_base:
                 return True
 
         return False
