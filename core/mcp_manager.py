@@ -5,7 +5,9 @@ Supports stdio process execution with JSON-RPC 2.0.
 """
 import json
 import os
+import select
 import subprocess
+import time
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
@@ -55,6 +57,16 @@ class MCPProcessClient:
     def stop(self):
         if self.process:
             try:
+                if self.process.stdin:
+                    self.process.stdin.close()
+                if self.process.stdout:
+                    self.process.stdout.close()
+                if self.process.stderr:
+                    self.process.stderr.close()
+            except Exception:
+                pass
+
+            try:
                 self.process.terminate()
                 self.process.wait(timeout=2)
             except Exception:
@@ -75,7 +87,21 @@ class MCPProcessClient:
         if not self.process or not self.process.stdout:
             return None
 
+        start_time = time.time()
         while True:
+            elapsed = time.time() - start_time
+            remaining = timeout - elapsed
+            if remaining <= 0:
+                return None
+
+            try:
+                rlist, _, _ = select.select([self.process.stdout], [], [], remaining)
+            except Exception:
+                return None
+
+            if not rlist:
+                return None  # Timeout reached
+
             line = self.process.stdout.readline()
             if not line:
                 return None
@@ -271,9 +297,11 @@ class MCPManager:
     def get_active_tools(self) -> List[Dict[str, Any]]:
         """
         Connects to all enabled MCP servers and returns their tools in OpenAI function format.
+        Namespaces tools automatically if name collisions occur across servers.
         """
         tools: List[Dict[str, Any]] = []
         servers = self.load_servers()
+        seen_names: Dict[str, str] = {}  # tool_name -> server_name
 
         for s in servers:
             if s.get("disabled", False):
@@ -302,10 +330,16 @@ class MCPManager:
                 if not t_name:
                     continue
 
+                exposed_name = t_name
+                if t_name in seen_names and seen_names[t_name] != name:
+                    exposed_name = f"{name}__{t_name}"
+                else:
+                    seen_names[t_name] = name
+
                 tools.append({
                     "type": "function",
                     "function": {
-                        "name": t_name,
+                        "name": exposed_name,
                         "description": t.get("description", ""),
                         "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
                     },
@@ -318,16 +352,31 @@ class MCPManager:
     def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.
+        Supports both direct tool_name and namespaced server_name__tool_name formats.
         """
+        target_server = None
+        target_tool = tool_name
+
+        if "__" in tool_name:
+            target_server, target_tool = tool_name.split("__", 1)
+
         active_tools = self.get_active_tools()
         for t in active_tools:
             fn = t.get("function", {})
-            if fn.get("name") == tool_name:
-                server_name = t.get("_mcp_server")
-                orig_tool_name = t.get("_mcp_tool_name")
-                client = self.clients.get(server_name)
-                if client:
-                    return client.call_tool(orig_tool_name, arguments)
+            s_name = t.get("_mcp_server")
+            o_name = t.get("_mcp_tool_name")
+            exposed_name = fn.get("name")
+
+            if target_server:
+                if s_name == target_server and (o_name == target_tool or exposed_name == tool_name):
+                    client = self.clients.get(s_name)
+                    if client:
+                        return client.call_tool(o_name, arguments)
+            else:
+                if exposed_name == tool_name or o_name == tool_name:
+                    client = self.clients.get(s_name)
+                    if client:
+                        return client.call_tool(o_name, arguments)
         return None
 
     def get_system_prompt_snippet(self) -> str:

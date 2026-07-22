@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
@@ -48,7 +49,7 @@ async def execute_tool(name: str, args: dict, app: Any = None, context: Any = No
             return f"Error executing tool {name}: {e}"
 
     from core.mcp_manager import get_mcp_manager
-    mcp_res = get_mcp_manager().call_tool(name, args)
+    mcp_res = await asyncio.to_thread(get_mcp_manager().call_tool, name, args)
     if mcp_res is not None:
         return mcp_res
 

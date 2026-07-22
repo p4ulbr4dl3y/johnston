@@ -63,5 +63,36 @@ class TestMCPManager(unittest.TestCase):
     def test_mcp_command_registered(self):
         self.assertIn("/mcp", COMMAND_REGISTRY)
 
+    def test_namespacing_and_timeout(self):
+        mm = MCPManager(project_dir=self.test_dir)
+        # Mock client tools
+        class DummyClient:
+            def __init__(self, name, tools):
+                self.name = name
+                self.tools = tools
+            def start(self): return True
+            def call_tool(self, tool_name, args): return f"result from {self.name}:{tool_name}"
+
+        c1 = DummyClient("serverA", [{"name": "search", "description": "s1"}])
+        c2 = DummyClient("serverB", [{"name": "search", "description": "s2"}])
+        mm.clients = {"serverA": c1, "serverB": c2}
+
+        # Mock load_servers
+        mm.load_servers = lambda: [
+            {"name": "serverA", "command": "python", "disabled": False},
+            {"name": "serverB", "command": "python", "disabled": False}
+        ]
+
+        tools = mm.get_active_tools()
+        names = [t["function"]["name"] for t in tools]
+        self.assertIn("search", names)
+        self.assertIn("serverB__search", names)
+
+        res1 = mm.call_tool("search", {})
+        self.assertEqual(res1, "result from serverA:search")
+
+        res2 = mm.call_tool("serverB__search", {})
+        self.assertEqual(res2, "result from serverB:search")
+
 if __name__ == "__main__":
     unittest.main()
