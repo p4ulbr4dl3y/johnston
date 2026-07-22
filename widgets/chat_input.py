@@ -161,8 +161,14 @@ class ChatInput(TextArea):
             else:
                 clean = stripped.strip("'\"").replace("\\ ", " ")
                 expanded = os.path.expanduser(clean)
-                if (stripped.startswith("/") or stripped.startswith("~/") or stripped.startswith("file://") or os.path.exists(expanded)):
-                    ext = os.path.splitext(clean)[1].lower()
+                ext = os.path.splitext(clean)[1].lower()
+                is_explicit_path = (
+                    stripped.startswith("/")
+                    or stripped.startswith("~/")
+                    or stripped.startswith("./")
+                    or stripped.startswith("file://")
+                )
+                if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
                     if ext in self.IMAGE_EXTENSIONS:
                         img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
                         tag = f"[Image #{img_count}]"

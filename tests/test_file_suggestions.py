@@ -49,6 +49,7 @@ class TestFileSuggestions(unittest.TestCase):
 
         normal_text = "def hello():\n    return 1"
         self.assertEqual(chat_input.format_pasted_file_path(normal_text), normal_text)
+        self.assertEqual(chat_input.format_pasted_file_path("Task"), "Task")
 
 
 if __name__ == "__main__":
