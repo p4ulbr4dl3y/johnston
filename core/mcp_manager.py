@@ -83,16 +83,18 @@ class MCPProcessClient:
         self.process.stdin.write(line)
         self.process.stdin.flush()
 
-    def _read_response(self, req_id: Optional[int] = None, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    def _read_response(self, req_id: Optional[int] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout:
             return None
 
         start_time = time.time()
         while True:
-            elapsed = time.time() - start_time
-            remaining = timeout - elapsed
-            if remaining <= 0:
-                return None
+            remaining = None
+            if timeout is not None:
+                elapsed = time.time() - start_time
+                remaining = timeout - elapsed
+                if remaining <= 0:
+                    return None
 
             try:
                 rlist, _, _ = select.select([self.process.stdout], [], [], remaining)
@@ -156,7 +158,7 @@ class MCPProcessClient:
             self.tools = res["result"].get("tools", [])
         return self.tools
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: float = 600.0) -> str:
+    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
         if not self.process or self.process.poll() is not None:
             if not self.start():
                 return f"Error: MCP server '{self.name}' process is not running"
@@ -367,7 +369,7 @@ class MCPManager:
 
         return tools
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: float = 600.0) -> Optional[str]:
+    def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name and namespaced server_name__tool_name formats.
