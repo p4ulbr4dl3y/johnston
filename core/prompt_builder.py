@@ -150,7 +150,7 @@ class PromptBuilder:
                         "type": "function",
                         "function": {
                             "name": "ViewImage",
-                            "description": "Inspect an image file on disk via Vision Sub-Agent (mimo-v2.5). Provide image path and detailed prompt.",
+                            "description": "Inspect an image file on disk via Vision Sub-Agent. Provide image path and detailed prompt.",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
