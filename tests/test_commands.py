@@ -5,7 +5,7 @@ from widgets.chat_view import ChatView
 
 
 class MockAgent:
-    def __init__(self, mode="build"):
+    def __init__(self, mode="action"):
         self.mode = mode
         self.compact_called = False
 
@@ -50,11 +50,11 @@ class MockApp:
 class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_homoglyph_normalization_and_routing(self):
         app = MockApp()
-        # Cyrillic letters 'р' (p) and 'а' (a) in /plan -> /рlаn
+        # Cyrillic letters 'р' (p) and 'а' (a) in /plan -> /рlаn (alias for /explore)
         cyrillic_plan = "/рlаn"
         handled = await handle_slash_command(app, cyrillic_plan)
         self.assertTrue(handled)
-        self.assertEqual(app.agent.mode, "plan")
+        self.assertEqual(app.agent.mode, "explore")
         self.assertTrue(app.status_refreshed)
 
     async def test_unknown_command(self):
@@ -62,38 +62,42 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
 
-    async def test_plan_and_build_and_mode_commands(self):
+    async def test_action_explore_and_mode_commands(self):
         app = MockApp()
 
-        # Switch to plan
-        await handle_slash_command(app, "/plan")
-        self.assertEqual(app.agent.mode, "plan")
+        # Switch to action via /action, /build, /code
+        await handle_slash_command(app, "/action")
+        self.assertEqual(app.agent.mode, "action")
 
-        # Switch to build & code
         await handle_slash_command(app, "/build")
-        self.assertEqual(app.agent.mode, "build")
+        self.assertEqual(app.agent.mode, "action")
 
         await handle_slash_command(app, "/code")
-        self.assertEqual(app.agent.mode, "build")
+        self.assertEqual(app.agent.mode, "action")
 
-        # Switch to ask
+        # Switch to explore via /explore, /plan, /ask
+        await handle_slash_command(app, "/explore")
+        self.assertEqual(app.agent.mode, "explore")
+
+        await handle_slash_command(app, "/plan")
+        self.assertEqual(app.agent.mode, "explore")
+
         await handle_slash_command(app, "/ask")
-        self.assertEqual(app.agent.mode, "ask")
+        self.assertEqual(app.agent.mode, "explore")
 
-        # Switch to debug
+        # Switch via debug & orchestrator aliases
         await handle_slash_command(app, "/debug")
-        self.assertEqual(app.agent.mode, "debug")
+        self.assertEqual(app.agent.mode, "action")
 
-        # Switch to orchestrator
         await handle_slash_command(app, "/orchestrator")
-        self.assertEqual(app.agent.mode, "orchestrator")
+        self.assertEqual(app.agent.mode, "action")
 
         # Cycle mode with /mode
-        app.agent.mode = "build"
+        app.agent.mode = "action"
         await handle_slash_command(app, "/mode")
-        self.assertEqual(app.agent.mode, "plan")
+        self.assertEqual(app.agent.mode, "explore")
         await handle_slash_command(app, "/mode")
-        self.assertEqual(app.agent.mode, "ask")
+        self.assertEqual(app.agent.mode, "action")
 
     async def test_compact_command(self):
         agent = MockAgent()
@@ -110,6 +114,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("AGENTS.md", app.ai_prompts[0][0])
 
     def test_registry_contains_all_commands(self):
+        self.assertIn("/action", COMMAND_REGISTRY)
+        self.assertIn("/explore", COMMAND_REGISTRY)
         self.assertIn("/plan", COMMAND_REGISTRY)
         self.assertIn("/build", COMMAND_REGISTRY)
         self.assertIn("/mode", COMMAND_REGISTRY)

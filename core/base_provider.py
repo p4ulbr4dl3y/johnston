@@ -244,7 +244,7 @@ class BaseAgent:
                             target = "."
                     elif t_name == "ListDir":
                         target = args.get("path") or "."
-                    elif t_name == "PlanExit":
+                    elif t_name in ("SwitchToAction", "PlanExit"):
                         target = ""
                     elif t_name == "AskUser":
                         qs = args.get("questions")
@@ -308,11 +308,11 @@ class BaseAgent:
                         target = target[:25] + "..." + target[-32:]
                     yield ("tool", t_name, target, args)
 
-                    current_mode = getattr(self, "mode", "build")
-                    if current_mode == "plan" and t_name in ("Edit", "Create"):
+                    current_mode = getattr(self, "mode", "action").lower()
+                    if current_mode in ("explore", "plan") and t_name in ("Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
                         if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Plan mode. Save your plan to '.johnston/plans/plan.md' or call PlanExit when finished."
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Ask user for confirmation to switch to Action mode or call SwitchToAction."
                         else:
                             tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
                     else:

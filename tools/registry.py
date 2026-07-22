@@ -14,6 +14,7 @@ from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
+from tools.switch_to_action import SwitchToActionTool
 from tools.view_image import ViewImageTool
 
 TOOL_CLASSES = [
@@ -27,6 +28,7 @@ TOOL_CLASSES = [
     AskUserTool,
     SkillTool,
     ManageTaskTool,
+    SwitchToActionTool,
     PlanExitTool,
     SubagentTool,
     ViewImageTool,

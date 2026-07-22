@@ -43,11 +43,11 @@ class JohnstonChatApp(App):
         self.background_tasks = []
 
     def action_toggle_mode(self) -> None:
-        """Цикличное переключение режима агента (Build / Plan / Ask / Debug / Orchestrator)"""
+        """Переключение режима агента (Action / Explore)"""
         if not hasattr(self, "agent") or not self.agent:
             return
-        modes = ["build", "plan", "ask", "debug", "orchestrator"]
-        curr = getattr(self.agent, "mode", "build").lower()
+        modes = ["action", "explore"]
+        curr = getattr(self.agent, "mode", "action").lower()
         next_idx = (modes.index(curr) + 1) % len(modes) if curr in modes else 0
         new_mode = modes[next_idx]
         self.agent.mode = new_mode
@@ -109,7 +109,7 @@ class JohnstonChatApp(App):
             mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
             active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])
 
-            agent_mode = getattr(self.agent, "mode", "build")
+            agent_mode = getattr(self.agent, "mode", "action")
 
             footer.update_status(
                 provider_key=pkey,

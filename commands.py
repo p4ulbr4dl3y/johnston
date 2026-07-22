@@ -288,93 +288,84 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
-class PlanCommand(BaseCommand):
-    name = "/plan"
-    description = "Switch agent to Plan mode"
+class ActionCommand(BaseCommand):
+    name = "/action"
+    description = "Switch agent to Action mode (execution, file edits, bash)"
 
     async def execute(self, app) -> None:
         if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "plan"
+            app.agent.mode = "action"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
         else:
             app.notify("No active agent", severity="error")
 
 
-class BuildCommand(BaseCommand):
+class ExploreCommand(BaseCommand):
+    name = "/explore"
+    description = "Switch agent to Explore mode (read-only research, planning, QA)"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "explore"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class BuildCommand(ActionCommand):
+    """Алиас команды /build на /action"""
     name = "/build"
-    description = "Switch agent to Build mode"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "build"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
+    description = "Switch agent to Action mode"
 
 
-class CodeCommand(BuildCommand):
-    """Алиас команды /code на /build"""
+class CodeCommand(ActionCommand):
+    """Алиас команды /code на /action"""
     name = "/code"
-    description = "Switch agent to Code/Build mode"
+    description = "Switch agent to Action mode"
 
 
-class AskCommand(BaseCommand):
+class PlanCommand(ExploreCommand):
+    """Алиас команды /plan на /explore"""
+    name = "/plan"
+    description = "Switch agent to Explore mode"
+
+
+class AskCommand(ExploreCommand):
+    """Алиас команды /ask на /explore"""
     name = "/ask"
-    description = "Switch agent to Ask mode (read-only assistant)"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "ask"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
+    description = "Switch agent to Explore mode"
 
 
-class DebugCommand(BaseCommand):
+class DebugCommand(ActionCommand):
+    """Алиас команды /debug на /action"""
     name = "/debug"
-    description = "Switch agent to Debug mode (systematic debugger)"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "debug"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
+    description = "Switch agent to Action mode"
 
 
-class OrchestratorCommand(BaseCommand):
+class OrchestratorCommand(ActionCommand):
+    """Алиас команды /orchestrator на /action"""
     name = "/orchestrator"
-    description = "Switch agent to Orchestrator mode (workflow coordinator)"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "orchestrator"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
+    description = "Switch agent to Action mode"
 
 
 class ModeCommand(BaseCommand):
     name = "/mode"
-    description = "Cycle agent mode (BUILD / PLAN / ASK / DEBUG / ORCHESTRATOR)"
+    description = "Cycle agent mode (ACTION / EXPLORE)"
 
     async def execute(self, app) -> None:
         if not hasattr(app, "agent") or not app.agent:
             app.notify("No active agent", severity="error")
             return
 
-        modes_cycle = ["build", "plan", "ask", "debug", "orchestrator"]
-        curr = getattr(app.agent, "mode", "build").lower()
+        modes_cycle = ["action", "explore"]
+        curr = getattr(app.agent, "mode", "action").lower()
         if curr in modes_cycle:
             next_idx = (modes_cycle.index(curr) + 1) % len(modes_cycle)
             new_mode = modes_cycle[next_idx]
         else:
-            new_mode = "build"
+            new_mode = "action"
 
         app.agent.mode = new_mode
         if hasattr(app, "refresh_status_footer"):
@@ -438,6 +429,8 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         MCPCommand,
         InitCommand,
         CompactCommand,
+        ActionCommand,
+        ExploreCommand,
         PlanCommand,
         BuildCommand,
         CodeCommand,

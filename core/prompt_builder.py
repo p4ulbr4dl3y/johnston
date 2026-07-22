@@ -5,8 +5,8 @@ import subprocess
 from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
-from tools.plan_exit import PlanExitTool
 from tools.subagent import SubagentTool
+from tools.switch_to_action import SwitchToActionTool
 
 
 def get_git_info() -> str:
@@ -114,54 +114,24 @@ class PromptBuilder:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
         mode_lower = self.mode.lower()
-        if mode_lower == "plan":
+        if mode_lower in ("explore", "plan", "ask"):
             sys_prompt += (
-                "\n\n[PLAN MODE ACTIVE]\n"
-                "You are in Plan mode. Analyze the codebase, research requirements, and design a step-by-step implementation plan.\n"
-                "Guidelines:\n"
-                "1. Perform read-only codebase exploration using Read, ListDir, Glob, Grep.\n"
-                "2. Output your complete, detailed implementation plan DIRECTLY in your chat response text. Do NOT attempt to create or edit files on disk.\n"
-                "3. Your plan should clearly cover: Goal, Proposed File Changes, and Verification Steps.\n"
-                "4. Present your plan and ask the user to confirm. Call the PlanExit tool AFTER the user approves the plan (or tells you to proceed) to switch to Build mode for execution."
-            )
-        elif mode_lower == "ask":
-            sys_prompt += (
-                "\n\n[ASK MODE ACTIVE - READ-ONLY ASSISTANT]\n"
-                "You are in Ask mode — a read-only assistant focused on answering questions and explaining concepts without modifying the codebase.\n"
-                "Guidelines:\n"
-                "1. Answer questions thoroughly with clear explanations, code context, and Mermaid diagrams where helpful.\n"
-                "2. Perform read-only exploration using Read, ListDir, Glob, Grep, etc.\n"
-                "3. Do NOT modify files or run write commands. Your toolset is read-only.\n"
-                "4. If a task requires code edits or file creation, suggest switching to /build or /code mode."
-            )
-        elif mode_lower == "debug":
-            sys_prompt += (
-                "\n\n[DEBUG MODE ACTIVE - SYSTEMATIC DEBUGGER]\n"
-                "You are in Debug mode — an expert software debugger specializing in systematic problem diagnosis.\n"
-                "Guidelines:\n"
-                "1. Reflect on 5-7 different potential sources of the issue.\n"
-                "2. Distill those down to 1-2 most probable root causes based on empirical evidence.\n"
-                "3. Add logging or run diagnostic commands via Bash to validate your assumptions before making fixes.\n"
-                "4. Explicitly ask the user via AskUser or message to confirm diagnosis before applying a fix.\n"
-                "5. Prefer minimal, targeted fixes over broad refactors."
-            )
-        elif mode_lower == "orchestrator":
-            sys_prompt += (
-                "\n\n[ORCHESTRATOR MODE ACTIVE - WORKFLOW COORDINATOR]\n"
-                "You are in Orchestrator mode — a strategic workflow coordinator who breaks down complex tasks into subtask waves.\n"
-                "Guidelines:\n"
-                "1. Research codebase first to identify files, patterns, and dependencies.\n"
-                "2. Classify subtasks into parallel execution waves (subtasks touching different files can run in parallel).\n"
-                "3. Delegate execution wave-by-wave using the Subagent tool.\n"
-                "4. Do NOT edit files directly yourself — delegate all implementation to subagents.\n"
-                "5. Synthesize final results when all waves complete."
+                "\n\n[MODE: EXPLORE]\n"
+                "Read-only research, codebase inspection, QA, and plan drafting.\n"
+                "Rules:\n"
+                "1. Code modification tools (Create, Edit) are disabled.\n"
+                "2. Output findings/plan directly in chat (Goal, Proposed Changes, Verification).\n"
+                "3. Always ask user for confirmation before proceeding to implementation.\n"
+                "4. CRITICAL: Do NOT call SwitchToAction on your own. You MUST wait for explicit user approval (e.g., 'yes', 'proceed', 'do it') in a subsequent message before calling SwitchToAction."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
-            if os.path.exists(local_plan):
-                sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
-            else:
-                sys_prompt += "\n\n[BUILD MODE ACTIVE]\nYou are in Build mode. You have full access to create/edit files and run commands."
+            plan_note = f" Refer to plan at '{local_plan}' if present." if os.path.exists(local_plan) else ""
+            sys_prompt += (
+                f"\n\n[MODE: ACTION]\n"
+                f"Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.{plan_note}\n"
+                "Execute tasks precisely, write clean code, and verify with tests."
+            )
 
         return sys_prompt
 
@@ -177,16 +147,14 @@ class PromptBuilder:
         all_tools = list(self.base_tools) + clean_mcp_tools
 
         mode_lower = self.mode.lower()
-        if mode_lower in ("ask", "plan"):
-            # Filter out file modification tools in ask and plan modes
+        if mode_lower in ("explore", "plan", "ask"):
+            # Filter out file modification tools in explore mode
             all_tools = [
                 t for t in all_tools
                 if t.get("function", {}).get("name") not in ("Create", "Edit")
             ]
-
-        if mode_lower == "plan":
-            if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
-                all_tools.append(PlanExitTool.schema)
+            if not any(t.get("function", {}).get("name") in ("SwitchToAction", "PlanExit") for t in all_tools):
+                all_tools.append(SwitchToActionTool.schema)
 
         if self.allow_task and not any(t.get("function", {}).get("name") in ("Subagent", "Task", "task") for t in all_tools):
             all_tools.append(SubagentTool.schema)

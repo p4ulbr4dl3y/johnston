@@ -9,7 +9,6 @@ from tools.glob import GlobTool
 from tools.grep import GrepTool
 from tools.linter import run_linter
 from tools.list_dir import ListDirTool
-from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
 
 
@@ -142,19 +141,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("test1.py", res_list)
         self.assertIn("test2.txt", res_list)
 
-    async def test_plan_exit_tool(self):
-        tool = PlanExitTool()
-        app = MockApp(mode="plan")
+    async def test_switch_to_action_tool(self):
+        from tools.switch_to_action import SwitchToActionTool
+        tool = SwitchToActionTool()
+        app = MockApp(mode="explore")
 
-        # Execute plan exit in plan mode
-        res = await tool.execute({"explanation": "Plan completed"}, app=app)
-        self.assertIn("Switched to build mode", res)
-        self.assertEqual(app.agent.mode, "build")
-
-        # Execute when already in build mode
-        app_build = MockApp(mode="build")
-        res_build = await tool.execute({"explanation": "Already in build"}, app=app_build)
-        self.assertIn("Switched to build mode", res_build)
+        # Execute switch_to_action in explore mode
+        res = await tool.execute({"explanation": "User approved"}, app=app)
+        self.assertIn("Switched to Action mode", res)
+        self.assertEqual(app.agent.mode, "action")
 
     async def test_linter_tool(self):
         # Test run_linter helper function
