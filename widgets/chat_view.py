@@ -409,18 +409,7 @@ class ToolCallWidget(Vertical):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     output_text = "(Running command...)"
-                try:
-                    syntax = Syntax(
-                        output_text,
-                        "bash",
-                        theme="one-dark",
-                        line_numbers=False,
-                        word_wrap=True,
-                        background_color="#18181b"
-                    )
-                    self.content_widget.update(syntax)
-                except Exception:
-                    self.content_widget.update(output_text)
+                self.content_widget.update(output_text)
             else:
                 self.content_widget.update(self.result_text or "(No result)")
         except Exception:

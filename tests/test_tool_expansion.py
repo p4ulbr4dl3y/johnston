@@ -89,8 +89,7 @@ class TestToolExpansion(unittest.TestCase):
         widget.append_bash_output("line 2\n")
 
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
-        self.assertEqual(content.code, "line 1\nline 2")
+        self.assertEqual(content, "line 1\nline 2")
 
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")
