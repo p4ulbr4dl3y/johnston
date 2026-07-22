@@ -1,10 +1,8 @@
-/* Selection Style - True Inverse (Dark text on White selection) */
+/* Dynamic True Color Inversion Selection (Original text color becomes selection bg) */
 .screen--selection,
 .text-area--selection,
 Screen > .screen--selection,
 TextArea > .text-area--selection {
-    background: #ffffff;
-    color: #09090b;
     text-style: reverse;
 }
 
