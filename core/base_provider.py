@@ -58,7 +58,7 @@ class BaseAgent:
         allow_task = getattr(self, "allow_task", True)
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
         sys_prompt = builder.build_system_prompt()
-        all_tools = builder.build_tools()
+        all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
 
         # Automatic context compaction when history exceeds threshold (75% of context_limit)
         threshold = int(getattr(self, "context_limit", 32000) * 0.75)

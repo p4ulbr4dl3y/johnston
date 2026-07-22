@@ -123,8 +123,10 @@ class PromptBuilder:
 
         return sys_prompt
 
-    def build_tools(self) -> List[Dict[str, Any]]:
+    def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
+        from core.models_catalog import catalog
+
         mcp_tools = get_mcp_manager().get_active_tools()
         clean_mcp_tools = [
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
@@ -138,5 +140,28 @@ class PromptBuilder:
 
         if self.allow_task and not any(t.get("function", {}).get("name") in ("Task", "task") for t in all_tools):
             all_tools.append(TaskTool.schema)
+
+        if provider_key and model_id and not catalog.supports_vision(provider_key, model_id):
+            updated_tools = []
+            for t in all_tools:
+                t_func = t.get("function", {})
+                if t_func.get("name") == "ViewImage":
+                    t = {
+                        "type": "function",
+                        "function": {
+                            "name": "ViewImage",
+                            "description": "Inspect an image file on disk via Vision Sub-Agent (mimo-v2.5). Provide image path and detailed prompt.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {"type": "string", "description": "Absolute or relative path to image file"},
+                                    "prompt": {"type": "string", "description": "Prompt for Vision Sub-Agent describing what to inspect in the image"}
+                                },
+                                "required": ["path", "prompt"]
+                            }
+                        }
+                    }
+                updated_tools.append(t)
+            all_tools = updated_tools
 
         return all_tools
