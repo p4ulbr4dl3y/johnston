@@ -30,7 +30,7 @@ class ConnectProviderScreen(BaseSelectionScreen[str]):
             items.append(key)
 
         super().__init__(
-            title="### **Select AI provider to connect (/connect)**",
+            title="### **Select AI provider to connect**",
             options=options,
             items=items,
             default_value=active_key if active_key in items else (items[0] if items else "")

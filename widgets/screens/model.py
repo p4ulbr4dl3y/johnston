@@ -56,7 +56,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             default_val = current_model if current_model in items else (items[0] if items else "")
 
         super().__init__(
-            title="### **Select model by provider (/models)**",
+            title="### **Select model by provider**",
             options=options,
             items=items,
             default_value=default_val,
