@@ -90,23 +90,26 @@ class StatusFooter(Static):
         clean_model = catalog.get_model_display_name(provider_key, model_name)
         mode_formatted = "Build" if agent_mode.lower() == "build" else "Plan"
 
-        # Строка 1: Режим • Проект • Провайдер › Модель • Скиллы • MCP
-        row1_parts = [
+        # Строка 1: Слева (Режим • Проект • Провайдер › Модель), Справа (Skills • MCP)
+        row1_left_parts = [
             f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
             f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]"
         ]
 
         if provider_display and clean_model:
-            row1_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/{THEME_SECONDARY}]")
+            row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/{THEME_SECONDARY}]")
         elif provider_display:
-            row1_parts.append(f"[{THEME_SECONDARY}]{provider_display}[/{THEME_SECONDARY}]")
+            row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display}[/{THEME_SECONDARY}]")
 
-        row1_parts.append(f"Skills: [{THEME_SECONDARY}]{skills_count}[/{THEME_SECONDARY}]")
-        row1_parts.append(f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]")
+        row1_left = "  •  ".join(row1_left_parts)
 
-        row1_text = "  •  ".join(row1_parts)
+        row1_right_parts = [
+            f"Skills: [{THEME_SECONDARY}]{skills_count}[/{THEME_SECONDARY}]",
+            f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
+        ]
+        row1_right = "  •  ".join(row1_right_parts)
 
-        # Строка 2: Контекст • Токены • Стоимость • Активность
+        # Строка 2: Слева (Контекст), Справа (Токены • Стоимость • Активность)
         pct = (total_tokens / context_limit * 100) if context_limit > 0 else 0.0
         pct = min(100.0, max(0.0, pct))
         bar_len = 8
@@ -114,22 +117,24 @@ class StatusFooter(Static):
         bar_str = "█" * filled + "░" * (bar_len - filled)
         used_formatted = format_context_tokens(total_tokens)
 
-        ctx_text = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
-        tokens_text = f"[{THEME_SECONDARY}]{total_tokens:,} tok[/{THEME_SECONDARY}]"
-        cost_text = f"[{THEME_SECONDARY}]${cost_usd:.4f}[/{THEME_SECONDARY}]"
+        row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
 
-        row2_parts = [ctx_text, tokens_text, cost_text]
+        row2_right_parts = [
+            f"[{THEME_SECONDARY}]{total_tokens:,} tok[/{THEME_SECONDARY}]",
+            f"[{THEME_SECONDARY}]${cost_usd:.4f}[/{THEME_SECONDARY}]"
+        ]
 
         if active_bg_tasks > 0:
-            row2_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/{THEME_SECONDARY}]")
+            row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/{THEME_SECONDARY}]")
         if subagents_active > 0:
-            row2_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total} subagent[/{THEME_SECONDARY}]")
+            row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total} subagent[/{THEME_SECONDARY}]")
 
-        row2_text = "  •  ".join(row2_parts)
+        row2_right = "  •  ".join(row2_right_parts)
 
         grid = Table.grid(expand=True)
         grid.add_column(justify="left")
-        grid.add_row(row1_text)
-        grid.add_row(row2_text)
+        grid.add_column(justify="right")
+        grid.add_row(row1_left, row1_right)
+        grid.add_row(row2_left, row2_right)
 
         self.update(grid)
