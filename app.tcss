@@ -195,7 +195,10 @@ OptionList > .option-list--option-blur-highlighted {
     max-height: 5;
     margin: 0;
     padding: 0;
-    border: solid #27272a;
+    border-top: solid #27272a;
+    border-left: solid #27272a;
+    border-right: solid #27272a;
+    border-bottom: none;
     background: #18181b;
 }
 
