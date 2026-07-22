@@ -74,6 +74,9 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
 
             for opt, item in zip(self.raw_options, self.raw_items):
                 if item is None:
+                    opt_str = str(opt.prompt if hasattr(opt, "prompt") else opt).strip()
+                    if not opt_str:
+                        continue
                     if current_section_matches:
                         if current_header_opt is not None:
                             filtered_options.append(current_header_opt)

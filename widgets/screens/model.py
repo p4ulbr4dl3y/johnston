@@ -20,11 +20,17 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         default_val: Union[str, Tuple[str, str], None] = None
 
         if isinstance(models_data, dict):
+            first_group = True
             for p_key, p_info in models_data.items():
                 p_name = p_info.get("name", p_key)
                 p_models = p_info.get("models", [])
                 if not p_models:
                     continue
+
+                if not first_group:
+                    options.append(Option("", disabled=True))
+                    items.append(None)
+                first_group = False
 
                 options.append(Option(f"── {p_name} ──", disabled=True))
                 items.append(None)
