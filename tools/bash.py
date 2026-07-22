@@ -8,7 +8,7 @@ from tools.base import BaseTool, truncate_output
 
 class BashTool(BaseTool):
     name = "Bash"
-    description = "Run terminal command. >5s runs in background."
+    description = "Run terminal command. >10s runs in background."
     schema = {
         "type": "function",
         "function": {
@@ -37,7 +37,7 @@ class BashTool(BaseTool):
         task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
 
         try:
-            await asyncio.wait_for(p.wait(), timeout=5.0)
+            await asyncio.wait_for(p.wait(), timeout=10.0)
             if hasattr(task, "read_task") and task.read_task:
                 await task.read_task
             res = "".join(task.output)
