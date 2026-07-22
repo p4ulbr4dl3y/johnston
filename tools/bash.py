@@ -3,6 +3,7 @@ import time
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask
+from core.bash_guard import analyze_bash_command
 from tools.base import BaseTool, truncate_output
 
 
@@ -27,6 +28,26 @@ class BashTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         cmd = args.get("command", "")
+
+        is_safe, reason = analyze_bash_command(cmd)
+        if not is_safe and ctx.app:
+            try:
+                from widgets.modal_screens import BashConfirmScreen
+                screen = BashConfirmScreen(command=cmd, reason=reason)
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
+
+                def on_dismiss(result: Any) -> None:
+                    if not future.done():
+                        future.set_result(bool(result))
+
+                ctx.app.push_screen(screen, callback=on_dismiss)
+                confirmed = await future
+                if not confirmed:
+                    return "Command execution rejected by user."
+            except Exception as e:
+                return f"Error prompting for command permission: {e}"
+
         p = await asyncio.create_subprocess_shell(
             cmd,
             stdout=asyncio.subprocess.PIPE,

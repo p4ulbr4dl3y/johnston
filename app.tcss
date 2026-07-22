@@ -318,6 +318,17 @@ ModalScreen {
     margin-bottom: 1;
 }
 
+#modal-dialog MarkdownFence {
+    background: #27272a;
+    border-left: solid #ffffff;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    color: #f4f4f5;
+    padding: 0 2;
+    margin: 1 0;
+}
+
 #modal-dialog OptionList {
     height: auto;
     max-height: 10;

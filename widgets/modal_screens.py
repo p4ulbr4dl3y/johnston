@@ -1,5 +1,6 @@
 from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
 from widgets.screens.base_selection import BaseSelectionScreen
+from widgets.screens.bash_confirm import BashConfirmScreen
 from widgets.screens.connect import ApiKeyInputScreen, ConnectProviderScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
@@ -13,6 +14,7 @@ from widgets.screens.tasks import TasksListScreen
 __all__ = [
     "QuestionScreen",
     "ConfirmScreen",
+    "BashConfirmScreen",
     "BaseSelectionScreen",
     "ConnectProviderScreen",
     "ApiKeyInputScreen",
