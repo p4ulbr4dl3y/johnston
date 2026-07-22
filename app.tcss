@@ -348,7 +348,7 @@ ModalScreen {
 #write-in-input:focus,
 #modal-search-input:focus,
 #api-key-input:focus {
-    border: solid #ffffff;
+    border: solid #52525b;
 }
 
 .modal-buttons {
