@@ -214,6 +214,8 @@ class BaseAgent:
                             target = "."
                     elif t_name == "ListDir":
                         target = args.get("path") or "."
+                    elif t_name == "PlanExit":
+                        target = ""
                     elif t_name == "AskUser":
                         qs = args.get("questions")
                         if isinstance(qs, list) and qs:
