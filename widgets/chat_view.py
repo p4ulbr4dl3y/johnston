@@ -105,6 +105,11 @@ class ToolCallWidget(Vertical):
     can_focus = False
     ALLOW_SELECT = False
 
+    EXPANDABLE_TOOLS = {"Create", "Edit", "Bash", "Read"}
+
+    def is_expandable(self) -> bool:
+        return self.tool_type in self.EXPANDABLE_TOOLS
+
     def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
         classes = f"tool-call tool-{tool_type.lower()}"
         if is_sequential:
@@ -117,7 +122,8 @@ class ToolCallWidget(Vertical):
         self.icon_name = tool_type
         self.is_expanded = False
 
-        self.header_label = Label("", classes="tool-header")
+        header_cls = "tool-header tool-header-expandable" if self.is_expandable() else "tool-header"
+        self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
 
     def compose(self) -> ComposeResult:
@@ -146,10 +152,13 @@ class ToolCallWidget(Vertical):
         self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
-        self.toggle_expanded()
-        event.stop()
+        if self.is_expandable():
+            self.toggle_expanded()
+            event.stop()
 
     def toggle_expanded(self) -> None:
+        if not self.is_expandable():
+            return
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
@@ -405,6 +414,32 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(formatted_diff)
                 else:
                     self.content_widget.update(self.result_text or "(No diff)")
+            elif self.tool_type == "Read":
+                content = self.result_text
+                if not content.strip() and file_path and os.path.isfile(file_path):
+                    try:
+                        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                            content = f.read()
+                    except Exception:
+                        content = None
+
+                if content:
+                    lexer = self._guess_lexer(file_path)
+                    try:
+                        syntax = Syntax(
+                            content,
+                            lexer,
+                            theme="one-dark",
+                            line_numbers=True,
+                            word_wrap=True,
+                            background_color="#18181b"
+                        )
+                        self.content_widget.update(syntax)
+                    except Exception:
+                        rendered = self._format_code_with_line_numbers(content)
+                        self.content_widget.update(rendered)
+                else:
+                    self.content_widget.update(self.result_text or "(No content)")
             elif self.tool_type == "Bash":
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():

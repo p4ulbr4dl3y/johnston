@@ -116,7 +116,7 @@ WelcomeWidget {
     padding: 0;
 }
 
-.tool-header:hover {
+.tool-header-expandable:hover {
     color: #ffffff;
 }
 
