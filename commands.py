@@ -2,7 +2,7 @@ from typing import Dict, Type
 
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
-from widgets.chat_view import ChatView
+from widgets.chat_view import BotMessage, ChatView
 from widgets.modal_screens import (
     HelpScreen,
     MCPScreen,
@@ -309,6 +309,39 @@ class PasteCommand(BaseCommand):
         chat_input.focus()
 
 
+class CopyCommand(BaseCommand):
+    name = "/copy"
+    description = "Copy last assistant message to clipboard"
+
+    async def execute(self, app) -> None:
+        chat_view = app.query_one(ChatView)
+        last_bot_text = ""
+
+        for child in reversed(chat_view.children):
+            if isinstance(child, BotMessage) and child.content:
+                last_bot_text = child.content
+                break
+
+        if last_bot_text:
+            try:
+                app.copy_to_clipboard(last_bot_text)
+            except Exception:
+                pass
+
+            import subprocess
+            try:
+                subprocess.run(["pbcopy"], input=last_bot_text.encode("utf-8"), check=True)
+            except Exception:
+                pass
+
+            app.notify("Copied last assistant message!")
+        else:
+            app.notify("No assistant message to copy", severity="warning")
+
+        chat_input = app.query_one("#message-input", ChatInput)
+        chat_input.focus()
+
+
 COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
     cmd.name: cmd for cmd in [
         HelpCommand,
@@ -326,6 +359,7 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         BuildCommand,
         ModeCommand,
         PasteCommand,
+        CopyCommand,
     ]
 }
 
