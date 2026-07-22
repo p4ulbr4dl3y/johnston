@@ -46,6 +46,11 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                 opt_list.highlighted = self.raw_items.index(self.default_value)
             except Exception:
                 pass
+        else:
+            for i, it in enumerate(self.raw_items):
+                if it is not None:
+                    opt_list.highlighted = i
+                    break
 
         if self.show_search:
             self.query_one("#modal-search-input", Input).focus()
@@ -86,7 +91,12 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list.clear_options()
         opt_list.add_options(self.filtered_options)
         if self.filtered_options:
-            opt_list.highlighted = 0
+            first_valid = 0
+            for i, it in enumerate(self.filtered_items):
+                if it is not None:
+                    first_valid = i
+                    break
+            opt_list.highlighted = first_valid
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)
@@ -96,6 +106,12 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             if item is not None:
                 self.dismiss(item)
                 return
+
+        for item in self.filtered_items:
+            if item is not None:
+                self.dismiss(item)
+                return
+
         self.dismiss(self.default_value)
 
     def _on_key(self, event: events.Key) -> None:
