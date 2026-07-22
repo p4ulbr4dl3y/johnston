@@ -38,7 +38,7 @@ class TestProviderManager(unittest.TestCase):
         # We should have opencode provider because it gets created by ensure_config_dir
         providers = self.pm.load_providers()
         self.assertIn("opencode", providers)
-        self.assertEqual(providers["opencode"]["name"], "OpenCode Go (DeepSeek v4 Flash)")
+        self.assertEqual(providers["opencode"]["name"], "OpenCode Go")
 
     def test_get_set_active_provider_key(self):
         self.assertEqual(self.pm.get_active_provider_key(), "opencode")

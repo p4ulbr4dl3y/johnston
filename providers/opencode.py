@@ -8,7 +8,7 @@ except ImportError:
 
 import os
 
-NAME = "OpenCode Go (DeepSeek v4 Flash)"
+NAME = "OpenCode Go"
 KEY = "opencode"
 DESCRIPTION = "OpenCode Go agent (DeepSeek v4 Flash) with tools"
 
