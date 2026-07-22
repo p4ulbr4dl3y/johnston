@@ -6,10 +6,7 @@ class ProviderScreen(BaseSelectionScreen[str]):
 
     def __init__(self, providers: dict):
         providers_list = list(providers.values())
-        options = [
-            f"{p['name']}" + (f" — {p['description']}" if p.get('description') else "")
-            for p in providers_list
-        ]
+        options = [p["name"] for p in providers_list]
         items = [p["key"] for p in providers_list]
         super().__init__(
             title="### **Select AI provider**",

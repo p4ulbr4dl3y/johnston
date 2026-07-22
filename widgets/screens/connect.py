@@ -26,7 +26,7 @@ class ConnectProviderScreen(BaseSelectionScreen[str]):
             elif has_key:
                 badge = " [Configured]"
 
-            options.append(f"{name}{badge}" + (f" — {p['description']}" if p.get('description') else ""))
+            options.append(f"{name}{badge}")
             items.append(key)
 
         super().__init__(
