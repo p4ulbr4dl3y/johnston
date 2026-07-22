@@ -102,26 +102,14 @@ WelcomeWidget {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: #a1a1aa;
+    color: #d4d4d8;
 }
 
 .tool-sequential {
     margin-top: 0;
 }
 
-.tool-create {
-    color: #e4e4e7;
-}
-
-.tool-read {
-    color: #a1a1aa;
-}
-
-.tool-edit {
-    color: #e4e4e7;
-}
-
-.tool-bash {
+.tool-create, .tool-read, .tool-edit, .tool-bash {
     color: #d4d4d8;
 }
 
