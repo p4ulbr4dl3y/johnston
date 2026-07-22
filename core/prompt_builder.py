@@ -67,7 +67,8 @@ Core Principles:
 5. Clarification: Use AskUser to ask questions when user intent or design requirements are ambiguous.
 6. Subagents: Use Subagent to launch autonomous subagents for multi-step research or codebase exploration.
 7. Background CLI Tasks: Use ManageTask to monitor, check status, or terminate background shell commands.
-8. Concise Communication: Be direct, clear, and concise. Avoid unnecessary preamble."""
+8. Concise Communication: Be direct, clear, and concise. Avoid unnecessary preamble.
+9. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list."""
 
 
 class PromptBuilder:
