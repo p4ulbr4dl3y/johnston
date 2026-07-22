@@ -51,7 +51,6 @@ class JohnstonChatApp(App):
         new_mode = modes[next_idx]
         self.agent.mode = new_mode
         self.refresh_status_footer()
-        self.notify(f"Switched mode to: {new_mode.upper()}")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):

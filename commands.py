@@ -297,7 +297,6 @@ class PlanCommand(BaseCommand):
             app.agent.mode = "plan"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Switched to Plan mode")
         else:
             app.notify("No active agent", severity="error")
 
@@ -311,7 +310,6 @@ class BuildCommand(BaseCommand):
             app.agent.mode = "build"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Switched to Build mode")
         else:
             app.notify("No active agent", severity="error")
 
@@ -331,7 +329,6 @@ class AskCommand(BaseCommand):
             app.agent.mode = "ask"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Switched to Ask mode (Read-Only)")
         else:
             app.notify("No active agent", severity="error")
 
@@ -345,7 +342,6 @@ class DebugCommand(BaseCommand):
             app.agent.mode = "debug"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Switched to Debug mode")
         else:
             app.notify("No active agent", severity="error")
 
@@ -359,7 +355,6 @@ class OrchestratorCommand(BaseCommand):
             app.agent.mode = "orchestrator"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
-            app.notify("Switched to Orchestrator mode")
         else:
             app.notify("No active agent", severity="error")
 
@@ -384,7 +379,6 @@ class ModeCommand(BaseCommand):
         app.agent.mode = new_mode
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()
-        app.notify(f"Switched agent mode to: {new_mode.upper()}")
 
 
 class PasteCommand(BaseCommand):
