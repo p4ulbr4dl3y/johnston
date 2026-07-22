@@ -149,7 +149,8 @@ class JohnstonChatApp(App):
                 ttype = msg.get("tool_type", "")
                 target = msg.get("target", "")
                 rtext = msg.get("result_text", "")
-                self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext))
+                targs = msg.get("args", {})
+                self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs))
 
         chat_view.check_welcome()
 
@@ -192,7 +193,8 @@ class JohnstonChatApp(App):
                     "type": "tool",
                     "tool_type": getattr(child, "tool_type", ""),
                     "target": getattr(child, "target", ""),
-                    "result_text": getattr(child, "result_text", "")
+                    "result_text": getattr(child, "result_text", ""),
+                    "args": getattr(child, "args", {})
                 })
 
         agent_history = getattr(self.agent, "history", [])
@@ -336,7 +338,12 @@ class JohnstonChatApp(App):
         bot_msg = None
 
         try:
-            async for event_type, val1, val2 in self.agent.stream_steps(full_prompt):
+            async for step in self.agent.stream_steps(full_prompt):
+                event_type = step[0]
+                val1 = step[1] if len(step) > 1 else ""
+                val2 = step[2] if len(step) > 2 else ""
+                val3 = step[3] if len(step) > 3 else None
+
                 if event_type == "thinking_start":
                     thinking_widget = await chat_view.add_thinking_widget(val1)
                 elif event_type == "thinking_end":
@@ -348,7 +355,8 @@ class JohnstonChatApp(App):
                     if bot_msg and not bot_msg.content.strip():
                         bot_msg.remove()
                     bot_msg = None
-                    current_tool_widget = await chat_view.add_tool_call(val1, val2)
+                    targs = val3 if isinstance(val3, dict) else {}
+                    current_tool_widget = await chat_view.add_tool_call(val1, val2, args=targs)
                 elif event_type == "tool_result":
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)

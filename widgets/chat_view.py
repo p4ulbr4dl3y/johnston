@@ -1,3 +1,6 @@
+import os
+
+from rich.syntax import Syntax
 from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.reactive import reactive
@@ -75,11 +78,11 @@ class ThinkingWidget(Vertical):
 
 
 class ToolCallWidget(Vertical):
-    """Виджет вызова инструмента (Create, Read, Edit, Bash)"""
+    """Виджет вызова инструмента (Create, Read, Edit, Bash) с поддержкой разворачивания"""
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False):
+    def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
         classes = f"tool-call tool-{tool_type.lower()}"
         if is_sequential:
             classes += " tool-sequential"
@@ -87,21 +90,121 @@ class ToolCallWidget(Vertical):
         self.tool_type = tool_type
         self.target = target
         self.result_text = result_text
+        self.args = args or {}
         self.icon_name = tool_type
+        self.is_expanded = False
+
         self.header_label = Label("", classes="tool-header")
+        self.content_widget = Static("", classes="tool-content")
 
     def compose(self) -> ComposeResult:
         yield self.header_label
+        yield self.content_widget
 
     def on_mount(self) -> None:
+        self.content_widget.display = False
         self.render_header()
 
     def set_result(self, result_text: str) -> None:
         self.result_text = result_text.strip()
         self.render_header()
+        if self.is_expanded:
+            self.render_content()
 
     def render_header(self) -> None:
-        self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
+        arrow = "▼" if self.is_expanded else "▶"
+        self.header_label.update(f"{arrow} ⚙ [bold]{self.icon_name}[/bold]({self.target})")
+
+    def on_click(self, event) -> None:
+        self.toggle_expanded()
+        event.stop()
+
+    def toggle_expanded(self) -> None:
+        self.is_expanded = not self.is_expanded
+        self.render_header()
+        if self.is_expanded:
+            self.render_content()
+            self.content_widget.display = True
+        else:
+            self.content_widget.display = False
+
+    def _guess_lexer(self, path_str: str) -> str:
+        if not path_str:
+            return "text"
+        ext = os.path.splitext(path_str)[1].lower().lstrip(".")
+        mapping = {
+            "py": "python",
+            "js": "javascript",
+            "jsx": "jsx",
+            "ts": "typescript",
+            "tsx": "tsx",
+            "html": "html",
+            "css": "css",
+            "scss": "scss",
+            "json": "json",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "md": "markdown",
+            "sh": "bash",
+            "bash": "bash",
+            "zsh": "bash",
+            "rs": "rust",
+            "go": "go",
+            "c": "c",
+            "cpp": "cpp",
+            "h": "c",
+            "hpp": "cpp",
+            "sql": "sql",
+            "toml": "toml",
+            "ini": "ini",
+            "dockerfile": "dockerfile",
+            "xml": "xml"
+        }
+        return mapping.get(ext, ext or "text")
+
+    def render_content(self) -> None:
+        if self.tool_type == "Create":
+            content = self.args.get("content")
+            file_path = self.args.get("path") or self.target
+            if content is None:
+                if file_path and os.path.isfile(file_path):
+                    try:
+                        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                            content = f.read()
+                    except Exception:
+                        content = None
+
+            if content is not None:
+                lexer = self._guess_lexer(file_path)
+                try:
+                    syntax = Syntax(
+                        content,
+                        lexer,
+                        theme="one-dark",
+                        line_numbers=True,
+                        word_wrap=True,
+                        background_color="#18181b"
+                    )
+                    self.content_widget.update(syntax)
+                except Exception:
+                    rendered = self._format_code_with_line_numbers(content)
+                    self.content_widget.update(rendered)
+            else:
+                self.content_widget.update(self.result_text or "(No content)")
+        else:
+            self.content_widget.update(self.result_text or "(No result)")
+
+    def _format_code_with_line_numbers(self, code: str) -> str:
+        lines = code.splitlines()
+        if not lines:
+            return "[dim]1 │ [/dim]"
+        max_digits = max(len(str(len(lines))), 2)
+        formatted = []
+        for i, line in enumerate(lines, 1):
+            num_str = str(i).rjust(max_digits)
+            escaped_line = line.replace("[", "\\[")
+            formatted.append(f"[dim]{num_str} │ [/dim]{escaped_line}")
+        return "\n".join(formatted)
 
 
 class WelcomeWidget(Vertical):
@@ -181,10 +284,10 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=True)
         return widget
 
-    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "") -> ToolCallWidget:
+    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "", args: dict = None) -> ToolCallWidget:
         self.clear_welcome()
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
-        widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq)
+        widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget

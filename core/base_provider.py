@@ -222,7 +222,7 @@ class BaseAgent:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception as json_err:
                         tool_result = f"Error: Tool '{t_name}' received invalid JSON arguments: {json_err}. Raw arguments: {raw_args}"
-                        yield ("tool", t_name, t_name)
+                        yield ("tool", t_name, t_name, {})
                         yield ("tool_result", tool_result, "")
                         messages.append({
                             "role": "tool",
@@ -306,7 +306,7 @@ class BaseAgent:
                             target = t_name
                     if isinstance(target, str) and len(target) > 60:
                         target = target[:25] + "..." + target[-32:]
-                    yield ("tool", t_name, target)
+                    yield ("tool", t_name, target, args)
 
                     current_mode = getattr(self, "mode", "build")
                     if current_mode == "plan" and t_name in ("Edit", "Create"):
