@@ -16,8 +16,10 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     import httpx
 
     from core.provider_manager import ProviderManager
+    from tools.context import ToolContext
 
-    pm = getattr(app, "pm", None) or ProviderManager()
+    app_inst = app.app if isinstance(app, ToolContext) else app
+    pm = getattr(app_inst, "pm", None) or ProviderManager()
     providers = pm.load_providers()
 
     PREFERRED_PROVIDER_KEY = "clinepass"
@@ -122,14 +124,16 @@ class ViewImageTool(BaseTool):
 
         prompt = args.get("prompt") or "Describe the visual contents of this image in detail."
 
-        # Проверяем, поддерживает ли текущая активная модель Vision
-        agent = getattr(app, "agent", None) if app else None
+        # Получаем экземпляр приложения и активного агента
+        from tools.context import ToolContext
+        app_inst = app.app if isinstance(app, ToolContext) else app
+        agent = getattr(app_inst, "agent", None) if app_inst else None
         provider_key = getattr(agent, "provider_key", "opencode") if agent else "opencode"
         model_name = getattr(agent, "model", "") if agent else ""
 
-        if agent and not catalog.supports_vision(provider_key, model_name):
-            # Модель не поддерживает Vision -> вызываем фолбэк-субагент
-            return await analyze_image_with_fallback(path, prompt, app)
+        # Если модель не поддерживает Vision -> вызываем фолбэк-субагент (mimo-v2.5)
+        if not catalog.supports_vision(provider_key, model_name):
+            return await analyze_image_with_fallback(path, prompt, app_inst)
 
         try:
             mime_type, _ = mimetypes.guess_type(path)
