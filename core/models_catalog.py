@@ -21,7 +21,9 @@ DEFAULT_CONTEXT_LIMIT = 128000
 def format_context_tokens(tokens: int) -> str:
     if tokens >= 1_000_000:
         val = tokens / 1_000_000
-        if round(val, 1) == 1.0 or val % 1 == 0:
+        if val % 1 == 0:
+            return f"{int(val)}M"
+        if round(val, 1) == 1.0:
             return "1M"
         return f"{val:.1f}M"
     elif tokens >= 1_000:
