@@ -117,7 +117,8 @@ class StatusFooter(Static):
         bar_str = "█" * filled + "░" * (bar_len - filled)
         used_formatted = format_context_tokens(total_tokens)
 
-        row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
+        pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
+        row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
 
         cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
         row2_right_parts = [
