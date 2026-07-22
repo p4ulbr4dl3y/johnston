@@ -126,7 +126,7 @@ class MCPProcessClient:
             }
         }
         self._send(init_req)
-        res = self._read_response(timeout=5.0)
+        res = self._read_response(timeout=20.0)
         if not res or "error" in res:
             return False
 
@@ -143,7 +143,7 @@ class MCPProcessClient:
             "method": "tools/list"
         }
         self._send(req)
-        res = self._read_response(timeout=5.0)
+        res = self._read_response(timeout=15.0)
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
         return self.tools
