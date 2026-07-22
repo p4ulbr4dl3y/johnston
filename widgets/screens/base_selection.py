@@ -135,23 +135,15 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         self.dismiss(self.default_value)
 
     def _on_key(self, event: events.Key) -> None:
-        if self.show_search and event.key == "down":
+        if self.show_search and event.key in ("down", "up"):
             try:
                 search_input = self.query_one("#modal-search-input", Input)
                 if search_input.has_focus:
                     opt_list = self.query_one("#modal-option-list", OptionList)
-                    opt_list.focus()
-                    event.prevent_default()
-                    event.stop()
-                    return
-            except Exception:
-                pass
-        if self.show_search and event.key == "up":
-            try:
-                opt_list = self.query_one("#modal-option-list", OptionList)
-                if opt_list.has_focus and opt_list.highlighted == 0:
-                    search_input = self.query_one("#modal-search-input", Input)
-                    search_input.focus()
+                    if event.key == "down":
+                        opt_list.action_cursor_down()
+                    else:
+                        opt_list.action_cursor_up()
                     event.prevent_default()
                     event.stop()
                     return

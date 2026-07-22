@@ -329,14 +329,15 @@ ModalScreen {
     margin: 1 0;
 }
 
-#modal-dialog OptionList {
+#modal-dialog OptionList,
+#modal-dialog OptionList:focus {
     height: auto;
     max-height: 10;
     margin-top: 1;
     border: none;
-    background: #18181b;
+    background: #27272a;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #18181b;
+    scrollbar-color: #3f3f46 #27272a;
     scrollbar-color-hover: #ffffff #27272a;
     scrollbar-color-active: #ffffff #3f3f46;
 }

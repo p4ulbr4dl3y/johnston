@@ -23,6 +23,7 @@ from widgets.status_footer import StatusFooter
 class JohnstonChatApp(App):
     """Минималистичный Johnston чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
 
+    ENABLE_COMMAND_PALETTE = False
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
     BINDINGS = [
         ("ctrl+c", "quit", "Exit"),
