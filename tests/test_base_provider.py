@@ -148,6 +148,13 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.footer_refreshed)
         self.assertIn("Switched to build mode", res)
 
+    async def test_plan_exit_dynamic_mode_switch(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        agent.mode = "plan"
+        res = await execute_tool("PlanExit", {}, app=agent)
+        self.assertEqual(agent.mode, "build")
+        self.assertIn("Switched to build mode", res)
+
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         agent.history = [

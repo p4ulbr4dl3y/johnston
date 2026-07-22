@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
 from tools.plan_exit import PlanExitTool
-from tools.task import SubagentTool
+from tools.subagent import SubagentTool
 
 
 def get_git_info() -> str:
@@ -121,6 +121,8 @@ class PromptBuilder:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
             if os.path.exists(local_plan):
                 sys_prompt += f"\n\n[BUILD MODE ACTIVE]\nA plan file exists at '{local_plan}'. Execute the implementation steps defined within it."
+            else:
+                sys_prompt += "\n\n[BUILD MODE ACTIVE]\nYou are in Build mode. You have full access to create/edit files and run commands."
 
         return sys_prompt
 

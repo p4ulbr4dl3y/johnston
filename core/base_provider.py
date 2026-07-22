@@ -76,6 +76,15 @@ class BaseAgent:
 
         try:
             while True:
+                current_mode = getattr(self, "mode", "build")
+                if current_mode != agent_mode:
+                    agent_mode = current_mode
+                    builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
+                    sys_prompt = builder.build_system_prompt()
+                    all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                    if messages and messages[0].get("role") == "system":
+                        messages[0]["content"] = sys_prompt
+
                 full_assistant_text = ""
                 prompt_tokens_est = estimate_tokens(messages)
                 step_usage = None
@@ -288,14 +297,15 @@ class BaseAgent:
                         target = target[:25] + "..." + target[-32:]
                     yield ("tool", t_name, target)
 
-                    if agent_mode == "plan" and t_name in ("Edit", "Create"):
+                    current_mode = getattr(self, "mode", "build")
+                    if current_mode == "plan" and t_name in ("Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
                         if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
                             tool_result = f"Error: Editing code file '{f_path}' is disabled in Plan mode. Save your plan to '.johnston/plans/plan.md' or call PlanExit when finished."
                         else:
-                            tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
+                            tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
                     else:
-                        tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None))
+                        tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
 
                     tool_ui_result = tool_result
                     tool_content = tool_result

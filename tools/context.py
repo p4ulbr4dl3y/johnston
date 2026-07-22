@@ -27,13 +27,20 @@ class ToolContext:
         self.refresh_status()
 
     def set_agent_mode(self, mode: str) -> None:
-        if self.app and hasattr(self.app, "agent"):
-            self.app.agent.mode = mode
+        if self.app:
+            if hasattr(self.app, "agent") and self.app.agent:
+                self.app.agent.mode = mode
+            elif hasattr(self.app, "mode"):
+                self.app.mode = mode
             self.refresh_status()
 
     def toggle_agent_mode(self) -> str:
-        if self.app and hasattr(self.app, "agent"):
-            curr = getattr(self.app.agent, "mode", "build")
+        if self.app:
+            curr = "build"
+            if hasattr(self.app, "agent") and self.app.agent:
+                curr = getattr(self.app.agent, "mode", "build")
+            elif hasattr(self.app, "mode"):
+                curr = getattr(self.app, "mode", "build")
             new_mode = "plan" if curr == "build" else "build"
             self.set_agent_mode(new_mode)
             return new_mode
