@@ -48,6 +48,8 @@ class MCPScreen(ModalScreen[None]):
         opt_list.focus()
 
     def action_cancel(self) -> None:
+        if hasattr(self.app, "refresh_status_footer"):
+            self.app.refresh_status_footer()
         self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -57,4 +59,6 @@ class MCPScreen(ModalScreen[None]):
             is_enabled = self.mm.toggle_server(s_name)
             state_str = "enabled" if is_enabled else "disabled"
             self.app.notify(f"MCP server '{s_name}' {state_str}")
+            if hasattr(self.app, "refresh_status_footer"):
+                self.app.refresh_status_footer()
             self.refresh_list()
