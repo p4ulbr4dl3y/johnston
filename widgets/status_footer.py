@@ -90,7 +90,7 @@ class StatusFooter(Static):
 
         from core.models_catalog import catalog
         clean_model = catalog.get_model_display_name(provider_key, model_name)
-        mode_formatted = "Build" if agent_mode.lower() == "build" else "Plan"
+        mode_formatted = agent_mode.capitalize()
 
         width = self.size.width if (self.size and self.size.width > 0) else (self.app.size.width if (self.app and self.app.size) else 80)
         is_compact = width > 0 and width < 75

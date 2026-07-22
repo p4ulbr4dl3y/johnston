@@ -69,15 +69,31 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await handle_slash_command(app, "/plan")
         self.assertEqual(app.agent.mode, "plan")
 
-        # Switch to build
+        # Switch to build & code
         await handle_slash_command(app, "/build")
         self.assertEqual(app.agent.mode, "build")
 
-        # Toggle mode
+        await handle_slash_command(app, "/code")
+        self.assertEqual(app.agent.mode, "build")
+
+        # Switch to ask
+        await handle_slash_command(app, "/ask")
+        self.assertEqual(app.agent.mode, "ask")
+
+        # Switch to debug
+        await handle_slash_command(app, "/debug")
+        self.assertEqual(app.agent.mode, "debug")
+
+        # Switch to orchestrator
+        await handle_slash_command(app, "/orchestrator")
+        self.assertEqual(app.agent.mode, "orchestrator")
+
+        # Cycle mode with /mode
+        app.agent.mode = "build"
         await handle_slash_command(app, "/mode")
         self.assertEqual(app.agent.mode, "plan")
         await handle_slash_command(app, "/mode")
-        self.assertEqual(app.agent.mode, "build")
+        self.assertEqual(app.agent.mode, "ask")
 
     async def test_compact_command(self):
         agent = MockAgent()

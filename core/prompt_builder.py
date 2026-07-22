@@ -111,12 +111,47 @@ class PromptBuilder:
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        if self.mode == "plan":
+        mode_lower = self.mode.lower()
+        if mode_lower == "plan":
             sys_prompt += (
                 "\n\n[PLAN MODE ACTIVE]\n"
-                "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan. "
-                "Save your plan in '.johnston/plans/plan.md'. Do NOT edit project code files directly while in Plan mode. "
-                "When the plan is ready, call the PlanExit tool to propose switching to Build mode."
+                "You are in Plan mode. Analyze the codebase, research requirements, and outline a step-by-step implementation plan.\n"
+                "Guidelines:\n"
+                "1. Inspect codebase using Read, ListDir, Glob, Grep.\n"
+                "2. Save your plan in '.johnston/plans/plan.md'. Do NOT edit project source files directly while in Plan mode.\n"
+                "3. When the plan is ready, call the PlanExit tool to propose switching to Build mode."
+            )
+        elif mode_lower == "ask":
+            sys_prompt += (
+                "\n\n[ASK MODE ACTIVE - READ-ONLY ASSISTANT]\n"
+                "You are in Ask mode — a read-only assistant focused on answering questions and explaining concepts without modifying the codebase.\n"
+                "Guidelines:\n"
+                "1. Answer questions thoroughly with clear explanations, code context, and Mermaid diagrams where helpful.\n"
+                "2. Perform read-only exploration using Read, ListDir, Glob, Grep, etc.\n"
+                "3. Do NOT modify files or run write commands. Your toolset is read-only.\n"
+                "4. If a task requires code edits or file creation, suggest switching to /build or /code mode."
+            )
+        elif mode_lower == "debug":
+            sys_prompt += (
+                "\n\n[DEBUG MODE ACTIVE - SYSTEMATIC DEBUGGER]\n"
+                "You are in Debug mode — an expert software debugger specializing in systematic problem diagnosis.\n"
+                "Guidelines:\n"
+                "1. Reflect on 5-7 different potential sources of the issue.\n"
+                "2. Distill those down to 1-2 most probable root causes based on empirical evidence.\n"
+                "3. Add logging or run diagnostic commands via Bash to validate your assumptions before making fixes.\n"
+                "4. Explicitly ask the user via AskUser or message to confirm diagnosis before applying a fix.\n"
+                "5. Prefer minimal, targeted fixes over broad refactors."
+            )
+        elif mode_lower == "orchestrator":
+            sys_prompt += (
+                "\n\n[ORCHESTRATOR MODE ACTIVE - WORKFLOW COORDINATOR]\n"
+                "You are in Orchestrator mode — a strategic workflow coordinator who breaks down complex tasks into subtask waves.\n"
+                "Guidelines:\n"
+                "1. Research codebase first to identify files, patterns, and dependencies.\n"
+                "2. Classify subtasks into parallel execution waves (subtasks touching different files can run in parallel).\n"
+                "3. Delegate execution wave-by-wave using the Subagent tool.\n"
+                "4. Do NOT edit files directly yourself — delegate all implementation to subagents.\n"
+                "5. Synthesize final results when all waves complete."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
@@ -138,7 +173,15 @@ class PromptBuilder:
 
         all_tools = list(self.base_tools) + clean_mcp_tools
 
-        if self.mode == "plan":
+        mode_lower = self.mode.lower()
+        if mode_lower == "ask":
+            # Filter out file modification tools in ask mode
+            all_tools = [
+                t for t in all_tools
+                if t.get("function", {}).get("name") not in ("Create", "Edit")
+            ]
+
+        if mode_lower == "plan":
             if not any(t.get("function", {}).get("name") == "PlanExit" for t in all_tools):
                 all_tools.append(PlanExitTool.schema)
 

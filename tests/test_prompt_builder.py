@@ -38,5 +38,26 @@ class TestPromptBuilder(unittest.TestCase):
         sys_prompt = builder.build_system_prompt()
         self.assertIn("[PROJECT INSTRUCTIONS (AGENTS.md)]", sys_prompt)
 
+    def test_build_system_prompt_new_modes(self):
+        # Ask mode
+        pb_ask = PromptBuilder("System prompt test", [{"function": {"name": "Read"}}, {"function": {"name": "Create"}}, {"function": {"name": "Edit"}}], mode="ask")
+        prompt_ask = pb_ask.build_system_prompt()
+        tools_ask = pb_ask.build_tools()
+        ask_tool_names = [t["function"]["name"] for t in tools_ask]
+        self.assertIn("[ASK MODE ACTIVE - READ-ONLY ASSISTANT]", prompt_ask)
+        self.assertNotIn("Create", ask_tool_names)
+        self.assertNotIn("Edit", ask_tool_names)
+        self.assertIn("Read", ask_tool_names)
+
+        # Debug mode
+        pb_debug = PromptBuilder("System prompt test", [], mode="debug")
+        prompt_debug = pb_debug.build_system_prompt()
+        self.assertIn("[DEBUG MODE ACTIVE - SYSTEMATIC DEBUGGER]", prompt_debug)
+
+        # Orchestrator mode
+        pb_orch = PromptBuilder("System prompt test", [], mode="orchestrator")
+        prompt_orch = pb_orch.build_system_prompt()
+        self.assertIn("[ORCHESTRATOR MODE ACTIVE - WORKFLOW COORDINATOR]", prompt_orch)
+
 if __name__ == "__main__":
     unittest.main()

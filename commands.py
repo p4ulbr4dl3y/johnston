@@ -297,6 +297,7 @@ class PlanCommand(BaseCommand):
             app.agent.mode = "plan"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
+            app.notify("Switched to Plan mode")
         else:
             app.notify("No active agent", severity="error")
 
@@ -310,24 +311,80 @@ class BuildCommand(BaseCommand):
             app.agent.mode = "build"
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
+            app.notify("Switched to Build mode")
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class CodeCommand(BuildCommand):
+    """Алиас команды /code на /build"""
+    name = "/code"
+    description = "Switch agent to Code/Build mode"
+
+
+class AskCommand(BaseCommand):
+    name = "/ask"
+    description = "Switch agent to Ask mode (read-only assistant)"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "ask"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+            app.notify("Switched to Ask mode (Read-Only)")
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class DebugCommand(BaseCommand):
+    name = "/debug"
+    description = "Switch agent to Debug mode (systematic debugger)"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "debug"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+            app.notify("Switched to Debug mode")
+        else:
+            app.notify("No active agent", severity="error")
+
+
+class OrchestratorCommand(BaseCommand):
+    name = "/orchestrator"
+    description = "Switch agent to Orchestrator mode (workflow coordinator)"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "orchestrator"
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+            app.notify("Switched to Orchestrator mode")
         else:
             app.notify("No active agent", severity="error")
 
 
 class ModeCommand(BaseCommand):
     name = "/mode"
-    description = "Toggle agent mode (PLAN / BUILD)"
+    description = "Cycle agent mode (BUILD / PLAN / ASK / DEBUG / ORCHESTRATOR)"
 
     async def execute(self, app) -> None:
         if not hasattr(app, "agent") or not app.agent:
             app.notify("No active agent", severity="error")
             return
 
-        curr = getattr(app.agent, "mode", "build")
-        new_mode = "build" if curr == "plan" else "plan"
+        modes_cycle = ["build", "plan", "ask", "debug", "orchestrator"]
+        curr = getattr(app.agent, "mode", "build").lower()
+        if curr in modes_cycle:
+            next_idx = (modes_cycle.index(curr) + 1) % len(modes_cycle)
+            new_mode = modes_cycle[next_idx]
+        else:
+            new_mode = "build"
+
         app.agent.mode = new_mode
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()
+        app.notify(f"Switched agent mode to: {new_mode.upper()}")
 
 
 class PasteCommand(BaseCommand):
@@ -348,10 +405,9 @@ class CopyCommand(BaseCommand):
     async def execute(self, app) -> None:
         chat_view = app.query_one(ChatView)
         last_bot_text = ""
-
         for child in reversed(chat_view.children):
-            if isinstance(child, BotMessage) and child.content:
-                last_bot_text = child.content
+            if isinstance(child, BotMessage):
+                last_bot_text = child.full_text
                 break
 
         if last_bot_text:
@@ -390,6 +446,10 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
         CompactCommand,
         PlanCommand,
         BuildCommand,
+        CodeCommand,
+        AskCommand,
+        DebugCommand,
+        OrchestratorCommand,
         ModeCommand,
         PasteCommand,
         CopyCommand,
