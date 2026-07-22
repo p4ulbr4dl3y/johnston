@@ -1,12 +1,11 @@
-/* Selection Style - Inverse Pure White */
-Screen > .screen--selection {
-    background: #ffffff;
-    color: #09090b;
-}
-
+/* Selection Style - True Inverse (Dark text on White selection) */
+.screen--selection,
+.text-area--selection,
+Screen > .screen--selection,
 TextArea > .text-area--selection {
     background: #ffffff;
     color: #09090b;
+    text-style: reverse;
 }
 
 Screen {
