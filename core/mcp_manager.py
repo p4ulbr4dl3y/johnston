@@ -3,6 +3,7 @@ MCP (Model Context Protocol) Manager for Johnston.
 Handles global (~/.johnston/mcp.json) and project (.johnston/mcp.json) MCP servers.
 Supports stdio process execution with JSON-RPC 2.0.
 """
+import atexit
 import json
 import os
 import select
@@ -29,8 +30,10 @@ class MCPProcessClient:
         self.process: Optional[subprocess.Popen] = None
         self.req_id = 0
         self.tools: List[Dict[str, Any]] = []
+        self._stopped = False
 
     def start(self) -> bool:
+        self._stopped = False
         if self.process and self.process.poll() is None:
             return True
 
@@ -55,6 +58,7 @@ class MCPProcessClient:
             return False
 
     def stop(self):
+        self._stopped = True
         if self.process:
             try:
                 if self.process.stdin:
@@ -68,7 +72,7 @@ class MCPProcessClient:
 
             try:
                 self.process.terminate()
-                self.process.wait(timeout=2)
+                self.process.wait(timeout=1)
             except Exception:
                 try:
                     self.process.kill()
@@ -84,25 +88,29 @@ class MCPProcessClient:
         self.process.stdin.flush()
 
     def _read_response(self, req_id: Optional[int] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
-        if not self.process or not self.process.stdout:
+        if not self.process or not self.process.stdout or self._stopped:
             return None
 
         start_time = time.time()
-        while True:
-            remaining = None
+        while not self._stopped:
+            wait_time = 1.0
             if timeout is not None:
                 elapsed = time.time() - start_time
                 remaining = timeout - elapsed
                 if remaining <= 0:
                     return None
+                wait_time = min(1.0, max(0.05, remaining))
 
             try:
-                rlist, _, _ = select.select([self.process.stdout], [], [], remaining)
+                rlist, _, _ = select.select([self.process.stdout], [], [], wait_time)
             except Exception:
                 return None
 
+            if self._stopped:
+                return None
+
             if not rlist:
-                return None  # Timeout reached
+                continue  # Tick completed, check self._stopped again
 
             line = self.process.stdout.readline()
             if not line:
@@ -122,6 +130,8 @@ class MCPProcessClient:
                 return data
             except Exception:
                 continue
+
+        return None
 
     def _initialize(self) -> bool:
         self.req_id += 1
@@ -222,6 +232,16 @@ class MCPManager:
         self.project_file = os.path.join(self.project_dir, PROJECT_MCP_FILE)
         self.clients: Dict[str, MCPProcessClient] = {}
         self.ensure_default_configs()
+        atexit.register(self.stop_all)
+
+    def stop_all(self):
+        """Stops all running MCP client processes."""
+        for client in list(self.clients.values()):
+            try:
+                client.stop()
+            except Exception:
+                pass
+        self.clients.clear()
 
     def ensure_default_configs(self):
         os.makedirs(os.path.dirname(self.global_file), exist_ok=True)

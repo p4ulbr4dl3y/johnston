@@ -56,6 +56,14 @@ class JohnstonChatApp(App):
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
 
+    def on_unmount(self) -> None:
+        """Очистка всех запущенных MCP-серверов при закрытии приложения"""
+        try:
+            from core.mcp_manager import get_mcp_manager
+            get_mcp_manager().stop_all()
+        except Exception:
+            pass
+
     def refresh_status_footer(self) -> None:
         """Обновление строки директории, провайдера, модели, контекста, токенов и стоимости"""
         try:
