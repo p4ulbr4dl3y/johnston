@@ -56,8 +56,7 @@ class ApiKeyInputScreen(ModalScreen[str | None]):
         with Vertical(id="modal-dialog"):
             yield Markdown(
                 f"### **Connect {self.provider_name}**\n\n"
-                f"Current API Key: `{masked}`\n\n"
-                f"Enter API Key (press Enter to connect):",
+                f"Current API Key: `{masked}`",
                 classes="modal-markdown"
             )
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
