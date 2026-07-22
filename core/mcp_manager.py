@@ -179,6 +179,11 @@ class MCPProcessClient:
             else:
                 output_parts.append(json.dumps(item, ensure_ascii=False))
 
+        try:
+            self.fetch_tools()
+        except Exception:
+            pass
+
         return "\n".join(output_parts) or "Success (empty response)"
 
 

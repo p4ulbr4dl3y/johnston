@@ -83,13 +83,12 @@ class BaseAgent:
         try:
             while True:
                 current_mode = getattr(self, "mode", "build")
-                if current_mode != agent_mode:
-                    agent_mode = current_mode
-                    builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
-                    sys_prompt = builder.build_system_prompt()
-                    all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
-                    if messages and messages[0].get("role") == "system":
-                        messages[0]["content"] = sys_prompt
+                agent_mode = current_mode
+                builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
+                sys_prompt = builder.build_system_prompt()
+                all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                if messages and messages[0].get("role") == "system":
+                    messages[0]["content"] = sys_prompt
 
                 full_assistant_text = ""
                 prompt_tokens_est = estimate_tokens(messages)
