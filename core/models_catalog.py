@@ -15,23 +15,7 @@ MODELS_DEV_URL = "https://models.dev/api.json"
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_dev.json")
 CACHE_TTL = 86400  # 24 hours
 
-DEFAULT_MODEL_LIMITS: Dict[str, int] = {
-    "deepseek": 1000000,
-    "gpt-4o": 128000,
-    "gpt-4": 128000,
-    "claude-3": 200000,
-    "claude": 200000,
-    "gemini": 1000000,
-    "minimax": 128000,
-    "kimi": 200000,
-    "moonshot": 200000,
-    "nemotron": 1000000,
-    "grok": 1000000,
-    "qwen": 128000,
-    "glm": 128000,
-    "mistral": 128000,
-    "llama": 128000,
-}
+DEFAULT_CONTEXT_LIMIT = 128000
 
 
 def format_context_tokens(tokens: int) -> str:
@@ -118,12 +102,7 @@ class ModelsCatalog:
                         if isinstance(limit, (int, float)):
                             return int(limit)
 
-        model_clean = model_id.lower()
-        for key, val in DEFAULT_MODEL_LIMITS.items():
-            if key in model_clean:
-                return val
-
-        return 128000
+        return DEFAULT_CONTEXT_LIMIT
 
     def supports_vision(self, provider_id: str, model_id: str) -> bool:
         """Проверяет, поддерживает ли модель обработку изображений (Vision) через input_modalities API или кэш"""
