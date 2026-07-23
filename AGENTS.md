@@ -145,6 +145,9 @@ The project supports running autonomous isolated subagents for subtasks:
 * **`SubagentTool`** (`tools/subagent.py`): tool to launch a subtask subagent.
   * `subagent_type`: `"general"` (multi-step) or `"explore"` (fast code search).
   * `background`: `false` (synchronous waiting for result in `<task_result>`) or `true` (background async execution with auto notification on completion).
+* **`ManageSubagentTool`** (`tools/manage_subagent.py`): tool to inspect, list, terminate, or message subagents.
+  * `action`: `"list"`, `"status"`, `"kill"`, or `"send_message"`.
+  * `send_message`: sends follow-up prompts to ANY subagent (including `COMPLETED` subagents, which WILL automatically resume and respond).
 * **Isolation**: subagents run in isolated `BaseAgent` context without recursive access to `Subagent` tool.
 
 ---

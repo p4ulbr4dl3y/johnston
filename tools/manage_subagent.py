@@ -8,22 +8,23 @@ from tools.base import BaseTool
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
     description = (
-        "Manage active and historical subagents. "
-        "Actions: 'list' (view all subagents), 'status' (inspect subagent logs/status), "
-        "'kill' (terminate a running subagent), or 'send_message' (send a follow-up prompt to a subagent)."
+        "Manage active and historical subagents for current session. "
+        "Actions: 'list' (view subagents), 'status' (inspect subagent logs/status), "
+        "'kill' (terminate a running subagent), or 'send_message' (send a follow-up prompt to ANY subagent, "
+        "including COMPLETED ones. Completed subagents WILL resume, process the message, and respond)."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "manage_subagent",
-            "description": "Manage active and historical subagents: list subagents, inspect status/logs, terminate subagents, or send follow-up messages.",
+            "description": "Manage subagents: list subagents, inspect status/logs, terminate subagents, or send follow-up messages to ANY subagent (including COMPLETED ones, which WILL resume and answer).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "enum": ["list", "status", "kill", "send_message"],
-                        "description": "Action: 'list', 'status', 'kill', or 'send_message'"
+                        "description": "Action: 'list', 'status', 'kill', or 'send_message' (resumes ANY subagent, completed or running)"
                     },
                     "task_id": {
                         "type": "string",
@@ -31,7 +32,7 @@ class ManageSubagentTool(BaseTool):
                     },
                     "message": {
                         "type": "string",
-                        "description": "Follow-up message to send to the subagent (required for send_message)"
+                        "description": "Follow-up message to send to the subagent (works on COMPLETED subagents too, resuming them)"
                     }
                 },
                 "required": ["action"]
