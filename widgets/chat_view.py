@@ -205,8 +205,16 @@ class ToolCallWidget(Vertical):
         if self.is_expanded:
             self.render_content()
 
+    SYSTEM_TOOLS = {
+        "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
+        "AskUser", "Skill", "ManageTask", "SwitchToAction", "PlanExit",
+        "Subagent", "Task", "task", "ViewImage"
+    }
+
     def render_header(self) -> None:
-        if self.tool_type == "CallMCPTool":
+        if self.tool_type in self.SYSTEM_TOOLS:
+            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
+        elif self.tool_type == "CallMCPTool":
             tool_name = self.args.get("tool") or "CallMCPTool"
             server = self.args.get("server") or ""
             mcp_args = self.args.get("arguments")
@@ -218,15 +226,15 @@ class ToolCallWidget(Vertical):
                 compact = f"{{server: \"{server}\"}}" if server else "{}"
             escaped_compact = compact.replace("[", "\\[")
             self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
-        elif self.args and isinstance(self.args, dict) and self.tool_type not in ("Read", "Create", "Edit", "Bash"):
-            compact = self._format_compact_dict(self.args)
+        else:
+            # Eager MCP tool or custom external tool
+            mcp_args = self.args if isinstance(self.args, dict) else {}
+            compact = self._format_compact_dict(mcp_args)
             if compact:
                 escaped_compact = compact.replace("[", "\\[")
                 self.header_label.update(f"⚙ [bold]{self.tool_type}[/bold]({escaped_compact})")
             else:
                 self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
-        else:
-            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
         if self.is_expandable():
