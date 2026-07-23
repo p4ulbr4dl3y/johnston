@@ -115,7 +115,7 @@ class BashTool(BaseTool):
             await asyncio.wait_for(p.wait(), timeout=10.0)
             if hasattr(task, "read_task") and task.read_task:
                 await task.read_task
-            res = "".join(task.output)
+            res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
@@ -129,7 +129,7 @@ class BashTool(BaseTool):
                 await p.wait()
                 if hasattr(task, "read_task") and task.read_task:
                     await task.read_task
-                res = "".join(task.output)
+                res = task.get_formatted_output()
                 if not res.strip():
                     return "Command executed with no output."
                 return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")

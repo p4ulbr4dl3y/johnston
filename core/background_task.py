@@ -36,6 +36,11 @@ class BackgroundTask:
         self.master_fd = master_fd
         self.reader = reader
 
+    def get_formatted_output(self) -> str:
+        """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
+        raw = "".join(self.output)
+        return process_carriage_returns(strip_ansi(raw))
+
     def start_reading(self, app, on_completed_cb):
         async def _read():
             try:
@@ -47,12 +52,12 @@ class BackgroundTask:
                             break
                         if not chunk:
                             break
-                        text = process_carriage_returns(strip_ansi(chunk.decode("utf-8", errors="replace")))
+                        text = strip_ansi(chunk.decode("utf-8", errors="replace"))
                     else:
                         line = await self.process.stdout.readline()
                         if not line:
                             break
-                        text = process_carriage_returns(strip_ansi(line.decode("utf-8", errors="replace")))
+                        text = strip_ansi(line.decode("utf-8", errors="replace"))
 
                     self.output.append(text)
                     if self.widget and hasattr(self.widget, "append_bash_output"):
@@ -80,7 +85,7 @@ class BackgroundTask:
 
                 if self.is_background and on_completed_cb and getattr(app, "is_app_active", True):
                     try:
-                        out_res = "".join(self.output)
+                        out_res = self.get_formatted_output()
                         if len(out_res) > 3000:
                             out_res = out_res[:3000] + "\n... [output truncated]"
                         out_res = out_res if out_res.strip() else "Command executed with no output."

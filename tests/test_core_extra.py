@@ -65,6 +65,17 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         cleaned = process_carriage_returns(raw)
         self.assertEqual(cleaned, "Downloading 100%\nDone\n")
 
+    def test_get_formatted_output_chunks(self):
+        bg_task = BackgroundTask("task_git", "git clone", None)
+        bg_task.output = [
+            "Receiving objects: 26% (127/485)\r",
+            "Receiving objects: 27% (131/485)\r",
+            "Receiving objects: 100% (485/485)\n",
+            "Resolving deltas: 100% (17/17)\n"
+        ]
+        res = bg_task.get_formatted_output()
+        self.assertEqual(res, "Receiving objects: 100% (485/485)\nResolving deltas: 100% (17/17)\n")
+
     async def test_background_subagent_kill(self):
         async def dummy_subagent():
             await asyncio.sleep(100)
