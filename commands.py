@@ -448,6 +448,19 @@ class TestModalCommand(BaseCommand):
         app.push_screen(BashConfirmScreen("cd /Users/yegor/testing && echo -e \"John\\ny\" | python3 script.py", "Test command"))
 
 
+class SubagentsCommand(BaseCommand):
+    name = "/subagents"
+    description = "View and manage subagents"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.subagents_list import SubagentsListScreen
+        app.push_screen(SubagentsListScreen())
+
+
+class SubagentCommand(SubagentsCommand):
+    name = "/subagent"
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -457,6 +470,8 @@ COMMAND_CLASSES = [
     RewindCommand,
     ResumeCommand,
     TasksCommand,
+    SubagentsCommand,
+    SubagentCommand,
     SkillsCommand,
     MCPCommand,
     InitCommand,
