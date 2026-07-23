@@ -12,7 +12,7 @@ class TestTruncateOutput(unittest.TestCase):
         log_path = os.path.expanduser("~/.johnston/logs/last_tool.log")
         self.assertTrue(os.path.exists(log_path))
         self.assertIn("Full output saved to", res)
-        self.assertIn("Use Read tool to inspect", res)
+        self.assertIn("Use read tool to inspect", res)
 
         with open(log_path, "r", encoding="utf-8") as f:
             content = f.read()

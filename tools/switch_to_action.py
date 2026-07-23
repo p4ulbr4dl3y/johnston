@@ -4,12 +4,12 @@ from tools.base import BaseTool
 
 
 class SwitchToActionTool(BaseTool):
-    name = "SwitchToAction"
+    name = "switch_to_action"
     description = "Switch agent mode from Explore to Action after user explicitly approves proceeding."
     schema = {
         "type": "function",
         "function": {
-            "name": "SwitchToAction",
+            "name": "switch_to_action",
             "description": "Switch agent mode from Explore to Action after user explicitly approves proceeding with implementation/edits.",
             "parameters": {"type": "object", "properties": {}},
         },

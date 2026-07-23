@@ -6,12 +6,12 @@ from tools.base import IGNORE_DIRS, BaseTool, resolve_path, truncate_output
 
 
 class GlobTool(BaseTool):
-    name = "Glob"
+    name = "glob"
     description = "Search file paths by pattern."
     schema = {
         "type": "function",
         "function": {
-            "name": "Glob",
+            "name": "glob",
             "description": "Search file paths matching glob pattern.",
             "parameters": {
                 "type": "object",

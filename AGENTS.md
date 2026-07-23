@@ -42,7 +42,7 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "Read",
+            "name": "read",
             "description": "Read file content.",
             "parameters": { ... }
         }
@@ -84,7 +84,7 @@ Defined in [core/base_provider.py](file:///Users/yegor/johnston/core/base_provid
 ## 3. Tool Execution and `ToolContext`
 
 Tools are isolated in [tools/](file:///Users/yegor/johnston/tools/).
-All available tools are registered in [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py). UI isolation from business logic is guaranteed via `ToolContext` ([tools/context.py](file:///Users/yegor/johnston/tools/context.py)). Built-in tools include: `Read`, `Create`, `Edit`, `Bash`, `Glob`, `Grep`, `ListDir`, `AskUser`, `Skill`, `ManageTask`, `PlanExit`, `Subagent`. Large output truncation is handled via `truncate_output`.
+All available tools are registered in [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py). UI isolation from business logic is guaranteed via `ToolContext` ([tools/context.py](file:///Users/yegor/johnston/tools/context.py)). Built-in tools include: `read`, `create`, `edit`, `bash`, `glob`, `grep`, `list_dir`, `ask_user`, `skill`, `call_mcp_tool`, `manage_task`, `switch_to_action`, `subagent`, `view_image`. Large output truncation is handled via `truncate_output`.
 
 ### How to Add a New Tool:
 1. Create `tools/my_tool.py` inheriting from `BaseTool`:

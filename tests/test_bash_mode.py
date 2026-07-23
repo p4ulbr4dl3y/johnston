@@ -43,5 +43,5 @@ class TestBashMode(unittest.IsolatedAsyncioTestCase):
         # User message should NOT be printed
         mock_chat_view.add_user_message.assert_not_called()
         # Only tool widget should be printed
-        mock_chat_view.add_tool_call.assert_called_once_with("Bash", "ls")
+        mock_chat_view.add_tool_call.assert_called_once_with("bash", "ls")
         mock_tool_widget.set_result.assert_called_once()

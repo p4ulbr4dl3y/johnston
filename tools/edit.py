@@ -7,12 +7,12 @@ from tools.linter import run_linter
 
 
 class EditTool(BaseTool):
-    name = "Edit"
+    name = "edit"
     description = "Replace unique text block (old_string) with new_string."
     schema = {
         "type": "function",
         "function": {
-            "name": "Edit",
+            "name": "edit",
             "description": "Replace an exact, unique block of text (old_string) with new_string in an existing file. Must match exact whitespace and indentation.",
             "parameters": {
                 "type": "object",

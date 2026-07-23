@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
+
 from textual.widgets import Button
 
 from widgets.chat_view import CustomMarkdownFence

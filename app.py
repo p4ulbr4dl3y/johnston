@@ -292,7 +292,7 @@ class JohnstonChatApp(App):
         from tools.bash import BashTool
         chat_view = self.query_one(ChatView)
 
-        tool_widget = await chat_view.add_tool_call("Bash", cmd)
+        tool_widget = await chat_view.add_tool_call("bash", cmd)
         self.current_tool_widget = tool_widget
 
         res = await BashTool().execute({"command": cmd, "skip_confirm": True, "no_background": True}, app=self)

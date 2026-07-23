@@ -85,15 +85,15 @@ def get_rules_snippet() -> str:
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
 
 Core Principles:
-1. Research First: Inspect the codebase using ListDir, Glob, and Grep before forming hypotheses or making changes. Never guess file paths, signatures, or implementations.
-2. Read Before Edit: Always read target file contents with Read before making modifications with Edit or Create.
-3. Verification: Execute verification commands, linting, or unit tests via Bash to verify your code changes work cleanly before concluding.
-4. Precision Edits: When using Edit, include enough surrounding context lines and match exact indentation. Mimic existing project code conventions and style.
+1. Research First: Inspect the codebase using list_dir, glob, and grep before forming hypotheses or making changes. Never guess file paths, signatures, or implementations.
+2. Read Before Edit: Always read target file contents with read before making modifications with edit or create.
+3. Verification: Execute verification commands, linting, or unit tests via bash to verify your code changes work cleanly before concluding.
+4. Precision Edits: When using edit, include enough surrounding context lines and match exact indentation. Mimic existing project code conventions and style.
 5. Minimal Code Comments: Do NOT add unnecessary code comments unless explicitly requested by the user.
 6. No Unsolicited Commits: NEVER execute git commits unless explicitly instructed by the user.
-7. Clarification: Use AskUser to ask questions when user intent or design requirements are ambiguous.
-8. Subagents: Use Subagent to launch autonomous subagents for multi-step research or codebase exploration.
-9. Background CLI Tasks: Use ManageTask to monitor, check status, or terminate background shell commands.
+7. Clarification: Use ask_user to ask questions when user intent or design requirements are ambiguous.
+8. Subagents: Use subagent to launch autonomous subagents for multi-step research or codebase exploration.
+9. Background CLI Tasks: Use manage_task to monitor, check status, or terminate background shell commands.
 10. Concise Communication: Be direct, clear, and concise (under 4 lines of text outside code/tools). Avoid unnecessary preamble or post-task explanations.
 11. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list.
 12. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise."""
@@ -148,10 +148,10 @@ class PromptBuilder:
                 "\n\n[MODE: EXPLORE]\n"
                 "Read-only research, codebase inspection, QA, and plan drafting.\n"
                 "Rules:\n"
-                "1. Code modification tools (Create, Edit) are disabled.\n"
+                "1. Code modification tools (create, edit) are disabled.\n"
                 "2. Output findings/plan directly in chat (Goal, Proposed Changes, Verification).\n"
                 "3. Always ask user for confirmation before proceeding to implementation.\n"
-                "4. CRITICAL: Do NOT call SwitchToAction on your own. You MUST wait for explicit user approval (e.g., 'yes', 'proceed', 'do it') in a subsequent message before calling SwitchToAction."
+                "4. CRITICAL: Do NOT call switch_to_action on your own. You MUST wait for explicit user approval (e.g., 'yes', 'proceed', 'do it') in a subsequent message before calling switch_to_action."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
@@ -180,23 +180,23 @@ class PromptBuilder:
             # Filter out file modification tools in explore mode
             all_tools = [
                 t for t in all_tools
-                if t.get("function", {}).get("name") not in ("Create", "Edit")
+                if t.get("function", {}).get("name") not in ("create", "edit", "Create", "Edit")
             ]
-            if not any(t.get("function", {}).get("name") in ("SwitchToAction", "PlanExit") for t in all_tools):
+            if not any(t.get("function", {}).get("name") in ("switch_to_action", "SwitchToAction") for t in all_tools):
                 all_tools.append(SwitchToActionTool.schema)
 
-        if self.allow_task and not any(t.get("function", {}).get("name") in ("Subagent", "Task", "task") for t in all_tools):
+        if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent", "Task", "task") for t in all_tools):
             all_tools.append(SubagentTool.schema)
 
         if provider_key and model_id and not catalog.supports_vision(provider_key, model_id):
             updated_tools = []
             for t in all_tools:
                 t_func = t.get("function", {})
-                if t_func.get("name") == "ViewImage":
+                if t_func.get("name") in ("view_image", "ViewImage"):
                     t = {
                         "type": "function",
                         "function": {
-                            "name": "ViewImage",
+                            "name": "view_image",
                             "description": "Inspect an image file on disk via Vision Sub-Agent. Provide image path and detailed prompt.",
                             "parameters": {
                                 "type": "object",

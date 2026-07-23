@@ -14,6 +14,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.highlight import HighlightTheme
 from textual.reactive import reactive
 from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import MarkdownFence
@@ -44,9 +45,6 @@ class CustomMarkdownFence(MarkdownFence):
                 pass
             event.stop()
 
-
-from pygments.token import Token
-from textual.highlight import HighlightTheme
 
 HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
 HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
@@ -178,7 +176,10 @@ class ToolCallWidget(Vertical):
     can_focus = False
     ALLOW_SELECT = False
 
-    EXPANDABLE_TOOLS = {"Create", "Edit", "Bash", "Read", "CallMCPTool"}
+    EXPANDABLE_TOOLS = {
+        "create", "edit", "bash", "read", "call_mcp_tool",
+        "Create", "Edit", "Bash", "Read", "CallMCPTool"
+    }
 
     def is_expandable(self) -> bool:
         return self.tool_type in self.EXPANDABLE_TOOLS
@@ -248,7 +249,7 @@ class ToolCallWidget(Vertical):
 
     def set_result(self, result_text: str) -> None:
         cleaned = result_text.strip()
-        if self.tool_type == "Bash":
+        if self.tool_type in ("bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
                 self.render_header()
                 return
@@ -261,16 +262,19 @@ class ToolCallWidget(Vertical):
             self.render_content()
 
     SYSTEM_TOOLS = {
+        "read", "create", "edit", "bash", "glob", "grep", "list_dir",
+        "ask_user", "skill", "manage_task", "switch_to_action",
+        "subagent", "task", "view_image", "call_mcp_tool",
         "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
-        "AskUser", "Skill", "ManageTask", "SwitchToAction", "PlanExit",
-        "Subagent", "Task", "task", "ViewImage"
+        "AskUser", "Skill", "ManageTask", "SwitchToAction",
+        "Subagent", "Task", "ViewImage", "CallMCPTool"
     }
 
     def render_header(self) -> None:
         if self.tool_type in self.SYSTEM_TOOLS:
             self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
-        elif self.tool_type == "CallMCPTool":
-            tool_name = self.args.get("tool") or "CallMCPTool"
+        elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
+            tool_name = self.args.get("tool") or "call_mcp_tool"
             server = self.args.get("server") or ""
             mcp_args = self.args.get("arguments")
             if not isinstance(mcp_args, dict):
@@ -510,7 +514,7 @@ class ToolCallWidget(Vertical):
         cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", text)
         cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
         cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
-        cleaned = re.sub(r"Use ManageTask to inspect[^\n]*", "", cleaned)
+        cleaned = re.sub(r"Use (manage_task|ManageTask) to inspect[^\n]*", "", cleaned)
         return cleaned.strip()
 
     def append_bash_output(self, text: str) -> None:
@@ -528,7 +532,7 @@ class ToolCallWidget(Vertical):
     def render_content(self) -> None:
         try:
             file_path = self.args.get("path") or self.args.get("file") or self.target
-            if self.tool_type == "Create":
+            if self.tool_type in ("create", "Create"):
                 content = self.args.get("content")
                 if content is None:
                     if file_path and os.path.isfile(file_path):
@@ -555,7 +559,7 @@ class ToolCallWidget(Vertical):
                         self.content_widget.update(rendered)
                 else:
                     self.content_widget.update(self.result_text or "(No content)")
-            elif self.tool_type == "Edit":
+            elif self.tool_type in ("edit", "Edit"):
                 diff_text = self.result_text.strip()
                 if not diff_text or "@@" not in diff_text:
                     old_s = self.args.get("old_string", "")
@@ -575,7 +579,7 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(formatted_diff)
                 else:
                     self.content_widget.update(self.result_text or "(No diff)")
-            elif self.tool_type == "Read":
+            elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text
                 clean_code, start_line, fpath = self._format_read_content(raw_text, file_path)
                 if not clean_code.strip() and fpath and os.path.isfile(fpath):
@@ -604,12 +608,12 @@ class ToolCallWidget(Vertical):
                         self.content_widget.update(rendered)
                 else:
                     self.content_widget.update(self.result_text or "(No content)")
-            elif self.tool_type == "Bash":
+            elif self.tool_type in ("bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     output_text = "(Running command...)"
                 self.content_widget.update(output_text)
-            elif self.tool_type == "CallMCPTool":
+            elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 server = self.args.get("server", "")
                 tool = self.args.get("tool", "")
                 mcp_args = self.args.get("arguments", {})

@@ -13,12 +13,12 @@ SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*
 
 
 class BashTool(BaseTool):
-    name = "Bash"
+    name = "bash"
     description = "Run terminal command. >10s runs in background."
     schema = {
         "type": "function",
         "function": {
-            "name": "Bash",
+            "name": "bash",
             "description": "Run terminal command.",
             "parameters": {
                 "type": "object",
@@ -134,7 +134,7 @@ class BashTool(BaseTool):
                 task.is_background = True
                 ctx.add_background_task(task)
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-                return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use ManageTask to inspect active background tasks."
+                return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use manage_task to inspect active background tasks."
             else:
                 await p.wait()
                 if hasattr(task, "read_task") and task.read_task:

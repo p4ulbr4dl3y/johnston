@@ -6,12 +6,12 @@ from tools.linter import run_linter
 
 
 class CreateTool(BaseTool):
-    name = "Create"
+    name = "create"
     description = "Create new file."
     schema = {
         "type": "function",
         "function": {
-            "name": "Create",
+            "name": "create",
             "description": "Create a new file with specified content. Creates parent directories automatically.",
             "parameters": {
                 "type": "object",

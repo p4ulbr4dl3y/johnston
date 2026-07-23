@@ -11,7 +11,6 @@ from tools.glob import GlobTool
 from tools.grep import GrepTool
 from tools.list_dir import ListDirTool
 from tools.manage_task import ManageTaskTool
-from tools.plan_exit import PlanExitTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
@@ -31,7 +30,6 @@ TOOL_CLASSES = [
     CallMCPTool,
     ManageTaskTool,
     SwitchToActionTool,
-    PlanExitTool,
     SubagentTool,
     ViewImageTool,
 ]

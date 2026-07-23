@@ -5,12 +5,12 @@ from tools.base import IGNORE_DIRS, BaseTool, resolve_path, truncate_output
 
 
 class ListDirTool(BaseTool):
-    name = "ListDir"
+    name = "list_dir"
     description = "List contents of a directory (files and subdirectories at 1-level depth)."
     schema = {
         "type": "function",
         "function": {
-            "name": "ListDir",
+            "name": "list_dir",
             "description": "List contents of a directory (files and subdirectories at 1-level depth).",
             "parameters": {
                 "type": "object",

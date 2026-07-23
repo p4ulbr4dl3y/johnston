@@ -108,7 +108,7 @@ class TestModelsCatalog(unittest.TestCase):
         catalog = ModelsCatalog()
         self.assertEqual(catalog.get_model_display_name("opencode", ""), "")
         name = catalog.get_model_display_name("opencode", "deepseek-v4-flash")
-        self.assertIn("DeepSeek", name)
+        self.assertIn("deepseek", name.lower())
 
     def test_get_context_window_helper(self):
         window = get_context_window("opencode", "deepseek-v4-flash")

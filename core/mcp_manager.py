@@ -493,7 +493,7 @@ class MCPManager:
 
             lazy_lines = [
                 "<mcp_servers>",
-                "The following MCP servers are loaded lazily. Use `CallMCPTool` (server, tool, arguments) to execute these tools."
+                "The following MCP servers are loaded lazily. Use `call_mcp_tool` (server, tool, arguments) to execute these tools."
             ]
             for s_name, t_list in lazy_by_server.items():
                 lazy_lines.append(f"\n# {s_name} (Lazy)")

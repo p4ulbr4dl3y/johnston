@@ -5,12 +5,12 @@ from tools.base import BaseTool
 
 
 class AskUserTool(BaseTool):
-    name = "AskUser"
+    name = "ask_user"
     description = "Ask questions to the user with pre-defined options and write-ins."
     schema = {
         "type": "function",
         "function": {
-            "name": "AskUser",
+            "name": "ask_user",
             "description": "Ask questions to user with pre-defined options and write-ins.",
             "parameters": {
                 "type": "object",

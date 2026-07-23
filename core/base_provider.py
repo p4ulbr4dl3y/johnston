@@ -231,7 +231,7 @@ class BaseAgent:
                         })
                         continue
 
-                    if t_name in ("Grep", "Glob"):
+                    if t_name in ("grep", "glob", "Grep", "Glob"):
                         pattern = args.get("pattern") or args.get("query") or ""
                         path_val = args.get("path") or ""
                         if pattern and path_val:
@@ -242,11 +242,11 @@ class BaseAgent:
                             target = path_val
                         else:
                             target = "."
-                    elif t_name == "ListDir":
+                    elif t_name in ("list_dir", "ListDir"):
                         target = args.get("path") or "."
-                    elif t_name in ("SwitchToAction", "PlanExit"):
+                    elif t_name in ("switch_to_action", "SwitchToAction"):
                         target = ""
-                    elif t_name == "AskUser":
+                    elif t_name in ("ask_user", "AskUser"):
                         qs = args.get("questions")
                         if isinstance(qs, list) and qs:
                             formatted_qs = []
@@ -262,28 +262,28 @@ class BaseAgent:
                                     res = res[:57] + "..."
                                 target = res
                             else:
-                                target = "AskUser"
+                                target = "ask_user"
                         elif args.get("question"):
                             q_text = str(args.get("question"))
                             if len(q_text) > 50:
                                 q_text = q_text[:47] + "..."
                             target = f'"{q_text}"'
                         else:
-                            target = "AskUser"
-                    elif t_name in ("Subagent", "Task"):
+                            target = "ask_user"
+                    elif t_name in ("subagent", "Subagent", "Task", "task"):
                         desc = args.get("description") or args.get("prompt") or ""
                         if desc:
                             target = f'"{desc}"'
                         else:
                             target = t_name
-                    elif t_name == "ManageTask":
+                    elif t_name in ("manage_task", "ManageTask"):
                         act = args.get("action", "list")
                         tid = args.get("task_id", "")
                         if tid:
                             target = f"{act} {tid}"
                         else:
                             target = act
-                    elif t_name == "ViewImage":
+                    elif t_name in ("view_image", "ViewImage"):
                         img_path = args.get("path") or args.get("image_path") or ""
                         prompt_val = args.get("prompt") or ""
                         if prompt_val and img_path:
@@ -321,10 +321,10 @@ class BaseAgent:
                     yield ("tool", t_name, target, args)
 
                     current_mode = getattr(self, "mode", "action").lower()
-                    if current_mode in ("explore", "plan") and t_name in ("Edit", "Create"):
+                    if current_mode in ("explore", "plan") and t_name in ("edit", "create", "Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
                         if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Ask user for confirmation to switch to Action mode or call SwitchToAction."
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Ask user for confirmation to switch to Action mode or call switch_to_action."
                         else:
                             tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
                     else:

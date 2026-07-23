@@ -5,7 +5,7 @@ from tools.base import BaseTool
 
 
 class SkillTool(BaseTool):
-    name = "Skill"
+    name = "skill"
     description = (
         "Load a specialized skill when the task matches one of the available skills in system context. "
         "Injects instructions and resources for the specified skill."
@@ -13,7 +13,7 @@ class SkillTool(BaseTool):
     schema = {
         "type": "function",
         "function": {
-            "name": "Skill",
+            "name": "skill",
             "description": "Load a specialized skill when the task matches one of the available skills in system context.",
             "parameters": {
                 "type": "object",

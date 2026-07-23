@@ -4,7 +4,7 @@ from tools.base import BaseTool
 
 
 class CallMCPTool(BaseTool):
-    name = "CallMCPTool"
+    name = "call_mcp_tool"
     description = (
         "Call a lazy-loaded MCP tool by server name, tool name, and arguments. "
         "Use this tool when executing MCP tools listed under lazy MCP servers."
@@ -12,7 +12,7 @@ class CallMCPTool(BaseTool):
     schema = {
         "type": "function",
         "function": {
-            "name": "CallMCPTool",
+            "name": "call_mcp_tool",
             "description": "Call a lazy-loaded MCP tool by server name, tool name, and arguments.",
             "parameters": {
                 "type": "object",

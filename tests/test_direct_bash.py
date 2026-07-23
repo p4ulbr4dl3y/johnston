@@ -21,11 +21,11 @@ class TestDirectBashCommand(unittest.IsolatedAsyncioTestCase):
         worker = app.execute_direct_bash_command("echo hello_direct")
         await worker.wait()
 
-        mock_chat_view.add_user_message.assert_called_once_with("! echo hello_direct")
-        mock_chat_view.add_tool_call.assert_called_once_with("Bash", "echo hello_direct")
+        mock_chat_view.add_user_message.assert_not_called()
+        mock_chat_view.add_tool_call.assert_called_once_with("bash", "echo hello_direct")
         mock_tool_widget.set_result.assert_called_once()
 
         # Verify history updated
         self.assertEqual(len(app.agent.history), 2)
-        self.assertIn("! echo hello_direct", app.agent.history[0]["content"])
+        self.assertIn("echo hello_direct", app.agent.history[0]["content"])
         self.assertIn("hello_direct", app.agent.history[1]["content"])

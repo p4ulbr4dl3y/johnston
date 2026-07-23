@@ -25,20 +25,20 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_tool_call_widget_init(self):
         widget = ToolCallWidget(
-            tool_type="Create",
+            tool_type="create",
             target="test.txt",
             result_text="Success",
             args={"path": "test.txt", "content": "hello\nworld"}
         )
         widget.render_header()
         self.assertFalse(widget.is_expanded)
-        self.assertEqual(widget.tool_type, "Create")
+        self.assertEqual(widget.tool_type, "create")
         self.assertEqual(widget.args["content"], "hello\nworld")
         self.assertIn("⚙", str(widget.header_label.render()))
 
     def test_tool_call_widget_toggle_expand_syntax(self):
         widget = ToolCallWidget(
-            tool_type="Create",
+            tool_type="create",
             target="test.py",
             args={"path": "test.py", "content": "def foo():\n    return 42"}
         )
@@ -62,7 +62,7 @@ class TestToolExpansion(unittest.TestCase):
             "+    return a * b\n"
         )
         widget = ToolCallWidget(
-            tool_type="Edit",
+            tool_type="edit",
             target="test.py",
             result_text=diff_text,
             args={"path": "test.py", "old_string": "def multiply(a, b):", "new_string": "def multiply(a: float, b: float) -> float:\n    return a * b"}
@@ -78,7 +78,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_bash_tool_append_output(self):
         widget = ToolCallWidget(
-            tool_type="Bash",
+            tool_type="bash",
             target="echo 'live stream'",
             args={"command": "echo 'live stream'"}
         )
@@ -99,7 +99,7 @@ class TestToolExpansion(unittest.TestCase):
             " 7 | \n"
         )
         widget = ToolCallWidget(
-            tool_type="Read",
+            tool_type="read",
             target="test.py",
             result_text=raw_read_output,
             args={"path": "test.py"}
@@ -118,7 +118,7 @@ class TestToolExpansion(unittest.TestCase):
             f.write("print('from disk')\n")
 
         widget = ToolCallWidget(
-            tool_type="Create",
+            tool_type="create",
             target=file_path,
             args={"path": file_path}  # no 'content' in args
         )
@@ -128,14 +128,14 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIsInstance(content, Syntax)
 
     def test_guess_lexer(self):
-        widget = ToolCallWidget(tool_type="Create", target="script.sh")
+        widget = ToolCallWidget(tool_type="create", target="script.sh")
         self.assertEqual(widget._guess_lexer("app.py"), "python")
         self.assertEqual(widget._guess_lexer("index.ts"), "typescript")
         self.assertEqual(widget._guess_lexer("style.css"), "css")
         self.assertEqual(widget._guess_lexer("unknown.xyz"), "xyz")
 
     def test_line_formatting_escapes_markup(self):
-        widget = ToolCallWidget(tool_type="Create", target="test.py")
+        widget = ToolCallWidget(tool_type="create", target="test.py")
         formatted = widget._format_code_with_line_numbers("a = [1, 2]\nb = 'test'")
         self.assertIn("1 │ [/dim]a = \\[1, 2]", formatted)
         self.assertIn("2 │ [/dim]b = 'test'", formatted)

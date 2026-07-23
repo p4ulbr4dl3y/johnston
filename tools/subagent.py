@@ -7,7 +7,7 @@ from tools.base import BaseTool
 
 
 class SubagentTool(BaseTool):
-    name = "Subagent"
+    name = "subagent"
     description = (
         "Launch a subagent to perform a task. "
         "Use subagent_type='explore' for quick codebase searches, or 'general' for multi-step tasks. "
@@ -16,7 +16,7 @@ class SubagentTool(BaseTool):
     schema = {
         "type": "function",
         "function": {
-            "name": "Subagent",
+            "name": "subagent",
             "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
             "parameters": {
                 "type": "object",
@@ -39,7 +39,7 @@ class SubagentTool(BaseTool):
         run_in_background = bool(args.get("background", False))
 
         if not prompt:
-            return "Error: 'prompt' argument is required for Task tool."
+            return "Error: 'prompt' argument is required for subagent tool."
 
         subagent = ctx.create_agent()
         if not subagent:
@@ -51,7 +51,7 @@ class SubagentTool(BaseTool):
         original_tools = getattr(subagent, "tools", []) or []
         subagent.tools = [
             t for t in original_tools
-            if t.get("function", {}).get("name") not in ("Task", "task")
+            if t.get("function", {}).get("name") not in ("subagent", "Subagent", "Task", "task")
         ]
 
         if subagent_type == "explore":

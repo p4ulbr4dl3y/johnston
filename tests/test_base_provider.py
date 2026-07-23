@@ -21,25 +21,25 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "test.txt")
 
         # Test Create
-        res_create = await execute_tool("Create", {"path": file_path, "content": "hello world"})
+        res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
         self.assertIn("Success", res_create)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
-        res_read = await execute_tool("Read", {"path": file_path})
+        res_read = await execute_tool("read", {"path": file_path})
         self.assertIn("hello world", res_read)
 
     async def test_read_missing_file(self):
         file_path = os.path.join(self.test_dir, "missing.txt")
-        res_read = await execute_tool("Read", {"path": file_path})
+        res_read = await execute_tool("read", {"path": file_path})
         self.assertIn("Error", res_read)
 
     async def test_edit_tool(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
-        await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3"})
+        await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
         # Test valid Edit
-        res_edit = await execute_tool("Edit", {
+        res_edit = await execute_tool("edit", {
             "path": file_path,
             "old_string": "line2",
             "new_string": "line_two"
@@ -54,9 +54,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_line_range_pagination(self):
         file_path = os.path.join(self.test_dir, "range_test.txt")
-        await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
+        await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
 
-        res_read = await execute_tool("Read", {"path": file_path, "start_line": 2, "end_line": 3})
+        res_read = await execute_tool("read", {"path": file_path, "start_line": 2, "end_line": 3})
         self.assertIn("Lines 2-3", res_read)
         self.assertIn("2 | line2", res_read)
         self.assertIn("3 | line3", res_read)
@@ -64,9 +64,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_edit_missing_text(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
-        await execute_tool("Create", {"path": file_path, "content": "line1\nline2\nline3"})
+        await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
-        res_edit = await execute_tool("Edit", {
+        res_edit = await execute_tool("edit", {
             "path": file_path,
             "old_string": "missing_line",
             "new_string": "replacement"
@@ -75,9 +75,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
-        await execute_tool("Create", {"path": file_path, "content": "duplicate\nmiddle\nduplicate"})
+        await execute_tool("create", {"path": file_path, "content": "duplicate\nmiddle\nduplicate"})
 
-        res_edit = await execute_tool("Edit", {
+        res_edit = await execute_tool("edit", {
             "path": file_path,
             "old_string": "duplicate",
             "new_string": "replacement"
@@ -86,37 +86,37 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_dir_tool(self):
         os.makedirs(os.path.join(self.test_dir, "folder_a"))
-        await execute_tool("Create", {"path": os.path.join(self.test_dir, "file_b.txt"), "content": "data"})
+        await execute_tool("create", {"path": os.path.join(self.test_dir, "file_b.txt"), "content": "data"})
 
-        res_listdir = await execute_tool("ListDir", {"path": self.test_dir})
+        res_listdir = await execute_tool("list_dir", {"path": self.test_dir})
         self.assertIn("[DIR]  folder_a/", res_listdir)
         self.assertIn("[FILE] file_b.txt", res_listdir)
 
     async def test_glob_tool(self):
         os.makedirs(os.path.join(self.test_dir, "subdir"))
-        await execute_tool("Create", {"path": os.path.join(self.test_dir, "file1.txt"), "content": "a"})
-        await execute_tool("Create", {"path": os.path.join(self.test_dir, "subdir", "file2.log"), "content": "b"})
+        await execute_tool("create", {"path": os.path.join(self.test_dir, "file1.txt"), "content": "a"})
+        await execute_tool("create", {"path": os.path.join(self.test_dir, "subdir", "file2.log"), "content": "b"})
 
         # Glob txt
-        res_glob = await execute_tool("Glob", {"pattern": "*.txt"})
+        res_glob = await execute_tool("glob", {"pattern": "*.txt"})
         self.assertIn("file1.txt", res_glob)
         self.assertNotIn("file2.log", res_glob)
 
     async def test_grep_tool(self):
         file1 = os.path.join(self.test_dir, "file1.txt")
         file2 = os.path.join(self.test_dir, "file2.txt")
-        await execute_tool("Create", {"path": file1, "content": "banana apple pear"})
-        await execute_tool("Create", {"path": file2, "content": "grape orange cherry"})
+        await execute_tool("create", {"path": file1, "content": "banana apple pear"})
+        await execute_tool("create", {"path": file2, "content": "grape orange cherry"})
 
         # Grep apple
-        res_grep = await execute_tool("Grep", {"pattern": "apple"})
+        res_grep = await execute_tool("grep", {"pattern": "apple"})
         self.assertIn("file1.txt", res_grep)
         self.assertIn("banana apple pear", res_grep)
         self.assertNotIn("file2.txt", res_grep)
 
     async def test_bash_tool_sync(self):
         # Sync bash execution
-        res_bash = await execute_tool("Bash", {"command": "echo 'hello bash'"})
+        res_bash = await execute_tool("bash", {"command": "echo 'hello bash'"})
         self.assertEqual(res_bash.strip(), "hello bash")
 
     def test_init_and_compact_commands_registered(self):
@@ -127,7 +127,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/build", COMMAND_REGISTRY)
         self.assertIn("/mode", COMMAND_REGISTRY)
 
-    async def test_plan_exit_tool(self):
+    async def test_switch_to_action_tool(self):
         class DummyAgent:
             mode = "plan"
 
@@ -143,7 +143,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 self.notified = msg
 
         app = DummyApp()
-        res = await execute_tool("SwitchToAction", {}, app=app)
+        res = await execute_tool("switch_to_action", {}, app=app)
         self.assertEqual(app.agent.mode, "action")
         self.assertTrue(app.footer_refreshed)
         self.assertIn("Switched to Action mode", res)
@@ -151,7 +151,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_switch_to_action_dynamic_mode_switch(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         agent.mode = "explore"
-        res = await execute_tool("SwitchToAction", {}, app=agent)
+        res = await execute_tool("switch_to_action", {}, app=agent)
         self.assertEqual(agent.mode, "action")
         self.assertIn("Switched to Action mode", res)
 
@@ -196,7 +196,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             background_tasks = []
 
         app = DummyApp()
-        res_list = await execute_tool("ManageTask", {"action": "list"}, app=app)
+        res_list = await execute_tool("manage_task", {"action": "list"}, app=app)
         self.assertIn("No background tasks currently active", res_list)
 
     async def test_task_tool_foreground(self):
@@ -214,7 +214,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             pm = DummyPM()
 
         app = DummyApp()
-        res = await execute_tool("Subagent", {"prompt": "do research", "description": "research task"}, app=app)
+        res = await execute_tool("subagent", {"prompt": "do research", "description": "research task"}, app=app)
         self.assertIn("<task_result>", res)
         self.assertIn("Subagent answer for: do research", res)
 
@@ -244,7 +244,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 pass
 
         app = DummyApp()
-        res = await execute_tool("Subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
+        res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
         self.assertIn("launched in background", res)
         self.assertEqual(len(app.background_tasks), 1)
         self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
@@ -255,7 +255,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(truncate_output(short_text, max_chars=10), "hello")
 
         long_text = "a" * 100
-        truncated = truncate_output(long_text, max_chars=10, hint="Use line ranges.")
+        truncated = truncate_output(long_text, max_chars=10, hint="Use line ranges.", save_log=False)
         self.assertTrue(truncated.startswith("aaaaaaaaaa"))
         self.assertIn("Output truncated at 10 chars. Use line ranges.", truncated)
 

@@ -5,12 +5,12 @@ from tools.base import BaseTool, resolve_path, truncate_output
 
 
 class ReadTool(BaseTool):
-    name = "Read"
+    name = "read"
     description = "Read file content with optional 1-indexed line range pagination."
     schema = {
         "type": "function",
         "function": {
-            "name": "Read",
+            "name": "read",
             "description": "Read file content cleanly. Specify path, and optionally start_line and end_line for line range pagination (1-indexed).",
             "parameters": {
                 "type": "object",

@@ -6,12 +6,12 @@ from tools.base import IGNORE_DIRS, IGNORE_EXTENSIONS, BaseTool, resolve_path, t
 
 
 class GrepTool(BaseTool):
-    name = "Grep"
+    name = "grep"
     description = "Search text inside files by regex."
     schema = {
         "type": "function",
         "function": {
-            "name": "Grep",
+            "name": "grep",
             "description": "Search text inside files matching regex pattern.",
             "parameters": {
                 "type": "object",
