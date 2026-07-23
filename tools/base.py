@@ -46,7 +46,7 @@ def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: 
     footer = f"\n... [Output truncated at {max_chars} chars."
     if save_log:
         footer += f" Full output saved to {log_path}. Use read tool to inspect full log."
-    elif hint:
+    if hint:
         footer += f" {hint}"
     footer += "]"
     return truncated + footer
