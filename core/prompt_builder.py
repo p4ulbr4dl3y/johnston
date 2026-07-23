@@ -95,7 +95,8 @@ Core Principles:
 8. Subagents: Use Subagent to launch autonomous subagents for multi-step research or codebase exploration.
 9. Background CLI Tasks: Use ManageTask to monitor, check status, or terminate background shell commands.
 10. Concise Communication: Be direct, clear, and concise (under 4 lines of text outside code/tools). Avoid unnecessary preamble or post-task explanations.
-11. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list."""
+11. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list.
+12. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise."""
 
 
 class PromptBuilder:
