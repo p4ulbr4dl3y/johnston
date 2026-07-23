@@ -78,10 +78,10 @@ def _new_markdown_block_get_style(self, style):
         return Style(
             background=Color(39, 39, 42),
             foreground=Color(255, 255, 255),
-            bold=True,
         )
     return _old_markdown_block_get_style(self, style)
 MarkdownBlock._get_style = _new_markdown_block_get_style
+
 
 
 

@@ -523,8 +523,8 @@ MarkdownBlock:light > .code_inline,
 MarkdownBlock > .code_inline {
     background: #27272a;
     color: #ffffff;
-    text-style: bold;
 }
+
 
 
 
