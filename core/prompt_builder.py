@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 
 from core.skill_manager import SkillManager
 from tools.subagent import SubagentTool
-from tools.switch_to_action import SwitchToActionTool
 
 
 def get_git_info() -> str:
@@ -150,8 +149,7 @@ class PromptBuilder:
                 "Rules:\n"
                 "1. Code modification tools (create, edit) are disabled.\n"
                 "2. Output findings/plan directly in chat (Goal, Proposed Changes, Verification).\n"
-                "3. Always ask user for confirmation before proceeding to implementation.\n"
-                "4. CRITICAL: Do NOT call switch_to_action on your own. You MUST wait for explicit user approval (e.g., 'yes', 'proceed', 'do it') in a subsequent message before calling switch_to_action."
+                "3. Ask the user to switch to Action mode (via Shift+Tab or /action) when ready to apply changes."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
@@ -182,8 +180,6 @@ class PromptBuilder:
                 t for t in all_tools
                 if t.get("function", {}).get("name") not in ("create", "edit", "Create", "Edit")
             ]
-            if not any(t.get("function", {}).get("name") in ("switch_to_action", "SwitchToAction") for t in all_tools):
-                all_tools.append(SwitchToActionTool.schema)
 
         if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent", "Task", "task") for t in all_tools):
             all_tools.append(SubagentTool.schema)

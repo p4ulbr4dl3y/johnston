@@ -84,7 +84,7 @@ Defined in [core/base_provider.py](file:///Users/yegor/johnston/core/base_provid
 ## 3. Tool Execution and `ToolContext`
 
 Tools are isolated in [tools/](file:///Users/yegor/johnston/tools/).
-All available tools are registered in [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py). UI isolation from business logic is guaranteed via `ToolContext` ([tools/context.py](file:///Users/yegor/johnston/tools/context.py)). Built-in tools include: `read`, `create`, `edit`, `bash`, `glob`, `grep`, `list_dir`, `ask_user`, `skill`, `call_mcp_tool`, `manage_task`, `switch_to_action`, `subagent`, `view_image`. Large output truncation is handled via `truncate_output`.
+All available tools are registered in [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py). UI isolation from business logic is guaranteed via `ToolContext` ([tools/context.py](file:///Users/yegor/johnston/tools/context.py)). Built-in tools include: `read`, `create`, `edit`, `bash`, `glob`, `grep`, `list_dir`, `ask_user`, `skill`, `call_mcp_tool`, `manage_task`, `subagent`, `view_image`. Large output truncation is handled via `truncate_output`.
 
 ### How to Add a New Tool:
 1. Create `tools/my_tool.py` inheriting from `BaseTool`:
@@ -136,7 +136,6 @@ All slash commands are handled in [commands.py](file:///Users/yegor/johnston/com
 
 ### Shortcuts & Switching:
 * `Shift+Tab` — quick toggle between `action` and `explore`.
-* `SwitchToAction` (`tools/switch_to_action.py`) tool is invoked by model AFTER explicit user confirmation to switch from `explore` to `action`.
 
 ---
 

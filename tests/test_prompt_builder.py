@@ -18,20 +18,14 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], mode="explore")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("[MODE: EXPLORE]", sys_prompt)
-        self.assertIn("switch_to_action", sys_prompt)
+        self.assertIn("Shift+Tab or /action", sys_prompt)
 
-    def test_build_tools_adds_task_and_switch_to_action(self):
+    def test_build_tools_explore_mode_filters_create_edit(self):
         builder = PromptBuilder("System prompt test", [], mode="explore")
         tools = builder.build_tools()
         names = [t["function"]["name"] for t in tools]
-        self.assertIn("switch_to_action", names)
-        self.assertIn("subagent", names)
-
-    def test_build_tools_action_mode_no_switch_to_action(self):
-        builder = PromptBuilder("System prompt test", [], mode="action")
-        tools = builder.build_tools()
-        names = [t["function"]["name"] for t in tools]
-        self.assertNotIn("switch_to_action", names)
+        self.assertNotIn("create", names)
+        self.assertNotIn("edit", names)
         self.assertIn("subagent", names)
 
     def test_build_system_prompt_includes_project_instructions(self):

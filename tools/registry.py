@@ -14,7 +14,6 @@ from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
-from tools.switch_to_action import SwitchToActionTool
 from tools.view_image import ViewImageTool
 
 TOOL_CLASSES = [
@@ -29,7 +28,6 @@ TOOL_CLASSES = [
     SkillTool,
     CallMCPTool,
     ManageTaskTool,
-    SwitchToActionTool,
     SubagentTool,
     ViewImageTool,
 ]

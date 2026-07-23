@@ -141,16 +141,6 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("test1.py", res_list)
         self.assertIn("test2.txt", res_list)
 
-    async def test_switch_to_action_tool(self):
-        from tools.switch_to_action import SwitchToActionTool
-        tool = SwitchToActionTool()
-        app = MockApp(mode="explore")
-
-        # Execute switch_to_action in explore mode
-        res = await tool.execute({"explanation": "User approved"}, app=app)
-        self.assertIn("Switched to Action mode", res)
-        self.assertEqual(app.agent.mode, "action")
-
     async def test_linter_tool(self):
         # Test run_linter helper function
         file_path = os.path.join(self.test_dir, "syntax.py")

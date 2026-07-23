@@ -282,7 +282,6 @@ class ToolCallWidget(Vertical):
         "ask_user": "AskUser",
         "skill": "Skill",
         "manage_task": "ManageTask",
-        "switch_to_action": "SwitchToAction",
         "subagent": "Subagent",
         "task": "Task",
         "view_image": "ViewImage",
@@ -291,10 +290,10 @@ class ToolCallWidget(Vertical):
 
     SYSTEM_TOOLS = {
         "read", "create", "edit", "bash", "glob", "grep", "list_dir",
-        "ask_user", "skill", "manage_task", "switch_to_action",
+        "ask_user", "skill", "manage_task",
         "subagent", "task", "view_image",
         "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
-        "AskUser", "Skill", "ManageTask", "SwitchToAction",
+        "AskUser", "Skill", "ManageTask",
         "Subagent", "Task", "ViewImage"
     }
 

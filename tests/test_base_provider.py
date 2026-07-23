@@ -127,33 +127,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/build", COMMAND_REGISTRY)
         self.assertIn("/mode", COMMAND_REGISTRY)
 
-    async def test_switch_to_action_tool(self):
-        class DummyAgent:
-            mode = "plan"
 
-        class DummyApp:
-            agent = DummyAgent()
-            footer_refreshed = False
-            notified = None
-
-            def refresh_status_footer(self):
-                self.footer_refreshed = True
-
-            def notify(self, msg):
-                self.notified = msg
-
-        app = DummyApp()
-        res = await execute_tool("switch_to_action", {}, app=app)
-        self.assertEqual(app.agent.mode, "action")
-        self.assertTrue(app.footer_refreshed)
-        self.assertIn("Switched to Action mode", res)
-
-    async def test_switch_to_action_dynamic_mode_switch(self):
-        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
-        agent.mode = "explore"
-        res = await execute_tool("switch_to_action", {}, app=agent)
-        self.assertEqual(agent.mode, "action")
-        self.assertIn("Switched to Action mode", res)
 
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])

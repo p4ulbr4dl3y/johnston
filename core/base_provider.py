@@ -336,7 +336,7 @@ class BaseAgent:
                     if current_mode in ("explore", "plan") and t_name in ("edit", "create", "Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
                         if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Ask user for confirmation to switch to Action mode or call switch_to_action."
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Instruct the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
                         else:
                             tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
                     else:
