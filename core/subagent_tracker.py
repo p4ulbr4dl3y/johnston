@@ -138,7 +138,7 @@ class SubagentTracker:
     def get_sessions_for_session(self, session_id: Optional[str] = None) -> List[SubagentSessionData]:
         if not session_id:
             return list(self.sessions.values())
-        return [s for s in self.sessions.values() if not s.session_id or s.session_id == session_id]
+        return [s for s in self.sessions.values() if s.session_id == session_id]
 
     def find_session_by_description_or_id(
         self, identifier: str, session_id: Optional[str] = None
