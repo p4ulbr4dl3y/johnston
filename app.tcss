@@ -522,6 +522,6 @@ MarkdownBlock > .code_inline,
 MarkdownBlock .code_inline,
 Markdown > .code_inline {
     color: #ffffff;
-    background: #27272a;
+    background: #3f3f46;
     text-style: bold;
 }
