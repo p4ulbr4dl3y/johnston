@@ -1,10 +1,10 @@
-/* Text Selection - Uniform High Contrast Monochrome Slate */
+/* Text Selection - Clean Uniform White Inversion (#ffffff bg, #09090b text) */
 .screen--selection,
 .text-area--selection,
 Screen > .screen--selection,
 TextArea > .text-area--selection {
-    background: #3f3f46;
-    color: #ffffff;
+    background: #ffffff;
+    color: #09090b;
 }
 
 Screen {
