@@ -50,12 +50,15 @@ class BaseAgent:
         self.cost_usd = 0.0
 
     def get_metrics(self) -> Dict[str, Any]:
+        used = getattr(self, "last_context_tokens", 0)
+        if used == 0 and getattr(self, "history", None):
+            used = estimate_tokens(self.history)
         return {
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
             "tokens_cache_read": getattr(self, "tokens_cache_read", 0),
-            "context_used": getattr(self, "last_context_tokens", 0),
+            "context_used": used,
             "context": self.context_window,
             "context_limit": self.context_limit,
             "cost_usd": getattr(self, "cost_usd", 0.0)
