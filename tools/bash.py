@@ -115,7 +115,10 @@ class BashTool(BaseTool):
         if no_bg:
             await p.wait()
             if hasattr(task, "read_task") and task.read_task:
-                await task.read_task
+                try:
+                    await asyncio.wait_for(task.read_task, timeout=1.0)
+                except asyncio.TimeoutError:
+                    pass
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
@@ -124,7 +127,10 @@ class BashTool(BaseTool):
         try:
             await asyncio.wait_for(p.wait(), timeout=10.0)
             if hasattr(task, "read_task") and task.read_task:
-                await task.read_task
+                try:
+                    await asyncio.wait_for(task.read_task, timeout=1.0)
+                except asyncio.TimeoutError:
+                    pass
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
@@ -138,7 +144,10 @@ class BashTool(BaseTool):
             else:
                 await p.wait()
                 if hasattr(task, "read_task") and task.read_task:
-                    await task.read_task
+                    try:
+                        await asyncio.wait_for(task.read_task, timeout=1.0)
+                    except asyncio.TimeoutError:
+                        pass
                 res = task.get_formatted_output()
                 if not res.strip():
                     return "Command executed with no output."

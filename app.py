@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 
 from textual import events, work
 from textual.app import App, ComposeResult
@@ -378,6 +379,7 @@ class JohnstonChatApp(App):
         current_tool_widget = None
         bot_msg = None
 
+        start_time = time.time()
         try:
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
@@ -428,7 +430,8 @@ class JohnstonChatApp(App):
         except (asyncio.CancelledError, RuntimeError):
             if thinking_widget:
                 try:
-                    thinking_widget.finish_thinking(0.0, "Generation stopped (Esc).")
+                    duration = time.time() - start_time
+                    thinking_widget.finish_thinking(duration)
                 except Exception:
                     pass
             if bot_msg:
