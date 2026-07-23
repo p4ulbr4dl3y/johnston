@@ -140,31 +140,31 @@ class StatusFooter(Static):
             pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-            row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/{THEME_SECONDARY}]"
+            row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/]"
 
-            row2_right_parts = [f"[{THEME_SECONDARY}]{total_tokens:,}t[/{THEME_SECONDARY}]"]
+            row2_right_parts = [f"[{THEME_SECONDARY}]{total_tokens:,}t[/]"]
             if active_bg_tasks > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks}bg[/{THEME_SECONDARY}]")
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks}bg[/]")
             if subagents_active > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total}sub[/{THEME_SECONDARY}]")
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total}sub[/]")
             row2_right = " • ".join(row2_right_parts)
         else:
             # Line 1: Left (Mode • Project • Provider › Model), Right (Skills • MCP)
             row1_left_parts = [
-                f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
-                f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]"
+                f"[bold {THEME_PRIMARY}]{mode_formatted}[/]",
+                f"[{THEME_SECONDARY}]{dir_text}[/]"
             ]
 
             if provider_display and clean_model:
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/{THEME_SECONDARY}]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
             elif provider_display:
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display}[/{THEME_SECONDARY}]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display}[/]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
             row1_right_parts = [
-                f"Skills: [{THEME_SECONDARY}]{skills_count}[/{THEME_SECONDARY}]",
-                f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
+                f"Skills: [{THEME_SECONDARY}]{skills_count}[/]",
+                f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/]"
             ]
             row1_right = "  •  ".join(row1_right_parts)
 
@@ -178,18 +178,18 @@ class StatusFooter(Static):
             used_formatted = format_context_tokens(ctx_val)
 
             pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
-            row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/{THEME_SUBTLE}] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/{THEME_SECONDARY}]"
+            row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/]"
 
             cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
             row2_right_parts = [
-                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/{THEME_SECONDARY}]",
-                f"[{THEME_SECONDARY}]{cost_str}[/{THEME_SECONDARY}]"
+                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+                f"[{THEME_SECONDARY}]{cost_str}[/]"
             ]
 
             if active_bg_tasks > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/{THEME_SECONDARY}]")
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/]")
             if subagents_active > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total} subagent[/{THEME_SECONDARY}]")
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total} subagent[/]")
 
             row2_right = "  •  ".join(row2_right_parts)
 

@@ -69,7 +69,7 @@ class TasksListScreen(ModalScreen[None]):
 
         opt_list.clear_options()
         for t in self.app.background_tasks:
-            status = f"[{THEME_PRIMARY}]running[/{THEME_PRIMARY}]" if t.is_running else f"[{THEME_MUTED}]finished[/{THEME_MUTED}]"
+            status = f"[{THEME_PRIMARY}]running[/]" if t.is_running else f"[{THEME_MUTED}]finished[/]"
             cmd = t.command
             if len(cmd) > 38:
                 cmd = cmd[:35] + "..."

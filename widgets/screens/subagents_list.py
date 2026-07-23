@@ -47,11 +47,11 @@ class SubagentsListScreen(ModalScreen[None]):
         for sess in sessions:
             st = sess.status.lower()
             if st == "running":
-                status = f"[{THEME_PRIMARY}]running[/{THEME_PRIMARY}]"
+                status = f"[{THEME_PRIMARY}]running[/]"
             elif st == "completed":
-                status = f"[{THEME_MUTED}]completed[/{THEME_MUTED}]"
+                status = f"[{THEME_MUTED}]completed[/]"
             else:
-                status = f"[{THEME_MUTED}]{st}[/{THEME_MUTED}]"
+                status = f"[{THEME_MUTED}]{st}[/]"
 
             desc = sess.description or sess.prompt or sess.task_id
             if len(desc) > 38:
