@@ -52,7 +52,11 @@ class SubagentsListScreen(ModalScreen[None]):
                 status = f"[{THEME_MUTED}]completed[/{THEME_MUTED}]"
             else:
                 status = f"[{THEME_MUTED}]{st}[/{THEME_MUTED}]"
-            opt_list.add_option(f"{sess.task_id} | {status} | {sess.subagent_type} | {sess.description}")
+
+            desc = sess.description or sess.prompt or sess.task_id
+            if len(desc) > 38:
+                desc = desc[:35] + "..."
+            opt_list.add_option(f"{desc} | {status}")
 
         if current_highlighted is not None and current_highlighted < len(sessions):
             opt_list.highlighted = current_highlighted
