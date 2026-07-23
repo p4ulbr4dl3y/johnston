@@ -2,7 +2,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Input, Markdown, OptionList
+from textual.widgets import Input, Label, Markdown, OptionList
 
 
 class QuestionScreen(ModalScreen[dict]):
@@ -29,6 +29,7 @@ class QuestionScreen(ModalScreen[dict]):
             yield Markdown(self.title, classes="modal-markdown")
             yield OptionList(id="options-list")
             yield Input(placeholder="Type response here and press Enter...", id="write-in-input")
+            yield Label("enter: select • ←: back • →: next • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         opt_list = self.query_one("#options-list", OptionList)
@@ -152,6 +153,7 @@ class ConfirmScreen(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Confirm your answers**\n\n" + self.summary, classes="modal-markdown")
+            yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
 
     def action_confirm(self) -> None:
         self.dismiss("confirm")

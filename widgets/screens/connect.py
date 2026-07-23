@@ -1,7 +1,7 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Input, Markdown
+from textual.widgets import Input, Label, Markdown
 
 from widgets.screens.base_selection import BaseSelectionScreen
 
@@ -60,6 +60,7 @@ class ApiKeyInputScreen(ModalScreen[str | None]):
                 classes="modal-markdown"
             )
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
+            yield Label("enter: save • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.query_one("#api-key-input", Input).focus()

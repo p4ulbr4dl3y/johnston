@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Markdown, OptionList
+from textual.widgets import Label, Markdown, OptionList
 
 from core.skill_manager import SkillManager
 
@@ -31,6 +31,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
                 yield OptionList(*self.options)
             else:
                 yield Markdown("*No skills found in ~/.johnston/skills/ or .johnston/skills/*", classes="modal-body")
+            yield Label("enter: select • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         if self.options:

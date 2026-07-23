@@ -4,7 +4,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Input, Markdown, OptionList
+from textual.widgets import Input, Label, Markdown, OptionList
 
 T = TypeVar("T")
 
@@ -38,6 +38,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             if self.show_search:
                 yield Input(placeholder="Search models...", id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
+            yield Label("enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
     def on_mount(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)

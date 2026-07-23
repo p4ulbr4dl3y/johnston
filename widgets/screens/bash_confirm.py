@@ -1,7 +1,7 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Markdown
+from textual.widgets import Label, Markdown
 
 
 class BashConfirmScreen(ModalScreen[bool]):
@@ -27,6 +27,7 @@ class BashConfirmScreen(ModalScreen[bool]):
         )
         with Vertical(id="modal-dialog"):
             yield Markdown(content, classes="modal-markdown")
+            yield Label("enter: confirm • esc: cancel", id="modal-hint")
 
     def action_confirm(self) -> None:
         self.dismiss(True)

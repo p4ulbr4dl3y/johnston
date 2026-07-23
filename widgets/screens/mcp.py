@@ -3,7 +3,7 @@ from typing import Any, Dict
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Markdown, OptionList
+from textual.widgets import Label, Markdown, OptionList
 
 from core.mcp_manager import MCPManager
 
@@ -27,6 +27,7 @@ class MCPScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("# MCP Servers", classes="modal-markdown")
             yield OptionList(id="mcp-option-list")
+            yield Label("enter: toggle • m/tab: mode • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()

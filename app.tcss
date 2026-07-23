@@ -395,6 +395,14 @@ ModalScreen {
     margin-left: 1;
 }
 
+#modal-hint {
+    width: 100%;
+    text-align: center;
+    color: #71717a;
+    text-style: dim;
+    margin-top: 1;
+}
+
 /* Status Footer - Matching dark grey background with muted zinc text */
 #status-footer {
     width: 100%;

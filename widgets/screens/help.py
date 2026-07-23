@@ -1,7 +1,7 @@
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Markdown
+from textual.widgets import Label, Markdown
 
 
 class HelpScreen(ModalScreen[None]):
@@ -33,6 +33,7 @@ class HelpScreen(ModalScreen[None]):
                 "* `Ctrl+C` / `Ctrl+Q` — Exit application",
                 classes="modal-markdown"
             )
+            yield Label("enter / esc: close", id="modal-hint")
 
     def action_close(self) -> None:
         self.dismiss(None)

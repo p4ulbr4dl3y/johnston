@@ -22,7 +22,7 @@ class TaskConsoleScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown(f"### **Console Output: `{self.bg_task.command}`**")
             yield RichLog(id="console-log", highlight=True, markup=True)
-            yield Label("Press Escape to return to tasks menu", id="modal-hint")
+            yield Label("esc: back to tasks", id="modal-hint")
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -54,7 +54,7 @@ class TasksListScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Background Tasks Manager**")
             yield OptionList(id="tasks-option-list")
-            yield Label("Enter: View Output | K: Kill Task | Escape: Close", id="modal-hint")
+            yield Label("enter: view output • k: kill task • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
         self.update_tasks_list()
