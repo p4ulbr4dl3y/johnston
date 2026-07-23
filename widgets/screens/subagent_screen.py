@@ -29,9 +29,9 @@ class SubagentViewScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         desc = self.session.description if self.session else self.task_id_or_desc
-        status = self.session.status.capitalize() if self.session else "Not Found"
+        status = self.session.status.lower() if self.session else "not found"
         with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Subagent: `{desc}`**\n*Status: {status}*", classes="modal-markdown")
+            yield Markdown(f"### **Subagent:** `{desc}` • {status}", classes="modal-markdown")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield Label("esc: close window", id="modal-hint")
 
@@ -132,11 +132,11 @@ class SubagentViewScreen(ModalScreen[None]):
                 self.bot_msg.content = txt
                 self.bot_msg = None
         elif etype == "status_change":
-            status = evt.get("status", "").capitalize()
+            status = evt.get("status", "").lower()
             try:
                 desc = self.session.description if self.session else self.task_id_or_desc
                 title_md = self.query_one(".modal-markdown", Markdown)
-                title_md.update(f"### **Subagent: `{desc}`**\n*Status: {status}*")
+                title_md.update(f"### **Subagent:** `{desc}` • {status}")
             except Exception:
                 pass
 
