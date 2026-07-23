@@ -117,9 +117,9 @@ class ThinkingWidget(Vertical):
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, thinking_text: str = "Thinking..."):
+    def __init__(self, thinking_text: str = ""):
         super().__init__(classes="thinking-widget thinking-active")
-        self.thinking_text = thinking_text
+        self.thinking_text = "" if thinking_text == "Thinking..." else thinking_text
         self.duration_seconds = 0.0
         self.is_thinking = True
         self.is_expanded = False
@@ -146,10 +146,13 @@ class ThinkingWidget(Vertical):
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
         self.duration_seconds = duration
-        if thinking_content:
+        if thinking_content and thinking_content != "Thinking...":
             self.thinking_text = thinking_content
         self.remove_class("thinking-active")
-        safe_update_markdown(self.md_widget, self.thinking_text)
+        if self.thinking_text and self.thinking_text != "Thinking...":
+            safe_update_markdown(self.md_widget, self.thinking_text)
+        else:
+            safe_update_markdown(self.md_widget, "")
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
