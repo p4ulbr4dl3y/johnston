@@ -49,6 +49,14 @@ class BackgroundTask:
                         try:
                             chunk = await self.reader.read(1024)
                         except (OSError, Exception):
+                            if self.master_fd is not None:
+                                try:
+                                    data = os.read(self.master_fd, 4096)
+                                    if data:
+                                        text = strip_ansi(data.decode("utf-8", errors="replace"))
+                                        self.output.append(text)
+                                except Exception:
+                                    pass
                             break
                         if not chunk:
                             break

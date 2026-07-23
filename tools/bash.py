@@ -119,6 +119,7 @@ class BashTool(BaseTool):
                     await asyncio.wait_for(task.read_task, timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
+            await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
@@ -131,6 +132,7 @@ class BashTool(BaseTool):
                     await asyncio.wait_for(task.read_task, timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
+            await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
