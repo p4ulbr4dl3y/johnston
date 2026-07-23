@@ -33,6 +33,10 @@ class ManageSubagentTool(BaseTool):
                     "message": {
                         "type": "string",
                         "description": "Follow-up message to send to the subagent (works on COMPLETED subagents too, resuming them)"
+                    },
+                    "background": {
+                        "type": "boolean",
+                        "description": "If true, run follow-up message in background without blocking chat UI"
                     }
                 },
                 "required": ["action"]
@@ -168,7 +172,8 @@ class ManageSubagentTool(BaseTool):
                     main_agent.cost_usd += getattr(subagent, "cost_usd", 0.0)
                     ctx.refresh_status()
 
-            if session.background:
+            run_bg = bool(args["background"]) if "background" in args else session.background
+            if run_bg:
                 async def _run_msg_bg():
                     acc = [""]
                     try:
