@@ -62,12 +62,10 @@ class JohnstonChatApp(App):
             yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
-        """Instant focus on start, refresh status bar, and open TasksListScreen modal"""
+        """Instant focus on start and refresh status bar"""
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
-        from widgets.screens.tasks import TasksListScreen
-        self.push_screen(TasksListScreen())
 
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""

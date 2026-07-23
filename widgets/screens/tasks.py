@@ -58,22 +58,9 @@ class TasksListScreen(ModalScreen[None]):
             yield Label("enter: view output • k: kill task • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
-        self._ensure_mock_tasks()
         self.update_tasks_list()
         self.query_one("#tasks-option-list", OptionList).focus()
         self.set_interval(0.5, self.update_tasks_list)
-
-    def _ensure_mock_tasks(self) -> None:
-        if not self.app.background_tasks:
-            from core.background_task import BackgroundTask
-            mock1 = BackgroundTask("bash_mock1", "end=$((SECONDS + 600)); while [ $SECONDS -lt $end ]; do echo \"tick\"; sleep 1; done", None)
-            mock1.is_running = True
-            mock1.output = ["tick 00:01:00\n", "tick 00:01:01\n"]
-            mock2 = BackgroundTask("bash_mock2", "uv run ruff check .", None)
-            mock2.is_running = False
-            mock2.output = ["All checks passed!\n"]
-            self.app.background_tasks.append(mock1)
-            self.app.background_tasks.append(mock2)
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
