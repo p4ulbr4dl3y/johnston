@@ -6,11 +6,37 @@ from textual.widgets import Static
 from core.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 
+SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
 
 class StatusFooter(Static):
     """Two-line status footer below chat"""
     can_focus = False
     ALLOW_SELECT = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.is_generating: bool = False
+        self._spinner_idx: int = 0
+        self._spinner_timer = None
+
+    def set_generating(self, generating: bool) -> None:
+        if self.is_generating == generating:
+            return
+        self.is_generating = generating
+        if generating:
+            if not self._spinner_timer:
+                self._spinner_timer = self.set_interval(0.1, self._spin)
+        else:
+            if self._spinner_timer:
+                self._spinner_timer.stop()
+                self._spinner_timer = None
+            self._spinner_idx = 0
+        self.on_mount()
+
+    def _spin(self) -> None:
+        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
+        self.on_mount()
 
     def on_mount(self) -> None:
         try:
@@ -90,7 +116,12 @@ class StatusFooter(Static):
 
         from core.models_catalog import catalog
         clean_model = catalog.get_model_display_name(provider_key, model_name)
-        mode_formatted = agent_mode.capitalize()
+        mode_str = agent_mode.capitalize()
+        if self.is_generating:
+            frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
+            mode_formatted = f"{frame} {mode_str}"
+        else:
+            mode_formatted = mode_str
 
         width = self.size.width if (self.size and self.size.width > 0) else (self.app.size.width if (self.app and self.app.size) else 80)
         is_compact = width > 0 and width < 75

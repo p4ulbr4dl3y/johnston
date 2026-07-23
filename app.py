@@ -379,6 +379,12 @@ class JohnstonChatApp(App):
         bot_msg = None
 
         try:
+            try:
+                footer = self.query_one("#status-footer", StatusFooter)
+                footer.set_generating(True)
+            except Exception:
+                pass
+
             async for step in self.agent.stream_steps(full_prompt):
                 event_type = step[0]
                 val1 = step[1] if len(step) > 1 else ""
@@ -433,6 +439,11 @@ class JohnstonChatApp(App):
                 except Exception:
                     pass
         finally:
+            try:
+                footer = self.query_one("#status-footer", StatusFooter)
+                footer.set_generating(False)
+            except Exception:
+                pass
             try:
                 if getattr(self, "is_app_active", True):
                     self.save_current_session()
