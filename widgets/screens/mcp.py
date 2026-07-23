@@ -9,7 +9,7 @@ from core.mcp_manager import MCPManager
 
 
 class MCPScreen(ModalScreen[None]):
-    """Модальное окно выключения/включения и настройки Eager/Lazy режимов MCP серверов"""
+    """Modal screen for enabling/disabling and toggling Eager/Lazy modes of MCP servers"""
 
     ALLOW_SELECT = False
     BINDINGS = [

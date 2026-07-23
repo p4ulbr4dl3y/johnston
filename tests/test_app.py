@@ -12,7 +12,7 @@ async def test_chat_app_flow():
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        # 1. Проверяем /help
+        # 1. Test /help
         chat_input.load_text("/help")
         await pilot.press("enter")
         await pilot.pause(0.2)
@@ -23,19 +23,19 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, HelpScreen)
         print("✓ HelpScreen tests passed")
 
-        # 2. Сообщения пользователя
+        # 2. User messages
         for msg in ["First message", "Second message", "Third message"]:
             chat_input.load_text(msg)
             await pilot.press("enter")
             await pilot.pause(0.5)
 
-        # 3. Проверяем /rewind
+        # 3. Test /rewind
         chat_input.load_text("/rewind")
         await pilot.press("enter")
         await pilot.pause(0.2)
         assert isinstance(app.screen, RewindScreen)
 
-        # Выбираем первый элемент по Enter
+        # Select first element with Enter
         await pilot.press("enter")
         await pilot.pause(0.5)
 
@@ -45,7 +45,7 @@ async def test_chat_app_flow():
         assert chat_input.text == "Third message"
         print("✓ RewindScreen tests passed cleanly!")
 
-        # 4. Проверяем /resume
+        # 4. Test /resume
         chat_input.load_text("/resume")
         await pilot.press("enter")
         await pilot.pause(0.2)
@@ -56,7 +56,7 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, ResumeScreen)
         print("✓ ResumeScreen tests passed cleanly!")
 
-        # 5. Проверяем /provider
+        # 5. Test /provider
         chat_input.load_text("/provider")
         await pilot.press("enter")
         await pilot.pause(0.2)
@@ -65,7 +65,7 @@ async def test_chat_app_flow():
         await pilot.pause(0.2)
         print("✓ ProviderScreen tests passed cleanly!")
 
-        # 6. Проверяем /models и поиск моделей
+        # 6. Test /models and model search
         chat_input.load_text("/models")
         await pilot.press("enter")
         await pilot.pause(0.5)
@@ -77,7 +77,7 @@ async def test_chat_app_flow():
         await pilot.pause(0.2)
         print("✓ ModelScreen tests passed cleanly!")
 
-        # 7. Проверяем /new
+        # 7. Test /new
         chat_input.load_text("/new")
         await pilot.press("enter")
         await pilot.pause(0.5)
@@ -85,14 +85,14 @@ async def test_chat_app_flow():
         assert len(chat_view.get_user_messages()) == 0
         print("✓ /new command tests passed cleanly!")
 
-        # 8. Проверяем /tasks
+        # 8. Test /tasks
         chat_input.load_text("/tasks")
         await pilot.press("enter")
         await pilot.pause(0.2)
         assert not isinstance(app.screen, TasksListScreen)
         print("✓ /tasks command tests passed cleanly!")
 
-        # 9. Проверяем переключение режима по Shift+Tab
+        # 9. Test mode toggle via Shift+Tab
         assert getattr(app.agent, "mode", "action") == "action"
         await pilot.press("shift+tab")
         await pilot.pause(0.2)
@@ -100,20 +100,20 @@ async def test_chat_app_flow():
         await pilot.press("shift+tab")
         await pilot.pause(0.2)
         assert getattr(app.agent, "mode", "action") == "action"
-        # 10. Проверяем авто-расширение высоты инпута при вставке многострочного текста
+        # 10. Test input height auto-expansion on multiline text insert
         chat_input.load_text("")
         chat_input.insert("line1\nline2\nline3\nline4")
         await pilot.pause(0.1)
         assert chat_input.styles.height.value == 5
 
-        # 11. Проверяем сворачивание длинного текста при paste (> 10 строк)
+        # 11. Test long text folding on paste (> 10 lines)
         chat_input.load_text("")
         from textual import events
         chat_input.on_paste(events.Paste("hello\n" * 15))
         await pilot.pause(0.1)
         assert "[Pasted text #1 +15 lines]" in chat_input.text
         assert chat_input.get_full_text() == "hello\n" * 15
-        # 12. Проверяем атомарное удаление блока вставки по Backspace
+        # 12. Test atomic deletion of paste block via Backspace
         chat_input.move_cursor((0, len(chat_input.text)))
         await pilot.press("backspace")
         await pilot.pause(0.1)

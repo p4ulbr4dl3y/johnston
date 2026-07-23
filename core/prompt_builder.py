@@ -74,7 +74,7 @@ Core Principles:
 
 
 class PromptBuilder:
-    """Формирует скомпонованный системный промпт и набор инструментов с учетом MCP, Skills и режима (Plan/Build)"""
+    """Builds composite system prompt and tool definitions accounting for MCP, Skills, and mode (Action/Explore)"""
 
     def __init__(self, base_system_prompt: str, base_tools: List[Dict[str, Any]], mode: str = "action", allow_task: bool = True):
         self.base_system_prompt = base_system_prompt

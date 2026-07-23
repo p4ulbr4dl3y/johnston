@@ -1,28 +1,28 @@
 # AI Agents and Providers in Johnston Chat
 
-В проекте используется модульная архитектура для настройки и выполнения AI-агентов. Пользователь может переключать провайдеров и модели "на лету" прямо из интерфейса или через слэш-команды.
+The project uses a modular architecture for configuring and executing AI agents. Users can switch providers and models on the fly directly from the interface or via slash commands.
 
 ---
 
-## Архитектура Агентов
+## Agent Architecture
 
 ```mermaid
 graph TD
-    PM[ProviderManager core/provider_manager.py] -->|Загрузка .py конфигураций| P[Providers ~/.johnston/providers/]
-    PM -->|Создание агента| Agent[BaseAgent core/base_provider.py]
-    Agent -->|Сборка промптов| PB[PromptBuilder core/prompt_builder.py]
-    Agent -->|Запросы через OpenAI API| LLM[LLM API / OpenCode / Custom]
-    Agent -->|Вызов инструментов с ToolContext| Tools[tools/registry.py]
+    PM[ProviderManager core/provider_manager.py] -->|Loads .py configs| P[Providers ~/.johnston/providers/]
+    PM -->|Creates agent| Agent[BaseAgent core/base_provider.py]
+    Agent -->|Builds prompts| PB[PromptBuilder core/prompt_builder.py]
+    Agent -->|Requests via OpenAI API| LLM[LLM API / OpenCode / Custom]
+    Agent -->|Invokes tools with ToolContext| Tools[tools/registry.py]
 ```
 
 ---
 
-## 1. Провайдеры (Providers)
+## 1. Providers
 
-Каждый провайдер описывается отдельным `.py` файлом в локальной директории `providers/` проекта.
-При старте приложения `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/tui/core/provider_manager.py)) динамически импортирует эти файлы.
+Each provider is described by a separate `.py` file in the local `providers/` directory of the project.
+When the application starts, `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/johnston/core/provider_manager.py)) dynamically imports these files.
 
-### Пример конфигурации провайдера (`providers/opencode.py`):
+### Provider Configuration Example (`providers/opencode.py`):
 ```python
 try:
     from core.base_provider import BaseAgent
@@ -63,31 +63,31 @@ class Agent(BaseAgent):
 
 ---
 
-## 2. Базовый класс агента (`BaseAgent`) и `PromptBuilder`
+## 2. Base Agent Class (`BaseAgent`) and `PromptBuilder`
 
-Определен в [core/base_provider.py](file:///Users/yegor/tui/core/base_provider.py).
-* Использует асинхронный клиент `openai.AsyncOpenAI`.
-* Делегирует динамическую сборку промптов и схем инструментов в `PromptBuilder` ([core/prompt_builder.py](file:///Users/yegor/tui/core/prompt_builder.py)) с учетом активных MCP, навыков (Skills) и режима (Plan/Build).
-* **Динамические метаданные и инструкции проекта**: `PromptBuilder` автоматически добавляет в системный промпт:
-  * Метаданные окружения: CWD, локальное время, ОС, состояние Git (текущая ветка, количество измененных/неотслеживаемых файлов).
-  * Инструкции проекта: содержимое файлов `AGENTS.md`, `CLAUDE.md`, `.cursorrules` или `CONVENTIONS.md` из рабочей директории.
-* **Автоматическая и ручная компактизация контекста**:
-  * `BaseAgent` отслеживает объем токенов истории и при достижении порога в 75% от лимита контекстного окна автоматически выполняет сжатие (компактизацию) истории через LLM-резюме.
-  * Ручная компактизация доступна через слэш-команду `/compact`.
-* Реализует метод `stream_steps(user_text)`:
-  * Получает поток токенов (chunks) от модели.
-  * Парсит мыслительные цепочки (reasoning/thinking) и выводит их в UI.
-  * Распознает вызовы инструментов (`tool_calls`), передает их в реестр `execute_tool` и отправляет результаты обратно модели.
+Defined in [core/base_provider.py](file:///Users/yegor/johnston/core/base_provider.py).
+* Uses `openai.AsyncOpenAI` client.
+* Delegates dynamic prompt and tool schema construction to `PromptBuilder` ([core/prompt_builder.py](file:///Users/yegor/johnston/core/prompt_builder.py)) considering active MCPs, Skills, and mode (Plan/Build).
+* **Dynamic metadata and project instructions**: `PromptBuilder` automatically appends to system prompt:
+  * Environment metadata: CWD, local time, OS, Git status (current branch, modified/untracked files count).
+  * Project instructions: contents of `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, or `CONVENTIONS.md` from the working directory.
+* **Automatic and Manual Context Compaction**:
+  * `BaseAgent` monitors history token usage and automatically compacts history via LLM summaries upon reaching 75% of context window limit.
+  * Manual compaction is available via `/compact` slash command.
+* Implements `stream_steps(user_text)` method:
+  * Streams token chunks from the model.
+  * Parses reasoning/thinking chains and renders them in the UI.
+  * Recognizes tool calls (`tool_calls`), delegates execution to `execute_tool`, and sends results back to the model.
 
 ---
 
-## 3. Выполнение Инструментов (Tools) и `ToolContext`
+## 3. Tool Execution and `ToolContext`
 
-Инструменты изолированы в директории [tools/](file:///Users/yegor/tui/tools/).
-Все доступные инструменты регистрируются в [tools/registry.py](file:///Users/yegor/tui/tools/registry.py). Изоляция UI от бизнес-логики обеспечивается объектом `ToolContext` ([tools/context.py](file:///Users/yegor/tui/tools/context.py)). Встроенные инструменты включают: `Read`, `Create`, `Edit`, `Bash`, `Glob`, `Grep`, `ListDir`, `AskUser`, `Skill`, `ManageTask`, `PlanExit`, `Subagent`. Для корректной оптимизации вывода больших ответов используется утилита усечения `truncate_output`.
+Tools are isolated in [tools/](file:///Users/yegor/johnston/tools/).
+All available tools are registered in [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py). UI isolation from business logic is guaranteed via `ToolContext` ([tools/context.py](file:///Users/yegor/johnston/tools/context.py)). Built-in tools include: `Read`, `Create`, `Edit`, `Bash`, `Glob`, `Grep`, `ListDir`, `AskUser`, `Skill`, `ManageTask`, `PlanExit`, `Subagent`. Large output truncation is handled via `truncate_output`.
 
-### Как добавить новый инструмент:
-1. Создайте файл `tools/my_tool.py`, унаследовав `BaseTool`:
+### How to Add a New Tool:
+1. Create `tools/my_tool.py` inheriting from `BaseTool`:
    ```python
    from tools.base import BaseTool
 
@@ -108,67 +108,67 @@ class Agent(BaseAgent):
            ctx.notify("Executing tool...")
            return "Result string"
    ```
-2. Зарегистрируйте класс в `TOOL_CLASSES` внутри [tools/registry.py](file:///Users/yegor/tui/tools/registry.py).
-3. Схема инструмента подтягивается автоматически через `get_default_tools()`. Переопределять `TOOLS` вручную в конфигах провайдеров не требуется!
+2. Register the class in `TOOL_CLASSES` inside [tools/registry.py](file:///Users/yegor/johnston/tools/registry.py).
+3. Tool schemas are pulled automatically via `get_default_tools()`. Manual `TOOLS` overrides in provider configs are not required!
 
 ---
 
-## 4. Слэш-команды и Режимы Action / Explore
+## 4. Slash Commands and Action / Explore Modes
 
-Все слэш-команды обрабатываются в [commands.py](file:///Users/yegor/tui/commands.py) с поддержкой автоматической нормализации кириллических омоглифов (для устранения ошибок ошибочной раскладки клавиатуры).
+All slash commands are handled in [commands.py](file:///Users/yegor/johnston/commands.py) with automatic normalization of Cyrillic homoglyphs (to handle wrong keyboard layout input).
 
-### Режимы работы:
-* **Action** (`/action`, алиасы: `/build`, `/code`) — стандартный режим исполнения с полным доступом к созданию/редактированию файлов и выполнению bash-команд.
-* **Explore** (`/explore`, алиасы: `/plan`, `/ask`) — исследовательский read-only режим (исследование кода, ответы на вопросы, составление планов). Прямое изменение кода запрещено.
+### Modes:
+* **Action** (`/action`, aliases: `/build`, `/code`) — standard execution mode with full permissions for creating/editing files and executing bash commands.
+* **Explore** (`/explore`, aliases: `/plan`, `/ask`) — read-only exploratory mode (code exploration, Q&A, planning). Direct code modifications are prohibited.
 
-### Доступные слэш-команды:
-* `/action` — включить режим исполнения `action` (`/build`, `/code`).
-* `/explore` — включить исследовательский режим `explore` (`/plan`, `/ask`).
-* `/mode` — переключить режим (`action` <-> `explore`).
-* `/compact` — выполнить принудительную компактизацию истории диалога.
-* `/init` — интерактивный запуск генерации/обновления инструкции `AGENTS.md` для текущего репозитория.
-* `/connect` — подключение провайдера и настройка API-ключа (`/provider` — алиас).
-* `/models` — выбор модели с группировкой по провайдерам.
-* `/skills`, `/mcp` — управление навыками и MCP-серверами.
-* `/tasks` — просмотр и управление фоновыми задачами.
-* `/rewind`, `/resume` — откат истории или возобновление сессии.
-* `/new`, `/help` — создание нового чата / справка по горячим клавишам.
+### Available Slash Commands:
+* `/action` — enable `action` execution mode (`/build`, `/code`).
+* `/explore` — enable `explore` read-only mode (`/plan`, `/ask`).
+* `/mode` — toggle mode (`action` <-> `explore`).
+* `/compact` — force history compaction.
+* `/init` — interactive generation/update of `AGENTS.md` for current repository.
+* `/connect` — connect provider and setup API key (`/provider` alias).
+* `/models` — select model grouped by provider.
+* `/skills`, `/mcp` — manage skills and MCP servers.
+* `/tasks` — view and manage background tasks.
+* `/rewind`, `/resume` — rewind chat history or resume session.
+* `/new`, `/help` — start new chat / view keyboard shortcuts help.
 
-### Горячие клавиши и переключение:
-* `Shift+Tab` — быстрая клавиша переключения `action` <-> `explore`.
-* Инструмент `SwitchToAction` (`tools/switch_to_action.py`) вызывается моделью ПОСЛЕ явного подтверждения пользователя для переключения из `explore` в `action`.
-
----
-
-## 5. Субагенты (Subagents & Subagent Tool)
-
-Проект поддерживает запуск автономных изолированных субагентов для подзадач:
-* **`SubagentTool`** (`tools/subagent.py`): инструмент для создания субагента подзадачи.
-  * `subagent_type`: `"general"` (мультишаговый) или `"explore"` (быстрый поиск кода).
-  * `background`: `false` (синхронное ожидание результата в `<task_result>`) или `true` (фоновое асинхронное исполнение с авто-уведомлением в чате по финишу).
-* **Изоляция**: субагент запускается в изолированном контексте `BaseAgent` без рекурсивного доступа к инструменту `Subagent`.
+### Shortcuts & Switching:
+* `Shift+Tab` — quick toggle between `action` and `explore`.
+* `SwitchToAction` (`tools/switch_to_action.py`) tool is invoked by model AFTER explicit user confirmation to switch from `explore` to `action`.
 
 ---
 
-## 6. Тестирование и Линтинг
+## 5. Subagents (Subagents & Subagent Tool)
 
-Все юнит-тесты изолированы в директории [tests/](file:///Users/yegor/tui/tests/).
+The project supports running autonomous isolated subagents for subtasks:
+* **`SubagentTool`** (`tools/subagent.py`): tool to launch a subtask subagent.
+  * `subagent_type`: `"general"` (multi-step) or `"explore"` (fast code search).
+  * `background`: `false` (synchronous waiting for result in `<task_result>`) or `true` (background async execution with auto notification on completion).
+* **Isolation**: subagents run in isolated `BaseAgent` context without recursive access to `Subagent` tool.
 
-* **Запуск тестов**:
+---
+
+## 6. Testing and Linting
+
+All unit tests are isolated in [tests/](file:///Users/yegor/johnston/tests/).
+
+* **Run tests**:
   ```bash
   uv run python -m unittest discover -s tests
   ```
-* **Запуск линтера**:
+* **Run linter**:
   ```bash
   uv run ruff check .
   ```
 
 ---
 
-## 7. UI и Дизайн-система (Monochrome Slate)
+## 7. UI and Design System (Monochrome Slate)
 
-Проект использует монохромную дизайн-систему на базе Textual TCSS ([app.tcss](file:///Users/yegor/tui/app.tcss)), константы цвета которой централизованы в [core/config.py](file:///Users/yegor/tui/core/config.py):
-* **Акцентный цвет**: Чистый белый (`#ffffff` / `THEME_PRIMARY`) для текста сообщений пользователя, активных выделений в OptionList/меню подсказок и главных заголовков.
-* **Палитра фона**: `#09090b` (`THEME_BG` — экран чата), `#18181b` (`THEME_CARD` — карточки, инпут ввода, всплывающие окна, уведомления Toast, футер), `#27272a` (`THEME_BORDER` — бордеры и разделители).
-* **Уведомления (Toast)**: Плашки `#18181b` с монохромной левой акцентной полосой (`#ffffff` / `#a1a1aa`).
-* **Экран приветствия**: Заставка `WelcomeWidget` с логотипом `johnston` по центру пустого чата.
+The project uses a monochrome design system based on Textual TCSS ([app.tcss](file:///Users/yegor/johnston/app.tcss)), with color constants centralized in [core/config.py](file:///Users/yegor/johnston/core/config.py):
+* **Accent Color**: Pure white (`#ffffff` / `THEME_PRIMARY`) for user text, active options in OptionList/suggestions menu, and main titles.
+* **Background Palette**: `#09090b` (`THEME_BG` — chat screen), `#18181b` (`THEME_CARD` — cards, input field, popups, Toast notifications, footer), `#27272a` (`THEME_BORDER` — borders and dividers).
+* **Toast Notifications**: `#18181b` cards with monochrome left accent bar (`#ffffff` / `#a1a1aa`).
+* **Welcome Screen**: `WelcomeWidget` splash screen with `johnston` logo centered in empty chat.

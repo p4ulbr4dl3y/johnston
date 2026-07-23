@@ -46,7 +46,7 @@ class SubagentTool(BaseTool):
             return "Error: No application context available to spawn subagent."
         subagent.app = ctx.app
 
-        # Отключаем возможность повторного вызова Task (защита от рекурсии)
+        # Disable nested Task tool calls (recursion guard)
         subagent.allow_task = False
         original_tools = getattr(subagent, "tools", []) or []
         subagent.tools = [

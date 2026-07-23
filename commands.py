@@ -17,7 +17,7 @@ from widgets.modal_screens import (
 
 
 class BaseCommand:
-    """Базовый класс для слэш-команд"""
+    """Base class for slash commands"""
     name: str = ""
     description: str = ""
 
@@ -93,7 +93,7 @@ class ConnectCommand(BaseCommand):
 
 
 class ProviderCommand(ConnectCommand):
-    """Алиас команды /provider на /connect"""
+    """Alias for /connect command"""
     name = "/provider"
     description = "Connect AI provider (alias for /connect)"
 
@@ -147,14 +147,14 @@ class RewindCommand(BaseCommand):
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
-                # Находим исходный текст сообщения, до которого откатываемся
+                # Find original text of message being rolled back to
                 msg_text = ""
                 for idx, text in user_msgs:
                     if idx == selected_idx:
                         msg_text = text
                         break
 
-                # Откатываем чат до позиции непосредственно перед выбранным сообщением
+                # Rollback chat to position immediately preceding selected message
                 chat_view.rollback_to(selected_idx - 1)
 
                 if hasattr(app.agent, "clear_history"):
@@ -164,7 +164,7 @@ class RewindCommand(BaseCommand):
 
                 app.save_current_session()
 
-                # Загружаем текст в поле ввода
+                # Load text into input field
                 chat_input = app.query_one("#message-input")
                 chat_input.load_text(msg_text)
                 lines = chat_input.text.split("\n")
@@ -315,37 +315,37 @@ class ExploreCommand(BaseCommand):
 
 
 class BuildCommand(ActionCommand):
-    """Алиас команды /build на /action"""
+    """Alias for /action command"""
     name = "/build"
     description = "Switch agent to Action mode"
 
 
 class CodeCommand(ActionCommand):
-    """Алиас команды /code на /action"""
+    """Alias for /action command"""
     name = "/code"
     description = "Switch agent to Action mode"
 
 
 class PlanCommand(ExploreCommand):
-    """Алиас команды /plan на /explore"""
+    """Alias for /explore command"""
     name = "/plan"
     description = "Switch agent to Explore mode"
 
 
 class AskCommand(ExploreCommand):
-    """Алиас команды /ask на /explore"""
+    """Alias for /explore command"""
     name = "/ask"
     description = "Switch agent to Explore mode"
 
 
 class DebugCommand(ActionCommand):
-    """Алиас команды /debug на /action"""
+    """Alias for /action command"""
     name = "/debug"
     description = "Switch agent to Action mode"
 
 
 class OrchestratorCommand(ActionCommand):
-    """Алиас команды /orchestrator на /action"""
+    """Alias for /action command"""
     name = "/orchestrator"
     description = "Switch agent to Action mode"
 
@@ -444,11 +444,11 @@ COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
 }
 
 async def handle_slash_command(app, command_text: str) -> bool:
-    """Выполняет команду, если она зарегистрирована. Возвращает True, если обработана."""
+    """Executes command if registered. Returns True if handled."""
     parts = command_text.strip().split(maxsplit=1)
     cmd_name = parts[0].lower()
 
-    # Нормализация кириллических омоглифов в латиницу (для исключения ошибок раскладки)
+    # Normalization of Cyrillic homoglyphs to Latin (to handle layout errors)
     homoglyphs = {
         'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h',
         'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'

@@ -10,19 +10,19 @@ class TestFileSuggestions(unittest.TestCase):
     def test_file_suggestions_query(self):
         suggestions = CommandSuggestions()
 
-        # 1. Ввод '@' должен включить режим 'file' и показать файлы
+        # 1. Typing '@' should enable 'file' mode and show files
         res = suggestions.update_query("@", "@", 1)
         self.assertEqual(suggestions.mode, "file")
         self.assertTrue(len(res) > 0)
         self.assertTrue(suggestions.display)
         self.assertIn("app.py", res)
 
-        # 2. Фильтрация по имени файла (например '@app')
+        # 2. Filtering by file name (e.g. '@app')
         res_app = suggestions.update_query("Check @app", "Check @app", 10)
         self.assertEqual(suggestions.mode, "file")
         self.assertIn("app.py", res_app)
 
-        # 3. Игнорирование email адресов (символ перед @ не пробел и не начало строки)
+        # 3. Ignoring email addresses (char before @ is not space nor start of line)
         suggestions.update_query("test@domain.com", "test@domain.com", 15)
         self.assertIsNone(suggestions.mode)
         self.assertFalse(suggestions.display)
@@ -30,7 +30,7 @@ class TestFileSuggestions(unittest.TestCase):
     def test_prepare_prompt_with_attachments(self):
         app = JohnstonChatApp()
 
-        # Если прикреплен существующий файл (например @AGENTS.md)
+        # If an existing file is attached (e.g. @AGENTS.md)
         prompt = app.prepare_prompt_with_attachments("Check @AGENTS.md and fix")
         self.assertIn("Check @AGENTS.md and fix", prompt)
         self.assertIn("--- Attached File: AGENTS.md ---", prompt)

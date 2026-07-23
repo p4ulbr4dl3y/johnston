@@ -33,32 +33,31 @@ SENSITIVE_PATHS = [
 
 def analyze_bash_command(command: str) -> Tuple[bool, str]:
     """
-    Анализирует bash-команду на безопасность.
-    Возвращает (is_safe, reason).
+    Analyzes bash command for safety.
+    Returns (is_safe, reason).
     """
     cmd_str = command.strip()
     if not cmd_str:
-        return True, "Пустая команда"
+        return True, "Empty command"
 
-    # 1. Проверка на реддиректы записи (>, >>, &>, 2>)
+    # 1. Check for output redirection (>, >>, &>, 2>)
     if REDIRECTION_REGEX.search(cmd_str):
-        return False, "Перенаправление вывода в файл (> или >>)"
+        return False, "Output redirection to file (> or >>)"
 
-    # 2. Проверка на подоболочки и подстановку команд $(...) или `...`
+    # 2. Check for subshells and command substitution $(...) or `...`
     if SUBSHELL_REGEX.search(cmd_str):
-        return False, "Выполнение команд внутри подоболочки $() или ``"
+        return False, "Execution of commands inside subshell $() or ``"
 
-    # 3. Проверка опасных git-команд
+    # 3. Check for mutating Git commands
     if MUTATING_GIT_REGEX.search(cmd_str):
-        return False, "Мутирующая операция Git (push, reset, clean, etc.)"
+        return False, "Mutating Git operation (push, reset, clean, etc.)"
 
-    # 4. Проверка чувствительных системных путей
+    # 4. Check for sensitive system paths
     for path in SENSITIVE_PATHS:
         if path in cmd_str:
-            return False, f"Доступ к чувствительному системному пути ({path})"
+            return False, f"Access to sensitive system path ({path})"
 
-    # 5. Разделение цепочки команд (; , &&, ||, |)
-    # Заменяем операторы цепочки на единый разделитель
+    # 5. Split command chain (; , &&, ||, |)
     cmd_chain = re.split(r";|&&|\|\||\|", cmd_str)
 
     for sub_cmd in cmd_chain:
@@ -69,26 +68,26 @@ def analyze_bash_command(command: str) -> Tuple[bool, str]:
         try:
             tokens = shlex.split(sub_cmd)
         except Exception:
-            return False, "Не удалось спарсить синтаксис команды"
+            return False, "Failed to parse command syntax"
 
         if not tokens:
             continue
 
         base_bin = tokens[0]
 
-        # Если прямое упоминание деструктивных команд
+        # Check for direct destructive commands
         if base_bin in DESTRUCTIVE_COMMANDS:
-            return False, f"Выполнение потенц. опасной или изменяющей команды: {base_bin}"
+            return False, f"Execution of potentially unsafe or mutating command: {base_bin}"
 
-        # Проверка git подкоманд
+        # Check Git subcommands
         if base_bin == "git":
             full_git = " ".join(tokens[:2]) if len(tokens) >= 2 else "git"
             if full_git not in {"git status", "git diff", "git log", "git show", "git branch"}:
-                return False, f"Операция Git под подтверждение: {full_git}"
+                return False, f"Git operation requiring confirmation: {full_git}"
             continue
 
-        # Проверка одиночных безопасных команд
+        # Check safe single commands
         if base_bin not in SAFE_SINGLE_COMMANDS:
-            return False, f"Команда не из списка безопасных для автозапуска: {base_bin}"
+            return False, f"Command not in safe auto-execute list: {base_bin}"
 
-    return True, "Команда безопасна"
+    return True, "Command is safe"

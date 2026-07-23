@@ -31,7 +31,7 @@ class SessionManager:
         return f"session_{int(time.time())}_{uuid.uuid4().hex[:4]}"
 
     def list_sessions(self) -> List[Dict[str, Any]]:
-        """Возвращает список только НЕПУСТЫХ сессий текущего проекта, отсортированный по времени обновления"""
+        """Returns list of only NON-EMPTY sessions for current project, sorted by updated time"""
         sessions = []
         if not os.path.exists(self.sessions_dir):
             return sessions
@@ -44,7 +44,7 @@ class SessionManager:
                         data = json.load(f)
                         ui_msgs = data.get("ui_messages") or data.get("messages") or []
 
-                        # Если сессия пустая — удаляем мусорный файл
+                        # If session is empty - remove junk file
                         if not ui_msgs:
                             os.remove(filepath)
                             continue
@@ -75,14 +75,14 @@ class SessionManager:
         return None
 
     def save_session(self, session_id: str, data: Dict[str, Any]):
-        """Сохраняет сессию ТОЛЬКО если в ней есть хотя бы одно сообщение"""
+        """Saves session ONLY if it contains at least one message"""
         if not session_id:
             return
 
         filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
         ui_msgs = data.get("ui_messages") or data.get("messages") or []
 
-        # Не сохраняем пустые сессии, а если файл существовал — удаляем
+        # Do not save empty sessions; if file existed - remove it
         if not ui_msgs:
             if os.path.exists(filepath):
                 os.remove(filepath)
@@ -103,7 +103,7 @@ class SessionManager:
             os.remove(filepath)
 
     def get_active_session_id(self) -> Optional[str]:
-        """Возвращает ID последней активной сессии проекта или None если сохраненных нет"""
+        """Returns ID of last active session or None if none exist"""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, "r", encoding="utf-8") as f:

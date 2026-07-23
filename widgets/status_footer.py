@@ -8,7 +8,7 @@ from core.models_catalog import format_context_tokens
 
 
 class StatusFooter(Static):
-    """Двухстрочная информационная строка состояния под чатом"""
+    """Two-line status footer below chat"""
     can_focus = False
     ALLOW_SELECT = False
 
@@ -118,7 +118,7 @@ class StatusFooter(Static):
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total}sub[/{THEME_SECONDARY}]")
             row2_right = " • ".join(row2_right_parts)
         else:
-            # Строка 1: Слева (Режим • Проект • Провайдер › Модель), Справа (Skills • MCP)
+            # Line 1: Left (Mode • Project • Provider › Model), Right (Skills • MCP)
             row1_left_parts = [
                 f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
                 f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]"
@@ -137,7 +137,7 @@ class StatusFooter(Static):
             ]
             row1_right = "  •  ".join(row1_right_parts)
 
-            # Строка 2: Слева (Контекст), Справа (Токены • Стоимость • Активность)
+            # Line 2: Left (Context), Right (Tokens • Cost • Activity)
             ctx_val = context_used if context_used > 0 else total_tokens
             pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))

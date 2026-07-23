@@ -4,10 +4,10 @@ from textual.widgets import TextArea
 
 
 class ChatInput(TextArea):
-    """Поле ввода с реактивными подсказками при реальном вводе символов"""
+    """Input field with reactive suggestions on character typing"""
 
     class Submitted(Message):
-        """Событие отправки текста"""
+        """Text submission event"""
         def __init__(self, value: str) -> None:
             super().__init__()
             self.value = value
@@ -45,7 +45,7 @@ class ChatInput(TextArea):
         return text
 
     def update_height(self) -> None:
-        """Динамический расчет высоты от 2 до 6 строк"""
+        """Dynamic height calculation from 2 to 6 lines"""
         lines = len(self.text.split("\n"))
         target_height = max(2, min(lines + 1, 6))
         h = self.styles.height
@@ -53,7 +53,7 @@ class ChatInput(TextArea):
             self.styles.height = target_height
 
     def update_suggestions(self) -> None:
-        """Обновление списка подсказок слэш-команд и файлов"""
+        """Update slash command and file suggestions list"""
         try:
             if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
@@ -65,7 +65,7 @@ class ChatInput(TextArea):
             pass
 
     def apply_file_suggestion(self, chosen_file: str, at_start_idx: int) -> None:
-        """Вставляет выбранный путь к файлу после символа @"""
+        """Inserts chosen file path after @ symbol"""
         row, col = self.cursor_location
         line_str = self.document.get_line(row)
         before = line_str[:at_start_idx]
@@ -81,7 +81,7 @@ class ChatInput(TextArea):
         self.move_cursor((row, new_col))
 
     def auto_format_image_tags(self) -> None:
-        """Сканирует текст инпута на наличие путей к изображениям и заменяет их на [Image #N]"""
+        """Scans input text for image paths and replaces them with [Image #N]"""
         import os
         import re
 
@@ -124,7 +124,7 @@ class ChatInput(TextArea):
             self.move_cursor((min(row, len(lines) - 1), len(lines[-1])))
 
     def _on_input_change(self) -> None:
-        """Вызывается при любом изменении текста в инпуте"""
+        """Called on any input text change"""
         self.update_height()
         self.update_suggestions()
         self.auto_format_image_tags()
@@ -135,7 +135,7 @@ class ChatInput(TextArea):
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
 
     def format_pasted_file_path(self, pasted_text: str) -> str:
-        """Автоматически форматирует вставленные пути к файлам (@file или [Image #N])"""
+        """Automatically formats pasted file paths (@file or [Image #N])"""
         import os
         lines = pasted_text.strip().splitlines()
         if not lines:
@@ -188,7 +188,7 @@ class ChatInput(TextArea):
         return pasted_text
 
     def try_paste_clipboard_image(self) -> bool:
-        """Проверяет буфер обмена на наличие PNG изображения и вставляет его как [Image #N]"""
+        """Checks clipboard for PNG image and inserts as [Image #N]"""
         import os
         import subprocess
         import time
@@ -220,14 +220,14 @@ class ChatInput(TextArea):
         return False
 
     def paste_universal_clipboard(self) -> bool:
-        """Универсальная вставка из буфера обмена (картинка или текст)"""
+        """Universal clipboard paste (image or text)"""
         import subprocess
 
-        # 1. Пробуем вставить картинку из буфера
+        # 1. Try pasting image from clipboard
         if self.try_paste_clipboard_image():
             return True
 
-        # 2. Если картинки нет, считываем текст из буфера обмена
+        # 2. If no image, read text from clipboard
         try:
             res = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=2)
             if res.returncode == 0 and res.stdout:
@@ -273,14 +273,14 @@ class ChatInput(TextArea):
             self._on_input_change()
 
     def add_to_history(self, text: str) -> None:
-        """Сохранение отправленного сообщения в историю запросов"""
+        """Save submitted message to query history"""
         if text and (not self.prompt_history or self.prompt_history[-1] != text):
             self.prompt_history.append(text)
         self.prompt_history_index = len(self.prompt_history)
         self.prompt_draft = ""
 
     def _handle_tag_deletion(self, event_key: str) -> bool:
-        """Атомарное удаление блока [Pasted text #N +X lines] при нажатии Backspace или Delete"""
+        """Atomic deletion of [Pasted text #N +X lines] block on Backspace or Delete"""
         if not self.pasted_texts or not self.selection.is_empty:
             return False
 
@@ -313,21 +313,21 @@ class ChatInput(TextArea):
                 event.prevent_default()
                 event.stop()
                 return
-        # Атомарное удаление блока вставки по Backspace/Delete
+        # Atomic deletion of pasted block via Backspace/Delete
         if event.key in ("backspace", "delete"):
             if self._handle_tag_deletion(event.key):
                 event.prevent_default()
                 event.stop()
                 return
 
-        # Горячие клавиши выхода (Ctrl+C, Ctrl+Q)
+        # Exit hotkeys (Ctrl+C, Ctrl+Q)
         if event.key in ("ctrl+c", "ctrl+q"):
             event.prevent_default()
             event.stop()
             self.app.exit()
             return
 
-        # Отмена активной генерации агента по Escape
+        # Cancel active agent generation via Escape
         if event.key == "escape":
             active_workers = [w for w in self.app.workers if w.is_running]
             if active_workers:
@@ -337,7 +337,7 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Нажатие Tab для автодополнения слэш-команды или файла
+        # Tab press for slash command or file autocompletion
         if event.key == "tab":
             try:
                 from widgets.command_suggestions import CommandSuggestions
@@ -364,7 +364,7 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
-        # Нажатие Shift+Tab для переключения режимов (Build / Plan / Ask / Debug / Orchestrator)
+        # Shift+Tab press to toggle mode (Action / Explore)
         if event.key in ("shift+tab", "backtab", "shift_tab"):
             event.prevent_default()
             event.stop()
@@ -372,7 +372,7 @@ class ChatInput(TextArea):
                 self.app.action_toggle_mode()
             return
 
-        # Обработка навигации в меню подсказок по стрелкам
+        # Handle arrow navigation in suggestions menu
         try:
             from widgets.command_suggestions import CommandSuggestions
             suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
@@ -390,7 +390,7 @@ class ChatInput(TextArea):
         except Exception:
             pass
 
-        # Зацикленная навигация по истории запросов: Вверх
+        # Looped navigation through query history: Up
         if event.key == "up" and self.cursor_location[0] == 0:
             if self.prompt_history:
                 if self.prompt_history_index == len(self.prompt_history):
@@ -409,7 +409,7 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Зацикленная навигация по истории запросов: Вниз
+        # Looped navigation through query history: Down
         lines = self.text.split("\n")
         if event.key == "down" and self.cursor_location[0] == len(lines) - 1:
             if self.prompt_history:
@@ -434,7 +434,7 @@ class ChatInput(TextArea):
             event.prevent_default()
             event.stop()
 
-            # Скрываем подсказки
+            # Hide suggestions
             try:
                 from widgets.command_suggestions import CommandSuggestions
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
@@ -453,5 +453,5 @@ class ChatInput(TextArea):
             self.insert("\n")
             self._on_input_change()
         else:
-            # На ЛЮБОЕ нажатие клавиши вызываем перерасчет после рефреша
+            # On ANY keypress invoke recalculation after refresh
             self.call_after_refresh(self._on_input_change)

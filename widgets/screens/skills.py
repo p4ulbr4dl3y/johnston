@@ -9,7 +9,7 @@ from core.skill_manager import SkillManager
 
 
 class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
-    """Модальное окно списка доступных скиллов (глобальных и проектных)"""
+    """Modal screen for listing available skills (global and project)"""
 
     ALLOW_SELECT = False
     BINDINGS = [("escape", "cancel", "Cancel")]

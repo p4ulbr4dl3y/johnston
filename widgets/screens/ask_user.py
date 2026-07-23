@@ -6,7 +6,7 @@ from textual.widgets import Input, Markdown, OptionList
 
 
 class QuestionScreen(ModalScreen[dict]):
-    """Модальное окно для выбора вариантов или текстового ввода без кнопок"""
+    """Modal screen for selecting options or typing custom input without buttons"""
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
@@ -133,7 +133,7 @@ class QuestionScreen(ModalScreen[dict]):
 
 
 class ConfirmScreen(ModalScreen[str]):
-    """Модальное окно подтверждения ответов перед отправкой без подсказок"""
+    """Confirmation modal screen before submitting answers"""
 
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
@@ -148,7 +148,7 @@ class ConfirmScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Подтвердите ваши ответы**\n\n" + self.summary, classes="modal-markdown")
+            yield Markdown("### **Confirm your answers**\n\n" + self.summary, classes="modal-markdown")
 
     def action_confirm(self) -> None:
         self.dismiss("confirm")

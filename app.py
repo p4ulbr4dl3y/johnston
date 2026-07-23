@@ -21,7 +21,7 @@ from widgets.status_footer import StatusFooter
 
 
 class JohnstonChatApp(App):
-    """Минималистичный Johnston чат с конфигурацией провайдеров, моделей и изолированными сессиями по проектам"""
+    """Minimalist Johnston chat with provider/model configuration and isolated project sessions"""
 
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
@@ -43,7 +43,7 @@ class JohnstonChatApp(App):
         self.background_tasks = []
 
     def action_toggle_mode(self) -> None:
-        """Переключение режима агента (Action / Explore)"""
+        """Toggle agent mode (Action / Explore)"""
         if not hasattr(self, "agent") or not self.agent:
             return
         modes = ["action", "explore"]
@@ -61,13 +61,13 @@ class JohnstonChatApp(App):
             yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
-        """Мгновенный фокус при старте и обновление строки состояния"""
+        """Instant focus on start and refresh status bar"""
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
 
     def on_unmount(self) -> None:
-        """Очистка всех запущенных MCP-серверов и фоновых процессов при закрытии приложения"""
+        """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
         for task in getattr(self, "background_tasks", []):
             try:
@@ -90,7 +90,7 @@ class JohnstonChatApp(App):
             pass
 
     def refresh_status_footer(self) -> None:
-        """Обновление строки директории, провайдера, модели, контекста, токенов и стоимости"""
+        """Refresh status bar with directory, provider, model, context, tokens, and cost"""
         try:
             footer = self.query_one("#status-footer", StatusFooter)
             pkey = self.pm.get_active_provider_key()
@@ -129,7 +129,7 @@ class JohnstonChatApp(App):
             print(f"Error refreshing status footer: {e}")
 
     def load_session_ui(self, session_id: str) -> None:
-        """Загрузка состояния сессии в UI и в историю агента"""
+        """Load session state into UI and agent history"""
         session_data = self.sm.load_session(session_id)
         if not session_data:
             return
@@ -141,7 +141,7 @@ class JohnstonChatApp(App):
         for child in list(chat_view.children):
             child.remove()
 
-        # Восстановление полной истории элементов в UI (user, bot, thinking, tool)
+        # Restore complete element history in UI (user, bot, thinking, tool)
         saved_ui_msgs = session_data.get("ui_messages", [])
         for msg in saved_ui_msgs:
             mtype = msg.get("type")
@@ -170,7 +170,7 @@ class JohnstonChatApp(App):
 
         chat_view.check_welcome()
 
-        # Восстановление контекста агента
+        # Restore agent context
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
             self.agent.tokens_input = session_data.get("tokens_input", 0)
@@ -181,7 +181,7 @@ class JohnstonChatApp(App):
         self.refresh_status_footer()
 
     def save_current_session(self) -> None:
-        """Сохранение полного состояния элементов UI в ~/.johnston/projects/<project>/sessions"""
+        """Save complete UI element state to ~/.johnston/projects/<project>/sessions"""
         chat_view = self.query_one(ChatView)
         user_msgs = chat_view.get_user_messages()
 
@@ -229,11 +229,11 @@ class JohnstonChatApp(App):
         self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
-        """Любой клик мыши возвращает фокус в инпут"""
+        """Any mouse click returns focus to input"""
         self.query_one("#message-input", ChatInput).focus()
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
-        """При отпускании мыши копирует выделенный фрагмент и сбрасывает выделение"""
+        """On mouse up, copy selected fragment and clear selection"""
         selected_text = self.screen.get_selected_text()
         if selected_text:
             try:
@@ -250,7 +250,7 @@ class JohnstonChatApp(App):
                 asyncio.create_task(reset_flag())
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Переключение провайдера агента из конфига ~/.johnston"""
+        """Switch agent provider from ~/.johnston config"""
         if event.value and isinstance(event.value, str) and event.value != "none":
             self.pm.set_active_provider_key(event.value)
             self.agent = self.pm.create_active_agent()
@@ -263,7 +263,7 @@ class JohnstonChatApp(App):
             self.notify(f"Agent switched: {event.value}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Обработка ввода и слэш-команд (/help, /new, /provider, /models, /rewind, /resume)"""
+        """Handle input and slash commands (/help, /new, /provider, /models, /rewind, /resume)"""
         user_text = event.value.strip()
         if not user_text:
             return
@@ -280,7 +280,7 @@ class JohnstonChatApp(App):
         self.generate_ai_response(user_text)
 
     def prepare_prompt_with_attachments(self, user_text: str):
-        """Поиск @path/to/file и прямых путей в user_text и прикрепление текстовых файлов и картинок"""
+        """Search for @path/to/file and raw paths in user_text and attach text files and images"""
         import base64
         import mimetypes
         import re
@@ -340,7 +340,7 @@ class JohnstonChatApp(App):
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
-        """Потоковая генерация ответа с поддержкой отмены по Esc"""
+        """Stream AI response generation with cancellation support via Esc"""
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
@@ -415,7 +415,7 @@ class JohnstonChatApp(App):
                 pass
 
     def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
-        """Вызывается при завершении фоновой bash команды"""
+        """Callback when background bash command finishes"""
         if not getattr(self, "is_app_active", True):
             return
         try:

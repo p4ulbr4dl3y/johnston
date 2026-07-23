@@ -8,19 +8,19 @@ COMMANDS = [(name, cmd.description) for name, cmd in COMMAND_REGISTRY.items()]
 
 
 class CommandSuggestions(OptionList):
-    """Выпадающее меню подсказок слэш-команд (/help, /rewind) и прикрепления файлов (@file)"""
+    """Dropdown suggestions menu for slash commands (/help, /rewind) and file attachments (@file)"""
 
     can_focus = False
     ALLOW_SELECT = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.mode: str | None = None  # "command" или "file"
+        self.mode: str | None = None  # "command" or "file"
         self.current_matched: list[str] = []
         self.at_start_idx: int = -1
 
     def get_workspace_files(self) -> list[str]:
-        """Получение списка относительных путей файлов в текущем проекте"""
+        """Gets relative file paths list in current project"""
         files_list = []
         cwd = os.getcwd()
         ignore_dirs = {
@@ -46,7 +46,7 @@ class CommandSuggestions(OptionList):
         return sorted(files_list)
 
     def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
-        """Обновление списка совпадений с форматированием для /команд и @файлов"""
+        """Updates matches list formatted for /commands and @files"""
         self.clear_options()
         self.mode = None
         self.current_matched = []
@@ -56,7 +56,7 @@ class CommandSuggestions(OptionList):
             self.display = False
             return []
 
-        # 1. Проверка на слэш-команду в начале ввода
+        # 1. Check for slash command at start of input
         cleaned = full_text.strip().lower()
         if cleaned.startswith("/") and " " not in cleaned:
             self.mode = "command"
@@ -75,7 +75,7 @@ class CommandSuggestions(OptionList):
                 self.display = False
             return matched_cmds
 
-        # 2. Проверка на ввод @файла
+        # 2. Check for @file input
         check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
         at_idx = check_text.rfind("@")
         if at_idx != -1:
@@ -107,7 +107,7 @@ class CommandSuggestions(OptionList):
         return []
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        """Клик мыши по пункту подсказки"""
+        """Mouse click on suggestion option"""
         event.stop()
         if not self.app or not self.current_matched or self.highlighted is None:
             return

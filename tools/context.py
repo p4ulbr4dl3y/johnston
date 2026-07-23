@@ -2,7 +2,7 @@ from typing import Any, List
 
 
 class ToolContext:
-    """Унифицированный контекст исполнения для инструментов (изолирует UI от бизнес-логики)"""
+    """Unified execution context for tools (isolates UI from business logic)"""
 
     def __init__(self, app: Any = None):
         self.app = app

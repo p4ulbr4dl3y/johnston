@@ -24,8 +24,8 @@ class TestBashGuard(unittest.TestCase):
     def test_risky_commands(self):
         risky_cmds = [
             ("rm -rf /tmp/foo", "rm"),
-            ("echo 'secret' > .env", "Перенаправление"),
-            ("cat file.txt >> log.txt", "Перенаправление"),
+            ("echo 'secret' > .env", "redirection"),
+            ("cat file.txt >> log.txt", "redirection"),
             ("git push origin main", "Git"),
             ("git reset --hard", "Git"),
             ("git clean -fd", "Git"),
@@ -35,8 +35,8 @@ class TestBashGuard(unittest.TestCase):
             ("uv run pytest", "uv"),
             ("npm install", "npm"),
             ("ls && rm -rf .", "rm"),
-            ("echo $(whoami)", "подоболоч"),
-            ("cat `pwd`", "подоболоч"),
+            ("echo $(whoami)", "subshell"),
+            ("cat `pwd`", "subshell"),
             ("cat /etc/passwd", "/etc"),
         ]
         for cmd, expected_substring in risky_cmds:

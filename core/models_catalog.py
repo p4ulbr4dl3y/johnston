@@ -138,7 +138,7 @@ class ModelsCatalog:
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
         cache_dir = os.path.join(CONFIG_DIR, "cache")
 
-        # 1. Проверяем кеш локального провайдера
+        # 1. Check local provider cache
         cache_path = os.path.join(cache_dir, f"models_{provider_id}.json")
         if os.path.exists(cache_path):
             try:
@@ -150,7 +150,7 @@ class ModelsCatalog:
             except Exception:
                 pass
 
-        # 2. Проверяем кеш каталога OpenRouter
+        # 2. Check OpenRouter catalog cache
         if not self._limits:
             self.load_cache()
 
@@ -203,7 +203,7 @@ class ModelsCatalog:
         if m_base in self._names:
             return self._names[m_base]
 
-        # Красивое дефолтное форматирование без префикса организации
+        # Fallback clean formatting without organization prefix
         base_raw = model_id.split("/")[-1]
         parts = base_raw.replace("_", "-").split("-")
         capitalized = " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)

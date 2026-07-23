@@ -32,7 +32,7 @@ TOKEN_COLORS = {
 
 
 class UserMessage(Static):
-    """Сообщение пользователя"""
+    """User message"""
     can_focus = False
 
     def __init__(self, content: str):
@@ -41,7 +41,7 @@ class UserMessage(Static):
 
 
 class BotMessage(Vertical):
-    """Сообщение ИИ с полным рендерингом Markdown"""
+    """AI message with full Markdown rendering"""
     can_focus = False
     content = reactive("")
 
@@ -57,7 +57,7 @@ class BotMessage(Vertical):
 
 
 class ThinkingWidget(Vertical):
-    """Виджет думания с поддержкой Markdown при разворачивании"""
+    """Thinking widget with Markdown expansion support"""
     can_focus = False
     ALLOW_SELECT = False
 
@@ -122,7 +122,7 @@ class ThinkingWidget(Vertical):
 
 
 class ToolCallWidget(Vertical):
-    """Виджет вызова инструмента (Create, Read, Edit, Bash) с поддержкой разворачивания"""
+    """Tool call widget (Create, Read, Edit, Bash) with expansion support"""
     can_focus = False
     ALLOW_SELECT = False
 
@@ -590,7 +590,7 @@ class ToolCallWidget(Vertical):
 
 
 class WelcomeWidget(Vertical):
-    """Приветствие по центру главного экрана"""
+    """Centered welcome logo on main screen"""
     can_focus = False
 
     FULL_BANNER = (
@@ -625,7 +625,7 @@ class WelcomeWidget(Vertical):
 
 
 class ChatView(VerticalScroll):
-    """Скроллируемый поток чата"""
+    """Scrollable chat stream"""
     can_focus = False
 
     def on_mount(self) -> None:

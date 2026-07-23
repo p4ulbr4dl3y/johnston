@@ -44,7 +44,7 @@ class ProviderManager:
             self.set_active_provider_key("opencode")
 
     def load_providers(self) -> Dict[str, Any]:
-        """Динамически загружает все .py провайдеры из локальной директории providers/"""
+        """Dynamically loads all .py providers from local providers/ directory"""
         providers = {}
         if not os.path.exists(PROVIDERS_DIR):
             return providers
@@ -125,7 +125,7 @@ class ProviderManager:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def set_provider_model(self, key: str, model_name: str):
-        """Сохраняет выбранную модель для провайдера в конфиг и в .py файл провайдера"""
+        """Saves selected model for provider to config and provider .py file"""
         data = {}
         if os.path.exists(CONFIG_FILE):
             try:
@@ -189,12 +189,12 @@ class ProviderManager:
         return agent
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
-        """Возвращает кешированный список моделей провайдера (TTL = 24 часа) или делает HTTP запрос"""
+        """Returns cached list of provider models (TTL = 24h) or performs HTTP request"""
         CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
         os.makedirs(CACHE_DIR, exist_ok=True)
         cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
 
-        # 1. Проверяем файл кеша
+        # 1. Check cache file
         if not force_refresh and os.path.exists(cache_path):
             try:
                 with open(cache_path, "r", encoding="utf-8") as f:
@@ -205,7 +205,7 @@ class ProviderManager:
             except Exception:
                 pass
 
-        # 2. Запрашиваем модели через HTTP API провайдера
+        # 2. Request models via provider HTTP API
         providers = self.load_providers()
         if provider_key not in providers:
             return []
@@ -245,14 +245,14 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Фолбэк на список моделей из модуля или дефолтную модель
+        # Fallback to models list from module or default model
         if not models:
             if hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
                 models = mod.MODELS
             elif hasattr(mod, "MODEL"):
                 models = [mod.MODEL]
 
-        # Записываем в кеш
+        # Save to cache
         if models:
             try:
                 with open(cache_path, "w", encoding="utf-8") as f:
@@ -263,7 +263,7 @@ class ProviderManager:
         return models
 
     async def fetch_models_grouped(self, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
-        """Возвращает словари моделей, сгруппированные по провайдерам"""
+        """Returns model dictionaries grouped by provider"""
         providers = self.load_providers()
         grouped = {}
         for p_key, p_data in providers.items():

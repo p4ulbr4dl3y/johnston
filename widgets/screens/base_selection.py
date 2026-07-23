@@ -10,7 +10,7 @@ T = TypeVar("T")
 
 
 class BaseSelectionScreen(ModalScreen[T], Generic[T]):
-    """Базовый класс для модальных окон выбора с OptionList"""
+    """Base class for selection modal screens with OptionList"""
 
     ALLOW_SELECT = False
     BINDINGS = [("escape", "cancel", "Cancel")]

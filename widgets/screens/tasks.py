@@ -7,7 +7,7 @@ from core.config import THEME_MUTED, THEME_PRIMARY
 
 
 class TaskConsoleScreen(ModalScreen[None]):
-    """Модальный экран для просмотра вывода конкретной таски в реальном времени"""
+    """Modal screen for viewing console output of a specific task in real-time"""
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "back", "Back to list"),
@@ -43,7 +43,7 @@ class TaskConsoleScreen(ModalScreen[None]):
 
 
 class TasksListScreen(ModalScreen[None]):
-    """Модальный экран со списком фоновых тасок"""
+    """Modal screen with background tasks list"""
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Manager"),

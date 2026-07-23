@@ -88,7 +88,7 @@ class AskUserTool(BaseTool):
                         for idx in range(len(questions_list)):
                             q_clean = questions_list[idx].get("question_text", "")
                             ans_info = answers.get(idx, {"status": "skipped", "answer": "Skipped"})
-                            summary += f"**Вопрос {idx+1}:** {q_clean}\n\n**Ответ:** {ans_info['answer']}\n\n"
+                            summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_info['answer']}\n\n"
 
                         screen = ConfirmScreen(summary)
                         loop = asyncio.get_running_loop()

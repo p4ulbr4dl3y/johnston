@@ -2,7 +2,7 @@ import asyncio
 
 
 class BackgroundTask:
-    """Управление фоновым bash-процессом с построчным чтением вывода в реальном времени"""
+    """Manages background bash process with real-time line-by-line output reading"""
     def __init__(self, task_id: str, command: str, process, widget=None):
         self.task_id = task_id
         self.command = command
@@ -68,7 +68,7 @@ class BackgroundTask:
 
 
 class BackgroundSubagent:
-    """Управление фоновым субагентом"""
+    """Manages background subagent"""
     def __init__(self, task_id: str, description: str, task: asyncio.Task):
         self.task_id = task_id
         self.command = f"Subagent: {description}"

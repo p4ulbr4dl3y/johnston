@@ -9,7 +9,7 @@ from tools.base import BaseTool, resolve_path
 
 
 async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:
-    """Отправляет изображение фолбэк-модели с поддержкой Vision (по умолчанию cline-pass/mimo-v2.5)"""
+    """Sends image to fallback Vision model (default cline-pass/mimo-v2.5)"""
     import base64
     import mimetypes
 
@@ -124,14 +124,14 @@ class ViewImageTool(BaseTool):
 
         prompt = args.get("prompt") or "Describe the visual contents of this image in detail."
 
-        # Получаем экземпляр приложения и активного агента
+        # Obtain application instance and active agent
         from tools.context import ToolContext
         app_inst = app.app if isinstance(app, ToolContext) else app
         agent = getattr(app_inst, "agent", None) if app_inst else None
         provider_key = getattr(agent, "provider_key", "opencode") if agent else "opencode"
         model_name = getattr(agent, "model", "") if agent else ""
 
-        # Если модель не поддерживает Vision -> вызываем фолбэк-субагент (mimo-v2.5)
+        # If model does not support Vision -> invoke fallback subagent (mimo-v2.5)
         if not catalog.supports_vision(provider_key, model_name):
             return await analyze_image_with_fallback(path, prompt, app_inst)
 

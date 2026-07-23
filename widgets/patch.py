@@ -2,7 +2,7 @@ from textual.widget import Widget
 
 
 def apply_textual_patches() -> None:
-    """Применяет расширения над базом классами Textual (allow_select для вложенных виджетов)"""
+    """Applies patches to Textual base classes (allow_select for nested widgets)"""
     def _new_allow_select(self) -> bool:
         node = self
         while node is not None:
