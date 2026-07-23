@@ -89,7 +89,6 @@ class BaseAgent:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
-        t0 = time.time()
 
         try:
             while True:
@@ -124,6 +123,7 @@ class BaseAgent:
                 tool_calls_dict = {}
                 active_thought = ""
                 thinking_started = False
+                thinking_t0 = time.time()
 
                 async for chunk in response:
                     if getattr(chunk, "usage", None):
@@ -143,13 +143,14 @@ class BaseAgent:
                         if not thinking_started:
                             yield ("thinking_start", "Thinking...", "")
                             thinking_started = True
+                            thinking_t0 = time.time()
                         active_thought += reasoning
                         yield ("thinking_delta", active_thought, "")
 
                     delta = choice.delta
                     if delta.content:
                         if thinking_started:
-                            dt = time.time() - t0
+                            dt = time.time() - thinking_t0
                             yield ("thinking_end", f"{dt}", active_thought)
                             thinking_started = False
                         full_assistant_text += delta.content
@@ -157,7 +158,7 @@ class BaseAgent:
 
                     if delta.tool_calls:
                         if thinking_started:
-                            dt = time.time() - t0
+                            dt = time.time() - thinking_t0
                             yield ("thinking_end", f"{dt}", active_thought)
                             thinking_started = False
 
@@ -198,7 +199,7 @@ class BaseAgent:
                     self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
 
                 if thinking_started:
-                    dt = time.time() - t0
+                    dt = time.time() - thinking_t0
                     yield ("thinking_end", f"{dt}", active_thought)
                     thinking_started = False
 
