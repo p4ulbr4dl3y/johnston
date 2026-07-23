@@ -49,6 +49,19 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(screen.session, sess)
         self.assertEqual(screen.task_id_or_desc, "task-789")
 
+    def test_session_persistence(self):
+        sess = self.tracker.create_session("task-persist", "Persistent Agent", "save to disk", "explore", False)
+        sess.add_event({"type": "bot_text", "text": "persisted output"})
+
+        # Reload tracker sessions from disk
+        self.tracker.sessions.clear()
+        self.tracker._load_all_sessions()
+
+        reloaded = self.tracker.get_session("task-persist")
+        self.assertIsNotNone(reloaded)
+        self.assertEqual(reloaded.description, "Persistent Agent")
+        self.assertTrue(any(e.get("text") == "persisted output" for e in reloaded.events))
+
 
 if __name__ == "__main__":
     unittest.main()

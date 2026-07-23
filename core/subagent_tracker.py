@@ -1,4 +1,10 @@
+import json
+import os
 from typing import Any, Callable, Dict, List, Optional
+
+from core.config import CONFIG_DIR
+
+SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
 
 
 class SubagentSessionData:
@@ -21,6 +27,7 @@ class SubagentSessionData:
                 cb(event)
             except Exception:
                 pass
+        SubagentTracker.get_instance().save_session(self)
 
     def add_listener(self, cb: Callable[[Dict[str, Any]], None]) -> None:
         if cb not in self.listeners:
@@ -34,12 +41,39 @@ class SubagentSessionData:
         self.status = status
         self.add_event({"type": "status_change", "status": status, "error": error_msg})
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "description": self.description,
+            "prompt": self.prompt,
+            "subagent_type": self.subagent_type,
+            "background": self.background,
+            "status": self.status,
+            "events": self.events,
+            "agent_history": getattr(self.agent, "history", []) if self.agent else []
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SubagentSessionData":
+        sess = cls(
+            task_id=data.get("task_id", ""),
+            description=data.get("description", ""),
+            prompt=data.get("prompt", ""),
+            subagent_type=data.get("subagent_type", "general"),
+            background=bool(data.get("background", False)),
+        )
+        sess.status = data.get("status", "completed")
+        sess.events = data.get("events", [])
+        return sess
+
 
 class SubagentTracker:
     _instance: Optional["SubagentTracker"] = None
 
     def __init__(self):
         self.sessions: Dict[str, SubagentSessionData] = {}
+        self.storage_dir = SUBAGENTS_DIR
+        self._load_all_sessions()
 
     @classmethod
     def get_instance(cls) -> "SubagentTracker":
@@ -47,11 +81,35 @@ class SubagentTracker:
             cls._instance = SubagentTracker()
         return cls._instance
 
+    def _load_all_sessions(self) -> None:
+        if not os.path.exists(self.storage_dir):
+            return
+        for fname in os.listdir(self.storage_dir):
+            if fname.endswith(".json"):
+                fpath = os.path.join(self.storage_dir, fname)
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    sess = SubagentSessionData.from_dict(data)
+                    self.sessions[sess.task_id] = sess
+                except Exception:
+                    pass
+
+    def save_session(self, sess: SubagentSessionData) -> None:
+        try:
+            os.makedirs(self.storage_dir, exist_ok=True)
+            fpath = os.path.join(self.storage_dir, f"{sess.task_id}.json")
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(sess.to_dict(), f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
     def create_session(
         self, task_id: str, description: str, prompt: str, subagent_type: str, background: bool
     ) -> SubagentSessionData:
         sess = SubagentSessionData(task_id, description, prompt, subagent_type, background)
         self.sessions[task_id] = sess
+        self.save_session(sess)
         return sess
 
     def get_session(self, task_id: str) -> Optional[SubagentSessionData]:

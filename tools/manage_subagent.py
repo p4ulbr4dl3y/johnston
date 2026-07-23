@@ -111,6 +111,15 @@ class ManageSubagentTool(BaseTool):
 
             subagent = session.agent
             if not subagent:
+                subagent = ctx.create_agent()
+                if subagent:
+                    subagent.app = ctx.app
+                    hist = session.to_dict().get("agent_history", []) if hasattr(session, "to_dict") else []
+                    if hist:
+                        subagent.history = hist
+                    session.agent = subagent
+
+            if not subagent:
                 return f"Error: No active agent instance available for subagent {session.task_id}."
 
             session.add_event({"type": "user", "text": message})
