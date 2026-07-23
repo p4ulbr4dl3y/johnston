@@ -337,6 +337,50 @@ class MCPManager:
 
         return not new_disabled
 
+    def toggle_mode(self, name: str) -> str:
+        """
+        Toggles mode between 'eager' and 'lazy' for server by name.
+        Saves updated mode to appropriate config file.
+        Returns new mode string ('eager' or 'lazy').
+        """
+        servers = self.load_servers()
+        target = next((s for s in servers if s["name"] == name), None)
+        if not target:
+            return "eager"
+
+        curr_mode = target.get("mode", "eager")
+        new_mode = "lazy" if curr_mode == "eager" else "eager"
+
+        file_to_update = self.project_file if target["scope"] == "project" and os.path.exists(self.project_file) else self.global_file
+
+        try:
+            cfg = {"mcpServers": {}}
+            if os.path.exists(file_to_update):
+                with open(file_to_update, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+
+            if "mcpServers" not in cfg:
+                cfg["mcpServers"] = {}
+
+            if name in cfg["mcpServers"]:
+                cfg["mcpServers"][name]["mode"] = new_mode
+            else:
+                cfg["mcpServers"][name] = {
+                    "command": target.get("command"),
+                    "args": target.get("args"),
+                    "env": target.get("env"),
+                    "url": target.get("url"),
+                    "mode": new_mode,
+                    "disabled": target.get("disabled", False)
+                }
+
+            with open(file_to_update, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Failed to toggle mode for MCP server {name}: {e}")
+
+        return new_mode
+
     def get_active_tools(self, mode: Optional[str] = "eager") -> List[Dict[str, Any]]:
         """
         Connects to enabled MCP servers and returns their tools in OpenAI function format.
