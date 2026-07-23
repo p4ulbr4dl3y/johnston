@@ -198,8 +198,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task", "manage_subagent",
-        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task", "ManageSubagent"
+        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task",
+        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task"
     }
 
     def is_expandable(self) -> bool:
