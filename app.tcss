@@ -1,10 +1,9 @@
-/* Text Selection - Clean Uniform White Inversion (#ffffff bg, #09090b text) */
+/* Dynamic True Color Inversion Selection (Original text color becomes selection bg) */
 .screen--selection,
 .text-area--selection,
 Screen > .screen--selection,
 TextArea > .text-area--selection {
-    background: #ffffff;
-    color: #09090b;
+    text-style: reverse;
 }
 
 Screen {
