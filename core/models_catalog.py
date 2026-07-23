@@ -2,6 +2,7 @@
 AI Model Catalog and Context Limit Manager for Johnston.
 Fetches model context limits dynamically from provider APIs, OpenRouter catalog API, or defaults.
 """
+import asyncio
 import json
 import os
 import time
@@ -42,19 +43,30 @@ class ModelsCatalog:
         self._pricing: Dict[str, Dict[str, float]] = {}
         self.load_cache()
 
+    def _trigger_background_refresh(self):
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                loop.create_task(self.refresh())
+        except RuntimeError:
+            pass
+
     def load_cache(self) -> bool:
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    if time.time() - data.get("updated_at", 0) < CACHE_TTL:
-                        self._limits = data.get("model_limits", {})
-                        self._vision = data.get("vision_models", [])
-                        self._names = data.get("model_names", {})
-                        self._pricing = data.get("model_pricing", {})
-                        return True
+                    self._limits = data.get("model_limits", {})
+                    self._vision = data.get("vision_models", [])
+                    self._names = data.get("model_names", {})
+                    self._pricing = data.get("model_pricing", {})
+
+                    if time.time() - data.get("updated_at", 0) >= CACHE_TTL:
+                        self._trigger_background_refresh()
+                    return True
             except Exception:
                 pass
+        self._trigger_background_refresh()
         return False
 
     def save_cache(
@@ -136,21 +148,6 @@ class ModelsCatalog:
         return self._limits
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
-        cache_dir = os.path.join(CONFIG_DIR, "cache")
-
-        # 1. Check local provider cache
-        cache_path = os.path.join(cache_dir, f"models_{provider_id}.json")
-        if os.path.exists(cache_path):
-            try:
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    limits = cdata.get("model_limits", {})
-                    if model_id in limits and isinstance(limits[model_id], (int, float)):
-                        return int(limits[model_id])
-            except Exception:
-                pass
-
-        # 2. Check OpenRouter catalog cache
         if not self._limits:
             self.load_cache()
 
@@ -165,17 +162,6 @@ class ModelsCatalog:
         return DEFAULT_CONTEXT_LIMIT
 
     def supports_vision(self, provider_id: str, model_id: str) -> bool:
-        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
-        if os.path.exists(cache_path):
-            try:
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    vision_models = cdata.get("vision_models")
-                    if isinstance(vision_models, list) and vision_models:
-                        return model_id in vision_models
-            except Exception:
-                pass
-
         if not self._vision:
             self.load_cache()
 
@@ -210,17 +196,6 @@ class ModelsCatalog:
         return capitalized
 
     def get_model_pricing(self, provider_id: str, model_id: str) -> Dict[str, float]:
-        cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
-        if os.path.exists(cache_path):
-            try:
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    pricing = cdata.get("model_pricing", {})
-                    if model_id in pricing and isinstance(pricing[model_id], dict):
-                        return pricing[model_id]
-            except Exception:
-                pass
-
         if not self._pricing:
             self.load_cache()
 
