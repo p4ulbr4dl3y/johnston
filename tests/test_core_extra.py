@@ -47,6 +47,18 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         mock_proc.terminate.assert_called_once()
         self.assertIn("Task terminated by user", "".join(bg_task.output))
 
+    async def test_background_task_send_input(self):
+        mock_proc = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdin.write = MagicMock()
+        mock_stdin.drain = MagicMock(return_value=asyncio.sleep(0))
+        mock_proc.stdin = mock_stdin
+
+        bg_task = BackgroundTask("task_3", "interactive_cmd", mock_proc)
+        res = await bg_task.send_input("hello stdin")
+        self.assertIn("Input sent to task task_3", res)
+        mock_stdin.write.assert_called_once_with(b"hello stdin\n")
+
     async def test_background_subagent_kill(self):
         async def dummy_subagent():
             await asyncio.sleep(100)

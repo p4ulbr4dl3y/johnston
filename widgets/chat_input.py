@@ -194,6 +194,11 @@ class ChatInput(TextArea):
         import time
 
         try:
+            # If clipboard contains a Finder file reference («class furl»), do not treat as raw image paste
+            info_res = subprocess.run("osascript -e 'clipboard info'", shell=True, capture_output=True, text=True, timeout=2)
+            if info_res.returncode == 0 and "«class furl»" in info_res.stdout:
+                return False
+
             cmd = "osascript -e 'get the clipboard as «class PNGf»'"
             res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=2)
             if res.returncode == 0 and "«data PNGf" in res.stdout:
@@ -251,7 +256,17 @@ class ChatInput(TextArea):
         return False
 
     def on_paste(self, event: events.Paste) -> None:
-        if self.try_paste_clipboard_image():
+        import os
+        text_strip = event.text.strip().strip("'\"")
+        expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
+        is_path = (
+            text_strip.startswith("/")
+            or text_strip.startswith("~/")
+            or text_strip.startswith("./")
+            or text_strip.startswith("file://")
+            or os.path.exists(expanded)
+        )
+        if not is_path and self.try_paste_clipboard_image():
             event.prevent_default()
             event.stop()
             return

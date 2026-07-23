@@ -1,9 +1,17 @@
 import asyncio
+import os
+import re
+
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE.sub('', text)
 
 
 class BackgroundTask:
-    """Manages background bash process with real-time line-by-line output reading"""
-    def __init__(self, task_id: str, command: str, process, widget=None):
+    """Manages background bash process with real-time line/chunk output reading and input sending"""
+    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None):
         self.task_id = task_id
         self.command = command
         self.process = process
@@ -12,26 +20,45 @@ class BackgroundTask:
         self.is_background = False
         self.read_task = None
         self.widget = widget
+        self.master_fd = master_fd
+        self.reader = reader
 
     def start_reading(self, app, on_completed_cb):
         async def _read():
             try:
                 while True:
-                    line = await self.process.stdout.readline()
-                    if not line:
-                        break
-                    line_str = line.decode("utf-8", errors="replace")
-                    self.output.append(line_str)
+                    if self.reader:
+                        try:
+                            chunk = await self.reader.read(1024)
+                        except (OSError, Exception):
+                            break
+                        if not chunk:
+                            break
+                        text = strip_ansi(chunk.decode("utf-8", errors="replace"))
+                    else:
+                        line = await self.process.stdout.readline()
+                        if not line:
+                            break
+                        text = strip_ansi(line.decode("utf-8", errors="replace"))
+
+                    self.output.append(text)
                     if self.widget and hasattr(self.widget, "append_bash_output"):
                         try:
                             if getattr(self.widget, "is_mounted", True):
-                                self.widget.append_bash_output(line_str)
+                                self.widget.append_bash_output(text)
                         except Exception:
                             pass
             except Exception:
                 pass
             finally:
                 self.is_running = False
+                if self.master_fd is not None:
+                    try:
+                        os.close(self.master_fd)
+                    except Exception:
+                        pass
+                    self.master_fd = None
+
                 if self.process:
                     try:
                         await self.process.wait()
@@ -51,8 +78,31 @@ class BackgroundTask:
         self.read_task = asyncio.create_task(_read())
         return self.read_task
 
+    async def send_input(self, text: str) -> str:
+        if not self.is_running:
+            return f"Task {self.task_id} is not running."
+        data = (text + "\n").encode("utf-8")
+        try:
+            if self.master_fd is not None:
+                os.write(self.master_fd, data)
+                return f"Input sent to task {self.task_id}."
+            elif self.process and self.process.stdin:
+                self.process.stdin.write(data)
+                await self.process.stdin.drain()
+                return f"Input sent to task {self.task_id}."
+            else:
+                return f"Task {self.task_id} stdin is not writable."
+        except Exception as e:
+            return f"Failed to send input to task {self.task_id}: {e}"
+
     async def kill(self):
         self.is_running = False
+        if self.master_fd is not None:
+            try:
+                os.close(self.master_fd)
+            except Exception:
+                pass
+            self.master_fd = None
         if self.process:
             try:
                 self.process.terminate()
@@ -86,3 +136,4 @@ class BackgroundSubagent:
                 pass
         self.is_running = False
         self.output.append("\n[Subagent task terminated by user]\n")
+

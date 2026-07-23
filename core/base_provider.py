@@ -313,8 +313,11 @@ class BaseAgent:
                                 target = str_args[0]
                         if not target:
                             target = t_name
-                    if isinstance(target, str) and len(target) > 60:
-                        target = target[:25] + "..." + target[-32:]
+                    if isinstance(target, str):
+                        import re
+                        target = re.sub(r'\s+', ' ', target.replace("\n", " ").replace("\r", " ")).strip()
+                        if len(target) > 60:
+                            target = target[:25] + "..." + target[-32:]
                     yield ("tool", t_name, target, args)
 
                     current_mode = getattr(self, "mode", "action").lower()

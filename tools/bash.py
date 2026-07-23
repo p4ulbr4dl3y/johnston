@@ -1,4 +1,6 @@
 import asyncio
+import os
+import pty
 import time
 from typing import Any, Dict
 
@@ -48,14 +50,44 @@ class BashTool(BaseTool):
             except Exception as e:
                 return f"Error prompting for command permission: {e}"
 
-        p = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT
-        )
+        master_fd = None
+        slave_fd = None
+        reader = None
+
+        try:
+            master_fd, slave_fd = pty.openpty()
+        except Exception:
+            master_fd, slave_fd = None, None
+
+        if master_fd is not None and slave_fd is not None:
+            try:
+                p = await asyncio.create_subprocess_shell(
+                    cmd,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    close_fds=True,
+                    start_new_session=True
+                )
+            finally:
+                os.close(slave_fd)
+
+            os.set_blocking(master_fd, False)
+            loop = asyncio.get_running_loop()
+            reader = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(reader)
+            await loop.connect_read_pipe(lambda: protocol, os.fdopen(master_fd, "rb", buffering=0))
+        else:
+            p = await asyncio.create_subprocess_shell(
+                cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
+
         task_id = f"bash_{int(time.time())}"
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
-        task = BackgroundTask(task_id, cmd, p, widget=target_widget)
+        task = BackgroundTask(task_id, cmd, p, widget=target_widget, master_fd=master_fd, reader=reader)
         task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
 
         try:
@@ -80,3 +112,4 @@ class BashTool(BaseTool):
                 if not res.strip():
                     return "Command executed with no output."
                 return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
+

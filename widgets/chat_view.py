@@ -154,6 +154,9 @@ class ToolCallWidget(Vertical):
             classes += " tool-sequential"
         super().__init__(classes=classes)
         self.tool_type = tool_type
+        if isinstance(target, str):
+            import re
+            target = re.sub(r'\s+', ' ', target.replace("\n", " ").replace("\r", " ")).strip()
         self.target = target
         self.result_text = result_text
         self.args = args or {}

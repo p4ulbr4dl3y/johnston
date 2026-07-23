@@ -5,17 +5,18 @@ from tools.base import BaseTool
 
 class ManageTaskTool(BaseTool):
     name = "ManageTask"
-    description = "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command)."
+    description = "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command)."
     schema = {
         "type": "function",
         "function": {
             "name": "ManageTask",
-            "description": "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command).",
+            "description": "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "description": "Action: 'list', 'status', or 'kill'"},
-                    "task_id": {"type": "string", "description": "Target background task ID"}
+                    "action": {"type": "string", "description": "Action: 'list', 'status', 'kill', or 'send_input'"},
+                    "task_id": {"type": "string", "description": "Target background task ID"},
+                    "input": {"type": "string", "description": "Input text to send (required for 'send_input')"}
                 }
             }
         }
@@ -52,6 +53,23 @@ class ManageTaskTool(BaseTool):
                 out = out[-4000:] + "\n... [truncated]"
             return f"Task ID: {t.task_id}\nStatus: {status}\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 
+        elif action in ("send_input", "input"):
+            if not task_id:
+                return "Error: task_id parameter required for 'send_input' action."
+            input_text = args.get("input", "")
+            if input_text is None:
+                input_text = ""
+            matching = [t for t in tasks if t.task_id == task_id]
+            if not matching:
+                return f"No task found with ID: {task_id}"
+            t = matching[0]
+            if not getattr(t, "is_running", False):
+                return f"Task {task_id} is not running."
+
+            if hasattr(t, "send_input"):
+                return await t.send_input(input_text)
+            return f"Task {task_id} does not support stdin input."
+
         elif action == "kill":
             if not task_id:
                 return "Error: task_id parameter required for 'kill' action."
@@ -72,4 +90,5 @@ class ManageTaskTool(BaseTool):
                     return f"Failed to kill task {task_id}: {e}"
             return f"Task {task_id} is not running."
 
-        return f"Unknown action: {action}. Use 'list', 'status', or 'kill'."
+        return f"Unknown action: {action}. Use 'list', 'status', 'kill', or 'send_input'."
+

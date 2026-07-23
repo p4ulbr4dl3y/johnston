@@ -90,7 +90,7 @@ class CommandSuggestions(OptionList):
                     for f in files:
                         if not query_lower or query_lower in f.lower():
                             matched_files.append(f)
-                            formatted_line = f"@{f:<45} File"
+                            formatted_line = f"{f:<46} File"
                             self.add_option(formatted_line)
                             if len(matched_files) >= 50:
                                 break
