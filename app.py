@@ -295,7 +295,7 @@ class JohnstonChatApp(App):
         tool_widget = await chat_view.add_tool_call("Bash", cmd)
         self.current_tool_widget = tool_widget
 
-        res = await BashTool().execute({"command": cmd}, app=self)
+        res = await BashTool().execute({"command": cmd, "skip_confirm": True}, app=self)
         tool_widget.set_result(res)
 
         if hasattr(self, "agent") and self.agent and hasattr(self.agent, "history"):

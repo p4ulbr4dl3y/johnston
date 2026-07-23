@@ -44,8 +44,9 @@ class BashTool(BaseTool):
                 return f"Slept for {sec} seconds."
             cmd = remainder
 
+        skip_confirm = args.get("skip_confirm", False)
         is_safe, reason = analyze_bash_command(cmd)
-        if not is_safe and ctx.app:
+        if not is_safe and not skip_confirm and ctx.app:
             try:
                 from widgets.modal_screens import BashConfirmScreen
                 screen = BashConfirmScreen(command=cmd, reason=reason)
