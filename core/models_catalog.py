@@ -154,9 +154,9 @@ class ModelsCatalog:
         if model_id in self._limits:
             return self._limits[model_id]
 
-        m_base = model_id.split("/")[-1].lower()
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
         for k, v in self._limits.items():
-            if k.split("/")[-1].lower() == m_base and isinstance(v, (int, float)):
+            if k.split("/")[-1].split(":")[0].lower() == m_base and isinstance(v, (int, float)):
                 return int(v)
 
         return DEFAULT_CONTEXT_LIMIT
@@ -168,9 +168,9 @@ class ModelsCatalog:
         if model_id in self._vision:
             return True
 
-        m_base = model_id.split("/")[-1].lower()
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
         for k in self._vision:
-            if k.split("/")[-1].lower() == m_base:
+            if k.split("/")[-1].split(":")[0].lower() == m_base:
                 return True
 
         return False
@@ -185,12 +185,13 @@ class ModelsCatalog:
         if model_id in self._names:
             return self._names[model_id]
 
-        m_base = model_id.split("/")[-1].lower()
-        if m_base in self._names:
-            return self._names[m_base]
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
+        for k, v in self._names.items():
+            if k.split("/")[-1].split(":")[0].lower() == m_base:
+                return v
 
         # Fallback clean formatting without organization prefix
-        base_raw = model_id.split("/")[-1]
+        base_raw = model_id.split("/")[-1].split(":")[0]
         parts = base_raw.replace("_", "-").split("-")
         capitalized = " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
         return capitalized
@@ -202,9 +203,10 @@ class ModelsCatalog:
         if model_id in self._pricing:
             return self._pricing[model_id]
 
-        m_base = model_id.split("/")[-1].lower()
-        if m_base in self._pricing:
-            return self._pricing[m_base]
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
+        for k, v in self._pricing.items():
+            if k.split("/")[-1].split(":")[0].lower() == m_base and isinstance(v, dict):
+                return v
 
         return {"prompt": 0.0, "completion": 0.0}
 
