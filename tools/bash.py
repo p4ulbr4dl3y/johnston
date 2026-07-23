@@ -1,12 +1,15 @@
 import asyncio
 import os
 import pty
+import re
 import time
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask
 from core.bash_guard import analyze_bash_command
 from tools.base import BaseTool, truncate_output
+
+SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
 
 
 class BashTool(BaseTool):
@@ -29,7 +32,17 @@ class BashTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
-        cmd = args.get("command", "")
+        cmd = args.get("command", "").strip()
+
+        # Handle sleep via Python asyncio.sleep without spawning background tasks
+        m = SLEEP_CHAIN_REGEX.match(cmd)
+        if m:
+            sec = float(m.group(1))
+            remainder = (m.group(2) or "").strip()
+            await asyncio.sleep(sec)
+            if not remainder:
+                return f"Slept for {sec} seconds."
+            cmd = remainder
 
         is_safe, reason = analyze_bash_command(cmd)
         if not is_safe and ctx.app:
