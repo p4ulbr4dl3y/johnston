@@ -516,3 +516,17 @@ MarkdownBlockQuote {
     margin: 1 0;
     padding: 0 1;
 }
+
+/* Markdown Inline Code - Clean Monochrome Slate (White text on dark zinc background) */
+MarkdownBlock:dark > .code_inline,
+MarkdownBlock:light > .code_inline,
+MarkdownBlock > .code_inline {
+    background: #27272a;
+    color: #ffffff;
+    text-style: bold;
+}
+
+
+
+
+

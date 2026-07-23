@@ -14,11 +14,13 @@ from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.color import Color
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.highlight import HighlightTheme
 from textual.reactive import reactive
+from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
-from textual.widgets._markdown import MarkdownFence
+from textual.widgets._markdown import MarkdownBlock, MarkdownFence
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
 
@@ -69,6 +71,18 @@ def _new_markdown_init(self, *args, **kwargs):
     self.BLOCKS["fence"] = CustomMarkdownFence
     self.BLOCKS["code_block"] = CustomMarkdownFence
 Markdown.__init__ = _new_markdown_init
+
+_old_markdown_block_get_style = MarkdownBlock._get_style
+def _new_markdown_block_get_style(self, style):
+    if style == ".code_inline":
+        return Style(
+            background=Color(39, 39, 42),
+            foreground=Color(255, 255, 255),
+            bold=True,
+        )
+    return _old_markdown_block_get_style(self, style)
+MarkdownBlock._get_style = _new_markdown_block_get_style
+
 
 
 def safe_update_markdown(widget: Markdown, content: str) -> None:
