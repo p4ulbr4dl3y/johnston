@@ -310,10 +310,7 @@ class ToolCallWidget(Vertical):
     }
 
     def render_header(self) -> None:
-        if self.tool_type.lower() in ("subagent", "task"):
-            display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target}) [dim]• click to watch[/dim]")
-        elif self.tool_type in self.SYSTEM_TOOLS:
+        if self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
