@@ -25,9 +25,21 @@ class SubagentsListScreen(ModalScreen[None]):
             yield Label("enter: watch / view • k: kill subagent • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
+        self._ensure_mock_subagents()
         self.update_subagents_list()
         self.query_one("#subagents-option-list", OptionList).focus()
         self.set_interval(0.5, self.update_subagents_list)
+
+    def _ensure_mock_subagents(self) -> None:
+        sessions = self._get_target_sessions()
+        if not sessions:
+            try:
+                curr_session_id = getattr(self.app, "current_session_id", None)
+            except Exception:
+                curr_session_id = None
+            tracker = SubagentTracker.get_instance()
+            tracker.create_session("sub_mock1", "Explore project structure", "explore codebase", "explore", False, session_id=curr_session_id)
+            tracker.create_session("sub_mock2", "Refactor module and run tests", "refactor code", "general", True, session_id=curr_session_id)
 
     def _get_target_sessions(self):
         tracker = SubagentTracker.get_instance()
@@ -45,6 +57,10 @@ class SubagentsListScreen(ModalScreen[None]):
         sessions = self._get_target_sessions()
 
         opt_list.clear_options()
+        if not sessions:
+            opt_list.add_option(Text("No subagents registered for this session.", style=THEME_MUTED))
+            return
+
         for sess in sessions:
             st = sess.status.lower()
             status_style = THEME_PRIMARY if st == "running" else THEME_MUTED

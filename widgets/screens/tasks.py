@@ -81,8 +81,12 @@ class TasksListScreen(ModalScreen[None]):
         opt_list = self.query_one("#tasks-option-list", OptionList)
         current_highlighted = opt_list.highlighted
 
+        tasks = getattr(self.app, "background_tasks", [])
         opt_list.clear_options()
-        tasks = self.app.background_tasks
+        if not tasks:
+            opt_list.add_option(Text("No active background tasks.", style=THEME_MUTED))
+            return
+
         for t in tasks:
             cmd = t.command
             if len(cmd) > 38:
@@ -96,11 +100,10 @@ class TasksListScreen(ModalScreen[None]):
             opt_text.append(status_str, style=status_style)
             opt_list.add_option(opt_text)
 
-        if tasks:
-            if current_highlighted is not None and current_highlighted < len(tasks):
-                opt_list.highlighted = current_highlighted
-            else:
-                opt_list.highlighted = 0
+        if current_highlighted is not None and current_highlighted < len(tasks):
+            opt_list.highlighted = current_highlighted
+        else:
+            opt_list.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_index is not None and event.option_index < len(self.app.background_tasks):
