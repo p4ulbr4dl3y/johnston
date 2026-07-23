@@ -58,8 +58,11 @@ class SubagentsListScreen(ModalScreen[None]):
                 desc = desc[:35] + "..."
             opt_list.add_option(f"{desc} | {status}")
 
-        if current_highlighted is not None and current_highlighted < len(sessions):
-            opt_list.highlighted = current_highlighted
+        if sessions:
+            if current_highlighted is not None and current_highlighted < len(sessions):
+                opt_list.highlighted = current_highlighted
+            else:
+                opt_list.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         sessions = self._get_target_sessions()

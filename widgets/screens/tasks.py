@@ -75,8 +75,12 @@ class TasksListScreen(ModalScreen[None]):
                 cmd = cmd[:35] + "..."
             opt_list.add_option(f"{cmd} | {status}")
 
-        if current_highlighted is not None and current_highlighted < len(self.app.background_tasks):
-            opt_list.highlighted = current_highlighted
+        tasks = self.app.background_tasks
+        if tasks:
+            if current_highlighted is not None and current_highlighted < len(tasks):
+                opt_list.highlighted = current_highlighted
+            else:
+                opt_list.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_index is not None and event.option_index < len(self.app.background_tasks):
