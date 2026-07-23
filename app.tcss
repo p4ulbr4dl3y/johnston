@@ -183,9 +183,40 @@ Markdown OrderedList {
 MarkdownFence {
     background: #18181b;
     margin: 1 0;
-    padding: 0 2;
+    padding: 0;
     border-left: solid #3f3f46;
+    height: auto;
     scrollbar-size: 0 0;
+}
+
+MarkdownFence .fence-header {
+    height: 1;
+    background: #27272a;
+    padding: 0 1;
+}
+
+MarkdownFence .fence-lang {
+    color: #a1a1aa;
+    text-style: bold;
+    width: 1fr;
+}
+
+MarkdownFence .fence-copy-btn {
+    height: 1;
+    min-width: 6;
+    border: none;
+    background: #3f3f46;
+    color: #ffffff;
+    padding: 0 1;
+}
+
+MarkdownFence .fence-copy-btn:hover {
+    background: #ffffff;
+    color: #09090b;
+}
+
+MarkdownFence #code-content {
+    padding: 0 1;
 }
 
 /* OptionList Base Styles */

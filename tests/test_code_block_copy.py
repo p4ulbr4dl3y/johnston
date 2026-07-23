@@ -1,0 +1,29 @@
+import unittest
+from unittest.mock import MagicMock, PropertyMock, patch
+from textual.widgets import Button
+
+from widgets.chat_view import CustomMarkdownFence
+
+
+class TestCodeBlockCopy(unittest.TestCase):
+    @patch.object(CustomMarkdownFence, "app", new_callable=PropertyMock)
+    def test_custom_markdown_fence_button_press(self, mock_app_prop):
+        mock_app = MagicMock()
+        mock_app_prop.return_value = mock_app
+
+        fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        fence.code = "x = 42"
+
+        event = MagicMock(spec=Button.Pressed)
+        event.button = MagicMock(spec=Button)
+        event.button.classes = {"fence-copy-btn"}
+
+        fence.on_button_pressed(event)
+
+        mock_app.copy_to_clipboard.assert_called_once_with("x = 42")
+        mock_app.notify.assert_called_once_with("Code block copied to clipboard!")
+        event.stop.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()

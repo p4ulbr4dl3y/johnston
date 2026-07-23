@@ -13,11 +13,44 @@ from pygments.token import Token
 from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Label, Markdown, Static
+from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets._markdown import MarkdownFence
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
+
+
+class CustomMarkdownFence(MarkdownFence):
+    """Markdown code block with a header line and Copy button."""
+
+    def compose(self) -> ComposeResult:
+        lang_str = self.lexer.strip() if self.lexer else "code"
+        with Horizontal(classes="fence-header"):
+            yield Label(f" {lang_str}", classes="fence-lang")
+            yield Button("Copy", classes="fence-copy-btn")
+        yield Label(self._highlighted_code, id="code-content", expand=True)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if "fence-copy-btn" in event.button.classes:
+            try:
+                app = self.app
+                if hasattr(app, "copy_to_clipboard"):
+                    app.copy_to_clipboard(self.code)
+                    app.notify("Code block copied to clipboard!")
+            except Exception:
+                pass
+            event.stop()
+
+
+from pygments.token import Token
+from textual.highlight import HighlightTheme
+
+HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
+HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
+
+Markdown.BLOCKS["fence"] = CustomMarkdownFence
+Markdown.BLOCKS["code_block"] = CustomMarkdownFence
 
 
 def safe_update_markdown(widget: Markdown, content: str) -> None:
