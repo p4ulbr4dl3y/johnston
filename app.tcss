@@ -154,17 +154,21 @@ WelcomeWidget {
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
-Markdown {
-    width: 100%;
-    height: auto;
-    margin: 0;
-    padding: 0;
+Markdown, MarkdownBlock, MarkdownParagraph {
     link-color: #ffffff;
     link-color-hover: #ffffff;
     link-background-hover: #3f3f46;
     link-style: underline;
     link-style-hover: bold;
 }
+
+Markdown {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 0;
+}
+
 
 
 MarkdownParagraph {
