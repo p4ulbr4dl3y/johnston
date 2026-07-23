@@ -179,22 +179,9 @@ class ModelsCatalog:
         if not model_id:
             return ""
 
-        if not self._names:
-            self.load_cache()
-
-        if model_id in self._names:
-            return self._names[model_id]
-
-        m_base = model_id.split("/")[-1].split(":")[0].lower()
-        for k, v in self._names.items():
-            if k.split("/")[-1].split(":")[0].lower() == m_base:
-                return v
-
-        # Fallback clean formatting without organization prefix
         base_raw = model_id.split("/")[-1].split(":")[0]
         parts = base_raw.replace("_", "-").split("-")
-        capitalized = " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
-        return capitalized
+        return " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
 
     def get_model_pricing(self, provider_id: str, model_id: str) -> Dict[str, float]:
         if not self._pricing:

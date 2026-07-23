@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 from textual.widgets.option_list import Option
 
+from core.models_catalog import catalog
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -35,7 +36,8 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 items.append(None)
 
                 for m in p_models:
-                    opt_label = f"   {m}"
+                    clean_m = catalog.get_model_display_name(p_key, m)
+                    opt_label = f"   {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
@@ -48,7 +50,8 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 default_val = valid_items[0]
         else:
             for m in models_data:
-                options.append(m)
+                clean_m = catalog.get_model_display_name(current_provider, m)
+                options.append(clean_m)
                 items.append(m)
             default_val = current_model if current_model in items else (items[0] if items else "")
 

@@ -114,7 +114,8 @@ class StatusFooter(Static):
         elif provider_key:
             provider_display = provider_key.capitalize()
 
-        clean_model = model_name
+        from core.models_catalog import catalog
+        clean_model = catalog.get_model_display_name(provider_key, model_name)
         mode_str = agent_mode.capitalize()
         if self.is_generating:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
