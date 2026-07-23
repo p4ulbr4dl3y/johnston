@@ -249,7 +249,7 @@ If `AGENTS.md` already exists, improve it in place rather than rewriting blindly
 
 class InitCommand(BaseCommand):
     name = "/init"
-    description = "Guided AGENTS.md project setup"
+    description = "Guided `AGENTS.md` project setup"
 
     async def execute(self, app) -> None:
         app.notify("Initializing AGENTS.md guide for this project...")

@@ -27,7 +27,7 @@ class HelpScreen(ModalScreen[None]):
                 "* `/subagents` — View and manage subagents\n"
                 "* `/skills` — Browse and activate available skills\n"
                 "* `/mcp` — Manage MCP servers\n"
-                "* `/init` — Guided AGENTS.md project setup\n"
+                "* `/init` — Guided `AGENTS.md` project setup\n"
                 "* `/compact` — Compact session conversation history\n\n"
                 "**Hotkeys:**\n"
                 "* `Enter` — Send message\n"
