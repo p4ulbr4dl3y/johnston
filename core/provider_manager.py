@@ -19,9 +19,9 @@ if core_dir not in sys.path:
 
 
 def _get_default_opencode_template() -> str:
-    template_path = os.path.join(johnston_dir, "templates", "opencode_provider.py.template")
-    if os.path.exists(template_path):
-        with open(template_path, "r", encoding="utf-8") as f:
+    default_path = os.path.join(johnston_dir, "providers", "opencode.py")
+    if os.path.exists(default_path):
+        with open(default_path, "r", encoding="utf-8") as f:
             return f.read()
     return ""
 
