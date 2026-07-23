@@ -165,6 +165,35 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(success)
         self.assertIn("too short", msg)
 
+    async def test_compact_history_opencode_template(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        agent.history = [
+            {"role": "user", "content": "Fix bug in auth.py"},
+            {"role": "assistant", "content": "Checking auth.py", "tool_calls": [{"function": {"name": "read", "arguments": "auth.py"}}]},
+            {"role": "tool", "content": "def login(): return False"},
+            {"role": "user", "content": "Change to return True"},
+            {"role": "assistant", "content": "Updated auth.py"},
+            {"role": "user", "content": "Run tests"}
+        ]
+
+        # Mock OpenAI chat completion call
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = "## Objective\n- Fix auth.py\n\n## Work State\n### Completed\n- Updated login\n\n## Next Move\n1. Run tests\n\n## Relevant Files\n- auth.py"
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+
+            self.assertTrue(success)
+            self.assertIn("compacted successfully", msg)
+            self.assertEqual(len(agent.history), 4) # 1 summary + 3 tail messages starting at user turn
+            self.assertIn("<conversation-checkpoint>", agent.history[0]["content"])
+            self.assertIn("## Objective", agent.history[0]["content"])
+            self.assertIn("auth.py", agent.history[0]["content"])
+
+
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         agent.history = [

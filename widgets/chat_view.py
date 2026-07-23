@@ -10,6 +10,7 @@ from typing import Any
 import pygments
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
+from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
 from textual.app import ComposeResult
@@ -85,6 +86,15 @@ TOKEN_COLORS = {
     Token.Punctuation: "#abb2bf",
     Token.Comment: "#5c6370 italic",
 }
+
+
+class CompactionDivider(Static):
+    """Full-width centered divider for session compaction"""
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def __init__(self, title: str = "Session Compacted"):
+        super().__init__(Rule(title, style="dim #71717a"), classes="compaction-divider")
 
 
 class UserMessage(Static):
@@ -766,6 +776,13 @@ class ChatView(VerticalScroll):
         self.clear_welcome()
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
+        await self.mount(widget)
+        self.scroll_end(animate=True)
+        return widget
+
+    async def add_compaction_divider(self, text: str = "Session Compacted") -> CompactionDivider:
+        self.clear_welcome()
+        widget = CompactionDivider(text)
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget

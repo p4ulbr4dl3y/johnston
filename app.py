@@ -16,7 +16,7 @@ from commands import handle_slash_command
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionManager
 from widgets.chat_input import ChatInput
-from widgets.chat_view import BotMessage, ChatView, ThinkingWidget, ToolCallWidget, UserMessage
+from widgets.chat_view import BotMessage, ChatView, CompactionDivider, ThinkingWidget, ToolCallWidget, UserMessage
 from widgets.command_suggestions import CommandSuggestions
 from widgets.status_footer import StatusFooter
 
@@ -119,6 +119,7 @@ class JohnstonChatApp(App):
                 directory=os.path.basename(os.path.realpath(os.getcwd())),
                 active_bg_tasks=active_bg_tasks,
                 total_tokens=metrics.get("total_tokens", 0),
+                context_used=metrics.get("context_used", 0),
                 context_window=metrics.get("context", "128k"),
                 context_limit=metrics.get("context_limit", 128000),
                 cost_usd=metrics.get("cost_usd", 0.0),
@@ -168,6 +169,9 @@ class JohnstonChatApp(App):
                 rtext = msg.get("result_text", "")
                 targs = msg.get("args", {})
                 self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs))
+            elif mtype == "compaction_divider":
+                ctxt = msg.get("text", "Session Compacted")
+                self.run_worker(chat_view.add_compaction_divider(ctxt))
 
         chat_view.check_welcome()
 
@@ -178,6 +182,16 @@ class JohnstonChatApp(App):
             self.agent.tokens_output = session_data.get("tokens_output", 0)
             self.agent.total_tokens = session_data.get("total_tokens", 0)
             self.agent.cost_usd = session_data.get("cost_usd", 0.0)
+
+            ctx = session_data.get("last_context_tokens", 0)
+            if not ctx and self.agent.history:
+                from core.prompt_builder import PromptBuilder
+                from core.token_util import estimate_tokens
+                builder = PromptBuilder(self.agent.system_prompt, self.agent.tools, mode=getattr(self.agent, "mode", "action"))
+                sys_prompt = builder.build_system_prompt()
+                all_tools = builder.build_tools(provider_key=getattr(self.agent, "provider_key", ""), model_id=getattr(self.agent, "model", ""))
+                ctx = estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(self.agent.history)
+            self.agent.last_context_tokens = ctx
 
         self.refresh_status_footer()
 
@@ -213,6 +227,11 @@ class JohnstonChatApp(App):
                     "result_text": getattr(child, "result_text", ""),
                     "args": getattr(child, "args", {})
                 })
+            elif isinstance(child, CompactionDivider):
+                ui_messages.append({
+                    "type": "compaction_divider",
+                    "text": "Session Compacted"
+                })
 
         agent_history = getattr(self.agent, "history", [])
 
@@ -224,7 +243,8 @@ class JohnstonChatApp(App):
             "tokens_input": getattr(self.agent, "tokens_input", 0),
             "tokens_output": getattr(self.agent, "tokens_output", 0),
             "total_tokens": getattr(self.agent, "total_tokens", 0),
-            "cost_usd": getattr(self.agent, "cost_usd", 0.0)
+            "cost_usd": getattr(self.agent, "cost_usd", 0.0),
+            "last_context_tokens": getattr(self.agent, "last_context_tokens", 0)
         }
         self.sm.save_session(self.current_session_id, session_data)
         self.refresh_status_footer()
@@ -427,6 +447,9 @@ class JohnstonChatApp(App):
                             bot_msg = await chat_view.add_bot_message()
                         bot_msg.content = val1
                         bot_msg = None
+                elif event_type == "compaction_divider":
+                    await chat_view.add_compaction_divider(val1 or "Session Compacted")
+                    self.refresh_status_footer()
         except (asyncio.CancelledError, RuntimeError):
             if thinking_widget:
                 try:

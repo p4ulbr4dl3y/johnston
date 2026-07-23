@@ -13,7 +13,7 @@ KEY = "nvidia"
 DESCRIPTION = "NVIDIA NIM multi-model AI agent with tools"
 
 BASE_URL = "https://integrate.api.nvidia.com/v1"
-MODEL = "meta/llama-3.3-70b-instruct"
+MODEL = "meta/codellama-70b"
 API_KEY = os.getenv("NVIDIA_API_KEY", "")
 
 try:

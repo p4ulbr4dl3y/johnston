@@ -70,6 +70,15 @@ WelcomeWidget {
     color: #f4f4f5;
 }
 
+/* Compaction Divider Styling - Full width centered zinc divider */
+.compaction-divider {
+    width: 100%;
+    height: auto;
+    margin-top: 1;
+    margin-bottom: 1;
+    color: #71717a;
+}
+
 /* ThinkingWidget Styling - Subtle Zinc */
 .thinking-widget {
     width: 100%;

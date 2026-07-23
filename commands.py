@@ -281,6 +281,15 @@ class CompactCommand(BaseCommand):
                 app.notify(msg)
                 if hasattr(app, "refresh_status_footer"):
                     app.refresh_status_footer()
+                if hasattr(app, "query_one"):
+                    try:
+                        from widgets.chat_view import ChatView
+                        chat_view = app.query_one(ChatView)
+                        await chat_view.add_compaction_divider("Session Compacted")
+                    except Exception:
+                        pass
+                if hasattr(app, "save_current_session"):
+                    app.save_current_session()
             else:
                 app.notify(msg, severity="warning")
         else:

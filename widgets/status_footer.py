@@ -136,7 +136,7 @@ class StatusFooter(Static):
             row1_left = " • ".join(row1_left_parts)
             row1_right = f"[{THEME_SECONDARY}]MCP:{mcp_active}[/{THEME_SECONDARY}]" if mcp_total > 0 else ""
 
-            ctx_val = context_used if context_used > 0 else total_tokens
+            ctx_val = context_used
             pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
@@ -169,7 +169,7 @@ class StatusFooter(Static):
             row1_right = "  •  ".join(row1_right_parts)
 
             # Line 2: Left (Context), Right (Tokens • Cost • Activity)
-            ctx_val = context_used if context_used > 0 else total_tokens
+            ctx_val = context_used
             pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             bar_len = 8
