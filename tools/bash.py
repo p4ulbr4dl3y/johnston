@@ -111,6 +111,16 @@ class BashTool(BaseTool):
         task = BackgroundTask(task_id, cmd, p, widget=target_widget, master_fd=master_fd, reader=reader)
         task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
 
+        no_bg = args.get("no_background", False)
+        if no_bg:
+            await p.wait()
+            if hasattr(task, "read_task") and task.read_task:
+                await task.read_task
+            res = task.get_formatted_output()
+            if not res.strip():
+                return "Command executed with no output."
+            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
+
         try:
             await asyncio.wait_for(p.wait(), timeout=10.0)
             if hasattr(task, "read_task") and task.read_task:
