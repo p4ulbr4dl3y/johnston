@@ -1,0 +1,138 @@
+import asyncio
+
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Label, Markdown
+
+from core.subagent_tracker import SubagentTracker
+from widgets.chat_view import ChatView
+
+
+class SubagentViewScreen(ModalScreen[None]):
+    """Modal screen for watching subagent execution in a full chat window without an input panel."""
+
+    ALLOW_SELECT = False
+    BINDINGS = [
+        ("escape", "close", "Close Screen"),
+    ]
+
+    def __init__(self, task_id_or_desc: str):
+        super().__init__()
+        self.task_id_or_desc = task_id_or_desc
+        self.session = SubagentTracker.get_instance().find_session_by_description_or_id(task_id_or_desc)
+        self.thinking_widget = None
+        self.current_tool_widget = None
+        self.bot_msg = None
+        self.event_queue = asyncio.Queue()
+        self.queue_task = None
+
+    def compose(self) -> ComposeResult:
+        desc = self.session.description if self.session else self.task_id_or_desc
+        status = self.session.status.upper() if self.session else "NOT FOUND"
+        with Vertical(id="modal-dialog"):
+            yield Markdown(f"### 🤖 **Subagent: `{desc}`** `[{status}]`")
+            yield ChatView(id="subagent-chat-view", show_welcome=False)
+            yield Label("esc: close window", id="modal-hint")
+
+    def on_mount(self) -> None:
+        chat_view = self.query_one("#subagent-chat-view", ChatView)
+        chat_view.focus()
+        chat_view.clear_welcome()
+
+        if not self.session:
+            async def _no_sess():
+                bm = await chat_view.add_bot_message()
+                bm.content = f"Subagent `{self.task_id_or_desc}` session details not found."
+            self.run_worker(_no_sess())
+            return
+
+        # Start queue processing worker loop
+        self.queue_task = asyncio.create_task(self._process_queue())
+
+        # Put recorded events in queue
+        for evt in list(self.session.events):
+            self.event_queue.put_nowait(evt)
+
+        # Attach live listener for background updates
+        self.session.add_listener(self._on_live_event)
+
+    def on_unmount(self) -> None:
+        if self.queue_task and not self.queue_task.done():
+            self.queue_task.cancel()
+        if self.session:
+            self.session.remove_listener(self._on_live_event)
+
+    def _on_live_event(self, evt: dict) -> None:
+        if self.is_mounted and hasattr(self, "event_queue"):
+            self.event_queue.put_nowait(evt)
+
+    async def _process_queue(self) -> None:
+        while True:
+            try:
+                evt = await self.event_queue.get()
+                await self._render_event(evt)
+                self.event_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                pass
+
+    async def _render_event(self, evt: dict) -> None:
+        chat_view = self.query_one("#subagent-chat-view", ChatView)
+        etype = evt.get("type")
+
+        if etype == "user":
+            await chat_view.add_user_message(evt.get("text", ""))
+        elif etype == "thinking_start":
+            self.thinking_widget = await chat_view.add_thinking_widget(evt.get("val1", ""))
+        elif etype == "thinking_delta":
+            if self.thinking_widget:
+                self.thinking_widget.update_thinking(evt.get("val1", ""))
+        elif etype == "thinking_end":
+            if self.thinking_widget:
+                self.thinking_widget.finish_thinking(evt.get("duration", 0.0), evt.get("content", ""))
+                self.thinking_widget = None
+        elif etype == "tool":
+            if self.bot_msg and not self.bot_msg.content.strip():
+                try:
+                    self.bot_msg.remove()
+                except Exception:
+                    pass
+            self.bot_msg = None
+            self.current_tool_widget = await chat_view.add_tool_call(
+                evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {})
+            )
+        elif etype == "tool_result":
+            if self.current_tool_widget:
+                self.current_tool_widget.set_result(evt.get("result_text", ""))
+        elif etype == "bot_delta":
+            txt = evt.get("text", "")
+            if txt:
+                if self.bot_msg is None:
+                    self.bot_msg = await chat_view.add_bot_message()
+                self.bot_msg.content = txt
+        elif etype == "bot_chunk":
+            txt = evt.get("text", "")
+            if txt:
+                if self.bot_msg is None:
+                    self.bot_msg = await chat_view.add_bot_message()
+                self.bot_msg.content += txt
+        elif etype == "bot_text":
+            txt = evt.get("text", "")
+            if txt:
+                if self.bot_msg is None:
+                    self.bot_msg = await chat_view.add_bot_message()
+                self.bot_msg.content = txt
+                self.bot_msg = None
+        elif etype == "status_change":
+            status = evt.get("status", "").upper()
+            try:
+                desc = self.session.description if self.session else self.task_id_or_desc
+                title_md = self.query_one(Markdown)
+                title_md.update(f"### 🤖 **Subagent: `{desc}`** `[{status}]`")
+            except Exception:
+                pass
+
+    def action_close(self) -> None:
+        self.dismiss()

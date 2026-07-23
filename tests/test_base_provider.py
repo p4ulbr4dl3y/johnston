@@ -2,6 +2,7 @@ import os
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 
 from core.base_provider import BaseAgent
 from tools.registry import execute_tool

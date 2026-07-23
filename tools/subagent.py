@@ -3,6 +3,7 @@ import uuid
 from typing import Any, Dict
 
 from core.background_task import BackgroundSubagent
+from core.subagent_tracker import SubagentTracker
 from tools.base import BaseTool
 
 
@@ -46,6 +47,17 @@ class SubagentTool(BaseTool):
             return "Error: No application context available to spawn subagent."
         subagent.app = ctx.app
 
+        task_id = args.get("task_id") or f"subagent-{uuid.uuid4().hex[:6]}"
+        args["task_id"] = task_id
+
+        if ctx.app and getattr(ctx.app, "current_tool_widget", None):
+            ctx.app.current_tool_widget.args["task_id"] = task_id
+            setattr(ctx.app.current_tool_widget, "subagent_task_id", task_id)
+
+        tracker = SubagentTracker.get_instance()
+        session = tracker.create_session(task_id, description, prompt, subagent_type, run_in_background)
+        session.add_event({"type": "user", "text": prompt})
+
         # Disable nested Task tool calls (recursion guard)
         subagent.allow_task = False
         original_tools = getattr(subagent, "tools", []) or []
@@ -59,21 +71,50 @@ class SubagentTool(BaseTool):
         else:
             subagent.system_prompt += f"\n\n[SUBAGENT MODE: {subagent_type.upper()}]\nYou are a subagent executing: {description}. Perform the task and return concise results."
 
-        if run_in_background:
-            task_id = f"subagent-{uuid.uuid4().hex[:6]}"
+        def _record_step(step, acc):
+            etype = step[0]
+            val1 = step[1] if len(step) > 1 else ""
+            val2 = step[2] if len(step) > 2 else ""
+            val3 = step[3] if len(step) > 3 else None
 
-            async def _run_bg():
-                full_text = ""
+            if etype == "thinking_start":
+                session.add_event({"type": "thinking_start", "val1": val1})
+            elif etype == "thinking_delta":
+                session.add_event({"type": "thinking_delta", "val1": val1})
+            elif etype == "thinking_end":
                 try:
-                    async for event_type, val1, val2 in subagent.stream_steps(prompt):
-                        if event_type in ("bot_text", "outro", "bot_delta"):
-                            full_text = val1
-                        elif event_type == "bot_chunk":
-                            full_text += val1
+                    dur = float(val1)
+                except Exception:
+                    dur = 0.0
+                session.add_event({"type": "thinking_end", "duration": dur, "content": val2})
+            elif etype == "tool":
+                targs = val3 if isinstance(val3, dict) else {}
+                session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
+            elif etype == "tool_result":
+                session.add_event({"type": "tool_result", "result_text": val1})
+            elif etype == "bot_chunk":
+                session.add_event({"type": "bot_chunk", "text": val1})
+                acc[0] += val1
+            elif etype == "bot_delta":
+                session.add_event({"type": "bot_delta", "text": val1})
+                acc[0] = val1
+            elif etype in ("bot_text", "outro"):
+                session.add_event({"type": "bot_text", "text": val1})
+                acc[0] = val1
+
+        if run_in_background:
+            async def _run_bg():
+                acc = [""]
+                try:
+                    async for step in subagent.stream_steps(prompt):
+                        _record_step(step, acc)
+                    session.finish("completed")
                 except asyncio.CancelledError:
-                    full_text = "[Subagent cancelled]"
+                    acc[0] = "[Subagent cancelled]"
+                    session.finish("cancelled", "Cancelled by user")
                 except Exception as err:
-                    full_text = f"[Subagent error: {err}]"
+                    acc[0] = f"[Subagent error: {err}]"
+                    session.finish("error", str(err))
                 finally:
                     for t in ctx.background_tasks:
                         if getattr(t, "task_id", "") == task_id:
@@ -82,7 +123,7 @@ class SubagentTool(BaseTool):
 
                     msg = (
                         f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
-                        f"<task_result>\n{full_text.strip() or 'Completed with no text output.'}\n</task_result>"
+                        f"<task_result>\n{acc[0].strip() or 'Completed with no text output.'}\n</task_result>"
                     )
                     ctx.trigger_ai_response(msg)
 
@@ -97,14 +138,13 @@ class SubagentTool(BaseTool):
             )
         else:
             # Foreground execution
-            full_text = ""
+            acc = [""]
             try:
-                async for event_type, val1, val2 in subagent.stream_steps(prompt):
-                    if event_type in ("bot_text", "outro", "bot_delta"):
-                        full_text = val1
-                    elif event_type == "bot_chunk":
-                        full_text += val1
+                async for step in subagent.stream_steps(prompt):
+                    _record_step(step, acc)
+                session.finish("completed")
             except Exception as err:
+                session.finish("error", str(err))
                 return f"Subagent execution error: {err}"
 
-            return f"<task_result>\n{full_text.strip() or 'Subagent finished with no text output.'}\n</task_result>"
+            return f"<task_result>\n{acc[0].strip() or 'Subagent finished with no text output.'}\n</task_result>"

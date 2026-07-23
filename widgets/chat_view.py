@@ -114,12 +114,23 @@ class BotMessage(Vertical):
     def __init__(self):
         super().__init__(classes="bot-msg")
         self.md_widget = Markdown("")
+        self._update_scheduled = False
 
     def compose(self) -> ComposeResult:
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
-        safe_update_markdown(self.md_widget, new_content)
+        if not self._update_scheduled:
+            self._update_scheduled = True
+            try:
+                loop = asyncio.get_running_loop()
+                loop.call_later(0.05, self._flush_update)
+            except Exception:
+                safe_update_markdown(self.md_widget, new_content)
+
+    def _flush_update(self) -> None:
+        self._update_scheduled = False
+        safe_update_markdown(self.md_widget, self.content)
 
 
 class ThinkingWidget(Vertical):
@@ -187,8 +198,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read", "call_mcp_tool",
-        "Create", "Edit", "Bash", "Read", "CallMCPTool"
+        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task",
+        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task"
     }
 
     def is_expandable(self) -> bool:
@@ -298,7 +309,10 @@ class ToolCallWidget(Vertical):
     }
 
     def render_header(self) -> None:
-        if self.tool_type in self.SYSTEM_TOOLS:
+        if self.tool_type.lower() in ("subagent", "task"):
+            display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target}) [dim]• click to watch[/dim]")
+        elif self.tool_type in self.SYSTEM_TOOLS:
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
@@ -325,6 +339,17 @@ class ToolCallWidget(Vertical):
                 self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
+        if self.tool_type.lower() in ("subagent", "task"):
+            task_id = self.args.get("task_id") if isinstance(self.args, dict) else None
+            identifier = task_id or self.target
+            try:
+                from widgets.screens.subagent_screen import SubagentViewScreen
+                self.app.push_screen(SubagentViewScreen(identifier))
+            except Exception:
+                pass
+            event.stop()
+            return
+
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
@@ -724,6 +749,10 @@ class ChatView(VerticalScroll):
     """Scrollable chat stream"""
     can_focus = False
 
+    def __init__(self, *args, show_welcome: bool = True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.show_welcome = show_welcome
+
     def on_mount(self) -> None:
         self.check_welcome()
 
@@ -732,6 +761,9 @@ class ChatView(VerticalScroll):
             w.remove()
 
     def check_welcome(self) -> None:
+        if not getattr(self, "show_welcome", True):
+            self.clear_welcome()
+            return
         msg_children = [c for c in self.children if not isinstance(c, WelcomeWidget)]
         welcome = list(self.query(WelcomeWidget))
         if not msg_children:

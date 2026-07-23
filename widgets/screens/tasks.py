@@ -78,7 +78,11 @@ class TasksListScreen(ModalScreen[None]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_index is not None and event.option_index < len(self.app.background_tasks):
             task = self.app.background_tasks[event.option_index]
-            self.app.push_screen(TaskConsoleScreen(task))
+            if hasattr(task, "async_task"):
+                from widgets.screens.subagent_screen import SubagentViewScreen
+                self.app.push_screen(SubagentViewScreen(task.task_id))
+            else:
+                self.app.push_screen(TaskConsoleScreen(task))
 
     async def action_kill_task(self) -> None:
         opt_list = self.query_one("#tasks-option-list", OptionList)

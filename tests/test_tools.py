@@ -30,10 +30,14 @@ class MockApp:
 
 class TestTools(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        from tools.context import ToolContext
+        ToolContext._instance = None
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
 
     def tearDown(self):
+        from tools.context import ToolContext
+        ToolContext._instance = None
         self.temp_dir.cleanup()
 
     async def test_read_tool(self):
