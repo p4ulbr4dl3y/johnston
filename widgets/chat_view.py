@@ -1,7 +1,10 @@
+import asyncio
 import difflib
+import inspect
 import json
 import os
 import re
+import warnings
 from typing import Any
 
 import pygments
@@ -13,6 +16,26 @@ from textual.app import ComposeResult
 from textual.containers import Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
+
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
+
+
+def safe_update_markdown(widget: Markdown, content: str) -> None:
+    """Updates Markdown widget safely without creating unawaited coroutines when unattached."""
+    if not getattr(widget, "is_attached", True):
+        return
+    try:
+        res = widget.update(content)
+        if inspect.isawaitable(res):
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(res)
+            except RuntimeError:
+                pass
+    except Exception:
+        pass
+
 
 TOKEN_COLORS = {
     Token.Keyword: "bold #c678dd",
@@ -53,7 +76,7 @@ class BotMessage(Vertical):
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
-        self.md_widget.update(new_content)
+        safe_update_markdown(self.md_widget, new_content)
 
 
 class ThinkingWidget(Vertical):
@@ -93,10 +116,7 @@ class ThinkingWidget(Vertical):
         if thinking_content:
             self.thinking_text = thinking_content
         self.remove_class("thinking-active")
-        try:
-            self.md_widget.update(self.thinking_text)
-        except Exception:
-            pass
+        safe_update_markdown(self.md_widget, self.thinking_text)
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
@@ -112,10 +132,7 @@ class ThinkingWidget(Vertical):
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
             if self.thinking_text:
-                try:
-                    self.md_widget.update(self.thinking_text)
-                except Exception:
-                    pass
+                safe_update_markdown(self.md_widget, self.thinking_text)
             self.md_widget.display = True
         else:
             self.md_widget.display = False
