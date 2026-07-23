@@ -72,6 +72,11 @@ class BashTool(BaseTool):
         except Exception:
             master_fd, slave_fd = None, None
 
+        env = os.environ.copy()
+        env["TERM"] = "dumb"
+        env["NO_COLOR"] = "1"
+        env["PYTHONUNBUFFERED"] = "1"
+
         if master_fd is not None and slave_fd is not None:
             try:
                 p = await asyncio.create_subprocess_shell(
@@ -79,6 +84,7 @@ class BashTool(BaseTool):
                     stdin=slave_fd,
                     stdout=slave_fd,
                     stderr=slave_fd,
+                    env=env,
                     close_fds=True,
                     start_new_session=True
                 )
@@ -95,7 +101,8 @@ class BashTool(BaseTool):
                 cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT
+                stderr=asyncio.subprocess.STDOUT,
+                env=env
             )
 
         task_id = f"bash_{int(time.time())}"

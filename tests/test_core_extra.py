@@ -59,6 +59,12 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Input sent to task task_3", res)
         mock_stdin.write.assert_called_once_with(b"hello stdin\n")
 
+    def test_process_carriage_returns(self):
+        from core.background_task import process_carriage_returns
+        raw = "Downloading 0%\rDownloading 50%\rDownloading 100%\nDone\n"
+        cleaned = process_carriage_returns(raw)
+        self.assertEqual(cleaned, "Downloading 100%\nDone\n")
+
     async def test_background_subagent_kill(self):
         async def dummy_subagent():
             await asyncio.sleep(100)

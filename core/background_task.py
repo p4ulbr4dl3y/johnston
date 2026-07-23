@@ -9,6 +9,19 @@ def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub('', text)
 
 
+def process_carriage_returns(text: str) -> str:
+    if "\r" not in text:
+        return text
+    lines = text.split("\n")
+    processed = []
+    for line in lines:
+        if "\r" in line:
+            parts = [p for p in line.split("\r") if p]
+            line = parts[-1] if parts else ""
+        processed.append(line)
+    return "\n".join(processed)
+
+
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
     def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None):
@@ -34,12 +47,12 @@ class BackgroundTask:
                             break
                         if not chunk:
                             break
-                        text = strip_ansi(chunk.decode("utf-8", errors="replace"))
+                        text = process_carriage_returns(strip_ansi(chunk.decode("utf-8", errors="replace")))
                     else:
                         line = await self.process.stdout.readline()
                         if not line:
                             break
-                        text = strip_ansi(line.decode("utf-8", errors="replace"))
+                        text = process_carriage_returns(strip_ansi(line.decode("utf-8", errors="replace")))
 
                     self.output.append(text)
                     if self.widget and hasattr(self.widget, "append_bash_output"):
