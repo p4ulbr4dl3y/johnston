@@ -288,7 +288,7 @@ class BaseAgent:
                             target = f'"{desc}"'
                         else:
                             target = t_name
-                    elif t_name in ("manage_task", "ManageTask"):
+                    elif t_name in ("manage_task", "ManageTask", "manage_subagent", "ManageSubagent"):
                         act = args.get("action", "list")
                         tid = args.get("task_id", "")
                         if tid:
