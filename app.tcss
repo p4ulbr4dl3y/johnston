@@ -78,15 +78,11 @@ WelcomeWidget {
     color: #71717a;
 }
 
-.thinking-active {
-    color: #ffffff;
-    text-style: bold;
-}
-
 .thinking-header {
     height: auto;
     margin: 0;
     padding: 0;
+    color: #71717a;
 }
 
 .thinking-header:hover {
