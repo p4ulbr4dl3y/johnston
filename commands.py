@@ -430,6 +430,15 @@ class BashModeCommand(BaseCommand):
             app.notify("Bash mode disabled")
 
 
+class TestModalCommand(BaseCommand):
+    name = "/testmodal"
+    description = "Spawn bash confirm modal for UI testing"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.bash_confirm import BashConfirmScreen
+        app.push_screen(BashConfirmScreen("cd /Users/yegor/testing && echo -e \"John\\ny\" | python3 script.py", "Test command"))
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -455,6 +464,7 @@ COMMAND_CLASSES = [
     BashModeCommand,
     PasteCommand,
     CopyCommand,
+    TestModalCommand,
 ]
 
 COMMAND_REGISTRY = {

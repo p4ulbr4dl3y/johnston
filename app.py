@@ -66,6 +66,9 @@ class JohnstonChatApp(App):
         self.query_one("#message-input", ChatInput).focus()
         self.refresh_status_footer()
 
+        from widgets.screens.bash_confirm import BashConfirmScreen
+        self.push_screen(BashConfirmScreen("cd /Users/yegor/testing && echo -e \"John\\ny\" | python3 script.py", "Test reason"))
+
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
