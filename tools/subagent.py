@@ -102,6 +102,15 @@ class SubagentTool(BaseTool):
                 session.add_event({"type": "bot_text", "text": val1})
                 acc[0] = val1
 
+        def _merge_metrics():
+            if ctx.app and hasattr(ctx.app, "agent") and ctx.app.agent:
+                main_agent = ctx.app.agent
+                main_agent.tokens_input += getattr(subagent, "tokens_input", 0)
+                main_agent.tokens_output += getattr(subagent, "tokens_output", 0)
+                main_agent.total_tokens += getattr(subagent, "total_tokens", 0)
+                main_agent.cost_usd += getattr(subagent, "cost_usd", 0.0)
+                ctx.refresh_status()
+
         if run_in_background:
             async def _run_bg():
                 acc = [""]
@@ -116,6 +125,7 @@ class SubagentTool(BaseTool):
                     acc[0] = f"[Subagent error: {err}]"
                     session.finish("error", str(err))
                 finally:
+                    _merge_metrics()
                     for t in ctx.background_tasks:
                         if getattr(t, "task_id", "") == task_id:
                             t.is_running = False
@@ -146,5 +156,7 @@ class SubagentTool(BaseTool):
             except Exception as err:
                 session.finish("error", str(err))
                 return f"Subagent execution error: {err}"
+            finally:
+                _merge_metrics()
 
             return f"<task_result>\n{acc[0].strip() or 'Subagent finished with no text output.'}\n</task_result>"
