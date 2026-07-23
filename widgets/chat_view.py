@@ -8,6 +8,7 @@ import warnings
 from typing import Any
 
 import pygments
+from markdown_it import MarkdownIt
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
 from rich.rule import Rule
@@ -65,12 +66,22 @@ HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
 Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence
 
+def _custom_markdown_parser_factory() -> MarkdownIt:
+    md = MarkdownIt("gfm-like")
+    md.validateLink = lambda url: True
+    return md
+
+
+
 _old_markdown_init = Markdown.__init__
 def _new_markdown_init(self, *args, **kwargs):
+    if "parser_factory" not in kwargs or kwargs["parser_factory"] is None:
+        kwargs["parser_factory"] = _custom_markdown_parser_factory
     _old_markdown_init(self, *args, **kwargs)
     self.BLOCKS["fence"] = CustomMarkdownFence
     self.BLOCKS["code_block"] = CustomMarkdownFence
 Markdown.__init__ = _new_markdown_init
+
 
 _old_markdown_block_get_style = MarkdownBlock._get_style
 def _new_markdown_block_get_style(self, style):
