@@ -261,18 +261,37 @@ class ToolCallWidget(Vertical):
         if self.is_expanded:
             self.render_content()
 
+    DISPLAY_NAMES = {
+        "read": "Read",
+        "create": "Create",
+        "edit": "Edit",
+        "bash": "Bash",
+        "glob": "Glob",
+        "grep": "Grep",
+        "list_dir": "ListDir",
+        "ask_user": "AskUser",
+        "skill": "Skill",
+        "manage_task": "ManageTask",
+        "switch_to_action": "SwitchToAction",
+        "subagent": "Subagent",
+        "task": "Task",
+        "view_image": "ViewImage",
+        "call_mcp_tool": "CallMCPTool",
+    }
+
     SYSTEM_TOOLS = {
         "read", "create", "edit", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "switch_to_action",
-        "subagent", "task", "view_image", "call_mcp_tool",
+        "subagent", "task", "view_image",
         "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "SwitchToAction",
-        "Subagent", "Task", "ViewImage", "CallMCPTool"
+        "Subagent", "Task", "ViewImage"
     }
 
     def render_header(self) -> None:
         if self.tool_type in self.SYSTEM_TOOLS:
-            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
+            display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
             tool_name = self.args.get("tool") or "call_mcp_tool"
             server = self.args.get("server") or ""
@@ -293,7 +312,8 @@ class ToolCallWidget(Vertical):
                 escaped_compact = compact.replace("[", "\\[")
                 self.header_label.update(f"⚙ [bold]{self.tool_type}[/bold]({escaped_compact})")
             else:
-                self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
+                display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
+                self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
         if self.is_expandable():
