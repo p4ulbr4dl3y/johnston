@@ -1,4 +1,4 @@
-from rich.markup import escape
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -47,18 +47,17 @@ class SubagentsListScreen(ModalScreen[None]):
         opt_list.clear_options()
         for sess in sessions:
             st = sess.status.lower()
-            if st == "running":
-                status = f"[{THEME_PRIMARY}]running[/]"
-            elif st == "completed":
-                status = f"[{THEME_MUTED}]completed[/]"
-            else:
-                status = f"[{THEME_MUTED}]{st}[/]"
+            status_style = THEME_PRIMARY if st == "running" else THEME_MUTED
 
-            raw_desc = sess.description or sess.prompt or sess.task_id
-            if len(raw_desc) > 38:
-                raw_desc = raw_desc[:35] + "..."
-            desc = escape(raw_desc)
-            opt_list.add_option(f"{desc} | {status}")
+            desc = sess.description or sess.prompt or sess.task_id
+            if len(desc) > 38:
+                desc = desc[:35] + "..."
+
+            opt_text = Text()
+            opt_text.append(desc)
+            opt_text.append(" | ")
+            opt_text.append(st, style=status_style)
+            opt_list.add_option(opt_text)
 
         if sessions:
             if current_highlighted is not None and current_highlighted < len(sessions):
