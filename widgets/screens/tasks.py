@@ -1,3 +1,4 @@
+from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -70,7 +71,7 @@ class TasksListScreen(ModalScreen[None]):
         opt_list.clear_options()
         for t in self.app.background_tasks:
             status = f"[{THEME_PRIMARY}]running[/]" if t.is_running else f"[{THEME_MUTED}]finished[/]"
-            cmd = t.command
+            cmd = escape(t.command)
             if len(cmd) > 38:
                 cmd = cmd[:35] + "..."
             opt_list.add_option(f"{cmd} | {status}")

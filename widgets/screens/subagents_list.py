@@ -1,3 +1,4 @@
+from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
@@ -53,7 +54,7 @@ class SubagentsListScreen(ModalScreen[None]):
             else:
                 status = f"[{THEME_MUTED}]{st}[/]"
 
-            desc = sess.description or sess.prompt or sess.task_id
+            desc = escape(sess.description or sess.prompt or sess.task_id)
             if len(desc) > 38:
                 desc = desc[:35] + "..."
             opt_list.add_option(f"{desc} | {status}")
