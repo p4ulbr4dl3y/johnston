@@ -47,22 +47,25 @@ class ManageSubagentTool(BaseTool):
 
         tracker = SubagentTracker.get_instance()
 
+        curr_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+
         if action == "list":
-            sessions = tracker.sessions
-            if not sessions:
-                return "No subagent sessions registered."
+            show_all = bool(args.get("all", False))
+            target_sessions = list(tracker.sessions.values()) if show_all else tracker.get_sessions_for_session(curr_session_id)
+            if not target_sessions:
+                return "No subagent sessions registered for current chat session."
 
             lines = ["Registered Subagents:"]
-            for sid, sess in sessions.items():
+            for sess in target_sessions:
                 lines.append(
-                    f"• ID: {sid} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
+                    f"• ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
                 )
             return "\n".join(lines)
 
         if not task_id:
             return "Error: 'task_id' parameter is required for action '" + action + "'."
 
-        session = tracker.find_session_by_description_or_id(task_id)
+        session = tracker.find_session_by_description_or_id(task_id, session_id=curr_session_id)
         if not session:
             return f"Error: Subagent session '{task_id}' not found."
 

@@ -54,8 +54,11 @@ class SubagentTool(BaseTool):
             ctx.app.current_tool_widget.args["task_id"] = task_id
             setattr(ctx.app.current_tool_widget, "subagent_task_id", task_id)
 
+        session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
         tracker = SubagentTracker.get_instance()
-        session = tracker.create_session(task_id, description, prompt, subagent_type, run_in_background)
+        session = tracker.create_session(
+            task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
+        )
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 

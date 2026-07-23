@@ -41,6 +41,12 @@ class SubagentViewScreen(ModalScreen[None]):
         chat_view.clear_welcome()
 
         if not self.session:
+            curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+            self.session = SubagentTracker.get_instance().find_session_by_description_or_id(
+                self.task_id_or_desc, session_id=curr_session_id
+            )
+
+        if not self.session:
             async def _no_sess():
                 bm = await chat_view.add_bot_message()
                 bm.content = f"Subagent `{self.task_id_or_desc}` session details not found."

@@ -8,12 +8,21 @@ SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
 
 
 class SubagentSessionData:
-    def __init__(self, task_id: str, description: str, prompt: str, subagent_type: str, background: bool):
+    def __init__(
+        self,
+        task_id: str,
+        description: str,
+        prompt: str,
+        subagent_type: str,
+        background: bool,
+        session_id: Optional[str] = None
+    ):
         self.task_id = task_id
         self.description = description
         self.prompt = prompt
         self.subagent_type = subagent_type
         self.background = background
+        self.session_id = session_id
         self.status = "running"
         self.events: List[Dict[str, Any]] = []
         self.listeners: List[Callable[[Dict[str, Any]], None]] = []
@@ -48,6 +57,7 @@ class SubagentSessionData:
             "prompt": self.prompt,
             "subagent_type": self.subagent_type,
             "background": self.background,
+            "session_id": self.session_id,
             "status": self.status,
             "events": self.events,
             "agent_history": getattr(self.agent, "history", []) if self.agent else []
@@ -61,6 +71,7 @@ class SubagentSessionData:
             prompt=data.get("prompt", ""),
             subagent_type=data.get("subagent_type", "general"),
             background=bool(data.get("background", False)),
+            session_id=data.get("session_id"),
         )
         sess.status = data.get("status", "completed")
         sess.events = data.get("events", [])
@@ -105,9 +116,15 @@ class SubagentTracker:
             pass
 
     def create_session(
-        self, task_id: str, description: str, prompt: str, subagent_type: str, background: bool
+        self,
+        task_id: str,
+        description: str,
+        prompt: str,
+        subagent_type: str,
+        background: bool,
+        session_id: Optional[str] = None
     ) -> SubagentSessionData:
-        sess = SubagentSessionData(task_id, description, prompt, subagent_type, background)
+        sess = SubagentSessionData(task_id, description, prompt, subagent_type, background, session_id=session_id)
         self.sessions[task_id] = sess
         self.save_session(sess)
         return sess
@@ -115,15 +132,25 @@ class SubagentTracker:
     def get_session(self, task_id: str) -> Optional[SubagentSessionData]:
         return self.sessions.get(task_id)
 
-    def find_session_by_description_or_id(self, identifier: str) -> Optional[SubagentSessionData]:
+    def get_sessions_for_session(self, session_id: Optional[str] = None) -> List[SubagentSessionData]:
+        if not session_id:
+            return list(self.sessions.values())
+        return [s for s in self.sessions.values() if not s.session_id or s.session_id == session_id]
+
+    def find_session_by_description_or_id(
+        self, identifier: str, session_id: Optional[str] = None
+    ) -> Optional[SubagentSessionData]:
+        candidates = self.get_sessions_for_session(session_id)
         if not identifier:
-            return list(self.sessions.values())[-1] if self.sessions else None
+            return candidates[-1] if candidates else None
 
         if identifier in self.sessions:
-            return self.sessions[identifier]
+            cand = self.sessions[identifier]
+            if not session_id or not cand.session_id or cand.session_id == session_id:
+                return cand
 
         clean_id = identifier.strip('"\' `')
-        for sess in self.sessions.values():
+        for sess in candidates:
             if sess.task_id == identifier or sess.task_id == clean_id:
                 return sess
             clean_desc = sess.description.strip('"\' `')
@@ -133,6 +160,6 @@ class SubagentTracker:
             if clean_prompt == clean_id or clean_id in clean_prompt or clean_prompt in clean_id:
                 return sess
 
-        if self.sessions:
-            return list(self.sessions.values())[-1]
+        if candidates:
+            return candidates[-1]
         return None
