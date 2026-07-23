@@ -198,8 +198,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task",
-        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task"
+        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task", "manage_subagent",
+        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task", "ManageSubagent"
     }
 
     def is_expandable(self) -> bool:
@@ -294,6 +294,7 @@ class ToolCallWidget(Vertical):
         "skill": "Skill",
         "manage_task": "ManageTask",
         "subagent": "Subagent",
+        "manage_subagent": "ManageSubagent",
         "task": "Task",
         "view_image": "ViewImage",
         "call_mcp_tool": "CallMCPTool",
@@ -301,10 +302,10 @@ class ToolCallWidget(Vertical):
 
     SYSTEM_TOOLS = {
         "read", "create", "edit", "bash", "glob", "grep", "list_dir",
-        "ask_user", "skill", "manage_task",
+        "ask_user", "skill", "manage_task", "manage_subagent",
         "subagent", "task", "view_image",
         "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
-        "AskUser", "Skill", "ManageTask",
+        "AskUser", "Skill", "ManageTask", "ManageSubagent",
         "Subagent", "Task", "ViewImage"
     }
 
