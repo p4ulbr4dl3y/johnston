@@ -10,7 +10,10 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.tracker = SubagentTracker.get_instance()
         self.tracker.sessions.clear()
 
-    def tearDown(self):
+    async def asyncTearDown(self):
+        for sess in list(self.tracker.sessions.values()):
+            if sess.async_task and not sess.async_task.done():
+                sess.async_task.cancel()
         self.tracker.sessions.clear()
 
     def test_tracker_create_and_find(self):

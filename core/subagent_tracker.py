@@ -11,6 +11,8 @@ class SubagentSessionData:
         self.status = "running"
         self.events: List[Dict[str, Any]] = []
         self.listeners: List[Callable[[Dict[str, Any]], None]] = []
+        self.agent: Any = None
+        self.async_task: Any = None
 
     def add_event(self, event: Dict[str, Any]) -> None:
         self.events.append(event)

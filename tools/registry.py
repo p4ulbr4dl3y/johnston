@@ -10,6 +10,7 @@ from tools.edit import EditTool
 from tools.glob import GlobTool
 from tools.grep import GrepTool
 from tools.list_dir import ListDirTool
+from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
 from tools.skill import SkillTool
@@ -29,6 +30,7 @@ TOOL_CLASSES = [
     CallMCPTool,
     ManageTaskTool,
     SubagentTool,
+    ManageSubagentTool,
     ViewImageTool,
 ]
 

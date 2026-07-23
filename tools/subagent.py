@@ -56,6 +56,7 @@ class SubagentTool(BaseTool):
 
         tracker = SubagentTracker.get_instance()
         session = tracker.create_session(task_id, description, prompt, subagent_type, run_in_background)
+        session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 
         # Disable nested Task tool calls (recursion guard)
@@ -138,6 +139,7 @@ class SubagentTool(BaseTool):
                     ctx.trigger_ai_response(msg)
 
             bg_task = asyncio.create_task(_run_bg())
+            session.async_task = bg_task
             bg_obj = BackgroundSubagent(task_id, description, bg_task)
             ctx.add_background_task(bg_obj)
             ctx.notify(f"Subagent launched in background (ID: {task_id})")
