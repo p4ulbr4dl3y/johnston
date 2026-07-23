@@ -28,13 +28,25 @@ def resolve_path(path_str: str | None = None) -> str:
     return os.path.abspath(os.path.expanduser(path_str))
 
 
-def truncate_output(text: str, max_chars: int = 8000, hint: str = "") -> str:
-    """Truncates text safely if it exceeds max_chars, appending an actionable hint for the LLM."""
+def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: bool = True) -> str:
+    """Truncates text safely if it exceeds max_chars, saving full output to log file."""
     if len(text) <= max_chars:
         return text
+
+    log_path = os.path.expanduser("~/.johnston/logs/last_tool.log")
+    if save_log:
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(text)
+        except Exception:
+            pass
+
     truncated = text[:max_chars]
     footer = f"\n... [Output truncated at {max_chars} chars."
-    if hint:
+    if save_log:
+        footer += f" Full output saved to {log_path}. Use Read tool to inspect full log."
+    elif hint:
         footer += f" {hint}"
     footer += "]"
     return truncated + footer
