@@ -127,6 +127,12 @@ class BashTool(BaseTool):
 
         try:
             await asyncio.wait_for(p.wait(), timeout=10.0)
+            if master_fd is not None:
+                try:
+                    os.close(master_fd)
+                except Exception:
+                    pass
+                master_fd = None
             if hasattr(task, "read_task") and task.read_task:
                 try:
                     await asyncio.wait_for(task.read_task, timeout=1.0)
@@ -145,6 +151,12 @@ class BashTool(BaseTool):
                 return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use manage_task to inspect active background tasks."
             else:
                 await p.wait()
+                if master_fd is not None:
+                    try:
+                        os.close(master_fd)
+                    except Exception:
+                        pass
+                    master_fd = None
                 if hasattr(task, "read_task") and task.read_task:
                     try:
                         await asyncio.wait_for(task.read_task, timeout=1.0)

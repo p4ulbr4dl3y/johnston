@@ -133,10 +133,8 @@ class ThinkingWidget(Vertical):
         self.duration_seconds = 0.0
         self.is_thinking = True
         self.is_expanded = False
-        self.spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        self.spinner_idx = 0
 
-        self.header_label = Label("⠋ Thinking...", classes="thinking-header")
+        self.header_label = Label("Thinking...", classes="thinking-header")
         self.md_widget = Markdown("")
 
     def compose(self) -> ComposeResult:
@@ -145,13 +143,6 @@ class ThinkingWidget(Vertical):
 
     def on_mount(self) -> None:
         self.md_widget.display = False
-        self.set_interval(0.08, self.animate_spinner)
-
-    def animate_spinner(self) -> None:
-        if self.is_thinking:
-            self.spinner_idx = (self.spinner_idx + 1) % len(self.spinner_frames)
-            frame = self.spinner_frames[self.spinner_idx]
-            self.header_label.update(f"{frame} Thinking...")
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
