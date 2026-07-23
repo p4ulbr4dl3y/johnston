@@ -7,9 +7,15 @@ from tools.manage_subagent import ManageSubagentTool
 class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
+        import tempfile
+
+        from core.subagent_tracker import SUBAGENTS_DIR
         from tools.context import ToolContext
         ToolContext._instance = None
+        self.old_dir = SUBAGENTS_DIR
+        self.temp_dir = tempfile.TemporaryDirectory()
         self.tracker = SubagentTracker.get_instance()
+        self.tracker.storage_dir = self.temp_dir.name
         self.tracker.sessions.clear()
 
     async def asyncTearDown(self):
@@ -19,6 +25,8 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             if sess.async_task and not sess.async_task.done():
                 sess.async_task.cancel()
         self.tracker.sessions.clear()
+        self.tracker.storage_dir = self.old_dir
+        self.temp_dir.cleanup()
 
     async def test_list_action(self):
         tool = ManageSubagentTool()

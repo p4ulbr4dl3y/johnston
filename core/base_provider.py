@@ -289,12 +289,16 @@ class BaseAgent:
                         else:
                             target = t_name
                     elif t_name in ("manage_task", "ManageTask", "manage_subagent", "ManageSubagent"):
-                        act = args.get("action", "list")
-                        tid = args.get("task_id", "")
-                        if tid:
+                        act = args.get("action") or ""
+                        tid = args.get("task_id") or args.get("subagent_id") or ""
+                        if act and tid:
                             target = f"{act} {tid}"
-                        else:
+                        elif tid:
+                            target = tid
+                        elif act:
                             target = act
+                        else:
+                            target = "list"
                     elif t_name in ("view_image", "ViewImage"):
                         img_path = args.get("path") or args.get("image_path") or ""
                         prompt_val = args.get("prompt") or ""

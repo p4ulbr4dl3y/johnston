@@ -10,11 +10,15 @@ from tools.registry import execute_tool
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        from tools.context import ToolContext
+        ToolContext._instance = None
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
 
     def tearDown(self):
+        from tools.context import ToolContext
+        ToolContext._instance = None
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
 
