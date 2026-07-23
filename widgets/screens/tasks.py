@@ -20,7 +20,7 @@ class TaskConsoleScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Console Output: `{self.bg_task.command}`**")
+            yield Markdown(f"### **Console Output: `{self.bg_task.command}`**", classes="modal-markdown")
             yield RichLog(id="console-log", highlight=True, markup=True)
             yield Label("esc: back to tasks", id="modal-hint")
 
@@ -52,7 +52,7 @@ class TasksListScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Background Tasks Manager**")
+            yield Markdown("### **Background Tasks Manager**", classes="modal-markdown")
             yield OptionList(id="tasks-option-list")
             yield Label("enter: view output • k: kill task • esc: close", id="modal-hint")
 
@@ -69,8 +69,11 @@ class TasksListScreen(ModalScreen[None]):
 
         opt_list.clear_options()
         for t in self.app.background_tasks:
-            status = f"[{THEME_PRIMARY}]Running[/{THEME_PRIMARY}]" if t.is_running else f"[{THEME_MUTED}]Finished[/{THEME_MUTED}]"
-            opt_list.add_option(f"{t.task_id} | {status} | {t.command}")
+            status = f"[{THEME_PRIMARY}]running[/{THEME_PRIMARY}]" if t.is_running else f"[{THEME_MUTED}]finished[/{THEME_MUTED}]"
+            cmd = t.command
+            if len(cmd) > 38:
+                cmd = cmd[:35] + "..."
+            opt_list.add_option(f"{cmd} | {status}")
 
         if current_highlighted is not None and current_highlighted < len(self.app.background_tasks):
             opt_list.highlighted = current_highlighted
@@ -92,6 +95,14 @@ class TasksListScreen(ModalScreen[None]):
             if task.is_running:
                 await task.kill()
                 self.app.notify(f"Task {task.task_id} terminated.")
+                if not task.is_background:
+                    from tools.context import ToolContext
+                    out = task.get_formatted_output()
+                    msg = (
+                        f"[System Notification] Background task '{task.command}' (ID: {task.task_id}) was killed by user.\n"
+                        f"<task_result>\n{out.strip() or '[Task terminated by user]'}\n</task_result>"
+                    )
+                    ToolContext(self.app).trigger_ai_response(msg)
                 self.update_tasks_list()
             else:
                 self.app.notify("Task is already finished.", severity="warning")
