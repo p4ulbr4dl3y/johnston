@@ -57,6 +57,31 @@ def get_project_instructions_snippet() -> str:
     return "\n\n".join(found_snippets)
 
 
+def get_rules_snippet() -> str:
+    """Reads rules from ~/.johnston/rules and <cwd>/.rules."""
+    rules = []
+    dirs = [
+        os.path.expanduser("~/.johnston/rules"),
+        os.path.join(os.getcwd(), ".rules"),
+    ]
+    for d in dirs:
+        if not os.path.isdir(d):
+            continue
+        for fname in sorted(os.listdir(d)):
+            fpath = os.path.join(d, fname)
+            if os.path.isfile(fpath) and not fname.startswith("."):
+                name = os.path.splitext(fname)[0]
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read().strip()
+                    if content:
+                        rules.append(f"[RULE: {name}]\n{content}")
+                except Exception:
+                    pass
+
+    return "\n\n".join(rules)
+
+
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
 
 Core Principles:
@@ -104,10 +129,13 @@ class PromptBuilder:
         env_block = "\n".join(env_lines)
 
         project_snippet = get_project_instructions_snippet()
+        rules_snippet = get_rules_snippet()
 
         sys_prompt = f"{self.base_system_prompt}\n\n{env_block}"
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
+        if rules_snippet:
+            sys_prompt = f"{sys_prompt}\n\n[USER RULES]\n{rules_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if mcp_snippet:

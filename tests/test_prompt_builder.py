@@ -53,6 +53,24 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertNotIn("Edit", exp_tool_names)
         self.assertIn("Read", exp_tool_names)
 
+    def test_build_system_prompt_includes_user_rules(self):
+        import os
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rules_dir = os.path.join(tmpdir, ".rules")
+            os.makedirs(rules_dir)
+            with open(os.path.join(rules_dir, "custom_rule.md"), "w") as f:
+                f.write("Always use pytest")
+
+            with patch("os.getcwd", return_value=tmpdir):
+                builder = PromptBuilder("Test", [], mode="action")
+                prompt = builder.build_system_prompt()
+                self.assertIn("[USER RULES]", prompt)
+                self.assertIn("[RULE: custom_rule]", prompt)
+                self.assertIn("Always use pytest", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
