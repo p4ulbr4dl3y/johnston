@@ -1,12 +1,11 @@
 """
 NVIDIA NIM Provider configuration
 """
-try:
-    from core.base_provider import BaseAgent
-except ImportError:
-    from base_provider import BaseAgent
-
 import os
+
+from core.base_provider import BaseAgent
+from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
+from tools.registry import get_default_tools
 
 NAME = "NVIDIA NIM"
 KEY = "nvidia"
@@ -16,17 +15,8 @@ BASE_URL = "https://integrate.api.nvidia.com/v1"
 MODEL = "meta/codellama-70b"
 API_KEY = os.getenv("NVIDIA_API_KEY", "")
 
-try:
-    from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
-    SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
-except ImportError:
-    SYSTEM_PROMPT = "You are Johnston, an expert AI software engineer."
-
-try:
-    from tools.registry import get_default_tools
-    TOOLS = get_default_tools()
-except ImportError:
-    TOOLS = None
+SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
+TOOLS = get_default_tools()
 
 
 class Agent(BaseAgent):

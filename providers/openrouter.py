@@ -1,12 +1,11 @@
 """
 OpenRouter Provider configuration
 """
-try:
-    from core.base_provider import BaseAgent
-except ImportError:
-    from base_provider import BaseAgent
-
 import os
+
+from core.base_provider import BaseAgent
+from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
+from tools.registry import get_default_tools
 
 NAME = "OpenRouter"
 KEY = "openrouter"
@@ -16,17 +15,8 @@ BASE_URL = "https://openrouter.ai/api/v1"
 MODEL = "openai/o3-mini"
 API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
-try:
-    from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
-    SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
-except ImportError:
-    SYSTEM_PROMPT = "You are Johnston, an expert AI software engineer."
-
-try:
-    from tools.registry import get_default_tools
-    TOOLS = get_default_tools()
-except ImportError:
-    TOOLS = None
+SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
+TOOLS = get_default_tools()
 
 
 class Agent(BaseAgent):

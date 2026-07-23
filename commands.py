@@ -43,10 +43,7 @@ class NewCommand(BaseCommand):
         chat_view = app.query_one(ChatView)
         await chat_view.remove_children()
         chat_view.check_welcome()
-        if hasattr(app.agent, "clear_history"):
-            app.agent.clear_history()
-        elif hasattr(app.agent, "history"):
-            app.agent.history = []
+        app.agent.clear_history()
         app.refresh_status_footer()
         app.notify("New chat session created!")
 
@@ -423,22 +420,6 @@ class CopyCommand(BaseCommand):
         chat_input.focus()
 
 
-class BashModeCommand(BaseCommand):
-    name = "/bash"
-    description = "Toggle direct Bash mode"
-
-    async def execute(self, app) -> None:
-        curr = getattr(app, "bash_mode", False)
-        new_mode = not curr
-        app.bash_mode = new_mode
-        if hasattr(app, "refresh_status_footer"):
-            app.refresh_status_footer()
-        if new_mode:
-            app.notify("Bash mode enabled (! prefix optional)")
-        else:
-            app.notify("Bash mode disabled")
-
-
 class TestModalCommand(BaseCommand):
     name = "/testmodal"
     description = "Spawn bash confirm modal for UI testing"
@@ -485,7 +466,6 @@ COMMAND_CLASSES = [
     DebugCommand,
     OrchestratorCommand,
     ModeCommand,
-    BashModeCommand,
     PasteCommand,
     CopyCommand,
     TestModalCommand,

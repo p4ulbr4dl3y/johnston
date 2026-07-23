@@ -284,20 +284,13 @@ class JohnstonChatApp(App):
             self.notify(f"Agent switched: {event.value}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Handle input, slash commands (/help, /new), and direct shell execution (!cmd or bash_mode)"""
+        """Handle input and slash commands (/help, /new)"""
         user_text = event.value.strip()
         if not user_text:
             return
 
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
-
-        is_bash_mode = getattr(self, "bash_mode", False)
-        if is_bash_mode or user_text.startswith("!"):
-            cmd = user_text.lstrip("!").strip()
-            if cmd:
-                self.execute_direct_bash_command(cmd)
-                return
 
         if user_text.startswith("/"):
             processed = await handle_slash_command(self, user_text)
@@ -306,24 +299,6 @@ class JohnstonChatApp(App):
             return
 
         self.generate_ai_response(user_text)
-
-    @work(exclusive=False, thread=False)
-    async def execute_direct_bash_command(self, cmd: str) -> None:
-        """Executes direct user bash command without LLM call, appending tool widget to chat and history."""
-        from tools.bash import BashTool
-        chat_view = self.query_one(ChatView)
-
-        tool_widget = await chat_view.add_tool_call("bash", cmd)
-        self.current_tool_widget = tool_widget
-
-        res = await BashTool().execute({"command": cmd, "skip_confirm": True, "no_background": True}, app=self)
-        tool_widget.set_result(res)
-
-        if hasattr(self, "agent") and self.agent and hasattr(self.agent, "history"):
-            self.agent.history.append({"role": "user", "content": f"User executed manual shell command: {cmd}"})
-            self.agent.history.append({"role": "assistant", "content": f"[Executed Bash command: {cmd}]\nResult:\n{res}"})
-
-        self.save_current_session()
 
     def prepare_prompt_with_attachments(self, user_text: str):
         """Search for @path/to/file and raw paths in user_text and attach text files and images"""
