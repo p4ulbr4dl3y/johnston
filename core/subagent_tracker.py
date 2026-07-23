@@ -36,7 +36,9 @@ class SubagentSessionData:
                 cb(event)
             except Exception:
                 pass
-        SubagentTracker.get_instance().save_session(self)
+        etype = event.get("type", "")
+        if etype not in ("bot_chunk", "bot_delta", "thinking_delta"):
+            SubagentTracker.get_instance().save_session(self)
 
     def add_listener(self, cb: Callable[[Dict[str, Any]], None]) -> None:
         if cb not in self.listeners:
@@ -49,6 +51,7 @@ class SubagentSessionData:
     def finish(self, status: str = "completed", error_msg: str = "") -> None:
         self.status = status
         self.add_event({"type": "status_change", "status": status, "error": error_msg})
+        SubagentTracker.get_instance().save_session(self)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
