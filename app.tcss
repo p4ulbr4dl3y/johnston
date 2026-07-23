@@ -383,6 +383,12 @@ ModalScreen {
     display: none;
 }
 
+BashConfirmScreen MarkdownFence {
+    border-left: none;
+    padding: 0;
+    margin: 0;
+}
+
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus {
     height: auto;
