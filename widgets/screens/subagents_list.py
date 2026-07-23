@@ -54,9 +54,10 @@ class SubagentsListScreen(ModalScreen[None]):
             else:
                 status = f"[{THEME_MUTED}]{st}[/]"
 
-            desc = escape(sess.description or sess.prompt or sess.task_id)
-            if len(desc) > 38:
-                desc = desc[:35] + "..."
+            raw_desc = sess.description or sess.prompt or sess.task_id
+            if len(raw_desc) > 38:
+                raw_desc = raw_desc[:35] + "..."
+            desc = escape(raw_desc)
             opt_list.add_option(f"{desc} | {status}")
 
         if sessions:
