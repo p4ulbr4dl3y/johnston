@@ -147,49 +147,41 @@ class ToolCallWidget(Vertical):
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
 
-    def _format_compact_mcp_args(self, args: dict) -> tuple[str, str, str]:
-        server = args.get("server", "")
-        tool = args.get("tool", "")
-        mcp_args = args.get("arguments")
-        if not isinstance(mcp_args, dict):
-            mcp_args = {}
-
-        if not mcp_args:
-            return tool or "CallMCPTool", server, f"{{server: \"{server}\"}}" if server else "{}"
+    def _format_compact_dict(self, d: dict) -> str:
+        if not isinstance(d, dict) or not d:
+            return ""
 
         items = []
         total_len = 0
         overflow = False
-        for k, v in mcp_args.items():
+        for k, v in d.items():
             k_str = str(k)
             if len(k_str) > 20:
                 k_str = k_str[:17] + "..."
 
             if isinstance(v, str):
                 v_clean = v.replace("\n", "\\n")
-                if len(v_clean) > 30:
-                    v_clean = v_clean[:27] + "..."
+                if len(v_clean) > 35:
+                    v_clean = v_clean[:32] + "..."
                 v_str = f'"{v_clean}"'
             else:
                 v_str = json.dumps(v, ensure_ascii=False)
-                if len(v_str) > 30:
-                    v_str = v_str[:27] + "..."
+                if len(v_str) > 35:
+                    v_str = v_str[:32] + "..."
 
             item_str = f"{k_str}: {v_str}"
-            if total_len + len(item_str) > 60:
+            if total_len + len(item_str) > 70:
                 overflow = True
                 break
             items.append(item_str)
             total_len += len(item_str) + 2
 
         if overflow and items:
-            compact_str = "{" + ", ".join(items) + ", ...}"
+            return "{" + ", ".join(items) + ", ...}"
         elif items:
-            compact_str = "{" + ", ".join(items) + "}"
+            return "{" + ", ".join(items) + "}"
         else:
-            compact_str = "{...}"
-
-        return tool or "CallMCPTool", server, compact_str
+            return "{...}"
 
     def compose(self) -> ComposeResult:
         yield self.header_label
@@ -215,9 +207,24 @@ class ToolCallWidget(Vertical):
 
     def render_header(self) -> None:
         if self.tool_type == "CallMCPTool":
-            tool_name, server_name, compact_str = self._format_compact_mcp_args(self.args)
-            escaped_compact = compact_str.replace("[", "\\[")
+            tool_name = self.args.get("tool") or "CallMCPTool"
+            server = self.args.get("server") or ""
+            mcp_args = self.args.get("arguments")
+            if not isinstance(mcp_args, dict):
+                mcp_args = {}
+
+            compact = self._format_compact_dict(mcp_args)
+            if not compact:
+                compact = f"{{server: \"{server}\"}}" if server else "{}"
+            escaped_compact = compact.replace("[", "\\[")
             self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
+        elif self.args and isinstance(self.args, dict) and self.tool_type not in ("Read", "Create", "Edit", "Bash"):
+            compact = self._format_compact_dict(self.args)
+            if compact:
+                escaped_compact = compact.replace("[", "\\[")
+                self.header_label.update(f"⚙ [bold]{self.tool_type}[/bold]({escaped_compact})")
+            else:
+                self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
         else:
             self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
