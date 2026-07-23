@@ -28,7 +28,7 @@ class CustomMarkdownFence(MarkdownFence):
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "code"
-        copy_btn = Button("Copy", classes="fence-copy-btn")
+        copy_btn = Button("copy", classes="fence-copy-btn")
         copy_btn.can_focus = False
         with Horizontal(classes="fence-header"):
             yield Label(f" {lang_str}", classes="fence-lang")
