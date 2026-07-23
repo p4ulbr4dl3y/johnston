@@ -323,6 +323,22 @@ class ChatInput(TextArea):
         return False
 
     def _on_key(self, event: events.Key) -> None:
+        # Toggle Bash mode on typing ! into empty chat input
+        if (event.character == "!" or event.key in ("!", "exclamation", "shift+exclamation")) and not self.text.strip():
+            event.prevent_default()
+            event.stop()
+            if self.app:
+                curr = getattr(self.app, "bash_mode", False)
+                new_mode = not curr
+                self.app.bash_mode = new_mode
+                if hasattr(self.app, "refresh_status_footer"):
+                    self.app.refresh_status_footer()
+                if new_mode:
+                    self.app.notify("Bash mode enabled (! prefix optional)")
+                else:
+                    self.app.notify("Bash mode disabled")
+            return
+
         if event.key in ("ctrl+v", "cmd+v", "ctrl+м", "ctrl+m"):
             if self.try_paste_clipboard_image():
                 event.prevent_default()

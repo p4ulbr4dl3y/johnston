@@ -1,4 +1,3 @@
-from typing import Dict, Type
 
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
@@ -415,32 +414,52 @@ class CopyCommand(BaseCommand):
         chat_input.focus()
 
 
-COMMAND_REGISTRY: Dict[str, Type[BaseCommand]] = {
-    cmd.name: cmd for cmd in [
-        HelpCommand,
-        NewCommand,
-        ConnectCommand,
-        ProviderCommand,
-        ModelsCommand,
-        RewindCommand,
-        ResumeCommand,
-        TasksCommand,
-        SkillsCommand,
-        MCPCommand,
-        InitCommand,
-        CompactCommand,
-        ActionCommand,
-        ExploreCommand,
-        PlanCommand,
-        BuildCommand,
-        CodeCommand,
-        AskCommand,
-        DebugCommand,
-        OrchestratorCommand,
-        ModeCommand,
-        PasteCommand,
-        CopyCommand,
-    ]
+class BashModeCommand(BaseCommand):
+    name = "/bash"
+    description = "Toggle direct Bash mode"
+
+    async def execute(self, app) -> None:
+        curr = getattr(app, "bash_mode", False)
+        new_mode = not curr
+        app.bash_mode = new_mode
+        if hasattr(app, "refresh_status_footer"):
+            app.refresh_status_footer()
+        if new_mode:
+            app.notify("Bash mode enabled (! prefix optional)")
+        else:
+            app.notify("Bash mode disabled")
+
+
+COMMAND_CLASSES = [
+    HelpCommand,
+    NewCommand,
+    ConnectCommand,
+    ProviderCommand,
+    ModelsCommand,
+    RewindCommand,
+    ResumeCommand,
+    TasksCommand,
+    SkillsCommand,
+    MCPCommand,
+    InitCommand,
+    CompactCommand,
+    ActionCommand,
+    ExploreCommand,
+    PlanCommand,
+    BuildCommand,
+    CodeCommand,
+    AskCommand,
+    DebugCommand,
+    OrchestratorCommand,
+    ModeCommand,
+    BashModeCommand,
+    PasteCommand,
+    CopyCommand,
+]
+
+COMMAND_REGISTRY = {
+    cls.name: cls
+    for cls in COMMAND_CLASSES
 }
 
 async def handle_slash_command(app, command_text: str) -> bool:
