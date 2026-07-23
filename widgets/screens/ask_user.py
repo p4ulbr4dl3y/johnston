@@ -20,24 +20,29 @@ class QuestionScreen(ModalScreen[dict]):
         self.num_text = num_text
         self.question_text = question_text
         self.title = f"{num_text}\n\n{question_text}"
-        self.raw_options = options
-        self.options = options + ["Write-in..."]
+        self.raw_options = options or []
+        self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
         self.current_val = current_val
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown(self.title, classes="modal-markdown")
             yield OptionList(id="options-list")
-            yield Input(placeholder="Type custom response here and press Enter...", id="write-in-input")
+            yield Input(placeholder="Type response here and press Enter...", id="write-in-input")
 
     def on_mount(self) -> None:
-        try:
-            input_field = self.query_one("#write-in-input", Input)
-            input_field.display = False
-        except Exception:
-            pass
-
         opt_list = self.query_one("#options-list", OptionList)
+        input_field = self.query_one("#write-in-input", Input)
+
+        if not self.raw_options:
+            opt_list.display = False
+            input_field.display = True
+            if self.current_val:
+                input_field.value = self.current_val
+            input_field.focus()
+            return
+
+        input_field.display = False
         opt_list.clear_options()
         for opt in self.options:
             opt_list.add_option(opt)
@@ -48,25 +53,18 @@ class QuestionScreen(ModalScreen[dict]):
                 highlight_idx = self.raw_options.index(self.current_val)
             else:
                 highlight_idx = len(self.options) - 1
-                try:
-                    input_field = self.query_one("#write-in-input", Input)
-                    input_field.value = self.current_val
-                    input_field.display = True
-                except Exception:
-                    pass
+                input_field.value = self.current_val
+                input_field.display = True
 
         opt_list.highlighted = highlight_idx
 
         if highlight_idx == len(self.options) - 1:
-            try:
-                self.query_one("#write-in-input", Input).focus()
-            except Exception:
-                opt_list.focus()
+            input_field.focus()
         else:
             opt_list.focus()
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        if not self.is_mounted:
+        if not self.is_mounted or not self.raw_options:
             return
         try:
             input_field = self.query_one("#write-in-input", Input)
@@ -79,6 +77,8 @@ class QuestionScreen(ModalScreen[dict]):
             pass
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if not self.raw_options:
+            return
         try:
             if event.option_index != len(self.options) - 1:
                 self.submit_answer()
@@ -91,7 +91,7 @@ class QuestionScreen(ModalScreen[dict]):
         self.submit_answer()
 
     def on_key(self, event: events.Key) -> None:
-        if event.key == "up":
+        if event.key == "up" and self.raw_options:
             try:
                 input_field = self.query_one("#write-in-input", Input)
                 if self.focused is input_field:
@@ -106,11 +106,11 @@ class QuestionScreen(ModalScreen[dict]):
         self.dismiss({"status": "cancelled", "answer": "Cancelled"})
 
     def action_go_back(self) -> None:
-        if self.focused is not self.query_one("#write-in-input"):
+        if self.focused is not self.query_one("#write-in-input") or not self.raw_options:
             self.dismiss({"status": "back", "answer": ""})
 
     def action_go_next(self) -> None:
-        if self.focused is not self.query_one("#write-in-input"):
+        if self.focused is not self.query_one("#write-in-input") or not self.raw_options:
             self.submit_answer(status="next")
 
     def action_quit(self) -> None:
@@ -118,14 +118,17 @@ class QuestionScreen(ModalScreen[dict]):
 
     def submit_answer(self, status: str = "next") -> None:
         try:
-            opt_list = self.query_one("#options-list", OptionList)
-            idx = opt_list.highlighted
-
-            if idx == len(self.options) - 1:
+            if not self.raw_options:
                 val = self.query_one("#write-in-input", Input).value.strip()
-                answer = val if val else "Custom answer"
+                answer = val if val else "No response"
             else:
-                answer = self.options[idx] if idx is not None else ""
+                opt_list = self.query_one("#options-list", OptionList)
+                idx = opt_list.highlighted
+                if idx == len(self.options) - 1:
+                    val = self.query_one("#write-in-input", Input).value.strip()
+                    answer = val if val else "Custom answer"
+                else:
+                    answer = self.options[idx] if idx is not None else ""
 
             self.dismiss({"status": status, "answer": answer})
         except Exception as e:
