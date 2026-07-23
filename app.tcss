@@ -378,6 +378,11 @@ ModalScreen {
     margin: 1 0;
 }
 
+#modal-dialog MarkdownFence .fence-header,
+.modal-markdown MarkdownFence .fence-header {
+    display: none;
+}
+
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus {
     height: auto;
