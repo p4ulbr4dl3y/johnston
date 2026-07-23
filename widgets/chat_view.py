@@ -33,7 +33,7 @@ class CustomMarkdownFence(MarkdownFence):
         copy_btn = Button("copy", classes="fence-copy-btn")
         copy_btn.can_focus = False
         with Horizontal(classes="fence-header"):
-            yield Label(f" {lang_str}", classes="fence-lang")
+            yield Label(lang_str, classes="fence-lang")
             yield copy_btn
         yield Label(self._highlighted_code, id="code-content", expand=True)
 
