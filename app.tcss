@@ -1,9 +1,10 @@
-/* Dynamic True Color Inversion Selection (Original text color becomes selection bg) */
+/* Text Selection - Uniform High Contrast Monochrome Slate */
 .screen--selection,
 .text-area--selection,
 Screen > .screen--selection,
 TextArea > .text-area--selection {
-    text-style: reverse;
+    background: #3f3f46;
+    color: #ffffff;
 }
 
 Screen {
