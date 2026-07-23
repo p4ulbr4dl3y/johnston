@@ -42,6 +42,8 @@ class JohnstonChatApp(App):
         self.current_session_id = self.sm.generate_session_id()
         self.selection_copy_active = False
         self.background_tasks = []
+        self.message_queue = []
+        self.is_generating = False
 
     def action_toggle_mode(self) -> None:
         """Toggle agent mode (Action / Explore)"""
@@ -298,7 +300,11 @@ class JohnstonChatApp(App):
                 self.notify("Unknown command", severity="warning")
             return
 
-        self.generate_ai_response(user_text)
+        if self.is_generating:
+            self.message_queue.append((user_text, True))
+            self.notify("Message added to queue")
+        else:
+            self.generate_ai_response(user_text)
 
     def prepare_prompt_with_attachments(self, user_text: str):
         """Search for @path/to/file and raw paths in user_text and attach text files and images"""
@@ -362,6 +368,7 @@ class JohnstonChatApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Stream AI response generation with cancellation support via Esc"""
+        self.is_generating = True
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
@@ -426,6 +433,7 @@ class JohnstonChatApp(App):
                     await chat_view.add_compaction_divider(val1 or "Session Compacted")
                     self.refresh_status_footer()
         except (asyncio.CancelledError, RuntimeError):
+            self.message_queue.clear()
             if thinking_widget:
                 try:
                     duration = time.time() - start_time
@@ -447,6 +455,7 @@ class JohnstonChatApp(App):
                 except Exception:
                     pass
         finally:
+            self.is_generating = False
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
                 footer.set_generating(False)
@@ -457,6 +466,9 @@ class JohnstonChatApp(App):
                     self.save_current_session()
             except Exception:
                 pass
+            if self.message_queue and getattr(self, "is_app_active", True):
+                next_text, next_show = self.message_queue.pop(0)
+                self.generate_ai_response(next_text, show_in_ui=next_show)
 
     def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background bash command finishes"""
@@ -465,7 +477,10 @@ class JohnstonChatApp(App):
         try:
             self.notify(f"Background command completed (TID: {task_id})")
             msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
-            self.generate_ai_response(msg, show_in_ui=False)
+            if self.is_generating:
+                self.message_queue.append((msg, False))
+            else:
+                self.generate_ai_response(msg, show_in_ui=False)
         except Exception:
             pass
 

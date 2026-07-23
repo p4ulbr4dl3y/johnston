@@ -442,6 +442,75 @@ class SubagentCommand(SubagentsCommand):
     name = "/subagent"
 
 
+class DemoCommand(BaseCommand):
+    name = "/demo"
+    description = "Showcase all Markdown styles and UI widgets"
+
+    async def execute(self, app) -> None:
+        chat_view = app.query_one(ChatView)
+        await chat_view.add_user_message("/demo — Showcase all Markdown & UI styles")
+
+        tw = await chat_view.add_thinking_widget("Thinking about layout aesthetics...")
+        tw.finish_thinking(0.4, "Analyzing Markdown CSS tokens, H1-H6 headers, code block syntax themes, and table borders.")
+
+        await chat_view.add_tool_call("read", "/Users/yegor/testing/snake.html", result_text="1 | <!DOCTYPE html> ...")
+        await chat_view.add_tool_call("edit", "core/config.py", result_text="Updated styles")
+        await chat_view.add_tool_call("bash", "uv run pytest", result_text="107 passed in 0.9s")
+
+        bot_msg = await chat_view.add_bot_message()
+        bot_msg.content = (
+            "# Heading 1 (H1)\n"
+            "## Heading 2 (H2)\n"
+            "### Heading 3 (H3)\n"
+            "#### Heading 4 (H4)\n"
+            "##### Heading 5 (H5)\n\n"
+            "---\n\n"
+            "### Text Formatting\n"
+            "Standard text. **Bold text**. *Italic text*. ~~Strikethrough~~. Inline code: `const x = 42;`.\n\n"
+            "---\n\n"
+            "### Lists\n"
+            "* Bullet item 1\n"
+            "* Bullet item 2\n"
+            "  * Nested item A\n"
+            "  * Nested item B\n\n"
+            "1. Numbered item 1\n"
+            "2. Numbered item 2\n\n"
+            "- [x] Completed task\n"
+            "- [ ] Pending task\n\n"
+            "---\n\n"
+            "### Blockquote\n"
+            "> This is a blockquote element in Johnston Chat UI.\n\n"
+            "---\n\n"
+            "### Table\n"
+            "| Element | Type | Status |\n"
+            "| :--- | :---: | ---: |\n"
+            "| H1..H6 | Header | Active |\n"
+            "| Table | Layout | Active |\n"
+            "| Code | Highlight | Active |\n\n"
+            "---\n\n"
+            "### Code Blocks\n"
+            "```python\n"
+            "def check_styles():\n"
+            "    return 'Markdown ready!'\n"
+            "```\n\n"
+            "```bash\n"
+            "uv run python -m unittest\n"
+            "```\n"
+        )
+        await chat_view.add_compaction_divider("Session Compacted Sample")
+        app.notify("Markdown & UI showcase rendered!")
+
+
+class MarkdownCommand(DemoCommand):
+    name = "/markdown"
+    description = "Showcase all Markdown styles (alias for /demo)"
+
+
+class StylesCommand(DemoCommand):
+    name = "/styles"
+    description = "Showcase all UI styles (alias for /demo)"
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -469,6 +538,9 @@ COMMAND_CLASSES = [
     PasteCommand,
     CopyCommand,
     TestModalCommand,
+    DemoCommand,
+    MarkdownCommand,
+    StylesCommand,
 ]
 
 COMMAND_REGISTRY = {

@@ -35,6 +35,16 @@ class CustomMarkdownFence(MarkdownFence):
             yield copy_btn
         yield Label(self._highlighted_code, id="code-content", expand=True)
 
+    def set_content(self, content: Any) -> None:
+        self._content = content
+        try:
+            self.query_one("#code-content", Label).update(content)
+        except Exception:
+            pass
+
+    def render(self):
+        return ""
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if "fence-copy-btn" in event.button.classes:
             try:
@@ -52,6 +62,13 @@ HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
 
 Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence
+
+_old_markdown_init = Markdown.__init__
+def _new_markdown_init(self, *args, **kwargs):
+    _old_markdown_init(self, *args, **kwargs)
+    self.BLOCKS["fence"] = CustomMarkdownFence
+    self.BLOCKS["code_block"] = CustomMarkdownFence
+Markdown.__init__ = _new_markdown_init
 
 
 def safe_update_markdown(widget: Markdown, content: str) -> None:

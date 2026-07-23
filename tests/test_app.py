@@ -27,7 +27,7 @@ async def test_chat_app_flow():
         for msg in ["First message", "Second message", "Third message"]:
             chat_input.load_text(msg)
             await pilot.press("enter")
-            await pilot.pause(0.5)
+            await pilot.pause(1.5)
 
         # 3. Test /rewind
         chat_input.load_text("/rewind")
@@ -52,14 +52,14 @@ async def test_chat_app_flow():
         assert isinstance(app.screen, ResumeScreen)
 
         await pilot.press("escape")
-        await pilot.pause(0.2)
+        await pilot.pause(0.5)
         assert not isinstance(app.screen, ResumeScreen)
         print("✓ ResumeScreen tests passed cleanly!")
 
         # 5. Test /provider and provider search
         chat_input.load_text("/provider")
         await pilot.press("enter")
-        await pilot.pause(0.2)
+        await pilot.pause(0.5)
         assert isinstance(app.screen, ProviderScreen)
         assert app.screen.show_search is True
         await pilot.press("o", "p", "e", "n")
@@ -125,5 +125,16 @@ async def test_chat_app_flow():
         assert chat_input.pasted_texts == {}
         print("✓ Atomic tag deletion tests passed cleanly!")
 
+async def test_message_queue():
+    app = JohnstonChatApp()
+    app.is_generating = True
+    class FakeEvent:
+        value = "Queued message"
+    await app.on_chat_input_submitted(FakeEvent())
+    assert len(app.message_queue) == 1
+    assert app.message_queue[0] == ("Queued message", True)
+    print("✓ Message queue tests passed cleanly!")
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
+    asyncio.run(test_message_queue())
