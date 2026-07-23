@@ -1,4 +1,5 @@
 import difflib
+import json
 import os
 import re
 from typing import Any
@@ -125,7 +126,7 @@ class ToolCallWidget(Vertical):
     can_focus = False
     ALLOW_SELECT = False
 
-    EXPANDABLE_TOOLS = {"Create", "Edit", "Bash", "Read"}
+    EXPANDABLE_TOOLS = {"Create", "Edit", "Bash", "Read", "CallMCPTool"}
 
     def is_expandable(self) -> bool:
         return self.tool_type in self.EXPANDABLE_TOOLS
@@ -145,6 +146,50 @@ class ToolCallWidget(Vertical):
         header_cls = "tool-header tool-header-expandable" if self.is_expandable() else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
+
+    def _format_compact_mcp_args(self, args: dict) -> tuple[str, str, str]:
+        server = args.get("server", "")
+        tool = args.get("tool", "")
+        mcp_args = args.get("arguments")
+        if not isinstance(mcp_args, dict):
+            mcp_args = {}
+
+        if not mcp_args:
+            return tool or "CallMCPTool", server, f"{{server: \"{server}\"}}" if server else "{}"
+
+        items = []
+        total_len = 0
+        overflow = False
+        for k, v in mcp_args.items():
+            k_str = str(k)
+            if len(k_str) > 20:
+                k_str = k_str[:17] + "..."
+
+            if isinstance(v, str):
+                v_clean = v.replace("\n", "\\n")
+                if len(v_clean) > 30:
+                    v_clean = v_clean[:27] + "..."
+                v_str = f'"{v_clean}"'
+            else:
+                v_str = json.dumps(v, ensure_ascii=False)
+                if len(v_str) > 30:
+                    v_str = v_str[:27] + "..."
+
+            item_str = f"{k_str}: {v_str}"
+            if total_len + len(item_str) > 60:
+                overflow = True
+                break
+            items.append(item_str)
+            total_len += len(item_str) + 2
+
+        if overflow and items:
+            compact_str = "{" + ", ".join(items) + ", ...}"
+        elif items:
+            compact_str = "{" + ", ".join(items) + "}"
+        else:
+            compact_str = "{...}"
+
+        return tool or "CallMCPTool", server, compact_str
 
     def compose(self) -> ComposeResult:
         yield self.header_label
@@ -169,7 +214,12 @@ class ToolCallWidget(Vertical):
             self.render_content()
 
     def render_header(self) -> None:
-        self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
+        if self.tool_type == "CallMCPTool":
+            tool_name, server_name, compact_str = self._format_compact_mcp_args(self.args)
+            escaped_compact = compact_str.replace("[", "\\[")
+            self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
+        else:
+            self.header_label.update(f"⚙ [bold]{self.icon_name}[/bold]({self.target})")
 
     def on_click(self, event) -> None:
         if self.is_expandable():
@@ -489,6 +539,31 @@ class ToolCallWidget(Vertical):
                 if not output_text.strip():
                     output_text = "(Running command...)"
                 self.content_widget.update(output_text)
+            elif self.tool_type == "CallMCPTool":
+                server = self.args.get("server", "")
+                tool = self.args.get("tool", "")
+                mcp_args = self.args.get("arguments", {})
+                display_parts = [f"Server: {server}", f"Tool: {tool}"]
+                if mcp_args:
+                    try:
+                        args_json = json.dumps(mcp_args, indent=2, ensure_ascii=False)
+                        display_parts.append(f"Arguments:\n{args_json}")
+                    except Exception:
+                        display_parts.append(f"Arguments: {mcp_args}")
+                if self.result_text:
+                    display_parts.append(f"\nResult:\n{self.result_text.strip()}")
+                full_display = "\n".join(display_parts)
+                try:
+                    syntax = Syntax(
+                        full_display,
+                        "json",
+                        theme="one-dark",
+                        word_wrap=True,
+                        background_color="#18181b"
+                    )
+                    self.content_widget.update(syntax)
+                except Exception:
+                    self.content_widget.update(full_display)
             else:
                 self.content_widget.update(self.result_text or "(No result)")
         except Exception:

@@ -459,13 +459,13 @@ class MCPManager:
                     params = fn.get("parameters", {})
                     props = params.get("properties", {})
                     reqs = params.get("required", [])
-                    
+
                     param_parts = []
                     for prop_name, prop_info in props.items():
                         p_type = prop_info.get("type", "any")
                         p_req = "*" if prop_name in reqs else ""
                         param_parts.append(f"{prop_name}{p_req}: {p_type}")
-                    
+
                     param_sig = f"({', '.join(param_parts)})"
                     desc_str = f" — {desc}" if desc else ""
                     lazy_lines.append(f"- {fn.get('name')}{param_sig}{desc_str}")
