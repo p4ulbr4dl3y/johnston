@@ -294,12 +294,21 @@ class BaseAgent:
                             target = img_path
                         else:
                             target = t_name
+                    elif "query" in args or "prompt" in args:
+                        q_val = args.get("query") or args.get("prompt") or ""
+                        if isinstance(q_val, str) and q_val:
+                            target = f'"{q_val}"'
+                        else:
+                            target = t_name
                     else:
                         target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
                             target = args["questions"][0].get("question_text", "")
                         if not target:
-                            str_args = [str(v) for v in args.values() if isinstance(v, (str, int, float)) and v]
+                            # Prioritize string values over numbers/booleans to avoid using numeric limits (e.g. num_results=1) as target
+                            str_args = [str(v) for v in args.values() if isinstance(v, str) and v]
+                            if not str_args:
+                                str_args = [str(v) for v in args.values() if isinstance(v, (int, float)) and v]
                             if str_args:
                                 target = str_args[0]
                         if not target:
