@@ -21,7 +21,6 @@ class AskUserTool(BaseTool):
                         "items": {
                             "type": "object",
                             "properties": {
-                                "num_text": {"type": "string", "description": "Header text (e.g. ### Question 1/3)"},
                                 "question_text": {"type": "string", "description": "Main question"},
                                 "options": {
                                     "type": "array",
@@ -55,7 +54,7 @@ class AskUserTool(BaseTool):
                 while q_idx <= len(questions_list):
                     if q_idx < len(questions_list):
                         q = questions_list[q_idx]
-                        num_text = q.get("num_text") or f"### **Question {q_idx+1}/{len(questions_list)}**"
+                        num_text = f"### **Question {q_idx+1}/{len(questions_list)}**"
                         q_text = q.get("question_text", "")
                         opts = q.get("options") or []
                         prev_val = answers.get(q_idx, {}).get("answer", "")
