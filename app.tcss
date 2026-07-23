@@ -383,9 +383,10 @@ ModalScreen {
     display: none;
 }
 
-BashConfirmScreen MarkdownFence {
+#modal-dialog.bash-confirm-dialog MarkdownFence {
+    border: none;
     border-left: none;
-    padding: 0;
+    padding: 0 1;
     margin: 0;
 }
 

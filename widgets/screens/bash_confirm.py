@@ -25,7 +25,7 @@ class BashConfirmScreen(ModalScreen[bool]):
             f"{self.command}\n"
             "```"
         )
-        with Vertical(id="modal-dialog"):
+        with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
             yield Markdown(content, classes="modal-markdown")
             yield Label("enter: confirm • esc: cancel", id="modal-hint")
 
