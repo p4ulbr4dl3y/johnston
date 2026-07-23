@@ -439,6 +439,10 @@ class JohnstonChatApp(App):
                     bot_msg.content += " *(interrupted)*"
                 except Exception:
                     pass
+            if hasattr(self, "agent") and hasattr(self.agent, "history"):
+                partial = (bot_msg.content if bot_msg else "").strip()
+                hist_text = f"{partial}\n[Response interrupted by user]".strip()
+                self.agent.history.append({"role": "assistant", "content": hist_text})
             if getattr(self, "is_app_active", True):
                 try:
                     self.notify("Agent response interrupted (Esc)", severity="warning")
