@@ -37,7 +37,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         if self.options:
             opt_list = self.query_one(OptionList)
             opt_list.focus()
-            opt_list.highlighted = None
+            opt_list.highlighted = 0
 
     def action_cancel(self) -> None:
         self.dismiss(None)
