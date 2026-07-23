@@ -122,15 +122,13 @@ All slash commands are handled in [commands.py](file:///Users/yegor/johnston/com
 * **Explore** (`/explore`, aliases: `/plan`, `/ask`) — read-only exploratory mode (code exploration, Q&A, planning). Direct code modifications are prohibited.
 
 ### Available Slash Commands:
-* `/action` — enable `action` execution mode (`/build`, `/code`).
-* `/explore` — enable `explore` read-only mode (`/plan`, `/ask`).
-* `/mode` — toggle mode (`action` <-> `explore`).
+* `/connect` — connect provider and setup API key.
+* `/models` — select model grouped by provider.
 * `/compact` — force history compaction.
 * `/init` — interactive generation/update of `AGENTS.md` for current repository.
-* `/connect` — connect provider and setup API key (`/provider` alias).
-* `/models` — select model grouped by provider.
 * `/skills`, `/mcp` — manage skills and MCP servers.
 * `/tasks` — view and manage background tasks.
+* `/subagents` — view and manage subagents.
 * `/rewind`, `/resume` — rewind chat history or resume session.
 * `/new`, `/help` — start new chat / view keyboard shortcuts help.
 

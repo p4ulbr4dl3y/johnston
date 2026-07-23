@@ -1,7 +1,7 @@
 
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
-from widgets.chat_view import BotMessage, ChatView
+from widgets.chat_view import ChatView
 from widgets.modal_screens import (
     ApiKeyInputScreen,
     ConnectProviderScreen,
@@ -86,12 +86,6 @@ class ConnectCommand(BaseCommand):
             app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
 
         app.push_screen(ConnectProviderScreen(providers, active_key, configured_keys), callback=on_provider_selected)
-
-
-class ProviderCommand(ConnectCommand):
-    """Alias for /connect command"""
-    name = "/provider"
-    description = "Connect AI provider (alias for /connect)"
 
 
 class ModelsCommand(BaseCommand):
@@ -293,142 +287,6 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
-class ActionCommand(BaseCommand):
-    name = "/action"
-    description = "Switch agent to Action mode (execution, file edits, bash)"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "action"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
-
-
-class ExploreCommand(BaseCommand):
-    name = "/explore"
-    description = "Switch agent to Explore mode (read-only research, planning, QA)"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "explore"
-            if hasattr(app, "refresh_status_footer"):
-                app.refresh_status_footer()
-        else:
-            app.notify("No active agent", severity="error")
-
-
-class BuildCommand(ActionCommand):
-    """Alias for /action command"""
-    name = "/build"
-    description = "Switch agent to Action mode"
-
-
-class CodeCommand(ActionCommand):
-    """Alias for /action command"""
-    name = "/code"
-    description = "Switch agent to Action mode"
-
-
-class PlanCommand(ExploreCommand):
-    """Alias for /explore command"""
-    name = "/plan"
-    description = "Switch agent to Explore mode"
-
-
-class AskCommand(ExploreCommand):
-    """Alias for /explore command"""
-    name = "/ask"
-    description = "Switch agent to Explore mode"
-
-
-class DebugCommand(ActionCommand):
-    """Alias for /action command"""
-    name = "/debug"
-    description = "Switch agent to Action mode"
-
-
-class OrchestratorCommand(ActionCommand):
-    """Alias for /action command"""
-    name = "/orchestrator"
-    description = "Switch agent to Action mode"
-
-
-class ModeCommand(BaseCommand):
-    name = "/mode"
-    description = "Cycle agent mode (ACTION / EXPLORE)"
-
-    async def execute(self, app) -> None:
-        if not hasattr(app, "agent") or not app.agent:
-            app.notify("No active agent", severity="error")
-            return
-
-        modes_cycle = ["action", "explore"]
-        curr = getattr(app.agent, "mode", "action").lower()
-        if curr in modes_cycle:
-            next_idx = (modes_cycle.index(curr) + 1) % len(modes_cycle)
-            new_mode = modes_cycle[next_idx]
-        else:
-            new_mode = "action"
-
-        app.agent.mode = new_mode
-        if hasattr(app, "refresh_status_footer"):
-            app.refresh_status_footer()
-
-
-class PasteCommand(BaseCommand):
-    name = "/paste"
-    description = "Universal paste from clipboard (text or image)"
-
-    async def execute(self, app) -> None:
-        chat_input = app.query_one("#message-input", ChatInput)
-        if not chat_input.paste_universal_clipboard():
-            app.notify("Clipboard is empty", severity="warning")
-        chat_input.focus()
-
-
-class CopyCommand(BaseCommand):
-    name = "/copy"
-    description = "Copy last assistant message to clipboard"
-
-    async def execute(self, app) -> None:
-        chat_view = app.query_one(ChatView)
-        last_bot_text = ""
-        for child in reversed(chat_view.children):
-            if isinstance(child, BotMessage):
-                last_bot_text = child.full_text
-                break
-
-        if last_bot_text:
-            try:
-                app.copy_to_clipboard(last_bot_text)
-            except Exception:
-                pass
-
-            import subprocess
-            try:
-                subprocess.run(["pbcopy"], input=last_bot_text.encode("utf-8"), check=True)
-            except Exception:
-                pass
-
-            app.notify("Copied last assistant message!")
-        else:
-            app.notify("No assistant message to copy", severity="warning")
-
-        chat_input = app.query_one("#message-input", ChatInput)
-        chat_input.focus()
-
-
-class TestModalCommand(BaseCommand):
-    name = "/testmodal"
-    description = "Spawn bash confirm modal for UI testing"
-
-    async def execute(self, app) -> None:
-        from widgets.screens.bash_confirm import BashConfirmScreen
-        app.push_screen(BashConfirmScreen("cd /Users/yegor/testing && echo -e \"John\\ny\" | python3 script.py", "Test command"))
-
-
 class SubagentsCommand(BaseCommand):
     name = "/subagents"
     description = "View and manage subagents"
@@ -438,112 +296,19 @@ class SubagentsCommand(BaseCommand):
         app.push_screen(SubagentsListScreen())
 
 
-class SubagentCommand(SubagentsCommand):
-    name = "/subagent"
-
-
-class DemoCommand(BaseCommand):
-    name = "/demo"
-    description = "Showcase all Markdown styles and UI widgets"
-
-    async def execute(self, app) -> None:
-        chat_view = app.query_one(ChatView)
-        await chat_view.add_user_message("/demo — Showcase all Markdown & UI styles")
-
-        tw = await chat_view.add_thinking_widget("Thinking about layout aesthetics...")
-        tw.finish_thinking(0.4, "Analyzing Markdown CSS tokens, H1-H6 headers, code block syntax themes, and table borders.")
-
-        await chat_view.add_tool_call("read", "/Users/yegor/testing/snake.html", result_text="1 | <!DOCTYPE html> ...")
-        await chat_view.add_tool_call("edit", "core/config.py", result_text="Updated styles")
-        await chat_view.add_tool_call("bash", "uv run pytest", result_text="107 passed in 0.9s")
-
-        bot_msg = await chat_view.add_bot_message()
-        bot_msg.content = (
-            "# Heading 1 (H1)\n"
-            "## Heading 2 (H2)\n"
-            "### Heading 3 (H3)\n"
-            "#### Heading 4 (H4)\n"
-            "##### Heading 5 (H5)\n\n"
-            "---\n\n"
-            "### Text Formatting\n"
-            "Standard text. **Bold text**. *Italic text*. ~~Strikethrough~~. Inline code: `const x = 42;`.\n\n"
-            "---\n\n"
-            "### Lists\n"
-            "* Bullet item 1\n"
-            "* Bullet item 2\n"
-            "  * Nested item A\n"
-            "  * Nested item B\n\n"
-            "1. Numbered item 1\n"
-            "2. Numbered item 2\n\n"
-            "- [x] Completed task\n"
-            "- [ ] Pending task\n\n"
-            "---\n\n"
-            "### Blockquote\n"
-            "> This is a blockquote element in Johnston Chat UI.\n\n"
-            "---\n\n"
-            "### Table\n"
-            "| Element | Type | Status |\n"
-            "| :--- | :---: | ---: |\n"
-            "| H1..H6 | Header | Active |\n"
-            "| Table | Layout | Active |\n"
-            "| Code | Highlight | Active |\n\n"
-            "---\n\n"
-            "### Code Blocks\n"
-            "```javascript\n"
-            "const x = 42;\n"
-            "```\n\n"
-            "```python\n"
-            "def check_styles():\n"
-            "    return 'Markdown ready!'\n"
-            "```\n\n"
-            "```bash\n"
-            "uv run python -m unittest\n"
-            "```\n"
-        )
-        await chat_view.add_compaction_divider("Session Compacted Sample")
-        app.notify("Markdown & UI showcase rendered!")
-
-
-class MarkdownCommand(DemoCommand):
-    name = "/markdown"
-    description = "Showcase all Markdown styles (alias for /demo)"
-
-
-class StylesCommand(DemoCommand):
-    name = "/styles"
-    description = "Showcase all UI styles (alias for /demo)"
-
-
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
     ConnectCommand,
-    ProviderCommand,
     ModelsCommand,
     RewindCommand,
     ResumeCommand,
     TasksCommand,
     SubagentsCommand,
-    SubagentCommand,
     SkillsCommand,
     MCPCommand,
     InitCommand,
     CompactCommand,
-    ActionCommand,
-    ExploreCommand,
-    PlanCommand,
-    BuildCommand,
-    CodeCommand,
-    AskCommand,
-    DebugCommand,
-    OrchestratorCommand,
-    ModeCommand,
-    PasteCommand,
-    CopyCommand,
-    TestModalCommand,
-    DemoCommand,
-    MarkdownCommand,
-    StylesCommand,
 ]
 
 COMMAND_REGISTRY = {

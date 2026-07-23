@@ -128,9 +128,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         from commands import COMMAND_REGISTRY
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/compact", COMMAND_REGISTRY)
-        self.assertIn("/plan", COMMAND_REGISTRY)
-        self.assertIn("/build", COMMAND_REGISTRY)
-        self.assertIn("/mode", COMMAND_REGISTRY)
 
 
 
