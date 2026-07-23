@@ -159,7 +159,13 @@ Markdown {
     height: auto;
     margin: 0;
     padding: 0;
+    link-color: #ffffff;
+    link-color-hover: #ffffff;
+    link-background-hover: #3f3f46;
+    link-style: underline;
+    link-style-hover: bold;
 }
+
 
 MarkdownParagraph {
     height: auto;
