@@ -34,6 +34,21 @@ def format_context_tokens(tokens: int) -> str:
     return str(tokens)
 
 
+KNOWN_MODEL_PATTERNS = [
+    ("gemini-2", 1_000_000),
+    ("gemini-1.5", 1_000_000),
+    ("claude-3-7", 200_000),
+    ("claude-3.7", 200_000),
+    ("claude-3-5", 200_000),
+    ("claude-3.5", 200_000),
+    ("deepseek", 128_000),
+    ("qwen", 128_000),
+    ("gpt-4o", 128_000),
+    ("gpt-4", 128_000),
+    ("llama-3", 128_000),
+]
+
+
 class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
@@ -136,6 +151,9 @@ class ModelsCatalog:
         return self._limits
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
+        if not model_id:
+            return DEFAULT_CONTEXT_LIMIT
+
         cache_dir = os.path.join(CONFIG_DIR, "cache")
 
         # 1. Check local provider cache
@@ -145,12 +163,28 @@ class ModelsCatalog:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     cdata = json.load(f)
                     limits = cdata.get("model_limits", {})
-                    if model_id in limits and isinstance(limits[model_id], (int, float)):
+                    if model_id in limits and isinstance(limits[model_id], (int, float)) and limits[model_id] > 0:
                         return int(limits[model_id])
             except Exception:
                 pass
 
-        # 2. Check OpenRouter catalog cache
+        # 2. Check provider module if loaded
+        try:
+            from core.provider_manager import ProviderManager
+            pm = ProviderManager()
+            providers = pm.load_providers()
+            if provider_id in providers:
+                mod = providers[provider_id].get("module")
+                if mod:
+                    if hasattr(mod, "MODEL_LIMITS") and isinstance(mod.MODEL_LIMITS, dict):
+                        if model_id in mod.MODEL_LIMITS:
+                            return int(mod.MODEL_LIMITS[model_id])
+                    if hasattr(mod, "CONTEXT_LIMIT") and isinstance(mod.CONTEXT_LIMIT, (int, float)):
+                        return int(mod.CONTEXT_LIMIT)
+        except Exception:
+            pass
+
+        # 3. Check OpenRouter catalog cache
         if not self._limits:
             self.load_cache()
 
@@ -161,6 +195,12 @@ class ModelsCatalog:
         for k, v in self._limits.items():
             if k.split("/")[-1].lower() == m_base and isinstance(v, (int, float)):
                 return int(v)
+
+        # 4. Check known model name patterns (e.g. gemini -> 1M, sonnet -> 200k, etc.)
+        m_lower = model_id.lower()
+        for pattern, limit in KNOWN_MODEL_PATTERNS:
+            if pattern in m_lower:
+                return limit
 
         return DEFAULT_CONTEXT_LIMIT
 
