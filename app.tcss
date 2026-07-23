@@ -386,7 +386,7 @@ ModalScreen {
 #modal-dialog.bash-confirm-dialog MarkdownFence {
     border: none;
     border-left: none;
-    padding: 0;
+    padding: 1 1;
     margin: 0;
 }
 
