@@ -31,6 +31,8 @@ class MCPScreen(ModalScreen[None]):
 
     def on_mount(self) -> None:
         self.refresh_list()
+        opt_list = self.query_one("#mcp-option-list", OptionList)
+        opt_list.highlighted = None
 
     def refresh_list(self) -> None:
         self.servers = self.mm.load_servers()
