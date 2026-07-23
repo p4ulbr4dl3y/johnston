@@ -56,11 +56,15 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, ResumeScreen)
         print("✓ ResumeScreen tests passed cleanly!")
 
-        # 5. Test /provider
+        # 5. Test /provider and provider search
         chat_input.load_text("/provider")
         await pilot.press("enter")
         await pilot.pause(0.2)
         assert isinstance(app.screen, ProviderScreen)
+        assert app.screen.show_search is True
+        await pilot.press("o", "p", "e", "n")
+        await pilot.pause(0.2)
+        assert len(app.screen.filtered_items) > 0
         await pilot.press("escape")
         await pilot.pause(0.2)
         print("✓ ProviderScreen tests passed cleanly!")

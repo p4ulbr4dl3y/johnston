@@ -21,7 +21,8 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         options: list[str],
         items: list[T],
         default_value: T,
-        show_search: bool = False
+        show_search: bool = False,
+        search_placeholder: str = "Search..."
     ):
         super().__init__()
         self.title = title
@@ -29,6 +30,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         self.raw_items = items
         self.default_value = default_value
         self.show_search = show_search
+        self.search_placeholder = search_placeholder
         self.filtered_items = list(items)
         self.filtered_options = list(options)
 
@@ -36,7 +38,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         with Vertical(id="modal-dialog"):
             yield Markdown(self.title, classes="modal-markdown")
             if self.show_search:
-                yield Input(placeholder="Search models...", id="modal-search-input")
+                yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
             yield Label("enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
 

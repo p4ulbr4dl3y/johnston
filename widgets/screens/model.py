@@ -60,5 +60,6 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             options=options,
             items=items,
             default_value=default_val,
-            show_search=True
+            show_search=True,
+            search_placeholder="Search models..."
         )
