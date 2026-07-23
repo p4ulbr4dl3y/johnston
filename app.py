@@ -393,6 +393,9 @@ class JohnstonChatApp(App):
 
                 if event_type == "thinking_start":
                     thinking_widget = await chat_view.add_thinking_widget(val1)
+                elif event_type == "thinking_delta":
+                    if thinking_widget:
+                        thinking_widget.update_thinking(val1)
                 elif event_type == "thinking_end":
                     if thinking_widget:
                         duration = float(val1)

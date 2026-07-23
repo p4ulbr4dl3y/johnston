@@ -143,6 +143,12 @@ class ThinkingWidget(Vertical):
             frame = self.spinner_frames[self.spinner_idx]
             self.header_label.update(f"{frame} Thinking...")
 
+    def update_thinking(self, content: str) -> None:
+        if content and content != "Thinking...":
+            self.thinking_text = content
+            if self.is_expanded:
+                safe_update_markdown(self.md_widget, self.thinking_text)
+
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
         self.duration_seconds = duration
