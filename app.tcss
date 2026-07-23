@@ -518,8 +518,9 @@ MarkdownBlockQuote {
 }
 
 /* Inline Code Styling - Clean Monochrome Slate Pill */
+MarkdownBlock > .code_inline,
 MarkdownBlock .code_inline,
-Markdown .code_inline {
+Markdown > .code_inline {
     color: #ffffff;
     background: #27272a;
     text-style: bold;
