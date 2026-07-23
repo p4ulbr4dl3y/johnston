@@ -44,20 +44,20 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
 
     def on_mount(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)
-        if self.default_value in self.raw_items:
-            try:
-                opt_list.highlighted = self.raw_items.index(self.default_value)
-            except Exception:
-                pass
-        else:
-            for i, it in enumerate(self.raw_items):
-                if it is not None:
-                    opt_list.highlighted = i
-                    break
-
         if self.show_search:
+            opt_list.highlighted = None
             self.query_one("#modal-search-input", Input).focus()
         else:
+            if self.default_value in self.raw_items:
+                try:
+                    opt_list.highlighted = self.raw_items.index(self.default_value)
+                except Exception:
+                    pass
+            else:
+                for i, it in enumerate(self.raw_items):
+                    if it is not None:
+                        opt_list.highlighted = i
+                        break
             opt_list.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -113,7 +113,9 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list = self.query_one("#modal-option-list", OptionList)
         opt_list.clear_options()
         opt_list.add_options(self.filtered_options)
-        if self.filtered_options:
+        if self.show_search:
+            opt_list.highlighted = None
+        elif self.filtered_options:
             first_valid = 0
             for i, it in enumerate(self.filtered_items):
                 if it is not None:
@@ -143,10 +145,16 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                 search_input = self.query_one("#modal-search-input", Input)
                 if search_input.has_focus:
                     opt_list = self.query_one("#modal-option-list", OptionList)
-                    if event.key == "down":
-                        opt_list.action_cursor_down()
+                    if opt_list.highlighted is None:
+                        for i, it in enumerate(self.filtered_items):
+                            if it is not None:
+                                opt_list.highlighted = i
+                                break
                     else:
-                        opt_list.action_cursor_up()
+                        if event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
                     event.prevent_default()
                     event.stop()
                     return
