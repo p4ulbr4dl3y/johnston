@@ -83,6 +83,18 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/help", COMMAND_REGISTRY)
         self.assertIn("/connect", COMMAND_REGISTRY)
 
+    def test_alias_suggestions_formatting(self):
+        from widgets.command_suggestions import COMMANDS
+        commands_dict = dict(COMMANDS)
+        self.assertIn("/providers", commands_dict)
+        self.assertIn("/connect", commands_dict)
+        self.assertEqual(commands_dict["/connect"], "Alias for /providers")
+        self.assertEqual(commands_dict["/h"], "Alias for /help")
+        self.assertEqual(commands_dict["/clear"], "Alias for /new")
+        self.assertEqual(commands_dict["/undo"], "Alias for /rewind")
+        self.assertEqual(commands_dict["/model"], "Alias for /models")
+        self.assertIn("Manage AI providers", commands_dict["/providers"])
+
 
 if __name__ == "__main__":
     unittest.main()

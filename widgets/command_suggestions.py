@@ -4,7 +4,10 @@ from textual.widgets import OptionList
 
 from commands import COMMAND_REGISTRY
 
-COMMANDS = [(name, cmd.description) for name, cmd in COMMAND_REGISTRY.items()]
+COMMANDS = [
+    (name, cmd.description if name == cmd.name else f"Alias for {cmd.name}")
+    for name, cmd in COMMAND_REGISTRY.items()
+]
 
 
 class CommandSuggestions(OptionList):

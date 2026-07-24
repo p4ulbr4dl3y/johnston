@@ -24,6 +24,7 @@ class BaseCommand:
 
 class HelpCommand(BaseCommand):
     name = "/help"
+    aliases = ["/h", "/?"]
     description = "Help and keybindings"
 
     async def execute(self, app) -> None:
@@ -32,6 +33,7 @@ class HelpCommand(BaseCommand):
 
 class NewCommand(BaseCommand):
     name = "/new"
+    aliases = ["/clear", "/reset"]
     description = "Start a new chat session"
 
     async def execute(self, app) -> None:
@@ -104,6 +106,7 @@ class ProvidersCommand(BaseCommand):
 
 class ModelsCommand(BaseCommand):
     name = "/models"
+    aliases = ["/model"]
     description = "Switch model for providers"
 
     async def execute(self, app) -> None:
@@ -140,6 +143,7 @@ class ModelsCommand(BaseCommand):
 
 class RewindCommand(BaseCommand):
     name = "/rewind"
+    aliases = ["/undo", "/rollback"]
     description = "Rollback chat history to a message"
 
     async def execute(self, app) -> None:
@@ -182,6 +186,7 @@ class RewindCommand(BaseCommand):
 
 class ResumeCommand(BaseCommand):
     name = "/resume"
+    aliases = ["/sessions", "/load"]
     description = "Resume a saved session"
 
     async def execute(self, app) -> None:
@@ -201,6 +206,7 @@ class ResumeCommand(BaseCommand):
 
 class TasksCommand(BaseCommand):
     name = "/tasks"
+    aliases = ["/task"]
     description = "Manage background tasks"
 
     async def execute(self, app) -> None:
@@ -222,6 +228,7 @@ class SubagentsCommand(BaseCommand):
 
 class SkillsCommand(BaseCommand):
     name = "/skills"
+    aliases = ["/skill"]
     description = "Browse and activate available skills"
 
     async def execute(self, app) -> None:
@@ -243,6 +250,7 @@ class SkillsCommand(BaseCommand):
 
 class MCPCommand(BaseCommand):
     name = "/mcp"
+    aliases = ["/mcps"]
     description = "Manage MCP servers (toggle enabled/disabled)"
 
     async def execute(self, app) -> None:
@@ -251,6 +259,7 @@ class MCPCommand(BaseCommand):
 
 class RulesCommand(BaseCommand):
     name = "/rules"
+    aliases = ["/rule"]
     description = "View active user and project Markdown rules"
 
     async def execute(self, app) -> None:
@@ -291,6 +300,7 @@ class InitCommand(BaseCommand):
 
 class CompactCommand(BaseCommand):
     name = "/compact"
+    aliases = ["/compress"]
     description = "Compact session conversation history with AI summary"
 
     async def execute(self, app) -> None:
