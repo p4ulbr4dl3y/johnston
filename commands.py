@@ -210,6 +210,16 @@ class TasksCommand(BaseCommand):
         app.push_screen(TasksListScreen())
 
 
+class SubagentsCommand(BaseCommand):
+    name = "/subagents"
+    aliases = ["/agents", "/subagent"]
+    description = "Browse and manage subagents and subagent templates"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.subagents import SubagentsScreen
+        app.push_screen(SubagentsScreen())
+
+
 class SkillsCommand(BaseCommand):
     name = "/skills"
     description = "Browse and activate available skills"
@@ -308,15 +318,6 @@ class CompactCommand(BaseCommand):
                 app.notify(msg, severity="warning")
         else:
             app.notify("Active agent does not support context compaction", severity="warning")
-
-
-class SubagentsCommand(BaseCommand):
-    name = "/subagents"
-    description = "View and manage subagents"
-
-    async def execute(self, app) -> None:
-        from widgets.screens.subagents_list import SubagentsListScreen
-        app.push_screen(SubagentsListScreen())
 
 
 COMMAND_CLASSES = [
