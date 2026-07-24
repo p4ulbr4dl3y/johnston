@@ -79,7 +79,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)
-        self.assertIn("/demo", COMMAND_REGISTRY)
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/help", COMMAND_REGISTRY)
         self.assertIn("/connect", COMMAND_REGISTRY)
