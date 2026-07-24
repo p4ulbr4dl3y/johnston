@@ -245,11 +245,6 @@ OptionList {
     scrollbar-color-active: #ffffff #3f3f46;
 }
 
-OptionList > .option-list--option-disabled {
-    color: #71717a;
-    text-style: dim;
-}
-
 OptionList > .option-list--option-highlighted,
 OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
@@ -426,11 +421,6 @@ ModalScreen {
     scrollbar-color: #3f3f46 #27272a;
     scrollbar-color-hover: #ffffff #27272a;
     scrollbar-color-active: #ffffff #3f3f46;
-}
-
-#modal-dialog OptionList > .option-list--option-disabled {
-    color: #71717a;
-    text-style: dim;
 }
 
 #modal-dialog OptionList > .option-list--option-highlighted,

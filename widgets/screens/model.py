@@ -37,14 +37,12 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
                 for m in p_models:
                     clean_m = catalog.get_model_display_name(p_key, m)
-                    is_active = (p_key == current_provider and m == current_model)
-                    status_tag = r"\[ACTIVE] " if is_active else ""
-                    opt_label = f"   {status_tag}{clean_m}"
+                    opt_label = f"   {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
 
-                    if is_active:
+                    if p_key == current_provider and m == current_model:
                         default_val = item_val
 
             valid_items = [it for it in items if it is not None]
@@ -53,9 +51,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         else:
             for m in models_data:
                 clean_m = catalog.get_model_display_name(current_provider, m)
-                is_active = (m == current_model)
-                status_tag = r"\[ACTIVE] " if is_active else ""
-                options.append(f"{status_tag}{clean_m}")
+                options.append(clean_m)
                 items.append(m)
             default_val = current_model if current_model in items else (items[0] if items else "")
 
