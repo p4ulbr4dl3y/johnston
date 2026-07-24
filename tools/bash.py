@@ -78,7 +78,25 @@ class BashTool(BaseTool):
         env["NO_COLOR"] = "1"
         env["PYTHONUNBUFFERED"] = "1"
 
+        use_pty = False
         if master_fd is not None and slave_fd is not None:
+            try:
+                os.set_blocking(master_fd, False)
+                loop = asyncio.get_running_loop()
+                reader = asyncio.StreamReader()
+                protocol = asyncio.StreamReaderProtocol(reader)
+                await loop.connect_read_pipe(lambda: protocol, os.fdopen(master_fd, "rb", buffering=0))
+                use_pty = True
+            except Exception:
+                try:
+                    os.close(master_fd)
+                    os.close(slave_fd)
+                except Exception:
+                    pass
+                master_fd, slave_fd = None, None
+                reader = None
+
+        if use_pty:
             try:
                 p = await asyncio.create_subprocess_shell(
                     cmd,
@@ -90,13 +108,10 @@ class BashTool(BaseTool):
                     start_new_session=True
                 )
             finally:
-                os.close(slave_fd)
-
-            os.set_blocking(master_fd, False)
-            loop = asyncio.get_running_loop()
-            reader = asyncio.StreamReader()
-            protocol = asyncio.StreamReaderProtocol(reader)
-            await loop.connect_read_pipe(lambda: protocol, os.fdopen(master_fd, "rb", buffering=0))
+                try:
+                    os.close(slave_fd)
+                except Exception:
+                    pass
         else:
             p = await asyncio.create_subprocess_shell(
                 cmd,
@@ -105,6 +120,8 @@ class BashTool(BaseTool):
                 stderr=asyncio.subprocess.STDOUT,
                 env=env
             )
+            master_fd = None
+            reader = None
 
         task_id = f"bash_{int(time.time())}"
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None

@@ -627,8 +627,10 @@ def run_headless_prompt(
     mode: str | None = None,
     provider: str | None = None,
     model: str | None = None,
+    quiet: bool = False,
+    verbose: bool = False,
 ):
-    """Execute a single prompt headless via CLI without TUI"""
+    """Execute a single prompt headless via CLI with clean stdout piping and stderr tool logging"""
     pm = ProviderManager()
     if provider:
         pm.set_active_provider_key(provider)
@@ -639,17 +641,33 @@ def run_headless_prompt(
         agent.mode = mode
 
     async def _runner():
-        async for chunk_type, content in agent.stream_steps(prompt):
-            if chunk_type == "text":
-                print(content, end="", flush=True)
-            elif chunk_type == "reasoning":
-                print(f"[Thinking: {content}]", flush=True)
-            elif chunk_type == "tool_start":
-                tool_name = content.get("name") if isinstance(content, dict) else content
-                print(f"\n[Executing Tool: {tool_name}]", flush=True)
-            elif chunk_type == "tool_end":
-                print(f"[Tool Result: {content}]", flush=True)
-        print()
+        last_printed_len = 0
+        async for step in agent.stream_steps(prompt):
+            chunk_type = step[0]
+            val1 = step[1] if len(step) > 1 else ""
+            val2 = step[2] if len(step) > 2 else ""
+
+            if chunk_type in ("bot_delta", "bot_text", "text"):
+                new_text = val1[last_printed_len:]
+                if new_text:
+                    sys.stdout.write(new_text)
+                    sys.stdout.flush()
+                    last_printed_len = len(val1)
+            elif not quiet:
+                if chunk_type in ("thinking_start", "thinking_delta") and verbose:
+                    sys.stderr.write(f"\r[Thinking: {val1[:80]}...]\x1b[K")
+                    sys.stderr.flush()
+                elif chunk_type == "thinking_end" and verbose:
+                    sys.stderr.write(f"\n[Thought for {val1}s]\n")
+                    sys.stderr.flush()
+                elif chunk_type == "tool":
+                    sys.stderr.write(f"\n[Executing Tool: {val1} ({val2})]\n")
+                    sys.stderr.flush()
+                elif chunk_type == "tool_result" and verbose:
+                    sys.stderr.write(f"[Tool Result: {str(val1)[:150]}...]\n")
+                    sys.stderr.flush()
+        sys.stdout.write("\n")
+        sys.stdout.flush()
 
     asyncio.run(_runner())
 
@@ -671,6 +689,8 @@ def main():
     parser.add_argument("--provider", help="Set active provider key (e.g. opencode)")
     parser.add_argument("--model", help="Set active model ID")
     parser.add_argument("--resume", help="Resume specific session ID")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress tool execution logs on stderr")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed thinking and tool output logs on stderr")
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
@@ -705,6 +725,18 @@ def main():
         print_subagents()
         sys.exit(0)
 
+    # Check for stdin piped input (e.g. cat file | johnston -p "...")
+    stdin_input = ""
+    if not sys.stdin.isatty():
+        try:
+            stdin_input = sys.stdin.read().strip()
+        except Exception:
+            pass
+
+    target_prompt = args.prompt or ""
+    if stdin_input:
+        target_prompt = f"Piped Stdin Content:\n{stdin_input}\n\nTask: {target_prompt}".strip()
+
     if args.init:
         from commands import INIT_PROMPT_TEMPLATE
         run_headless_prompt(
@@ -712,15 +744,19 @@ def main():
             mode=args.mode,
             provider=args.provider,
             model=args.model,
+            quiet=args.quiet,
+            verbose=args.verbose,
         )
         sys.exit(0)
 
-    if args.prompt:
+    if target_prompt:
         run_headless_prompt(
-            prompt=args.prompt,
+            prompt=target_prompt,
             mode=args.mode,
             provider=args.provider,
             model=args.model,
+            quiet=args.quiet,
+            verbose=args.verbose,
         )
         sys.exit(0)
 
