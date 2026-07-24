@@ -368,4 +368,20 @@ async def handle_slash_command(app, command_text: str) -> bool:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()
         await cmd_instance.execute(app)
         return True
+
+    # Skill slash command execution (e.g. /caveman [optional text])
+    if normalized_name.startswith("/"):
+        skill_name = normalized_name[1:]
+        sm = SkillManager()
+        skill = sm.get_skill(skill_name)
+        if skill:
+            extra_text = parts[1].strip() if len(parts) > 1 else ""
+            app.notify(f"Activating skill: {skill['name']}")
+            if extra_text:
+                prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
+            else:
+                prompt = f"Load and apply the skill '{skill['name']}'."
+            app.generate_ai_response(prompt, show_in_ui=True)
+            return True
+
     return False

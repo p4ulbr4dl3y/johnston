@@ -70,5 +70,23 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         from commands import COMMAND_REGISTRY
         self.assertIn("/skills", COMMAND_REGISTRY)
 
+    def test_skill_command_suggestions(self):
+        from widgets.command_suggestions import get_all_command_suggestions
+        suggestions = get_all_command_suggestions()
+        cmd_names = [name for name, _ in suggestions]
+        self.assertIn("/skills", cmd_names)
+        self.assertIn("/johnston-architect", cmd_names)
+
+    async def test_skill_slash_command_execution(self):
+        from commands import handle_slash_command
+        from tests.test_commands import MockApp
+
+        app = MockApp()
+        handled = await handle_slash_command(app, "/johnston-architect configure MCP")
+        self.assertTrue(handled)
+        self.assertEqual(len(app.ai_prompts), 1)
+        self.assertIn("Load and apply the skill 'johnston-architect'", app.ai_prompts[0][0])
+        self.assertIn("configure MCP", app.ai_prompts[0][0])
+
 if __name__ == "__main__":
     unittest.main()

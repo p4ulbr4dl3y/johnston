@@ -3,11 +3,32 @@ import os
 from textual.widgets import OptionList
 
 from commands import COMMAND_REGISTRY
+from core.skill_manager import SkillManager
 
-COMMANDS = [
-    (name, cmd.description if name == cmd.name else f"Alias for {cmd.name}")
-    for name, cmd in COMMAND_REGISTRY.items()
-]
+
+def get_all_command_suggestions() -> list[tuple[str, str]]:
+    """Gets list of (command_name, description) for registered commands and skills"""
+    suggestions = []
+    registered = set()
+
+    for name, cmd in COMMAND_REGISTRY.items():
+        desc = cmd.description if name == cmd.name else f"Alias for {cmd.name}"
+        suggestions.append((name, desc))
+        registered.add(name)
+
+    try:
+        sm = SkillManager()
+        skills = sm.list_skills()
+        for s in skills:
+            s_cmd = f"/{s['name']}"
+            if s_cmd not in registered:
+                desc = f"Skill: {s['description']}" if s.get("description") else f"Skill: {s['name']}"
+                suggestions.append((s_cmd, desc))
+                registered.add(s_cmd)
+    except Exception:
+        pass
+
+    return suggestions
 
 
 class CommandSuggestions(OptionList):
@@ -64,10 +85,13 @@ class CommandSuggestions(OptionList):
         if cleaned.startswith("/") and " " not in cleaned:
             self.mode = "command"
             matched_cmds = []
-            for cmd, desc in COMMANDS:
+            all_cmds = get_all_command_suggestions()
+            max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
+            padding = max(16, max_cmd_len + 2)
+            for cmd, desc in all_cmds:
                 if cmd.startswith(cleaned):
                     matched_cmds.append(cmd)
-                    formatted_line = f"{cmd:<14} {desc}"
+                    formatted_line = f"{cmd:<{padding}} {desc}"
                     self.add_option(formatted_line)
 
             self.current_matched = matched_cmds

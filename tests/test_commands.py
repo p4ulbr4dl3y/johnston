@@ -84,8 +84,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/connect", COMMAND_REGISTRY)
 
     def test_alias_suggestions_formatting(self):
-        from widgets.command_suggestions import COMMANDS
-        commands_dict = dict(COMMANDS)
+        from widgets.command_suggestions import get_all_command_suggestions
+        commands_dict = dict(get_all_command_suggestions())
         self.assertIn("/providers", commands_dict)
         self.assertIn("/connect", commands_dict)
         self.assertEqual(commands_dict["/connect"], "Alias for /providers")
