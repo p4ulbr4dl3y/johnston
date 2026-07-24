@@ -146,7 +146,8 @@ class SubagentTool(BaseTool):
 
                     msg = (
                         f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
-                        f"<task_result>\n{acc[0].strip() or 'Completed with no text output.'}\n</task_result>"
+                        f"<task_result>\n{acc[0].strip() or 'Completed with no text output.'}\n</task_result>\n"
+                        f"(Note: Full session log stored in storage file; inspect via `manage_subagent(action='status', task_id='{task_id}')`)"
                     )
                     ctx.trigger_ai_response(msg)
 

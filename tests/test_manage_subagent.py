@@ -48,6 +48,8 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sub-2", res_status)
         self.assertIn("Refactor module", res_status)
         self.assertIn("[User]: clean up code", res_status)
+        self.assertIn("Full Log File:", res_status)
+        self.assertIn("sub-2.json", res_status)
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()

@@ -82,6 +82,9 @@ class ManageSubagentTool(BaseTool):
             return f"Error: Subagent session '{task_id}' not found."
 
         if action == "status":
+            import os
+            log_file = os.path.join(tracker.storage_dir, f"{session.task_id}.json")
+
             lines = [
                 f"Subagent Status ({session.task_id}):",
                 f"• Description: {session.description}",
@@ -89,6 +92,7 @@ class ManageSubagentTool(BaseTool):
                 f"• Status: {session.status.upper()}",
                 f"• Mode: {'Background' if session.background else 'Foreground'}",
                 f"• Total Events: {len(session.events)}",
+                f"• Full Log File: {log_file}",
                 "\nRecent Events Log:"
             ]
 
