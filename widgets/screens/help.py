@@ -30,6 +30,7 @@ class HelpScreen(ModalScreen[None]):
                 "* `/init` — Guided `AGENTS.md` project setup\n"
                 "* `/compact` — Compact session conversation history\n\n"
                 "**Hotkeys:**\n"
+                "* `Shift+Tab` — Toggle Action / Explore mode\n"
                 "* `Enter` — Send message\n"
                 "* `Ctrl+Enter` / `Shift+Enter` — Insert new line\n"
                 "* `↑ / ↓` — History navigation (looping)\n"
