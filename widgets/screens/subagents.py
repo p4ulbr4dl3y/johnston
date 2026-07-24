@@ -35,7 +35,7 @@ class TemplateDetailScreen(ModalScreen[None]):
 
         with Vertical(id="modal-dialog"):
             yield Markdown(header_md, classes="modal-markdown")
-            yield Label("esc: back to templates list", id="modal-hint")
+            yield Label("esc: back", id="modal-hint")
 
     def action_cancel(self) -> None:
         self.dismiss(None)
