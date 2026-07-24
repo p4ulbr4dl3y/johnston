@@ -54,7 +54,7 @@ class ProvidersCommand(BaseCommand):
     description = "Manage AI providers (API keys, active status, enable/disable)"
 
     async def execute(self, app) -> None:
-        from widgets.screens.connect import ApiKeyInputScreen, ProvidersScreen
+        from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 
         def open_providers_screen(focus_key: str = None) -> None:
             provs = app.pm.load_providers(include_disabled=True)
