@@ -20,8 +20,8 @@ if core_dir not in sys.path:
 DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "opencode": {
         "key": "opencode",
-        "name": "OpenCode Go (DeepSeek v4 Flash)",
-        "description": "OpenCode Go agent (DeepSeek v4 Flash) with tools",
+        "name": "OpenCode",
+        "description": "OpenCode agent provider",
         "base_url": "https://opencode.ai/zen/go/v1",
         "model": "deepseek-v4-flash",
         "api_type": "openai",
@@ -29,7 +29,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "clinepass": {
         "key": "clinepass",
         "name": "ClinePass",
-        "description": "ClinePass AI provider (DeepSeek, GLM, Kimi, Qwen, MiniMax, MiMo)",
+        "description": "ClinePass AI provider",
         "base_url": "https://api.cline.bot/api/v1",
         "model": "cline-pass/deepseek-v4-flash",
         "api_type": "openai",
@@ -57,7 +57,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "anthropic": {
         "key": "anthropic",
-        "name": "Anthropic (Claude)",
+        "name": "Anthropic",
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
         "model": "claude-3-5-sonnet-20241022",
@@ -73,7 +73,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "ollama": {
         "key": "ollama",
-        "name": "Ollama (Local)",
+        "name": "Ollama",
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
         "model": "qwen2.5-coder:32b",
@@ -89,7 +89,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "groq": {
         "key": "groq",
-        "name": "Groq LPU",
+        "name": "Groq",
         "description": "Ultra-fast Groq LPU inference",
         "base_url": "https://api.groq.com/openai/v1",
         "model": "llama-3.3-70b-versatile",
@@ -97,7 +97,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "xai": {
         "key": "xai",
-        "name": "xAI (Grok)",
+        "name": "xAI",
         "description": "xAI Grok API provider",
         "base_url": "https://api.x.ai/v1",
         "model": "grok-2-latest",
@@ -105,7 +105,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "mistral": {
         "key": "mistral",
-        "name": "Mistral AI",
+        "name": "Mistral",
         "description": "Mistral AI API provider",
         "base_url": "https://api.mistral.ai/v1",
         "model": "mistral-large-latest",
@@ -129,7 +129,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "fireworks": {
         "key": "fireworks",
-        "name": "Fireworks AI",
+        "name": "Fireworks",
         "description": "Fireworks AI fast open-source inference",
         "base_url": "https://api.fireworks.ai/inference/v1",
         "model": "accounts/fireworks/models/llama-v3p3-70b-instruct",
@@ -145,8 +145,8 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
     "nvidia": {
         "key": "nvidia",
-        "name": "NVIDIA NIM",
-        "description": "NVIDIA NIM multi-model AI agent",
+        "name": "Nvidia",
+        "description": "Nvidia NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
         "model": "meta/codellama-70b",
         "api_type": "openai",

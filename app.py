@@ -539,9 +539,9 @@ def print_models():
     print("Available Johnston Providers & Models:\n")
     for key, info in providers.items():
         is_active = "*" if key == active_key else " "
-        name = info.get("NAME", key)
-        model = info.get("MODEL", "unknown")
-        desc = info.get("DESCRIPTION", "")
+        name = info.get("name") or info.get("NAME") or key
+        model = info.get("model") or info.get("MODEL") or "unknown"
+        desc = info.get("description") or info.get("DESCRIPTION") or ""
         print(f"{is_active} [{key}] {name}")
         print(f"    Default Model: {model}")
         if desc:

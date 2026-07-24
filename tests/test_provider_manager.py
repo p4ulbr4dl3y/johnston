@@ -40,7 +40,7 @@ class TestProviderManager(unittest.TestCase):
     def test_load_providers(self):
         providers = self.pm.load_providers()
         self.assertIn("opencode", providers)
-        self.assertIn("OpenCode Go", providers["opencode"]["name"])
+        self.assertEqual(providers["opencode"]["name"], "OpenCode")
 
     def test_get_set_active_provider_key(self):
         self.assertEqual(self.pm.get_active_provider_key(), "opencode")
