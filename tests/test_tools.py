@@ -2,13 +2,11 @@ import os
 import tempfile
 import unittest
 
+from core.rtk_manager import rewrite_cmd
 from tools.bash import BashTool
 from tools.create import CreateTool
 from tools.edit import EditTool
-from tools.glob import GlobTool
-from tools.grep import GrepTool
 from tools.linter import run_linter
-from tools.list_dir import ListDirTool
 from tools.read import ReadTool
 
 
@@ -118,32 +116,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
         self.assertIn("error msg", res_err)
 
-    async def test_grep_glob_listdir_tools(self):
-        # Create test files
-        file1 = os.path.join(self.test_dir, "test1.py")
-        file2 = os.path.join(self.test_dir, "test2.txt")
-        with open(file1, "w", encoding="utf-8") as f:
-            f.write("def search_target(): pass\n")
-        with open(file2, "w", encoding="utf-8") as f:
-            f.write("no match here\n")
-
-        # GrepTool
-        grep_tool = GrepTool()
-        res_grep = await grep_tool.execute({"path": self.test_dir, "pattern": "search_target"})
-        self.assertIn("test1.py", res_grep)
-        self.assertIn("search_target", res_grep)
-
-        # GlobTool
-        glob_tool = GlobTool()
-        res_glob = await glob_tool.execute({"path": self.test_dir, "pattern": "*.py"})
-        self.assertIn("test1.py", res_glob)
-        self.assertNotIn("test2.txt", res_glob)
-
-        # ListDirTool
-        list_tool = ListDirTool()
-        res_list = await list_tool.execute({"path": self.test_dir})
-        self.assertIn("test1.py", res_list)
-        self.assertIn("test2.txt", res_list)
+    def test_rtk_rewrite_cmd(self):
+        # Test rtk rewrite behavior
+        cmd = "git status"
+        rewritten = rewrite_cmd(cmd)
+        if rewritten != cmd:
+            self.assertTrue(rewritten.startswith("rtk "))
+        # Testing rtk command passthrough
+        self.assertEqual(rewrite_cmd("rtk git status"), "rtk git status")
 
     async def test_linter_tool(self):
         # Test run_linter helper function

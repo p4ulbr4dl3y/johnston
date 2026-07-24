@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from core.background_task import BackgroundTask
 from core.bash_guard import analyze_bash_command
+from core.rtk_manager import rewrite_cmd
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
@@ -63,6 +64,8 @@ class BashTool(BaseTool):
                     return "Command execution rejected by user."
             except Exception as e:
                 return f"Error prompting for command permission: {e}"
+
+        cmd = rewrite_cmd(cmd)
 
         master_fd = None
         slave_fd = None

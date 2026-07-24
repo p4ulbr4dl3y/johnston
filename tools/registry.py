@@ -7,9 +7,6 @@ from tools.bash import BashTool
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool
-from tools.glob import GlobTool
-from tools.grep import GrepTool
-from tools.list_dir import ListDirTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
@@ -22,9 +19,6 @@ TOOL_CLASSES = [
     CreateTool,
     EditTool,
     BashTool,
-    GlobTool,
-    GrepTool,
-    ListDirTool,
     AskUserTool,
     SkillTool,
     CallMCPTool,

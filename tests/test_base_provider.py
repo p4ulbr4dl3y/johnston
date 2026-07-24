@@ -89,36 +89,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         })
         self.assertIn("matches 2 occurrences", res_edit)
 
-    async def test_list_dir_tool(self):
-        os.makedirs(os.path.join(self.test_dir, "folder_a"))
-        await execute_tool("create", {"path": os.path.join(self.test_dir, "file_b.txt"), "content": "data"})
-
-        res_listdir = await execute_tool("list_dir", {"path": self.test_dir})
-        self.assertIn("[DIR]  folder_a/", res_listdir)
-        self.assertIn("[FILE] file_b.txt", res_listdir)
-
-    async def test_glob_tool(self):
-        os.makedirs(os.path.join(self.test_dir, "subdir"))
-        await execute_tool("create", {"path": os.path.join(self.test_dir, "file1.txt"), "content": "a"})
-        await execute_tool("create", {"path": os.path.join(self.test_dir, "subdir", "file2.log"), "content": "b"})
-
-        # Glob txt
-        res_glob = await execute_tool("glob", {"pattern": "*.txt"})
-        self.assertIn("file1.txt", res_glob)
-        self.assertNotIn("file2.log", res_glob)
-
-    async def test_grep_tool(self):
-        file1 = os.path.join(self.test_dir, "file1.txt")
-        file2 = os.path.join(self.test_dir, "file2.txt")
-        await execute_tool("create", {"path": file1, "content": "banana apple pear"})
-        await execute_tool("create", {"path": file2, "content": "grape orange cherry"})
-
-        # Grep apple
-        res_grep = await execute_tool("grep", {"pattern": "apple"})
-        self.assertIn("file1.txt", res_grep)
-        self.assertIn("banana apple pear", res_grep)
-        self.assertNotIn("file2.txt", res_grep)
-
     async def test_bash_tool_sync(self):
         # Sync bash execution
         res_bash = await execute_tool("bash", {"command": "echo 'hello bash'"})
