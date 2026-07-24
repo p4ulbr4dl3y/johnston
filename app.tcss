@@ -423,6 +423,12 @@ ModalScreen {
     scrollbar-color-active: #ffffff #3f3f46;
 }
 
+#modal-dialog OptionList > .option-list--option-disabled {
+    color: #ffffff;
+    text-style: bold;
+    opacity: 100%;
+}
+
 #modal-dialog OptionList > .option-list--option-highlighted,
 #modal-dialog OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
