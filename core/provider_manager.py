@@ -195,6 +195,11 @@ class ProviderManager:
                 "models": pdata.get("models", []),
                 "fetch_models": pdata.get("fetch_models", True),
                 "api_type": pdata.get("api_type", "openai"),
+                "headers": pdata.get("headers"),
+                "extra_body": pdata.get("extra_body"),
+                "reasoning_effort": pdata.get("reasoning_effort"),
+                "chunk_timeout": pdata.get("chunk_timeout", 30.0),
+                "fallback_provider": pdata.get("fallback_provider"),
                 "source": "json",
             }
 
@@ -322,48 +327,56 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error updating model in provider file {key}.py: {e}")
 
-    def create_active_agent(self):
+    def create_agent_for_provider(self, provider_key: str):
         providers = self.load_providers()
-        active_key = self.get_active_provider_key()
+        if provider_key not in providers:
+            if providers:
+                provider_key = list(providers.keys())[0]
+            else:
+                raise RuntimeError("No available providers configured.")
 
-        target_provider = None
-        if active_key in providers:
-            target_provider = providers[active_key]
-        elif providers:
-            first_key = list(providers.keys())[0]
-            target_provider = providers[first_key]
-        else:
-            raise RuntimeError("No available providers configured.")
-
+        target_provider = providers[provider_key]
         stored_key = self.get_api_key(target_provider["key"])
-        kwargs = {}
-        if stored_key:
-            kwargs["api_key"] = stored_key
 
         if "module" in target_provider and hasattr(target_provider["module"], "Agent"):
-            agent = target_provider["module"].Agent(**kwargs)
-        else:
-            from core.base_provider import BaseAgent
-            agent = BaseAgent(
-                api_key=stored_key or target_provider.get("api_key", ""),
-                model=target_provider.get("model", "gpt-4o"),
-                base_url=target_provider.get("base_url", ""),
-                system_prompt=target_provider.get("system_prompt", "You write code and execute tasks."),
-                provider_key=target_provider["key"],
-                api_type=target_provider.get("api_type", "openai"),
-            )
+            kwargs = {}
+            if stored_key:
+                kwargs["api_key"] = stored_key
+            return target_provider["module"].Agent(**kwargs)
+
+        from core.base_provider import BaseAgent
+
+        model_val = target_provider.get("model", "")
+        if not model_val and target_provider.get("models"):
+            model_val = target_provider["models"][0]
 
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     cdata = json.load(f)
                     p_models = cdata.get("provider_models", {})
-                    if active_key in p_models:
-                        agent.model = p_models[active_key]
+                    if provider_key in p_models and p_models[provider_key]:
+                        model_val = p_models[provider_key]
             except Exception:
                 pass
 
-        return agent
+        return BaseAgent(
+            api_key=stored_key or target_provider.get("api_key", ""),
+            model=model_val,
+            base_url=target_provider.get("base_url", ""),
+            system_prompt=target_provider.get("system_prompt", "You write code and execute tasks."),
+            provider_key=target_provider["key"],
+            api_type=target_provider.get("api_type", "openai"),
+            headers=target_provider.get("headers"),
+            extra_body=target_provider.get("extra_body"),
+            reasoning_effort=target_provider.get("reasoning_effort"),
+            chunk_timeout=target_provider.get("chunk_timeout", 30.0),
+            fallback_provider=target_provider.get("fallback_provider"),
+        )
+
+    def create_active_agent(self):
+        active_key = self.get_active_provider_key()
+        return self.create_agent_for_provider(active_key)
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Returns cached list of provider models (TTL = 24h) or performs HTTP request"""
