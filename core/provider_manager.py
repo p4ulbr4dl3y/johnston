@@ -380,9 +380,33 @@ class ProviderManager:
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Returns cached list of provider models (TTL = 24h) or performs HTTP request"""
+        providers = self.load_providers()
+        if provider_key not in providers:
+            return []
+
+        pdata = providers[provider_key]
+        mod = pdata.get("module")
+        base_url = getattr(mod, "BASE_URL", None) if mod else pdata.get("base_url")
+        api_key = self.get_api_key(provider_key) or (getattr(mod, "API_KEY", None) if mod else pdata.get("api_key"))
+
+        # If provider has explicit static models list, return it directly
+        if pdata.get("models"):
+            return list(pdata["models"])
+        if mod and hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
+            return list(mod.MODELS)
+
         CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
         os.makedirs(CACHE_DIR, exist_ok=True)
         cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
+
+        # If no API key set and not local/built-in provider, invalidate old cache and return empty list
+        if not api_key and provider_key not in ("opencode", "ollama"):
+            if os.path.exists(cache_path):
+                try:
+                    os.remove(cache_path)
+                except Exception:
+                    pass
+            return []
 
         # 1. Check cache file
         if not force_refresh and os.path.exists(cache_path):
@@ -396,15 +420,6 @@ class ProviderManager:
                 pass
 
         # 2. Request models via provider HTTP API
-        providers = self.load_providers()
-        if provider_key not in providers:
-            return []
-
-        pdata = providers[provider_key]
-        mod = pdata.get("module")
-        base_url = getattr(mod, "BASE_URL", None) if mod else pdata.get("base_url")
-        api_key = self.get_api_key(provider_key) or (getattr(mod, "API_KEY", None) if mod else pdata.get("api_key"))
-
         models = []
         model_limits = {}
         vision_models = []
@@ -437,13 +452,9 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Universal fallback to static models list, module, or default model for ANY provider
+        # Universal fallback to static model defined in python module
         if not models:
-            if pdata.get("models"):
-                models = list(pdata["models"])
-            elif mod and hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
-                models = list(mod.MODELS)
-            elif mod and hasattr(mod, "MODEL"):
+            if mod and hasattr(mod, "MODEL") and mod.MODEL:
                 models = [mod.MODEL]
             elif pdata.get("model"):
                 models = [pdata["model"]]
