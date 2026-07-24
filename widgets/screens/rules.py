@@ -8,6 +8,32 @@ from textual.widgets import Label, Markdown, OptionList
 from core.rules_manager import RuleDefinition, RulesManager
 
 
+class RuleDetailScreen(ModalScreen[None]):
+    """Modal screen displaying full markdown content of a rule"""
+    BINDINGS = [("escape", "cancel", "Back")]
+
+    def __init__(self, rule: RuleDefinition):
+        super().__init__()
+        self.rule = rule
+
+    def compose(self) -> ComposeResult:
+        source_tag = self.rule.source.upper()
+        mode_str = "/".join(m.upper() for m in self.rule.modes) if self.rule.modes else "ALL"
+
+        header_md = f"### **Rule: {self.rule.name}** (`[{source_tag}] [{mode_str}]`)"
+        if self.rule.description:
+            header_md += f"\n\n*{self.rule.description}*"
+
+        body_md = f"{header_md}\n\n---\n\n{self.rule.content}"
+
+        with Vertical(id="modal-dialog"):
+            yield Markdown(body_md, classes="modal-markdown")
+            yield Label("esc: back to rules list", id="modal-hint")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class RulesScreen(ModalScreen[None]):
     """Modal screen for viewing active Markdown rules (/rules command)"""
 
@@ -25,7 +51,7 @@ class RulesScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("# User & Project Rules", classes="modal-markdown")
             yield OptionList(id="rules-option-list")
-            yield Label("esc: close • ↑/↓: navigate", id="modal-hint")
+            yield Label("enter: view detail • esc: close • ↑/↓: navigate", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -46,16 +72,20 @@ class RulesScreen(ModalScreen[None]):
             source_tag = rf"\[{r.source.upper()}]"
             mode_str = "/".join(m.upper() for m in r.modes) if r.modes else "ALL"
             mode_tag = rf"\[{mode_str}]"
-
-            desc = r.description
-            if not desc and r.content:
-                first_line = r.content.splitlines()[0].strip("#* ").strip()
-                desc = first_line[:60] if first_line else ""
-
-            desc_info = f" — {desc}" if desc else ""
-            opt_list.add_option(f"{source_tag} {mode_tag} {r.name}{desc_info}")
+            opt_list.add_option(f"{source_tag} {mode_tag} {r.name}")
 
         opt_list.focus()
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if 0 <= event.option_index < len(self.rules):
+            target_rule = self.rules[event.option_index]
+
+            def on_detail_close(_: None) -> None:
+                opt_list = self.query_one("#rules-option-list", OptionList)
+                opt_list.focus()
+                opt_list.highlighted = event.option_index
+
+            self.app.push_screen(RuleDetailScreen(target_rule), callback=on_detail_close)
