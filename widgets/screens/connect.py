@@ -46,12 +46,10 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             else:
                 status_tag = r"\[AUTH]"
 
-            api_type = p.get("api_type", "openai").upper()
-            type_tag = rf"\[{api_type}]"
             desc = p.get("description", "")
             desc_info = f" — {desc}" if desc else ""
 
-            options.append(f"{status_tag} {type_tag} {name}{desc_info}")
+            options.append(f"{status_tag} {name}{desc_info}")
             items.append(key)
         return options, items
 
