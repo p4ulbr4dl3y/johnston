@@ -7,7 +7,7 @@ from core.base_provider import BaseAgent
 from core.provider_manager import ProviderManager
 
 
-class TestProviderAdvancedFeatures(unittest.TestCase):
+class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     def test_custom_headers_extra_body_and_reasoning_effort(self):
         agent = BaseAgent(
             provider_key="test_prov",
@@ -71,6 +71,16 @@ class TestProviderAdvancedFeatures(unittest.TestCase):
 
                     pm.set_provider_disabled("xai", False)
                     self.assertNotIn("xai", pm.get_disabled_providers())
+
+    async def test_fetch_models_grouped_excludes_disabled(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = os.path.join(tmpdir, "config.json")
+            with patch("core.provider_manager.CONFIG_FILE", config_file):
+                with patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                    pm = ProviderManager()
+                    pm.set_provider_disabled("opencode", True)
+                    grouped = await pm.fetch_models_grouped()
+                    self.assertNotIn("opencode", grouped)
 
 
 if __name__ == "__main__":

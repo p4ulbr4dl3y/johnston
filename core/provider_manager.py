@@ -483,11 +483,13 @@ class ProviderManager:
 
         return models
 
-    async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True) -> Dict[str, Dict[str, Any]]:
+    async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True, include_disabled: bool = False) -> Dict[str, Dict[str, Any]]:
         """Returns model dictionaries grouped by provider (only connected/configured providers by default)"""
-        providers = self.load_providers()
+        providers = self.load_providers(include_disabled=include_disabled)
         grouped = {}
         for p_key, p_data in providers.items():
+            if not include_disabled and p_data.get("disabled", False):
+                continue
             models = await self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
             if connected_only and not models:
                 continue
