@@ -6,11 +6,12 @@ from textual.widgets import Input, Label, Markdown
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
-class ConnectProviderScreen(BaseSelectionScreen[str]):
-    """Modal provider selection screen for /connect command"""
+class ProvidersScreen(BaseSelectionScreen[str]):
+    """Modal provider selection screen for /providers command"""
 
-    def __init__(self, providers: dict, active_key: str, configured_keys: dict):
+    def __init__(self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None):
         providers_list = list(providers.values())
+        disabled_set = set(disabled_providers or [])
         options = []
         items = []
 
@@ -19,9 +20,12 @@ class ConnectProviderScreen(BaseSelectionScreen[str]):
             name = p["name"]
             has_key = bool(configured_keys.get(key))
             is_active = (key == active_key)
+            is_disabled = key in disabled_set or p.get("disabled", False)
 
             badge = ""
-            if is_active:
+            if is_disabled:
+                badge = " [Disabled]"
+            elif is_active:
                 badge = " [Active]"
             elif has_key:
                 badge = " [Configured]"
@@ -30,12 +34,37 @@ class ConnectProviderScreen(BaseSelectionScreen[str]):
             items.append(key)
 
         super().__init__(
-            title="### **Select AI provider to connect**",
+            title="### **Manage AI Providers**",
             options=options,
             items=items,
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
             search_placeholder="Search providers..."
+        )
+
+
+ConnectProviderScreen = ProvidersScreen
+
+
+class ProviderActionScreen(BaseSelectionScreen[str]):
+    """Modal provider action screen (Configure Key vs Toggle Disable)"""
+
+    def __init__(self, provider_name: str, is_disabled: bool = False):
+        toggle_label = "Enable Provider" if is_disabled else "Disable Provider"
+        options = [
+            "1. Configure API Key / Connect",
+            f"2. {toggle_label}"
+        ]
+        items = [
+            "connect",
+            "toggle_disable"
+        ]
+        super().__init__(
+            title=f"### **Provider Options: {provider_name}**",
+            options=options,
+            items=items,
+            default_value=items[0],
+            show_search=False
         )
 
 

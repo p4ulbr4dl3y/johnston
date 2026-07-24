@@ -53,6 +53,25 @@ class TestProviderAdvancedFeatures(unittest.TestCase):
                         self.assertEqual(agent.chunk_timeout, 20.0)
                         self.assertEqual(agent.fallback_provider, "opencode")
 
+    def test_provider_disabling(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = os.path.join(tmpdir, "config.json")
+            with patch("core.provider_manager.CONFIG_FILE", config_file):
+                with patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                    pm = ProviderManager()
+                    self.assertEqual(pm.get_disabled_providers(), [])
+                    pm.set_provider_disabled("xai", True)
+                    self.assertIn("xai", pm.get_disabled_providers())
+
+                    providers_all = pm.load_providers(include_disabled=True)
+                    self.assertTrue(providers_all["xai"]["disabled"])
+
+                    providers_enabled = pm.load_providers(include_disabled=False)
+                    self.assertNotIn("xai", providers_enabled)
+
+                    pm.set_provider_disabled("xai", False)
+                    self.assertNotIn("xai", pm.get_disabled_providers())
+
 
 if __name__ == "__main__":
     unittest.main()

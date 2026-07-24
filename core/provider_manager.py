@@ -179,13 +179,43 @@ class ProviderManager:
                 pass
         return providers
 
-    def load_providers(self) -> Dict[str, Any]:
+    def get_disabled_providers(self) -> List[str]:
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("disabled_providers", [])
+            except Exception:
+                pass
+        return []
+
+    def set_provider_disabled(self, key: str, disabled: bool):
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        disabled_set = set(data.get("disabled_providers", []))
+        if disabled:
+            disabled_set.add(key)
+        else:
+            disabled_set.discard(key)
+        data["disabled_providers"] = list(disabled_set)
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
         """Loads providers from JSON definitions + Python plugin files in providers/"""
         providers = {}
+        disabled_set = set(self.get_disabled_providers())
 
         # 1. Load JSON providers
         json_providers = self._load_json_providers()
         for pkey, pdata in json_providers.items():
+            if not include_disabled and pkey in disabled_set:
+                continue
             providers[pkey] = {
                 "key": pkey,
                 "name": pdata.get("name", pkey),
@@ -200,6 +230,7 @@ class ProviderManager:
                 "reasoning_effort": pdata.get("reasoning_effort"),
                 "chunk_timeout": pdata.get("chunk_timeout", 30.0),
                 "fallback_provider": pdata.get("fallback_provider"),
+                "disabled": pkey in disabled_set,
                 "source": "json",
             }
 
@@ -217,6 +248,8 @@ class ProviderManager:
                             spec.loader.exec_module(module)
 
                             provider_key = getattr(module, "KEY", filename[:-3])
+                            if not include_disabled and provider_key in disabled_set:
+                                continue
                             provider_name = getattr(module, "NAME", provider_key)
 
                             if hasattr(module, "Agent"):
@@ -228,6 +261,7 @@ class ProviderManager:
                                     "model": getattr(module, "MODEL", ""),
                                     "module": module,
                                     "file": filepath,
+                                    "disabled": provider_key in disabled_set,
                                     "source": "python",
                                 }
                     except Exception as e:
