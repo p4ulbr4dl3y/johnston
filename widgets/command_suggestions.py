@@ -81,7 +81,7 @@ class CommandSuggestions(OptionList):
             return []
 
         # 1. Check for slash command at start of input
-        cleaned = full_text.strip().lower()
+        cleaned = full_text.lstrip().lower()
         if cleaned.startswith("/") and " " not in cleaned:
             self.mode = "command"
             matched_cmds = []
