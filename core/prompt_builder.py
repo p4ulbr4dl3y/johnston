@@ -56,30 +56,10 @@ def get_project_instructions_snippet() -> str:
     return "\n\n".join(found_snippets)
 
 
-def get_rules_snippet() -> str:
-    """Reads rules from ~/.johnston/rules, <cwd>/.johnston/rules, and <cwd>/.rules."""
-    rules = []
-    dirs = [
-        os.path.expanduser("~/.johnston/rules"),
-        os.path.join(os.getcwd(), ".johnston", "rules"),
-        os.path.join(os.getcwd(), ".rules"),
-    ]
-    for d in dirs:
-        if not os.path.isdir(d):
-            continue
-        for fname in sorted(os.listdir(d)):
-            fpath = os.path.join(d, fname)
-            if os.path.isfile(fpath) and not fname.startswith("."):
-                name = os.path.splitext(fname)[0]
-                try:
-                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read().strip()
-                    if content:
-                        rules.append(f"[RULE: {name}]\n{content}")
-                except Exception:
-                    pass
-
-    return "\n\n".join(rules)
+def get_rules_snippet(mode: str = "action") -> str:
+    """Reads rules from ~/.johnston/rules, <cwd>/.johnston/rules, and <cwd>/.rules using RulesManager."""
+    from core.rules_manager import RulesManager
+    return RulesManager.get_instance().get_formatted_rules(mode=mode)
 
 
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
@@ -130,7 +110,7 @@ class PromptBuilder:
         env_block = "\n".join(env_lines)
 
         project_snippet = get_project_instructions_snippet()
-        rules_snippet = get_rules_snippet()
+        rules_snippet = get_rules_snippet(mode=self.mode)
 
         sys_prompt = f"{self.base_system_prompt}\n\n{env_block}"
         if project_snippet:
