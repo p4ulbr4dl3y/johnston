@@ -1,6 +1,14 @@
 import asyncio
 import os
+import sys
 import time
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    tomllib = None  # type: ignore
 
 from textual import events, work
 from textual.app import App, ComposeResult
@@ -21,6 +29,22 @@ from widgets.command_suggestions import CommandSuggestions
 from widgets.status_footer import StatusFooter
 
 
+def get_version() -> str:
+    """Get application version dynamically from metadata or pyproject.toml"""
+    try:
+        return version("johnston")
+    except PackageNotFoundError:
+        pyproject = Path(__file__).parent / "pyproject.toml"
+        if pyproject.exists() and tomllib:
+            try:
+                with open(pyproject, "rb") as f:
+                    data = tomllib.load(f)
+                    return data.get("project", {}).get("version", "0.1.0-dev")
+            except Exception:
+                pass
+        return "0.1.0-dev"
+
+
 class JohnstonChatApp(App):
     """Minimalist Johnston chat with provider/model configuration and isolated project sessions"""
 
@@ -33,13 +57,36 @@ class JohnstonChatApp(App):
         ("backtab", "toggle_mode", "Toggle Mode"),
     ]
 
-    def __init__(self):
+    def __init__(
+        self,
+        mode: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        resume_session_id: str | None = None,
+    ):
         super().__init__()
         self.pm = ProviderManager()
+        if provider:
+            self.pm.set_active_provider_key(provider)
         self.sm = SessionManager()
         self.agent = self.pm.create_active_agent()
-        self.agent.app = self
-        self.current_session_id = self.sm.generate_session_id()
+        if model and self.agent:
+            self.agent.model = model
+        if mode and self.agent:
+            self.agent.mode = mode
+        if self.agent:
+            self.agent.app = self
+
+        if resume_session_id:
+            sess = self.sm.load_session(resume_session_id)
+            if sess:
+                self.current_session_id = resume_session_id
+                self.agent.history = sess.get("history", [])
+            else:
+                self.current_session_id = self.sm.generate_session_id()
+        else:
+            self.current_session_id = self.sm.generate_session_id()
+
         self.selection_copy_active = False
         self.background_tasks = []
         self.message_queue = []
@@ -484,8 +531,187 @@ class JohnstonChatApp(App):
         except Exception:
             pass
 
+def print_models():
+    """Print available providers and models to stdout"""
+    pm = ProviderManager()
+    providers = pm.load_providers()
+    active_key = pm.get_active_provider_key()
+    print("Available Johnston Providers & Models:\n")
+    for key, info in providers.items():
+        is_active = "*" if key == active_key else " "
+        name = info.get("NAME", key)
+        model = info.get("MODEL", "unknown")
+        desc = info.get("DESCRIPTION", "")
+        print(f"{is_active} [{key}] {name}")
+        print(f"    Default Model: {model}")
+        if desc:
+            print(f"    Description: {desc}")
+        print()
+
+
+def print_skills():
+    """Print available skills to stdout"""
+    from core.skill_manager import SkillManager
+    skills = SkillManager().list_skills()
+    print("Available Johnston Skills:\n")
+    if not skills:
+        print("  No skills found (~/.johnston/skills/ or .johnston/skills/)")
+        return
+    for s in skills:
+        scope = f"[{s.get('scope', 'global')}]"
+        print(f"  * {s.get('name', 'unnamed')} {scope}")
+        if s.get("description"):
+            print(f"    Description: {s.get('description')}")
+        if s.get("path"):
+            print(f"    Path: {s.get('path')}")
+        print()
+
+
+def print_mcp():
+    """Print configured MCP servers to stdout"""
+    from core.mcp_manager import get_mcp_manager
+    servers = get_mcp_manager().load_servers()
+    print("Configured MCP Servers:\n")
+    if not servers:
+        print("  No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)")
+        return
+    for s in servers:
+        status = "[disabled]" if s.get("disabled", False) else "[active]"
+        print(f"  * {s.get('name')} {status}")
+        cmd = s.get("command")
+        if isinstance(cmd, list):
+            cmd = " ".join(cmd)
+        print(f"    Command: {cmd}")
+        print()
+
+
+def print_rules():
+    """Print active project instructions and rules to stdout"""
+    from core.prompt_builder import get_project_instructions_snippet, get_rules_snippet
+    print("Active Rules & Project Instructions:\n")
+    instructions = get_project_instructions_snippet()
+    rules = get_rules_snippet()
+    if not instructions and not rules:
+        print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .rules/).")
+        return
+    if instructions:
+        print("=== Project Instructions ===")
+        print(instructions)
+        print()
+    if rules:
+        print("=== Global & Local Rules ===")
+        print(rules)
+        print()
+
+
+
+def run_headless_prompt(
+    prompt: str,
+    mode: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+):
+    """Execute a single prompt headless via CLI without TUI"""
+    pm = ProviderManager()
+    if provider:
+        pm.set_active_provider_key(provider)
+    agent = pm.create_active_agent()
+    if model and agent:
+        agent.model = model
+    if mode and agent:
+        agent.mode = mode
+
+    async def _runner():
+        async for chunk_type, content in agent.stream_steps(prompt):
+            if chunk_type == "text":
+                print(content, end="", flush=True)
+            elif chunk_type == "reasoning":
+                print(f"[Thinking: {content}]", flush=True)
+            elif chunk_type == "tool_start":
+                tool_name = content.get("name") if isinstance(content, dict) else content
+                print(f"\n[Executing Tool: {tool_name}]", flush=True)
+            elif chunk_type == "tool_end":
+                print(f"[Tool Result: {content}]", flush=True)
+        print()
+
+    asyncio.run(_runner())
+
+
 def main():
-    JohnstonChatApp().run()
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="johnston",
+        description="Johnston AI Chat & Coding Agent CLI",
+    )
+    parser.add_argument("-p", "--prompt", help="Run a single prompt in CLI headless mode")
+    parser.add_argument(
+        "-m",
+        "--mode",
+        choices=["action", "explore"],
+        help="Agent execution mode ('action' or 'explore')",
+    )
+    parser.add_argument("--provider", help="Set active provider key (e.g. opencode)")
+    parser.add_argument("--model", help="Set active model ID")
+    parser.add_argument("--resume", help="Resume specific session ID")
+    parser.add_argument("--models", action="store_true", help="List available providers and models")
+    parser.add_argument("--skills", action="store_true", help="List available skills")
+    parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
+    parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
+    parser.add_argument("--init", action="store_true", help="Initialize or update AGENTS.md guide for repo")
+    parser.add_argument("-v", "--version", action="store_true", help="Show application version")
+
+    args = parser.parse_args()
+
+    if args.version:
+        print(f"johnston {get_version()}")
+        sys.exit(0)
+
+    if args.models:
+        print_models()
+        sys.exit(0)
+
+    if args.skills:
+        print_skills()
+        sys.exit(0)
+
+    if args.mcp:
+        print_mcp()
+        sys.exit(0)
+
+    if args.rules:
+        print_rules()
+        sys.exit(0)
+
+    if args.init:
+        from commands import INIT_PROMPT_TEMPLATE
+        run_headless_prompt(
+            prompt=INIT_PROMPT_TEMPLATE,
+            mode=args.mode,
+            provider=args.provider,
+            model=args.model,
+        )
+        sys.exit(0)
+
+    if args.prompt:
+        run_headless_prompt(
+            prompt=args.prompt,
+            mode=args.mode,
+            provider=args.provider,
+            model=args.model,
+        )
+        sys.exit(0)
+
+    app = JohnstonChatApp(
+        mode=args.mode,
+        provider=args.provider,
+        model=args.model,
+        resume_session_id=args.resume,
+    )
+    app.run()
+
 
 if __name__ == "__main__":
     main()
+
+
