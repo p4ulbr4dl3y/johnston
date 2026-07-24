@@ -62,7 +62,7 @@ class SubagentsScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown(self._get_header_title(), id="subagents-title", classes="modal-markdown")
             yield OptionList(id="subagents-option-list")
-            yield Label(self._get_hint_text(), id="subagents-hint")
+            yield Label(self._get_hint_text(), id="modal-hint")
 
     def _get_header_title(self) -> str:
         if self.active_tab == 0:
@@ -72,9 +72,9 @@ class SubagentsScreen(ModalScreen[None]):
 
     def _get_hint_text(self) -> str:
         if self.active_tab == 0:
-            return "enter: watch/view • k: kill • ←/→: switch tab • esc: close • ↑/↓: navigate"
+            return "enter: watch • k: kill • ←/→: tab • esc: close"
         else:
-            return "enter: template details • ←/→: switch tab • esc: close • ↑/↓: navigate"
+            return "enter: detail • ←/→: tab • esc: close"
 
     def on_mount(self) -> None:
         self.refresh_tab()
@@ -83,7 +83,7 @@ class SubagentsScreen(ModalScreen[None]):
         title_md = self.query_one("#subagents-title", Markdown)
         title_md.update(self._get_header_title())
 
-        hint_label = self.query_one("#subagents-hint", Label)
+        hint_label = self.query_one("#modal-hint", Label)
         hint_label.update(self._get_hint_text())
 
         opt_list = self.query_one("#subagents-option-list", OptionList)
