@@ -14,6 +14,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         ToolContext._instance = None
         self.old_dir = SUBAGENTS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()
         self.tracker.storage_dir = self.temp_dir.name
         self.tracker.sessions.clear()

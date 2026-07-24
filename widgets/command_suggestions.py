@@ -2,7 +2,7 @@ import os
 
 from textual.widgets import OptionList
 
-from commands import COMMAND_REGISTRY
+from core.commands import COMMAND_REGISTRY
 from core.skill_manager import SkillManager
 
 

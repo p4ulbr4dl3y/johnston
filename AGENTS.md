@@ -115,7 +115,7 @@ All available tools are registered in [tools/registry.py](file:///Users/yegor/jo
 
 ## 4. Slash Commands and Action / Explore Modes
 
-All slash commands are handled in [commands.py](file:///Users/yegor/johnston/commands.py) with automatic normalization of Cyrillic homoglyphs (to handle wrong keyboard layout input).
+All slash commands are handled in [core/commands.py](file:///Users/yegor/johnston/core/commands.py) with automatic normalization of Cyrillic homoglyphs (to handle wrong keyboard layout input).
 
 ### Modes:
 * **Action** (`/action`, aliases: `/build`, `/code`) — standard execution mode with full permissions for creating/editing files and executing bash commands.

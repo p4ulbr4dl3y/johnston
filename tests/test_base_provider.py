@@ -95,7 +95,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res_bash.strip(), "hello bash")
 
     def test_init_and_compact_commands_registered(self):
-        from commands import COMMAND_REGISTRY
+        from core.commands import COMMAND_REGISTRY
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/compact", COMMAND_REGISTRY)
 
@@ -103,6 +103,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
         agent.history = [
             {"role": "user", "content": "hi"},
             {"role": "assistant", "content": "hello"}
@@ -113,6 +114,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_compact_history_opencode_template(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
         agent.history = [
             {"role": "user", "content": "Fix bug in auth.py"},
             {"role": "assistant", "content": "Checking auth.py", "tool_calls": [{"function": {"name": "read", "arguments": "auth.py"}}]},
@@ -142,6 +144,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
         agent.history = [
             {"role": "user", "content": "a" * 200},
             {"role": "assistant", "content": "b" * 200},

@@ -67,7 +67,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Error: Unable to load skill", res_missing)
 
     def test_skills_command_registered(self):
-        from commands import COMMAND_REGISTRY
+        from core.commands import COMMAND_REGISTRY
         self.assertIn("/skills", COMMAND_REGISTRY)
 
     def test_skill_command_suggestions(self):
@@ -78,7 +78,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/johnston-architect", cmd_names)
 
     async def test_skill_slash_command_execution(self):
-        from commands import handle_slash_command
+        from core.commands import handle_slash_command
         from tests.test_commands import MockApp
 
         app = MockApp()

@@ -57,6 +57,10 @@ class BaseAgent:
         self.cost_usd = 0.0
         self.mode = "action"
 
+    async def close(self):
+        if hasattr(self, "client") and self.client:
+            await self.client.close()
+
     @property
     def context_limit(self) -> int:
         return catalog.get_context_limit(self.provider_key, self.model)

@@ -20,7 +20,7 @@ from widgets.patch import apply_textual_patches
 apply_textual_patches()
 
 
-from commands import handle_slash_command
+from core.commands import handle_slash_command
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionManager
 from widgets.chat_input import ChatInput
@@ -745,7 +745,7 @@ def main():
         target_prompt = f"Piped Stdin Content:\n{stdin_input}\n\nTask: {target_prompt}".strip()
 
     if args.init:
-        from commands import INIT_PROMPT_TEMPLATE
+        from core.commands import INIT_PROMPT_TEMPLATE
         run_headless_prompt(
             prompt=INIT_PROMPT_TEMPLATE,
             mode=args.mode,

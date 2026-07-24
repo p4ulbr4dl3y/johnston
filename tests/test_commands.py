@@ -1,6 +1,6 @@
 import unittest
 
-from commands import COMMAND_REGISTRY, handle_slash_command
+from core.commands import COMMAND_REGISTRY, handle_slash_command
 from widgets.chat_view import ChatView
 
 

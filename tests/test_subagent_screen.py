@@ -12,17 +12,17 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         from core.subagent_tracker import SUBAGENTS_DIR
         self.old_dir = SUBAGENTS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()
         self.tracker.storage_dir = self.temp_dir.name
         self.tracker.sessions.clear()
 
-    async def asyncTearDown(self):
+    def tearDown(self):
         for sess in list(self.tracker.sessions.values()):
             if sess.async_task and not sess.async_task.done():
                 sess.async_task.cancel()
         self.tracker.sessions.clear()
         self.tracker.storage_dir = self.old_dir
-        self.temp_dir.cleanup()
 
     def test_tracker_create_and_find(self):
         sess = self.tracker.create_session("task-123", "test subagent", "test prompt", "general", False)

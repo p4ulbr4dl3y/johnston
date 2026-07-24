@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from commands import COMMAND_REGISTRY
+from core.commands import COMMAND_REGISTRY
 from core.mcp_manager import MCPManager
 
 
