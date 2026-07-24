@@ -50,7 +50,7 @@ class SubagentDetailScreen(ModalScreen[None]):
 
 
 class TemplateDetailScreen(ModalScreen[None]):
-    """Modal screen displaying definition of a subagent template"""
+    """Modal screen displaying full definition, tools, and description of a subagent template"""
     BINDINGS = [("escape", "cancel", "Back")]
 
     def __init__(self, definition: SubagentDefinition):
@@ -60,8 +60,14 @@ class TemplateDetailScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         source_tag = self.defn.source.upper()
         header_md = f"### **Subagent Template: {self.defn.name}** (`[{source_tag}]`)\n\n"
-        header_md += f"*{self.defn.description}*\n\n---\n\n"
-        header_md += f"### **System Prompt:**\n```\n{self.defn.system_prompt}\n```"
+        if self.defn.description:
+            header_md += f"**Description:** *{self.defn.description}*\n\n"
+        if self.defn.tools:
+            tools_str = ", ".join(f"`{t}`" for t in self.defn.tools)
+            header_md += f"**Tools:** {tools_str}\n\n"
+        if self.defn.model:
+            header_md += f"**Model:** `{self.defn.model}`\n\n"
+        header_md += f"---\n\n### **System Prompt:**\n```\n{self.defn.system_prompt}\n```"
 
         with Vertical(id="modal-dialog"):
             yield Markdown(header_md, classes="modal-markdown")
@@ -72,7 +78,7 @@ class TemplateDetailScreen(ModalScreen[None]):
 
 
 class SubagentsScreen(ModalScreen[None]):
-    """2-Tab Modal screen for Subagents: [ Tasks ] & [ Templates ] (Left/Right arrow switching)"""
+    """2-Tab Modal screen for Subagents: [ Tasks ] & [ Templates ] (Single-line list view)"""
 
     ALLOW_SELECT = False
     BINDINGS = [
@@ -91,7 +97,7 @@ class SubagentsScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown(self._get_header_title(), id="subagents-title", classes="modal-markdown")
             yield OptionList(id="subagents-option-list")
-            yield Label("←/→: switch tab • enter: details • esc: close • ↑/↓: navigate", id="modal-hint")
+            yield Label("←/→: switch tab • enter: view details • esc: close • ↑/↓: navigate", id="modal-hint")
 
     def _get_header_title(self) -> str:
         if self.active_tab == 0:
@@ -134,8 +140,7 @@ class SubagentsScreen(ModalScreen[None]):
             else:
                 for t in self.templates:
                     source_tag = rf"\[{t.source.upper()}]"
-                    desc_info = f" — {t.description}" if t.description else ""
-                    opt_list.add_option(f"{source_tag} {t.name}{desc_info}")
+                    opt_list.add_option(f"{source_tag} {t.name}")
 
         if opt_list.option_count > 0:
             opt_list.highlighted = 0
