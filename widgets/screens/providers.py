@@ -56,10 +56,10 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: connect • ctrl+d: disable/enable • esc: cancel • ↑/↓: navigate", id="modal-hint")
+            yield Label("enter: connect • ctrl+t: disable/enable • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("ctrl+d", "ctrl_d"):
+        if event.key in ("ctrl+t", "ctrl_t"):
             opt_list = self.query_one("#modal-option-list", OptionList)
             idx = opt_list.highlighted
             if idx is not None and 0 <= idx < len(self.filtered_items):
