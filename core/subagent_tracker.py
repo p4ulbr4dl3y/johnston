@@ -2,9 +2,7 @@ import json
 import os
 from typing import Any, Callable, Dict, List, Optional
 
-from core.config import CONFIG_DIR
-
-SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
+from core.config import SUBAGENT_SESSIONS_DIR, SUBAGENTS_DIR
 
 
 class SubagentSessionData:
@@ -86,7 +84,7 @@ class SubagentTracker:
 
     def __init__(self):
         self.sessions: Dict[str, SubagentSessionData] = {}
-        self.storage_dir = SUBAGENTS_DIR
+        self.storage_dir = SUBAGENT_SESSIONS_DIR
         self._load_all_sessions()
 
     @classmethod
@@ -96,18 +94,20 @@ class SubagentTracker:
         return cls._instance
 
     def _load_all_sessions(self) -> None:
-        if not os.path.exists(self.storage_dir):
-            return
-        for fname in os.listdir(self.storage_dir):
-            if fname.endswith(".json"):
-                fpath = os.path.join(self.storage_dir, fname)
-                try:
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    sess = SubagentSessionData.from_dict(data)
-                    self.sessions[sess.task_id] = sess
-                except Exception:
-                    pass
+        dirs_to_check = [self.storage_dir, SUBAGENTS_DIR]
+        for dpath in dirs_to_check:
+            if os.path.exists(dpath):
+                for fname in os.listdir(dpath):
+                    if fname.endswith(".json"):
+                        fpath = os.path.join(dpath, fname)
+                        try:
+                            with open(fpath, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            sess = SubagentSessionData.from_dict(data)
+                            if sess.task_id not in self.sessions:
+                                self.sessions[sess.task_id] = sess
+                        except Exception:
+                            pass
 
     def save_session(self, sess: SubagentSessionData) -> None:
         try:

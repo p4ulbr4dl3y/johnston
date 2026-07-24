@@ -70,10 +70,19 @@ class SubagentTool(BaseTool):
             if t.get("function", {}).get("name") not in ("subagent", "Subagent", "Task", "task")
         ]
 
-        if subagent_type == "explore":
-            subagent.system_prompt += "\n\n[SUBAGENT EXPLORE MODE]\nYou are a fast exploration subagent. Find answers, search codebase, read files, and summarize findings concisely."
-        else:
-            subagent.system_prompt += f"\n\n[SUBAGENT MODE: {subagent_type.upper()}]\nYou are a subagent executing: {description}. Perform the task and return concise results."
+        from core.subagent_registry import SubagentRegistry
+        registry = SubagentRegistry.get_instance()
+        registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
+        definition = registry.get_definition(subagent_type)
+
+        subagent.system_prompt += f"\n\n{definition.system_prompt}"
+        if definition.model:
+            subagent.model = definition.model
+        if definition.tools:
+            subagent.tools = [
+                t for t in subagent.tools
+                if t.get("function", {}).get("name") in definition.tools
+            ]
 
         def _record_step(step, acc):
             etype = step[0]

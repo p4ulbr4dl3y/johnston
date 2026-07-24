@@ -5,6 +5,11 @@ PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROVIDERS_DIR = os.path.join(PROJECT_DIR, "providers")
 PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")
+
+SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
+SUBAGENT_DEFS_DIR = os.path.join(SUBAGENTS_DIR, "definitions")
+SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
 
 # Theme Palette Constants (Monochrome Slate)
 THEME_BG = "#09090b"

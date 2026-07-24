@@ -11,7 +11,15 @@ from tools.registry import execute_tool
 
 
 class BaseAgent:
-    def __init__(self, api_key: str, model: str, base_url: str, system_prompt: str, tools: List[Dict[str, Any]] = None, provider_key: str = "opencode"):
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "",
+        base_url: str = "",
+        system_prompt: str = "You write code and execute tasks.",
+        tools: List[Dict[str, Any]] = None,
+        provider_key: str = "opencode"
+    ):
         if tools is None:
             from tools.registry import get_default_tools
             tools = get_default_tools()

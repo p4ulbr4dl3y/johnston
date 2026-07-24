@@ -55,16 +55,23 @@ class ManageSubagentTool(BaseTool):
         curr_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
 
         if action == "list":
+            from core.subagent_registry import SubagentRegistry
+            registry = SubagentRegistry.get_instance()
+            registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
+            defs = registry.list_definitions()
+
+            lines = ["Available Subagent Definitions:"]
+            for dname, dval in defs.items():
+                lines.append(f"• Type: '{dname}' [{dval.source}] — {dval.description}")
+
             show_all = bool(args.get("all", False))
             target_sessions = list(tracker.sessions.values()) if show_all else tracker.get_sessions_for_session(curr_session_id)
-            if not target_sessions:
-                return "No subagent sessions registered for current chat session."
-
-            lines = ["Registered Subagents:"]
-            for sess in target_sessions:
-                lines.append(
-                    f"• ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
-                )
+            if target_sessions:
+                lines.append("\nActive/Past Subagent Sessions:")
+                for sess in target_sessions:
+                    lines.append(
+                        f"• ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
+                    )
             return "\n".join(lines)
 
         if not task_id:

@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR
+from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR, PROVIDERS_JSON_FILE
 
 johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 core_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,13 +17,71 @@ if core_dir not in sys.path:
     sys.path.insert(0, core_dir)
 
 
+DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
+    "opencode": {
+        "key": "opencode",
+        "name": "OpenCode Go (DeepSeek v4 Flash)",
+        "description": "OpenCode Go agent (DeepSeek v4 Flash) with tools",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "model": "deepseek-v4-flash",
+    },
+    "clinepass": {
+        "key": "clinepass",
+        "name": "ClinePass",
+        "description": "ClinePass AI provider (DeepSeek, GLM, Kimi, Qwen, MiniMax, MiMo)",
+        "base_url": "https://api.cline.bot/api/v1",
+        "model": "cline-pass/deepseek-v4-flash",
+        "models": [
+            "cline-pass/glm-5.2",
+            "cline-pass/kimi-k3",
+            "cline-pass/kimi-k2.7-code",
+            "cline-pass/kimi-k2.6",
+            "cline-pass/deepseek-v4-pro",
+            "cline-pass/deepseek-v4-flash",
+            "cline-pass/mimo-v2.5",
+            "cline-pass/mimo-v2.5-pro",
+            "cline-pass/minimax-m3",
+            "cline-pass/qwen3.7-max",
+            "cline-pass/qwen3.7-plus",
+        ],
+    },
+    "nvidia": {
+        "key": "nvidia",
+        "name": "NVIDIA NIM",
+        "description": "NVIDIA NIM multi-model AI agent",
+        "base_url": "https://integrate.api.nvidia.com/v1",
+        "model": "meta/codellama-70b",
+    },
+    "openai": {
+        "key": "openai",
+        "name": "OpenAI",
+        "description": "Official OpenAI API provider",
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o",
+    },
+    "anthropic": {
+        "key": "anthropic",
+        "name": "Anthropic (Claude)",
+        "description": "Anthropic Claude API provider",
+        "base_url": "https://api.anthropic.com/v1",
+        "model": "claude-3-5-sonnet-20241022",
+    },
+    "ollama": {
+        "key": "ollama",
+        "name": "Ollama (Local)",
+        "description": "Local Ollama server",
+        "base_url": "http://localhost:11434/v1",
+        "model": "qwen2.5-coder:32b",
+    },
+    "openrouter": {
+        "key": "openrouter",
+        "name": "OpenRouter",
+        "description": "Unified OpenRouter API",
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "anthropic/claude-3.5-sonnet",
+    },
+}
 
-def _get_default_opencode_template() -> str:
-    default_path = os.path.join(johnston_dir, "providers", "opencode.py")
-    if os.path.exists(default_path):
-        with open(default_path, "r", encoding="utf-8") as f:
-            return f.read()
-    return ""
 
 class ProviderManager:
     def __init__(self):
@@ -33,46 +91,77 @@ class ProviderManager:
         os.makedirs(PROVIDERS_DIR, exist_ok=True)
         os.makedirs(CONFIG_DIR, exist_ok=True)
 
-        opencode_file = os.path.join(PROVIDERS_DIR, "opencode.py")
-        if not os.path.exists(opencode_file):
-            content = _get_default_opencode_template()
-            if content:
-                with open(opencode_file, "w", encoding="utf-8") as f:
-                    f.write(content.strip())
+        if not os.path.exists(PROVIDERS_JSON_FILE):
+            try:
+                with open(PROVIDERS_JSON_FILE, "w", encoding="utf-8") as f:
+                    json.dump(DEFAULT_JSON_PROVIDERS, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
 
         if not os.path.exists(CONFIG_FILE):
             self.set_active_provider_key("opencode")
 
+    def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
+        providers = dict(DEFAULT_JSON_PROVIDERS)
+        if os.path.exists(PROVIDERS_JSON_FILE):
+            try:
+                with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if isinstance(v, dict):
+                                providers[k] = v
+            except Exception:
+                pass
+        return providers
+
     def load_providers(self) -> Dict[str, Any]:
-        """Dynamically loads all .py providers from local providers/ directory"""
+        """Loads providers from JSON definitions + Python plugin files in providers/"""
         providers = {}
-        if not os.path.exists(PROVIDERS_DIR):
-            return providers
 
-        for filename in os.listdir(PROVIDERS_DIR):
-            if filename.endswith(".py") and not filename.startswith("_"):
-                filepath = os.path.join(PROVIDERS_DIR, filename)
-                mod_name = f"johnston_provider_{filename[:-3]}"
+        # 1. Load JSON providers
+        json_providers = self._load_json_providers()
+        for pkey, pdata in json_providers.items():
+            providers[pkey] = {
+                "key": pkey,
+                "name": pdata.get("name", pkey),
+                "description": pdata.get("description", ""),
+                "base_url": pdata.get("base_url", ""),
+                "model": pdata.get("model", ""),
+                "models": pdata.get("models", []),
+                "fetch_models": pdata.get("fetch_models", True),
+                "source": "json",
+            }
 
-                try:
-                    spec = importlib.util.spec_from_file_location(mod_name, filepath)
-                    if spec and spec.loader:
-                        module = importlib.util.module_from_spec(spec)
-                        spec.loader.exec_module(module)
+        # 2. Load .py plugins from PROVIDERS_DIR (take precedence if defined)
+        if os.path.exists(PROVIDERS_DIR):
+            for filename in os.listdir(PROVIDERS_DIR):
+                if filename.endswith(".py") and not filename.startswith("_"):
+                    filepath = os.path.join(PROVIDERS_DIR, filename)
+                    mod_name = f"johnston_provider_{filename[:-3]}"
 
-                        provider_key = getattr(module, "KEY", filename[:-3])
-                        provider_name = getattr(module, "NAME", provider_key)
+                    try:
+                        spec = importlib.util.spec_from_file_location(mod_name, filepath)
+                        if spec and spec.loader:
+                            module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(module)
 
-                        if hasattr(module, "Agent"):
-                            providers[provider_key] = {
-                                "key": provider_key,
-                                "name": provider_name,
-                                "description": getattr(module, "DESCRIPTION", ""),
-                                "module": module,
-                                "file": filepath
-                            }
-                except Exception as e:
-                    print(f"Error loading provider {filename}: {e}")
+                            provider_key = getattr(module, "KEY", filename[:-3])
+                            provider_name = getattr(module, "NAME", provider_key)
+
+                            if hasattr(module, "Agent"):
+                                providers[provider_key] = {
+                                    "key": provider_key,
+                                    "name": provider_name,
+                                    "description": getattr(module, "DESCRIPTION", ""),
+                                    "base_url": getattr(module, "BASE_URL", ""),
+                                    "model": getattr(module, "MODEL", ""),
+                                    "module": module,
+                                    "file": filepath,
+                                    "source": "python",
+                                }
+                    except Exception as e:
+                        print(f"Error loading provider {filename}: {e}")
 
         return providers
 
@@ -125,7 +214,7 @@ class ProviderManager:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def set_provider_model(self, key: str, model_name: str):
-        """Saves selected model for provider to config and provider .py file"""
+        """Saves selected model for provider to config and provider definition"""
         data = {}
         if os.path.exists(CONFIG_FILE):
             try:
@@ -139,6 +228,19 @@ class ProviderManager:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
+        # Also update JSON providers file if present
+        if os.path.exists(PROVIDERS_JSON_FILE):
+            try:
+                with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
+                    jdata = json.load(f)
+                if key in jdata:
+                    jdata[key]["model"] = model_name
+                    with open(PROVIDERS_JSON_FILE, "w", encoding="utf-8") as f:
+                        json.dump(jdata, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+        # Update .py provider file if present
         provider_path = os.path.join(PROVIDERS_DIR, f"{key}.py")
         if os.path.exists(provider_path):
             try:
@@ -166,15 +268,24 @@ class ProviderManager:
             first_key = list(providers.keys())[0]
             target_provider = providers[first_key]
         else:
-            raise RuntimeError("No available providers in project providers/")
+            raise RuntimeError("No available providers configured.")
 
-        mod = target_provider["module"]
-        stored_key = self.get_api_key(active_key)
+        stored_key = self.get_api_key(target_provider["key"])
         kwargs = {}
         if stored_key:
             kwargs["api_key"] = stored_key
 
-        agent = mod.Agent(**kwargs)
+        if "module" in target_provider and hasattr(target_provider["module"], "Agent"):
+            agent = target_provider["module"].Agent(**kwargs)
+        else:
+            from core.base_provider import BaseAgent
+            agent = BaseAgent(
+                api_key=stored_key or target_provider.get("api_key", ""),
+                model=target_provider.get("model", "gpt-4o"),
+                base_url=target_provider.get("base_url", ""),
+                system_prompt=target_provider.get("system_prompt", "You write code and execute tasks."),
+                provider_key=target_provider["key"],
+            )
 
         if os.path.exists(CONFIG_FILE):
             try:
@@ -210,14 +321,16 @@ class ProviderManager:
         if provider_key not in providers:
             return []
 
-        mod = providers[provider_key]["module"]
-        base_url = getattr(mod, "BASE_URL", None)
-        api_key = self.get_api_key(provider_key) or getattr(mod, "API_KEY", None)
+        pdata = providers[provider_key]
+        mod = pdata.get("module")
+        base_url = getattr(mod, "BASE_URL", None) if mod else pdata.get("base_url")
+        api_key = self.get_api_key(provider_key) or (getattr(mod, "API_KEY", None) if mod else pdata.get("api_key"))
 
         models = []
         model_limits = {}
         vision_models = []
-        if base_url:
+        should_fetch = pdata.get("fetch_models", True)
+        if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
             try:
@@ -245,12 +358,16 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Fallback to models list from module or default model
+        # Universal fallback to static models list, module, or default model for ANY provider
         if not models:
-            if hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
-                models = mod.MODELS
-            elif hasattr(mod, "MODEL"):
+            if pdata.get("models"):
+                models = list(pdata["models"])
+            elif mod and hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
+                models = list(mod.MODELS)
+            elif mod and hasattr(mod, "MODEL"):
                 models = [mod.MODEL]
+            elif pdata.get("model"):
+                models = [pdata["model"]]
 
         # Save to cache
         if models:
@@ -273,4 +390,3 @@ class ProviderManager:
                 "models": models
             }
         return grouped
-

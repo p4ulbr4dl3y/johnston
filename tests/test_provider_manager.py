@@ -16,10 +16,12 @@ class TestProviderManager(unittest.TestCase):
         self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
         self.providers_dir_patcher = patch("core.provider_manager.PROVIDERS_DIR", os.path.join(self.test_dir, "providers"))
         self.config_file_patcher = patch("core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
+        self.providers_json_patcher = patch("core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json"))
 
         self.config_dir_patcher.start()
         self.providers_dir_patcher.start()
         self.config_file_patcher.start()
+        self.providers_json_patcher.start()
 
         self.pm = ProviderManager()
 
@@ -27,18 +29,18 @@ class TestProviderManager(unittest.TestCase):
         self.config_dir_patcher.stop()
         self.providers_dir_patcher.stop()
         self.config_file_patcher.stop()
+        self.providers_json_patcher.stop()
         shutil.rmtree(self.test_dir)
 
     def test_ensure_config_dir(self):
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers")))
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers", "opencode.py")))
+        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers.json")))
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "config.json")))
 
     def test_load_providers(self):
-        # We should have opencode provider because it gets created by ensure_config_dir
         providers = self.pm.load_providers()
         self.assertIn("opencode", providers)
-        self.assertEqual(providers["opencode"]["name"], "OpenCode Go")
+        self.assertIn("OpenCode Go", providers["opencode"]["name"])
 
     def test_get_set_active_provider_key(self):
         self.assertEqual(self.pm.get_active_provider_key(), "opencode")
@@ -48,7 +50,7 @@ class TestProviderManager(unittest.TestCase):
     def test_create_active_agent(self):
         agent = self.pm.create_active_agent()
         self.assertIsNotNone(agent)
-        self.assertEqual(agent.model, "qwen3.7-max")
+        self.assertEqual(agent.model, "deepseek-v4-flash")
 
     def test_api_keys(self):
         self.assertEqual(self.pm.get_api_key("opencode"), "")
