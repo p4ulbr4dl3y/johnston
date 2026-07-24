@@ -116,7 +116,11 @@ class SubagentsScreen(ModalScreen[None]):
         opt_list.clear_options()
 
         if self.active_tab == 0:
-            self.sessions = self.st.get_sessions_for_session()
+            curr_sid = getattr(self.app, "current_session_id", None) if hasattr(self, "app") else None
+            self.sessions = self.st.get_sessions_for_session(curr_sid)
+            if not self.sessions:
+                self.sessions = self.st.get_sessions_for_session(None)
+
             if not self.sessions:
                 opt_list.add_option("*No subagent tasks spawned yet*")
             else:
