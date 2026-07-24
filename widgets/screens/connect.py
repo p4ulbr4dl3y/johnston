@@ -1,26 +1,41 @@
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Input, Label, Markdown
+from textual.widgets import Input, Label, Markdown, OptionList
 
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
 class ProvidersScreen(BaseSelectionScreen[str]):
-    """Modal provider selection screen for /providers command"""
+    """Modal provider selection screen for /providers command with 'd' key toggle"""
 
-    def __init__(self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None):
-        providers_list = list(providers.values())
-        disabled_set = set(disabled_providers or [])
+    def __init__(self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None):
+        self.providers = providers
+        self.active_key = active_key
+        self.configured_keys = configured_keys
+        self.disabled_set = set(disabled_providers or [])
+        self.pm = pm
+
+        options, items = self._build_options()
+        super().__init__(
+            title="### **Manage AI Providers**",
+            options=options,
+            items=items,
+            default_value=active_key if active_key in items else (items[0] if items else ""),
+            show_search=True,
+            search_placeholder="Search providers..."
+        )
+
+    def _build_options(self):
         options = []
         items = []
-
-        for p in providers_list:
+        for p in self.providers.values():
             key = p["key"]
             name = p["name"]
-            has_key = bool(configured_keys.get(key))
-            is_active = (key == active_key)
-            is_disabled = key in disabled_set or p.get("disabled", False)
+            has_key = bool(self.configured_keys.get(key))
+            is_active = (key == self.active_key)
+            is_disabled = key in self.disabled_set or p.get("disabled", False)
 
             badge = ""
             if is_disabled:
@@ -32,40 +47,45 @@ class ProvidersScreen(BaseSelectionScreen[str]):
 
             options.append(f"{name}{badge}")
             items.append(key)
+        return options, items
 
-        super().__init__(
-            title="### **Manage AI Providers**",
-            options=options,
-            items=items,
-            default_value=active_key if active_key in items else (items[0] if items else ""),
-            show_search=True,
-            search_placeholder="Search providers..."
-        )
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            yield Markdown(self.title, classes="modal-markdown")
+            if self.show_search:
+                yield Input(placeholder=self.search_placeholder, id="modal-search-input")
+            yield OptionList(*self.filtered_options, id="modal-option-list")
+            yield Label("enter: connect • d: disable/enable • esc: cancel • ↑/↓: navigate", id="modal-hint")
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.character == "d" or event.key == "d":
+            opt_list = self.query_one("#modal-option-list", OptionList)
+            idx = opt_list.highlighted
+            if idx is not None and 0 <= idx < len(self.filtered_items):
+                pkey = self.filtered_items[idx]
+                if pkey:
+                    if pkey in self.disabled_set:
+                        self.disabled_set.remove(pkey)
+                        if self.pm:
+                            self.pm.set_provider_disabled(pkey, False)
+                    else:
+                        self.disabled_set.add(pkey)
+                        if self.pm:
+                            self.pm.set_provider_disabled(pkey, True)
+
+                    options, items = self._build_options()
+                    self.raw_options = options
+                    self.raw_items = items
+                    search_input = self.query_one("#modal-search-input", Input)
+                    self.on_input_changed(Input.Changed(search_input, search_input.value))
+                    opt_list.highlighted = idx
+                    event.prevent_default()
+                    event.stop()
+                    return
+        super()._on_key(event)
 
 
 ConnectProviderScreen = ProvidersScreen
-
-
-class ProviderActionScreen(BaseSelectionScreen[str]):
-    """Modal provider action screen (Configure Key vs Toggle Disable)"""
-
-    def __init__(self, provider_name: str, is_disabled: bool = False):
-        toggle_label = "Enable Provider" if is_disabled else "Disable Provider"
-        options = [
-            "1. Configure API Key / Connect",
-            f"2. {toggle_label}"
-        ]
-        items = [
-            "connect",
-            "toggle_disable"
-        ]
-        super().__init__(
-            title=f"### **Provider Options: {provider_name}**",
-            options=options,
-            items=items,
-            default_value=items[0],
-            show_search=False
-        )
 
 
 class ApiKeyInputScreen(ModalScreen[str | None]):
