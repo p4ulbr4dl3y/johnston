@@ -361,7 +361,7 @@ class ChatInput(TextArea):
                     if suggestions.mode == "command":
                         if suggestions.highlighted < len(suggestions.current_matched):
                             chosen_cmd = suggestions.current_matched[suggestions.highlighted]
-                            self.load_text(chosen_cmd)
+                            self.load_text(chosen_cmd + " ")
                             lines = self.text.split("\n")
                             self.move_cursor((len(lines) - 1, len(lines[-1])))
                             suggestions.display = False

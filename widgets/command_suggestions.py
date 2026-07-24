@@ -144,7 +144,7 @@ class CommandSuggestions(OptionList):
                 chat_input = self.app.query_one("#message-input", ChatInput)
                 if self.mode == "command":
                     chosen_cmd = self.current_matched[self.highlighted]
-                    chat_input.load_text(chosen_cmd)
+                    chat_input.load_text(chosen_cmd + " ")
                     lines = chat_input.text.split("\n")
                     chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
                 elif self.mode == "file":
