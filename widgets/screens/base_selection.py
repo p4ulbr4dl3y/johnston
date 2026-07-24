@@ -13,7 +13,14 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
     """Base class for selection modal screens with OptionList"""
 
     ALLOW_SELECT = False
-    BINDINGS = [("escape", "cancel", "Cancel")]
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(
         self,

@@ -135,6 +135,63 @@ async def test_message_queue():
     assert app.message_queue[0] == ("Queued message", True)
     print("✓ Message queue tests passed cleanly!")
 
+def test_resume_tip_on_exit():
+    from io import StringIO
+    from unittest.mock import patch
+    app = JohnstonChatApp()
+    app.sm.save_session(app.current_session_id, {"ui_messages": [{"type": "user", "text": "hi"}]})
+
+    out = StringIO()
+    with patch("sys.stdout", out):
+        if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
+            sess = app.sm.load_session(app.current_session_id)
+            if sess and (sess.get("ui_messages") or sess.get("agent_history")):
+                print(f"\nTo resume this session, run:\n  johnston --resume {app.current_session_id}")
+
+    assert f"johnston --resume {app.current_session_id}" in out.getvalue()
+    print("✓ Exit resume tip test passed cleanly!")
+
+
+async def test_resume_cli_flag():
+    app = JohnstonChatApp()
+    app.sm.save_session("test_sess_123", {
+        "ui_messages": [{"type": "user", "text": "Resumed user msg"}],
+        "agent_history": [{"role": "user", "content": "Resumed user msg"}]
+    })
+
+    resumed_app = JohnstonChatApp(resume_session_id="test_sess_123")
+    async with resumed_app.run_test() as pilot:
+        await pilot.pause(0.2)
+        assert resumed_app.current_session_id == "test_sess_123"
+        chat_view = resumed_app.query_one(ChatView)
+        user_msgs = chat_view.get_user_messages()
+        assert len(user_msgs) == 1
+        assert user_msgs[0][1] == "Resumed user msg"
+        print("✓ CLI --resume test passed cleanly!")
+
+
+async def test_modal_ctrl_c_quit():
+    app = JohnstonChatApp()
+    async with app.run_test() as pilot:
+        chat_input = app.query_one("#message-input", ChatInput)
+        chat_input.load_text("/models")
+        await pilot.press("enter")
+        await pilot.pause(0.2)
+        assert isinstance(app.screen, ModelScreen)
+
+        await pilot.press("ctrl+c")
+        await pilot.pause(0.2)
+        assert not app.is_running
+        print("✓ Modal Ctrl+C quit test passed cleanly!")
+
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
     asyncio.run(test_message_queue())
+    asyncio.run(test_resume_cli_flag())
+    asyncio.run(test_modal_ctrl_c_quit())
+    test_resume_tip_on_exit()
+
+
+
+

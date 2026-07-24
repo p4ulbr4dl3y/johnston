@@ -10,7 +10,14 @@ from core.rules_manager import RuleDefinition, RulesManager
 
 class RuleDetailScreen(ModalScreen[None]):
     """Modal screen displaying full markdown content of a rule"""
-    BINDINGS = [("escape", "cancel", "Back")]
+    BINDINGS = [
+        ("escape", "cancel", "Back"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, rule: RuleDefinition):
         super().__init__()
@@ -43,7 +50,12 @@ class RulesScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self):
         super().__init__()

@@ -15,7 +15,14 @@ from widgets.screens.subagent_screen import SubagentViewScreen
 
 class TemplateDetailScreen(ModalScreen[None]):
     """Modal screen displaying full definition, tools, and description of a subagent template"""
-    BINDINGS = [("escape", "cancel", "Back")]
+    BINDINGS = [
+        ("escape", "cancel", "Back"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, definition: SubagentDefinition):
         super().__init__()
@@ -48,7 +55,12 @@ class SubagentsScreen(ModalScreen[None]):
     BINDINGS = [
         ("escape", "cancel", "Close"),
         ("k", "kill_subagent", "Kill Subagent"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self):
         super().__init__()

@@ -12,7 +12,12 @@ class TaskConsoleScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "back", "Back to list"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, bg_task):
         super().__init__()
@@ -49,7 +54,12 @@ class TasksListScreen(ModalScreen[None]):
     BINDINGS = [
         ("escape", "close", "Close Manager"),
         ("k", "kill_task", "Kill Task"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):

@@ -15,7 +15,12 @@ class SubagentViewScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Screen"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, task_id_or_desc: str):
         super().__init__()

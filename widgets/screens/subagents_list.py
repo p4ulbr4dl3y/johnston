@@ -16,7 +16,12 @@ class SubagentsListScreen(ModalScreen[None]):
     BINDINGS = [
         ("escape", "close", "Close Screen"),
         ("k", "kill_subagent", "Kill Subagent"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):

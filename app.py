@@ -77,11 +77,11 @@ class JohnstonChatApp(App):
         if self.agent:
             self.agent.app = self
 
+        self.resume_session_id = resume_session_id
         if resume_session_id:
             sess = self.sm.load_session(resume_session_id)
             if sess:
                 self.current_session_id = resume_session_id
-                self.agent.history = sess.get("history", [])
             else:
                 self.current_session_id = self.sm.generate_session_id()
         else:
@@ -114,6 +114,8 @@ class JohnstonChatApp(App):
         """Instant focus on start and refresh status bar"""
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
+        if getattr(self, "resume_session_id", None):
+            self.load_session_ui(self.resume_session_id)
         self.refresh_status_footer()
 
     def on_unmount(self) -> None:
@@ -773,8 +775,17 @@ def main():
     )
     app.run()
 
+    if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
+        try:
+            sess = app.sm.load_session(app.current_session_id)
+            if sess and (sess.get("ui_messages") or sess.get("agent_history")):
+                print(f"\nTo resume this session, run:\n  johnston --resume {app.current_session_id}")
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     main()
+
 
 

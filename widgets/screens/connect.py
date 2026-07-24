@@ -91,7 +91,14 @@ ConnectProviderScreen = ProvidersScreen
 
 class ApiKeyInputScreen(ModalScreen[str | None]):
     """Modal API key input screen"""
-    BINDINGS = [("escape", "cancel", "Cancel")]
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, provider_name: str, provider_key: str, current_key: str = ""):
         super().__init__()

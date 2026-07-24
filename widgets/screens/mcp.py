@@ -16,7 +16,12 @@ class MCPScreen(ModalScreen[None]):
         ("escape", "cancel", "Close"),
         ("m", "toggle_mode", "Toggle Eager/Lazy"),
         ("tab", "toggle_mode", "Toggle Eager/Lazy"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self):
         super().__init__()

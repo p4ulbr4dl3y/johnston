@@ -13,7 +13,12 @@ class SkillDetailScreen(ModalScreen[bool]):
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("enter", "activate", "Activate"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self, skill: Dict[str, Any]):
         super().__init__()
@@ -40,7 +45,14 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
     """Modal screen for listing available skills (global and project) as one-liners"""
 
     ALLOW_SELECT = False
-    BINDINGS = [("escape", "cancel", "Cancel")]
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self):
         super().__init__()
