@@ -35,9 +35,9 @@ def get_git_info() -> str:
 
 
 def get_project_instructions_snippet() -> str:
-    """Reads AGENTS.md, CLAUDE.md, or .cursorrules from current working directory if available."""
+    """Reads AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules, or CONVENTIONS.md from current working directory."""
     cwd = os.getcwd()
-    candidates = ["AGENTS.md", "CLAUDE.md", ".cursorrules", "CONVENTIONS.md"]
+    candidates = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
     found_snippets = []
 
     for name in candidates:
@@ -57,10 +57,11 @@ def get_project_instructions_snippet() -> str:
 
 
 def get_rules_snippet() -> str:
-    """Reads rules from ~/.johnston/rules and <cwd>/.rules."""
+    """Reads rules from ~/.johnston/rules, <cwd>/.johnston/rules, and <cwd>/.rules."""
     rules = []
     dirs = [
         os.path.expanduser("~/.johnston/rules"),
+        os.path.join(os.getcwd(), ".johnston", "rules"),
         os.path.join(os.getcwd(), ".rules"),
     ]
     for d in dirs:
