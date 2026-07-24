@@ -41,7 +41,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
                 status_tag = r"\[OFF]"
             elif is_active:
                 status_tag = r"\[ACTIVE]"
-            elif has_key or key in ("opencode", "clinepass"):
+            elif has_key or key == "opencode":
                 status_tag = r"\[ON]"
             else:
                 status_tag = r"\[AUTH]"

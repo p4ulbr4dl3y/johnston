@@ -542,7 +542,7 @@ def print_models():
     for key, info in providers.items():
         api_key = pm.get_api_key(key) or info.get("api_key", "")
         models = info.get("models") or ([info["model"]] if info.get("model") else [])
-        if not api_key and not models and key not in ("opencode", "clinepass"):
+        if not api_key and not models and key != "opencode":
             continue
         is_active = "*" if key == active_key else " "
         name = info.get("name") or info.get("NAME") or key
