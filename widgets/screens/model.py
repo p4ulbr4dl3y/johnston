@@ -32,7 +32,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                     items.append(None)
                 first_group = False
 
-                options.append(Option(f"[dim #71717a]{p_name}[/dim]", disabled=True))
+                options.append(Option(p_name, disabled=True))
                 items.append(None)
 
                 for m in p_models:
