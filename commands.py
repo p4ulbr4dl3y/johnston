@@ -53,51 +53,53 @@ class ProvidersCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         from widgets.screens.connect import ApiKeyInputScreen, ProvidersScreen
-        providers = app.pm.load_providers(include_disabled=True)
-        if not providers:
-            app.notify("No available providers configured", severity="warning")
-            return
 
-        active_key = app.pm.get_active_provider_key()
-        configured_keys = {
-            k: app.pm.get_api_key(k) for k in providers
-        }
-        disabled_providers = app.pm.get_disabled_providers()
-
-        def on_provider_selected(selected_key: str | None) -> None:
-            if not selected_key:
-                app.query_one("#message-input", ChatInput).focus()
+        def open_providers_screen(focus_key: str = None) -> None:
+            provs = app.pm.load_providers(include_disabled=True)
+            if not provs:
+                app.notify("No available providers configured", severity="warning")
                 return
 
-            provider_info = providers.get(selected_key, {})
-            p_name = provider_info.get("name", selected_key)
-            curr_key = app.pm.get_api_key(selected_key)
+            act_key = focus_key or app.pm.get_active_provider_key()
+            cfg_keys = {k: app.pm.get_api_key(k) for k in provs}
+            dis_provs = app.pm.get_disabled_providers()
 
-            def on_key_entered(entered_key: str | None) -> None:
-                if entered_key is not None:
-                    if entered_key:
-                        app.pm.set_provider_api_key(selected_key, entered_key)
-                    # Enable if previously disabled
-                    app.pm.set_provider_disabled(selected_key, False)
-                    app.pm.set_active_provider_key(selected_key)
-                    app.agent = app.pm.create_active_agent()
-                    app.agent.app = app
-                    app.refresh_status_footer()
-                    app.notify(f"Connected to provider: {p_name}")
-                app.query_one("#message-input", ChatInput).focus()
+            def on_provider_selected(selected_key: str | None) -> None:
+                if not selected_key:
+                    app.query_one("#message-input", ChatInput).focus()
+                    return
 
-            app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+                p_info = provs.get(selected_key, {})
+                p_name = p_info.get("name", selected_key)
+                curr_key = app.pm.get_api_key(selected_key)
 
-        app.push_screen(
-            ProvidersScreen(
-                providers,
-                active_key,
-                configured_keys,
-                disabled_providers=disabled_providers,
-                pm=app.pm
-            ),
-            callback=on_provider_selected
-        )
+                def on_key_entered(entered_key: str | None) -> None:
+                    if entered_key is not None:
+                        if entered_key:
+                            app.pm.set_provider_api_key(selected_key, entered_key)
+                        app.pm.set_provider_disabled(selected_key, False)
+                        app.pm.set_active_provider_key(selected_key)
+                        app.agent = app.pm.create_active_agent()
+                        app.agent.app = app
+                        app.refresh_status_footer()
+                        app.notify(f"Connected to provider: {p_name}")
+                    # Always return back to ProvidersScreen
+                    open_providers_screen(focus_key=selected_key)
+
+                app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+
+            app.push_screen(
+                ProvidersScreen(
+                    provs,
+                    act_key,
+                    cfg_keys,
+                    disabled_providers=dis_provs,
+                    pm=app.pm
+                ),
+                callback=on_provider_selected
+            )
+
+        open_providers_screen()
 
 
 class ModelsCommand(BaseCommand):
