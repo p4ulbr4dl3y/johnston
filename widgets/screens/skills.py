@@ -21,12 +21,9 @@ class SkillDetailScreen(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         scope_tag = self.skill.get("scope", "global").upper()
-        header_md = f"### **Skill: {self.skill['name']}** (`[{scope_tag}]`)\n\n"
-        if self.skill.get("description"):
-            header_md += f"**Description:** *{self.skill['description']}*\n\n"
-        body_md = header_md
-        if self.skill.get("content"):
-            body_md = f"{header_md}---\n\n{self.skill['content']}"
+        header_md = f"### **Skill: {self.skill['name']}** (`[{scope_tag}]`)"
+        desc = self.skill.get("description", "").strip() or "No description provided."
+        body_md = f"{header_md}\n\n---\n\n{desc}"
 
         with Vertical(id="modal-dialog"):
             yield Markdown(body_md, classes="modal-markdown")
