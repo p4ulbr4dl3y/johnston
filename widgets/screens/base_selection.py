@@ -147,6 +147,11 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         self.dismiss(self.default_value)
 
     def _on_key(self, event: events.Key) -> None:
+        if self.show_search and event.key in ("shift+tab", "backtab", "shift_tab"):
+            event.prevent_default()
+            event.stop()
+            return
+
         if self.show_search and event.key in ("down", "up"):
             try:
                 search_input = self.query_one("#modal-search-input", Input)

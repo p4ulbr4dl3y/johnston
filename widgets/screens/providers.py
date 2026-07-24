@@ -127,5 +127,11 @@ class ApiKeyInputScreen(ModalScreen[str | None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value.strip())
 
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("shift+tab", "backtab", "shift_tab"):
+            event.prevent_default()
+            event.stop()
+            return
+
     def action_cancel(self) -> None:
         self.dismiss(None)
