@@ -51,20 +51,23 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
 
     def on_mount(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)
+        default_idx = None
+        if self.default_value in self.raw_items:
+            try:
+                default_idx = self.raw_items.index(self.default_value)
+            except Exception:
+                pass
+        if default_idx is None:
+            for i, it in enumerate(self.raw_items):
+                if it is not None:
+                    default_idx = i
+                    break
+
+        opt_list.highlighted = default_idx
+
         if self.show_search:
-            opt_list.highlighted = None
             self.query_one("#modal-search-input", Input).focus()
         else:
-            if self.default_value in self.raw_items:
-                try:
-                    opt_list.highlighted = self.raw_items.index(self.default_value)
-                except Exception:
-                    pass
-            else:
-                for i, it in enumerate(self.raw_items):
-                    if it is not None:
-                        opt_list.highlighted = i
-                        break
             opt_list.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
