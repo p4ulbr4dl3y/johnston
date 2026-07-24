@@ -40,7 +40,7 @@ DEFAULT_DEFINITIONS: Dict[str, SubagentDefinition] = {
     "explore": SubagentDefinition(
         name="explore",
         description="Fast code exploration subagent",
-        system_prompt="[SUBAGENT EXPLORE MODE]\nYou are a fast exploration subagent. Find answers, search codebase, read files, and summarize findings concisely.",
+        system_prompt="[SUBAGENT EXPLORE MODE]\nYou are a read-only exploration subagent. Search codebase, read files, run search commands, and summarize findings concisely.",
         source="builtin"
     ),
     "general": SubagentDefinition(

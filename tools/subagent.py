@@ -88,6 +88,13 @@ class SubagentTool(BaseTool):
         subagent.system_prompt += f"\n\n{definition.system_prompt}"
         if definition.model:
             subagent.model = definition.model
+
+        if subagent_type == "explore":
+            subagent.tools = [
+                t for t in subagent.tools
+                if t.get("function", {}).get("name") not in ("create", "edit", "Create", "Edit")
+            ]
+
         if definition.tools:
             subagent.tools = [
                 t for t in subagent.tools

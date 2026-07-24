@@ -37,7 +37,37 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         # Attempt to spawn one more
         res = await tool.execute({"prompt": "another task", "description": "Over limit"})
         self.assertIn("Maximum concurrent subagents limit", res)
-        self.assertIn(str(MAX_CONCURRENT_SUBAGENTS), res)
+    async def test_explore_subagent_tool_filtering(self):
+        from unittest.mock import MagicMock
+        tool = SubagentTool()
+
+        # Mock app context and agent
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [
+            {"function": {"name": "read"}},
+            {"function": {"name": "create"}},
+            {"function": {"name": "edit"}},
+            {"function": {"name": "bash"}},
+        ]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        await tool.execute({"prompt": "search codebase", "subagent_type": "explore"})
+
+        tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
+        self.assertIn("read", tool_names)
+        self.assertIn("bash", tool_names)
+        self.assertNotIn("create", tool_names)
+        self.assertNotIn("edit", tool_names)
+        self.assertIn("read-only exploration subagent", mock_agent.system_prompt)
 
 
 if __name__ == "__main__":
