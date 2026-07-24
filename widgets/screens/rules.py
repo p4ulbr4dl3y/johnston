@@ -20,11 +20,14 @@ class RuleDetailScreen(ModalScreen[None]):
         source_tag = self.rule.source.upper()
         mode_str = "/".join(m.upper() for m in self.rule.modes) if self.rule.modes else "ALL"
 
-        header_md = f"### **Rule: {self.rule.name}** (`[{source_tag}] [{mode_str}]`)"
+        header_md = f"### **Rule: {self.rule.name}** (`[{source_tag}] [{mode_str}]`)\n\n"
         if self.rule.description:
-            header_md += f"\n\n*{self.rule.description}*"
+            header_md += f"**Description:** *{self.rule.description}*\n\n"
+        if self.rule.globs:
+            globs_str = ", ".join(f"`{g}`" for g in self.rule.globs)
+            header_md += f"**Globs:** {globs_str}\n\n"
 
-        body_md = f"{header_md}\n\n---\n\n{self.rule.content}"
+        body_md = f"{header_md}---\n\n{self.rule.content}"
 
         with Vertical(id="modal-dialog"):
             yield Markdown(body_md, classes="modal-markdown")
