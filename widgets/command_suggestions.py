@@ -91,7 +91,10 @@ class CommandSuggestions(OptionList):
             for cmd, desc in all_cmds:
                 if cmd.startswith(cleaned):
                     matched_cmds.append(cmd)
-                    formatted_line = f"{cmd:<{padding}} {desc}"
+                    clean_desc = " ".join(desc.split())
+                    if len(clean_desc) > 60:
+                        clean_desc = clean_desc[:57] + "..."
+                    formatted_line = f"{cmd:<{padding}} {clean_desc}"
                     self.add_option(formatted_line)
 
             self.current_matched = matched_cmds
