@@ -24,11 +24,12 @@ class SkillDetailScreen(ModalScreen[bool]):
         header_md = f"### **Skill: {self.skill['name']}** (`[{scope_tag}]`)\n\n"
         if self.skill.get("description"):
             header_md += f"**Description:** *{self.skill['description']}*\n\n"
-        if self.skill.get("path"):
-            header_md += f"**Path:** `{self.skill['path']}`\n\n"
+        body_md = header_md
+        if self.skill.get("content"):
+            body_md = f"{header_md}---\n\n{self.skill['content']}"
 
         with Vertical(id="modal-dialog"):
-            yield Markdown(header_md, classes="modal-markdown")
+            yield Markdown(body_md, classes="modal-markdown")
             yield Label("enter: activate • esc: back", id="modal-hint")
 
     def action_cancel(self) -> None:
