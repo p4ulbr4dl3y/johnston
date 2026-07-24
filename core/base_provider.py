@@ -18,7 +18,8 @@ class BaseAgent:
         base_url: str = "",
         system_prompt: str = "You write code and execute tasks.",
         tools: List[Dict[str, Any]] = None,
-        provider_key: str = "opencode"
+        provider_key: str = "opencode",
+        api_type: str = "openai"
     ):
         if tools is None:
             from tools.registry import get_default_tools
@@ -29,6 +30,7 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.tools = tools
         self.provider_key = provider_key
+        self.api_type = api_type
         self.client = AsyncOpenAI(api_key=self.api_key or "sk-placeholder", base_url=self.base_url)
         self.history = []
         self.app = None
@@ -110,77 +112,100 @@ class BaseAgent:
 
                 full_assistant_text = ""
                 prompt_tokens_est = estimate_tokens(messages)
-                step_usage = None
-
-                try:
-                    response = await self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        tools=all_tools if all_tools else None,
-                        stream=True,
-                        stream_options={"include_usage": True}
-                    )
-                except Exception:
-                    response = await self.client.chat.completions.create(
-                        model=self.model,
-                        messages=messages,
-                        tools=all_tools if all_tools else None,
-                        stream=True
-                    )
-
                 tool_calls_dict = {}
                 active_thought = ""
                 thinking_started = False
                 thinking_t0 = time.time()
 
-                async for chunk in response:
-                    if getattr(chunk, "usage", None):
-                        step_usage = parse_usage(chunk.usage)
+                if getattr(self, "api_type", "openai") != "openai":
+                    from core.adapters import get_adapter
+                    adapter = get_adapter(self.api_type)
+                    async for tag, evt in adapter.stream_chat(self.base_url, self.api_key, self.model, messages, all_tools if all_tools else None):
+                        if tag == "anthropic_evt":
+                            etype = evt.get("type")
+                            if etype == "content_block_delta":
+                                dtext = evt.get("delta", {}).get("text", "")
+                                if dtext:
+                                    full_assistant_text += dtext
+                                    yield ("bot_delta", full_assistant_text, "")
+                        elif tag == "gemini_evt":
+                            cands = evt.get("candidates", [])
+                            if cands and "content" in cands[0]:
+                                parts = cands[0]["content"].get("parts", [])
+                                for p in parts:
+                                    if "text" in p:
+                                        full_assistant_text += p["text"]
+                                        yield ("bot_delta", full_assistant_text, "")
+                        elif tag == "ollama_evt":
+                            msg_c = evt.get("message", {}).get("content", "")
+                            if msg_c:
+                                full_assistant_text += msg_c
+                                yield ("bot_delta", full_assistant_text, "")
+                else:
+                    try:
+                        response = await self.client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            tools=all_tools if all_tools else None,
+                            stream=True,
+                            stream_options={"include_usage": True}
+                        )
+                    except Exception:
+                        response = await self.client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            tools=all_tools if all_tools else None,
+                            stream=True
+                        )
 
-                    if not chunk.choices:
-                        continue
-                    choice = chunk.choices[0]
-                    delta = choice.delta
-                    reasoning = (
-                        getattr(delta, "reasoning_content", None)
-                        or getattr(delta, "reasoning", None)
-                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
-                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
-                    )
-                    if reasoning:
-                        if not thinking_started:
-                            yield ("thinking_start", "Thinking...", "")
-                            thinking_started = True
-                            thinking_t0 = time.time()
-                        active_thought += reasoning
-                        yield ("thinking_delta", active_thought, "")
+                    async for chunk in response:
+                        if getattr(chunk, "usage", None):
+                            step_usage = parse_usage(chunk.usage)
 
-                    delta = choice.delta
-                    if delta.content:
-                        if thinking_started:
-                            dt = time.time() - thinking_t0
-                            yield ("thinking_end", f"{dt}", active_thought)
-                            thinking_started = False
-                        full_assistant_text += delta.content
-                        yield ("bot_delta", full_assistant_text, "")
+                        if not chunk.choices:
+                            continue
+                        choice = chunk.choices[0]
+                        delta = choice.delta
+                        reasoning = (
+                            getattr(delta, "reasoning_content", None)
+                            or getattr(delta, "reasoning", None)
+                            or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
+                            or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
+                        )
+                        if reasoning:
+                            if not thinking_started:
+                                yield ("thinking_start", "Thinking...", "")
+                                thinking_started = True
+                                thinking_t0 = time.time()
+                            active_thought += reasoning
+                            yield ("thinking_delta", active_thought, "")
 
-                    if delta.tool_calls:
-                        if thinking_started:
-                            dt = time.time() - thinking_t0
-                            yield ("thinking_end", f"{dt}", active_thought)
-                            thinking_started = False
+                        delta = choice.delta
+                        if delta.content:
+                            if thinking_started:
+                                dt = time.time() - thinking_t0
+                                yield ("thinking_end", f"{dt}", active_thought)
+                                thinking_started = False
+                            full_assistant_text += delta.content
+                            yield ("bot_delta", full_assistant_text, "")
 
-                        for tc in delta.tool_calls:
-                            idx = tc.index
-                            if idx not in tool_calls_dict:
-                                tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
-                            if tc.id:
-                                tool_calls_dict[idx]["id"] = tc.id
-                            if tc.function:
-                                if tc.function.name:
-                                    tool_calls_dict[idx]["name"] = tc.function.name
-                                if tc.function.arguments:
-                                    tool_calls_dict[idx]["arguments"] += tc.function.arguments
+                        if delta.tool_calls:
+                            if thinking_started:
+                                dt = time.time() - thinking_t0
+                                yield ("thinking_end", f"{dt}", active_thought)
+                                thinking_started = False
+
+                            for tc in delta.tool_calls:
+                                idx = tc.index
+                                if idx not in tool_calls_dict:
+                                    tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
+                                if tc.id:
+                                    tool_calls_dict[idx]["id"] = tc.id
+                                if tc.function:
+                                    if tc.function.name:
+                                        tool_calls_dict[idx]["name"] = tc.function.name
+                                    if tc.function.arguments:
+                                        tool_calls_dict[idx]["arguments"] += tc.function.arguments
 
                 pricing = catalog.get_model_pricing(self.provider_key, self.model)
                 p_prompt = pricing.get("prompt", 0.0)

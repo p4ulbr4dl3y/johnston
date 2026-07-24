@@ -24,6 +24,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "OpenCode Go agent (DeepSeek v4 Flash) with tools",
         "base_url": "https://opencode.ai/zen/go/v1",
         "model": "deepseek-v4-flash",
+        "api_type": "openai",
     },
     "clinepass": {
         "key": "clinepass",
@@ -31,6 +32,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "ClinePass AI provider (DeepSeek, GLM, Kimi, Qwen, MiniMax, MiMo)",
         "base_url": "https://api.cline.bot/api/v1",
         "model": "cline-pass/deepseek-v4-flash",
+        "api_type": "openai",
         "models": [
             "cline-pass/glm-5.2",
             "cline-pass/kimi-k3",
@@ -51,6 +53,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "NVIDIA NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
         "model": "meta/codellama-70b",
+        "api_type": "openai",
     },
     "openai": {
         "key": "openai",
@@ -58,6 +61,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
         "model": "gpt-4o",
+        "api_type": "openai",
     },
     "anthropic": {
         "key": "anthropic",
@@ -65,6 +69,15 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
         "model": "claude-3-5-sonnet-20241022",
+        "api_type": "anthropic",
+    },
+    "gemini": {
+        "key": "gemini",
+        "name": "Google Gemini",
+        "description": "Google Gemini REST API provider",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "model": "gemini-1.5-pro",
+        "api_type": "gemini",
     },
     "ollama": {
         "key": "ollama",
@@ -72,6 +85,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
         "model": "qwen2.5-coder:32b",
+        "api_type": "ollama",
     },
     "openrouter": {
         "key": "openrouter",
@@ -79,6 +93,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
         "model": "anthropic/claude-3.5-sonnet",
+        "api_type": "openai",
     },
 }
 
@@ -130,6 +145,7 @@ class ProviderManager:
                 "model": pdata.get("model", ""),
                 "models": pdata.get("models", []),
                 "fetch_models": pdata.get("fetch_models", True),
+                "api_type": pdata.get("api_type", "openai"),
                 "source": "json",
             }
 
@@ -285,6 +301,7 @@ class ProviderManager:
                 base_url=target_provider.get("base_url", ""),
                 system_prompt=target_provider.get("system_prompt", "You write code and execute tasks."),
                 provider_key=target_provider["key"],
+                api_type=target_provider.get("api_type", "openai"),
             )
 
         if os.path.exists(CONFIG_FILE):
