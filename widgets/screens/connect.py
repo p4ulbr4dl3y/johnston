@@ -46,10 +46,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             else:
                 status_tag = r"\[AUTH]"
 
-            desc = p.get("description", "")
-            desc_info = f" — {desc}" if desc else ""
-
-            options.append(f"{status_tag} {name}{desc_info}")
+            options.append(f"{status_tag} {name}")
             items.append(key)
         return options, items
 
