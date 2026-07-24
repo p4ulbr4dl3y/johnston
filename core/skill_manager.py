@@ -30,6 +30,71 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
             return fm, body
     return {}, content
 
+DEFAULT_ARCHITECT_SKILL_CONTENT = """---
+name: johnston-architect
+description: Johnston system configurator & architect. Manages MCP servers, subagent definitions, rules, LLM providers, and skills with CLI self-verification.
+---
+
+# Johnston Architect Skill
+
+You are the Johnston System Configurator & Architect. Your goal is to configure, customize, and extend Johnston safely according to user requests.
+
+## Core Capabilities & Instructions
+
+### 1. MCP Server Configuration (`johnston --mcp`)
+- Location: `~/.johnston/mcp.json` (global) or `.johnston/mcp.json` (project).
+- Format: JSON object containing server configurations (command, args, env, disabled).
+- Verification: Run `johnston --mcp` via bash tool to verify server registration.
+
+### 2. Custom Subagent Definitions (`johnston --subagents`)
+- Location: `~/.johnston/subagents/definitions/<name>.md` (global) or `.johnston/subagents/<name>.md` (project).
+- Format: Markdown with YAML frontmatter:
+  ```markdown
+  ---
+  name: reviewer
+  description: Code reviewer subagent
+  tools: read, grep, glob
+  model: deepseek-v4-flash
+  ---
+  System prompt instructions here...
+  ```
+- Verification: Run `johnston --subagents` via bash tool.
+
+### 3. Rules & Instructions (`johnston --rules`)
+- Location: `~/.johnston/rules/<name>.md` (global) or `.johnston/rules/<name>.md` (project).
+- Format: Markdown with optional YAML frontmatter:
+  ```markdown
+  ---
+  name: python_style
+  mode: action, explore
+  globs: "*.py"
+  ---
+  Rule instructions here...
+  ```
+- Verification: Run `johnston --rules` via bash tool.
+
+### 4. LLM Providers Setup (`johnston --models`)
+- Location: `~/.johnston/providers.json`.
+- Format: JSON object for OpenAI, Anthropic, Gemini, or Ollama endpoints:
+  ```json
+  "my_llm": {
+    "key": "my_llm",
+    "name": "Custom LLM",
+    "base_url": "https://api.myllm.com/v1",
+    "model": "model-v1",
+    "api_type": "openai",
+    "models": ["model-v1", "model-v2"],
+    "fetch_models": false
+  }
+  ```
+- Verification: Run `johnston --models` via bash tool.
+
+### 5. Skills Management (`johnston --skills`)
+- Location: `~/.johnston/skills/<name>/SKILL.md` (global) or `.johnston/skills/<name>/SKILL.md` (project).
+- Verification: Run `johnston --skills` via bash tool.
+"""
+
+
 class SkillManager:
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
@@ -40,6 +105,16 @@ class SkillManager:
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
         os.makedirs(self.project_dir_skills, exist_ok=True)
+
+        architect_dir = os.path.join(self.global_dir, "johnston-architect")
+        architect_file = os.path.join(architect_dir, "SKILL.md")
+        if not os.path.exists(architect_file):
+            try:
+                os.makedirs(architect_dir, exist_ok=True)
+                with open(architect_file, "w", encoding="utf-8") as f:
+                    f.write(DEFAULT_ARCHITECT_SKILL_CONTENT.strip())
+            except Exception:
+                pass
 
     def list_skills(self) -> List[Dict[str, Any]]:
         """
