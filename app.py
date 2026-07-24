@@ -605,6 +605,23 @@ def print_rules():
 
 
 
+def print_subagents():
+    from core.subagent_registry import SubagentRegistry
+    from core.subagent_tracker import SubagentTracker
+    registry = SubagentRegistry.get_instance()
+    defs = registry.list_definitions()
+    print("Available Subagent Definitions:")
+    for dname, dval in defs.items():
+        print(f"  • {dname} [{dval.source}] — {dval.description}")
+
+    tracker = SubagentTracker.get_instance()
+    sessions = list(tracker.sessions.values())
+    if sessions:
+        print("\nRegistered Subagent Sessions:")
+        for sess in sessions:
+            print(f"  • ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}")
+
+
 def run_headless_prompt(
     prompt: str,
     mode: str | None = None,
@@ -658,6 +675,7 @@ def main():
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
+    parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
     parser.add_argument("--init", action="store_true", help="Initialize or update AGENTS.md guide for repo")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
@@ -681,6 +699,10 @@ def main():
 
     if args.rules:
         print_rules()
+        sys.exit(0)
+
+    if args.subagents:
+        print_subagents()
         sys.exit(0)
 
     if args.init:
