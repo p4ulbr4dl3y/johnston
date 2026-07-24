@@ -3,6 +3,7 @@ import uuid
 from typing import Any, Dict
 
 from core.background_task import BackgroundSubagent
+from core.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_tracker import SubagentTracker
 from tools.base import BaseTool
 
@@ -42,11 +43,6 @@ class SubagentTool(BaseTool):
         if not prompt:
             return "Error: 'prompt' argument is required for subagent tool."
 
-        subagent = ctx.create_agent()
-        if not subagent:
-            return "Error: No application context available to spawn subagent."
-        subagent.app = ctx.app
-
         task_id = args.get("task_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args["task_id"] = task_id
 
@@ -56,6 +52,20 @@ class SubagentTool(BaseTool):
 
         session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
         tracker = SubagentTracker.get_instance()
+
+        active_sessions = tracker.get_sessions_for_session(session_id)
+        running_subagents = [s for s in active_sessions if s.status == "running"]
+        if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
+            return (
+                f"Error: Maximum concurrent subagents limit ({MAX_CONCURRENT_SUBAGENTS}) reached. "
+                "Wait for running subagents to finish or terminate them using `manage_subagent` action='kill'."
+            )
+
+        subagent = ctx.create_agent()
+        if not subagent:
+            return "Error: No application context available to spawn subagent."
+        subagent.app = ctx.app
+
         session = tracker.create_session(
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
         )

@@ -11,6 +11,8 @@ SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
 SUBAGENT_DEFS_DIR = os.path.join(SUBAGENTS_DIR, "definitions")
 SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
 
+MAX_CONCURRENT_SUBAGENTS = 5
+
 # Theme Palette Constants (Monochrome Slate)
 THEME_BG = "#09090b"
 THEME_CARD = "#18181b"
