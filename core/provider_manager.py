@@ -52,7 +52,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenAI",
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
-        "model": "gpt-4o",
+        "model": "",
         "api_type": "openai",
     },
     "anthropic": {
@@ -60,7 +60,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Anthropic",
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "",
         "api_type": "anthropic",
     },
     "gemini": {
@@ -68,7 +68,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Gemini",
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "gemini-1.5-pro",
+        "model": "",
         "api_type": "gemini",
     },
     "ollama": {
