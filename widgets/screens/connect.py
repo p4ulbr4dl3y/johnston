@@ -8,7 +8,7 @@ from widgets.screens.base_selection import BaseSelectionScreen
 
 
 class ProvidersScreen(BaseSelectionScreen[str]):
-    """Modal provider selection screen for /providers command with 'd' key toggle"""
+    """Modal provider selection screen for /providers command with MCP-style [] status tags"""
 
     def __init__(self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None):
         self.providers = providers
@@ -37,15 +37,21 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             is_active = (key == self.active_key)
             is_disabled = key in self.disabled_set or p.get("disabled", False)
 
-            badge = ""
             if is_disabled:
-                badge = " [Disabled]"
+                status_tag = r"\[OFF]"
             elif is_active:
-                badge = " [Active]"
-            elif has_key:
-                badge = " [Configured]"
+                status_tag = r"\[ACTIVE]"
+            elif has_key or key in ("opencode", "clinepass"):
+                status_tag = r"\[ON]"
+            else:
+                status_tag = r"\[AUTH]"
 
-            options.append(f"{name}{badge}")
+            api_type = p.get("api_type", "openai").upper()
+            type_tag = rf"\[{api_type}]"
+            desc = p.get("description", "")
+            desc_info = f" — {desc}" if desc else ""
+
+            options.append(f"{status_tag} {type_tag} {name}{desc_info}")
             items.append(key)
         return options, items
 
