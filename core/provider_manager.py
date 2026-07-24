@@ -31,7 +31,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "ClinePass",
         "description": "ClinePass AI provider",
         "base_url": "https://api.cline.bot/api/v1",
-        "model": "cline-pass/deepseek-v4-flash",
         "api_type": "openai",
         "models": [
             "cline-pass/glm-5.2",
@@ -52,7 +51,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenAI",
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
-        "model": "",
         "api_type": "openai",
     },
     "anthropic": {
@@ -60,7 +58,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Anthropic",
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
-        "model": "",
         "api_type": "anthropic",
     },
     "gemini": {
@@ -68,7 +65,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Gemini",
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "",
         "api_type": "gemini",
     },
     "ollama": {
@@ -76,7 +72,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Ollama",
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
-        "model": "",
         "api_type": "ollama",
     },
     "openrouter": {
@@ -84,7 +79,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenRouter",
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
-        "model": "",
         "api_type": "openai",
     },
     "groq": {
@@ -92,7 +86,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Groq",
         "description": "Ultra-fast Groq LPU inference",
         "base_url": "https://api.groq.com/openai/v1",
-        "model": "",
         "api_type": "openai",
     },
     "xai": {
@@ -100,7 +93,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "xAI",
         "description": "xAI Grok API provider",
         "base_url": "https://api.x.ai/v1",
-        "model": "",
         "api_type": "openai",
     },
     "mistral": {
@@ -108,7 +100,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Mistral",
         "description": "Mistral AI API provider",
         "base_url": "https://api.mistral.ai/v1",
-        "model": "",
         "api_type": "openai",
     },
     "togetherai": {
@@ -116,7 +107,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Together AI",
         "description": "Together AI open-weight model cloud",
         "base_url": "https://api.together.xyz/v1",
-        "model": "",
         "api_type": "openai",
     },
     "deepinfra": {
@@ -124,7 +114,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "DeepInfra",
         "description": "High-throughput cost-efficient model server",
         "base_url": "https://api.deepinfra.com/v1/openai",
-        "model": "",
         "api_type": "openai",
     },
     "fireworks": {
@@ -132,7 +121,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Fireworks",
         "description": "Fireworks AI fast open-source inference",
         "base_url": "https://api.fireworks.ai/inference/v1",
-        "model": "",
         "api_type": "openai",
     },
     "cerebras": {
@@ -140,7 +128,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Cerebras",
         "description": "Cerebras Wafer-Scale Engine high-speed inference",
         "base_url": "https://api.cerebras.ai/v1",
-        "model": "",
         "api_type": "openai",
     },
     "nvidia": {
@@ -148,7 +135,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Nvidia",
         "description": "Nvidia NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
-        "model": "",
         "api_type": "openai",
     },
     "github-copilot": {
@@ -156,7 +142,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "GitHub Copilot",
         "description": "GitHub Copilot Chat API endpoint",
         "base_url": "https://api.githubcopilot.com",
-        "model": "",
         "api_type": "openai",
     },
 }
