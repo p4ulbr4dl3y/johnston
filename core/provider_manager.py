@@ -460,12 +460,14 @@ class ProviderManager:
 
         return models
 
-    async def fetch_models_grouped(self, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
-        """Returns model dictionaries grouped by provider"""
+    async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True) -> Dict[str, Dict[str, Any]]:
+        """Returns model dictionaries grouped by provider (only connected/configured providers by default)"""
         providers = self.load_providers()
         grouped = {}
         for p_key, p_data in providers.items():
             models = await self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
+            if connected_only and not models:
+                continue
             grouped[p_key] = {
                 "name": p_data["name"],
                 "models": models

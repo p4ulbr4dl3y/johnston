@@ -538,12 +538,17 @@ def print_models():
     active_key = pm.get_active_provider_key()
     print("Available Johnston Providers & Models:\n")
     for key, info in providers.items():
+        api_key = pm.get_api_key(key) or info.get("api_key", "")
+        models = info.get("models") or ([info["model"]] if info.get("model") else [])
+        if not api_key and not models and key not in ("opencode", "clinepass"):
+            continue
         is_active = "*" if key == active_key else " "
         name = info.get("name") or info.get("NAME") or key
-        model = info.get("model") or info.get("MODEL") or "unknown"
+        model = info.get("model") or info.get("MODEL") or (models[0] if models else "not configured")
         desc = info.get("description") or info.get("DESCRIPTION") or ""
         print(f"{is_active} [{key}] {name}")
-        print(f"    Default Model: {model}")
+        if model and model != "not configured":
+            print(f"    Active Model: {model}")
         if desc:
             print(f"    Description: {desc}")
         print()
