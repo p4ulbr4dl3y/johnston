@@ -95,13 +95,20 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         options, items, default_val = self._build_data(initial_tab)
 
         super().__init__(
-            title="### **Select model by provider**",
+            title=self._get_header_title_text(initial_tab),
             options=options,
             items=items,
             default_value=default_val,
             show_search=True,
             search_placeholder="Search models..."
         )
+
+    @staticmethod
+    def _get_header_title_text(tab: str) -> str:
+        if tab == "all":
+            return "### **[ All Models ]** &nbsp;&nbsp;&nbsp;&nbsp; Vision Models"
+        else:
+            return "### &nbsp;&nbsp; All Models &nbsp;&nbsp;&nbsp;&nbsp; **[ Vision Models ]**"
 
     def _build_data(self, tab: str) -> Tuple[List[Union[str, Option]], List[Union[str, Tuple[str, str], None]], Union[str, Tuple[str, str], None]]:
         filter_vision = (tab == "vision")
@@ -155,41 +162,17 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self.title, classes="modal-markdown")
-            with Horizontal(classes="modal-tabs"):
-                yield Button(
-                    "All Models",
-                    id="tab-all",
-                    classes="modal-tab active-tab" if self.active_tab == "all" else "modal-tab"
-                )
-                yield Button(
-                    "Vision Models",
-                    id="tab-vision",
-                    classes="modal-tab active-tab" if self.active_tab == "vision" else "modal-tab"
-                )
+            yield Markdown(self._get_header_title_text(self.active_tab), id="model-title", classes="modal-markdown")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: select • tab: switch tab • esc: cancel • ↑/↓: navigate", id="modal-hint")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id in ("tab-all", "tab-vision"):
-            new_tab = "all" if event.button.id == "tab-all" else "vision"
-            if new_tab != self.active_tab:
-                self.switch_tab(new_tab)
+            yield Label("←/→: switch tab • enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
     def switch_tab(self, new_tab: str) -> None:
         self.active_tab = new_tab
         try:
-            btn_all = self.query_one("#tab-all", Button)
-            btn_vision = self.query_one("#tab-vision", Button)
-
-            if new_tab == "all":
-                btn_all.add_class("active-tab")
-                btn_vision.remove_class("active-tab")
-            else:
-                btn_vision.add_class("active-tab")
-                btn_all.remove_class("active-tab")
+            title_md = self.query_one("#model-title", Markdown)
+            title_md.update(self._get_header_title_text(new_tab))
         except Exception:
             pass
 
@@ -205,18 +188,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             pass
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("left", "right"):
-            if self.active_tab == "all" and event.key == "right":
-                self.switch_tab("vision")
-                event.prevent_default()
-                event.stop()
-                return
-            elif self.active_tab == "vision" and event.key == "left":
-                self.switch_tab("all")
-                event.prevent_default()
-                event.stop()
-                return
-        elif event.key == "tab":
+        if event.key in ("left", "right", "tab", "backtab", "shift+tab"):
             new_tab = "vision" if self.active_tab == "all" else "all"
             self.switch_tab(new_tab)
             event.prevent_default()
