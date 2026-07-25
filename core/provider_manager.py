@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR, PROVIDERS_JSON_FILE
+from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR, PROVIDERS_JSON_FILE, USER_PROVIDERS_DIR
 
 johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 core_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +24,27 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "OpenCode agent provider",
         "base_url": "https://opencode.ai/zen/go/v1",
         "model": "deepseek-v4-flash",
+        "api_type": "openai",
+    },
+    "clinepass": {
+        "key": "clinepass",
+        "name": "ClinePass",
+        "description": "ClinePass AI provider",
+        "base_url": "https://api.cline.bot/api/v1",
+        "model": "cline-pass/deepseek-v4-flash",
+        "models": [
+            "cline-pass/glm-5.2",
+            "cline-pass/kimi-k3",
+            "cline-pass/kimi-k2.7-code",
+            "cline-pass/kimi-k2.6",
+            "cline-pass/deepseek-v4-pro",
+            "cline-pass/deepseek-v4-flash",
+            "cline-pass/mimo-v2.5",
+            "cline-pass/mimo-v2.5-pro",
+            "cline-pass/minimax-m3",
+            "cline-pass/qwen3.7-max",
+            "cline-pass/qwen3.7-plus",
+        ],
         "api_type": "openai",
     },
     "openai": {
@@ -133,6 +154,7 @@ class ProviderManager:
 
     def ensure_config_dir(self):
         os.makedirs(PROVIDERS_DIR, exist_ok=True)
+        os.makedirs(USER_PROVIDERS_DIR, exist_ok=True)
         os.makedirs(CONFIG_DIR, exist_ok=True)
 
         if not os.path.exists(PROVIDERS_JSON_FILE):
@@ -187,11 +209,10 @@ class ProviderManager:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
-        """Loads providers from JSON definitions + Python plugin files in providers/"""
+        """Loads providers from JSON definitions"""
         providers = {}
         disabled_set = set(self.get_disabled_providers())
 
-        # 1. Load JSON providers
         json_providers = self._load_json_providers()
         for pkey, pdata in json_providers.items():
             if not include_disabled and pkey in disabled_set:
@@ -213,39 +234,6 @@ class ProviderManager:
                 "disabled": pkey in disabled_set,
                 "source": "json",
             }
-
-        # 2. Load .py plugins from PROVIDERS_DIR (take precedence if defined)
-        if os.path.exists(PROVIDERS_DIR):
-            for filename in os.listdir(PROVIDERS_DIR):
-                if filename.endswith(".py") and not filename.startswith("_"):
-                    filepath = os.path.join(PROVIDERS_DIR, filename)
-                    mod_name = f"johnston_provider_{filename[:-3]}"
-
-                    try:
-                        spec = importlib.util.spec_from_file_location(mod_name, filepath)
-                        if spec and spec.loader:
-                            module = importlib.util.module_from_spec(spec)
-                            spec.loader.exec_module(module)
-
-                            provider_key = getattr(module, "KEY", filename[:-3])
-                            if not include_disabled and provider_key in disabled_set:
-                                continue
-                            provider_name = getattr(module, "NAME", provider_key)
-
-                            if hasattr(module, "Agent"):
-                                providers[provider_key] = {
-                                    "key": provider_key,
-                                    "name": provider_name,
-                                    "description": getattr(module, "DESCRIPTION", ""),
-                                    "base_url": getattr(module, "BASE_URL", ""),
-                                    "model": getattr(module, "MODEL", ""),
-                                    "module": module,
-                                    "file": filepath,
-                                    "disabled": provider_key in disabled_set,
-                                    "source": "python",
-                                }
-                    except Exception as e:
-                        print(f"Error loading provider {filename}: {e}")
 
         return providers
 

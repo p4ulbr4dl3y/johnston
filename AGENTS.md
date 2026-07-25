@@ -8,7 +8,7 @@ The project uses a modular architecture for configuring and executing AI agents.
 
 ```mermaid
 graph TD
-    PM[ProviderManager core/provider_manager.py] -->|Loads .py configs| P[Providers ~/.johnston/providers/]
+    PM[ProviderManager core/provider_manager.py] -->|Loads JSON configs| P[~/.johnston/providers.json]
     PM -->|Creates agent| Agent[BaseAgent core/base_provider.py]
     Agent -->|Builds prompts| PB[PromptBuilder core/prompt_builder.py]
     Agent -->|Requests via OpenAI API| LLM[LLM API / OpenCode / Custom]
@@ -19,46 +19,32 @@ graph TD
 
 ## 1. Providers
 
-Each provider is described by a separate `.py` file in the local `providers/` directory of the project.
-When the application starts, `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/johnston/core/provider_manager.py)) dynamically imports these files.
+All providers are defined via clean JSON in `~/.johnston/providers.json` or built-in defaults in `ProviderManager` ([core/provider_manager.py](file:///Users/yegor/johnston/core/provider_manager.py)).
 
-### Provider Configuration Example (`providers/opencode.py`):
-```python
-try:
-    from core.base_provider import BaseAgent
-except ImportError:
-    from base_provider import BaseAgent
-
-NAME = "OpenCode Go (DeepSeek v4 Flash)"
-KEY = "opencode"
-DESCRIPTION = "OpenCode Go agent (DeepSeek v4 Flash) with tools"
-
-BASE_URL = "https://opencode.ai/zen/go/v1"
-MODEL = "deepseek-v4-flash"
-API_KEY = "sk-..."
-
-SYSTEM_PROMPT = "You write code..."
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read",
-            "description": "Read file content.",
-            "parameters": { ... }
-        }
-    }
-]
-
-class Agent(BaseAgent):
-    def __init__(self, api_key: str = API_KEY, model: str = MODEL, base_url: str = BASE_URL):
-        super().__init__(
-            api_key=api_key,
-            model=model,
-            base_url=base_url,
-            system_prompt=SYSTEM_PROMPT,
-            tools=TOOLS,
-            provider_key=KEY
-        )
+### Provider JSON Configuration Example (`~/.johnston/providers.json`):
+```json
+{
+  "opencode": {
+    "key": "opencode",
+    "name": "OpenCode",
+    "description": "OpenCode agent provider",
+    "base_url": "https://opencode.ai/zen/go/v1",
+    "model": "deepseek-v4-flash",
+    "api_type": "openai"
+  },
+  "clinepass": {
+    "key": "clinepass",
+    "name": "ClinePass",
+    "description": "ClinePass AI provider",
+    "base_url": "https://api.cline.bot/api/v1",
+    "model": "cline-pass/deepseek-v4-flash",
+    "models": [
+      "cline-pass/deepseek-v4-flash",
+      "cline-pass/mimo-v2.5"
+    ],
+    "api_type": "openai"
+  }
+}
 ```
 
 ---

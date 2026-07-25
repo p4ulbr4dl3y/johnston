@@ -22,15 +22,22 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     pm = getattr(app_inst, "pm", None) or ProviderManager()
     providers = pm.load_providers()
 
-    PREFERRED_PROVIDER_KEY = "clinepass"
-    PREFERRED_VISION_MODEL = "cline-pass/mimo-v2.5"
-
     target_mod = None
-    target_model = PREFERRED_VISION_MODEL
+    target_model = None
 
-    if PREFERRED_PROVIDER_KEY in providers:
-        target_mod = providers[PREFERRED_PROVIDER_KEY]["module"]
-    else:
+    active_key = pm.get_active_provider_key()
+    if active_key in providers:
+        pinfo = providers[active_key]
+        mod = pinfo["module"]
+        try:
+            agent_inst = mod.Agent()
+            if catalog.supports_vision(active_key, agent_inst.model):
+                target_mod = mod
+                target_model = agent_inst.model
+        except Exception:
+            pass
+
+    if not target_mod:
         for pkey, pinfo in providers.items():
             try:
                 mod = pinfo["module"]
