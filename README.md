@@ -8,8 +8,6 @@
  /_/                                           
 ```
 
-# Johnston
-
 Terminal-based AI assistant CLI.
 
 ## Quick Start
