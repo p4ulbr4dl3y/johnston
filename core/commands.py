@@ -265,11 +265,20 @@ class TasksCommand(BaseCommand):
 class SubagentsCommand(BaseCommand):
     name = "/subagents"
     aliases = ["/agents", "/subagent"]
-    description = "Browse and manage subagents and subagent templates"
+    description = "Browse and manage subagents"
 
     async def execute(self, app) -> None:
+        from core.subagent_tracker import SubagentTracker
         from widgets.screens.subagents import SubagentsScreen
+
+        curr_session_id = getattr(app, "current_session_id", None)
+        sessions = SubagentTracker.get_instance().get_sessions_for_session(curr_session_id)
+        if not sessions:
+            app.notify("No subagents registered for this session", severity="warning")
+            return
+
         app.push_screen(SubagentsScreen())
+
 
 
 class SkillsCommand(BaseCommand):

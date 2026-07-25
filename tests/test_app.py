@@ -3,7 +3,14 @@ import asyncio
 from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView, UserMessage
-from widgets.modal_screens import HelpScreen, ModelScreen, ProviderScreen, ResumeScreen, RewindScreen, TasksListScreen
+from widgets.modal_screens import (
+    ConnectProviderScreen,
+    HelpScreen,
+    ModelScreen,
+    ResumeScreen,
+    RewindScreen,
+    TasksListScreen,
+)
 
 
 async def test_chat_app_flow():
@@ -56,18 +63,15 @@ async def test_chat_app_flow():
         assert not isinstance(app.screen, ResumeScreen)
         print("✓ ResumeScreen tests passed cleanly!")
 
-        # 5. Test /provider and provider search
-        chat_input.load_text("/provider")
+        # 5. Test /connect and ConnectProviderScreen
+        chat_input.load_text("/connect")
         await pilot.press("enter")
         await pilot.pause(0.5)
-        assert isinstance(app.screen, ProviderScreen)
-        assert app.screen.show_search is True
-        await pilot.press("o", "p", "e", "n")
-        await pilot.pause(0.2)
-        assert len(app.screen.filtered_items) > 0
+        assert isinstance(app.screen, ConnectProviderScreen)
         await pilot.press("escape")
         await pilot.pause(0.2)
-        print("✓ ProviderScreen tests passed cleanly!")
+        print("✓ ConnectProviderScreen tests passed cleanly!")
+
 
         # 6. Test /models and model search
         chat_input.load_text("/models")

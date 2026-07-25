@@ -70,13 +70,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(reloaded.description, "Persistent Agent")
         self.assertTrue(any(e.get("text") == "persisted output" for e in reloaded.events))
 
-    def test_subagents_list_screen(self):
-        from widgets.screens.subagents_list import SubagentsListScreen
-        self.tracker.create_session("task-menu", "Menu subagent", "list in menu", "general", True)
-        screen = SubagentsListScreen()
-        sessions = screen._get_target_sessions()
-        self.assertTrue(any(s.task_id == "task-menu" for s in sessions))
-
 
 if __name__ == "__main__":
     unittest.main()
+
