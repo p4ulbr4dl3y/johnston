@@ -348,8 +348,22 @@ class JohnstonApp(App):
         except Exception:
             pass
 
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        """Track mouse down position to distinguish clicks from text drag selection"""
+        self._mouse_down_pos = (event.screen_x, event.screen_y)
+
     def on_mouse_up(self, event: events.MouseUp) -> None:
         """On mouse up, copy selected fragment and clear selection"""
+        down_pos = getattr(self, "_mouse_down_pos", None)
+        self._mouse_down_pos = None
+
+        if down_pos is not None:
+            dx = abs(event.screen_x - down_pos[0])
+            dy = abs(event.screen_y - down_pos[1])
+            is_drag = (dx > 1 or dy > 1)
+        else:
+            is_drag = False
+
         try:
             chat_view = self.query_one(ChatView)
             if chat_view.query(WelcomeWidget):
@@ -369,6 +383,10 @@ class JohnstonApp(App):
                 self.screen.clear_selection()
                 return
             curr = getattr(curr, "parent", None)
+
+        if not is_drag:
+            self.screen.clear_selection()
+            return
 
         selected_text = self.screen.get_selected_text()
         if selected_text and selected_text.strip():

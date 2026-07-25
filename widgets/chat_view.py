@@ -781,6 +781,7 @@ class ToolCallWidget(Vertical):
 class WelcomeWidget(Vertical):
     """Centered welcome logo on main screen"""
     can_focus = False
+    ALLOW_SELECT = False
 
     FULL_BANNER = (
         "   _       _                 _                 \n"
