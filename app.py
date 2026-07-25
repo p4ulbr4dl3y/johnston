@@ -328,6 +328,9 @@ class JohnstonApp(App):
         from textual.screen import ModalScreen
         if isinstance(self.screen, ModalScreen):
             return
+        target = getattr(event, "widget", None) or getattr(event, "target", None)
+        if isinstance(target, ChatView):
+            self.screen.clear_selection()
         try:
             chat_view = self.query_one(ChatView)
             if chat_view.query(WelcomeWidget):
@@ -336,7 +339,6 @@ class JohnstonApp(App):
             pass
         if self.screen.get_selected_text() or getattr(self, "selection_copy_active", False):
             return
-        target = getattr(event, "widget", None) or getattr(event, "target", None)
         if target and getattr(target, "can_focus", False) and target is not self.query_one("#message-input"):
             return
         if target and ("button" in getattr(target, "classes", []) or "copy" in str(getattr(target, "id", ""))):
@@ -357,6 +359,10 @@ class JohnstonApp(App):
             pass
 
         target = getattr(event, "widget", None) or getattr(event, "target", None)
+        if isinstance(target, ChatView):
+            self.screen.clear_selection()
+            return
+
         curr = target
         while curr:
             if isinstance(curr, WelcomeWidget):
@@ -365,7 +371,7 @@ class JohnstonApp(App):
             curr = getattr(curr, "parent", None)
 
         selected_text = self.screen.get_selected_text()
-        if selected_text:
+        if selected_text and selected_text.strip():
             banner_signatures = ["|_|", "\\__\\___/", "___ _| |_", "_  ___ |", "johnston"]
             if any(sig in selected_text for sig in banner_signatures):
                 self.screen.clear_selection()
@@ -382,6 +388,8 @@ class JohnstonApp(App):
                     await asyncio.sleep(0.05)
                     self.selection_copy_active = False
                 asyncio.create_task(reset_flag())
+        else:
+            self.screen.clear_selection()
 
     def on_select_changed(self, event: Select.Changed) -> None:
         """Switch agent provider from ~/.johnston config"""
