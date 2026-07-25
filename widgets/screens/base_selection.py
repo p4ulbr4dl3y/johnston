@@ -118,15 +118,13 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list = self.query_one("#modal-option-list", OptionList)
         opt_list.clear_options()
         opt_list.add_options(self.filtered_options)
-        if self.show_search:
-            opt_list.highlighted = None
-        elif self.filtered_options:
-            first_valid = 0
-            for i, it in enumerate(self.filtered_items):
-                if it is not None:
-                    first_valid = i
-                    break
-            opt_list.highlighted = first_valid
+        default_idx = None
+        if self.default_value in self.filtered_items:
+            try:
+                default_idx = self.filtered_items.index(self.default_value)
+            except Exception:
+                pass
+        opt_list.highlighted = default_idx
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)

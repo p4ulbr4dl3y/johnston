@@ -144,10 +144,6 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
                     if p_key == self.current_provider and m == self.current_model:
                         default_val = item_val
-
-            valid_items = [it for it in items if it is not None]
-            if not default_val and valid_items:
-                default_val = valid_items[0]
         else:
             p_models = self.models_data
             if filter_vision:
@@ -156,7 +152,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
                 options.append(clean_m)
                 items.append(m)
-            default_val = self.current_model if self.current_model in items else (items[0] if items else "")
+            default_val = self.current_model if self.current_model in items else None
 
         return options, items, default_val
 
