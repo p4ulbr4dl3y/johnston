@@ -22,8 +22,8 @@ if [ -f "pyproject.toml" ] && grep -q 'name = "johnston"' pyproject.toml 2>/dev/
     echo "-> Installing johnston from local directory..."
     uv tool install --force .
 else
-    echo "-> Installing johnston from GitHub repository..."
-    uv tool install --force "git+${REPO_URL}"
+    echo "-> Installing johnston from PyPI..."
+    uv tool install --force johnston
 fi
 
 # 3. Optional dependency notice (rtk)
