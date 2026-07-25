@@ -25,7 +25,15 @@ from core.commands import handle_slash_command
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionManager
 from widgets.chat_input import ChatInput
-from widgets.chat_view import BotMessage, ChatView, CompactionDivider, ThinkingWidget, ToolCallWidget, UserMessage
+from widgets.chat_view import (
+    BotMessage,
+    ChatView,
+    CompactionDivider,
+    ThinkingWidget,
+    ToolCallWidget,
+    UserMessage,
+    WelcomeWidget,
+)
 from widgets.command_suggestions import CommandSuggestions
 from widgets.status_footer import StatusFooter
 
@@ -334,8 +342,19 @@ class JohnstonApp(App):
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         """On mouse up, copy selected fragment and clear selection"""
+        target = getattr(event, "widget", None) or getattr(event, "target", None)
+        curr = target
+        while curr:
+            if isinstance(curr, WelcomeWidget):
+                self.screen.clear_selection()
+                return
+            curr = getattr(curr, "parent", None)
+
         selected_text = self.screen.get_selected_text()
         if selected_text:
+            if "johnston" in selected_text.lower() and ("_" in selected_text or "|" in selected_text or "/" in selected_text):
+                self.screen.clear_selection()
+                return
             try:
                 self.selection_copy_active = True
                 self.copy_to_clipboard(selected_text)

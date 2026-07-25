@@ -15,6 +15,7 @@ from rich.markup import escape
 from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -810,6 +811,18 @@ class WelcomeWidget(Vertical):
 
     def on_resize(self, event) -> None:
         self._update_banner_for_size(event.size.width)
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        if self.screen:
+            self.screen.clear_selection()
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self.screen:
+            self.screen.clear_selection()
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        if self.screen:
+            self.screen.clear_selection()
 
 
 class ChatView(VerticalScroll):
