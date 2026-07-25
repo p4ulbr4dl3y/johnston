@@ -52,7 +52,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
     def on_mount(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)
         default_idx = None
-        if self.default_value in self.raw_items:
+        if self.default_value is not None and self.default_value in self.raw_items:
             try:
                 default_idx = self.raw_items.index(self.default_value)
             except Exception:
@@ -119,7 +119,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list.clear_options()
         opt_list.add_options(self.filtered_options)
         default_idx = None
-        if self.default_value in self.filtered_items:
+        if self.default_value is not None and self.default_value in self.filtered_items:
             try:
                 default_idx = self.filtered_items.index(self.default_value)
             except Exception:

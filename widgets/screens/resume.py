@@ -11,10 +11,11 @@ class ResumeScreen(BaseSelectionScreen[str]):
             options.append(f"{title} ({s.get('message_count', 0)} msgs)")
 
         items = [s["id"] for s in sessions]
+        default_val = items[0] if items else ""
         super().__init__(
             title="### **Select session to resume**",
             options=options,
             items=items,
-            default_value=""
+            default_value=default_val
         )
 
