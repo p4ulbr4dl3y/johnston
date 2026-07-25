@@ -143,8 +143,9 @@ class QuestionScreen(ModalScreen[dict]):
 
 
 class ConfirmScreen(ModalScreen[str]):
-    """Confirmation modal screen before submitting answers"""
+    """Modal screen for requesting confirmation from the user (yes/no/cancel)"""
 
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("left", "go_back", "Back"),

@@ -3,7 +3,7 @@ from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.bash_confirm import BashConfirmScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
-from widgets.screens.model import ModelScreen
+from widgets.screens.model import ModelScreen, VisionWarningScreen
 from widgets.screens.provider import ProviderScreen
 from widgets.screens.providers import ApiKeyInputScreen, ConnectProviderScreen
 from widgets.screens.resume import ResumeScreen
@@ -23,6 +23,7 @@ __all__ = [
     "HelpScreen",
     "MCPScreen",
     "ModelScreen",
+    "VisionWarningScreen",
     "ProviderScreen",
     "ResumeScreen",
     "RewindScreen",

@@ -1,9 +1,80 @@
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+from textual import events
+from textual.app import ComposeResult
+from textual.containers import Horizontal, Vertical
+from textual.screen import ModalScreen
+from textual.widgets import Button, Label, Markdown
 from textual.widgets.option_list import Option
 
 from core.models_catalog import catalog
 from widgets.screens.base_selection import BaseSelectionScreen
+
+
+class VisionWarningScreen(ModalScreen[Optional[str]]):
+    """Modal screen warning the user when a selected model lacks vision capabilities."""
+
+    ALLOW_SELECT = False
+    BINDINGS = [
+        ("escape", "cancel", "Close"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ]
+
+    def __init__(self, model_name: str, provider_name: str = ""):
+        super().__init__()
+        self.model_name = model_name
+        self.provider_name = provider_name
+
+    def compose(self) -> ComposeResult:
+        content = (
+            "### **Vision Support Warning**\n\n"
+            "The selected model does not natively support **Vision**.\n\n"
+            "Image reading will operate in **Agent Fallback Mode**."
+        )
+        with Vertical(id="modal-dialog"):
+            yield Markdown(content, classes="modal-markdown")
+            with Horizontal(classes="modal-buttons"):
+                yield Button("Select Vision Model", id="btn-select-vision")
+                yield Button("My Model Supports Vision", id="btn-force-vision")
+            yield Label("enter: select • tab / ←/→: switch button • esc: continue", id="modal-hint")
+
+    def on_mount(self) -> None:
+        try:
+            self.query_one("#btn-select-vision", Button).focus()
+        except Exception:
+            pass
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("left", "right"):
+            try:
+                btn1 = self.query_one("#btn-select-vision", Button)
+                btn2 = self.query_one("#btn-force-vision", Button)
+                if btn1.has_focus:
+                    btn2.focus()
+                    event.prevent_default()
+                    event.stop()
+                    return
+                elif btn2.has_focus:
+                    btn1.focus()
+                    event.prevent_default()
+                    event.stop()
+                    return
+            except Exception:
+                pass
+        super()._on_key(event)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-select-vision":
+            self.dismiss("select_vision")
+        elif event.button.id == "btn-force-vision":
+            self.dismiss("force_vision")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
 
 class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):

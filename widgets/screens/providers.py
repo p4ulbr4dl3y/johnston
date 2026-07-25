@@ -91,6 +91,7 @@ ConnectProviderScreen = ProvidersScreen
 
 class ApiKeyInputScreen(ModalScreen[str | None]):
     """Modal API key input screen"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("ctrl+c", "quit_app", "Quit"),

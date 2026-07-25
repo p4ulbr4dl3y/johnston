@@ -10,6 +10,7 @@ from core.skill_manager import SkillManager
 
 class SkillDetailScreen(ModalScreen[bool]):
     """Modal screen displaying full details of a skill with option to activate"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("enter", "activate", "Activate"),

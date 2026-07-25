@@ -113,6 +113,38 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         self.assertIn("AGENTS.md", app.ai_prompts[0][0])
 
+    async def test_models_command_non_vision_warning(self):
+        from core.commands import ModelsCommand
+        from core.models_catalog import catalog
+        from widgets.screens.model import VisionWarningScreen
+
+        class MockPM:
+            async def fetch_models_grouped(self): return {"custom": {"name": "Custom", "models": ["test-override-model-999"]}}
+            def get_active_provider_key(self): return "custom"
+            def set_provider_model(self, p, m): pass
+            def set_active_provider_key(self, p): pass
+            def create_active_agent(self): return MockAgent()
+
+        app = MockApp()
+        app.pm = MockPM()
+        cmd = ModelsCommand()
+
+        pushed_screens = []
+        def simulate_push_screen(screen, callback=None):
+            pushed_screens.append(screen)
+            if isinstance(screen, VisionWarningScreen) and callback:
+                callback("force_vision")
+            elif callback:
+                callback(("custom", "test-override-model-999"))
+
+        app.push_screen = simulate_push_screen
+        app.query_one = lambda target, default=None: type("MockInput", (), {"focus": lambda self: None})()
+
+        await cmd.execute(app)
+        warning_screens = [s for s in pushed_screens if isinstance(s, VisionWarningScreen)]
+        self.assertTrue(len(warning_screens) > 0)
+        self.assertTrue(catalog.supports_vision("custom", "test-override-model-999"))
+
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)
         self.assertIn("/init", COMMAND_REGISTRY)

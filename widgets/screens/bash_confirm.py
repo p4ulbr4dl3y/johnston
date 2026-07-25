@@ -7,6 +7,7 @@ from textual.widgets import Label, Markdown
 class BashConfirmScreen(ModalScreen[bool]):
     """Modal screen for requesting permission to run a bash command."""
 
+    ALLOW_SELECT = False
     BINDINGS = [
         ("enter", "confirm", "Confirm"),
         ("escape", "cancel", "Cancel"),

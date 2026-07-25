@@ -10,6 +10,7 @@ from core.rules_manager import RuleDefinition, RulesManager
 
 class RuleDetailScreen(ModalScreen[None]):
     """Modal screen displaying full markdown content of a rule"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("ctrl+c", "quit_app", "Quit"),

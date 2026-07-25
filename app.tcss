@@ -355,7 +355,7 @@ ModalScreen {
     padding: 1 2;
     border: solid #27272a;
     background: #18181b;
-    overflow-y: scroll;
+    overflow-y: auto;
 }
 
 .modal-title {
@@ -457,12 +457,23 @@ ModalScreen {
 .modal-buttons {
     width: 100%;
     height: auto;
-    align-horizontal: right;
+    align: center middle;
     margin-top: 1;
+    margin-bottom: 1;
 }
 
 .modal-buttons Button {
-    margin-left: 1;
+    margin: 0 1;
+    border: none;
+    background: #27272a;
+    color: #e4e4e7;
+}
+
+.modal-buttons Button:focus,
+.modal-buttons Button:hover {
+    background: #ffffff;
+    color: #09090b;
+    text-style: bold;
 }
 
 #modal-hint {

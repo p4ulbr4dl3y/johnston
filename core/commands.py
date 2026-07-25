@@ -1,4 +1,5 @@
 
+from core.models_catalog import catalog
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
@@ -10,6 +11,7 @@ from widgets.modal_screens import (
     RewindScreen,
     SkillsScreen,
     TasksListScreen,
+    VisionWarningScreen,
 )
 
 
@@ -136,6 +138,16 @@ class ModelsCommand(BaseCommand):
                 app.pm.set_provider_model(selected_prov, selected_model)
                 app.refresh_status_footer()
                 app.notify(f"Model switched: [{selected_prov}] {selected_model}")
+
+                if not catalog.supports_vision(selected_prov, selected_model):
+                    def on_warning_action(action: str | None) -> None:
+                        if action == "select_vision":
+                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov), callback=on_model_selected)
+                        elif action == "force_vision":
+                            catalog.add_vision_override(selected_model)
+                            app.notify(f"Vision support enabled for {selected_model}")
+
+                    app.push_screen(VisionWarningScreen(selected_model, selected_prov), callback=on_warning_action)
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)

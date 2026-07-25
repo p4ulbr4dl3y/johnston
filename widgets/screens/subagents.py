@@ -15,6 +15,7 @@ from widgets.screens.subagent_screen import SubagentViewScreen
 
 class TemplateDetailScreen(ModalScreen[None]):
     """Modal screen displaying full definition, tools, and description of a subagent template"""
+    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("ctrl+c", "quit_app", "Quit"),
