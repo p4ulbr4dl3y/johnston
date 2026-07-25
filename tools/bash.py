@@ -177,5 +177,5 @@ class BashTool(BaseTool):
             ctx.add_background_task(task)
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use manage_task to inspect active background tasks."
+            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes."
 
