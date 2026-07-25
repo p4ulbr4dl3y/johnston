@@ -423,6 +423,12 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Stream AI response generation with cancellation support via Esc"""
+        if not getattr(self.agent, "model", ""):
+            self.notify("No model selected. Please select a model from /models.", severity="warning")
+            from core.commands import ModelsCommand
+            await ModelsCommand().execute(self)
+            return
+
         self.is_generating = True
         chat_view = self.query_one(ChatView)
 

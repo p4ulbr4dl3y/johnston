@@ -116,6 +116,8 @@ class StatusFooter(Static):
 
         from core.models_catalog import catalog
         clean_model = catalog.get_model_display_name(provider_key, model_name)
+        if not clean_model:
+            clean_model = "[Select model: /models]"
         mode_str = agent_mode.capitalize()
         if self.is_generating:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
@@ -158,7 +160,7 @@ class StatusFooter(Static):
             if provider_display and clean_model:
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
             elif provider_display:
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display}[/]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › [Select model: /models][/]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
