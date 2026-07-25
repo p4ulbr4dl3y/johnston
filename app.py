@@ -328,6 +328,12 @@ class JohnstonApp(App):
         from textual.screen import ModalScreen
         if isinstance(self.screen, ModalScreen):
             return
+        try:
+            chat_view = self.query_one(ChatView)
+            if chat_view.query(WelcomeWidget):
+                self.screen.clear_selection()
+        except Exception:
+            pass
         if self.screen.get_selected_text() or getattr(self, "selection_copy_active", False):
             return
         target = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -342,6 +348,14 @@ class JohnstonApp(App):
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         """On mouse up, copy selected fragment and clear selection"""
+        try:
+            chat_view = self.query_one(ChatView)
+            if chat_view.query(WelcomeWidget):
+                self.screen.clear_selection()
+                return
+        except Exception:
+            pass
+
         target = getattr(event, "widget", None) or getattr(event, "target", None)
         curr = target
         while curr:
@@ -352,7 +366,8 @@ class JohnstonApp(App):
 
         selected_text = self.screen.get_selected_text()
         if selected_text:
-            if "johnston" in selected_text.lower() and ("_" in selected_text or "|" in selected_text or "/" in selected_text):
+            banner_signatures = ["|_|", "\\__\\___/", "___ _| |_", "_  ___ |", "johnston"]
+            if any(sig in selected_text for sig in banner_signatures):
                 self.screen.clear_selection()
                 return
             try:
