@@ -234,6 +234,7 @@ MarkdownFence .fence-copy-btn:hover {
 
 MarkdownFence #code-content {
     padding: 0 1;
+    background: #18181b;
 }
 
 /* OptionList Base Styles */

@@ -38,10 +38,15 @@ class CustomMarkdownFence(MarkdownFence):
         with Horizontal(classes="fence-header"):
             yield Label(lang_str, classes="fence-lang")
             yield copy_btn
-        yield Label(self._highlighted_code, id="code-content", expand=True)
+        code_content = self._highlighted_code
+        if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
+            code_content.code = code_content.code.rstrip("\r\n")
+        yield Label(code_content, id="code-content", expand=True)
 
     def set_content(self, content: Any) -> None:
         self._content = content
+        if hasattr(content, "code") and isinstance(getattr(content, "code", None), str):
+            content.code = content.code.rstrip("\r\n")
         try:
             self.query_one("#code-content", Label).update(content)
         except Exception:
