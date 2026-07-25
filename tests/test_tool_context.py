@@ -33,8 +33,8 @@ class TestToolContext(unittest.TestCase):
         ctx.notify("test notification")
         self.assertEqual(app.notified, ["test notification"])
 
-        ctx.set_agent_mode("plan")
-        self.assertEqual(app.agent.mode, "plan")
+        ctx.set_agent_mode("explore")
+        self.assertEqual(app.agent.mode, "explore")
         self.assertTrue(app.status_refreshed)
 
         ctx.add_background_task("task1")

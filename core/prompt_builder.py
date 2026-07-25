@@ -190,14 +190,15 @@ class PromptBuilder:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
         mode_lower = self.mode.lower()
-        if mode_lower in ("explore", "plan", "ask"):
+        if mode_lower == "explore":
             sys_prompt += (
                 "\n\n[MODE: EXPLORE]\n"
-                "Read-only research, codebase inspection, QA, and plan drafting.\n"
-                "Rules:\n"
-                "1. Code modification tools (create, edit) are disabled.\n"
-                "2. Output findings/plan directly in chat (Goal, Proposed Changes, Verification).\n"
-                "3. Ask the user to switch to Action mode (via Shift+Tab or /action) when ready to apply changes."
+                "Read-only research, codebase inspection, QA, and architectural planning.\n"
+                "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
+                "1. Code modification tools (create, edit) are DISABLED.\n"
+                "2. You are STRICTLY PROHIBITED from running state-changing bash commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
+                "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n"
+                "4. When designing a plan, include 'Critical Files' (3-5 files involved) and execution steps, then ask the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
@@ -205,7 +206,11 @@ class PromptBuilder:
             sys_prompt += (
                 f"\n\n[MODE: ACTION]\n"
                 f"Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.{plan_note}\n"
-                "Execute tasks precisely, write clean code, and verify with tests."
+                "Rules:\n"
+                "1. Research First & Read Before Edit: Inspect codebase and target files before modifying.\n"
+                "2. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
+                "3. Minimal Comments: Write comments ONLY when the WHY is non-obvious. Never explain WHAT code does.\n"
+                "4. Empirical Verification: ALWAYS verify changes using tests or execution commands before concluding. Never claim tests pass if any test fails."
             )
 
         # Volatile metadata last: time/git change every turn, so keeping them at
@@ -225,7 +230,7 @@ class PromptBuilder:
         all_tools = list(self.base_tools) + clean_mcp_tools
 
         mode_lower = self.mode.lower()
-        if mode_lower in ("explore", "plan", "ask"):
+        if mode_lower == "explore":
             # Filter out file modification tools in explore mode
             all_tools = [
                 t for t in all_tools

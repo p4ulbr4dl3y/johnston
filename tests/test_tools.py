@@ -11,11 +11,11 @@ from tools.read import ReadTool
 
 
 class MockAgent:
-    def __init__(self, mode="plan"):
+    def __init__(self, mode="explore"):
         self.mode = mode
 
 class MockApp:
-    def __init__(self, mode="plan"):
+    def __init__(self, mode="explore"):
         self.agent = MockAgent(mode=mode)
         self.notified = []
 
