@@ -201,7 +201,7 @@ MarkdownFence {
     padding: 0;
     border-left: solid #3f3f46;
     height: auto;
-    scrollbar-size: 1 1;
+    scrollbar-size: 0 0;
 }
 
 
@@ -395,6 +395,7 @@ ModalScreen {
     color: #f4f4f5;
     padding: 0 2;
     margin: 1 0;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog MarkdownFence .fence-header,
