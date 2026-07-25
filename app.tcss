@@ -378,6 +378,35 @@ ModalScreen {
     color: #e4e4e7;
 }
 
+.modal-tabs {
+    height: 3;
+    width: 100%;
+    align: center middle;
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+.modal-tab {
+    min-width: 16;
+    height: 3;
+    margin: 0 1;
+    border: none;
+    background: #18181b;
+    color: #a1a1aa;
+}
+
+.modal-tab:hover {
+    background: #27272a;
+    color: #ffffff;
+}
+
+.modal-tab.active-tab {
+    background: #27272a;
+    color: #ffffff;
+    border-bottom: solid #ffffff;
+    text-style: bold;
+}
+
 .modal-markdown MarkdownHeader {
     text-align: center;
     color: #ffffff;

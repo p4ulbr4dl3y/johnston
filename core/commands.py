@@ -142,7 +142,7 @@ class ModelsCommand(BaseCommand):
                 if not catalog.supports_vision(selected_prov, selected_model):
                     def on_warning_action(action: str | None) -> None:
                         if action == "select_vision":
-                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov), callback=on_model_selected)
+                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_model_selected)
                         elif action == "force_vision":
                             catalog.add_vision_override(selected_model)
                             app.notify(f"Vision support enabled for {selected_model}")
