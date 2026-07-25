@@ -347,15 +347,16 @@ class ToolCallWidget(Vertical):
         "task": "Task",
         "view_image": "ViewImage",
         "call_mcp_tool": "CallMCPTool",
+        "web_fetch": "WebFetch",
     }
 
     SYSTEM_TOOLS = {
         "read", "create", "edit", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
-        "subagent", "task", "view_image",
+        "subagent", "task", "view_image", "web_fetch",
         "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
-        "Subagent", "Task", "ViewImage"
+        "Subagent", "Task", "ViewImage", "WebFetch"
     }
 
     def render_header(self) -> None:

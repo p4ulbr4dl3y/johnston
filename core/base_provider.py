@@ -510,7 +510,7 @@ class BaseAgent:
                         else:
                             target = t_name
                     else:
-                        target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file")
+                        target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file") or args.get("url")
                         if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
                             target = args["questions"][0].get("question_text", "")
                         if not target:

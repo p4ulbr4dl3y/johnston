@@ -59,6 +59,23 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
         self.assertIn("Error:", res_err)
 
+        # Plain text HTML file (read as raw text without markitdown)
+        html_path = os.path.join(self.test_dir, "doc.html")
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write("<h1>Test HTML</h1>")
+        res_html = await tool.execute({"path": html_path})
+        self.assertIn("<h1>Test HTML</h1>", res_html)
+
+        # PDF document format via markitdown conversion
+        pdf_path = os.path.join(self.test_dir, "doc.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.7 mock content")
+
+        from unittest.mock import patch
+        with patch("tools.read.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
+            res_pdf = await tool.execute({"path": pdf_path})
+            self.assertIn("Converted PDF Header", res_pdf)
+
     async def test_create_tool(self):
         tool = CreateTool()
         file_path = os.path.join(self.test_dir, "nested", "new_file.txt")

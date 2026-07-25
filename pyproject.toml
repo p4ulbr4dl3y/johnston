@@ -15,6 +15,7 @@ dependencies = [
     "linkify-it-py",
     "mdit-py-plugins",
     "pillow>=12.3.0",
+    "markitdown>=0.1.0",
 ]
 
 [project.scripts]

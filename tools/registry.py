@@ -13,6 +13,7 @@ from tools.read import ReadTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
 from tools.view_image import ViewImageTool
+from tools.web_fetch import WebFetchTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -26,6 +27,7 @@ TOOL_CLASSES = [
     SubagentTool,
     ManageSubagentTool,
     ViewImageTool,
+    WebFetchTool,
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
