@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import sys
@@ -404,8 +405,10 @@ class ProviderManager:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     cdata = json.load(f)
                     age = time.time() - cdata.get("updated_at", 0)
-                    if age < 86400 and cdata.get("models"):
-                        return cdata["models"]
+                    cached_models = cdata.get("models", [])
+                    ttl = 300 if not cached_models else 86400
+                    if age < ttl:
+                        return cached_models
             except Exception:
                 pass
 
@@ -417,9 +420,10 @@ class ProviderManager:
         if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            timeout_sec = 0.8 if provider_key in ("ollama", "lmstudio") else 3.0
             try:
                 async with httpx.AsyncClient() as client:
-                    resp = await client.get(models_url, headers=headers, timeout=10)
+                    resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
                     if resp.status_code == 200:
                         data = resp.json()
                         for m in data.get("data", []):
@@ -449,28 +453,32 @@ class ProviderManager:
             elif pdata.get("model"):
                 models = [pdata["model"]]
 
-        # Save to cache
-        if models:
-            try:
-                with open(cache_path, "w", encoding="utf-8") as f:
-                    json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models}, f, indent=2)
-            except Exception as e:
-                print(f"Error writing models cache: {e}")
+        # Save to cache (including empty/fallback lists with 5-minute TTL)
+        try:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models}, f, indent=2)
+        except Exception as e:
+            print(f"Error writing models cache: {e}")
 
         return models
 
     async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True, include_disabled: bool = False) -> Dict[str, Dict[str, Any]]:
         """Returns model dictionaries grouped by provider (only connected/configured providers by default)"""
         providers = self.load_providers(include_disabled=include_disabled)
+        active_providers = [
+            (p_key, p_data) for p_key, p_data in providers.items()
+            if include_disabled or not p_data.get("disabled", False)
+        ]
+        results = await asyncio.gather(*[
+            self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
+            for p_key, _ in active_providers
+        ], return_exceptions=True)
+
         grouped = {}
-        for p_key, p_data in providers.items():
-            if not include_disabled and p_data.get("disabled", False):
-                continue
-            models = await self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
-            if connected_only and not models:
-                continue
-            grouped[p_key] = {
-                "name": p_data["name"],
-                "models": models
-            }
+        for (p_key, p_data), res in zip(active_providers, results):
+            if isinstance(res, list) and (not connected_only or res):
+                grouped[p_key] = {
+                    "name": p_data["name"],
+                    "models": res
+                }
         return grouped

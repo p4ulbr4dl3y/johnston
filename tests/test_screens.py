@@ -234,6 +234,7 @@ class TestModelScreen(unittest.TestCase):
         s = ModelScreen(models_data=["model-a", "model-b"], current_model="model-a", current_provider="tp")
         self.assertIn("model-a", s.raw_items)
         self.assertEqual(s.default_value, "model-a")
+        self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
 
     def test_build_data_dict_format(self):
         models_data = {"prov1": {"name": "P1", "models": ["m1", "m2"]}, "prov2": {"name": "P2", "models": ["m3"]}}
@@ -242,6 +243,7 @@ class TestModelScreen(unittest.TestCase):
         self.assertTrue(len(tuple_items) >= 3)
         self.assertEqual(s.default_value[0], "prov1")
         self.assertEqual(s.default_value[1], "m2")
+        self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
 
 
 class TestVisionWarningScreen(unittest.TestCase):

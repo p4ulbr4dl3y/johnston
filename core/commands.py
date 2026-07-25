@@ -127,7 +127,9 @@ class ModelsCommand(BaseCommand):
             return
 
         curr_provider = app.pm.get_active_provider_key()
-        curr_model = getattr(app.agent, "model", "")
+        curr_model = getattr(app.agent, "model", "") if getattr(app, "agent", None) else ""
+        if not curr_model and hasattr(app.pm, "get_provider_model"):
+            curr_model = app.pm.get_provider_model(curr_provider)
 
         def on_model_selected(selection: Any) -> None:
             if selection:

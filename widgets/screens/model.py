@@ -110,6 +110,19 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         else:
             return "### &nbsp;&nbsp; All Models &nbsp;&nbsp;&nbsp;&nbsp; **[ Vision Models ]**"
 
+    @staticmethod
+    def _is_active_model(p_key: str, m: str, target_prov: str, target_model: str) -> bool:
+        if not target_model:
+            return False
+        if target_prov and p_key and p_key.lower() != target_prov.lower():
+            return False
+        m_low, t_low = m.lower(), target_model.lower()
+        if m_low == t_low or m_low.split("/")[-1] == t_low.split("/")[-1]:
+            return True
+        clean_m = catalog.get_model_display_name(p_key, m).lower()
+        clean_t = catalog.get_model_display_name(target_prov or p_key, target_model).lower()
+        return bool(clean_m and clean_t and clean_m == clean_t)
+
     def _build_data(self, tab: str) -> Tuple[List[Union[str, Option]], List[Union[str, Tuple[str, str], None]], Union[str, Tuple[str, str], None]]:
         filter_vision = (tab == "vision")
         options: List[Union[str, Option]] = []
@@ -142,10 +155,22 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 options.append(Option(p_name, disabled=True))
                 items.append(None)
 
-                for m in p_models:
+                is_target_prov = bool(target_prov and p_key.lower() == target_prov.lower())
+                active_idx = None
+                if is_target_prov:
+                    if target_model:
+                        for idx, m in enumerate(p_models):
+                            if self._is_active_model(p_key, m, target_prov, target_model):
+                                active_idx = idx
+                                break
+                    if active_idx is None and p_models:
+                        active_idx = 0
+
+                for idx, m in enumerate(p_models):
                     clean_m = catalog.get_model_display_name(p_key, m)
-                    is_active = (p_key == target_prov and (m == target_model or m.split("/")[-1] == target_model.split("/")[-1]))
-                    opt_label = f"   {clean_m}  ✓" if is_active else f"   {clean_m}"
+                    is_active = bool(is_target_prov and idx == active_idx)
+                    status_tag = r"\[ACTIVE]"
+                    opt_label = f"   {status_tag} {clean_m}" if is_active else f"   {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
@@ -156,10 +181,22 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             p_models = self.models_data
             if filter_vision:
                 p_models = [m for m in p_models if catalog.supports_vision(self.current_provider, m)]
-            for m in p_models:
+
+            active_idx = None
+            if target_model:
+                for idx, m in enumerate(p_models):
+                    if self._is_active_model(self.current_provider, m, target_prov, target_model):
+                        active_idx = idx
+                        break
+
+            if active_idx is None and p_models:
+                active_idx = 0
+
+            for idx, m in enumerate(p_models):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
-                is_active = (m == target_model or m.split("/")[-1] == target_model.split("/")[-1])
-                opt_label = f"{clean_m}  ✓" if is_active else clean_m
+                is_active = (idx == active_idx)
+                status_tag = r"\[ACTIVE]"
+                opt_label = f"{status_tag} {clean_m}" if is_active else clean_m
                 options.append(opt_label)
                 items.append(m)
                 if is_active:

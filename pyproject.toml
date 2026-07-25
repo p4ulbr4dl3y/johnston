@@ -22,7 +22,7 @@ dependencies = [
 johnston = "app:main"
 
 [tool.hatch.build]
-exclude = [".agents", "dist", "tests"]
+exclude = ["dist", "tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]

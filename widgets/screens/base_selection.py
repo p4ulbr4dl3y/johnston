@@ -59,6 +59,11 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                 pass
 
         opt_list.highlighted = default_idx
+        if default_idx is not None:
+            try:
+                opt_list.scroll_to_highlight()
+            except Exception:
+                pass
 
         if self.show_search:
             self.query_one("#modal-search-input", Input).focus()
