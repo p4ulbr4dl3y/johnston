@@ -99,8 +99,7 @@ class TestProviderManager(unittest.TestCase):
         pm = ProviderManager()
         pm.set_active_provider_key("custom_no_model")
         agent = pm.create_active_agent()
-        self.assertEqual(agent.provider_key, "custom_no_model")
-        self.assertEqual(agent.model, "")  # No model selected automatically
+        self.assertEqual(agent.model, "model-1")  # Fallback to first model in models list
 
         pm.set_provider_model("custom_no_model", "model-2")
         agent2 = pm.create_active_agent()

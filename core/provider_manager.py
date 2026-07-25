@@ -289,6 +289,37 @@ class ProviderManager:
             except Exception:
                 pass
 
+    def get_provider_model(self, provider_key: str) -> str:
+        """Returns active model for specified provider with priority:
+        1. Saved user choice in config.json (provider_models)
+        2. Explicit 'model' field in provider definition
+        3. First item in provider's 'models' list
+        """
+        providers = self.load_providers()
+        if provider_key not in providers:
+            return ""
+
+        target_provider = providers[provider_key]
+
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    p_models = cdata.get("provider_models", {})
+                    if provider_key in p_models and p_models[provider_key]:
+                        return p_models[provider_key]
+            except Exception:
+                pass
+
+        if target_provider.get("model"):
+            return target_provider["model"]
+
+        models_list = target_provider.get("models")
+        if isinstance(models_list, list) and len(models_list) > 0 and models_list[0]:
+            return models_list[0]
+
+        return ""
+
     def create_agent_for_provider(self, provider_key: str):
         providers = self.load_providers()
         if provider_key not in providers:
@@ -299,35 +330,17 @@ class ProviderManager:
 
         target_provider = providers[provider_key]
         stored_key = self.get_api_key(target_provider["key"])
+        model_val = self.get_provider_model(provider_key)
 
         if "module" in target_provider and hasattr(target_provider["module"], "Agent"):
             kwargs = {}
             if stored_key:
                 kwargs["api_key"] = stored_key
-            if os.path.exists(CONFIG_FILE):
-                try:
-                    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                        cdata = json.load(f)
-                        p_models = cdata.get("provider_models", {})
-                        if provider_key in p_models and p_models[provider_key]:
-                            kwargs["model"] = p_models[provider_key]
-                except Exception:
-                    pass
+            if model_val:
+                kwargs["model"] = model_val
             return target_provider["module"].Agent(**kwargs)
 
         from core.base_provider import BaseAgent
-
-        model_val = target_provider.get("model", "")
-
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    p_models = cdata.get("provider_models", {})
-                    if provider_key in p_models and p_models[provider_key]:
-                        model_val = p_models[provider_key]
-            except Exception:
-                pass
 
         return BaseAgent(
             api_key=stored_key or target_provider.get("api_key", ""),
