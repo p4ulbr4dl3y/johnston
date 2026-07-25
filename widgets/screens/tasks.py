@@ -68,6 +68,7 @@ class TasksListScreen(ModalScreen[None]):
             yield Label("enter: view output • k: kill task • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
+        self._last_signatures = None
         self.update_tasks_list()
         self.query_one("#tasks-option-list", OptionList).focus()
         self.set_interval(0.5, self.update_tasks_list)
@@ -75,10 +76,15 @@ class TasksListScreen(ModalScreen[None]):
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
             return
+        tasks = getattr(self.app, "background_tasks", [])
+        new_signatures = [(getattr(t, "task_id", ""), getattr(t, "is_running", False), getattr(t, "command", "")) for t in tasks]
+        if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
+            return
+        self._last_signatures = new_signatures
+
         opt_list = self.query_one("#tasks-option-list", OptionList)
         current_highlighted = opt_list.highlighted
 
-        tasks = getattr(self.app, "background_tasks", [])
         opt_list.clear_options()
         if not tasks:
             opt_list.add_option(Text("No active background tasks.", style=THEME_MUTED))

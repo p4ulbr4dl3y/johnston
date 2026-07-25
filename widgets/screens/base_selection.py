@@ -178,4 +178,5 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             if item is not None:
                 self.dismiss(item)
                 return
-        self.dismiss(self.default_value)
+            event.stop()
+            return

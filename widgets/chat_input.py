@@ -335,15 +335,26 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Exit hotkeys (Ctrl+C, Ctrl+Q)
+        # Global Exit shortcut: Ctrl+C / Ctrl+Q
         if event.key in ("ctrl+c", "ctrl+q"):
             event.prevent_default()
             event.stop()
             self.app.exit()
             return
 
-        # Cancel active agent generation via Escape
+        # Cancel active suggestions popup or agent generation via Escape
         if event.key == "escape":
+            try:
+                from widgets.command_suggestions import CommandSuggestions
+                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                if suggestions.display:
+                    suggestions.display = False
+                    event.prevent_default()
+                    event.stop()
+                    return
+            except Exception:
+                pass
+
             active_workers = [w for w in self.app.workers if w.is_running]
             if active_workers:
                 for w in active_workers:
@@ -446,6 +457,32 @@ class ChatInput(TextArea):
                 return
 
         if event.key == "enter":
+            # Select suggestion if suggestion menu is open
+            try:
+                from widgets.command_suggestions import CommandSuggestions
+                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                if suggestions.display and suggestions.highlighted is not None:
+                    if suggestions.mode == "command":
+                        if suggestions.highlighted < len(suggestions.current_matched):
+                            chosen_cmd = suggestions.current_matched[suggestions.highlighted]
+                            self.load_text(chosen_cmd + " ")
+                            lines = self.text.split("\n")
+                            self.move_cursor((len(lines) - 1, len(lines[-1])))
+                            suggestions.display = False
+                            event.prevent_default()
+                            event.stop()
+                            return
+                    elif suggestions.mode == "file":
+                        if suggestions.highlighted < len(suggestions.current_matched):
+                            chosen_file = suggestions.current_matched[suggestions.highlighted]
+                            self.apply_file_suggestion(chosen_file, suggestions.at_start_idx)
+                            suggestions.display = False
+                            event.prevent_default()
+                            event.stop()
+                            return
+            except Exception:
+                pass
+
             event.prevent_default()
             event.stop()
 

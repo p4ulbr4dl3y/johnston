@@ -187,7 +187,7 @@ async def test_modal_ctrl_c_quit():
 
 async def test_interrupted_divider_serialization():
     app = JohnstonApp()
-    async with app.run_test() as pilot:
+    async with app.run_test():
         chat_view = app.query_one(ChatView)
         await chat_view.add_user_message("Hello")
         divider = await chat_view.add_compaction_divider("Response Interrupted")

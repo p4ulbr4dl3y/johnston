@@ -193,6 +193,13 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             pass
 
     def _on_key(self, event: events.Key) -> None:
+        try:
+            search_input = self.query_one("#modal-search-input", Input)
+            if search_input.has_focus and event.key in ("left", "right"):
+                return
+        except Exception:
+            pass
+
         if event.key in ("left", "right", "tab", "backtab", "shift+tab"):
             new_tab = "vision" if self.active_tab == "all" else "all"
             self.switch_tab(new_tab)

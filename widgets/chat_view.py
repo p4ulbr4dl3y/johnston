@@ -11,6 +11,7 @@ import pygments
 from markdown_it import MarkdownIt
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
+from rich.markup import escape
 from rich.rule import Rule
 from rich.syntax import Syntax
 from rich.text import Text
@@ -174,6 +175,11 @@ class BotMessage(Vertical):
     def _flush_update(self) -> None:
         self._update_scheduled = False
         safe_update_markdown(self.md_widget, self.content)
+        try:
+            if isinstance(self.parent, VerticalScroll):
+                self.parent.scroll_end(animate=False)
+        except Exception:
+            pass
 
 
 class ThinkingWidget(Vertical):
@@ -385,18 +391,18 @@ class ToolCallWidget(Vertical):
             compact = self._format_compact_dict(mcp_args)
             if not compact:
                 compact = f"{{server: \"{server}\"}}" if server else "{}"
-            escaped_compact = compact.replace("[", "\\[")
+            escaped_compact = escape(compact)
             self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
         else:
             # Eager MCP tool or custom external tool
             mcp_args = self.args if isinstance(self.args, dict) else {}
             compact = self._format_compact_dict(mcp_args)
             if compact:
-                escaped_compact = compact.replace("[", "\\[")
+                escaped_compact = escape(compact)
                 self.header_label.update(f"⚙ [bold]{self.tool_type}[/bold]({escaped_compact})")
             else:
                 display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
-                self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
+                self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(self.target)})")
 
     def on_click(self, event) -> None:
         if self.tool_type.lower() in ("subagent", "task"):

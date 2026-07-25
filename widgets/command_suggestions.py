@@ -42,9 +42,16 @@ class CommandSuggestions(OptionList):
         self.mode: str | None = None  # "command" or "file"
         self.current_matched: list[str] = []
         self.at_start_idx: int = -1
+        self._cached_files: list[str] = []
+        self._cache_time: float = 0.0
 
     def get_workspace_files(self) -> list[str]:
-        """Gets relative file paths list in current project"""
+        """Gets relative file paths list in current project with 5s caching"""
+        import time
+        now = time.time()
+        if self._cached_files and (now - self._cache_time < 5.0):
+            return self._cached_files
+
         files_list = []
         cwd = os.getcwd()
         ignore_dirs = {
@@ -67,7 +74,9 @@ class CommandSuggestions(OptionList):
                     break
         except Exception:
             pass
-        return sorted(files_list)
+        self._cached_files = sorted(files_list)
+        self._cache_time = now
+        return self._cached_files
 
     def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
         """Updates matches list formatted for /commands and @files"""

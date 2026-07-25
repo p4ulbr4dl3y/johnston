@@ -32,13 +32,19 @@ class StatusFooter(Static):
                 self._spinner_timer.stop()
                 self._spinner_timer = None
             self._spinner_idx = 0
-        self.on_mount()
+        self.refresh_footer()
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        self.on_mount()
+        if hasattr(self, "_last_status_args"):
+            self.update_status(**self._last_status_args)
+        else:
+            self.refresh_footer()
 
     def on_mount(self) -> None:
+        self.refresh_footer()
+
+    def refresh_footer(self) -> None:
         try:
             from core.mcp_manager import get_mcp_manager
             from core.skill_manager import SkillManager
@@ -63,23 +69,25 @@ class StatusFooter(Static):
 
             agent_mode = getattr(agent, "mode", "action")
 
-            self.update_status(
-                provider_key=pkey,
-                model_name=model_name,
-                agent_mode=agent_mode,
-                directory=os.path.basename(os.path.realpath(os.getcwd())),
-                active_bg_tasks=active_bg_tasks,
-                subagents_active=subagents_active,
-                subagents_total=subagents_total,
-                context_used=metrics.get("context_used", 0),
-                total_tokens=metrics.get("total_tokens", 0),
-                context_window=metrics.get("context", "128k"),
-                context_limit=metrics.get("context_limit", 128000),
-                cost_usd=metrics.get("cost_usd", 0.0),
-                skills_count=skills_count,
-                mcp_active=mcp_active,
-                mcp_total=mcp_total
-            )
+            kwargs = {
+                "provider_key": pkey,
+                "model_name": model_name,
+                "agent_mode": agent_mode,
+                "directory": os.path.basename(os.path.realpath(os.getcwd())),
+                "active_bg_tasks": active_bg_tasks,
+                "subagents_active": subagents_active,
+                "subagents_total": subagents_total,
+                "context_used": metrics.get("context_used", 0),
+                "total_tokens": metrics.get("total_tokens", 0),
+                "context_window": metrics.get("context", "128k"),
+                "context_limit": metrics.get("context_limit", 128000),
+                "cost_usd": metrics.get("cost_usd", 0.0),
+                "skills_count": skills_count,
+                "mcp_active": mcp_active,
+                "mcp_total": mcp_total
+            }
+            self._last_status_args = kwargs
+            self.update_status(**kwargs)
         except Exception:
             self.update_status(provider_key="default")
 

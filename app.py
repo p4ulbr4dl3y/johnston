@@ -302,8 +302,18 @@ class JohnstonApp(App):
         self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
-        """Any mouse click returns focus to input"""
-        self.query_one("#message-input", ChatInput).focus()
+        """Any mouse click returns focus to input unless interacting with focusable widgets or screens"""
+        from textual.screen import ModalScreen
+        if isinstance(self.screen, ModalScreen):
+            return
+        if event.target and getattr(event.target, "can_focus", False) and event.target is not self.query_one("#message-input"):
+            return
+        if event.target and ("button" in getattr(event.target, "classes", []) or "copy" in str(getattr(event.target, "id", ""))):
+            return
+        try:
+            self.query_one("#message-input", ChatInput).focus()
+        except Exception:
+            pass
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         """On mouse up, copy selected fragment and clear selection"""
