@@ -159,3 +159,31 @@ The project uses a monochrome design system based on Textual TCSS ([app.tcss](fi
 * **Background Palette**: `#09090b` (`THEME_BG` — chat screen), `#18181b` (`THEME_CARD` — cards, input field, popups, Toast notifications, footer), `#27272a` (`THEME_BORDER` — borders and dividers).
 * **Toast Notifications**: `#18181b` cards with monochrome left accent bar (`#ffffff` / `#a1a1aa`).
 * **Welcome Screen**: `WelcomeWidget` splash screen with `johnston` logo centered in empty chat.
+
+---
+
+## 8. Deployment & Publishing
+
+### Build and Publish to PyPI:
+```bash
+# 1. Bump version in pyproject.toml
+# 2. Build package
+uv build
+
+# 3. Publish to PyPI
+uv publish --token <PYPI_TOKEN>
+```
+
+### Installation Options for Users:
+* **Run directly via `uvx`**:
+  ```bash
+  uvx johnston
+  ```
+* **Install globally via `uv`**:
+  ```bash
+  uv tool install johnston
+  ```
+* **One-liner shell script**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/p4ulbr4dl3y/johnston/main/install.sh | bash
+  ```
