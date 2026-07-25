@@ -15,7 +15,7 @@ SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*
 
 class BashTool(BaseTool):
     name = "bash"
-    description = "Run a terminal command. Commands running longer than 10 seconds are automatically moved to the background; use manage_task to inspect, send input, or kill them. Destructive commands require user confirmation."
+    description = "Run a terminal command. Commands running longer than 60 seconds are automatically moved to the background; use manage_task to inspect, send input, or kill them. Destructive commands require user confirmation."
     schema = {
         "type": "function",
         "function": {
@@ -155,7 +155,7 @@ class BashTool(BaseTool):
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
 
         try:
-            await asyncio.wait_for(p.wait(), timeout=10.0)
+            await asyncio.wait_for(p.wait(), timeout=60.0)
             if master_fd is not None:
                 try:
                     os.close(master_fd)
