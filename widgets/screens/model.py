@@ -122,7 +122,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 p_name = p_info.get("name", p_key)
                 p_models = p_info.get("models", [])
                 if filter_vision:
-                    p_models = [m for m in p_models if catalog.supports_vision(p_key, m)]
+                    p_models = [m for m in p_models if catalog.is_native_vision(p_key, m)]
 
                 if not p_models:
                     continue
@@ -151,7 +151,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         else:
             p_models = self.models_data
             if filter_vision:
-                p_models = [m for m in p_models if catalog.supports_vision(self.current_provider, m)]
+                p_models = [m for m in p_models if catalog.is_native_vision(self.current_provider, m)]
             for m in p_models:
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
                 options.append(clean_m)
@@ -184,6 +184,21 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         try:
             search_input = self.query_one("#modal-search-input", Input)
             self.on_input_changed(Input.Changed(search_input, search_input.value))
+        except Exception:
+            pass
+
+        try:
+            opt_list = self.query_one("#modal-option-list", OptionList)
+            target_idx = None
+            if self.default_value in self.filtered_items:
+                target_idx = self.filtered_items.index(self.default_value)
+            if target_idx is None:
+                for i, it in enumerate(self.filtered_items):
+                    if it is not None:
+                        target_idx = i
+                        break
+            if target_idx is not None:
+                opt_list.highlighted = target_idx
         except Exception:
             pass
 
