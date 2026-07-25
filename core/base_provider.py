@@ -396,10 +396,14 @@ class BaseAgent:
                     elif t_name in ("view_image", "ViewImage"):
                         img_path = args.get("path") or args.get("image_path") or ""
                         prompt_val = args.get("prompt") or ""
-                        if prompt_val and img_path:
-                            target = f'{img_path} — "{prompt_val}"'
-                        elif prompt_val:
-                            target = f'"{prompt_val}"'
+                        base_name = os.path.basename(img_path) if img_path else ""
+                        short_prompt = (prompt_val[:45] + "...") if len(prompt_val) > 45 else prompt_val
+                        if short_prompt and base_name:
+                            target = f'{base_name} — "{short_prompt}"'
+                        elif short_prompt:
+                            target = f'"{short_prompt}"'
+                        elif base_name:
+                            target = base_name
                         elif img_path:
                             target = img_path
                         else:
