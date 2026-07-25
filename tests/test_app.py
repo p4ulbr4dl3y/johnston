@@ -201,12 +201,23 @@ async def test_interrupted_divider_serialization():
         print("✓ Interrupted divider serialization test passed cleanly!")
 
 
+async def test_click_event_handler():
+    from textual import events
+    app = JohnstonApp()
+    async with app.run_test():
+        # Simulate Click event without target attribute
+        click_evt = events.Click(0, 0, 0, 0, 0, 1, False, False, False)
+        app.on_click(click_evt)
+    print("✓ Click event handler test passed cleanly!")
+
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
     asyncio.run(test_message_queue())
     asyncio.run(test_resume_cli_flag())
     asyncio.run(test_modal_ctrl_c_quit())
     asyncio.run(test_interrupted_divider_serialization())
+    asyncio.run(test_click_event_handler())
     test_resume_tip_on_exit()
 
 

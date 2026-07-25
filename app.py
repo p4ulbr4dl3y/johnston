@@ -227,6 +227,20 @@ class JohnstonApp(App):
 
         chat_view.check_welcome()
 
+        def _scroll_to_bottom():
+            try:
+                chat_view.scroll_end(animate=False)
+            except Exception:
+                pass
+
+        self.call_after_refresh(_scroll_to_bottom)
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_later(0.1, _scroll_to_bottom)
+            loop.call_later(0.3, _scroll_to_bottom)
+        except Exception:
+            pass
+
         # Restore agent context
         if hasattr(self.agent, "history"):
             self.agent.history = session_data.get("agent_history", [])
@@ -302,13 +316,16 @@ class JohnstonApp(App):
         self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
-        """Any mouse click returns focus to input unless interacting with focusable widgets or screens"""
+        """Any mouse click returns focus to input unless text is selected or interacting with focusable widgets"""
         from textual.screen import ModalScreen
         if isinstance(self.screen, ModalScreen):
             return
-        if event.target and getattr(event.target, "can_focus", False) and event.target is not self.query_one("#message-input"):
+        if self.screen.get_selected_text() or getattr(self, "selection_copy_active", False):
             return
-        if event.target and ("button" in getattr(event.target, "classes", []) or "copy" in str(getattr(event.target, "id", ""))):
+        target = getattr(event, "widget", None) or getattr(event, "target", None)
+        if target and getattr(target, "can_focus", False) and target is not self.query_one("#message-input"):
+            return
+        if target and ("button" in getattr(target, "classes", []) or "copy" in str(getattr(target, "id", ""))):
             return
         try:
             self.query_one("#message-input", ChatInput).focus()
