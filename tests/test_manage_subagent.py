@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 
 from core.subagent_tracker import SubagentTracker
 from tools.manage_subagent import ManageSubagentTool
@@ -78,6 +79,96 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         sess = SubagentSessionData.from_dict(data)
         self.assertEqual(len(sess.agent_history), 2)
         self.assertEqual(sess.to_dict()["agent_history"], data["agent_history"])
+
+
+class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        import tempfile
+
+        from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
+        from tools.context import ToolContext
+        ToolContext._instance = None
+        self.old_dir = SUBAGENTS_DIR
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.tracker = SubagentTracker.get_instance()
+        self.tracker.storage_dir = self.temp_dir.name
+        self.tracker.sessions.clear()
+
+    async def asyncTearDown(self):
+        from tools.context import ToolContext
+        ToolContext._instance = None
+        for sess in list(self.tracker.sessions.values()):
+            if sess.async_task and not sess.async_task.done():
+                sess.async_task.cancel()
+        self.tracker.sessions.clear()
+        self.tracker.storage_dir = self.old_dir
+
+    async def test_send_message_no_message(self):
+        tool = ManageSubagentTool()
+        self.tracker.create_session("sub-sm1", "Task", "prompt", "general", False)
+        res = await tool.execute({"action": "send_message", "task_id": "sub-sm1"}, app=MagicMock())
+        self.assertIn("'message' parameter is required", res)
+
+    async def test_send_message_no_task_id(self):
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "send_message", "message": "hi"})
+        self.assertIn("'task_id' parameter is required", res)
+
+    async def test_send_message_task_not_found(self):
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "send_message", "task_id": "ghost", "message": "hi"})
+        self.assertIn("not found", res)
+
+    async def test_send_message_no_agent_available(self):
+        tool = ManageSubagentTool()
+        self.tracker.create_session("sub-sm2", "Task", "prompt", "general", False)
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.pm = MagicMock()
+        mock_app.pm.create_active_agent.return_value = None
+        res = await tool.execute({"action": "send_message", "task_id": "sub-sm2", "message": "hi"}, app=mock_app)
+        self.assertIn("No active agent instance", res)
+
+    async def test_send_message_sync_success(self):
+        tool = ManageSubagentTool()
+        sess = self.tracker.create_session("sub-sm3", "Task", "prompt", "general", False)
+
+        class MockSubagent:
+            def __init__(self):
+                self.app = None
+                self.history = []
+                self.tokens_input = 0
+                self.tokens_output = 0
+                self.total_tokens = 0
+                self.cost_usd = 0.0
+                self._merged_tokens_input = 0
+                self._merged_tokens_output = 0
+                self._merged_total_tokens = 0
+                self._merged_cost_usd = 0.0
+
+            async def stream_steps(self, message):
+                yield ("bot_text", "Subagent reply text")
+
+        mock_agent = MockSubagent()
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.project_dir = None
+        mock_app.agent = None
+        mock_app.pm = MagicMock()
+        mock_app.pm.create_active_agent.return_value = mock_agent
+        res = await tool.execute({"action": "send_message", "task_id": "sub-sm3", "message": "hello"}, app=mock_app)
+        self.assertIn("<task_result>", res)
+        self.assertIn("Subagent reply text", res)
+        self.assertIsNotNone(sess.agent)
+
+    async def test_unknown_action(self):
+        tool = ManageSubagentTool()
+        self.tracker.create_session("sub-unk", "Task", "prompt", "general", False)
+        res = await tool.execute({"action": "bogus", "task_id": "sub-unk"})
+        self.assertIn("Unknown action", res)
+        self.assertIn("bogus", res)
 
 
 if __name__ == "__main__":
