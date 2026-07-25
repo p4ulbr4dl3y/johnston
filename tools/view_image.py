@@ -111,8 +111,7 @@ class ViewImageTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative path to image file"},
-                    "prompt": {"type": "string", "description": "Optional prompt/question for analyzing the image content"}
+                    "path": {"type": "string", "description": "Absolute or relative path to image file"}
                 },
                 "required": ["path"]
             }
