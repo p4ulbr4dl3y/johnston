@@ -22,7 +22,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenCode",
         "description": "OpenCode agent provider",
         "base_url": "https://opencode.ai/zen/go/v1",
-        "model": "deepseek-v4-flash",
         "api_type": "openai",
     },
     "clinepass": {
@@ -30,7 +29,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "ClinePass",
         "description": "ClinePass AI provider",
         "base_url": "https://api.cline.bot/api/v1",
-        "model": "cline-pass/deepseek-v4-flash",
         "models": [
             "cline-pass/glm-5.2",
             "cline-pass/kimi-k3",

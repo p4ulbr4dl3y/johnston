@@ -50,7 +50,7 @@ class TestProviderManager(unittest.TestCase):
     def test_create_active_agent(self):
         agent = self.pm.create_active_agent()
         self.assertIsNotNone(agent)
-        self.assertEqual(agent.model, "deepseek-v4-flash")
+        self.assertEqual(agent.model, "")
 
     def test_api_keys(self):
         self.assertEqual(self.pm.get_api_key("opencode"), "")
