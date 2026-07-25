@@ -193,12 +193,14 @@ class PromptBuilder:
         if mode_lower == "explore":
             sys_prompt += (
                 "\n\n[MODE: EXPLORE]\n"
-                "Read-only research, codebase inspection, QA, and architectural planning.\n"
+                "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
                 "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
                 "1. Code modification tools (create, edit) are DISABLED.\n"
                 "2. You are STRICTLY PROHIBITED from running state-changing bash commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
-                "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n"
-                "4. When designing a plan, include 'Critical Files' (3-5 files involved) and execution steps, then ask the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
+                "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n\n"
+                "Response Guidelines:\n"
+                "- Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
+                "- Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab or /action) when ready to implement."
             )
         else:
             local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
