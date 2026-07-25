@@ -48,14 +48,18 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
 
 
     def test_set_fallback_vision_on_selection(self):
+        from unittest.mock import patch
+
         from core.models_catalog import catalog
-        catalog.add_vision_override("my-vision-model")
-        catalog.set_fallback_vision_model("my-provider", "my-vision-model")
-        fb_p, fb_m = catalog.get_fallback_vision_model()
-        self.assertEqual(fb_p, "my-provider")
-        self.assertEqual(fb_m, "my-vision-model")
-        catalog.remove_vision_override("my-vision-model")
-        self.assertNotIn("my-vision-model", catalog._user_overrides)
+        with patch.object(catalog, "save_cache"):
+            catalog.add_vision_override("my-vision-model")
+            catalog.set_fallback_vision_model("my-provider", "my-vision-model")
+            fb_p, fb_m = catalog.get_fallback_vision_model()
+            self.assertEqual(fb_p, "my-provider")
+            self.assertEqual(fb_m, "my-vision-model")
+            catalog.remove_vision_override("my-vision-model")
+            self.assertNotIn("my-vision-model", catalog._user_overrides)
+            catalog.set_fallback_vision_model("", "")
 
 
 class TestProcessAndEncodeImage(unittest.TestCase):

@@ -2,79 +2,46 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Markdown, OptionList
+from textual.containers import Vertical
+from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.models_catalog import catalog
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
-class VisionWarningScreen(ModalScreen[Optional[str]]):
+class VisionWarningScreen(BaseSelectionScreen[Optional[str]]):
     """Modal screen warning the user when a selected model lacks vision capabilities."""
 
-    ALLOW_SELECT = False
-    BINDINGS = [
-        ("escape", "cancel", "Close"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ]
-
     def __init__(self, model_name: str, provider_name: str = ""):
-        super().__init__()
         self.model_name = model_name
         self.provider_name = provider_name
 
-    def compose(self) -> ComposeResult:
-        content = (
+        options = ["Select Dedicated Vision Model"]
+        items = ["select_vision"]
+
+        fb_prov, fb_model = catalog.get_fallback_vision_model()
+        if fb_model:
+            fb_disp = catalog.get_model_display_name(fb_prov, fb_model)
+            options.append(f"Use Fallback ({fb_disp})")
+            items.append("use_fallback")
+
+        options.append("My Model Supports Vision (Force)")
+        items.append("force_vision")
+
+        title = (
             "### **Vision Support Warning**\n\n"
-            "The selected model does not natively support **Vision**.\n\n"
+            "The selected model does not natively support **Vision**.\n"
             "Image reading will operate in **Agent Fallback Mode**."
         )
-        with Vertical(id="modal-dialog"):
-            yield Markdown(content, classes="modal-markdown")
-            with Horizontal(classes="modal-buttons"):
-                yield Button("Select Vision Model", id="btn-select-vision")
-                yield Button("My Model Supports Vision", id="btn-force-vision")
-            yield Label("enter: select • tab / ←/→: switch button • esc: continue", id="modal-hint")
 
-    def on_mount(self) -> None:
-        try:
-            self.query_one("#btn-select-vision", Button).focus()
-        except Exception:
-            pass
-
-    def _on_key(self, event: events.Key) -> None:
-        if event.key in ("left", "right"):
-            try:
-                btn1 = self.query_one("#btn-select-vision", Button)
-                btn2 = self.query_one("#btn-force-vision", Button)
-                if btn1.has_focus:
-                    btn2.focus()
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif btn2.has_focus:
-                    btn1.focus()
-                    event.prevent_default()
-                    event.stop()
-                    return
-            except Exception:
-                pass
-        super()._on_key(event)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-select-vision":
-            self.dismiss("select_vision")
-        elif event.button.id == "btn-force-vision":
-            self.dismiss("force_vision")
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
+        super().__init__(
+            title=title,
+            options=options,
+            items=items,
+            default_value="select_vision",
+            show_search=False,
+        )
 
 
 class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
@@ -132,9 +99,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         target_prov = self.current_provider
         target_model = self.current_model
         if filter_vision:
-            fb_prov, fb_model = catalog.get_fallback_vision_model()
-            if fb_prov and fb_model:
-                target_prov, target_model = fb_prov, fb_model
+            if not (self.current_provider and self.current_model and catalog.supports_vision(self.current_provider, self.current_model)):
+                fb_prov, fb_model = catalog.get_fallback_vision_model()
+                if fb_prov and fb_model:
+                    target_prov, target_model = fb_prov, fb_model
 
         if isinstance(self.models_data, dict):
             first_group = True
@@ -157,18 +125,15 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
                 is_target_prov = bool(target_prov and p_key.lower() == target_prov.lower())
                 active_idx = None
-                if is_target_prov:
-                    if target_model:
-                        for idx, m in enumerate(p_models):
-                            if self._is_active_model(p_key, m, target_prov, target_model):
-                                active_idx = idx
-                                break
-                    if active_idx is None and p_models:
-                        active_idx = 0
+                if is_target_prov and target_model:
+                    for idx, m in enumerate(p_models):
+                        if self._is_active_model(p_key, m, target_prov, target_model):
+                            active_idx = idx
+                            break
 
                 for idx, m in enumerate(p_models):
                     clean_m = catalog.get_model_display_name(p_key, m)
-                    is_active = bool(is_target_prov and idx == active_idx)
+                    is_active = bool(active_idx is not None and idx == active_idx)
                     status_tag = r"\[ACTIVE]"
                     opt_label = f"   {status_tag} {clean_m}" if is_active else f"   {clean_m}"
                     item_val = (p_key, m, p_name)
@@ -189,18 +154,21 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                         active_idx = idx
                         break
 
-            if active_idx is None and p_models:
-                active_idx = 0
-
             for idx, m in enumerate(p_models):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
-                is_active = (idx == active_idx)
+                is_active = bool(active_idx is not None and idx == active_idx)
                 status_tag = r"\[ACTIVE]"
                 opt_label = f"{status_tag} {clean_m}" if is_active else clean_m
                 options.append(opt_label)
                 items.append(m)
                 if is_active:
                     default_val = m
+
+        if default_val is None:
+            for it in items:
+                if it is not None:
+                    default_val = it
+                    break
 
         return options, items, default_val
 

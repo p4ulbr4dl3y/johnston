@@ -185,6 +185,13 @@ class ModelsCommand(BaseCommand):
                         elif action == "force_vision":
                             catalog.add_vision_override(selected_model)
                             catalog.set_fallback_vision_model(selected_prov, selected_model)
+                        elif action == "use_fallback":
+                            catalog.remove_vision_override(selected_model)
+                            fb_prov, fb_model = catalog.get_fallback_vision_model()
+                            if not fb_model:
+                                vision_models = getattr(catalog, "_vision", [])
+                                if vision_models:
+                                    catalog.set_fallback_vision_model(selected_prov, vision_models[0])
 
                     app.push_screen(VisionWarningScreen(selected_model, selected_prov), callback=on_warning_action)
             app.query_one("#message-input", ChatInput).focus()

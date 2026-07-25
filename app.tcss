@@ -466,7 +466,8 @@ ModalScreen {
 }
 
 .modal-buttons Button {
-    margin: 0 1;
+    width: 100%;
+    margin-bottom: 1;
     border: none;
     background: #27272a;
     color: #e4e4e7;

@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+from core.models_catalog import catalog
 from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
@@ -245,6 +246,12 @@ class TestModelScreen(unittest.TestCase):
         self.assertEqual(s.default_value[1], "m2")
         self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
 
+    def test_build_data_vision_tab_active(self):
+        models_data = {"prov1": {"name": "P1", "models": ["m1", "m2"]}}
+        catalog.add_vision_override("m1")
+        s = ModelScreen(models_data=models_data, current_model="m1", current_provider="prov1", initial_tab="vision")
+        self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
+
 
 class TestVisionWarningScreen(unittest.TestCase):
     def test_init(self):
@@ -255,6 +262,17 @@ class TestVisionWarningScreen(unittest.TestCase):
     def test_bindings(self):
         keys = [b[0] for b in VisionWarningScreen.BINDINGS]
         self.assertIn("escape", keys)
+
+    def test_options(self):
+        with patch.object(catalog, "save_cache"):
+            catalog.set_fallback_vision_model("", "")
+            s1 = VisionWarningScreen("gpt-3.5", "OpenAI")
+            self.assertEqual(s1.raw_items, ["select_vision", "force_vision"])
+
+            catalog.set_fallback_vision_model("prov1", "vision-1")
+            s2 = VisionWarningScreen("gpt-3.5", "OpenAI")
+            self.assertEqual(s2.raw_items, ["select_vision", "use_fallback", "force_vision"])
+            catalog.set_fallback_vision_model("", "")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import time
 import unittest
+from unittest.mock import patch
 
 from core.commands import COMMAND_REGISTRY, handle_slash_command
 from widgets.chat_view import ChatView
@@ -146,10 +147,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.push_screen = simulate_push_screen
         app.query_one = lambda target, default=None: type("MockInput", (), {"focus": lambda self: None})()
 
-        await cmd.execute(app)
-        warning_screens = [s for s in pushed_screens if isinstance(s, VisionWarningScreen)]
-        self.assertTrue(len(warning_screens) > 0)
-        self.assertTrue(catalog.supports_vision("custom", test_model_name))
+        with patch.object(catalog, "save_cache"):
+            await cmd.execute(app)
+            warning_screens = [s for s in pushed_screens if isinstance(s, VisionWarningScreen)]
+            self.assertTrue(len(warning_screens) > 0)
+            self.assertTrue(catalog.supports_vision("custom", test_model_name))
+            catalog.remove_vision_override(test_model_name)
+            catalog.set_fallback_vision_model("", "")
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)
