@@ -50,5 +50,27 @@ class TestTokenUtil(unittest.TestCase):
         ctx = get_context_window("unknown_provider", "unknown_model")
         self.assertEqual(ctx, "128k")
 
+    def test_estimate_tokens_cyrillic_more_expensive_than_ascii(self):
+        # Cyrillic tokenizes poorly (~2 chars/token) vs ASCII (~4 chars/token).
+        # Same character count must yield a higher token estimate for Cyrillic,
+        # which the old flat len/4 heuristic understated by ~2x.
+        ascii_text = "a" * 40
+        cyr_text = "Я" * 40  # 40 Cyrillic chars (U+042F)
+        self.assertEqual(estimate_tokens(ascii_text), 10)  # 40 / 4
+        self.assertGreater(estimate_tokens(cyr_text), estimate_tokens(ascii_text))
+        # Roughly 2x (~20 tokens), not the naive 10 the old heuristic returned.
+        self.assertGreaterEqual(estimate_tokens(cyr_text), 18)
+
+    def test_estimate_tokens_mixed_content(self):
+        # Mixed ASCII + Cyrillic: weighted blend rather than a flat len/4.
+        mixed = "hello world " + "Я" * 20  # 12 ASCII + 20 Cyrillic
+        # 12*0.25 + 20*0.5 = 3 + 10 = 13
+        self.assertEqual(estimate_tokens(mixed), 13)
+
+    def test_estimate_tokens_ascii_fast_path_unchanged(self):
+        # Pure ASCII must keep the classic 4 chars/token ratio (back-compat).
+        self.assertEqual(estimate_tokens("1234"), 1)
+        self.assertEqual(estimate_tokens("12345678"), 2)
+
 if __name__ == "__main__":
     unittest.main()

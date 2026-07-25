@@ -344,5 +344,100 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         self.assertEqual(tool_msg["content"], "result text")
 
 
+class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
+    async def test_anthropic_payload_marks_system_and_tools_for_caching(self):
+        captured = {}
+
+        class _CaptureClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            def stream(self, *args, **kwargs):
+                captured["payload"] = kwargs.get("json")
+
+                class _CM:
+                    async def __aenter__(self):
+                        return self
+
+                    async def __aexit__(self, *args):
+                        pass
+
+                    async def aiter_lines(self):
+                        if False:
+                            yield ""
+                return _CM()
+
+        with patch("core.adapters.httpx.AsyncClient", return_value=_CaptureClient()):
+            async for _ in AnthropicAdapter().stream_chat(
+                "http://x", "k", "m",
+                [{"role": "system", "content": "You are helpful."}, {"role": "user", "content": "hi"}],
+                tools=[{"type": "function", "function": {"name": "bash", "parameters": {}}}],
+            ):
+                pass
+
+        payload = captured["payload"]
+        # System is sent as a content block list with an ephemeral cache breakpoint
+        self.assertIsInstance(payload["system"], list)
+        self.assertEqual(payload["system"][0]["cache_control"], {"type": "ephemeral"})
+        self.assertIn("You are helpful.", payload["system"][0]["text"])
+        # The final tool definition carries a cache breakpoint
+        self.assertEqual(payload["tools"][-1]["cache_control"], {"type": "ephemeral"})
+
+    async def test_anthropic_empty_system_not_cached(self):
+        captured = {}
+
+        class _CaptureClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+            def stream(self, *args, **kwargs):
+                captured["payload"] = kwargs.get("json")
+
+                class _CM:
+                    async def __aenter__(self):
+                        return self
+
+                    async def __aexit__(self, *args):
+                        pass
+
+                    async def aiter_lines(self):
+                        if False:
+                            yield ""
+                return _CM()
+
+        with patch("core.adapters.httpx.AsyncClient", return_value=_CaptureClient()):
+            async for _ in AnthropicAdapter().stream_chat(
+                "http://x", "k", "m", [{"role": "user", "content": "hi"}],
+            ):
+                pass
+
+        # No system prompt -> system stays an empty string, no cache block
+        self.assertEqual(captured["payload"]["system"], "")
+
+    async def test_openai_adapter_reports_cached_tokens(self):
+        class _UsageWithCache:
+            prompt_tokens = 100
+            completion_tokens = 10
+            total_tokens = 110
+
+            class prompt_tokens_details:
+                cached_tokens = 40
+
+        chunks = [_MockChunk(choices=[], usage=_UsageWithCache())]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
+        with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
+            events = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+        usage = [e for e in events if e[0] == "adapter_usage"]
+        self.assertEqual(usage[0][1]["cache_read_tokens"], 40)
+        self.assertEqual(usage[0][1]["prompt_tokens"], 100)
+
+
 if __name__ == "__main__":
     unittest.main()

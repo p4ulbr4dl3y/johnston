@@ -324,6 +324,84 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sanitized[3]["role"], "user")
         self.assertIn("orphan content", sanitized[3]["content"])
 
+    def test_default_max_tokens_is_8192(self):
+        agent = BaseAgent(api_key="t", model="m", base_url="http://t", system_prompt="t", provider_key="p")
+        self.addAsyncCleanup(agent.close)
+        # Raised from 4096 so long code answers are not truncated mid-generation.
+        self.assertEqual(agent.max_tokens, 8192)
+
+    async def test_cost_usd_cache_multiplier_anthropic_vs_openai(self):
+        # Cached input is discounted ~90% for Anthropic (0.1x) and ~50% for
+        # OpenAI-compatible (0.5x). The same cached usage event must therefore
+        # produce a lower cost for an Anthropic-type agent than an OpenAI-type one.
+        from unittest.mock import patch
+
+        from core.models_catalog import catalog
+
+        cached_usage = {
+            "prompt_tokens": 100,
+            "completion_tokens": 20,
+            "total_tokens": 120,
+            "cache_read_tokens": 80,
+        }
+
+        # OpenAI path: the agent talks to self.client directly and parses usage
+        # off each streamed chunk.
+        mock_delta = unittest.mock.MagicMock()
+        mock_delta.reasoning_content = None
+        mock_delta.reasoning = None
+        mock_delta.model_extra = None
+        mock_delta.content = None
+        mock_delta.tool_calls = None
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.delta = mock_delta
+        usage_chunk = unittest.mock.MagicMock(spec=["choices", "usage"])
+        usage_chunk.choices = []
+        usage_chunk.usage = unittest.mock.MagicMock(
+            prompt_tokens=100, completion_tokens=20, total_tokens=120
+        )
+        usage_chunk.usage.prompt_tokens_details = unittest.mock.MagicMock(cached_tokens=80)
+        text_chunk = unittest.mock.MagicMock(spec=["choices"])
+        text_chunk.choices = [mock_choice]
+
+        async def mock_aiter(*args, **kwargs):
+            yield usage_chunk
+            yield text_chunk
+
+        mock_response = unittest.mock.MagicMock()
+        mock_response.__aiter__ = mock_aiter
+
+        pricing = {"prompt": 0.01, "completion": 0.03}
+
+        # Anthropic path: the agent routes through AnthropicAdapter.stream_chat,
+        # which yields normalized adapter_usage events. Mock the adapter to emit
+        # the cached-usage event plus a terminal text chunk so the loop finishes.
+        class _FakeAnthropicAdapter:
+            async def stream_chat(self, *args, **kwargs):
+                yield ("adapter_usage", dict(cached_usage))
+                yield ("adapter_text", "done")
+
+        agent_openai = BaseAgent(api_key="t", model="test-model", base_url="http://t", system_prompt="t", provider_key="tprov", api_type="openai")
+        self.addAsyncCleanup(agent_openai.close)
+        agent_anthropic = BaseAgent(api_key="t", model="test-model", base_url="http://t", system_prompt="t", provider_key="tprov", api_type="anthropic")
+        self.addAsyncCleanup(agent_anthropic.close)
+
+        with patch.object(catalog, "get_model_pricing", return_value=pricing):
+            with patch.object(agent_openai.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                mock_create.return_value = mock_response
+                async for _ in agent_openai.stream_steps("hi"):
+                    pass
+            with patch("core.adapters.get_adapter", return_value=_FakeAnthropicAdapter()):
+                async for _ in agent_anthropic.stream_steps("hi"):
+                    pass
+
+        # uncached_in=20, cache_read=80, out=20, prompt=0.01, completion=0.03
+        # anthropic (0.1x): 20*0.01 + 80*0.01*0.1 + 20*0.03 = 0.2 + 0.08 + 0.6 = 0.88
+        # openai    (0.5x): 20*0.01 + 80*0.01*0.5 + 20*0.03 = 0.2 + 0.4  + 0.6 = 1.2
+        self.assertAlmostEqual(agent_anthropic.cost_usd, 0.88, places=6)
+        self.assertAlmostEqual(agent_openai.cost_usd, 1.2, places=6)
+        self.assertLess(agent_anthropic.cost_usd, agent_openai.cost_usd)
+
 
 if __name__ == "__main__":
     unittest.main()

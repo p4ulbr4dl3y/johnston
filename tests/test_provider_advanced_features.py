@@ -84,6 +84,29 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                         grouped = await pm.fetch_models_grouped()
                         self.assertNotIn("opencode", grouped)
 
+    def test_provider_default_max_tokens_when_unspecified(self):
+        # When a provider config omits max_tokens, the agent must fall back to
+        # the raised production default (8192), not the old 4096.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_file = os.path.join(tmpdir, "providers.json")
+            with open(json_file, "w", encoding="utf-8") as f:
+                f.write("""{
+  "test_no_max": {
+    "key": "test_no_max",
+    "name": "Test No Max",
+    "base_url": "https://api.test.com/v1",
+    "model": "m1",
+    "api_type": "openai"
+  }
+}""")
+            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file):
+                with patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                    with patch("core.provider_manager.PROVIDERS_DIR", os.path.join(tmpdir, "providers")):
+                        pm = ProviderManager()
+                        agent = pm.create_agent_for_provider("test_no_max")
+                        self.assertIsNotNone(agent)
+                        self.assertEqual(agent.max_tokens, 8192)
+
 
 if __name__ == "__main__":
     unittest.main()

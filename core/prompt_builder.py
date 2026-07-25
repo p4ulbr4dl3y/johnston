@@ -2,14 +2,35 @@ import datetime
 import os
 import platform
 import subprocess
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Tuple
 
 from core.skill_manager import SkillManager
 from tools.subagent import SubagentTool
 
+_GIT_INFO_CACHE: Dict[str, Any] = {"ts": 0.0, "val": ""}
+_GIT_INFO_CACHE_TTL = 30.0
+
 
 def get_git_info() -> str:
-    """Returns current git branch and dirty working tree status safely."""
+    """Returns current git branch and dirty working tree status safely.
+
+    The result is cached briefly so the multi-step agent loop does not spawn two
+    git subprocesses on every tool-call step. Freezing the git string within a
+    turn also keeps the system prompt byte-identical across steps, which is what
+    makes provider prompt caching (OpenAI auto-cache / Anthropic cache_control)
+    actually hit on steps 2..N of a turn.
+    """
+    now = time.time()
+    if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
+        return _GIT_INFO_CACHE["val"]
+    val = _compute_git_info()
+    _GIT_INFO_CACHE["ts"] = now
+    _GIT_INFO_CACHE["val"] = val
+    return val
+
+
+def _compute_git_info() -> str:
     try:
         branch = subprocess.check_output(
             ["git", "branch", "--show-current"],
@@ -79,6 +100,28 @@ Core Principles:
 12. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise."""
 
 
+_SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
+_SYSTEM_PROMPT_CACHE_TTL = 30.0
+_INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md")
+
+
+def _instruction_mtimes(cwd: str) -> Tuple:
+    """Cheap signature of project-instruction files for cache invalidation.
+
+    Uses only os.path.getmtime (no subprocess), so checking the cache key is far
+    cheaper than rebuilding the prompt (which runs git + reads the files).
+    """
+    sig = []
+    for name in _INSTRUCTION_FILES:
+        p = os.path.join(cwd, name)
+        try:
+            if os.path.isfile(p):
+                sig.append((name, os.path.getmtime(p)))
+        except OSError:
+            pass
+    return tuple(sig)
+
+
 class PromptBuilder:
     """Builds composite system prompt and tool definitions accounting for MCP, Skills, and mode (Action/Explore)"""
 
@@ -89,6 +132,28 @@ class PromptBuilder:
         self.allow_task = allow_task
 
     def build_system_prompt(self) -> str:
+        # Cache the fully-built prompt so that across the many tool-call steps of
+        # a single agent turn the system prompt string is byte-identical. That
+        # stability is what lets provider prompt caching (OpenAI/OpenRouter
+        # automatic prefix cache, Anthropic cache_control) hit on steps 2..N and
+        # avoid re-billing the ~2-4k token static overhead every step.
+        cwd = os.getcwd()
+        cache_key = (
+            self.base_system_prompt,
+            self.mode,
+            self.allow_task,
+            cwd,
+            _instruction_mtimes(cwd),
+        )
+        now = time.time()
+        cached = _SYSTEM_PROMPT_CACHE.get(cache_key)
+        if cached is not None and now < cached[0]:
+            return cached[1]
+        sys_prompt = self._build_system_prompt_uncached()
+        _SYSTEM_PROMPT_CACHE[cache_key] = (now + _SYSTEM_PROMPT_CACHE_TTL, sys_prompt)
+        return sys_prompt
+
+    def _build_system_prompt_uncached(self) -> str:
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
@@ -112,7 +177,9 @@ class PromptBuilder:
         project_snippet = get_project_instructions_snippet()
         rules_snippet = get_rules_snippet(mode=self.mode)
 
-        sys_prompt = f"{self.base_system_prompt}\n\n{env_block}"
+        # Stable prefix first (cacheable across turns); volatile env metadata
+        # last so the longest possible stable prefix can be prompt-cached.
+        sys_prompt = self.base_system_prompt
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
@@ -140,6 +207,10 @@ class PromptBuilder:
                 f"Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.{plan_note}\n"
                 "Execute tasks precisely, write clean code, and verify with tests."
             )
+
+        # Volatile metadata last: time/git change every turn, so keeping them at
+        # the tail preserves the stable cached prefix for provider prompt caching.
+        sys_prompt = f"{sys_prompt}\n\n{env_block}"
 
         return sys_prompt
 

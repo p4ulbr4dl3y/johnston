@@ -356,7 +356,7 @@ class ProviderManager:
             reasoning_effort=target_provider.get("reasoning_effort"),
             chunk_timeout=target_provider.get("chunk_timeout", 30.0),
             fallback_provider=target_provider.get("fallback_provider"),
-            max_tokens=target_provider.get("max_tokens") or 4096,
+            max_tokens=target_provider.get("max_tokens") or 8192,
             max_steps=target_provider.get("max_steps") or 50,
         )
 

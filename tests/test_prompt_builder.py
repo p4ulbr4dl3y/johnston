@@ -65,6 +65,40 @@ class TestPromptBuilder(unittest.TestCase):
                 self.assertIn("[RULE: custom_rule]", prompt)
                 self.assertIn("Always use pytest", prompt)
 
+    def test_build_system_prompt_env_metadata_last(self):
+        # Volatile env metadata must come AFTER the stable base + mode block so
+        # the stable prefix is prompt-cacheable across turns.
+        builder = PromptBuilder("Base instructions marker", [], mode="action")
+        prompt = builder.build_system_prompt()
+        self.assertLess(prompt.index("Base instructions marker"), prompt.index("Environment Metadata:"))
+        self.assertLess(prompt.index("[MODE: ACTION]"), prompt.index("Environment Metadata:"))
+
+    def test_build_system_prompt_cached_within_ttl(self):
+        import time as _time
+        from unittest.mock import patch
+
+        import core.prompt_builder as pb
+        pb._SYSTEM_PROMPT_CACHE.clear()
+        builder = PromptBuilder("Cache stability marker", [], mode="action")
+        first = builder.build_system_prompt()
+        # Rebuild "later" but still inside the TTL window: must return the exact
+        # same cached string (env time frozen) instead of recomputing.
+        with patch("core.prompt_builder.time.time", return_value=_time.time() + 1):
+            second = builder.build_system_prompt()
+        self.assertEqual(first, second)
+        self.assertIn("Cache stability marker", first)
+        self.assertGreaterEqual(len(pb._SYSTEM_PROMPT_CACHE), 1)
+
+    def test_build_system_prompt_cache_invalidates_on_mode_change(self):
+        import core.prompt_builder as pb
+        pb._SYSTEM_PROMPT_CACHE.clear()
+        action_prompt = PromptBuilder("Mode invalidate marker", [], mode="action").build_system_prompt()
+        explore_prompt = PromptBuilder("Mode invalidate marker", [], mode="explore").build_system_prompt()
+        # Different mode -> different cache key -> rebuilt with the explore block
+        self.assertIn("[MODE: ACTION]", action_prompt)
+        self.assertIn("[MODE: EXPLORE]", explore_prompt)
+        self.assertNotEqual(action_prompt, explore_prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

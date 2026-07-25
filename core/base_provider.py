@@ -27,7 +27,7 @@ class BaseAgent:
         reasoning_effort: str = None,
         chunk_timeout: float = 30.0,
         fallback_provider: str = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
         max_steps: int = 50,
     ):
         if tools is None:
@@ -397,7 +397,10 @@ class BaseAgent:
                     self.tokens_cache_read += cache_read_tok
                     self.last_context_tokens = in_tok
                     self.total_tokens += step_usage["total_tokens"]
-                    self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * 0.1) + out_tok * p_comp)
+                    # Cached input is discounted differently per provider:
+                    # Anthropic ~90% off (0.1x), OpenAI-compatible ~50% off (0.5x).
+                    cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
+                    self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
                 else:
                     output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
                     self.tokens_input += prompt_tokens_est
@@ -556,7 +559,7 @@ class BaseAgent:
                     previous_summary = content_str.split("[Context Summary of earlier conversation]:", 1)[1].strip()
 
         # Prune and serialize history to compact using OpenCode format
-        TOOL_OUTPUT_MAX_CHARS = 2000
+        TOOL_OUTPUT_MAX_CHARS = 3000
         pruned_history = []
         for msg in history_to_compact:
             if not isinstance(msg, dict):

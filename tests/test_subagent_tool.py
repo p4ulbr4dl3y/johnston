@@ -70,6 +70,22 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("edit", tool_names)
         self.assertIn("read-only exploration subagent", mock_agent.system_prompt)
 
+    def test_truncate_subagent_result_short(self):
+        from tools.subagent import _truncate_subagent_result
+        self.assertEqual(_truncate_subagent_result("short result"), "short result")
+        self.assertEqual(_truncate_subagent_result(""), "")
+        self.assertEqual(_truncate_subagent_result(None), "")
+
+    def test_truncate_subagent_result_long(self):
+        from tools.subagent import MAX_SUBAGENT_RESULT_CHARS, _truncate_subagent_result
+        long_text = "x" * (MAX_SUBAGENT_RESULT_CHARS + 500)
+        result = _truncate_subagent_result(long_text)
+        # Clipped and annotated with a pointer to the full session log
+        self.assertLess(len(result), len(long_text))
+        self.assertTrue(result.startswith("x" * MAX_SUBAGENT_RESULT_CHARS))
+        self.assertIn("truncated", result)
+        self.assertIn("manage_subagent", result)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,9 +6,50 @@ from typing import Any, Dict
 
 CHARS_PER_TOKEN = 4
 
+# Per-character token cost by character class. Real BPE tokenizers (cl100k/o200k)
+# treat ASCII densely (~4 chars/token) but tokenize Cyrillic and CJK far less
+# efficiently. A flat len/4 heuristic underestimates Russian text by ~2x, which
+# delays auto-compaction and understates context usage. These weights approximate
+# cl100k_base ratios without pulling in a tokenizer dependency.
+_TOKEN_COST_ASCII = 0.25      # ~4 chars/token
+_TOKEN_COST_CYRILLIC = 0.5    # ~2 chars/token
+_TOKEN_COST_CJK = 0.7         # ~1.4 chars/token
+_TOKEN_COST_OTHER = 0.5       # other non-ASCII (latin-extended, emoji, etc.)
+
+
+def _estimate_text_tokens(text: str) -> int:
+    if not text:
+        return 0
+    # Fast path: pure ASCII (code, JSON, English) keeps the classic 4 chars/token
+    # ratio and is identical to the previous implementation.
+    if text.isascii():
+        return max(0, round(len(text) / CHARS_PER_TOKEN))
+
+    ascii_n = cyrillic_n = cjk_n = other_n = 0
+    for ch in text:
+        o = ord(ch)
+        if o < 0x80:
+            ascii_n += 1
+        elif 0x0400 <= o <= 0x04FF:
+            cyrillic_n += 1
+        elif (0x4E00 <= o <= 0x9FFF) or (0x3040 <= o <= 0x30FF) or (0xAC00 <= o <= 0xD7AF):
+            cjk_n += 1
+        else:
+            other_n += 1
+
+    cost = (
+        ascii_n * _TOKEN_COST_ASCII
+        + cyrillic_n * _TOKEN_COST_CYRILLIC
+        + cjk_n * _TOKEN_COST_CJK
+        + other_n * _TOKEN_COST_OTHER
+    )
+    return max(0, round(cost))
+
+
 def estimate_tokens(input_val: Any) -> int:
     """
-    Estimate token count based on string length (4 chars per token).
+    Estimate token count using a character-class-aware heuristic.
+    ASCII is ~4 chars/token; Cyrillic ~2 chars/token; CJK ~1.4 chars/token.
     Supports strings, dicts, lists, or primitive types.
     """
     if input_val is None:
@@ -21,7 +62,7 @@ def estimate_tokens(input_val: Any) -> int:
     else:
         text = input_val
 
-    return max(0, round(len(text) / CHARS_PER_TOKEN))
+    return _estimate_text_tokens(text)
 
 def parse_usage(usage: Any) -> Dict[str, int]:
     """

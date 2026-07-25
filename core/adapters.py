@@ -58,11 +58,15 @@ class OpenAIAdapter(BaseApiAdapter):
         async for chunk in response:
             if getattr(chunk, "usage", None):
                 u = chunk.usage
+                cache_read = 0
+                prompt_details = getattr(u, "prompt_tokens_details", None)
+                if prompt_details:
+                    cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
                 yield ("adapter_usage", {
                     "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
                     "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
                     "total_tokens": getattr(u, "total_tokens", 0) or 0,
-                    "cache_read_tokens": 0,
+                    "cache_read_tokens": cache_read,
                 })
             if not chunk.choices:
                 continue
@@ -185,13 +189,22 @@ class AnthropicAdapter(BaseApiAdapter):
         }
         payload = {
             "model": model,
-            "max_tokens": max_tokens if max_tokens and max_tokens > 0 else 4096,
-            "system": system_prompt,
+            "max_tokens": max_tokens if max_tokens and max_tokens > 0 else 8192,
             "messages": anthropic_msgs,
             "stream": True,
         }
+        # Anthropic prompt caching: mark the stable system prompt and the final
+        # tool definition as ephemeral cache breakpoints. The system prompt +
+        # tool schemas (~2-4k tokens) are identical across the tool-call steps of
+        # a turn, so they are read from cache on steps 2..N at ~10% of the price.
+        if system_prompt:
+            payload["system"] = [
+                {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+            ]
+        else:
+            payload["system"] = ""
         if tools:
-            payload["tools"] = [
+            native_tools = [
                 {
                     "name": (t.get("function", {}) or {}).get("name"),
                     "description": (t.get("function", {}) or {}).get("description", ""),
@@ -199,6 +212,9 @@ class AnthropicAdapter(BaseApiAdapter):
                 }
                 for t in tools
             ]
+            if native_tools:
+                native_tools[-1]["cache_control"] = {"type": "ephemeral"}
+            payload["tools"] = native_tools
 
         tool_blocks: Dict[int, Dict[str, str]] = {}
         pending_usage: Dict[str, int] = {
