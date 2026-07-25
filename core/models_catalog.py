@@ -39,6 +39,7 @@ class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
         self._vision: List[str] = []
+        self._user_overrides: List[str] = []
         self._names: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
         self.load_cache()
@@ -57,7 +58,8 @@ class ModelsCatalog:
                 with open(CACHE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self._limits = data.get("model_limits", {})
-                    self._vision = data.get("vision_models", [])
+                    self._user_overrides = data.get("user_vision_overrides", [])
+                    self._vision = list(set(data.get("vision_models", []) + self._user_overrides))
                     self._names = data.get("model_names", {})
                     self._pricing = data.get("model_pricing", {})
 
@@ -84,6 +86,7 @@ class ModelsCatalog:
                         "updated_at": time.time(),
                         "model_limits": model_limits,
                         "vision_models": vision_models,
+                        "user_vision_overrides": self._user_overrides,
                         "model_names": model_names,
                         "model_pricing": model_pricing or {},
                     },
@@ -139,6 +142,9 @@ class ModelsCatalog:
                                 model_pricing[m_id.split("/")[-1].lower()] = p_item
 
                     self._limits = model_limits
+                    for ov in self._user_overrides:
+                        if ov not in vision_models:
+                            vision_models.append(ov)
                     self._vision = vision_models
                     self._names = model_names
                     self._pricing = model_pricing
@@ -180,9 +186,13 @@ class ModelsCatalog:
             return
         if not self._vision:
             self.load_cache()
+        if model_id not in self._user_overrides:
+            self._user_overrides.append(model_id)
         if model_id not in self._vision:
             self._vision.append(model_id)
         m_base = model_id.split("/")[-1].split(":")[0]
+        if m_base not in self._user_overrides:
+            self._user_overrides.append(m_base)
         if m_base not in self._vision:
             self._vision.append(m_base)
         self.save_cache(self._limits, self._vision, self._names, self._pricing)
