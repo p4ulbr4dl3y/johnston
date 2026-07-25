@@ -352,7 +352,26 @@ class ToolCallWidget(Vertical):
     }
 
     def render_header(self) -> None:
-        if self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
+        if self.tool_type.lower() in ("view_image", "viewimage"):
+            display_name = "ViewImage"
+            img_path = self.args.get("path") or self.args.get("image_path") or ""
+            prompt_val = self.args.get("prompt") or ""
+            if img_path or prompt_val:
+                import os
+                base_name = os.path.basename(img_path) if img_path else ""
+                short_prompt = (prompt_val[:45] + "...") if len(prompt_val) > 45 else prompt_val
+                if short_prompt and base_name:
+                    target_str = f'{base_name} — "{short_prompt}"'
+                elif short_prompt:
+                    target_str = f'"{short_prompt}"'
+                elif base_name:
+                    target_str = base_name
+                else:
+                    target_str = self.target
+            else:
+                target_str = self.target
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({target_str})")
+        elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
