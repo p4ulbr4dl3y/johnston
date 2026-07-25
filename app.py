@@ -398,7 +398,6 @@ class JohnstonApp(App):
             try:
                 self.selection_copy_active = True
                 self.copy_to_clipboard(selected_text)
-                self.notify("Selected text copied to clipboard!")
             except Exception as e:
                 self.notify(f"Copy failed: {e}", severity="error")
             finally:
@@ -421,7 +420,6 @@ class JohnstonApp(App):
                 if sess:
                     self.agent.history = sess.get("agent_history", [])
             self.refresh_status_footer()
-            self.notify(f"Agent switched: {event.value}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new)"""
@@ -440,7 +438,6 @@ class JohnstonApp(App):
 
         if self.is_generating:
             self.message_queue.append((user_text, True))
-            self.notify("Message added to queue")
         else:
             self.trigger_ai_response(user_text, show_in_ui=True)
 

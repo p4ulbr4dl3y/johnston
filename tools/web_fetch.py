@@ -53,7 +53,7 @@ class WebFetchTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+        self._ensure_context(app)
         url = args.get("url", "").strip()
         if not url:
             return "Error: parameter 'url' is required."
@@ -62,8 +62,6 @@ class WebFetchTool(BaseTool):
             return f"Error: invalid URL scheme for '{url}'. Must start with http:// or https://."
 
         raw_mode = bool(args.get("raw", False))
-
-        ctx.notify(f"Fetching URL {url}...")
 
         headers = {
             "User-Agent": DEFAULT_USER_AGENT,

@@ -61,7 +61,6 @@ class CustomMarkdownFence(MarkdownFence):
                 app = self.app
                 if hasattr(app, "copy_to_clipboard"):
                     app.copy_to_clipboard(self.code)
-                    app.notify("Code block copied to clipboard!")
             except Exception:
                 pass
             event.stop()

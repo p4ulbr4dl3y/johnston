@@ -54,7 +54,6 @@ class NewCommand(BaseCommand):
         chat_view.check_welcome()
         app.agent.clear_history()
         app.refresh_status_footer()
-        app.notify("New chat session created!")
 
 
 class ProvidersCommand(BaseCommand):
@@ -249,7 +248,6 @@ class ResumeCommand(BaseCommand):
         def on_resume_selected(selected_sid: str) -> None:
             if selected_sid:
                 app.load_session_ui(selected_sid)
-                app.notify(f"Session resumed: {selected_sid}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
@@ -301,7 +299,6 @@ class SkillsCommand(BaseCommand):
         def on_skill_selected(selected_skill: dict | None) -> None:
             if selected_skill:
                 s_name = selected_skill["name"]
-                app.notify(f"Activating skill: {s_name}")
                 app.generate_ai_response(f"Load and apply the skill '{s_name}'.", show_in_ui=True)
             app.query_one("#message-input", ChatInput).focus()
 
@@ -388,7 +385,6 @@ class ActionCommand(BaseCommand):
         if hasattr(app, "agent") and app.agent:
             app.agent.mode = "action"
             app.refresh_status_footer()
-            app.notify("Switched agent to Action mode")
 
 
 class ExploreCommand(BaseCommand):
@@ -400,7 +396,6 @@ class ExploreCommand(BaseCommand):
         if hasattr(app, "agent") and app.agent:
             app.agent.mode = "explore"
             app.refresh_status_footer()
-            app.notify("Switched agent to Explore mode")
 
 
 COMMAND_CLASSES = [
@@ -452,7 +447,6 @@ async def handle_slash_command(app, command_text: str) -> bool:
         skill = sm.get_skill(skill_name)
         if skill:
             extra_text = parts[1].strip() if len(parts) > 1 else ""
-            app.notify(f"Activating skill: {skill['name']}")
             if extra_text:
                 prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
             else:

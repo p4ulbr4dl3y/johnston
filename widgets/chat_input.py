@@ -216,8 +216,6 @@ class ChatInput(TextArea):
                     self.pasted_texts[tag] = f"@{filepath}"
                     self.insert(tag)
                     self._on_input_change()
-                    if self.app:
-                        self.app.notify("Pasted image from clipboard!")
                     return True
         except Exception:
             pass

@@ -22,7 +22,6 @@ class TestCodeBlockCopy(unittest.TestCase):
         fence.on_button_pressed(event)
 
         mock_app.copy_to_clipboard.assert_called_once_with("x = 42")
-        mock_app.notify.assert_called_once_with("Code block copied to clipboard!")
         event.stop.assert_called_once()
 
 
