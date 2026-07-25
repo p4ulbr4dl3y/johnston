@@ -505,11 +505,13 @@ class BaseAgent:
                     target = extract_tool_display(t_name, args)
                     yield ("tool", t_name, target, args)
 
+                    from core.mode_manager import ModeManager
                     current_mode = getattr(self, "mode", "action").lower()
-                    if current_mode == "explore" and t_name in ("edit", "create", "Edit", "Create"):
+                    mode_def = ModeManager.get_instance().get_mode(current_mode)
+                    if mode_def.read_only and t_name in ("edit", "create", "Edit", "Create"):
                         f_path = args.get("path") or args.get("file") or ""
                         if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in Explore mode. Instruct the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
+                            tool_result = f"Error: Editing code file '{f_path}' is disabled in {mode_def.name} mode. Instruct the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
                         else:
                             tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
                     else:

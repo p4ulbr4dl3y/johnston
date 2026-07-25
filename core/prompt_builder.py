@@ -154,6 +154,7 @@ class PromptBuilder:
         return sys_prompt
 
     def _build_system_prompt_uncached(self) -> str:
+        cwd = os.getcwd()
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
@@ -165,7 +166,7 @@ class PromptBuilder:
 
         env_lines = [
             "Environment Metadata:",
-            f"- Working Directory: {os.getcwd()}",
+            f"- Working Directory: {cwd}",
             f"- Local Time: {now_str}",
             f"- Operating System: {os_info}"
         ]
@@ -189,31 +190,12 @@ class PromptBuilder:
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        mode_lower = self.mode.lower()
-        if mode_lower == "explore":
-            sys_prompt += (
-                "\n\n[MODE: EXPLORE]\n"
-                "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
-                "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
-                "1. Code modification tools (create, edit) are DISABLED.\n"
-                "2. You are STRICTLY PROHIBITED from running state-changing bash commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
-                "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n\n"
-                "Response Guidelines:\n"
-                "- Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
-                "- Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab or /action) when ready to implement."
-            )
-        else:
-            local_plan = os.path.join(os.getcwd(), ".johnston", "plans", "plan.md")
-            plan_note = f" Refer to plan at '{local_plan}' if present." if os.path.exists(local_plan) else ""
-            sys_prompt += (
-                f"\n\n[MODE: ACTION]\n"
-                f"Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.{plan_note}\n"
-                "Rules:\n"
-                "1. Research First & Read Before Edit: Inspect codebase and target files before modifying.\n"
-                "2. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
-                "3. Minimal Comments: Write comments ONLY when the WHY is non-obvious. Never explain WHAT code does.\n"
-                "4. Empirical Verification: ALWAYS verify changes using tests or execution commands before concluding. Never claim tests pass if any test fails."
-            )
+        from core.mode_manager import ModeManager
+        mode_def = ModeManager.get_instance().get_mode(self.mode, project_dir=cwd)
+        if mode_def.prompt:
+            local_plan = os.path.join(cwd, ".johnston", "plans", "plan.md")
+            plan_note = f"\nRefer to plan at '{local_plan}' if present." if (mode_def.key == "action" and os.path.exists(local_plan)) else ""
+            sys_prompt += f"\n\n{mode_def.prompt}{plan_note}"
 
         # Volatile metadata last: time/git change every turn, so keeping them at
         # the tail preserves the stable cached prefix for provider prompt caching.
@@ -223,6 +205,7 @@ class PromptBuilder:
 
     def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
+        from core.mode_manager import ModeManager
 
         mcp_tools = get_mcp_manager().get_active_tools()
         clean_mcp_tools = [
@@ -231,12 +214,14 @@ class PromptBuilder:
 
         all_tools = list(self.base_tools) + clean_mcp_tools
 
-        mode_lower = self.mode.lower()
-        if mode_lower == "explore":
-            # Filter out file modification tools in explore mode
+        mode_def = ModeManager.get_instance().get_mode(self.mode)
+        if mode_def.read_only or mode_def.disallowed_tools:
+            disallowed = set(t.lower() for t in mode_def.disallowed_tools)
+            if mode_def.read_only:
+                disallowed.update({"create", "edit"})
             all_tools = [
                 t for t in all_tools
-                if t.get("function", {}).get("name") not in ("create", "edit", "Create", "Edit")
+                if t.get("function", {}).get("name", "").lower() not in disallowed
             ]
 
         if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent", "Task", "task") for t in all_tools):

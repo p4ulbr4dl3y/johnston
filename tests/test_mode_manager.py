@@ -1,0 +1,65 @@
+import os
+import tempfile
+import unittest
+
+from core.mode_manager import ModeManager
+
+
+class TestModeManager(unittest.TestCase):
+    def test_builtin_modes(self):
+        mm = ModeManager.get_instance()
+        modes = mm.load_modes(include_global=False)
+        self.assertIn("action", modes)
+        self.assertIn("explore", modes)
+        self.assertFalse(modes["action"].read_only)
+        self.assertTrue(modes["explore"].read_only)
+
+    def test_custom_json_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            modes_dir = os.path.join(tmpdir, ".johnston", "modes")
+            os.makedirs(modes_dir, exist_ok=True)
+            json_path = os.path.join(modes_dir, "architect.json")
+            with open(json_path, "w", encoding="utf-8") as f:
+                f.write('''{
+                    "key": "architect",
+                    "name": "Architect",
+                    "description": "High-level design mode",
+                    "read_only": true,
+                    "prompt": "Architect prompt content",
+                    "disallowed_tools": ["create", "edit"]
+                }''')
+
+            mm = ModeManager()
+            modes = mm.load_modes(project_dir=tmpdir, include_global=False)
+            self.assertIn("architect", modes)
+            arch = modes["architect"]
+            self.assertEqual(arch.name, "Architect")
+            self.assertTrue(arch.read_only)
+            self.assertEqual(arch.prompt, "Architect prompt content")
+            self.assertIn("create", arch.disallowed_tools)
+
+    def test_custom_md_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            modes_dir = os.path.join(tmpdir, ".johnston", "modes")
+            os.makedirs(modes_dir, exist_ok=True)
+            md_path = os.path.join(modes_dir, "reviewer.md")
+            with open(md_path, "w", encoding="utf-8") as f:
+                f.write('''---
+name: Reviewer
+description: Code review mode
+read_only: true
+disallowed_tools: [create, edit]
+---
+You are a Code Reviewer in Johnston...''')
+
+            mm = ModeManager()
+            modes = mm.load_modes(project_dir=tmpdir, include_global=False)
+            self.assertIn("reviewer", modes)
+            rev = modes["reviewer"]
+            self.assertEqual(rev.name, "Reviewer")
+            self.assertTrue(rev.read_only)
+            self.assertIn("You are a Code Reviewer", rev.prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()

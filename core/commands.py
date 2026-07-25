@@ -379,6 +379,48 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
+class ActionCommand(BaseCommand):
+    name = "/action"
+    aliases = ["/build", "/code"]
+    description = "Switch agent to Action mode"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "action"
+            app.refresh_status_footer()
+            app.notify("Switched agent to Action mode")
+
+
+class ExploreCommand(BaseCommand):
+    name = "/explore"
+    aliases = ["/plan", "/ask"]
+    description = "Switch agent to Explore mode"
+
+    async def execute(self, app) -> None:
+        if hasattr(app, "agent") and app.agent:
+            app.agent.mode = "explore"
+            app.refresh_status_footer()
+            app.notify("Switched agent to Explore mode")
+
+
+class ModesCommand(BaseCommand):
+    name = "/modes"
+    aliases = ["/mode"]
+    description = "List available agent execution modes"
+
+    async def execute(self, app) -> None:
+        from core.mode_manager import ModeManager
+        modes = ModeManager.get_instance().load_modes()
+        curr_mode = getattr(getattr(app, "agent", None), "mode", "action")
+        modes_list = []
+        for m in modes.values():
+            prefix = "✓ " if m.key == curr_mode else "  "
+            ro = " (read-only)" if m.read_only else ""
+            modes_list.append(f"{prefix}{m.name} [{m.key}]{ro} ({m.source})")
+        msg = "Registered Execution Modes:\n" + "\n".join(modes_list)
+        app.notify(msg)
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -392,6 +434,9 @@ COMMAND_CLASSES = [
     MCPCommand,
     InitCommand,
     CompactCommand,
+    ActionCommand,
+    ExploreCommand,
+    ModesCommand,
 ]
 
 

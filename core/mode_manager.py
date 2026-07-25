@@ -1,0 +1,173 @@
+import json
+import os
+from typing import Dict, List, Optional
+
+
+class ModeDefinition:
+    def __init__(
+        self,
+        key: str,
+        name: str,
+        description: str = "",
+        read_only: bool = False,
+        prompt: str = "",
+        disallowed_tools: Optional[List[str]] = None,
+        source: str = "builtin",
+    ):
+        self.key = key.lower().strip()
+        self.name = name
+        self.description = description
+        self.read_only = read_only
+        self.prompt = prompt
+        self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
+        self.source = source
+
+
+BUILTIN_MODES = {
+    "action": ModeDefinition(
+        key="action",
+        name="Action",
+        description="Execution and implementation mode. Full editing, bash, and task permissions.",
+        read_only=False,
+        prompt=(
+            "[MODE: ACTION]\n"
+            "Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.\n"
+            "Rules:\n"
+            "1. Research First & Read Before Edit: Inspect codebase and target files before modifying.\n"
+            "2. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
+            "3. Minimal Comments: Write comments ONLY when the WHY is non-obvious. Never explain WHAT code does.\n"
+            "4. Empirical Verification: ALWAYS verify changes using tests or execution commands before concluding. Never claim tests pass if any test fails."
+        ),
+        disallowed_tools=[],
+        source="builtin",
+    ),
+    "explore": ModeDefinition(
+        key="explore",
+        name="Explore",
+        description="Read-only mode for Q&A, research, code explanation, architecture review, and planning.",
+        read_only=True,
+        prompt=(
+            "[MODE: EXPLORE]\n"
+            "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
+            "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
+            "1. Code modification tools (create, edit) are DISABLED.\n"
+            "2. You are STRICTLY PROHIBITED from running state-changing bash commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
+            "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n\n"
+            "Response Guidelines:\n"
+            "- Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
+            "- Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab or /action) when ready to implement."
+        ),
+        disallowed_tools=["create", "edit", "Create", "Edit"],
+        source="builtin",
+    ),
+}
+
+
+class ModeManager:
+    _instance: Optional["ModeManager"] = None
+
+    def __init__(self):
+        self.modes: Dict[str, ModeDefinition] = dict(BUILTIN_MODES)
+
+    @classmethod
+    def get_instance(cls) -> "ModeManager":
+        if cls._instance is None:
+            cls._instance = ModeManager()
+        return cls._instance
+
+    def load_modes(self, project_dir: Optional[str] = None, include_global: bool = True) -> Dict[str, ModeDefinition]:
+        modes: Dict[str, ModeDefinition] = dict(BUILTIN_MODES)
+
+        dirs = []
+        if include_global:
+            dirs.append((os.path.expanduser("~/.johnston/modes"), "global"))
+        p_dir = project_dir or os.getcwd()
+        dirs.append((os.path.join(p_dir, ".johnston", "modes"), "project"))
+
+        for dpath, source in dirs:
+            if not os.path.isdir(dpath):
+                continue
+            for fname in sorted(os.listdir(dpath)):
+                fpath = os.path.join(dpath, fname)
+                if not os.path.isfile(fpath):
+                    continue
+                mode_def = None
+                if fname.endswith(".json"):
+                    mode_def = self._parse_json_mode(fpath, source)
+                elif fname.endswith(".md") or fname.endswith(".markdown"):
+                    mode_def = self._parse_md_mode(fpath, source)
+
+                if mode_def:
+                    modes[mode_def.key] = mode_def
+
+        self.modes = modes
+        return modes
+
+    def get_mode(self, key: str, project_dir: Optional[str] = None) -> ModeDefinition:
+        self.load_modes(project_dir=project_dir)
+        key_lower = key.lower().strip()
+        if key_lower in self.modes:
+            return self.modes[key_lower]
+        # Fallback to action if not found
+        return self.modes.get("action", BUILTIN_MODES["action"])
+
+    def _parse_json_mode(self, fpath: str, source: str) -> Optional[ModeDefinition]:
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            key = data.get("key") or os.path.splitext(os.path.basename(fpath))[0]
+            name = data.get("name") or key.capitalize()
+            return ModeDefinition(
+                key=key,
+                name=name,
+                description=data.get("description", ""),
+                read_only=bool(data.get("read_only", False)),
+                prompt=data.get("prompt", ""),
+                disallowed_tools=data.get("disallowed_tools", []),
+                source=source,
+            )
+        except Exception:
+            return None
+
+    def _parse_md_mode(self, fpath: str, source: str) -> Optional[ModeDefinition]:
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+            if not raw:
+                return None
+
+            base_key = os.path.splitext(os.path.basename(fpath))[0]
+            meta = {}
+            prompt = raw
+
+            if raw.startswith("---"):
+                parts = raw.split("---", 2)
+                if len(parts) >= 3:
+                    yaml_str = parts[1].strip()
+                    prompt = parts[2].strip()
+                    for line in yaml_str.splitlines():
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            meta[k.strip().lower()] = v.strip().strip("\"'")
+
+            key = meta.get("key") or base_key
+            name = meta.get("name") or key.capitalize()
+            read_only_val = str(meta.get("read_only", "false")).lower() in ("true", "1", "yes")
+
+            disallowed_raw = meta.get("disallowed_tools", "")
+            disallowed_tools = []
+            if disallowed_raw:
+                cleaned = disallowed_raw.strip("[]")
+                disallowed_tools = [t.strip() for t in cleaned.split(",") if t.strip()]
+
+            return ModeDefinition(
+                key=key,
+                name=name,
+                description=meta.get("description", ""),
+                read_only=read_only_val,
+                prompt=prompt,
+                disallowed_tools=disallowed_tools,
+                source=source,
+            )
+        except Exception:
+            return None

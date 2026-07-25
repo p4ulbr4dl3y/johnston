@@ -102,13 +102,14 @@ class JohnstonApp(App):
         self.is_generating = False
 
     def action_toggle_mode(self) -> None:
-        """Toggle agent mode (Action / Explore)"""
+        """Toggle agent mode across all registered modes (builtin, global, project)"""
         if not hasattr(self, "agent") or not self.agent:
             return
-        modes = ["action", "explore"]
+        from core.mode_manager import ModeManager
+        available_modes = list(ModeManager.get_instance().load_modes().keys())
         curr = getattr(self.agent, "mode", "action").lower()
-        next_idx = (modes.index(curr) + 1) % len(modes) if curr in modes else 0
-        new_mode = modes[next_idx]
+        next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
+        new_mode = available_modes[next_idx]
         self.agent.mode = new_mode
         self.refresh_status_footer()
 
@@ -731,6 +732,21 @@ def print_rules():
         print()
 
 
+def print_modes():
+    """Print available agent execution modes to stdout"""
+    from core.mode_manager import ModeManager
+    modes = ModeManager.get_instance().load_modes()
+    print("Available Agent Execution Modes:\n")
+    for key, m in modes.items():
+        ro_str = " (read-only)" if m.read_only else ""
+        print(f"  • {m.name} ({m.key}){ro_str} [{m.source}]")
+        if m.description:
+            print(f"    Description: {m.description}")
+        if m.disallowed_tools:
+            print(f"    Disallowed tools: {', '.join(m.disallowed_tools)}")
+        print()
+
+
 
 def print_subagents():
     from core.subagent_registry import SubagentRegistry
@@ -827,6 +843,7 @@ def main():
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
+    parser.add_argument("--modes", action="store_true", help="List available agent execution modes")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
     parser.add_argument("--init", action="store_true", help="Initialize or update AGENTS.md guide for repo")
@@ -836,6 +853,10 @@ def main():
 
     if args.version:
         print(f"johnston {get_version()}")
+        sys.exit(0)
+
+    if args.modes:
+        print_modes()
         sys.exit(0)
 
     if args.models:
