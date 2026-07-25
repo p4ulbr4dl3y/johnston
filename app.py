@@ -701,7 +701,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="johnston",
-        description="Johnston AI Coding Agent CLI",
+        description="Johnston Coding Agent",
     )
     parser.add_argument("-p", "--prompt", help="Run a single prompt in CLI headless mode")
     parser.add_argument(
