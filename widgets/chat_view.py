@@ -255,8 +255,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read",
-        "Create", "Edit", "Bash", "Read"
+        "create", "edit", "bash", "read", "web_fetch",
+        "Create", "Edit", "Bash", "Read", "WebFetch"
     }
 
     def is_expandable(self) -> bool:
@@ -697,16 +697,21 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(formatted_diff)
                 else:
                     self.content_widget.update(self.result_text or "(No diff)")
-            elif self.tool_type in ("read", "Read"):
+            elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text
-                clean_code, start_line, fpath = self._format_read_content(raw_text, file_path)
-                if not clean_code.strip() and fpath and os.path.isfile(fpath):
-                    try:
-                        with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                            clean_code = f.read()
-                            start_line = 1
-                    except Exception:
-                        clean_code = ""
+                if self.tool_type.lower() == "web_fetch":
+                    clean_code = raw_text.strip()
+                    start_line = 1
+                    fpath = "page.md"
+                else:
+                    clean_code, start_line, fpath = self._format_read_content(raw_text, file_path)
+                    if not clean_code.strip() and fpath and os.path.isfile(fpath):
+                        try:
+                            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                                clean_code = f.read()
+                                start_line = 1
+                        except Exception:
+                            clean_code = ""
 
                 if clean_code:
                     lexer = self._guess_lexer(fpath)
