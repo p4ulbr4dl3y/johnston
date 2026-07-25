@@ -18,7 +18,6 @@ class ManageSubagentTool(BaseTool):
         "type": "function",
         "function": {
             "name": "manage_subagent",
-            "description": "Manage subagents: list subagents, inspect status/logs, terminate subagents, or send follow-up messages to ANY subagent (including COMPLETED ones, which WILL resume and answer).",
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -169,12 +169,11 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
 class ViewImageTool(BaseTool):
     name = "view_image"
-    description = "Inspect an image file on disk (png, jpg, webp, gif, svg) to analyze its visual contents."
+    description = "Inspect an image file on disk (png, jpg, webp, gif, svg) to analyze its visual contents (UI screenshots, diagrams, photos)."
     schema = {
         "type": "function",
         "function": {
             "name": "view_image",
-            "description": "Inspect an image file on disk to analyze visual content (UI screenshots, diagrams, photos).",
             "parameters": {
                 "type": "object",
                 "properties": {

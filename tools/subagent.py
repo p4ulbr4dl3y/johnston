@@ -20,14 +20,14 @@ class SubagentTool(BaseTool):
         "type": "function",
         "function": {
             "name": "subagent",
-            "description": "Launch a subagent to perform a task. Use subagent_type='explore' for fast codebase search, or 'general' for multi-step tasks. Set background=true to run asynchronously.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "prompt": {"type": "string", "description": "Task prompt for the subagent"},
                     "description": {"type": "string", "description": "Short (3-5 words) description"},
                     "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
-                    "background": {"type": "boolean", "description": "Run asynchronously in background"}
+                    "background": {"type": "boolean", "description": "Run asynchronously in background"},
+                    "task_id": {"type": "string", "description": "Optional explicit task ID; auto-generated when omitted"}
                 },
                 "required": ["prompt", "description"]
             }

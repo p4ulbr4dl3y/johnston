@@ -13,7 +13,6 @@ class CallMCPTool(BaseTool):
         "type": "function",
         "function": {
             "name": "call_mcp_tool",
-            "description": "Call a lazy-loaded MCP tool by server name, tool name, and arguments.",
             "parameters": {
                 "type": "object",
                 "properties": {

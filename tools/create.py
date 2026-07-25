@@ -7,12 +7,11 @@ from tools.linter import run_linter
 
 class CreateTool(BaseTool):
     name = "create"
-    description = "Create new file."
+    description = "Create a new file with specified content. Creates parent directories automatically."
     schema = {
         "type": "function",
         "function": {
             "name": "create",
-            "description": "Create a new file with specified content. Creates parent directories automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {

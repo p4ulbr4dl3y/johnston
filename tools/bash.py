@@ -15,16 +15,17 @@ SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*
 
 class BashTool(BaseTool):
     name = "bash"
-    description = "Run terminal command. >10s runs in background."
+    description = "Run a terminal command. Commands running longer than 10 seconds are automatically moved to the background; use manage_task to inspect, send input, or kill them. Destructive commands require user confirmation."
     schema = {
         "type": "function",
         "function": {
             "name": "bash",
-            "description": "Run terminal command.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Terminal command"}
+                    "command": {"type": "string", "description": "Terminal command to execute"},
+                    "skip_confirm": {"type": "boolean", "description": "If true, skip the user confirmation prompt for destructive commands (use only for safe, repeated operations)"},
+                    "no_background": {"type": "boolean", "description": "If true, block until the command finishes instead of moving long-running commands to the background"}
                 },
                 "required": ["command"]
             }

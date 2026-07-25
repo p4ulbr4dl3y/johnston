@@ -10,14 +10,14 @@ class ManageTaskTool(BaseTool):
         "type": "function",
         "function": {
             "name": "manage_task",
-            "description": "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command).",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "description": "Action: 'list', 'status', 'kill', or 'send_input'"},
+                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"], "description": "Action: 'list', 'status', 'kill', or 'send_input'"},
                     "task_id": {"type": "string", "description": "Target background task ID"},
                     "input": {"type": "string", "description": "Input text to send (required for 'send_input')"}
-                }
+                },
+                "required": ["action"]
             }
         }
     }

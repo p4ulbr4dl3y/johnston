@@ -14,7 +14,6 @@ class SkillTool(BaseTool):
         "type": "function",
         "function": {
             "name": "skill",
-            "description": "Load a specialized skill when the task matches one of the available skills in system context.",
             "parameters": {
                 "type": "object",
                 "properties": {

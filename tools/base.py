@@ -57,6 +57,19 @@ class BaseTool:
     description: str = ""
     schema: Dict[str, Any] = None
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Single source of truth for tool descriptions: the class-level
+        # `description` attribute is canonical and is propagated into the JSON
+        # schema sent to the model. This prevents the class `description` and
+        # `schema["function"]["description"]` from drifting out of sync.
+        desc = getattr(cls, "description", "")
+        schema = getattr(cls, "schema", None)
+        if desc and isinstance(schema, dict):
+            fn = schema.get("function")
+            if isinstance(fn, dict):
+                fn["description"] = desc
+
     def _ensure_context(self, ctx_or_app: Any) -> ToolContext:
         if isinstance(ctx_or_app, ToolContext):
             return ctx_or_app

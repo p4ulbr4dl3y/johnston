@@ -6,12 +6,11 @@ from tools.base import BaseTool
 
 class AskUserTool(BaseTool):
     name = "ask_user"
-    description = "Ask questions to the user with pre-defined options and write-ins."
+    description = "Ask the user questions with pre-defined options and write-in answers. Use when user intent or requirements are ambiguous."
     schema = {
         "type": "function",
         "function": {
             "name": "ask_user",
-            "description": "Ask questions to user with pre-defined options and write-ins.",
             "parameters": {
                 "type": "object",
                 "properties": {

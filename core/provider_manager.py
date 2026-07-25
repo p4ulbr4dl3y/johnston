@@ -208,6 +208,8 @@ class ProviderManager:
                 "reasoning_effort": pdata.get("reasoning_effort"),
                 "chunk_timeout": pdata.get("chunk_timeout", 30.0),
                 "fallback_provider": pdata.get("fallback_provider"),
+                "max_tokens": pdata.get("max_tokens"),
+                "max_steps": pdata.get("max_steps"),
                 "disabled": pkey in disabled_set,
                 "source": "json",
             }
@@ -354,6 +356,8 @@ class ProviderManager:
             reasoning_effort=target_provider.get("reasoning_effort"),
             chunk_timeout=target_provider.get("chunk_timeout", 30.0),
             fallback_provider=target_provider.get("fallback_provider"),
+            max_tokens=target_provider.get("max_tokens") or 4096,
+            max_steps=target_provider.get("max_steps") or 50,
         )
 
     def create_active_agent(self):

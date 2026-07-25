@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import time
 from typing import Any, AsyncGenerator, Dict, List, Tuple
 
@@ -9,6 +8,7 @@ from openai import AsyncOpenAI
 from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import PromptBuilder
 from core.token_util import estimate_tokens, parse_usage
+from core.tool_display import extract_tool_display
 from tools.registry import execute_tool
 
 
@@ -27,6 +27,8 @@ class BaseAgent:
         reasoning_effort: str = None,
         chunk_timeout: float = 30.0,
         fallback_provider: str = None,
+        max_tokens: int = 4096,
+        max_steps: int = 50,
     ):
         if tools is None:
             from tools.registry import get_default_tools
@@ -43,6 +45,8 @@ class BaseAgent:
         self.reasoning_effort = reasoning_effort
         self.chunk_timeout = chunk_timeout
         self.fallback_provider = fallback_provider
+        self.max_tokens = max_tokens
+        self.max_steps = max_steps
 
         client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
         if self.headers:
@@ -81,14 +85,13 @@ class BaseAgent:
 
     def get_metrics(self) -> Dict[str, Any]:
         ctx_used = getattr(self, "last_context_tokens", 0)
-        if ctx_used <= 0 and getattr(self, "history", None):
-            try:
-                builder = PromptBuilder(self.system_prompt, self.tools, mode=getattr(self, "mode", "action"))
-                sys_prompt = builder.build_system_prompt()
-                all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
-                ctx_used = estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(self.history)
-            except Exception:
-                ctx_used = estimate_tokens(self.history)
+        if ctx_used <= 0:
+            # Avoid expensive prompt/tool rebuilds (and MCP connections) on every
+            # status-footer refresh: reuse the cached system+tools token count from
+            # the last stream and add the current history estimate.
+            sys_tok = getattr(self, "_last_sys_tokens", 0)
+            hist_tok = estimate_tokens(self.history) if getattr(self, "history", None) else 0
+            ctx_used = sys_tok + hist_tok
         return {
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,
@@ -174,6 +177,7 @@ class BaseAgent:
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+        self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 
         # Automatic context compaction when history exceeds threshold (75% of context_limit)
         threshold = int(getattr(self, "context_limit", 32000) * 0.75)
@@ -226,12 +230,19 @@ class BaseAgent:
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
+            max_steps = getattr(self, "max_steps", 50)
+            step_count = 0
             while True:
+                step_count += 1
+                if step_count > max_steps:
+                    yield ("thinking", f"Reached maximum agent loop steps ({max_steps}). Stopping to prevent runaway tool execution.", "")
+                    break
                 current_mode = getattr(self, "mode", "action")
                 agent_mode = current_mode
                 builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
                 sys_prompt = builder.build_system_prompt()
                 all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
                 if messages and messages[0].get("role") == "system":
                     messages[0]["content"] = sys_prompt
 
@@ -247,27 +258,35 @@ class BaseAgent:
                     if getattr(self, "api_type", "openai") != "openai":
                         from core.adapters import get_adapter
                         adapter = get_adapter(self.api_type)
-                        async for tag, evt in adapter.stream_chat(self.base_url, self.api_key, self.model, messages, all_tools if all_tools else None):
-                            if tag == "anthropic_evt":
-                                etype = evt.get("type")
-                                if etype == "content_block_delta":
-                                    dtext = evt.get("delta", {}).get("text", "")
-                                    if dtext:
-                                        full_assistant_text += dtext
-                                        yield ("bot_delta", full_assistant_text, "")
-                            elif tag == "gemini_evt":
-                                cands = evt.get("candidates", [])
-                                if cands and "content" in cands[0]:
-                                    parts = cands[0]["content"].get("parts", [])
-                                    for p in parts:
-                                        if "text" in p:
-                                            full_assistant_text += p["text"]
-                                            yield ("bot_delta", full_assistant_text, "")
-                            elif tag == "ollama_evt":
-                                msg_c = evt.get("message", {}).get("content", "")
-                                if msg_c:
-                                    full_assistant_text += msg_c
-                                    yield ("bot_delta", full_assistant_text, "")
+                        async for tag, payload in adapter.stream_chat(
+                            self.base_url,
+                            self.api_key,
+                            self.model,
+                            messages,
+                            all_tools if all_tools else None,
+                            max_tokens=getattr(self, "max_tokens", 4096),
+                        ):
+                            if tag == "adapter_text":
+                                if thinking_started:
+                                    dt = time.time() - thinking_t0
+                                    yield ("thinking_end", f"{dt}", active_thought)
+                                    thinking_started = False
+                                full_assistant_text += payload
+                                yield ("bot_delta", full_assistant_text, "")
+                            elif tag == "adapter_tool_call":
+                                if thinking_started:
+                                    dt = time.time() - thinking_t0
+                                    yield ("thinking_end", f"{dt}", active_thought)
+                                    thinking_started = False
+                                idx = len(tool_calls_dict)
+                                tc_id = payload.get("id") or f"call_{idx}"
+                                tool_calls_dict[idx] = {
+                                    "id": tc_id,
+                                    "name": payload.get("name", ""),
+                                    "arguments": payload.get("arguments", "") or "",
+                                }
+                            elif tag == "adapter_usage":
+                                step_usage = payload
                     else:
                         create_kwargs = {
                             "model": self.model,
@@ -432,101 +451,7 @@ class BaseAgent:
                         })
                         continue
 
-                    if t_name in ("grep", "glob", "Grep", "Glob"):
-                        pattern = args.get("pattern") or args.get("query") or ""
-                        path_val = args.get("path") or ""
-                        if pattern and path_val:
-                            target = f'"{pattern}" in {path_val}'
-                        elif pattern:
-                            target = f'"{pattern}"'
-                        elif path_val:
-                            target = path_val
-                        else:
-                            target = "."
-                    elif t_name in ("list_dir", "ListDir"):
-                        target = args.get("path") or "."
-                    elif t_name in ("switch_to_action", "SwitchToAction"):
-                        target = ""
-                    elif t_name in ("ask_user", "AskUser"):
-                        qs = args.get("questions")
-                        if isinstance(qs, list) and qs:
-                            formatted_qs = []
-                            for q in qs:
-                                q_text = q.get("question_text") or q.get("question") or ""
-                                if q_text:
-                                    if len(q_text) > 30:
-                                        q_text = q_text[:27] + "..."
-                                    formatted_qs.append(f'"{q_text}"')
-                            if formatted_qs:
-                                res = ", ".join(formatted_qs)
-                                if len(res) > 60:
-                                    res = res[:57] + "..."
-                                target = res
-                            else:
-                                target = "ask_user"
-                        elif args.get("question"):
-                            q_text = str(args.get("question"))
-                            if len(q_text) > 50:
-                                q_text = q_text[:47] + "..."
-                            target = f'"{q_text}"'
-                        else:
-                            target = "ask_user"
-                    elif t_name in ("subagent", "Subagent", "Task", "task"):
-                        desc = args.get("description") or args.get("prompt") or ""
-                        if desc:
-                            target = f'"{desc}"'
-                        else:
-                            target = t_name
-                    elif t_name in ("manage_task", "ManageTask", "manage_subagent", "ManageSubagent"):
-                        act = args.get("action") or ""
-                        tid = args.get("task_id") or args.get("subagent_id") or ""
-                        if act and tid:
-                            target = f"{act} {tid}"
-                        elif tid:
-                            target = tid
-                        elif act:
-                            target = act
-                        else:
-                            target = "list"
-                    elif t_name in ("view_image", "ViewImage"):
-                        img_path = args.get("path") or args.get("image_path") or ""
-                        prompt_val = args.get("prompt") or ""
-                        base_name = os.path.basename(img_path) if img_path else ""
-                        short_prompt = (prompt_val[:45] + "...") if len(prompt_val) > 45 else prompt_val
-                        if short_prompt and base_name:
-                            target = f'{base_name} — "{short_prompt}"'
-                        elif short_prompt:
-                            target = f'"{short_prompt}"'
-                        elif base_name:
-                            target = base_name
-                        elif img_path:
-                            target = img_path
-                        else:
-                            target = t_name
-                    elif "query" in args or "prompt" in args:
-                        q_val = args.get("query") or args.get("prompt") or ""
-                        if isinstance(q_val, str) and q_val:
-                            target = f'"{q_val}"'
-                        else:
-                            target = t_name
-                    else:
-                        target = args.get("path") or args.get("image_path") or args.get("command") or args.get("question") or args.get("file") or args.get("url")
-                        if not target and "questions" in args and isinstance(args["questions"], list) and args["questions"]:
-                            target = args["questions"][0].get("question_text", "")
-                        if not target:
-                            # Prioritize string values over numbers/booleans to avoid using numeric limits (e.g. num_results=1) as target
-                            str_args = [str(v) for v in args.values() if isinstance(v, str) and v]
-                            if not str_args:
-                                str_args = [str(v) for v in args.values() if isinstance(v, (int, float)) and v]
-                            if str_args:
-                                target = str_args[0]
-                        if not target:
-                            target = t_name
-                    if isinstance(target, str):
-                        import re
-                        target = re.sub(r'\s+', ' ', target.replace("\n", " ").replace("\r", " ")).strip()
-                        if len(target) > 60:
-                            target = target[:25] + "..." + target[-32:]
+                    target = extract_tool_display(t_name, args)
                     yield ("tool", t_name, target, args)
 
                     current_mode = getattr(self, "mode", "action").lower()

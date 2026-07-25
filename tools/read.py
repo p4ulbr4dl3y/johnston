@@ -42,12 +42,11 @@ def convert_doc_to_markdown_sync(path: str) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read file content (text, PDF, DOCX, XLSX, PPTX, images) with optional 1-indexed line range pagination."
+    description = "Read file content cleanly. Automatically converts PDF/DOCX/XLSX/PPTX to Markdown. Specify path, and optionally start_line and end_line for line range pagination (1-indexed)."
     schema = {
         "type": "function",
         "function": {
             "name": "read",
-            "description": "Read file content cleanly. Automatically converts PDF/DOCX/XLSX/PPTX to Markdown. Specify path, and optionally start_line and end_line for line range pagination (1-indexed).",
             "parameters": {
                 "type": "object",
                 "properties": {
