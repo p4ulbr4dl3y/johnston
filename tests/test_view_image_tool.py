@@ -1,7 +1,10 @@
+import os
+import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 
 from tools.read import ReadTool
-from tools.view_image import ViewImageTool
+from tools.view_image import ViewImageTool, analyze_image_with_fallback
 
 
 class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
@@ -23,6 +26,27 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(catalog.supports_vision("custom", "test-vision-model"))
         self.assertFalse(catalog.supports_vision("custom", "text-only-model-v1"))
 
+    async def test_fallback_vision_analysis(self):
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+            temp_path = f.name
+
+        try:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {
+                "choices": [{"message": {"content": "This is a 1x1 PNG image."}}]
+            }
+
+            with patch("httpx.AsyncClient.post", return_value=mock_resp):
+                res = await analyze_image_with_fallback(temp_path, "Describe")
+                self.assertIn("Vision Sub-Agent Analysis", res)
+                self.assertIn("1x1 PNG image", res)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main()
+

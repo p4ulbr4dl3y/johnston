@@ -8,11 +8,49 @@ from core.models_catalog import catalog
 from tools.base import BaseTool, resolve_path
 
 
-async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:
-    """Sends image to fallback Vision model (default cline-pass/mimo-v2.5)"""
-    import base64
-    import mimetypes
+def process_and_encode_image(image_path: str, max_dim: int = 1568) -> tuple[str, str]:
+    """
+    Reads image, auto-resizes if dimensions exceed max_dim (1568px),
+    compresses to optimized JPEG (quality 85), and returns (b64_url, mime_type).
+    """
+    ext = os.path.splitext(image_path)[1].lower()
+    try:
+        import io
 
+        from PIL import Image, ImageOps
+        with Image.open(image_path) as img:
+            img = ImageOps.exif_transpose(img)
+            w, h = img.size
+            if w > max_dim or h > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+            # Flatten alpha channel onto white background for optimal compression
+            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
+                bg.paste(img, mask=img.split()[3])
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=85, optimize=True)
+            mime_type = "image/jpeg"
+
+            b64_data = base64.b64encode(buf.getvalue()).decode("utf-8")
+            return f"data:{mime_type};base64,{b64_data}", mime_type
+    except Exception:
+        mime_type, _ = mimetypes.guess_type(image_path)
+        if not mime_type or not mime_type.startswith("image/"):
+            mime_type = f"image/{ext.lstrip('.')}" if ext in (".png", ".jpeg", ".gif", ".webp") else "image/png"
+        with open(image_path, "rb") as f:
+            b64_data = base64.b64encode(f.read()).decode("utf-8")
+        return f"data:{mime_type};base64,{b64_data}", mime_type
+
+
+async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:
+    """Sends image to fallback Vision model via HTTP request"""
     import httpx
 
     from core.provider_manager import ProviderManager
@@ -22,61 +60,66 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     pm = getattr(app_inst, "pm", None) or ProviderManager()
     providers = pm.load_providers()
 
-    target_mod = None
+    target_provider_key = None
     target_model = None
 
+    # Option 1: Configured fallback vision model
     fb_prov, fb_model = catalog.get_fallback_vision_model()
     if fb_prov and fb_model and fb_prov in providers:
-        try:
-            target_mod = providers[fb_prov]["module"]
-            target_model = fb_model
-        except Exception:
-            pass
+        target_provider_key = fb_prov
+        target_model = fb_model
 
-    if not target_mod:
+    # Option 2: Active provider if it supports vision
+    if not target_provider_key:
         active_key = pm.get_active_provider_key()
-    if active_key in providers:
-        pinfo = providers[active_key]
-        mod = pinfo["module"]
-        try:
-            agent_inst = mod.Agent()
-            if catalog.supports_vision(active_key, agent_inst.model):
-                target_mod = mod
-                target_model = agent_inst.model
-        except Exception:
-            pass
+        if active_key in providers:
+            pinfo = providers[active_key]
+            m_candidate = pinfo.get("model", "")
+            if not m_candidate and pinfo.get("models"):
+                m_candidate = pinfo["models"][0]
+            if m_candidate and catalog.supports_vision(active_key, m_candidate):
+                target_provider_key = active_key
+                target_model = m_candidate
 
-    if not target_mod:
+    # Option 3: Search any provider that supports vision
+    if not target_provider_key:
         for pkey, pinfo in providers.items():
-            try:
-                mod = pinfo["module"]
-                agent_inst = mod.Agent()
-                if catalog.supports_vision(pkey, agent_inst.model):
-                    target_mod = mod
-                    target_model = agent_inst.model
+            models_to_check = []
+            if pinfo.get("model"):
+                models_to_check.append(pinfo["model"])
+            if pinfo.get("models"):
+                models_to_check.extend(pinfo["models"])
+            for m_candidate in models_to_check:
+                if m_candidate and catalog.supports_vision(pkey, m_candidate):
+                    target_provider_key = pkey
+                    target_model = m_candidate
                     break
-            except Exception:
-                pass
+            if target_provider_key:
+                break
 
-    if not target_mod:
+    if not target_provider_key or not target_model:
         return f"Error: No vision-capable provider available to analyze image '{image_path}'."
 
+    pinfo = providers[target_provider_key]
+    base_url = pinfo.get("base_url", "").rstrip("/")
+    api_key = pm.get_api_key(target_provider_key) or pinfo.get("api_key", "")
+
+    if not base_url:
+        return f"Error: Base URL for vision provider '{target_provider_key}' is not configured."
+
+    url = f"{base_url}/chat/completions" if not base_url.endswith("/chat/completions") else base_url
+
     try:
-        base_url = getattr(target_mod, "BASE_URL", "").rstrip("/")
-        api_key = getattr(target_mod, "API_KEY", "")
-        url = f"{base_url}/chat/completions" if not base_url.endswith("/chat/completions") else base_url
+        b64_url, mime_type = process_and_encode_image(image_path, max_dim=1568)
 
-        ext = os.path.splitext(image_path)[1].lower()
-        mime_type, _ = mimetypes.guess_type(image_path)
-        if not mime_type or not mime_type.startswith("image/"):
-            mime_type = f"image/{ext.lstrip('.')}" if ext in (".png", ".jpeg", ".gif", ".webp") else "image/png"
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
 
-        with open(image_path, "rb") as f:
-            b64_data = base64.b64encode(f.read()).decode("utf-8")
+        extra_headers = pinfo.get("headers")
+        if isinstance(extra_headers, dict):
+            headers.update(extra_headers)
 
-        b64_url = f"data:{mime_type};base64,{b64_data}"
-
-        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         payload = {
             "model": target_model,
             "messages": [
@@ -143,22 +186,32 @@ class ViewImageTool(BaseTool):
         from tools.context import ToolContext
         app_inst = app.app if isinstance(app, ToolContext) else app
         agent = getattr(app_inst, "agent", None) if app_inst else None
-        provider_key = getattr(agent, "provider_key", "opencode") if agent else "opencode"
-        model_name = getattr(agent, "model", "") if agent else ""
+        if not agent and hasattr(app_inst, "provider_key"):
+            agent = app_inst
 
-        # If model does not support Vision -> invoke fallback subagent (mimo-v2.5)
+        provider_key = getattr(agent, "provider_key", None) if agent else None
+        model_name = getattr(agent, "model", None) if agent else None
+
+        if not provider_key or not model_name:
+            from core.provider_manager import ProviderManager
+            pm = getattr(app_inst, "pm", None) or ProviderManager()
+            provider_key = provider_key or pm.get_active_provider_key()
+            providers = pm.load_providers()
+            if provider_key in providers:
+                pinfo = providers[provider_key]
+                model_name = model_name or pinfo.get("model", "")
+                if not model_name and pinfo.get("models"):
+                    model_name = pinfo["models"][0]
+
+        provider_key = provider_key or "opencode"
+        model_name = model_name or ""
+
+        # If model does not support Vision -> invoke fallback vision subagent
         if not catalog.supports_vision(provider_key, model_name):
             return await analyze_image_with_fallback(path, prompt, app_inst)
 
         try:
-            mime_type, _ = mimetypes.guess_type(path)
-            if not mime_type or not mime_type.startswith("image/"):
-                mime_type = f"image/{ext.lstrip('.')}" if ext in (".png", ".jpeg", ".gif", ".webp") else "image/png"
-
-            with open(path, "rb") as f:
-                b64_data = base64.b64encode(f.read()).decode("utf-8")
-
-            b64_url = f"data:{mime_type};base64,{b64_data}"
+            b64_url, mime_type = process_and_encode_image(path, max_dim=1568)
             return json.dumps({
                 "status": "success",
                 "message": f"[Image Loaded: {path}]",
@@ -167,3 +220,5 @@ class ViewImageTool(BaseTool):
             })
         except Exception as e:
             return f"Error reading image file '{path}': {e}"
+
+

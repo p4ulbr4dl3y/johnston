@@ -117,6 +117,17 @@ class BaseAgent:
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
+        # Optimize previous turns' heavy base64 image_url payloads in history to save context tokens
+        for msg in self.history:
+            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
+                try:
+                    cdata = json.loads(msg["content"])
+                    if isinstance(cdata, list):
+                        txt = next((item.get("text") for item in cdata if isinstance(item, dict) and item.get("type") == "text"), "[Image Loaded & Analyzed]")
+                        msg["content"] = f"{txt} (History token optimized)"
+                except Exception:
+                    pass
+
         messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
 
         try:
