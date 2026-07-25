@@ -282,7 +282,7 @@ class JohnstonApp(App):
             elif isinstance(child, CompactionDivider):
                 ui_messages.append({
                     "type": "compaction_divider",
-                    "text": "Session Compacted"
+                    "text": getattr(child, "divider_title", "Session Compacted")
                 })
 
         agent_history = getattr(self.agent, "history", [])
@@ -507,15 +507,15 @@ class JohnstonApp(App):
                     thinking_widget.finish_thinking(duration)
                 except Exception:
                     pass
-            if bot_msg:
-                try:
-                    bot_msg.content += " *(interrupted)*"
-                except Exception:
-                    pass
             if hasattr(self, "agent") and hasattr(self.agent, "history"):
                 partial = (bot_msg.content if bot_msg else "").strip()
-                hist_text = f"{partial}\n[Response interrupted by user]".strip()
-                self.agent.history.append({"role": "assistant", "content": hist_text})
+                if partial:
+                    self.agent.history.append({"role": "assistant", "content": partial})
+                self.agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+            try:
+                await chat_view.add_compaction_divider("Response Interrupted")
+            except Exception:
+                pass
             if getattr(self, "is_app_active", True):
                 try:
                     self.notify("Agent response interrupted (Esc)", severity="warning")

@@ -131,11 +131,12 @@ TOKEN_COLORS = {
 
 
 class CompactionDivider(Static):
-    """Full-width centered divider for session compaction"""
+    """Full-width centered divider for session compaction or events"""
     can_focus = False
     ALLOW_SELECT = False
 
     def __init__(self, title: str = "Session Compacted"):
+        self.divider_title = title
         super().__init__(Rule(title, style="dim #71717a"), classes="compaction-divider")
 
 

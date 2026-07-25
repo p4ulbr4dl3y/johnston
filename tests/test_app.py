@@ -185,11 +185,28 @@ async def test_modal_ctrl_c_quit():
         print("✓ Modal Ctrl+C quit test passed cleanly!")
 
 
+async def test_interrupted_divider_serialization():
+    app = JohnstonApp()
+    async with app.run_test() as pilot:
+        chat_view = app.query_one(ChatView)
+        await chat_view.add_user_message("Hello")
+        divider = await chat_view.add_compaction_divider("Response Interrupted")
+        assert divider.divider_title == "Response Interrupted"
+
+        app.save_current_session()
+        sess = app.sm.load_session(app.current_session_id)
+        assert sess is not None
+        ui_msgs = sess.get("ui_messages", [])
+        assert any(m.get("type") == "compaction_divider" and m.get("text") == "Response Interrupted" for m in ui_msgs)
+        print("✓ Interrupted divider serialization test passed cleanly!")
+
+
 if __name__ == "__main__":
     asyncio.run(test_chat_app_flow())
     asyncio.run(test_message_queue())
     asyncio.run(test_resume_cli_flag())
     asyncio.run(test_modal_ctrl_c_quit())
+    asyncio.run(test_interrupted_divider_serialization())
     test_resume_tip_on_exit()
 
 
