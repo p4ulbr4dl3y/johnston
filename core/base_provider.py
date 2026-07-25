@@ -397,7 +397,7 @@ class BaseAgent:
                         img_path = args.get("path") or args.get("image_path") or ""
                         prompt_val = args.get("prompt") or ""
                         if prompt_val and img_path:
-                            target = f'"{prompt_val}" in {img_path}'
+                            target = f'{img_path} — "{prompt_val}"'
                         elif prompt_val:
                             target = f'"{prompt_val}"'
                         elif img_path:
