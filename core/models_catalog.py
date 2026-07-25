@@ -50,7 +50,15 @@ class ModelsCatalog:
         try:
             loop = asyncio.get_running_loop()
             if loop.is_running():
-                loop.create_task(self.refresh())
+                task = loop.create_task(self.refresh())
+                # Prevent "Task exception was never retrieved" warnings if refresh fails;
+                # surface the error to stderr instead of silently dropping it.
+                def _log_exc(t):
+                    try:
+                        t.result()
+                    except Exception as e:
+                        print(f"ModelsCatalog background refresh error: {e}")
+                task.add_done_callback(_log_exc)
         except RuntimeError:
             pass
 

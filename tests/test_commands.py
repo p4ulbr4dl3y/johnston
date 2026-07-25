@@ -45,6 +45,9 @@ class MockApp:
     def generate_ai_response(self, prompt: str, show_in_ui: bool = True):
         self.ai_prompts.append((prompt, show_in_ui))
 
+    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False):
+        self.ai_prompts.append((prompt, show_in_ui))
+
     def push_screen(self, screen, callback=None):
         self.pushed_screen = screen
 

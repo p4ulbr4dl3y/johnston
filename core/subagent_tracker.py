@@ -162,12 +162,13 @@ class SubagentTracker:
             if sess.task_id == identifier or sess.task_id == clean_id:
                 return sess
             clean_desc = sess.description.strip('"\' `')
-            if clean_desc == clean_id or clean_id in clean_desc or clean_desc in clean_id:
+            if clean_desc == clean_id:
                 return sess
             clean_prompt = sess.prompt.strip('"\' `')
-            if clean_prompt == clean_id or clean_id in clean_prompt or clean_prompt in clean_id:
+            if clean_prompt == clean_id:
                 return sess
 
-        if candidates:
-            return candidates[-1]
+        # No exact match: do NOT fall back to the last session. A loose fallback risks
+        # killing or inspecting the wrong subagent when the user gives a vague identifier.
+        # Require an explicit, unambiguous id/description/prompt instead.
         return None

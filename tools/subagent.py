@@ -222,6 +222,9 @@ class SubagentTool(BaseTool):
                 session.finish("completed")
             except Exception as err:
                 session.finish("error", str(err))
+                partial = _truncate_subagent_result(acc[0]).strip()
+                if partial:
+                    return f"Subagent execution error: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
                 return f"Subagent execution error: {err}"
             finally:
                 _merge_metrics()

@@ -441,7 +441,7 @@ class JohnstonApp(App):
             self.message_queue.append((user_text, True))
             self.notify("Message added to queue")
         else:
-            self.generate_ai_response(user_text)
+            self.trigger_ai_response(user_text, show_in_ui=True)
 
     def prepare_prompt_with_attachments(self, user_text: str):
         """Search for @path/to/file and raw paths in user_text and attach text files and images"""
@@ -506,6 +506,11 @@ class JohnstonApp(App):
         if getattr(self, "is_generating", False):
             self.message_queue.append((prompt, show_in_ui))
         else:
+            # Set the flag synchronously before dispatching the @work coroutine. The
+            # worker only sets is_generating=True once it starts running, leaving a
+            # window where a second trigger could bypass the queue and cancel the
+            # first exclusive worker.
+            self.is_generating = True
             self.generate_ai_response(prompt, show_in_ui=show_in_ui)
 
     @work(exclusive=True, thread=False)
@@ -515,6 +520,9 @@ class JohnstonApp(App):
             self.notify("No model selected. Please select a model from /models.", severity="warning")
             from core.commands import ModelsCommand
             await ModelsCommand().execute(self)
+            # trigger_ai_response may have set is_generating=True synchronously before
+            # dispatching this worker; clear it so the app returns to idle on early exit.
+            self.is_generating = False
             return
 
         self.is_generating = True
@@ -609,7 +617,6 @@ class JohnstonApp(App):
                 except Exception:
                     pass
         finally:
-            self.is_generating = False
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
                 footer.set_generating(False)
@@ -620,9 +627,17 @@ class JohnstonApp(App):
                     self.save_current_session()
             except Exception:
                 pass
+            # Drain the queue atomically: if a queued message exists, dispatch it WITHOUT
+            # clearing is_generating first. Clearing it early opens a window where a
+            # concurrent user input bypasses the queue and cancels this queued item via
+            # the exclusive worker. Only return to idle when the queue is empty.
+            queued_next = None
             if self.message_queue and getattr(self, "is_app_active", True):
-                next_text, next_show = self.message_queue.pop(0)
-                self.generate_ai_response(next_text, show_in_ui=next_show)
+                queued_next = self.message_queue.pop(0)
+            if queued_next is not None:
+                self.generate_ai_response(queued_next[0], show_in_ui=queued_next[1])
+            else:
+                self.is_generating = False
 
     def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background bash command finishes"""

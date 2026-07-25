@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Optional
 
 from tools.base import BaseTool
@@ -45,7 +46,7 @@ class CallMCPTool(BaseTool):
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
 
-        res = mcp_mgr.call_tool(tool_name=tool, arguments=arguments, target_server=server)
+        res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
         if res is not None:
             return res
 

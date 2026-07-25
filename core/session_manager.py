@@ -31,7 +31,13 @@ class SessionManager:
         return f"session_{int(time.time())}_{uuid.uuid4().hex[:4]}"
 
     def list_sessions(self) -> List[Dict[str, Any]]:
-        """Returns list of only NON-EMPTY sessions for current project, sorted by updated time"""
+        """Returns list of NON-EMPTY sessions for current project, sorted by updated time.
+
+        Pure reader: does NOT delete empty session files. Empty files are purged
+        explicitly via purge_empty_sessions() (called from save_session when a session
+        becomes empty). A read-only getter must not mutate the filesystem as a side
+        effect — that makes list_sessions unsafe to call from UI/status code.
+        """
         sessions = []
         if not os.path.exists(self.sessions_dir):
             return sessions
@@ -45,9 +51,7 @@ class SessionManager:
                         ui_msgs = data.get("ui_messages") or data.get("messages") or []
                         agent_history = data.get("agent_history") or []
 
-                        # If session is empty - remove junk file
                         if not ui_msgs and not agent_history:
-                            os.remove(filepath)
                             continue
 
                         sessions.append({
@@ -62,6 +66,31 @@ class SessionManager:
 
         sessions.sort(key=lambda s: s["updated_at"], reverse=True)
         return sessions
+
+    def purge_empty_sessions(self) -> int:
+        """Removes session files that contain no messages. Returns count removed.
+
+        Explicit cleanup operation kept separate from the read-only list_sessions so
+        that reading the session list never has destructive filesystem side effects.
+        """
+        removed = 0
+        if not os.path.exists(self.sessions_dir):
+            return removed
+        for filename in os.listdir(self.sessions_dir):
+            if not filename.endswith(".json"):
+                continue
+            filepath = os.path.join(self.sessions_dir, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                ui_msgs = data.get("ui_messages") or data.get("messages") or []
+                agent_history = data.get("agent_history") or []
+                if not ui_msgs and not agent_history:
+                    os.remove(filepath)
+                    removed += 1
+            except Exception:
+                pass
+        return removed
 
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         if not session_id:

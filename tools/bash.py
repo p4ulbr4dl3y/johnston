@@ -140,6 +140,14 @@ class BashTool(BaseTool):
                     await asyncio.wait_for(task.read_task, timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
+            # Ensure the pty master fd is released even if the reader timed out and
+            # BackgroundTask.start_reading's own finally did not run yet.
+            if getattr(task, "master_fd", None) is not None:
+                try:
+                    os.close(task.master_fd)
+                except Exception:
+                    pass
+                task.master_fd = None
             await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():

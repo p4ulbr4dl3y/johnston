@@ -43,6 +43,11 @@ class NewCommand(BaseCommand):
     async def execute(self, app) -> None:
         for w in [w for w in app.workers if w.is_running]:
             w.cancel()
+        # Reset generation state synchronously: cancelled workers clear is_generating
+        # in their own finally, but that runs asynchronously, so /new could leave the
+        # app stuck "generating" and swallow subsequent input into the queue.
+        app.is_generating = False
+        app.message_queue.clear()
         app.current_session_id = app.sm.generate_session_id()
         chat_view = app.query_one(ChatView)
         await chat_view.remove_children()
@@ -340,7 +345,7 @@ class InitCommand(BaseCommand):
     description = "Guided `AGENTS.md` project setup"
 
     async def execute(self, app) -> None:
-        app.generate_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
+        app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
 
 
 class CompactCommand(BaseCommand):
@@ -426,7 +431,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
                 prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
             else:
                 prompt = f"Load and apply the skill '{skill['name']}'."
-            app.generate_ai_response(prompt, show_in_ui=True)
+            app.trigger_ai_response(prompt, show_in_ui=True)
             return True
 
     return False

@@ -71,17 +71,31 @@ class WebFetchTool(BaseTool):
             "Accept-Language": "en-US,en;q=0.5",
         }
 
+        content_bytes = b""
+        content_type = ""
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
-                response = await client.get(url, headers=headers)
-                response.raise_for_status()
-
-                content_type = response.headers.get("content-type", "").lower()
-                content_bytes = response.content
-
-                if len(content_bytes) > MAX_RESPONSE_SIZE:
-                    return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
-
+                async with client.stream("GET", url, headers=headers) as response:
+                    response.raise_for_status()
+                    content_type = response.headers.get("content-type", "").lower()
+                    # Pre-check Content-Length to fail fast on oversized responses.
+                    cl = response.headers.get("content-length")
+                    if cl:
+                        try:
+                            if int(cl) > MAX_RESPONSE_SIZE:
+                                return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
+                        except ValueError:
+                            pass
+                    # Stream the body with a hard cap so an oversized or chunked
+                    # response cannot exhaust memory before the size check can trigger.
+                    total = 0
+                    chunks = []
+                    async for chunk in response.aiter_bytes():
+                        total += len(chunk)
+                        if total > MAX_RESPONSE_SIZE:
+                            return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
+                        chunks.append(chunk)
+                    content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
             return f"Error fetching '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
         except httpx.TimeoutException:
@@ -92,7 +106,7 @@ class WebFetchTool(BaseTool):
         lines: List[str] = []
 
         if raw_mode:
-            text_content = response.text
+            text_content = content_bytes.decode("utf-8", errors="replace")
             lines = text_content.splitlines(keepends=True)
         else:
             if "application/pdf" in content_type or url.lower().endswith(".pdf"):
@@ -105,14 +119,14 @@ class WebFetchTool(BaseTool):
                 suffix = ".html"
 
             if "json" in content_type or "text/plain" in content_type:
-                text_content = response.text
+                text_content = content_bytes.decode("utf-8", errors="replace")
                 lines = text_content.splitlines(keepends=True)
             else:
                 try:
                     md_text = await asyncio.to_thread(_convert_content_to_md_sync, content_bytes, suffix)
                     lines = md_text.splitlines(keepends=True)
                 except Exception:
-                    text_content = response.text
+                    text_content = content_bytes.decode("utf-8", errors="replace")
                     lines = text_content.splitlines(keepends=True)
 
         start = args.get("start_line")

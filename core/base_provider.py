@@ -171,6 +171,35 @@ class BaseAgent:
 
         return sanitized
 
+    def _optimize_history_images(self, history: List[Dict[str, Any]]) -> None:
+        """Replace heavy base64 image_url payloads with short text placeholders IN PLACE
+        on a history copy destined for the API request. Must never mutate self.history
+        directly — that would permanently destroy image data (breaks /rewind and resume)."""
+        for msg in history:
+            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
+                try:
+                    cdata = json.loads(msg["content"])
+                    if isinstance(cdata, list):
+                        txt = next(
+                            (item.get("text") for item in cdata if isinstance(item, dict) and item.get("type") == "text"),
+                            "[Image Loaded & Analyzed]",
+                        )
+                        msg["content"] = f"{txt} (History token optimized)"
+                except Exception:
+                    pass
+
+    def _restore_image_payloads(self) -> None:
+        """Restore original base64 image payloads into self.history after it was rebuilt
+        from the (optimized) API messages list. Uses the snapshot captured at the start
+        of stream_steps so /rewind and session resume see real image data, not placeholders."""
+        payload_map = getattr(self, "_image_payload_map", {})
+        if not payload_map:
+            return
+        for msg in self.history:
+            tid = msg.get("tool_call_id")
+            if tid and tid in payload_map:
+                msg["content"] = payload_map[tid]
+
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
@@ -179,9 +208,13 @@ class BaseAgent:
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
         self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 
-        # Automatic context compaction when history exceeds threshold (75% of context_limit)
+        # Automatic context compaction when total context (system prompt + tools + history)
+        # exceeds 75% of the context window. Counting history alone ignores the system
+        # prompt / tool schema overhead (often 2-4k tokens), which would let the real
+        # context silently overflow before this threshold ever triggers.
         threshold = int(getattr(self, "context_limit", 32000) * 0.75)
-        if len(self.history) > 4 and estimate_tokens(self.history) > threshold:
+        sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
+        if len(self.history) > 4 and (estimate_tokens(self.history) + sys_overhead) > threshold:
             yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
             try:
                 success, _ = await self.compact_history()
@@ -190,16 +223,17 @@ class BaseAgent:
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
-        # Optimize previous turns' heavy base64 image_url payloads in history to save context tokens
+        # Snapshot original base64 image payloads keyed by tool_call_id so they can be
+        # restored after the API request. The optimization below replaces them with short
+        # text placeholders on the wire to save context tokens, but self.history (used by
+        # /rewind and session resume) must keep the originals — otherwise images are
+        # permanently lost after the first turn that reuses them.
+        self._image_payload_map: Dict[str, str] = {}
         for msg in self.history:
             if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
-                try:
-                    cdata = json.loads(msg["content"])
-                    if isinstance(cdata, list):
-                        txt = next((item.get("text") for item in cdata if isinstance(item, dict) and item.get("type") == "text"), "[Image Loaded & Analyzed]")
-                        msg["content"] = f"{txt} (History token optimized)"
-                except Exception:
-                    pass
+                tid = msg.get("tool_call_id")
+                if tid and tid not in self._image_payload_map:
+                    self._image_payload_map[tid] = msg["content"]
 
         is_vis_supported = catalog.supports_vision(getattr(self, "provider_key", ""), getattr(self, "model", ""))
         user_content: Any = user_text
@@ -227,6 +261,8 @@ class BaseAgent:
                     pass
 
         sanitized_history = self.sanitize_history_for_model(self.history)
+        # Optimize heavy base64 image payloads on the API copy only (never on self.history).
+        self._optimize_history_images(sanitized_history)
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
@@ -379,6 +415,13 @@ class BaseAgent:
                             fb_agent.mode = getattr(self, "mode", "action")
                             async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
                                 yield (f_tag, f_val1, f_val2)
+                            # Merge fallback agent's token/cost metrics into the primary
+                            # agent so the status footer and session persistence reflect the
+                            # real total spent (including the fallback's own work).
+                            self.tokens_input += getattr(fb_agent, "tokens_input", 0)
+                            self.tokens_output += getattr(fb_agent, "tokens_output", 0)
+                            self.total_tokens += getattr(fb_agent, "total_tokens", 0)
+                            self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
                             return
                     raise api_err
 
@@ -419,6 +462,11 @@ class BaseAgent:
                     yield ("bot_text", full_assistant_text, "")
                     break
 
+                # Execute tool calls in the order the model emitted them. Dict insertion
+                # order usually matches, but delta tool_calls can arrive out of order on
+                # some providers, so sort explicitly by the tool-call index key.
+                ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
+
                 assistant_tool_msg = {
                     "role": "assistant",
                     "content": full_assistant_text or None,
@@ -431,12 +479,12 @@ class BaseAgent:
                                 "arguments": tc["arguments"]
                             }
                         }
-                        for tc in tool_calls_dict.values()
+                        for tc in ordered_calls
                     ]
                 }
                 messages.append(assistant_tool_msg)
 
-                for tc in tool_calls_dict.values():
+                for tc in ordered_calls:
                     t_id = tc["id"]
                     t_name = tc["name"]
                     raw_args = tc["arguments"]
@@ -497,6 +545,7 @@ class BaseAgent:
                     })
 
             self.history = messages[1:]
+            self._restore_image_payloads()
 
         except Exception as err:
             error_msg = f"**API Error:** `{err}`"
@@ -504,6 +553,7 @@ class BaseAgent:
         finally:
             if len(messages) > 1:
                 self.history = messages[1:]
+                self._restore_image_payloads()
 
     async def compact_history(self) -> Tuple[bool, str]:
         """

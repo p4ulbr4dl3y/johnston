@@ -84,6 +84,11 @@ class AskUserTool(BaseTool):
                         elif res.get("status") == "next":
                             answers[q_idx] = res
                             q_idx += 1
+                        else:
+                            # Unknown status from the screen: avoid an infinite loop by
+                            # treating it as a cancellation rather than re-prompting forever.
+                            cancelled = True
+                            break
                     else:
                         summary = ""
                         for idx in range(len(questions_list)):
@@ -107,6 +112,10 @@ class AskUserTool(BaseTool):
                             q_idx = len(questions_list) - 1
                         elif res == "confirm":
                             q_idx += 1
+                        else:
+                            # Unknown status: avoid an infinite loop by cancelling.
+                            cancelled = True
+                            break
 
                 if cancelled:
                     return "Cancelled by user."
