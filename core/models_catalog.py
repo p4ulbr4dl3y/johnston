@@ -176,10 +176,16 @@ class ModelsCatalog:
         return False
 
     def add_vision_override(self, model_id: str) -> None:
+        if not model_id:
+            return
         if not self._vision:
             self.load_cache()
-        if model_id and model_id not in self._vision:
+        if model_id not in self._vision:
             self._vision.append(model_id)
+        m_base = model_id.split("/")[-1].split(":")[0]
+        if m_base not in self._vision:
+            self._vision.append(m_base)
+        self.save_cache(self._limits, self._vision, self._names, self._pricing)
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:
