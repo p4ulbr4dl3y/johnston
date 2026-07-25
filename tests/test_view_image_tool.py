@@ -47,6 +47,17 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
                 os.remove(temp_path)
 
 
+    def test_set_fallback_vision_on_selection(self):
+        from core.models_catalog import catalog
+        catalog.add_vision_override("my-vision-model")
+        catalog.set_fallback_vision_model("my-provider", "my-vision-model")
+        fb_p, fb_m = catalog.get_fallback_vision_model()
+        self.assertEqual(fb_p, "my-provider")
+        self.assertEqual(fb_m, "my-vision-model")
+        catalog.remove_vision_override("my-vision-model")
+        self.assertNotIn("my-vision-model", catalog._user_overrides)
+
+
 if __name__ == "__main__":
     unittest.main()
 

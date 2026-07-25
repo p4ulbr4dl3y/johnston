@@ -146,7 +146,20 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                     or []
                 )
                 if choices and isinstance(choices, list) and len(choices) > 0:
-                    analysis_text = choices[0].get("message", {}).get("content", "No content in choice.")
+                    raw_content = choices[0].get("message", {}).get("content", "")
+                    if isinstance(raw_content, list):
+                        parts = []
+                        for item in raw_content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                parts.append(item.get("text", ""))
+                            elif isinstance(item, str):
+                                parts.append(item)
+                        analysis_text = "\n".join(parts) if parts else str(raw_content)
+                    elif isinstance(raw_content, str):
+                        analysis_text = raw_content
+                    else:
+                        analysis_text = str(raw_content) if raw_content else "No content in response."
+
                     return f"[Vision Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
 
             return f"Error from vision model (HTTP {resp.status_code}): {resp.text[:300]}"
@@ -182,6 +195,14 @@ class ViewImageTool(BaseTool):
         valid_exts = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
         if ext not in valid_exts:
             return f"Error: '{path}' is not a supported image file format ({', '.join(sorted(valid_exts))})."
+
+        if ext == ".svg":
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    svg_content = f.read(5000)
+                return f"[SVG Inspection for {os.path.basename(path)}]:\n{svg_content}"
+            except Exception as e:
+                return f"Error reading SVG file '{path}': {e}"
 
         prompt = args.get("prompt") or "Describe all visual content, text, UI elements, and layout of this image in detail."
 

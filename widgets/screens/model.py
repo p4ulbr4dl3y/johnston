@@ -116,13 +116,20 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         items: List[Union[str, Tuple[str, str], None]] = []
         default_val: Union[str, Tuple[str, str], None] = None
 
+        target_prov = self.current_provider
+        target_model = self.current_model
+        if filter_vision:
+            fb_prov, fb_model = catalog.get_fallback_vision_model()
+            if fb_prov and fb_model:
+                target_prov, target_model = fb_prov, fb_model
+
         if isinstance(self.models_data, dict):
             first_group = True
             for p_key, p_info in self.models_data.items():
                 p_name = p_info.get("name", p_key)
                 p_models = p_info.get("models", [])
                 if filter_vision:
-                    p_models = [m for m in p_models if catalog.is_native_vision(p_key, m)]
+                    p_models = [m for m in p_models if catalog.supports_vision(p_key, m)]
 
                 if not p_models:
                     continue
@@ -137,22 +144,26 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
                 for m in p_models:
                     clean_m = catalog.get_model_display_name(p_key, m)
-                    opt_label = f"   {clean_m}"
+                    is_active = (p_key == target_prov and (m == target_model or m.split("/")[-1] == target_model.split("/")[-1]))
+                    opt_label = f"   {clean_m}  ✓" if is_active else f"   {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
 
-                    if p_key == self.current_provider and m == self.current_model:
+                    if is_active:
                         default_val = item_val
         else:
             p_models = self.models_data
             if filter_vision:
-                p_models = [m for m in p_models if catalog.is_native_vision(self.current_provider, m)]
+                p_models = [m for m in p_models if catalog.supports_vision(self.current_provider, m)]
             for m in p_models:
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
-                options.append(clean_m)
+                is_active = (m == target_model or m.split("/")[-1] == target_model.split("/")[-1])
+                opt_label = f"{clean_m}  ✓" if is_active else clean_m
+                options.append(opt_label)
                 items.append(m)
-            default_val = self.current_model if self.current_model in items else None
+                if is_active:
+                    default_val = m
 
         return options, items, default_val
 
@@ -207,3 +218,9 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             event.stop()
             return
         super()._on_key(event)
+
+    def dismiss(self, result: Any = None) -> None:
+        if result is not None and not (isinstance(result, tuple) and len(result) == 2 and isinstance(result[1], bool)):
+            super().dismiss((result, self.active_tab == "vision"))
+        else:
+            super().dismiss(result)

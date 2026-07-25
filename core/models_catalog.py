@@ -174,6 +174,8 @@ class ModelsCatalog:
         return DEFAULT_CONTEXT_LIMIT
 
     def supports_vision(self, provider_id: str, model_id: str) -> bool:
+        if not model_id:
+            return False
         if not self._vision:
             self.load_cache()
 
@@ -218,6 +220,22 @@ class ModelsCatalog:
             self._user_overrides.append(m_base)
         if m_base not in self._vision:
             self._vision.append(m_base)
+        self.save_cache(self._limits, self._vision, self._names, self._pricing)
+
+    def remove_vision_override(self, model_id: str) -> None:
+        if not model_id:
+            return
+        if not self._vision:
+            self.load_cache()
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
+        self._user_overrides = [
+            m for m in self._user_overrides
+            if m.lower() != model_id.lower() and m.split("/")[-1].split(":")[0].lower() != m_base
+        ]
+        self._vision = list(set([
+            m for m in self._vision
+            if m.lower() != model_id.lower() and m.split("/")[-1].split(":")[0].lower() != m_base
+        ] + self._user_overrides))
         self.save_cache(self._limits, self._vision, self._names, self._pricing)
 
     def set_fallback_vision_model(self, provider_id: str, model_id: str) -> None:

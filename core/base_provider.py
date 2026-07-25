@@ -107,7 +107,7 @@ class BaseAgent:
         if not history:
             return []
 
-        is_vision_supported = catalog.is_native_vision(self.provider_key, self.model)
+        is_vision_supported = catalog.supports_vision(self.provider_key, self.model)
         sanitized = []
         known_tool_call_ids = set()
 
@@ -197,8 +197,33 @@ class BaseAgent:
                 except Exception:
                     pass
 
+        is_vis_supported = catalog.supports_vision(getattr(self, "provider_key", ""), getattr(self, "model", ""))
+        user_content: Any = user_text
+        if not is_vis_supported and user_text:
+            if isinstance(user_text, list):
+                new_u = []
+                for part in user_text:
+                    if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
+                        new_u.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
+                    else:
+                        new_u.append(part)
+                user_content = new_u
+            elif isinstance(user_text, str) and "data:image/" in user_text:
+                try:
+                    cdata = json.loads(user_text)
+                    if isinstance(cdata, list):
+                        new_cdata = []
+                        for part in cdata:
+                            if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
+                                new_cdata.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
+                            else:
+                                new_cdata.append(part)
+                        user_content = json.dumps(new_cdata)
+                except Exception:
+                    pass
+
         sanitized_history = self.sanitize_history_for_model(self.history)
-        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
+        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
             while True:

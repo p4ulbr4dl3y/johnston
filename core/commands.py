@@ -1,4 +1,6 @@
 
+from typing import Any
+
 from core.models_catalog import catalog
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
@@ -123,13 +125,24 @@ class ModelsCommand(BaseCommand):
         curr_provider = app.pm.get_active_provider_key()
         curr_model = getattr(app.agent, "model", "")
 
-        def on_model_selected(selection: tuple[str, str] | str | None) -> None:
+        def on_model_selected(selection: Any) -> None:
             if selection:
-                if isinstance(selection, (tuple, list)):
-                    selected_prov, selected_model = selection[0], selection[1]
+                is_vision_tab = False
+                if isinstance(selection, tuple) and len(selection) == 2 and isinstance(selection[1], bool):
+                    item_val, is_vision_tab = selection[0], selection[1]
+                else:
+                    item_val = selection
+
+                if isinstance(item_val, (tuple, list)):
+                    selected_prov, selected_model = item_val[0], item_val[1]
                 else:
                     selected_prov = curr_provider
-                    selected_model = selection
+                    selected_model = item_val
+
+                if is_vision_tab:
+                    catalog.set_fallback_vision_model(selected_prov, selected_model)
+                    app.query_one("#message-input", ChatInput).focus()
+                    return
 
                 if selected_prov != app.pm.get_active_provider_key():
                     old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
@@ -143,25 +156,29 @@ class ModelsCommand(BaseCommand):
                     app.agent.model = selected_model
                 app.pm.set_provider_model(selected_prov, selected_model)
                 app.refresh_status_footer()
-                app.notify(f"Model switched: [{selected_prov}] {selected_model}")
+                clean_selected = catalog.get_model_display_name(selected_prov, selected_model)
+                app.notify(f"Model switched: {clean_selected}")
 
-                if not catalog.is_native_vision(selected_prov, selected_model):
+                if catalog.is_native_vision(selected_prov, selected_model):
+                    catalog.set_fallback_vision_model(selected_prov, selected_model)
+                else:
                     def on_warning_action(action: str | None) -> None:
                         if action == "select_vision":
-                            def on_fallback_vision_selected(fb_selection: tuple[str, str] | str | None) -> None:
+                            catalog.remove_vision_override(selected_model)
+                            def on_fallback_vision_selected(fb_selection: Any) -> None:
                                 if fb_selection:
-                                    if isinstance(fb_selection, (tuple, list)):
-                                        f_prov, f_model = fb_selection[0], fb_selection[1]
+                                    fb_val = fb_selection[0] if isinstance(fb_selection, tuple) and len(fb_selection) == 2 and isinstance(fb_selection[1], bool) else fb_selection
+                                    if isinstance(fb_val, (tuple, list)):
+                                        f_prov, f_model = fb_val[0], fb_val[1]
                                     else:
                                         f_prov = selected_prov
-                                        f_model = fb_selection
+                                        f_model = fb_val
                                     catalog.set_fallback_vision_model(f_prov, f_model)
-                                    app.notify(f"Fallback vision model for view_image set to: [{f_prov}] {f_model}")
 
                             app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_fallback_vision_selected)
                         elif action == "force_vision":
                             catalog.add_vision_override(selected_model)
-                            app.notify(f"Vision support enabled for {selected_model}")
+                            catalog.set_fallback_vision_model(selected_prov, selected_model)
 
                     app.push_screen(VisionWarningScreen(selected_model, selected_prov), callback=on_warning_action)
             app.query_one("#message-input", ChatInput).focus()
