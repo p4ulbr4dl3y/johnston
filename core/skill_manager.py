@@ -92,6 +92,21 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 ### 5. Skills Management (`johnston --skills`)
 - Location: `~/.johnston/skills/<name>/SKILL.md` (global) or `.johnston/skills/<name>/SKILL.md` (project).
 - Verification: Run `johnston --skills` via bash tool.
+
+### 6. Custom Execution Modes (`johnston --modes`)
+- Location: `~/.johnston/modes/<name>.json` or `.md` (global) or `.johnston/modes/<name>.json` or `.md` (project).
+- Format: JSON object or Markdown with YAML frontmatter:
+  ```json
+  {
+    "key": "architect",
+    "name": "Architect",
+    "description": "High-level design mode",
+    "read_only": true,
+    "prompt": "Custom system prompt...",
+    "disallowed_tools": ["create", "edit"]
+  }
+  ```
+- Verification: Run `johnston --modes` via bash tool.
 """
 
 
@@ -108,7 +123,19 @@ class SkillManager:
 
         architect_dir = os.path.join(self.global_dir, "johnston-architect")
         architect_file = os.path.join(architect_dir, "SKILL.md")
+        should_write = False
         if not os.path.exists(architect_file):
+            should_write = True
+        else:
+            try:
+                with open(architect_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if "Custom Execution Modes" not in content:
+                    should_write = True
+            except Exception:
+                should_write = True
+
+        if should_write:
             try:
                 os.makedirs(architect_dir, exist_ok=True)
                 with open(architect_file, "w", encoding="utf-8") as f:
