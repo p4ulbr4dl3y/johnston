@@ -64,6 +64,21 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         res_kill_again = await tool.execute({"action": "kill", "task_id": "sub-3"})
         self.assertIn("already in state 'cancelled'", res_kill_again)
 
+    def test_subagent_session_data_agent_history_deserialization(self):
+        from core.subagent_tracker import SubagentSessionData
+        data = {
+            "task_id": "sub-test",
+            "description": "test desc",
+            "prompt": "test prompt",
+            "subagent_type": "general",
+            "background": False,
+            "status": "completed",
+            "agent_history": [{"role": "user", "content": "Prior prompt"}, {"role": "assistant", "content": "Prior response"}]
+        }
+        sess = SubagentSessionData.from_dict(data)
+        self.assertEqual(len(sess.agent_history), 2)
+        self.assertEqual(sess.to_dict()["agent_history"], data["agent_history"])
+
 
 if __name__ == "__main__":
     unittest.main()

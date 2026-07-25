@@ -38,6 +38,9 @@ class MockApp:
     def refresh_status_footer(self):
         self.status_refreshed = True
 
+    def save_current_session(self):
+        pass
+
     def generate_ai_response(self, prompt: str, show_in_ui: bool = True):
         self.ai_prompts.append((prompt, show_in_ui))
 
@@ -57,6 +60,39 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cyrillic_mcp = "/mсp"
         handled = await handle_slash_command(app, cyrillic_mcp)
         self.assertTrue(handled)
+
+    async def test_homoglyph_parts_updated(self):
+        app = MockApp()
+        # Cyrillic letter 'с' (c) in /cоmpact -> normalized to /compact
+        cyrillic_cmd = "/cоmpact"
+        handled = await handle_slash_command(app, cyrillic_cmd)
+        self.assertTrue(handled)
+        self.assertTrue(app.agent.compact_called)
+
+    async def test_rewind_command_selected_idx_zero(self):
+        from core.commands import RewindCommand
+        app = MockApp()
+        app.chat_view.get_user_messages = lambda: [(0, "First message")]
+        rolled_back_target = []
+        app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
+
+        mock_input = type("MockInput", (), {
+            "load_text": lambda self, txt: setattr(self, "text", txt),
+            "text": "First message",
+            "move_cursor": lambda self, pos: None,
+            "focus": lambda self: None
+        })()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+        # Simulate selecting user message at index 0 in on_rewind_selected
+        def simulate_on_rewind_selected(screen, callback):
+            callback(0)
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        self.assertEqual(rolled_back_target, [-1])
+        self.assertEqual(mock_input.text, "First message")
 
     async def test_unknown_command(self):
         app = MockApp()

@@ -324,23 +324,6 @@ class ProviderManager:
             except Exception:
                 pass
 
-        # Update .py provider file if present
-        provider_path = os.path.join(PROVIDERS_DIR, f"{key}.py")
-        if os.path.exists(provider_path):
-            try:
-                with open(provider_path, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
-                new_lines = []
-                for line in lines:
-                    if line.startswith("MODEL ="):
-                        new_lines.append(f'MODEL = "{model_name}"\n')
-                    else:
-                        new_lines.append(line)
-                with open(provider_path, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-            except Exception as e:
-                print(f"Error updating model in provider file {key}.py: {e}")
-
     def create_agent_for_provider(self, provider_key: str):
         providers = self.load_providers()
         if provider_key not in providers:
@@ -356,6 +339,15 @@ class ProviderManager:
             kwargs = {}
             if stored_key:
                 kwargs["api_key"] = stored_key
+            if os.path.exists(CONFIG_FILE):
+                try:
+                    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                        cdata = json.load(f)
+                        p_models = cdata.get("provider_models", {})
+                        if provider_key in p_models and p_models[provider_key]:
+                            kwargs["model"] = p_models[provider_key]
+                except Exception:
+                    pass
             return target_provider["module"].Agent(**kwargs)
 
         from core.base_provider import BaseAgent

@@ -31,6 +31,7 @@ class MCPProcessClient:
         self.req_id = 0
         self.tools: List[Dict[str, Any]] = []
         self._stopped = False
+        self._buffer = ""
 
     def start(self) -> bool:
         self._stopped = False
@@ -52,6 +53,12 @@ class MCPProcessClient:
                 text=True,
                 bufsize=1
             )
+            if self.process.stdout:
+                try:
+                    os.set_blocking(self.process.stdout.fileno(), False)
+                except Exception:
+                    pass
+            self._buffer = ""
             return self._initialize()
         except Exception as e:
             print(f"Failed to start MCP server {self.name}: {e}")
@@ -93,6 +100,24 @@ class MCPProcessClient:
 
         start_time = time.time()
         while not self._stopped:
+            while "\n" in self._buffer:
+                line_str, self._buffer = self._buffer.split("\n", 1)
+                line_str = line_str.strip()
+                if not line_str.startswith("{"):
+                    continue
+                try:
+                    data = json.loads(line_str)
+                    # Ignore notifications without an id (e.g. notifications/tools/list_changed)
+                    if "method" in data and "id" not in data:
+                        continue
+
+                    if req_id is not None and data.get("id") != req_id:
+                        continue
+
+                    return data
+                except Exception:
+                    continue
+
             wait_time = 1.0
             if timeout is not None:
                 elapsed = time.time() - start_time
@@ -112,24 +137,15 @@ class MCPProcessClient:
             if not rlist:
                 continue  # Tick completed, check self._stopped again
 
-            line = self.process.stdout.readline()
-            if not line:
-                return None
-            line_str = line.strip()
-            if not line_str.startswith("{"):
-                continue
             try:
-                data = json.loads(line_str)
-                # Ignore notifications without an id (e.g. notifications/tools/list_changed)
-                if "method" in data and "id" not in data:
-                    continue
-
-                if req_id is not None and data.get("id") != req_id:
-                    continue
-
-                return data
-            except Exception:
+                raw_chunk = os.read(self.process.stdout.fileno(), 8192)
+                if not raw_chunk:
+                    return None
+                self._buffer += raw_chunk.decode("utf-8", errors="replace")
+            except (OSError, BlockingIOError):
                 continue
+            except Exception:
+                return None
 
         return None
 

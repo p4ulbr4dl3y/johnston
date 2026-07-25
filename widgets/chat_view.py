@@ -858,6 +858,7 @@ class ChatView(VerticalScroll):
 
     def rollback_to(self, target_index: int) -> None:
         children = list(self.children)
-        for child in children[target_index + 1:]:
+        start_idx = max(0, target_index + 1)
+        for child in children[start_idx:]:
             child.remove()
         self.check_welcome()

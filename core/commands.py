@@ -163,7 +163,8 @@ class RewindCommand(BaseCommand):
                         break
 
                 # Rollback chat to position immediately preceding selected message
-                chat_view.rollback_to(selected_idx - 1)
+                target_idx = selected_idx - 1
+                chat_view.rollback_to(target_idx)
 
                 if hasattr(app.agent, "clear_history"):
                     app.agent.clear_history()
@@ -363,6 +364,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
         'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'
     }
     normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
+    parts[0] = normalized_name
 
     if normalized_name in COMMAND_REGISTRY:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()

@@ -130,6 +130,7 @@ class BaseAgent:
                     messages[0]["content"] = sys_prompt
 
                 full_assistant_text = ""
+                step_usage = None
                 prompt_tokens_est = estimate_tokens(messages)
                 tool_calls_dict = {}
                 active_thought = ""
@@ -445,10 +446,16 @@ class BaseAgent:
 
                     yield ("tool_result", tool_ui_result, "")
 
+                    content_str = tool_content
+                    if isinstance(tool_content, (dict, list)):
+                        content_str = json.dumps(tool_content, ensure_ascii=False)
+                    elif tool_content is None:
+                        content_str = ""
+
                     messages.append({
                         "role": "tool",
                         "tool_call_id": t_id,
-                        "content": tool_content
+                        "content": content_str
                     })
 
             self.history = messages[1:]
@@ -456,6 +463,9 @@ class BaseAgent:
         except Exception as err:
             error_msg = f"**API Error:** `{err}`"
             yield ("bot_text", error_msg, "")
+        finally:
+            if len(messages) > 1:
+                self.history = messages[1:]
 
     async def compact_history(self) -> Tuple[bool, str]:
         """

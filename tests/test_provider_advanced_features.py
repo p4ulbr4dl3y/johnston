@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from core.base_provider import BaseAgent
 from core.provider_manager import ProviderManager
@@ -79,8 +79,10 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     pm.set_provider_disabled("opencode", True)
-                    grouped = await pm.fetch_models_grouped()
-                    self.assertNotIn("opencode", grouped)
+                    with patch.object(pm, "fetch_models_for_provider", new_callable=AsyncMock) as mock_fetch:
+                        mock_fetch.return_value = ["dummy-model"]
+                        grouped = await pm.fetch_models_grouped()
+                        self.assertNotIn("opencode", grouped)
 
 
 if __name__ == "__main__":

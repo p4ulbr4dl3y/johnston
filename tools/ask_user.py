@@ -42,6 +42,9 @@ class AskUserTool(BaseTool):
         questions_list = args.get("questions")
         question = args.get("question", "")
 
+        if isinstance(questions_list, dict):
+            questions_list = [questions_list]
+
         if not questions_list and question:
             questions_list = [{"question_text": question, "options": []}]
 

@@ -162,12 +162,14 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             mock_limit.return_value = 100
             with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
                 mock_comp.return_value = (True, "compacted")
-                try:
-                    async for _ in agent.stream_steps("trigger"):
+                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                    mock_create.side_effect = Exception("Stop stream")
+                    try:
+                        async for _ in agent.stream_steps("trigger"):
+                            pass
+                    except Exception:
                         pass
-                except Exception:
-                    pass
-                mock_comp.assert_called_once()
+                    mock_comp.assert_called_once()
 
     async def test_manage_task_tool(self):
         class DummyApp:
@@ -249,6 +251,55 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent.clear_history()
         self.assertEqual(agent.cost_usd, 0.0)
 
+    async def test_stream_steps_history_updated_on_exception(self):
+        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent.client = unittest.mock.AsyncMock()
+        agent.client.chat.completions.create.side_effect = Exception("API connection error")
+
+        steps = []
+        async for step in agent.stream_steps("Hello test"):
+            steps.append(step)
+
+        # Confirm user prompt is saved into history despite exception
+        self.assertEqual(len(agent.history), 1)
+        self.assertEqual(agent.history[0]["role"], "user")
+        self.assertEqual(agent.history[0]["content"], "Hello test")
+
+    async def test_stream_steps_without_chunk_usage(self):
+        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        self.addAsyncCleanup(agent.close)
+
+        mock_chunk = unittest.mock.MagicMock(spec=["choices"])
+        mock_delta = unittest.mock.MagicMock()
+        mock_delta.reasoning_content = None
+        mock_delta.reasoning = None
+        mock_delta.model_extra = None
+        mock_delta.content = "Hello world"
+        mock_delta.tool_calls = None
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.delta = mock_delta
+        mock_chunk.choices = [mock_choice]
+
+        async def mock_aiter(*args, **kwargs):
+            yield mock_chunk
+
+        mock_response = unittest.mock.MagicMock()
+        mock_response.__aiter__ = mock_aiter
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            mock_create.return_value = mock_response
+
+            steps = []
+            async for step in agent.stream_steps("Hi"):
+                steps.append(step)
+
+            self.assertTrue(len(steps) > 0)
+            self.assertIn(("bot_delta", "Hello world", ""), steps)
+            self.assertEqual(steps[-1], ("bot_text", "Hello world", ""))
+            self.assertGreater(agent.tokens_input, 0)
+            self.assertGreater(agent.tokens_output, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+

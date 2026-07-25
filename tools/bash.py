@@ -164,26 +164,9 @@ class BashTool(BaseTool):
                 return "Command executed with no output."
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
         except asyncio.TimeoutError:
+            task.is_background = True
+            ctx.add_background_task(task)
             if ctx.app:
-                task.is_background = True
-                ctx.add_background_task(task)
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-                return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use manage_task to inspect active background tasks."
-            else:
-                await p.wait()
-                if master_fd is not None:
-                    try:
-                        os.close(master_fd)
-                    except Exception:
-                        pass
-                    master_fd = None
-                if hasattr(task, "read_task") and task.read_task:
-                    try:
-                        await asyncio.wait_for(task.read_task, timeout=1.0)
-                    except asyncio.TimeoutError:
-                        pass
-                res = task.get_formatted_output()
-                if not res.strip():
-                    return "Command executed with no output."
-                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
+            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Use manage_task to inspect active background tasks."
 

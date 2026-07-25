@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 import sys
 import time
@@ -315,7 +316,6 @@ class JohnstonChatApp(App):
             except Exception as e:
                 self.notify(f"Copy failed: {e}", severity="error")
             finally:
-                self.screen.clear_selection()
                 async def reset_flag():
                     await asyncio.sleep(0.05)
                     self.selection_copy_active = False
@@ -411,8 +411,14 @@ class JohnstonChatApp(App):
 
         if image_parts:
             return [{"type": "text", "text": final_text}] + image_parts
-
         return final_text
+
+    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False) -> None:
+        """Safely trigger AI response generation, or queue prompt if currently generating."""
+        if getattr(self, "is_generating", False):
+            self.message_queue.append((prompt, show_in_ui))
+        else:
+            self.generate_ai_response(prompt, show_in_ui=show_in_ui)
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
@@ -451,7 +457,12 @@ class JohnstonChatApp(App):
                         thinking_widget.update_thinking(val1)
                 elif event_type == "thinking_end":
                     if thinking_widget:
-                        duration = float(val1)
+                        try:
+                            duration = float(val1)
+                            if not math.isfinite(duration):
+                                duration = 0.0
+                        except Exception:
+                            duration = 0.0
                         thinking_widget.finish_thinking(duration, val2)
                     thinking_widget = None
                 elif event_type == "tool":
@@ -642,6 +653,9 @@ def run_headless_prompt(
     if provider:
         pm.set_active_provider_key(provider)
     agent = pm.create_active_agent()
+    if not agent:
+        sys.stderr.write("Error: Could not initialize AI agent provider.\n")
+        sys.exit(1)
     if model and agent:
         agent.model = model
     if mode and agent:
@@ -655,6 +669,8 @@ def run_headless_prompt(
             val2 = step[2] if len(step) > 2 else ""
 
             if chunk_type in ("bot_delta", "bot_text", "text"):
+                if len(val1) < last_printed_len:
+                    last_printed_len = 0
                 new_text = val1[last_printed_len:]
                 if new_text:
                     sys.stdout.write(new_text)
@@ -668,6 +684,7 @@ def run_headless_prompt(
                     sys.stderr.write(f"\n[Thought for {val1}s]\n")
                     sys.stderr.flush()
                 elif chunk_type == "tool":
+                    last_printed_len = 0
                     sys.stderr.write(f"\n[Executing Tool: {val1} ({val2})]\n")
                     sys.stderr.flush()
                 elif chunk_type == "tool_result" and verbose:

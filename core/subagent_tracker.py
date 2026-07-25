@@ -25,6 +25,7 @@ class SubagentSessionData:
         self.events: List[Dict[str, Any]] = []
         self.listeners: List[Callable[[Dict[str, Any]], None]] = []
         self.agent: Any = None
+        self.agent_history: List[Dict[str, Any]] = []
         self.async_task: Any = None
 
     def add_event(self, event: Dict[str, Any]) -> None:
@@ -52,6 +53,9 @@ class SubagentSessionData:
         SubagentTracker.get_instance().save_session(self)
 
     def to_dict(self) -> Dict[str, Any]:
+        history = getattr(self.agent, "history", None)
+        if history is None:
+            history = self.agent_history
         return {
             "task_id": self.task_id,
             "description": self.description,
@@ -61,7 +65,7 @@ class SubagentSessionData:
             "session_id": self.session_id,
             "status": self.status,
             "events": self.events,
-            "agent_history": getattr(self.agent, "history", []) if self.agent else []
+            "agent_history": history
         }
 
     @classmethod
@@ -76,6 +80,7 @@ class SubagentSessionData:
         )
         sess.status = data.get("status", "completed")
         sess.events = data.get("events", [])
+        sess.agent_history = data.get("agent_history", [])
         return sess
 
 

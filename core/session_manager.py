@@ -43,9 +43,10 @@ class SessionManager:
                     with open(filepath, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         ui_msgs = data.get("ui_messages") or data.get("messages") or []
+                        agent_history = data.get("agent_history") or []
 
                         # If session is empty - remove junk file
-                        if not ui_msgs:
+                        if not ui_msgs and not agent_history:
                             os.remove(filepath)
                             continue
 
@@ -54,7 +55,7 @@ class SessionManager:
                             "title": data.get("title", "Untitled"),
                             "created_at": data.get("created_at", 0),
                             "updated_at": data.get("updated_at", 0),
-                            "message_count": len(ui_msgs)
+                            "message_count": len(ui_msgs) if ui_msgs else len(agent_history)
                         })
                 except Exception as e:
                     print(f"Error reading session {filename}: {e}")
@@ -81,9 +82,10 @@ class SessionManager:
 
         filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
         ui_msgs = data.get("ui_messages") or data.get("messages") or []
+        agent_history = data.get("agent_history") or []
 
         # Do not save empty sessions; if file existed - remove it
-        if not ui_msgs:
+        if not ui_msgs and not agent_history:
             if os.path.exists(filepath):
                 os.remove(filepath)
             return

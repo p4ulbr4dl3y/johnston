@@ -52,5 +52,11 @@ class ToolContext:
         return None
 
     def trigger_ai_response(self, prompt: str) -> None:
-        if self.app and hasattr(self.app, "generate_ai_response"):
-            self.app.generate_ai_response(prompt, show_in_ui=False)
+        if self.app:
+            if hasattr(self.app, "trigger_ai_response"):
+                self.app.trigger_ai_response(prompt, show_in_ui=False)
+            elif hasattr(self.app, "generate_ai_response"):
+                if getattr(self.app, "is_generating", False) and hasattr(self.app, "message_queue"):
+                    self.app.message_queue.append((prompt, False))
+                else:
+                    self.app.generate_ai_response(prompt, show_in_ui=False)

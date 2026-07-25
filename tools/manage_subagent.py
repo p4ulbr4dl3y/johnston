@@ -1,4 +1,5 @@
 import asyncio
+import math
 from typing import Any, Dict
 
 from core.subagent_tracker import SubagentTracker
@@ -156,6 +157,8 @@ class ManageSubagentTool(BaseTool):
                 elif etype == "thinking_end":
                     try:
                         dur = float(val1)
+                        if not math.isfinite(dur):
+                            dur = 0.0
                     except Exception:
                         dur = 0.0
                     session.add_event({"type": "thinking_end", "duration": dur, "content": val2})
@@ -177,10 +180,25 @@ class ManageSubagentTool(BaseTool):
             def _merge_metrics():
                 if ctx.app and hasattr(ctx.app, "agent") and ctx.app.agent:
                     main_agent = ctx.app.agent
-                    main_agent.tokens_input += getattr(subagent, "tokens_input", 0)
-                    main_agent.tokens_output += getattr(subagent, "tokens_output", 0)
-                    main_agent.total_tokens += getattr(subagent, "total_tokens", 0)
-                    main_agent.cost_usd += getattr(subagent, "cost_usd", 0.0)
+                    last_in = getattr(subagent, "_merged_tokens_input", 0)
+                    last_out = getattr(subagent, "_merged_tokens_output", 0)
+                    last_tot = getattr(subagent, "_merged_total_tokens", 0)
+                    last_cost = getattr(subagent, "_merged_cost_usd", 0.0)
+
+                    cur_in = getattr(subagent, "tokens_input", 0)
+                    cur_out = getattr(subagent, "tokens_output", 0)
+                    cur_tot = getattr(subagent, "total_tokens", 0)
+                    cur_cost = getattr(subagent, "cost_usd", 0.0)
+
+                    main_agent.tokens_input += (cur_in - last_in)
+                    main_agent.tokens_output += (cur_out - last_out)
+                    main_agent.total_tokens += (cur_tot - last_tot)
+                    main_agent.cost_usd += (cur_cost - last_cost)
+
+                    subagent._merged_tokens_input = cur_in
+                    subagent._merged_tokens_output = cur_out
+                    subagent._merged_total_tokens = cur_tot
+                    subagent._merged_cost_usd = cur_cost
                     ctx.refresh_status()
 
             run_bg = bool(args["background"]) if "background" in args else session.background

@@ -272,7 +272,7 @@ OptionList > .option-list--option-blur-highlighted {
     color: #a1a1aa;
     border: none;
     padding: 0;
-    scrollbar-size: 0 0;
+    scrollbar-size: 1 1;
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted,
@@ -355,6 +355,7 @@ ModalScreen {
     padding: 1 2;
     border: solid #27272a;
     background: #18181b;
+    overflow-y: scroll;
 }
 
 .modal-title {
