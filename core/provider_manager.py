@@ -30,6 +30,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "ClinePass",
         "description": "ClinePass AI provider",
         "base_url": "https://api.cline.bot/api/v1",
+        "model": "cline-pass/deepseek-v4-flash",
         "models": [
             "cline-pass/glm-5.2",
             "cline-pass/kimi-k3",

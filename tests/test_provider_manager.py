@@ -83,25 +83,28 @@ class TestProviderManager(unittest.TestCase):
             cdata = json.load(f)
             self.assertEqual(cdata["models"], ["model-a", "model-b"])
 
-    def test_clinepass_provider(self):
-        providers = self.pm.load_providers()
-        self.assertIn("clinepass", providers)
+    def test_custom_provider_without_model(self):
+        # Create a custom provider entry in providers.json without a "model" property
+        providers_file = os.path.join(self.test_dir, "providers.json")
+        with open(providers_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "custom_no_model": {
+                    "key": "custom_no_model",
+                    "name": "Custom No Model",
+                    "base_url": "https://api.example.com/v1",
+                    "models": ["model-1", "model-2"]
+                }
+            }, f)
 
-        # Set active provider to clinepass
-        self.pm.set_active_provider_key("clinepass")
-        self.assertEqual(self.pm.get_active_provider_key(), "clinepass")
+        pm = ProviderManager()
+        pm.set_active_provider_key("custom_no_model")
+        agent = pm.create_active_agent()
+        self.assertEqual(agent.provider_key, "custom_no_model")
+        self.assertEqual(agent.model, "")  # No model selected automatically
 
-        # Create agent for clinepass (without model in JSON or config -> model is empty)
-        agent = self.pm.create_active_agent()
-        self.assertEqual(agent.provider_key, "clinepass")
-        self.assertEqual(agent.model, "")
-
-        # Switch model for clinepass to mimo-v2.5
-        self.pm.set_provider_model("clinepass", "cline-pass/mimo-v2.5")
-
-        # Create new agent instance for clinepass and verify model selection
-        agent2 = self.pm.create_active_agent()
-        self.assertEqual(agent2.model, "cline-pass/mimo-v2.5")
+        pm.set_provider_model("custom_no_model", "model-2")
+        agent2 = pm.create_active_agent()
+        self.assertEqual(agent2.model, "model-2")
 
 
 if __name__ == "__main__":
