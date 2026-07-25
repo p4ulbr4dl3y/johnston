@@ -83,9 +83,26 @@ class TestProviderManager(unittest.TestCase):
             cdata = json.load(f)
             self.assertEqual(cdata["models"], ["model-a", "model-b"])
 
-    def test_fetch_models_for_provider(self):
-        import asyncio
-        asyncio.run(self._async_test_fetch_models())
+    def test_clinepass_provider(self):
+        providers = self.pm.load_providers()
+        self.assertIn("clinepass", providers)
+
+        # Set active provider to clinepass
+        self.pm.set_active_provider_key("clinepass")
+        self.assertEqual(self.pm.get_active_provider_key(), "clinepass")
+
+        # Create agent for clinepass
+        agent = self.pm.create_active_agent()
+        self.assertEqual(agent.provider_key, "clinepass")
+        self.assertEqual(agent.model, "cline-pass/deepseek-v4-flash")
+
+        # Switch model for clinepass to mimo-v2.5
+        self.pm.set_provider_model("clinepass", "cline-pass/mimo-v2.5")
+
+        # Create new agent instance for clinepass and verify model selection
+        agent2 = self.pm.create_active_agent()
+        self.assertEqual(agent2.model, "cline-pass/mimo-v2.5")
+
 
 if __name__ == "__main__":
     unittest.main()
