@@ -6,7 +6,7 @@ import asyncio
 import json
 import os
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import httpx
 
@@ -42,6 +42,8 @@ class ModelsCatalog:
         self._user_overrides: List[str] = []
         self._names: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
+        self._fallback_vision_provider: str = ""
+        self._fallback_vision_model: str = ""
         self.load_cache()
 
     def _trigger_background_refresh(self):
@@ -62,6 +64,8 @@ class ModelsCatalog:
                     self._vision = list(set(data.get("vision_models", []) + self._user_overrides))
                     self._names = data.get("model_names", {})
                     self._pricing = data.get("model_pricing", {})
+                    self._fallback_vision_provider = data.get("fallback_vision_provider", "")
+                    self._fallback_vision_model = data.get("fallback_vision_model", "")
 
                     if time.time() - data.get("updated_at", 0) >= CACHE_TTL:
                         self._trigger_background_refresh()
@@ -87,6 +91,8 @@ class ModelsCatalog:
                         "model_limits": model_limits,
                         "vision_models": vision_models,
                         "user_vision_overrides": self._user_overrides,
+                        "fallback_vision_provider": self._fallback_vision_provider,
+                        "fallback_vision_model": self._fallback_vision_model,
                         "model_names": model_names,
                         "model_pricing": model_pricing or {},
                     },
@@ -213,6 +219,14 @@ class ModelsCatalog:
         if m_base not in self._vision:
             self._vision.append(m_base)
         self.save_cache(self._limits, self._vision, self._names, self._pricing)
+
+    def set_fallback_vision_model(self, provider_id: str, model_id: str) -> None:
+        self._fallback_vision_provider = provider_id
+        self._fallback_vision_model = model_id
+        self.save_cache(self._limits, self._vision, self._names, self._pricing)
+
+    def get_fallback_vision_model(self) -> Tuple[str, str]:
+        return getattr(self, "_fallback_vision_provider", ""), getattr(self, "_fallback_vision_model", "")
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:

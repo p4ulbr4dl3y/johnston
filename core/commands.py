@@ -142,7 +142,17 @@ class ModelsCommand(BaseCommand):
                 if not catalog.is_native_vision(selected_prov, selected_model):
                     def on_warning_action(action: str | None) -> None:
                         if action == "select_vision":
-                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_model_selected)
+                            def on_fallback_vision_selected(fb_selection: tuple[str, str] | str | None) -> None:
+                                if fb_selection:
+                                    if isinstance(fb_selection, (tuple, list)):
+                                        f_prov, f_model = fb_selection[0], fb_selection[1]
+                                    else:
+                                        f_prov = selected_prov
+                                        f_model = fb_selection
+                                    catalog.set_fallback_vision_model(f_prov, f_model)
+                                    app.notify(f"Fallback vision model for view_image set to: [{f_prov}] {f_model}")
+
+                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_fallback_vision_selected)
                         elif action == "force_vision":
                             catalog.add_vision_override(selected_model)
                             app.notify(f"Vision support enabled for {selected_model}")

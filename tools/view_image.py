@@ -25,7 +25,16 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     target_mod = None
     target_model = None
 
-    active_key = pm.get_active_provider_key()
+    fb_prov, fb_model = catalog.get_fallback_vision_model()
+    if fb_prov and fb_model and fb_prov in providers:
+        try:
+            target_mod = providers[fb_prov]["module"]
+            target_model = fb_model
+        except Exception:
+            pass
+
+    if not target_mod:
+        active_key = pm.get_active_provider_key()
     if active_key in providers:
         pinfo = providers[active_key]
         mod = pinfo["module"]
