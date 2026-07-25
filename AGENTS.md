@@ -1,4 +1,4 @@
-# AI Agents and Providers in Johnston Chat
+# AI Agents and Providers in Johnston
 
 The project uses a modular architecture for configuring and executing AI agents. Users can switch providers and models on the fly directly from the interface or via slash commands.
 

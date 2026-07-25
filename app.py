@@ -46,8 +46,8 @@ def get_version() -> str:
         return "0.1.0-dev"
 
 
-class JohnstonChatApp(App):
-    """Minimalist Johnston chat with provider/model configuration and isolated project sessions"""
+class JohnstonApp(App):
+    """Minimalist Johnston TUI agent with provider/model configuration and isolated project sessions"""
 
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.tcss")
@@ -701,7 +701,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="johnston",
-        description="Johnston AI Chat & Coding Agent CLI",
+        description="Johnston AI Coding Agent CLI",
     )
     parser.add_argument("-p", "--prompt", help="Run a single prompt in CLI headless mode")
     parser.add_argument(
@@ -784,7 +784,7 @@ def main():
         )
         sys.exit(0)
 
-    app = JohnstonChatApp(
+    app = JohnstonApp(
         mode=args.mode,
         provider=args.provider,
         model=args.model,

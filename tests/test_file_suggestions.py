@@ -1,6 +1,6 @@
 import unittest
 
-from app import JohnstonChatApp
+from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 
@@ -28,13 +28,13 @@ class TestFileSuggestions(unittest.TestCase):
         self.assertFalse(suggestions.display)
 
     def test_prepare_prompt_with_attachments(self):
-        app = JohnstonChatApp()
+        app = JohnstonApp()
 
         # If an existing file is attached (e.g. @AGENTS.md)
         prompt = app.prepare_prompt_with_attachments("Check @AGENTS.md and fix")
         self.assertIn("Check @AGENTS.md and fix", prompt)
         self.assertIn("--- Attached File: AGENTS.md ---", prompt)
-        self.assertIn("AI Agents and Providers in Johnston Chat", prompt)
+        self.assertIn("AI Agents and Providers in Johnston", prompt)
 
     def test_pasted_file_path_formatting(self):
         chat_input = ChatInput()

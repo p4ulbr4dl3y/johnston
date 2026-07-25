@@ -36,4 +36,4 @@ fi
 
 echo ""
 echo "=== Installation complete! ==="
-echo "Run 'johnston' to start Johnston Chat."
+echo "Run 'johnston' to start Johnston."

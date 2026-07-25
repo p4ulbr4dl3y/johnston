@@ -1,13 +1,13 @@
 import asyncio
 
-from app import JohnstonChatApp
+from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView, UserMessage
 from widgets.modal_screens import HelpScreen, ModelScreen, ProviderScreen, ResumeScreen, RewindScreen, TasksListScreen
 
 
 async def test_chat_app_flow():
-    app = JohnstonChatApp()
+    app = JohnstonApp()
     async with app.run_test() as pilot:
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()
@@ -126,7 +126,7 @@ async def test_chat_app_flow():
         print("✓ Atomic tag deletion tests passed cleanly!")
 
 async def test_message_queue():
-    app = JohnstonChatApp()
+    app = JohnstonApp()
     app.is_generating = True
     class FakeEvent:
         value = "Queued message"
@@ -138,7 +138,7 @@ async def test_message_queue():
 def test_resume_tip_on_exit():
     from io import StringIO
     from unittest.mock import patch
-    app = JohnstonChatApp()
+    app = JohnstonApp()
     app.sm.save_session(app.current_session_id, {"ui_messages": [{"type": "user", "text": "hi"}]})
 
     out = StringIO()
@@ -153,13 +153,13 @@ def test_resume_tip_on_exit():
 
 
 async def test_resume_cli_flag():
-    app = JohnstonChatApp()
+    app = JohnstonApp()
     app.sm.save_session("test_sess_123", {
         "ui_messages": [{"type": "user", "text": "Resumed user msg"}],
         "agent_history": [{"role": "user", "content": "Resumed user msg"}]
     })
 
-    resumed_app = JohnstonChatApp(resume_session_id="test_sess_123")
+    resumed_app = JohnstonApp(resume_session_id="test_sess_123")
     async with resumed_app.run_test() as pilot:
         await pilot.pause(0.2)
         assert resumed_app.current_session_id == "test_sess_123"
@@ -171,7 +171,7 @@ async def test_resume_cli_flag():
 
 
 async def test_modal_ctrl_c_quit():
-    app = JohnstonChatApp()
+    app = JohnstonApp()
     async with app.run_test() as pilot:
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.load_text("/models")
