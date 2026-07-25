@@ -30,7 +30,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "ClinePass",
         "description": "ClinePass AI provider",
         "base_url": "https://api.cline.bot/api/v1",
-        "model": "cline-pass/deepseek-v4-flash",
         "models": [
             "cline-pass/glm-5.2",
             "cline-pass/kimi-k3",
@@ -340,8 +339,6 @@ class ProviderManager:
         from core.base_provider import BaseAgent
 
         model_val = target_provider.get("model", "")
-        if not model_val and target_provider.get("models"):
-            model_val = target_provider["models"][0]
 
         if os.path.exists(CONFIG_FILE):
             try:

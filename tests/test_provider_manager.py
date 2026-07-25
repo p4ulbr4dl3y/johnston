@@ -91,10 +91,10 @@ class TestProviderManager(unittest.TestCase):
         self.pm.set_active_provider_key("clinepass")
         self.assertEqual(self.pm.get_active_provider_key(), "clinepass")
 
-        # Create agent for clinepass
+        # Create agent for clinepass (without model in JSON or config -> model is empty)
         agent = self.pm.create_active_agent()
         self.assertEqual(agent.provider_key, "clinepass")
-        self.assertEqual(agent.model, "cline-pass/deepseek-v4-flash")
+        self.assertEqual(agent.model, "")
 
         # Switch model for clinepass to mimo-v2.5
         self.pm.set_provider_model("clinepass", "cline-pass/mimo-v2.5")
