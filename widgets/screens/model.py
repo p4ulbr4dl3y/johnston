@@ -192,13 +192,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             target_idx = None
             if self.default_value in self.filtered_items:
                 target_idx = self.filtered_items.index(self.default_value)
-            if target_idx is None:
-                for i, it in enumerate(self.filtered_items):
-                    if it is not None:
-                        target_idx = i
-                        break
-            if target_idx is not None:
-                opt_list.highlighted = target_idx
+            opt_list.highlighted = target_idx
         except Exception:
             pass
 

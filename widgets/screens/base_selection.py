@@ -57,11 +57,6 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
                 default_idx = self.raw_items.index(self.default_value)
             except Exception:
                 pass
-        if default_idx is None:
-            for i, it in enumerate(self.raw_items):
-                if it is not None:
-                    default_idx = i
-                    break
 
         opt_list.highlighted = default_idx
 
