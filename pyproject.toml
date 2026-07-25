@@ -18,9 +18,6 @@ dependencies = [
 
 [project.scripts]
 johnston = "app:main"
-johnston-chat = "app:main"
-tui = "app:main"
-tui-chat = "app:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
