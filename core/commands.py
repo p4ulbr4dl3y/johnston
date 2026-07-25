@@ -323,7 +323,6 @@ class InitCommand(BaseCommand):
     description = "Guided `AGENTS.md` project setup"
 
     async def execute(self, app) -> None:
-        app.notify("Initializing AGENTS.md guide for this project...")
         app.generate_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
 
 
@@ -337,7 +336,6 @@ class CompactCommand(BaseCommand):
             app.notify("No active agent found", severity="error")
             return
 
-        app.notify("Compacting conversation context...")
         if hasattr(app.agent, "compact_history"):
             success, msg = await app.agent.compact_history()
             if success:

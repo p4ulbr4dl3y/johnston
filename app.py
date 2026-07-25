@@ -316,6 +316,7 @@ class JohnstonApp(App):
             except Exception as e:
                 self.notify(f"Copy failed: {e}", severity="error")
             finally:
+                self.screen.clear_selection()
                 async def reset_flag():
                     await asyncio.sleep(0.05)
                     self.selection_copy_active = False
