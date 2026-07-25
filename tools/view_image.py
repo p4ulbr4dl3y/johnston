@@ -216,7 +216,8 @@ class ViewImageTool(BaseTool):
                 "status": "success",
                 "message": f"[Image Loaded: {path}]",
                 "path": path,
-                "image_url": b64_url
+                "image_url": b64_url,
+                "detail": "high"
             })
         except Exception as e:
             return f"Error reading image file '{path}': {e}"

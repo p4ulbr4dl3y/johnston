@@ -450,7 +450,7 @@ class BaseAgent:
                                 tool_ui_result = t_data.get("message", f"[Image Loaded: {t_data.get('path')}]")
                                 tool_content = [
                                     {"type": "text", "text": tool_ui_result},
-                                    {"type": "image_url", "image_url": {"url": t_data["image_url"]}}
+                                    {"type": "image_url", "image_url": {"url": t_data["image_url"], "detail": "high"}}
                                 ]
                         except Exception:
                             pass
