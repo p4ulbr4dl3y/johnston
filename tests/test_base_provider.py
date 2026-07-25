@@ -299,6 +299,31 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             self.assertGreater(agent.tokens_input, 0)
             self.assertGreater(agent.tokens_output, 0)
 
+    async def test_sanitize_history_for_model(self):
+        agent = BaseAgent(api_key="test", model="non-vision-model", base_url="http://test", provider_key="opencode")
+        self.addAsyncCleanup(agent.close)
+
+        history = [
+            {"role": "user", "content": [{"type": "text", "text": "Look at this"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,123"}}]},
+            {"role": "assistant", "content": "Done", "tool_calls": [{"id": "call_1", "function": {"name": "read"}}]},
+            {"role": "tool", "tool_call_id": "call_1", "name": "read", "content": "file contents"},
+            {"role": "tool", "tool_call_id": "call_orphan", "name": "edit", "content": "orphan content"}
+        ]
+
+        sanitized = agent.sanitize_history_for_model(history)
+        self.assertEqual(len(sanitized), 4)
+
+        # Vision content transformed
+        self.assertEqual(sanitized[0]["content"][1]["text"], "[Image attached (vision disabled for active model)]")
+
+        # Valid tool output preserved
+        self.assertEqual(sanitized[2]["role"], "tool")
+        self.assertEqual(sanitized[2]["tool_call_id"], "call_1")
+
+        # Orphan tool converted to user role
+        self.assertEqual(sanitized[3]["role"], "user")
+        self.assertIn("orphan content", sanitized[3]["content"])
+
 
 if __name__ == "__main__":
     unittest.main()

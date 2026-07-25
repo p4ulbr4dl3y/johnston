@@ -100,6 +100,74 @@ class BaseAgent:
             "cost_usd": getattr(self, "cost_usd", 0.0)
         }
 
+    def sanitize_history_for_model(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Adapts and normalizes session history for the active provider & model.
+        Ensures seamless model switching across different providers and capabilities.
+        """
+        if not history:
+            return []
+
+        is_vision_supported = catalog.is_native_vision(self.provider_key, self.model)
+        sanitized = []
+        known_tool_call_ids = set()
+
+        for msg in history:
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role")
+            if role not in ("user", "assistant", "tool", "system"):
+                continue
+
+            item = dict(msg)
+
+            if role == "assistant":
+                tool_calls = item.get("tool_calls")
+                if tool_calls and isinstance(tool_calls, list):
+                    valid_calls = []
+                    for tc in tool_calls:
+                        if isinstance(tc, dict):
+                            tc_id = tc.get("id")
+                            if tc_id:
+                                known_tool_call_ids.add(tc_id)
+                            valid_calls.append(tc)
+                    item["tool_calls"] = valid_calls
+
+            elif role == "tool":
+                tc_id = item.get("tool_call_id")
+                if tc_id and tc_id not in known_tool_call_ids:
+                    item = {
+                        "role": "user",
+                        "content": f"[Tool Output ({item.get('name', 'tool')}): {item.get('content', '')}]"
+                    }
+
+            content = item.get("content")
+            if not is_vision_supported and content:
+                if isinstance(content, list):
+                    new_content = []
+                    for part in content:
+                        if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
+                            new_content.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
+                        else:
+                            new_content.append(part)
+                    item["content"] = new_content
+                elif isinstance(content, str) and "data:image/" in content:
+                    try:
+                        cdata = json.loads(content)
+                        if isinstance(cdata, list):
+                            new_cdata = []
+                            for part in cdata:
+                                if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
+                                    new_cdata.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
+                                else:
+                                    new_cdata.append(part)
+                            item["content"] = json.dumps(new_cdata)
+                    except Exception:
+                        pass
+
+            sanitized.append(item)
+
+        return sanitized
+
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
@@ -129,7 +197,8 @@ class BaseAgent:
                 except Exception:
                     pass
 
-        messages = [{"role": "system", "content": sys_prompt}] + self.history + [{"role": "user", "content": user_text}]
+        sanitized_history = self.sanitize_history_for_model(self.history)
+        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
 
         try:
             while True:

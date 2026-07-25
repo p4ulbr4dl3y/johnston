@@ -82,8 +82,11 @@ class ProvidersCommand(BaseCommand):
                         if entered_key:
                             app.pm.set_provider_api_key(selected_key, entered_key)
                         app.pm.set_provider_disabled(selected_key, False)
+                        old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
                         app.pm.set_active_provider_key(selected_key)
                         app.agent = app.pm.create_active_agent()
+                        if app.agent and old_history:
+                            app.agent.history = old_history
                         app.agent.app = app
                         app.refresh_status_footer()
                         app.notify(f"Connected to provider: {p_name}")
@@ -129,8 +132,11 @@ class ModelsCommand(BaseCommand):
                     selected_model = selection
 
                 if selected_prov != app.pm.get_active_provider_key():
+                    old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
                     app.pm.set_active_provider_key(selected_prov)
                     app.agent = app.pm.create_active_agent()
+                    if app.agent and old_history:
+                        app.agent.history = old_history
                     app.agent.app = app
 
                 if hasattr(app.agent, "model"):
