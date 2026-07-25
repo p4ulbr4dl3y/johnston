@@ -64,6 +64,8 @@ class CustomMarkdownFence(MarkdownFence):
 
 HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
 HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
+HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
+HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
 
 Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence

@@ -208,7 +208,7 @@ MarkdownFence {
 MarkdownFence .fence-header {
     height: 1;
     background: #27272a;
-    padding: 0 1;
+    padding: 0 0 0 1;
 }
 
 MarkdownFence .fence-lang {
@@ -224,6 +224,7 @@ MarkdownFence .fence-copy-btn {
     background: #3f3f46;
     color: #ffffff;
     padding: 0 1;
+    margin: 0;
 }
 
 MarkdownFence .fence-copy-btn:hover {
