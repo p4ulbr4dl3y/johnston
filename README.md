@@ -39,7 +39,3 @@ uv run python -m unittest discover -s tests
 # Check code style
 uv run ruff check .
 ```
-
-## License
-
-MIT
