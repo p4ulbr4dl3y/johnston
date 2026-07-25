@@ -1,5 +1,3 @@
-<div align="center">
-
 ```
    _       _                 _                 
   (_)     | |               | |                
@@ -10,9 +8,7 @@
  /_/                                           
 ```
 
-**Terminal-based AI assistant CLI.**
-
-</div>
+Terminal-based AI assistant CLI.
 
 ## Quick Start
 
