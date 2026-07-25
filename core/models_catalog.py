@@ -181,6 +181,23 @@ class ModelsCatalog:
 
         return False
 
+    def is_native_vision(self, provider_id: str, model_id: str) -> bool:
+        if not model_id:
+            return False
+        if not self._vision:
+            self.load_cache()
+
+        native_list = [m for m in self._vision if m not in self._user_overrides]
+        if model_id in native_list:
+            return True
+
+        m_base = model_id.split("/")[-1].split(":")[0].lower()
+        for k in native_list:
+            if k.split("/")[-1].split(":")[0].lower() == m_base:
+                return True
+
+        return False
+
     def add_vision_override(self, model_id: str) -> None:
         if not model_id:
             return

@@ -139,7 +139,7 @@ class ModelsCommand(BaseCommand):
                 app.refresh_status_footer()
                 app.notify(f"Model switched: [{selected_prov}] {selected_model}")
 
-                if not catalog.supports_vision(selected_prov, selected_model):
+                if not catalog.is_native_vision(selected_prov, selected_model):
                     def on_warning_action(action: str | None) -> None:
                         if action == "select_vision":
                             app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_model_selected)
