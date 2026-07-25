@@ -29,6 +29,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenAI",
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
         "api_type": "openai",
     },
     "anthropic": {
@@ -36,6 +37,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Anthropic",
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
+        "model": "claude-3-5-haiku-20241022",
         "api_type": "anthropic",
     },
     "gemini": {
@@ -43,6 +45,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Gemini",
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
+        "model": "gemini-2.0-flash",
         "api_type": "gemini",
     },
     "ollama": {
@@ -57,6 +60,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenRouter",
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
+        "model": "openrouter/free",
         "api_type": "openai",
     },
     "groq": {
