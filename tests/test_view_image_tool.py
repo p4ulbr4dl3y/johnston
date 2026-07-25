@@ -40,7 +40,7 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
 
             with patch("httpx.AsyncClient.post", return_value=mock_resp):
                 res = await analyze_image_with_fallback(temp_path, "Describe")
-                self.assertIn("Vision Sub-Agent Analysis", res)
+                self.assertIn("Vision Analysis", res)
                 self.assertIn("1x1 PNG image", res)
         finally:
             if os.path.exists(temp_path):

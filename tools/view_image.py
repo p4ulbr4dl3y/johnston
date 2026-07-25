@@ -1,5 +1,4 @@
 import base64
-import json
 import mimetypes
 import os
 from typing import Any, Dict
@@ -123,12 +122,15 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         payload = {
             "model": target_model,
             "messages": [
-                {"role": "system", "content": "You are a visual inspection assistant. Analyze the image accurately according to the user prompt."},
+                {
+                    "role": "system",
+                    "content": "You are a visual inspection assistant. Analyze the image accurately with 100% literal precision. Read and transcribe all visible text, UI elements, structure, and visual details without making assumptions or hallucinating unmentioned context."
+                },
                 {
                     "role": "user",
                     "content": [
                         {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": b64_url}}
+                        {"type": "image_url", "image_url": {"url": b64_url, "detail": "high"}}
                     ]
                 }
             ]
@@ -145,11 +147,11 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                 )
                 if choices and isinstance(choices, list) and len(choices) > 0:
                     analysis_text = choices[0].get("message", {}).get("content", "No content in choice.")
-                    return f"[Vision Sub-Agent Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
+                    return f"[Vision Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
 
             return f"Error from vision model (HTTP {resp.status_code}): {resp.text[:300]}"
     except Exception as e:
-        return f"Error running fallback vision model for '{image_path}': {e}"
+        return f"Error running vision model for '{image_path}': {e}"
 
 
 class ViewImageTool(BaseTool):
@@ -163,7 +165,8 @@ class ViewImageTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative path to image file"}
+                    "path": {"type": "string", "description": "Absolute or relative path to image file"},
+                    "prompt": {"type": "string", "description": "Optional specific prompt describing what to inspect in the image"}
                 },
                 "required": ["path"]
             }
@@ -180,46 +183,13 @@ class ViewImageTool(BaseTool):
         if ext not in valid_exts:
             return f"Error: '{path}' is not a supported image file format ({', '.join(sorted(valid_exts))})."
 
-        prompt = args.get("prompt") or "Describe the visual contents of this image in detail."
+        prompt = args.get("prompt") or "Describe all visual content, text, UI elements, and layout of this image in detail."
 
-        # Obtain application instance and active agent
         from tools.context import ToolContext
         app_inst = app.app if isinstance(app, ToolContext) else app
-        agent = getattr(app_inst, "agent", None) if app_inst else None
-        if not agent and hasattr(app_inst, "provider_key"):
-            agent = app_inst
 
-        provider_key = getattr(agent, "provider_key", None) if agent else None
-        model_name = getattr(agent, "model", None) if agent else None
+        # Always route vision inspection through clean isolated Vision pipeline
+        return await analyze_image_with_fallback(path, prompt, app_inst)
 
-        if not provider_key or not model_name:
-            from core.provider_manager import ProviderManager
-            pm = getattr(app_inst, "pm", None) or ProviderManager()
-            provider_key = provider_key or pm.get_active_provider_key()
-            providers = pm.load_providers()
-            if provider_key in providers:
-                pinfo = providers[provider_key]
-                model_name = model_name or pinfo.get("model", "")
-                if not model_name and pinfo.get("models"):
-                    model_name = pinfo["models"][0]
-
-        provider_key = provider_key or "opencode"
-        model_name = model_name or ""
-
-        # If model does not support Vision -> invoke fallback vision subagent
-        if not catalog.supports_vision(provider_key, model_name):
-            return await analyze_image_with_fallback(path, prompt, app_inst)
-
-        try:
-            b64_url, mime_type = process_and_encode_image(path, max_dim=1568)
-            return json.dumps({
-                "status": "success",
-                "message": f"[Image Loaded: {path}]",
-                "path": path,
-                "image_url": b64_url,
-                "detail": "high"
-            })
-        except Exception as e:
-            return f"Error reading image file '{path}': {e}"
 
 
