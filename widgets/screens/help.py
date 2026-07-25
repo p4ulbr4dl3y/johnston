@@ -1,11 +1,36 @@
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
 
+COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
+
+* `/connect` — Connect AI provider & set API key
+* `/models` — Switch active model across providers
+* `/new` — Start a new chat session
+* `/compact` — Compact session conversation history
+* `/init` — Guided `AGENTS.md` project setup
+* `/subagents` — View and manage active subagents
+* `/tasks` — View and manage background tasks
+* `/skills` — Browse and activate available skills
+* `/mcp` — Manage MCP servers (eager / lazy)
+* `/rewind` — Rollback chat history to a selected message
+* `/resume` — Switch and resume saved session dialogs
+* `/help` — Open this help screen"""
+
+KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybindings ]**
+
+* `Shift+Tab` — Toggle Action / Explore mode
+* `Enter` — Send message
+* `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
+* `↑` / `↓` — History navigation (looping)
+* `Esc` — Cancel response generation / Close modals
+* `Ctrl+C` / `Ctrl+Q` — Exit application"""
+
 
 class HelpScreen(ModalScreen[None]):
-    """Modal help screen (/help)"""
+    """Modal help screen with 2 tabs: Commands & Keybindings"""
 
     ALLOW_SELECT = False
     BINDINGS = [
@@ -13,32 +38,25 @@ class HelpScreen(ModalScreen[None]):
         ("enter", "close", "Close"),
     ]
 
+    def __init__(self):
+        super().__init__()
+        self.active_tab = 0  # 0: Commands, 1: Keybindings
+
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(
-                "### **Command Help**\n\n"
-                "* `/help` — Open this help\n"
-                "* `/new` — Start a new chat session\n"
-                "* `/connect` — Connect AI provider and set API key\n"
-                "* `/models` — Switch active model across providers\n"
-                "* `/rewind` — Rollback chat history to a selected message\n"
-                "* `/resume` — Switch and resume saved session dialogs\n"
-                "* `/tasks` — Manage background tasks\n"
-                "* `/subagents` — View and manage subagents\n"
-                "* `/skills` — Browse and activate available skills\n"
-                "* `/mcp` — Manage MCP servers\n"
-                "* `/init` — Guided `AGENTS.md` project setup\n"
-                "* `/compact` — Compact session conversation history\n\n"
-                "**Hotkeys:**\n"
-                "* `Shift+Tab` — Toggle Action / Explore mode\n"
-                "* `Enter` — Send message\n"
-                "* `Ctrl+Enter` / `Shift+Enter` — Insert new line\n"
-                "* `↑ / ↓` — History navigation (looping)\n"
-                "* `Esc` — Cancel response generation\n"
-                "* `Ctrl+C` / `Ctrl+Q` — Exit application",
-                classes="modal-markdown"
-            )
-            yield Label("enter / esc: close", id="modal-hint")
+            yield Markdown(COMMANDS_MD, id="help-markdown", classes="modal-markdown")
+            yield Label("←/→ or tab: switch • esc: close", id="modal-hint")
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("left", "right", "tab", "backtab"):
+            self.active_tab = 1 if self.active_tab == 0 else 0
+            md_widget = self.query_one("#help-markdown", Markdown)
+            md_widget.update(KEYBINDINGS_MD if self.active_tab == 1 else COMMANDS_MD)
+            event.prevent_default()
+            event.stop()
+            return
+        super()._on_key(event)
 
     def action_close(self) -> None:
         self.dismiss(None)
+
