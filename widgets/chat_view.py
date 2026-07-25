@@ -255,8 +255,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read", "call_mcp_tool", "subagent", "task",
-        "Create", "Edit", "Bash", "Read", "CallMCPTool", "Subagent", "Task"
+        "create", "edit", "bash", "read",
+        "Create", "Edit", "Bash", "Read"
     }
 
     def is_expandable(self) -> bool:
@@ -414,17 +414,6 @@ class ToolCallWidget(Vertical):
                 self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(self.target)})")
 
     def on_click(self, event) -> None:
-        if self.tool_type.lower() in ("subagent", "task"):
-            task_id = self.args.get("task_id") if isinstance(self.args, dict) else None
-            identifier = task_id or self.target
-            try:
-                from widgets.screens.subagent_screen import SubagentViewScreen
-                self.app.push_screen(SubagentViewScreen(identifier))
-            except Exception:
-                pass
-            event.stop()
-            return
-
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
