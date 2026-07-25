@@ -7,7 +7,6 @@ from widgets.screens.model import ModelScreen, VisionWarningScreen
 from widgets.screens.providers import ApiKeyInputScreen, ConnectProviderScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.rewind import RewindScreen
-from widgets.screens.rules import RulesScreen
 from widgets.screens.skills import SkillDetailScreen, SkillsScreen
 from widgets.screens.subagents import SubagentsScreen
 from widgets.screens.tasks import TasksListScreen
@@ -25,10 +24,10 @@ __all__ = [
     "VisionWarningScreen",
     "ResumeScreen",
     "RewindScreen",
-    "RulesScreen",
     "SkillDetailScreen",
     "SkillsScreen",
     "SubagentsScreen",
     "TasksListScreen",
 ]
+
 

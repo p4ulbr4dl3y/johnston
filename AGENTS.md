@@ -115,8 +115,8 @@ All slash commands are handled in [core/commands.py](file:///Users/yegor/johnsto
 * `/skills`, `/mcp` — manage skills and MCP servers.
 * `/tasks` — view and manage background tasks.
 * `/subagents` — view and manage subagents.
-* `/rules` — view active user and project Markdown rules.
 * `/rewind`, `/resume` — rewind chat history or resume session.
+
 * `/new`, `/help` — start new chat / view keyboard shortcuts help.
 
 ### Shortcuts & Switching:

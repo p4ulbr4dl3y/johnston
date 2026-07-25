@@ -312,17 +312,8 @@ class MCPCommand(BaseCommand):
         app.push_screen(MCPScreen())
 
 
-class RulesCommand(BaseCommand):
-    name = "/rules"
-    aliases = ["/rule"]
-    description = "View active user and project Markdown rules"
-
-    async def execute(self, app) -> None:
-        from widgets.screens.rules import RulesScreen
-        app.push_screen(RulesScreen())
-
-
 INIT_PROMPT_TEMPLATE = """Create or update `AGENTS.md` for this repository.
+
 
 The goal is a compact instruction file that helps future AI sessions avoid mistakes and ramp up quickly. Every line should answer: "Would an agent likely miss this without help?" If not, leave it out.
 
@@ -394,10 +385,10 @@ COMMAND_CLASSES = [
     SubagentsCommand,
     SkillsCommand,
     MCPCommand,
-    RulesCommand,
     InitCommand,
     CompactCommand,
 ]
+
 
 COMMAND_REGISTRY = {}
 for cls in COMMAND_CLASSES:
