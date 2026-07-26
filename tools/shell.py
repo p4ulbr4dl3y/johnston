@@ -178,8 +178,12 @@ class ShellTool(BaseTool):
 
         try:
             await asyncio.wait_for(p.wait(), timeout=60.0)
+            if task.read_task:
+                try:
+                    await asyncio.wait_for(task.read_task, timeout=2.0)
+                except asyncio.TimeoutError:
+                    pass
             task.close_pty()
-            await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
