@@ -249,13 +249,13 @@ class ThinkingWidget(Vertical):
 
 
 class ToolCallWidget(Vertical):
-    """Tool call widget (Create, Read, Edit, Bash) with expansion support"""
+    """Tool call widget (Create, Read, Edit, Shell) with expansion support"""
     can_focus = False
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "bash", "read", "web_fetch",
-        "Create", "Edit", "Bash", "Read", "WebFetch"
+        "create", "edit", "shell", "bash", "read", "web_fetch",
+        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch"
     }
 
     def is_expandable(self) -> bool:
@@ -326,7 +326,7 @@ class ToolCallWidget(Vertical):
 
     def set_result(self, result_text: str) -> None:
         cleaned = result_text.strip()
-        if self.tool_type in ("bash", "Bash"):
+        if self.tool_type in ("shell", "Shell", "bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
                 self.render_header()
                 return
@@ -342,6 +342,7 @@ class ToolCallWidget(Vertical):
         "read": "Read",
         "create": "Create",
         "edit": "Edit",
+        "shell": "Shell",
         "bash": "Bash",
         "glob": "Glob",
         "grep": "Grep",
@@ -358,10 +359,10 @@ class ToolCallWidget(Vertical):
     }
 
     SYSTEM_TOOLS = {
-        "read", "create", "edit", "bash", "glob", "grep", "list_dir",
+        "read", "create", "edit", "shell", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
         "subagent", "task", "view_image", "web_fetch",
-        "Read", "Create", "Edit", "Bash", "Glob", "Grep", "ListDir",
+        "Read", "Create", "Edit", "Shell", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
         "Subagent", "Task", "ViewImage", "WebFetch"
     }
@@ -729,7 +730,7 @@ class ToolCallWidget(Vertical):
                         self.content_widget.update(rendered)
                 else:
                     self.content_widget.update(escape(self.result_text or "(No content)"))
-            elif self.tool_type in ("bash", "Bash"):
+            elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     output_text = "(Running command...)"

@@ -2,6 +2,8 @@ import asyncio
 import os
 import re
 
+from core.platform_utils import terminate_process
+
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 
@@ -130,14 +132,7 @@ class BackgroundTask:
                 pass
             self.master_fd = None
         if self.process:
-            try:
-                self.process.terminate()
-                await asyncio.wait_for(self.process.wait(), timeout=1.0)
-            except Exception:
-                try:
-                    self.process.kill()
-                except Exception:
-                    pass
+            await terminate_process(self.process)
         if self.read_task and not self.read_task.done():
             self.read_task.cancel()
         self.output.append("\n[Task terminated by user]\n")
@@ -162,4 +157,3 @@ class BackgroundSubagent:
                 pass
         self.is_running = False
         self.output.append("\n[Subagent task terminated by user]\n")
-

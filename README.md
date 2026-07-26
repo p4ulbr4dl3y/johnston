@@ -29,6 +29,12 @@ Install via script:
 curl -fsSL https://raw.githubusercontent.com/p4ulbr4dl3y/johnston/main/install.sh | bash
 ```
 
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/p4ulbr4dl3y/johnston/main/install.ps1 | iex
+```
+
 ## Development
 
 ```bash

@@ -2,6 +2,8 @@ import json
 import os
 from typing import Dict, List, Optional
 
+from core.config import CONFIG_DIR
+
 
 class ModeDefinition:
     def __init__(
@@ -27,11 +29,11 @@ BUILTIN_MODES = {
     "action": ModeDefinition(
         key="action",
         name="Action",
-        description="Execution and implementation mode. Full editing, bash, and task permissions.",
+        description="Execution and implementation mode. Full editing, shell, and task permissions.",
         read_only=False,
         prompt=(
             "[MODE: ACTION]\n"
-            "Execution and implementation mode. Write, edit, bash, and task tools are fully enabled.\n"
+            "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n"
             "Rules:\n"
             "1. Research First & Read Before Edit: Inspect codebase and target files before modifying.\n"
             "2. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
@@ -51,8 +53,8 @@ BUILTIN_MODES = {
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
             "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
             "1. Code modification tools (create, edit) are DISABLED.\n"
-            "2. You are STRICTLY PROHIBITED from running state-changing bash commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
-            "3. Use bash ONLY for read-only inspection (ls, find, grep, git status, git log, git diff, cat).\n\n"
+            "2. You are STRICTLY PROHIBITED from running state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
+            "3. Use shell ONLY for read-only inspection (ls/find/dir, grep/rg/select-string, git status, git log, git diff, cat/type).\n\n"
             "Response Guidelines:\n"
             "- Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
             "- Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab or /action) when ready to implement."
@@ -80,7 +82,7 @@ class ModeManager:
 
         dirs = []
         if include_global:
-            dirs.append((os.path.expanduser("~/.johnston/modes"), "global"))
+            dirs.append((os.path.join(CONFIG_DIR, "modes"), "global"))
         p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "modes"), "project"))
 

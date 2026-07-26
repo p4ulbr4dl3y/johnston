@@ -642,8 +642,8 @@ class JohnstonApp(App):
             else:
                 self.is_generating = False
 
-    def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
-        """Callback when background bash command finishes"""
+    def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
+        """Callback when background shell command finishes"""
         if not getattr(self, "is_app_active", True):
             return
         try:
@@ -655,6 +655,9 @@ class JohnstonApp(App):
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception:
             pass
+
+    def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
+        self.on_background_shell_completed(task_id, command_str, result)
 
 def print_models():
     """Print available providers and models to stdout"""
@@ -935,4 +938,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

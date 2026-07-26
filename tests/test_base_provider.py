@@ -89,10 +89,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         })
         self.assertIn("matches 2 occurrences", res_edit)
 
-    async def test_bash_tool_sync(self):
-        # Sync bash execution
-        res_bash = await execute_tool("bash", {"command": "echo 'hello bash'"})
-        self.assertEqual(res_bash.strip(), "hello bash")
+    async def test_shell_tool_sync(self):
+        # Sync shell execution
+        res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
+        self.assertEqual(res_shell.strip(), "hello shell")
 
     def test_init_and_compact_commands_registered(self):
         from core.commands import COMMAND_REGISTRY
@@ -481,5 +481,3 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

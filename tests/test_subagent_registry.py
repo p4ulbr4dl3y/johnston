@@ -39,7 +39,7 @@ You are a senior code reviewer subagent. Analyze diffs carefully.""")
   "name": "tester",
   "description": "Automated testing subagent",
   "system_prompt": "You run tests and report coverage.",
-  "tools": ["bash"],
+  "tools": ["shell"],
   "model": "gpt-4o"
 }""")
 
@@ -58,7 +58,7 @@ You are a senior code reviewer subagent. Analyze diffs carefully.""")
 
             tester_def = registry.get_definition("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
-            self.assertEqual(tester_def.tools, ["bash"])
+            self.assertEqual(tester_def.tools, ["shell"])
             self.assertEqual(tester_def.model, "gpt-4o")
 
 

@@ -1,59 +1,106 @@
+import ntpath
+import os
 import re
 import shlex
 from typing import Tuple
 
-DESTRUCTIVE_COMMANDS = {
-    "rm", "dd", "mkfs", "fdisk", "truncate",
-    "sudo", "su", "chmod", "chown",
-    "reboot", "shutdown"
+from core.platform_utils import is_windows
+
+POSIX_DESTRUCTIVE_COMMANDS = {
+    "rm",
+    "dd",
+    "mkfs",
+    "fdisk",
+    "truncate",
+    "sudo",
+    "su",
+    "chmod",
+    "chown",
+    "reboot",
+    "shutdown",
 }
 
-DANGEROUS_GIT_REGEX = re.compile(r"\bgit\s+(?:push|reset\s+--hard|clean\s+-[a-zA-Z]*f[a-zA-Z]*)\b")
+WINDOWS_DESTRUCTIVE_COMMANDS = {
+    "del",
+    "erase",
+    "format",
+    "powershell.remove-item",
+    "rd",
+    "reg",
+    "remove-item",
+    "rmdir",
+    "set-executionpolicy",
+    "shutdown",
+    "takeown",
+}
 
-SENSITIVE_PATHS = [
-    "/etc", "/sys", "/proc", "/root", "~/.ssh"
-]
+DANGEROUS_GIT_REGEX = re.compile(r"\bgit\s+(?:push|reset\s+--hard|clean\s+-[a-zA-Z]*f[a-zA-Z]*)\b", re.I)
+POSIX_SENSITIVE_PATHS = ("/etc", "/sys", "/proc", "/root", "~/.ssh")
+WINDOWS_SENSITIVE_PATHS = (
+    r"c:\windows",
+    r"c:\program files",
+    r"c:\program files (x86)",
+    r"%appdata%\microsoft",
+    r"%userprofile%\.ssh",
+)
 
 
-def analyze_bash_command(command: str) -> Tuple[bool, str]:
+def _command_parts(command: str) -> list[str]:
+    return [part.strip() for part in re.split(r"(?:&&|\|\||;|\|)", command) if part.strip()]
+
+
+def _first_token(command: str) -> str:
+    try:
+        tokens = shlex.split(command, posix=not is_windows())
+    except Exception:
+        tokens = command.split()
+    if not tokens:
+        return ""
+    token = tokens[0].strip().lower()
+    if is_windows():
+        token = ntpath.basename(token)
+    else:
+        token = os.path.basename(token)
+    return token.removesuffix(".exe")
+
+
+def _contains_sensitive_path(command: str) -> str | None:
+    lowered = command.lower()
+    for path in POSIX_SENSITIVE_PATHS:
+        if path in lowered:
+            return path
+    for path in WINDOWS_SENSITIVE_PATHS:
+        if path in lowered:
+            return path
+    return None
+
+
+def analyze_shell_command(command: str) -> Tuple[bool, str]:
     """
-    Analyzes bash command for safety.
-    Returns (is_safe, reason).
+    Analyzes a shell command for safety before execution.
+
+    This is intentionally conservative. It only catches obvious destructive
+    commands and sensitive paths; it is not a sandbox.
     """
     cmd_str = command.strip()
     if not cmd_str:
         return True, "Empty command"
 
-    # 1. Check for dangerous Git operations (push, reset --hard, clean -f)
     if DANGEROUS_GIT_REGEX.search(cmd_str):
         return False, "Potentially dangerous Git operation (push, reset --hard, clean -f)"
 
-    # 2. Check for sensitive system paths
-    for path in SENSITIVE_PATHS:
-        if path in cmd_str:
-            return False, f"Access to sensitive system path ({path})"
+    sensitive_path = _contains_sensitive_path(cmd_str)
+    if sensitive_path:
+        return False, f"Command touches sensitive path: {sensitive_path}"
 
-    # 3. Split command chain (; , &&, ||, |)
-    cmd_chain = re.split(r";|&&|\|\||\|", cmd_str)
-
-    for sub_cmd in cmd_chain:
-        sub_cmd = sub_cmd.strip()
-        if not sub_cmd:
-            continue
-
-        try:
-            tokens = shlex.split(sub_cmd)
-        except Exception:
-            return False, "Failed to parse command syntax"
-
-        if not tokens:
-            continue
-
-        base_bin = tokens[0]
-
-        # Check for direct destructive commands
-        if base_bin in DESTRUCTIVE_COMMANDS:
+    destructive = POSIX_DESTRUCTIVE_COMMANDS | WINDOWS_DESTRUCTIVE_COMMANDS
+    for part in _command_parts(cmd_str):
+        base_bin = _first_token(part)
+        if base_bin in destructive:
             return False, f"Execution of potentially unsafe command: {base_bin}"
 
     return True, "Command is safe"
 
+
+def analyze_bash_command(command: str) -> Tuple[bool, str]:
+    return analyze_shell_command(command)

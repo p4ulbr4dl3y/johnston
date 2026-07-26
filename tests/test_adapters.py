@@ -29,11 +29,11 @@ class TestAdapterMessageNormalization(unittest.TestCase):
                     {
                         "id": "call_1",
                         "type": "function",
-                        "function": {"name": "bash", "arguments": '{"command": "ls"}'},
+                    "function": {"name": "shell", "arguments": '{"command": "ls"}'},
                     }
                 ],
             },
-            {"role": "tool", "tool_call_id": "call_1", "name": "bash", "content": "file_a\nfile_b"},
+            {"role": "tool", "tool_call_id": "call_1", "name": "shell", "content": "file_a\nfile_b"},
             {"role": "user", "content": "Thanks."},
         ]
 
@@ -47,7 +47,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         self.assertIn("text", kinds)
         self.assertIn("tool_use", kinds)
         tu = next(b for b in assistant["content"] if b.get("type") == "tool_use")
-        self.assertEqual(tu["name"], "bash")
+        self.assertEqual(tu["name"], "shell")
         self.assertEqual(tu["input"], {"command": "ls"})
 
         # tool results grouped into a single user turn with tool_result blocks
@@ -64,19 +64,19 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         model_turn = contents[1]
         self.assertEqual(model_turn["role"], "model")
         fc = next(p for p in model_turn["parts"] if "functionCall" in p)
-        self.assertEqual(fc["functionCall"]["name"], "bash")
+        self.assertEqual(fc["functionCall"]["name"], "shell")
         self.assertEqual(fc["functionCall"]["args"], {"command": "ls"})
 
         resp_turn = contents[2]
         self.assertEqual(resp_turn["role"], "user")
         fr = next(p for p in resp_turn["parts"] if "functionResponse" in p)
-        self.assertEqual(fr["functionResponse"]["name"], "bash")
+        self.assertEqual(fr["functionResponse"]["name"], "shell")
 
     def test_ollama_normalizes_assistant_tool_call_arguments(self):
         msgs = OllamaAdapter._to_ollama_messages(self._sample_messages())
         assistant = next(m for m in msgs if m["role"] == "assistant" and m.get("tool_calls"))
         tc = assistant["tool_calls"][0]
-        self.assertEqual(tc["function"]["name"], "bash")
+        self.assertEqual(tc["function"]["name"], "shell")
         # arguments converted from JSON string to object
         self.assertEqual(tc["function"]["arguments"], {"command": "ls"})
 
@@ -183,17 +183,17 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_tool_call_assembly(self):
         chunks = [
-            _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, id="c1", name="bash", arguments='{"com')]))]),
+            _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, id="c1", name="shell", arguments='{"com')]))]),
             _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, arguments='mand":"ls"}')]))]),
         ]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
         with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
             adapter = OpenAIAdapter()
-            events = [e async for e in adapter.stream_chat("http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "bash"}}])]
+            events = [e async for e in adapter.stream_chat("http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "shell"}}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0][1]["name"], "bash")
+        self.assertEqual(tc[0][1]["name"], "shell")
         self.assertEqual(tc[0][1]["arguments"], '{"command":"ls"}')
 
     async def test_stream_max_tokens(self):
@@ -225,7 +225,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_tool_use(self):
         lines = [
-            'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu1","name":"bash"}}',
+            'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu1","name":"shell"}}',
             'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"cmd\\":"}}',
             'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\\"ls\\"}"}}',
             'data: {"type":"content_block_stop","index":0}',
@@ -235,7 +235,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             events = [e async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0][1]["name"], "bash")
+        self.assertEqual(tc[0][1]["name"], "shell")
 
 
 class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
@@ -252,12 +252,12 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(usage[0][1]["total_tokens"], 15)
 
     async def test_stream_function_call(self):
-        lines = ['data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"bash","args":{"command":"ls"}}}]}}]}']
+        lines = ['data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"shell","args":{"command":"ls"}}}]}}]}']
         with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0][1]["name"], "bash")
+        self.assertEqual(tc[0][1]["name"], "shell")
 
 
 class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
@@ -276,14 +276,14 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_tool_call(self):
         lines = [
-            '{"message":{"content":"","tool_calls":[{"function":{"name":"bash","arguments":{"command":"ls"}}}]},"done":false}',
+            '{"message":{"content":"","tool_calls":[{"function":{"name":"shell","arguments":{"command":"ls"}}}]},"done":false}',
             '{"done":true,"prompt_eval_count":5,"eval_count":0}',
         ]
         with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0][1]["name"], "bash")
+        self.assertEqual(tc[0][1]["name"], "shell")
 
 
 class TestAdapterMessageEdgeCases(unittest.TestCase):
@@ -321,7 +321,7 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         self.assertEqual(inline[0]["inlineData"]["mimeType"], "image/png")
 
     def test_gemini_tool_non_dict_content(self):
-        _, contents = GeminiAdapter()._to_gemini([{"role": "tool", "name": "bash", "content": 12345}])
+        _, contents = GeminiAdapter()._to_gemini([{"role": "tool", "name": "shell", "content": 12345}])
         fr = [p for c in contents for p in c["parts"] if "functionResponse" in p]
         self.assertEqual(len(fr), 1)
 
@@ -374,7 +374,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
             async for _ in AnthropicAdapter().stream_chat(
                 "http://x", "k", "m",
                 [{"role": "system", "content": "You are helpful."}, {"role": "user", "content": "hi"}],
-                tools=[{"type": "function", "function": {"name": "bash", "parameters": {}}}],
+            tools=[{"type": "function", "function": {"name": "shell", "parameters": {}}}],
             ):
                 pass
 

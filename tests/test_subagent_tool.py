@@ -49,7 +49,7 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
             {"function": {"name": "read"}},
             {"function": {"name": "create"}},
             {"function": {"name": "edit"}},
-            {"function": {"name": "bash"}},
+            {"function": {"name": "shell"}},
         ]
         mock_agent.system_prompt = "Base prompt"
         mock_agent.stream_steps.return_value = (x for x in [])
@@ -65,7 +65,7 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
-        self.assertIn("bash", tool_names)
+        self.assertIn("shell", tool_names)
         self.assertNotIn("create", tool_names)
         self.assertNotIn("edit", tool_names)
         self.assertIn("read-only exploration subagent", mock_agent.system_prompt)

@@ -3,13 +3,13 @@ from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool
-from tools.bash import BashTool
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
+from tools.shell import ShellTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
 from tools.view_image import ViewImageTool
@@ -19,7 +19,7 @@ TOOL_CLASSES = [
     ReadTool,
     CreateTool,
     EditTool,
-    BashTool,
+    ShellTool,
     AskUserTool,
     SkillTool,
     CallMCPTool,
@@ -43,10 +43,9 @@ ALIAS_MAP: Dict[str, str] = {
     "str_replace_editor": "edit",
     "update_file": "edit",
     "modify_file": "edit",
-    "shell": "bash",
-    "terminal": "bash",
-    "exec": "bash",
-    "run_command": "bash",
+    "terminal": "shell",
+    "exec": "shell",
+    "run_command": "shell",
     "ask": "ask_user",
 }
 

@@ -5,7 +5,7 @@ from tools.base import BaseTool
 
 class ManageTaskTool(BaseTool):
     name = "manage_task"
-    description = "Manage background CLI commands spawned via Bash. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command)."
+    description = "Manage background CLI commands spawned via shell. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command)."
     schema = {
         "type": "function",
         "function": {
@@ -91,4 +91,3 @@ class ManageTaskTool(BaseTool):
             return f"Task {task_id} is not running."
 
         return f"Unknown action: {action}. Use 'list', 'status', 'kill', or 'send_input'."
-

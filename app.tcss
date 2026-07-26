@@ -115,7 +115,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-bash {
+.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash {
     color: #d4d4d8;
 }
 
@@ -556,7 +556,6 @@ MarkdownBlock > .code_inline {
     background: #27272a;
     color: #ffffff;
 }
-
 
 
 

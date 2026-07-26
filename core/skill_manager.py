@@ -44,7 +44,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 ### 1. MCP Server Configuration (`johnston --mcp`)
 - Location: `~/.johnston/mcp.json` (global) or `.johnston/mcp.json` (project).
 - Format: JSON object containing server configurations (command, args, env, disabled).
-- Verification: Run `johnston --mcp` via bash tool to verify server registration.
+- Verification: Run `johnston --mcp` via shell tool to verify server registration.
 
 ### 2. Custom Subagent Definitions (`johnston --subagents`)
 - Location: `~/.johnston/subagents/definitions/<name>.md` (global) or `.johnston/subagents/<name>.md` (project).
@@ -58,7 +58,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
   ---
   System prompt instructions here...
   ```
-- Verification: Run `johnston --subagents` via bash tool.
+- Verification: Run `johnston --subagents` via shell tool.
 
 ### 3. Rules & Instructions (`johnston --rules`)
 - Location: `~/.johnston/rules/<name>.md` (global) or `.johnston/rules/<name>.md` (project).
@@ -71,7 +71,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
   ---
   Rule instructions here...
   ```
-- Verification: Run `johnston --rules` via bash tool.
+- Verification: Run `johnston --rules` via shell tool.
 
 ### 4. LLM Providers Setup (`johnston --models`)
 - Location: `~/.johnston/providers.json`.
@@ -87,11 +87,11 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
     "fetch_models": false
   }
   ```
-- Verification: Run `johnston --models` via bash tool.
+- Verification: Run `johnston --models` via shell tool.
 
 ### 5. Skills Management (`johnston --skills`)
 - Location: `~/.johnston/skills/<name>/SKILL.md` (global) or `.johnston/skills/<name>/SKILL.md` (project).
-- Verification: Run `johnston --skills` via bash tool.
+- Verification: Run `johnston --skills` via shell tool.
 
 ### 6. Custom Execution Modes (`johnston --modes`)
 - Location: `~/.johnston/modes/<name>.json` or `.md` (global) or `.johnston/modes/<name>.json` or `.md` (project).
@@ -106,7 +106,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
     "disallowed_tools": ["create", "edit"]
   }
   ```
-- Verification: Run `johnston --modes` via bash tool.
+- Verification: Run `johnston --modes` via shell tool.
 """
 
 

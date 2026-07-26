@@ -2,11 +2,11 @@ import os
 import tempfile
 import unittest
 
-from tools.bash import BashTool
 from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.linter import run_linter
 from tools.read import ReadTool
+from tools.shell import ShellTool
 
 
 class MockAgent:
@@ -122,11 +122,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         })
         self.assertIn("matches 2 occurrences", res_dup)
 
-    async def test_bash_tool(self):
-        tool = BashTool()
+    async def test_shell_tool(self):
+        tool = ShellTool()
         # Successful command execution
-        res = await tool.execute({"command": "echo 'hello bash'"})
-        self.assertIn("hello bash", res)
+        res = await tool.execute({"command": "echo 'hello shell'"})
+        self.assertIn("hello shell", res)
 
         # Command with output and exit code
         res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
@@ -158,9 +158,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_cat = await execute_tool("cat", {"path": file_path2})
         self.assertIn("Write Content", res_cat)
 
-        # Test alias "shell" -> "bash"
-        res_shell = await execute_tool("shell", {"command": "echo 'alias bash'"})
-        self.assertIn("alias bash", res_shell)
+        # Test canonical shell tool
+        res_shell = await execute_tool("shell", {"command": "echo 'shell command'"})
+        self.assertIn("shell command", res_shell)
 
 
 if __name__ == "__main__":

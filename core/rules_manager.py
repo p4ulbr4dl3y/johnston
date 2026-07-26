@@ -2,6 +2,8 @@ import fnmatch
 import os
 from typing import List, Optional
 
+from core.config import CONFIG_DIR
+
 
 class RuleDefinition:
     def __init__(
@@ -54,7 +56,7 @@ class RulesManager:
         rules: List[RuleDefinition] = []
         dirs = []
         if include_global:
-            dirs.append((os.path.expanduser("~/.johnston/rules"), "global"))
+            dirs.append((os.path.join(CONFIG_DIR, "rules"), "global"))
         p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
         dirs.append((os.path.join(p_dir, ".rules"), "project"))

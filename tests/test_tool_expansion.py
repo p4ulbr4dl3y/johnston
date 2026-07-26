@@ -76,9 +76,9 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("9 + def multiply(a: float, b: float) -> float:", rendered_plain)
         self.assertIn("10 +     return a * b", rendered_plain)
 
-    def test_bash_tool_append_output(self):
+    def test_shell_tool_append_output(self):
         widget = ToolCallWidget(
-            tool_type="bash",
+            tool_type="shell",
             target="echo 'live stream'",
             args={"command": "echo 'live stream'"}
         )
@@ -156,9 +156,9 @@ class TestToolExpansion(unittest.TestCase):
         self.assertFalse(tw.md_widget.display)
 
 
-    def test_bash_tool_output_escapes_invalid_rich_markup(self):
+    def test_shell_tool_output_escapes_invalid_rich_markup(self):
         widget = ToolCallWidget(
-            tool_type="bash",
+            tool_type="shell",
             target="python -m pytest",
             result_text="Found error: [tag=e1]\n",
             args={"command": "python -m pytest"}

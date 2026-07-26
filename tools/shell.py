@@ -1,13 +1,19 @@
 import asyncio
 import itertools
 import os
-import pty
 import re
 import time
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask
-from core.bash_guard import analyze_bash_command
+from core.bash_guard import analyze_shell_command
+from core.platform_utils import (
+    is_windows,
+    shell_env,
+    shell_executable,
+    shell_subprocess_kwargs,
+    supports_pty,
+)
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
@@ -15,32 +21,36 @@ _TASK_ID_COUNTER = itertools.count()
 
 
 def _new_task_id() -> str:
-    return f"bash_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
+    return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
-class BashTool(BaseTool):
-    name = "bash"
+class ShellTool(BaseTool):
+    name = "shell"
     description = "Run a terminal command. Commands running longer than 60 seconds are automatically moved to the background; use manage_task to inspect, send input, or kill them. Destructive commands require user confirmation."
+
     schema = {
         "type": "function",
         "function": {
-            "name": "bash",
+            "name": "shell",
+            "description": description,
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Terminal command to execute"},
-                    "no_background": {"type": "boolean", "description": "If true, block until the command finishes instead of moving long-running commands to the background"}
+                    "command": {"type": "string", "description": "Terminal command to run"},
+                    "no_background": {
+                        "type": "boolean",
+                        "description": "If true, block until the command finishes instead of moving long-running commands to the background.",
+                    },
                 },
-                "required": ["command"]
-            }
-        }
+                "required": ["command"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         cmd = args.get("command", "").strip()
 
-        # Handle sleep via Python asyncio.sleep without spawning background tasks
         m = SLEEP_CHAIN_REGEX.match(cmd)
         if m:
             sec = float(m.group(1))
@@ -51,15 +61,16 @@ class BashTool(BaseTool):
             cmd = remainder
 
         skip_confirm = args.get("skip_confirm", False)
-        is_safe, reason = analyze_bash_command(cmd)
+        is_safe, reason = analyze_shell_command(cmd)
         if not is_safe and not skip_confirm and ctx.app:
             try:
                 from widgets.modal_screens import BashConfirmScreen
+
                 screen = BashConfirmScreen(command=cmd, reason=reason)
                 loop = asyncio.get_running_loop()
                 future = loop.create_future()
 
-                def on_dismiss(result: Any) -> None:
+                def on_dismiss(result: bool) -> None:
                     if not future.done():
                         future.set_result(bool(result))
 
@@ -70,23 +81,17 @@ class BashTool(BaseTool):
             except Exception as e:
                 return f"Error prompting for command permission: {e}"
 
+        env = shell_env()
         master_fd = None
         slave_fd = None
         reader = None
-
-        try:
-            master_fd, slave_fd = pty.openpty()
-        except Exception:
-            master_fd, slave_fd = None, None
-
-        env = os.environ.copy()
-        env["TERM"] = "dumb"
-        env["NO_COLOR"] = "1"
-        env["PYTHONUNBUFFERED"] = "1"
-
         use_pty = False
-        if master_fd is not None and slave_fd is not None:
+
+        if supports_pty():
             try:
+                import pty
+
+                master_fd, slave_fd = pty.openpty()
                 os.set_blocking(master_fd, False)
                 loop = asyncio.get_running_loop()
                 reader = asyncio.StreamReader()
@@ -94,15 +99,19 @@ class BashTool(BaseTool):
                 await loop.connect_read_pipe(lambda: protocol, os.fdopen(master_fd, "rb", buffering=0))
                 use_pty = True
             except Exception:
-                try:
-                    os.close(master_fd)
-                    os.close(slave_fd)
-                except Exception:
-                    pass
-                master_fd, slave_fd = None, None
+                for fd in (master_fd, slave_fd):
+                    if fd is not None:
+                        try:
+                            os.close(fd)
+                        except Exception:
+                            pass
+                master_fd = None
+                slave_fd = None
                 reader = None
 
-        if use_pty:
+        if is_windows():
+            p = await self._create_windows_process(cmd, env)
+        elif use_pty:
             try:
                 p = await asyncio.create_subprocess_shell(
                     cmd,
@@ -111,40 +120,44 @@ class BashTool(BaseTool):
                     stderr=slave_fd,
                     env=env,
                     close_fds=True,
-                    start_new_session=True
+                    **shell_subprocess_kwargs(),
                 )
             finally:
-                try:
-                    os.close(slave_fd)
-                except Exception:
-                    pass
+                if slave_fd is not None:
+                    try:
+                        os.close(slave_fd)
+                    except Exception:
+                        pass
         else:
             p = await asyncio.create_subprocess_shell(
                 cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                env=env
+                env=env,
+                executable=shell_executable(),
+                **shell_subprocess_kwargs(),
             )
-            master_fd = None
-            reader = None
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
         task = BackgroundTask(task_id, cmd, p, widget=target_widget, master_fd=master_fd, reader=reader)
-        task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
+        callback = None
+        if ctx.app:
+            callback = getattr(ctx.app, "on_background_shell_completed", None) or getattr(
+                ctx.app, "on_background_bash_completed", None
+            )
+        task.start_reading(ctx.app, callback)
 
         no_bg = args.get("no_background", False)
         if no_bg:
             await p.wait()
-            if hasattr(task, "read_task") and task.read_task:
+            if task.read_task:
                 try:
                     await asyncio.wait_for(task.read_task, timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
-            # Ensure the pty master fd is released even if the reader timed out and
-            # BackgroundTask.start_reading's own finally did not run yet.
-            if getattr(task, "master_fd", None) is not None:
+            if task.master_fd is not None:
                 try:
                     os.close(task.master_fd)
                 except Exception:
@@ -163,12 +176,7 @@ class BashTool(BaseTool):
                     os.close(master_fd)
                 except Exception:
                     pass
-                master_fd = None
-            if hasattr(task, "read_task") and task.read_task:
-                try:
-                    await asyncio.wait_for(task.read_task, timeout=1.0)
-                except asyncio.TimeoutError:
-                    pass
+                task.master_fd = None
             await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
@@ -180,3 +188,42 @@ class BashTool(BaseTool):
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
             return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes."
+
+    async def _create_windows_process(self, command: str, env: dict[str, str]):
+        shell = shell_executable()
+        if shell and shell.lower().endswith(("pwsh.exe", "pwsh", "powershell.exe", "powershell")):
+            return await asyncio.create_subprocess_exec(
+                shell,
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                **shell_subprocess_kwargs(),
+            )
+        if shell and shell.lower().endswith(("cmd.exe", "cmd")):
+            return await asyncio.create_subprocess_exec(
+                shell,
+                "/d",
+                "/s",
+                "/c",
+                command,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                **shell_subprocess_kwargs(),
+            )
+        return await asyncio.create_subprocess_shell(
+            command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env,
+            **shell_subprocess_kwargs(),
+        )

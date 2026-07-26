@@ -106,9 +106,9 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
     async def test_disallowed_tools_blocks_aliases(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
-        mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["bash"])
+        mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["shell"])
         err = agent._tool_policy_error("shell", {"command": "pwd"}, mode_def)
-        self.assertEqual(err, "Error: Tool 'bash' is disabled in Locked mode.")
+        self.assertEqual(err, "Error: Tool 'shell' is disabled in Locked mode.")
 
 
 class TestFallbackMetricsMerge(unittest.IsolatedAsyncioTestCase):
