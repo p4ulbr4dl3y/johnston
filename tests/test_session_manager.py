@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -72,6 +73,7 @@ class TestSessionManager(unittest.TestCase):
         sid2 = self.sm.generate_session_id()
 
         self.sm.save_session(sid1, {"id": sid1, "ui_messages": [{"type": "user", "text": "one"}]})
+        time.sleep(0.02)
         self.sm.save_session(sid2, {"id": sid2, "ui_messages": [{"type": "user", "text": "two"}]})
 
         sessions = self.sm.list_sessions()
