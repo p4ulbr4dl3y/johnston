@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.0...johnston-v0.2.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* avoid model catalog refresh during tests ([beb36ec](https://github.com/p4ulbr4dl3y/johnston/commit/beb36ec55dd8ca6f59551e264d39363f483a8f9c))
+* eliminate race condition in test_list_sessions ([92c5d05](https://github.com/p4ulbr4dl3y/johnston/commit/92c5d05df374958709a02692bd71072818d31e04))
+* reset usage metrics on rewind ([28f3aa7](https://github.com/p4ulbr4dl3y/johnston/commit/28f3aa7179e08dc4089c36f56b1c772942afde46))
+* stabilize session ordering test ([6d21803](https://github.com/p4ulbr4dl3y/johnston/commit/6d218039eaa82ba4d0ff59d95a0759af87a22263))
+* strip trailing newlines in create tool ([4c261b8](https://github.com/p4ulbr4dl3y/johnston/commit/4c261b85470ad4e86795f15984923f67fcc22a58))
+
 ## [0.2.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.1.4...johnston-v0.2.0) (2026-07-26)
 
 
