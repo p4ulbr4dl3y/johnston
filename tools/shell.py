@@ -85,6 +85,7 @@ class ShellTool(BaseTool):
         master_fd = None
         slave_fd = None
         reader = None
+        transport = None
         use_pty = False
 
         if supports_pty():
@@ -96,7 +97,9 @@ class ShellTool(BaseTool):
                 loop = asyncio.get_running_loop()
                 reader = asyncio.StreamReader()
                 protocol = asyncio.StreamReaderProtocol(reader)
-                await loop.connect_read_pipe(lambda: protocol, os.fdopen(master_fd, "rb", buffering=0))
+                transport, _ = await loop.connect_read_pipe(
+                    lambda: protocol, os.fdopen(master_fd, "rb", buffering=0)
+                )
                 use_pty = True
             except Exception:
                 for fd in (master_fd, slave_fd):
@@ -108,6 +111,7 @@ class ShellTool(BaseTool):
                 master_fd = None
                 slave_fd = None
                 reader = None
+                transport = None
 
         if is_windows():
             p = await self._create_windows_process(cmd, env)
@@ -141,7 +145,15 @@ class ShellTool(BaseTool):
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
-        task = BackgroundTask(task_id, cmd, p, widget=target_widget, master_fd=master_fd, reader=reader)
+        task = BackgroundTask(
+            task_id,
+            cmd,
+            p,
+            widget=target_widget,
+            master_fd=master_fd,
+            reader=reader,
+            transport=transport,
+        )
         callback = None
         if ctx.app:
             callback = getattr(ctx.app, "on_background_shell_completed", None) or getattr(
@@ -157,12 +169,7 @@ class ShellTool(BaseTool):
                     await asyncio.wait_for(task.read_task, timeout=1.0)
                 except asyncio.TimeoutError:
                     pass
-            if task.master_fd is not None:
-                try:
-                    os.close(task.master_fd)
-                except Exception:
-                    pass
-                task.master_fd = None
+            task.close_pty()
             await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
@@ -171,12 +178,7 @@ class ShellTool(BaseTool):
 
         try:
             await asyncio.wait_for(p.wait(), timeout=60.0)
-            if master_fd is not None:
-                try:
-                    os.close(master_fd)
-                except Exception:
-                    pass
-                task.master_fd = None
+            task.close_pty()
             await asyncio.sleep(0.02)
             res = task.get_formatted_output()
             if not res.strip():
