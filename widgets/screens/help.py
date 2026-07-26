@@ -28,6 +28,7 @@ KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybi
 * `Shift+Tab` — Toggle Action / Explore mode
 * `Enter` — Send message
 * `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
+* `Ctrl+V` — Paste text or clipboard image
 * `↑` / `↓` — History navigation (looping)
 * `@` — Attach workspace file (autocompletion)
 * `Esc` — Cancel response generation / Close modals
