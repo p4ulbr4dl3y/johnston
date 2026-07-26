@@ -56,6 +56,14 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "base_url": "http://localhost:11434/v1",
         "api_type": "ollama",
     },
+    "omlx": {
+        "key": "omlx",
+        "name": "oMLX",
+        "description": "Local oMLX server",
+        "base_url": "http://localhost:8000/v1",
+        "model": "gemma-4-E4B-it-MLX-4bit",
+        "api_type": "openai",
+    },
     "openrouter": {
         "key": "openrouter",
         "name": "OpenRouter",
