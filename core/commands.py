@@ -286,6 +286,18 @@ class RewindCommand(BaseCommand):
                 elif hasattr(app.agent, "history"):
                     app.agent.history = []
 
+                for attr, value in (
+                    ("tokens_input", 0),
+                    ("tokens_output", 0),
+                    ("tokens_cache_read", 0),
+                    ("last_context_tokens", 0),
+                    ("total_tokens", 0),
+                    ("cost_usd", 0.0),
+                ):
+                    if hasattr(app.agent, attr):
+                        setattr(app.agent, attr, value)
+
+                app.refresh_status_footer()
                 app.save_current_session()
 
                 # Load text into input field
