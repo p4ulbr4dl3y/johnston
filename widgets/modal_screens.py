@@ -10,6 +10,7 @@ from widgets.screens.rewind import RewindScreen
 from widgets.screens.skills import SkillDetailScreen, SkillsScreen
 from widgets.screens.subagents import SubagentsScreen
 from widgets.screens.tasks import TasksListScreen
+from widgets.screens.thinking_effort import ThinkingEffortScreen
 
 __all__ = [
     "QuestionScreen",
@@ -28,6 +29,6 @@ __all__ = [
     "SkillsScreen",
     "SubagentsScreen",
     "TasksListScreen",
+    "ThinkingEffortScreen",
 ]
-
 

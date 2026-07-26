@@ -5,6 +5,13 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 import httpx
 from openai import AsyncOpenAI
 
+from core.thinking_effort import (
+    build_anthropic_thinking_payload,
+    build_gemini_thinking_config,
+    build_ollama_thinking_payload,
+    build_openai_thinking_kwargs,
+)
+
 
 class BaseApiAdapter:
     """Base API Adapter interface for LLM formats.
@@ -24,6 +31,7 @@ class BaseApiAdapter:
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         raise NotImplementedError
 
@@ -46,6 +54,7 @@ class OpenAIAdapter(BaseApiAdapter):
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         client = AsyncOpenAI(api_key=api_key or "sk-placeholder", base_url=base_url or "https://api.openai.com/v1")
         kwargs: Dict[str, Any] = {"model": model, "messages": messages, "stream": True}
@@ -53,6 +62,7 @@ class OpenAIAdapter(BaseApiAdapter):
             kwargs["tools"] = tools
         if max_tokens and max_tokens > 0:
             kwargs["max_tokens"] = max_tokens
+        kwargs.update(build_openai_thinking_kwargs(thinking_effort))
         response = await client.chat.completions.create(**kwargs)
         tool_calls: Dict[int, Dict[str, str]] = {}
         async for chunk in response:
@@ -179,6 +189,7 @@ class AnthropicAdapter(BaseApiAdapter):
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_prompt, anthropic_msgs = self._to_anthropic_messages(messages)
         endpoint_url = f"{(base_url or 'https://api.anthropic.com/v1').rstrip('/')}/messages"
@@ -193,6 +204,7 @@ class AnthropicAdapter(BaseApiAdapter):
             "messages": anthropic_msgs,
             "stream": True,
         }
+        payload.update(build_anthropic_thinking_payload(thinking_effort))
         # Anthropic prompt caching: mark the stable system prompt and the final
         # tool definition as ephemeral cache breakpoints. The system prompt +
         # tool schemas (~2-4k tokens) are identical across the tool-call steps of
@@ -383,6 +395,7 @@ class GeminiAdapter(BaseApiAdapter):
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_instruction, contents = self._to_gemini(messages)
         base = (base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
@@ -392,8 +405,14 @@ class GeminiAdapter(BaseApiAdapter):
         payload: Dict[str, Any] = {"contents": contents}
         if system_instruction:
             payload["systemInstruction"] = system_instruction
+        generation_config: Dict[str, Any] = {}
         if max_tokens and max_tokens > 0:
-            payload["generationConfig"] = {"maxOutputTokens": max_tokens}
+            generation_config["maxOutputTokens"] = max_tokens
+        thinking_config = build_gemini_thinking_config(model, thinking_effort)
+        if thinking_config:
+            generation_config["thinkingConfig"] = thinking_config
+        if generation_config:
+            payload["generationConfig"] = generation_config
         if tools:
             function_declarations = []
             for t in tools:
@@ -494,6 +513,7 @@ class OllamaAdapter(BaseApiAdapter):
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         endpoint = f"{(base_url or 'http://localhost:11434').rstrip('/')}/api/chat"
         payload: Dict[str, Any] = {
@@ -501,6 +521,7 @@ class OllamaAdapter(BaseApiAdapter):
             "messages": self._to_ollama_messages(messages),
             "stream": True,
         }
+        payload.update(build_ollama_thinking_payload(thinking_effort))
         if tools:
             payload["tools"] = tools
         if max_tokens and max_tokens > 0:

@@ -13,6 +13,7 @@ from widgets.modal_screens import (
     RewindScreen,
     SkillsScreen,
     TasksListScreen,
+    ThinkingEffortScreen,
     VisionWarningScreen,
 )
 
@@ -216,6 +217,43 @@ class ModelsCommand(BaseCommand):
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
+
+
+class ThinkingEffortCommand(BaseCommand):
+    name = "/thinking"
+    aliases = ["/effort", "/reasoning"]
+    description = "Set thinking effort for the active provider/model"
+
+    async def execute(self, app) -> None:
+        if not getattr(app, "pm", None):
+            app.notify("Provider manager not available", severity="warning")
+            return
+
+        provider_key = app.pm.get_active_provider_key()
+        model_name = getattr(getattr(app, "agent", None), "model", "") or app.pm.get_provider_model(provider_key)
+        current_effort = ""
+        if hasattr(app.pm, "get_provider_thinking_effort"):
+            current_effort = app.pm.get_provider_thinking_effort(provider_key, model_name)
+
+        def on_effort_selected(effort: str):
+            if not effort:
+                app.query_one("#message-input", ChatInput).focus()
+                return
+
+            current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "action"))
+            old_history = getattr(getattr(app, "agent", None), "history", [])
+            if hasattr(app.pm, "set_provider_thinking_effort"):
+                app.pm.set_provider_thinking_effort(provider_key, model_name, effort)
+            app.agent = app.pm.create_active_agent()
+            app.agent.history = old_history
+            app.agent.mode = current_mode
+            app.agent.app = app
+            app.mode = current_mode
+            app.refresh_status_footer()
+            app.notify(f"Thinking effort: {effort}")
+            app.query_one("#message-input", ChatInput).focus()
+
+        app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)
 
 
 class RewindCommand(BaseCommand):
@@ -463,6 +501,7 @@ COMMAND_CLASSES = [
     NewCommand,
     ProvidersCommand,
     ModelsCommand,
+    ThinkingEffortCommand,
     RewindCommand,
     ResumeCommand,
     TasksCommand,

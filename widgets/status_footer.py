@@ -5,6 +5,7 @@ from textual.widgets import Static
 
 from core.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
+from core.thinking_effort import display_thinking_effort
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -53,6 +54,7 @@ class StatusFooter(Static):
             pkey = pm.get_active_provider_key() if pm else "default"
             agent = getattr(self.app, "agent", None)
             model_name = getattr(agent, "model", "")
+            thinking_effort = display_thinking_effort(getattr(agent, "thinking_effort", None))
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
 
             skills_count = len(SkillManager().list_skills())
@@ -82,6 +84,7 @@ class StatusFooter(Static):
                 "context_window": metrics.get("context", "128k"),
                 "context_limit": metrics.get("context_limit", 128000),
                 "cost_usd": metrics.get("cost_usd", 0.0),
+                "thinking_effort": thinking_effort,
                 "skills_count": skills_count,
                 "mcp_active": mcp_active,
                 "mcp_total": mcp_total
@@ -105,6 +108,7 @@ class StatusFooter(Static):
         context_window: str = "128k",
         context_limit: int = 128000,
         cost_usd: float = 0.0,
+        thinking_effort: str = "auto",
         skills_count: int = 0,
         mcp_active: int = 0,
         mcp_total: int = 0
@@ -193,7 +197,8 @@ class StatusFooter(Static):
             cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
             row2_right_parts = [
                 f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
-                f"[{THEME_SECONDARY}]{cost_str}[/]"
+                f"[{THEME_SECONDARY}]{cost_str}[/]",
+                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
             ]
 
             if active_bg_tasks > 0:

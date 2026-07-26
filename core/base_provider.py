@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 
 from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import PromptBuilder
+from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
 from tools.registry import ALIAS_MAP, execute_tool
@@ -25,6 +26,7 @@ class BaseAgent:
         headers: Dict[str, str] = None,
         extra_body: Dict[str, Any] = None,
         reasoning_effort: str = None,
+        thinking_effort: str = None,
         chunk_timeout: float = 30.0,
         fallback_provider: str = None,
         max_tokens: int = 8192,
@@ -47,6 +49,7 @@ class BaseAgent:
         self.headers = headers or {}
         self.extra_body = extra_body or {}
         self.reasoning_effort = reasoning_effort
+        self.thinking_effort = normalize_thinking_effort(thinking_effort or reasoning_effort)
         self.chunk_timeout = chunk_timeout
         self.fallback_provider = fallback_provider
         self.max_tokens = max_tokens
@@ -418,10 +421,11 @@ class BaseAgent:
                                 self.base_url,
                                 self.api_key,
                                 self.model,
-                                messages,
-                                all_tools if all_tools else None,
-                                max_tokens=getattr(self, "max_tokens", 4096),
-                            ):
+                                    messages,
+                                    all_tools if all_tools else None,
+                                    max_tokens=getattr(self, "max_tokens", 4096),
+                                    thinking_effort=getattr(self, "thinking_effort", None),
+                                ):
                                 if tag == "adapter_text":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
@@ -451,10 +455,9 @@ class BaseAgent:
                                 "stream": True,
                             }
                             e_body = dict(getattr(self, "extra_body", {}) or {})
-                            if getattr(self, "reasoning_effort", None):
-                                e_body["reasoning_effort"] = self.reasoning_effort
                             if e_body:
                                 create_kwargs["extra_body"] = e_body
+                            create_kwargs.update(build_openai_thinking_kwargs(getattr(self, "thinking_effort", None)))
 
                             try:
                                 response = await self.client.chat.completions.create(
@@ -464,6 +467,8 @@ class BaseAgent:
                             except Exception as create_err:
                                 c_err_str = str(create_err).lower()
                                 if "stream_options" in c_err_str or "extra" in c_err_str or isinstance(create_err, TypeError):
+                                    if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
+                                        create_kwargs.pop("reasoning_effort", None)
                                     response = await self.client.chat.completions.create(
                                         **create_kwargs
                                     )

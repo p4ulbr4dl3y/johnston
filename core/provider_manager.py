@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
+from core.thinking_effort import normalize_thinking_effort
 
 johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 core_dir = os.path.dirname(os.path.abspath(__file__))
@@ -306,6 +307,47 @@ class ProviderManager:
             except Exception:
                 pass
 
+    def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
+        data = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+
+        efforts = data.setdefault("provider_thinking_efforts", {})
+        provider_efforts = efforts.setdefault(provider_key, {})
+        normalized = normalize_thinking_effort(effort)
+        if normalized:
+            provider_efforts[model_name] = normalized
+        else:
+            provider_efforts.pop(model_name, None)
+            if not provider_efforts:
+                efforts.pop(provider_key, None)
+
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+    def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
+        providers = self.load_providers()
+        provider_default = None
+        if provider_key in providers:
+            provider_default = providers[provider_key].get("reasoning_effort") or providers[provider_key].get("thinking_effort")
+
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                efforts = data.get("provider_thinking_efforts", {})
+                provider_efforts = efforts.get(provider_key, {})
+                if model_name and model_name in provider_efforts:
+                    return normalize_thinking_effort(provider_efforts[model_name]) or ""
+            except Exception:
+                pass
+
+        return normalize_thinking_effort(provider_default) or ""
+
     def get_provider_model(self, provider_key: str) -> str:
         """Returns active model for specified provider with priority:
         1. Saved user choice in config.json (provider_models)
@@ -348,6 +390,7 @@ class ProviderManager:
         target_provider = providers[provider_key]
         stored_key = self.get_api_key(target_provider["key"])
         model_val = self.get_provider_model(provider_key)
+        thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
 
         if "module" in target_provider and hasattr(target_provider["module"], "Agent"):
             kwargs = {}
@@ -369,6 +412,7 @@ class ProviderManager:
             headers=target_provider.get("headers"),
             extra_body=target_provider.get("extra_body"),
             reasoning_effort=target_provider.get("reasoning_effort"),
+            thinking_effort=thinking_effort,
             chunk_timeout=target_provider.get("chunk_timeout", 30.0),
             fallback_provider=target_provider.get("fallback_provider"),
             max_tokens=target_provider.get("max_tokens") or 8192,
