@@ -174,7 +174,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from core.models_catalog import catalog
         from widgets.screens.model import VisionWarningScreen
 
-        test_model_name = f"test-non-vision-{int(time.time() * 1000)}"
+        test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
         class MockPM:
             async def fetch_models_grouped(self): return {"custom": {"name": "Custom", "models": [test_model_name]}}
