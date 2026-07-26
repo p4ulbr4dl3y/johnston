@@ -8,8 +8,12 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 
 * `/connect` — Connect AI provider & set API key
 * `/models` — Switch active model across providers
+* `/thinking` — Set reasoning effort / thinking budget
 * `/new` — Start a new chat session
+* `/action` — Switch to Action mode (edits & bash)
+* `/explore` — Switch to Explore mode (read-only)
 * `/compact` — Compact session conversation history
+* `/handoff` — Generate session handoff summary
 * `/init` — Guided `AGENTS.md` project setup
 * `/subagents` — View and manage active subagents
 * `/tasks` — View and manage background tasks
@@ -25,6 +29,7 @@ KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybi
 * `Enter` — Send message
 * `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
 * `↑` / `↓` — History navigation (looping)
+* `@` — Attach workspace file (autocompletion)
 * `Esc` — Cancel response generation / Close modals
 * `Ctrl+C` / `Ctrl+Q` — Exit application"""
 
