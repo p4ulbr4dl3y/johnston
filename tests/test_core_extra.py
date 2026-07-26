@@ -127,6 +127,34 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(pricing_unknown["prompt"], 0.0)
         self.assertEqual(pricing_unknown["completion"], 0.0)
 
+    def test_fuzzy_matching_local_models(self):
+        cat = ModelsCatalog()
+        cat._limits = {"google/gemma-4-31b": 262144, "gemma-4": 262144}
+        cat._vision = ["google/gemma-4-31b", "gemma-4"]
+        cat._reasoning = ["google/gemma-4-31b", "gemma-4"]
+
+        # Test exact match
+        self.assertEqual(cat.get_context_limit("google", "gemma-4"), 262144)
+        # Test fuzzy match with MLX/4bit suffix
+        self.assertEqual(cat.get_context_limit("omlx", "gemma-4-E4B-it-MLX-4bit"), 262144)
+        self.assertTrue(cat.supports_vision("omlx", "gemma-4-E4B-it-MLX-4bit"))
+        self.assertTrue(cat.supports_reasoning("omlx", "gemma-4-E4B-it-MLX-4bit"))
+
+
+    def test_output_limit_and_reasoning_and_open_weights(self):
+        cat = ModelsCatalog()
+        cat._limits = {"deepseek/deepseek-v4-pro": 1000000}
+        cat._output_limits = {"deepseek/deepseek-v4-pro": 384000}
+        cat._reasoning = ["deepseek/deepseek-v4-pro"]
+        cat._open_weights = ["deepseek/deepseek-v4-pro"]
+        cat._descriptions = {"deepseek/deepseek-v4-pro": "Open MoE flagship"}
+
+        self.assertEqual(cat.get_output_limit("deepseek", "deepseek-v4-pro"), 384000)
+        self.assertTrue(cat.supports_reasoning("deepseek", "deepseek-v4-pro"))
+        self.assertTrue(cat.is_open_weights("deepseek", "deepseek-v4-pro"))
+        self.assertEqual(cat.get_model_description("deepseek", "deepseek-v4-pro"), "Open MoE flagship")
+
 
 if __name__ == "__main__":
     unittest.main()
+
