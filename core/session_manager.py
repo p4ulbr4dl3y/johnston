@@ -64,7 +64,7 @@ class SessionManager:
                 except Exception as e:
                     print(f"Error reading session {filename}: {e}")
 
-        sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+        sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
         return sessions
 
     def purge_empty_sessions(self) -> int:
