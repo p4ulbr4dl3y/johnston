@@ -1,6 +1,6 @@
 import asyncio
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.background_task import BackgroundSubagent, BackgroundTask
 from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
@@ -98,6 +98,12 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(format_context_tokens(64_000), "64k")
         self.assertEqual(format_context_tokens(500), "500")
 
+    def test_init_does_not_start_background_refresh(self):
+        with patch.object(ModelsCatalog, "_trigger_background_refresh") as mock_refresh:
+            ModelsCatalog()
+
+        mock_refresh.assert_not_called()
+
     def test_get_context_limit_default_and_cache(self):
         catalog = ModelsCatalog()
         # Default fallback
@@ -157,4 +163,3 @@ class TestModelsCatalog(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
