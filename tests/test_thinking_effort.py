@@ -29,6 +29,15 @@ class TestThinkingEffortResolver(unittest.TestCase):
         )
         self.assertIsNone(build_gemini_thinking_config("gemini-1.5-pro", "high"))
 
+    def test_thinking_effort_screen_marks_active_but_highlights_auto(self):
+        from widgets.screens.thinking_effort import ThinkingEffortScreen
+
+        screen = ThinkingEffortScreen("medium")
+
+        self.assertEqual(screen.default_value, "auto")
+        self.assertIn(r"\[ACTIVE]", screen.raw_options[2])
+        self.assertNotIn(r"\[ACTIVE]", screen.raw_options[0])
+
 
 class TestThinkingEffortProviderManager(unittest.TestCase):
     def test_provider_model_effort_override_and_default(self):
