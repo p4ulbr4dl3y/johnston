@@ -135,6 +135,14 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         self.assertIn("AGENTS.md", app.ai_prompts[0][0])
 
+    async def test_handoff_command(self):
+        app = MockApp()
+        handled = await handle_slash_command(app, "/handoff")
+        self.assertTrue(handled)
+        self.assertEqual(len(app.ai_prompts), 1)
+        self.assertIn("handoff note", app.ai_prompts[0][0])
+        self.assertIn("Do not create, edit, or delete files", app.ai_prompts[0][0])
+
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
         from core.models_catalog import catalog

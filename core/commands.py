@@ -376,6 +376,30 @@ class InitCommand(BaseCommand):
         app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
 
 
+HANDOFF_PROMPT_TEMPLATE = """Prepare a concise handoff note for the next AI session.
+
+Output the handoff in chat only. Do not create, edit, or delete files unless the user explicitly asks for that in a follow-up.
+
+Include only information that would help another agent continue correctly:
+- current goal and user intent
+- relevant decisions and constraints
+- files, modules, or commands already inspected
+- work completed so far
+- remaining tasks or next steps
+- verification status, including tests or checks run
+- known risks, blockers, or assumptions
+
+Prefer short sections and bullets. Be specific enough that another agent can resume without rereading the whole conversation."""
+
+
+class HandoffCommand(BaseCommand):
+    name = "/handoff"
+    description = "Prepare a continuation note for the next AI session"
+
+    async def execute(self, app) -> None:
+        app.trigger_ai_response(HANDOFF_PROMPT_TEMPLATE, show_in_ui=True)
+
+
 class CompactCommand(BaseCommand):
     name = "/compact"
     aliases = ["/compress"]
@@ -443,6 +467,7 @@ COMMAND_CLASSES = [
     SkillsCommand,
     MCPCommand,
     InitCommand,
+    HandoffCommand,
     CompactCommand,
     ActionCommand,
     ExploreCommand,
