@@ -164,18 +164,16 @@ The project uses a monochrome design system based on Textual TCSS ([app.tcss](fi
 
 ## 8. Deployment & Publishing
 
-### Build and Publish to PyPI & GitHub Releases:
-Publishing is automated via GitHub Actions ([.github/workflows/publish.yml](file:///Users/yegor/johnston/.github/workflows/publish.yml)) with PyPI Trusted Publisher (OIDC):
+### Automated Release via GitHub Actions (`release-please`):
+Releases and PyPI publishing are automated using Google's `release-please` ([.github/workflows/release-please.yml](file:///Users/yegor/johnston/.github/workflows/release-please.yml)).
 
-```bash
-# 1. Bump version in pyproject.toml (e.g., 0.1.4)
-# 2. Commit, create git tag, and push
-git add .
-git commit -m "release: v0.1.4"
-git tag v0.1.4
-git push origin main --tags
-```
-GitHub Actions will automatically run lint & tests, build the package, create a GitHub Release, and publish to PyPI.
+Simply use **Conventional Commits**:
+* `fix: description` -> automatically bumps patch version (`0.1.4` -> `0.1.5`).
+* `feat: description` -> automatically bumps minor version (`0.1.4` -> `0.2.0`).
+* `feat!: description` -> automatically bumps major version (`0.1.4` -> `1.0.0`).
+* `chore:`, `docs:`, `style:` -> no release trigger.
+
+When you `git push origin main`, GitHub Actions will manage a Release PR. Once merged (or on push), `release-please` automatically bumps `pyproject.toml`, generates `CHANGELOG.md`, creates a GitHub Release, builds the wheel, and publishes to PyPI.
 
 ### Manual Local Build (Optional):
 ```bash

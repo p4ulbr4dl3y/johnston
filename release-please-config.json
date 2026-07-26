@@ -1,0 +1,9 @@
+{
+  "release-type": "python",
+  "packages": {
+    ".": {
+      "package-name": "johnston",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
