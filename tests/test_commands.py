@@ -29,6 +29,7 @@ class MockBotMessage:
 class MockApp:
     def __init__(self, agent=None):
         self.agent = agent or MockAgent()
+        self.mode = self.agent.mode
         self.notified = []
         self.status_refreshed = False
         self.ai_prompts = []
@@ -104,6 +105,22 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
 
+    async def test_mode_commands_sync_app_and_agent_mode(self):
+        app = MockApp()
+
+        handled = await handle_slash_command(app, "/explore")
+        self.assertTrue(handled)
+        self.assertEqual(app.agent.mode, "explore")
+        self.assertEqual(app.mode, "explore")
+        self.assertTrue(app.status_refreshed)
+
+        app.status_refreshed = False
+        handled = await handle_slash_command(app, "/action")
+        self.assertTrue(handled)
+        self.assertEqual(app.agent.mode, "action")
+        self.assertEqual(app.mode, "action")
+        self.assertTrue(app.status_refreshed)
+
     async def test_compact_command(self):
         agent = MockAgent()
         app = MockApp(agent=agent)
@@ -152,8 +169,103 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
             warning_screens = [s for s in pushed_screens if isinstance(s, VisionWarningScreen)]
             self.assertTrue(len(warning_screens) > 0)
             self.assertTrue(catalog.supports_vision("custom", test_model_name))
-            catalog.remove_vision_override(test_model_name)
-            catalog.set_fallback_vision_model("", "")
+        catalog.remove_vision_override(test_model_name)
+        catalog.set_fallback_vision_model("", "")
+
+    async def test_models_command_preserves_mode_when_switching_provider(self):
+        from core.commands import ModelsCommand
+
+        class MockPM:
+            def __init__(self):
+                self.active_provider = "old"
+                self.saved = []
+
+            async def fetch_models_grouped(self):
+                return {"old": {"name": "Old", "models": ["old-model"]}, "new": {"name": "New", "models": ["new-model"]}}
+
+            def get_active_provider_key(self):
+                return self.active_provider
+
+            def set_active_provider_key(self, provider):
+                self.active_provider = provider
+
+            def set_provider_model(self, provider, model):
+                self.saved.append((provider, model))
+
+            def create_active_agent(self):
+                return MockAgent(mode="action")
+
+        app = MockApp(agent=MockAgent(mode="explore"))
+        app.mode = "explore"
+        app.pm = MockPM()
+        app.query_one = lambda target, default=None: type("Input", (), {"focus": lambda self: None})()
+        app.push_screen = lambda screen, callback=None: callback(("new", "new-model")) if callback else None
+
+        await ModelsCommand().execute(app)
+
+        self.assertEqual(app.pm.active_provider, "new")
+        self.assertEqual(app.agent.mode, "explore")
+        self.assertEqual(app.mode, "explore")
+        self.assertEqual(app.pm.saved, [("new", "new-model")])
+
+    async def test_providers_command_preserves_mode_when_connecting_provider(self):
+        from core.commands import ProvidersCommand
+
+        class MockPM:
+            def __init__(self):
+                self.active_provider = "old"
+                self.saved_key = None
+
+            def load_providers(self, include_disabled=False):
+                return {
+                    "old": {"key": "old", "name": "Old"},
+                    "new": {"key": "new", "name": "New"},
+                }
+
+            def get_active_provider_key(self):
+                return self.active_provider
+
+            def get_api_key(self, provider):
+                return ""
+
+            def get_disabled_providers(self):
+                return ["new"]
+
+            def set_provider_api_key(self, provider, api_key):
+                self.saved_key = (provider, api_key)
+
+            def set_provider_disabled(self, provider, disabled):
+                self.disabled = (provider, disabled)
+
+            def set_active_provider_key(self, provider):
+                self.active_provider = provider
+
+            def create_active_agent(self):
+                return MockAgent(mode="action")
+
+        app = MockApp(agent=MockAgent(mode="explore"))
+        app.mode = "explore"
+        app.pm = MockPM()
+
+        seen_provider_screen = False
+
+        def push_screen(screen, callback=None):
+            nonlocal seen_provider_screen
+            if callback and screen.__class__.__name__ == "ProvidersScreen":
+                if not seen_provider_screen:
+                    seen_provider_screen = True
+                    callback("new")
+            elif callback and screen.__class__.__name__ == "ApiKeyInputScreen":
+                callback("secret")
+
+        app.push_screen = push_screen
+
+        await ProvidersCommand().execute(app)
+
+        self.assertEqual(app.pm.active_provider, "new")
+        self.assertEqual(app.pm.saved_key, ("new", "secret"))
+        self.assertEqual(app.agent.mode, "explore")
+        self.assertEqual(app.mode, "explore")
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)

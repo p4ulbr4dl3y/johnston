@@ -83,6 +83,7 @@ class JohnstonApp(App):
             self.agent.model = model
         if mode and self.agent:
             self.agent.mode = mode
+        self.mode = getattr(self.agent, "mode", mode or "action") if self.agent else (mode or "action")
         if self.agent:
             self.agent.app = self
 
@@ -111,6 +112,7 @@ class JohnstonApp(App):
         next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
         new_mode = available_modes[next_idx]
         self.agent.mode = new_mode
+        self.mode = new_mode
         self.refresh_status_footer()
 
     def compose(self) -> ComposeResult:
@@ -412,9 +414,12 @@ class JohnstonApp(App):
     def on_select_changed(self, event: Select.Changed) -> None:
         """Switch agent provider from ~/.johnston config"""
         if event.value and isinstance(event.value, str) and event.value != "none":
+            current_mode = getattr(self, "mode", getattr(self.agent, "mode", "action"))
             self.pm.set_active_provider_key(event.value)
             self.agent = self.pm.create_active_agent()
+            self.agent.mode = current_mode
             self.agent.app = self
+            self.mode = current_mode
             if hasattr(self.agent, "history"):
                 sess = self.sm.load_session(self.current_session_id)
                 if sess:
@@ -930,6 +935,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 

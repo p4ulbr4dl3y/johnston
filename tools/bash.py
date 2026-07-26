@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import os
 import pty
 import re
@@ -11,6 +12,11 @@ from core.rtk_manager import rewrite_cmd
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
+_TASK_ID_COUNTER = itertools.count()
+
+
+def _new_task_id() -> str:
+    return f"bash_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
 class BashTool(BaseTool):
@@ -127,7 +133,7 @@ class BashTool(BaseTool):
             master_fd = None
             reader = None
 
-        task_id = f"bash_{int(time.time())}"
+        task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
         task = BackgroundTask(task_id, cmd, p, widget=target_widget, master_fd=master_fd, reader=reader)
         task.start_reading(ctx.app, getattr(ctx.app, "on_background_bash_completed", None) if ctx.app else None)
@@ -178,4 +184,3 @@ class BashTool(BaseTool):
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
             return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes."
-

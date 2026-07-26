@@ -64,7 +64,7 @@ class ProvidersCommand(BaseCommand):
     async def execute(self, app) -> None:
         from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 
-        def open_providers_screen(focus_key: str = None) -> None:
+        def open_providers_screen(focus_key: str | None = None) -> None:
             provs = app.pm.load_providers(include_disabled=True)
             if not provs:
                 app.notify("No available providers configured", severity="warning")
@@ -87,17 +87,20 @@ class ProvidersCommand(BaseCommand):
                     if entered_key is not None:
                         if entered_key:
                             app.pm.set_provider_api_key(selected_key, entered_key)
-                        app.pm.set_provider_disabled(selected_key, False)
+                            app.pm.set_provider_disabled(selected_key, False)
                         old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
+                        current_mode = getattr(app, "mode", getattr(app.agent, "mode", "action"))
                         app.pm.set_active_provider_key(selected_key)
                         app.agent = app.pm.create_active_agent()
                         if app.agent and old_history:
                             app.agent.history = old_history
-                        app.agent.app = app
+                        if app.agent:
+                            app.agent.mode = current_mode
+                            app.agent.app = app
+                        app.mode = current_mode
                         app.refresh_status_footer()
                         app.notify(f"Connected to provider: {p_name}")
-                    # Always return back to ProvidersScreen
-                    open_providers_screen(focus_key=selected_key)
+                        open_providers_screen(focus_key=selected_key)
 
                 app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
 
@@ -107,9 +110,9 @@ class ProvidersCommand(BaseCommand):
                     act_key,
                     cfg_keys,
                     disabled_providers=dis_provs,
-                    pm=app.pm
+                    pm=app.pm,
                 ),
-                callback=on_provider_selected
+                callback=on_provider_selected,
             )
 
         open_providers_screen()
@@ -152,11 +155,15 @@ class ModelsCommand(BaseCommand):
 
                 if selected_prov != app.pm.get_active_provider_key():
                     old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
+                    current_mode = getattr(app, "mode", getattr(app.agent, "mode", "action"))
                     app.pm.set_active_provider_key(selected_prov)
                     app.agent = app.pm.create_active_agent()
                     if app.agent and old_history:
                         app.agent.history = old_history
-                    app.agent.app = app
+                    if app.agent:
+                        app.agent.mode = current_mode
+                        app.agent.app = app
+                    app.mode = current_mode
 
                 if hasattr(app.agent, "model"):
                     app.agent.model = selected_model
@@ -171,9 +178,16 @@ class ModelsCommand(BaseCommand):
                     def on_warning_action(action: str | None) -> None:
                         if action == "select_vision":
                             catalog.remove_vision_override(selected_model)
+
                             def on_fallback_vision_selected(fb_selection: Any) -> None:
                                 if fb_selection:
-                                    fb_val = fb_selection[0] if isinstance(fb_selection, tuple) and len(fb_selection) == 2 and isinstance(fb_selection[1], bool) else fb_selection
+                                    fb_val = (
+                                        fb_selection[0]
+                                        if isinstance(fb_selection, tuple)
+                                        and len(fb_selection) == 2
+                                        and isinstance(fb_selection[1], bool)
+                                        else fb_selection
+                                    )
                                     if isinstance(fb_val, (tuple, list)):
                                         f_prov, f_model = fb_val[0], fb_val[1]
                                     else:
@@ -181,7 +195,10 @@ class ModelsCommand(BaseCommand):
                                         f_model = fb_val
                                     catalog.set_fallback_vision_model(f_prov, f_model)
 
-                            app.push_screen(ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"), callback=on_fallback_vision_selected)
+                            app.push_screen(
+                                ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"),
+                                callback=on_fallback_vision_selected,
+                            )
                         elif action == "force_vision":
                             catalog.add_vision_override(selected_model)
                             catalog.set_fallback_vision_model(selected_prov, selected_model)
@@ -192,6 +209,8 @@ class ModelsCommand(BaseCommand):
                                 vision_models = getattr(catalog, "_vision", [])
                                 if vision_models:
                                     catalog.set_fallback_vision_model(selected_prov, vision_models[0])
+                            elif fb_prov:
+                                catalog.set_fallback_vision_model(fb_prov, fb_model)
 
                     app.push_screen(VisionWarningScreen(selected_model, selected_prov), callback=on_warning_action)
             app.query_one("#message-input", ChatInput).focus()
@@ -396,6 +415,7 @@ class ActionCommand(BaseCommand):
     async def execute(self, app) -> None:
         if hasattr(app, "agent") and app.agent:
             app.agent.mode = "action"
+            app.mode = "action"
             app.refresh_status_footer()
 
 
@@ -407,6 +427,7 @@ class ExploreCommand(BaseCommand):
     async def execute(self, app) -> None:
         if hasattr(app, "agent") and app.agent:
             app.agent.mode = "explore"
+            app.mode = "explore"
             app.refresh_status_footer()
 
 
