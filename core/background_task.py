@@ -26,7 +26,7 @@ def process_carriage_returns(text: str) -> str:
 
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
-    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None):
+    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None):
         self.task_id = task_id
         self.command = command
         self.process = process
@@ -37,6 +37,23 @@ class BackgroundTask:
         self.widget = widget
         self.master_fd = master_fd
         self.reader = reader
+        self.transport = transport
+
+    def close_pty(self):
+        if self.transport is not None:
+            try:
+                self.transport.close()
+            except Exception:
+                pass
+            self.transport = None
+            self.master_fd = None
+        elif self.master_fd is not None:
+            try:
+                os.close(self.master_fd)
+            except Exception:
+                pass
+            self.master_fd = None
+
 
     def get_formatted_output(self) -> str:
         """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
@@ -80,12 +97,7 @@ class BackgroundTask:
                 pass
             finally:
                 self.is_running = False
-                if self.master_fd is not None:
-                    try:
-                        os.close(self.master_fd)
-                    except Exception:
-                        pass
-                    self.master_fd = None
+                self.close_pty()
 
                 if self.process:
                     try:
@@ -125,12 +137,7 @@ class BackgroundTask:
 
     async def kill(self):
         self.is_running = False
-        if self.master_fd is not None:
-            try:
-                os.close(self.master_fd)
-            except Exception:
-                pass
-            self.master_fd = None
+        self.close_pty()
         if self.process:
             await terminate_process(self.process)
         if self.read_task and not self.read_task.done():
