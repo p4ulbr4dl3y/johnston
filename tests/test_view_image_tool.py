@@ -22,27 +22,51 @@ class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
 
     def test_supports_vision(self):
         from core.models_catalog import catalog
-        catalog._vision.append("test-vision-model")
-        self.assertTrue(catalog.supports_vision("custom", "test-vision-model"))
-        self.assertFalse(catalog.supports_vision("custom", "text-only-model-v1"))
+
+        model_id = "test-vision-model"
+        try:
+            catalog._vision.append(model_id)
+            self.assertTrue(catalog.supports_vision("custom", model_id))
+            self.assertFalse(catalog.supports_vision("custom", "text-only-model-v1"))
+        finally:
+            catalog.remove_vision_override(model_id)
+            catalog._vision = [m for m in catalog._vision if m != model_id]
+            catalog._match_cache.clear()
 
     async def test_fallback_vision_analysis(self):
+        from core.models_catalog import catalog
+
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
             temp_path = f.name
 
         try:
+            old_fallback = catalog.get_fallback_vision_model()
+            test_model = "test-fallback-vision-model"
+            catalog.set_fallback_vision_model("test-provider", test_model)
             mock_resp = MagicMock()
             mock_resp.status_code = 200
             mock_resp.json.return_value = {
                 "choices": [{"message": {"content": "This is a 1x1 PNG image."}}]
             }
 
-            with patch("httpx.AsyncClient.post", return_value=mock_resp):
+            providers = {
+                "test-provider": {
+                    "base_url": "https://example.com/v1",
+                    "model": test_model,
+                    "api_key": "test-key",
+                    "api_type": "openai",
+                }
+            }
+            with patch("core.provider_manager.ProviderManager.load_providers", return_value=providers), patch(
+                "httpx.AsyncClient.post", return_value=mock_resp
+            ):
                 res = await analyze_image_with_fallback(temp_path, "Describe")
                 self.assertIn("Vision Analysis", res)
                 self.assertIn("1x1 PNG image", res)
         finally:
+            catalog.set_fallback_vision_model(*old_fallback)
+            catalog.remove_vision_override(test_model)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
@@ -170,23 +194,40 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
         import tempfile
 
         from PIL import Image
+
+        from core.models_catalog import catalog
+
         tool = ViewImageTool()
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             temp_path = f.name
         try:
+            old_fallback = catalog.get_fallback_vision_model()
+            test_model = "test-custom-prompt-vision-model"
+            catalog.set_fallback_vision_model("test-provider", test_model)
             img = Image.new("RGB", (10, 10), color=(0, 0, 255))
             img.save(temp_path, format="PNG")
             mock_resp = MagicMock()
             mock_resp.status_code = 200
             mock_resp.json.return_value = {"choices": [{"message": {"content": "Blue square"}}]}
-            with patch("httpx.AsyncClient.post", return_value=mock_resp):
+            providers = {
+                "test-provider": {
+                    "base_url": "https://example.com/v1",
+                    "model": test_model,
+                    "api_key": "test-key",
+                    "api_type": "openai",
+                }
+            }
+            with patch("core.provider_manager.ProviderManager.load_providers", return_value=providers), patch(
+                "httpx.AsyncClient.post", return_value=mock_resp
+            ):
                 res = await tool.execute({"path": temp_path, "prompt": "What color is this?"})
                 self.assertIn("Vision Analysis", res)
         finally:
+            catalog.set_fallback_vision_model(*old_fallback)
+            catalog.remove_vision_override(test_model)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
 
 if __name__ == "__main__":
     unittest.main()
-
