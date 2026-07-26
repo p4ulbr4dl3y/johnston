@@ -164,14 +164,23 @@ The project uses a monochrome design system based on Textual TCSS ([app.tcss](fi
 
 ## 8. Deployment & Publishing
 
-### Build and Publish to PyPI:
-```bash
-# 1. Bump version in pyproject.toml
-# 2. Build package
-uv build
+### Build and Publish to PyPI & GitHub Releases:
+Publishing is automated via GitHub Actions ([.github/workflows/publish.yml](file:///Users/yegor/johnston/.github/workflows/publish.yml)) with PyPI Trusted Publisher (OIDC):
 
-# 3. Publish to PyPI
-uv publish --token <PYPI_TOKEN>
+```bash
+# 1. Bump version in pyproject.toml (e.g., 0.1.4)
+# 2. Commit, create git tag, and push
+git add .
+git commit -m "release: v0.1.4"
+git tag v0.1.4
+git push origin main --tags
+```
+GitHub Actions will automatically run lint & tests, build the package, create a GitHub Release, and publish to PyPI.
+
+### Manual Local Build (Optional):
+```bash
+uv build
+uv publish
 ```
 
 ### Installation Options for Users:
