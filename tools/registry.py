@@ -30,14 +30,36 @@ TOOL_CLASSES = [
     WebFetchTool,
 ]
 
-REGISTRY: Dict[str, Type[BaseTool]] = {cls.name: cls for cls in TOOL_CLASSES}
+REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLASSES}
+
+ALIAS_MAP: Dict[str, str] = {
+    "write": "create",
+    "write_file": "create",
+    "create_file": "create",
+    "save_file": "create",
+    "read_file": "read",
+    "view_file": "read",
+    "cat": "read",
+    "str_replace_editor": "edit",
+    "update_file": "edit",
+    "modify_file": "edit",
+    "shell": "bash",
+    "terminal": "bash",
+    "exec": "bash",
+    "run_command": "bash",
+    "ask": "ask_user",
+}
 
 
 def get_default_tools() -> list[Dict[str, Any]]:
     return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
 
 async def execute_tool(name: str, args: dict, app: Any = None, context: Any = None) -> str:
-    tool_cls = REGISTRY.get(name)
+    raw_name = (name or "").strip()
+    clean_name = raw_name.lower()
+    resolved_name = ALIAS_MAP.get(clean_name, clean_name)
+
+    tool_cls = REGISTRY.get(resolved_name) or REGISTRY.get(clean_name)
     if tool_cls:
         try:
             tool_inst = tool_cls()

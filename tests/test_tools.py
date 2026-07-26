@@ -150,6 +150,28 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = await run_linter(file_path)
         self.assertIsInstance(res, str)
 
+    async def test_tool_aliases_and_case(self):
+        from tools.registry import execute_tool
+        file_path = os.path.join(self.test_dir, "alias_test.txt")
+
+        # Test capitalized tool name "Create"
+        res_create = await execute_tool("Create", {"path": file_path, "content": "Alias Content"})
+        self.assertIn("Success: file", res_create)
+        self.assertTrue(os.path.exists(file_path))
+
+        # Test alias "write" -> "create"
+        file_path2 = os.path.join(self.test_dir, "write_test.txt")
+        res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
+        self.assertIn("Success: file", res_write)
+
+        # Test alias "cat" -> "read"
+        res_cat = await execute_tool("cat", {"path": file_path2})
+        self.assertIn("Write Content", res_cat)
+
+        # Test alias "shell" -> "bash"
+        res_shell = await execute_tool("shell", {"command": "echo 'alias bash'"})
+        self.assertIn("alias bash", res_shell)
+
 
 if __name__ == "__main__":
     unittest.main()
