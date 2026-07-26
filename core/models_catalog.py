@@ -88,12 +88,9 @@ class ModelsCatalog:
                     self._fallback_vision_provider = data.get("fallback_vision_provider", "")
                     self._fallback_vision_model = data.get("fallback_vision_model", "")
 
-                    if time.time() - data.get("updated_at", 0) >= CACHE_TTL:
-                        self._trigger_background_refresh()
-                    return True
+                return True
             except Exception:
                 pass
-        self._trigger_background_refresh()
         return False
 
     def save_cache(
