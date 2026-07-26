@@ -25,7 +25,7 @@ class CreateTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = resolve_path(args.get("path"))
-        content = args.get("content", "")
+        content = args.get("content", "").rstrip("\r\n")
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
