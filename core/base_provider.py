@@ -29,6 +29,10 @@ class BaseAgent:
         fallback_provider: str = None,
         max_tokens: int = 8192,
         max_steps: int = 50,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        retry_backoff: float = 2.0,
+        max_retry_delay: float = 10.0,
     ):
         if tools is None:
             from tools.registry import get_default_tools
@@ -47,6 +51,10 @@ class BaseAgent:
         self.fallback_provider = fallback_provider
         self.max_tokens = max_tokens
         self.max_steps = max_steps
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.retry_backoff = retry_backoff
+        self.max_retry_delay = max_retry_delay
 
         client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
         if self.headers:
@@ -65,6 +73,55 @@ class BaseAgent:
     async def close(self):
         if hasattr(self, "client") and self.client:
             await self.client.close()
+
+    def _is_retryable_error(self, err: Exception) -> bool:
+        err_str = str(err).lower()
+
+        non_retryable_terms = [
+            "invalid api key", "unauthorized", "authentication",
+            "invalid_api_key", "context_length_exceeded",
+            "context window", "maximum context length",
+            "invalid request", "model_not_found", "permission_denied"
+        ]
+        if any(term in err_str for term in non_retryable_terms):
+            return False
+
+        try:
+            import openai
+            if isinstance(err, (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError)):
+                return False
+        except ImportError:
+            pass
+
+        if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
+            if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
+                return True
+
+        retryable_terms = [
+            "timeout", "timed out", "rate limit", "429", "500", "502", "503", "504",
+            "connection", "network", "server error", "reset", "refused", "overloaded",
+            "chunk timeout"
+        ]
+        if any(term in err_str for term in retryable_terms):
+            return True
+
+        try:
+            import httpx
+            if isinstance(err, (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError)):
+                if isinstance(err, httpx.HTTPStatusError) and err.response.status_code in (401, 400, 403):
+                    return False
+                return True
+        except ImportError:
+            pass
+
+        try:
+            import openai
+            if isinstance(err, (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError)):
+                return True
+        except ImportError:
+            pass
+
+        return True
 
     @property
     def context_limit(self) -> int:
@@ -285,145 +342,171 @@ class BaseAgent:
                 full_assistant_text = ""
                 step_usage = None
                 prompt_tokens_est = estimate_tokens(messages)
-                tool_calls_dict = {}
-                active_thought = ""
-                thinking_started = False
-                thinking_t0 = time.time()
+                max_retries = getattr(self, "max_retries", 3)
+                retry_delay = getattr(self, "retry_delay", 1.0)
+                retry_backoff = getattr(self, "retry_backoff", 2.0)
+                max_retry_delay = getattr(self, "max_retry_delay", 10.0)
 
-                try:
-                    if getattr(self, "api_type", "openai") != "openai":
-                        from core.adapters import get_adapter
-                        adapter = get_adapter(self.api_type)
-                        async for tag, payload in adapter.stream_chat(
-                            self.base_url,
-                            self.api_key,
-                            self.model,
-                            messages,
-                            all_tools if all_tools else None,
-                            max_tokens=getattr(self, "max_tokens", 4096),
-                        ):
-                            if tag == "adapter_text":
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", active_thought)
-                                    thinking_started = False
-                                full_assistant_text += payload
-                                yield ("bot_delta", full_assistant_text, "")
-                            elif tag == "adapter_tool_call":
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", active_thought)
-                                    thinking_started = False
-                                idx = len(tool_calls_dict)
-                                tc_id = payload.get("id") or f"call_{idx}"
-                                tool_calls_dict[idx] = {
-                                    "id": tc_id,
-                                    "name": payload.get("name", ""),
-                                    "arguments": payload.get("arguments", "") or "",
-                                }
-                            elif tag == "adapter_usage":
-                                step_usage = payload
-                    else:
-                        create_kwargs = {
-                            "model": self.model,
-                            "messages": messages,
-                            "tools": all_tools if all_tools else None,
-                            "stream": True,
-                        }
-                        e_body = dict(getattr(self, "extra_body", {}) or {})
-                        if getattr(self, "reasoning_effort", None):
-                            e_body["reasoning_effort"] = self.reasoning_effort
-                        if e_body:
-                            create_kwargs["extra_body"] = e_body
+                attempt = 0
+                while True:
+                    attempt += 1
+                    full_assistant_text = ""
+                    step_usage = None
+                    tool_calls_dict = {}
+                    active_thought = ""
+                    thinking_started = False
+                    thinking_t0 = time.time()
 
-                        try:
-                            response = await self.client.chat.completions.create(
-                                **create_kwargs,
-                                stream_options={"include_usage": True}
-                            )
-                        except Exception:
-                            response = await self.client.chat.completions.create(
-                                **create_kwargs
-                            )
+                    try:
+                        if getattr(self, "api_type", "openai") != "openai":
+                            from core.adapters import get_adapter
+                            adapter = get_adapter(self.api_type)
+                            async for tag, payload in adapter.stream_chat(
+                                self.base_url,
+                                self.api_key,
+                                self.model,
+                                messages,
+                                all_tools if all_tools else None,
+                                max_tokens=getattr(self, "max_tokens", 4096),
+                            ):
+                                if tag == "adapter_text":
+                                    if thinking_started:
+                                        dt = time.time() - thinking_t0
+                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        thinking_started = False
+                                    full_assistant_text += payload
+                                    yield ("bot_delta", full_assistant_text, "")
+                                elif tag == "adapter_tool_call":
+                                    if thinking_started:
+                                        dt = time.time() - thinking_t0
+                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        thinking_started = False
+                                    idx = len(tool_calls_dict)
+                                    tc_id = payload.get("id") or f"call_{idx}"
+                                    tool_calls_dict[idx] = {
+                                        "id": tc_id,
+                                        "name": payload.get("name", ""),
+                                        "arguments": payload.get("arguments", "") or "",
+                                    }
+                                elif tag == "adapter_usage":
+                                    step_usage = payload
+                        else:
+                            create_kwargs = {
+                                "model": self.model,
+                                "messages": messages,
+                                "tools": all_tools if all_tools else None,
+                                "stream": True,
+                            }
+                            e_body = dict(getattr(self, "extra_body", {}) or {})
+                            if getattr(self, "reasoning_effort", None):
+                                e_body["reasoning_effort"] = self.reasoning_effort
+                            if e_body:
+                                create_kwargs["extra_body"] = e_body
 
-                        stream_iter = response.__aiter__()
-                        chunk_to = getattr(self, "chunk_timeout", 30.0) or 30.0
-                        while True:
                             try:
-                                chunk = await asyncio.wait_for(stream_iter.__anext__(), timeout=chunk_to)
-                            except StopAsyncIteration:
-                                break
-                            except asyncio.TimeoutError:
-                                raise RuntimeError(f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s.")
+                                response = await self.client.chat.completions.create(
+                                    **create_kwargs,
+                                    stream_options={"include_usage": True}
+                                )
+                            except Exception as create_err:
+                                c_err_str = str(create_err).lower()
+                                if "stream_options" in c_err_str or "extra" in c_err_str or isinstance(create_err, TypeError):
+                                    response = await self.client.chat.completions.create(
+                                        **create_kwargs
+                                    )
+                                else:
+                                    raise create_err
 
-                            if getattr(chunk, "usage", None):
-                                step_usage = parse_usage(chunk.usage)
+                            stream_iter = response.__aiter__()
+                            chunk_to = getattr(self, "chunk_timeout", 30.0) or 30.0
+                            while True:
+                                try:
+                                    chunk = await asyncio.wait_for(stream_iter.__anext__(), timeout=chunk_to)
+                                except StopAsyncIteration:
+                                    break
+                                except asyncio.TimeoutError:
+                                    raise RuntimeError(f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s.")
 
-                            if not chunk.choices:
-                                continue
-                            choice = chunk.choices[0]
-                            delta = choice.delta
-                            reasoning = (
-                                getattr(delta, "reasoning_content", None)
-                                or getattr(delta, "reasoning", None)
-                                or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
-                                or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
-                            )
-                            if reasoning:
-                                if not thinking_started:
-                                    yield ("thinking_start", "Thinking...", "")
-                                    thinking_started = True
-                                    thinking_t0 = time.time()
-                                active_thought += reasoning
-                                yield ("thinking_delta", active_thought, "")
+                                if getattr(chunk, "usage", None):
+                                    step_usage = parse_usage(chunk.usage)
 
-                            delta = choice.delta
-                            if delta.content:
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", active_thought)
-                                    thinking_started = False
-                                full_assistant_text += delta.content
-                                yield ("bot_delta", full_assistant_text, "")
+                                if not chunk.choices:
+                                    continue
+                                choice = chunk.choices[0]
+                                delta = choice.delta
+                                reasoning = (
+                                    getattr(delta, "reasoning_content", None)
+                                    or getattr(delta, "reasoning", None)
+                                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
+                                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
+                                )
+                                if reasoning:
+                                    if not thinking_started:
+                                        yield ("thinking_start", "Thinking...", "")
+                                        thinking_started = True
+                                        thinking_t0 = time.time()
+                                    active_thought += reasoning
+                                    yield ("thinking_delta", active_thought, "")
 
-                            if delta.tool_calls:
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", active_thought)
-                                    thinking_started = False
+                                delta = choice.delta
+                                if delta.content:
+                                    if thinking_started:
+                                        dt = time.time() - thinking_t0
+                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        thinking_started = False
+                                    full_assistant_text += delta.content
+                                    yield ("bot_delta", full_assistant_text, "")
 
-                                for tc in delta.tool_calls:
-                                    idx = tc.index
-                                    if idx not in tool_calls_dict:
-                                        tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
-                                    if tc.id:
-                                        tool_calls_dict[idx]["id"] = tc.id
-                                    if tc.function:
-                                        if tc.function.name:
-                                            tool_calls_dict[idx]["name"] = tc.function.name
-                                        if tc.function.arguments:
-                                            tool_calls_dict[idx]["arguments"] += tc.function.arguments
-                except Exception as api_err:
-                    fb_prov = getattr(self, "fallback_provider", None)
-                    if fb_prov:
-                        yield ("thinking", f"Provider '{self.provider_key}' error ({api_err}). Switching to fallback provider '{fb_prov}'...", "")
-                        from core.provider_manager import ProviderManager
-                        pm = ProviderManager()
-                        fb_agent = pm.create_agent_for_provider(fb_prov)
-                        if fb_agent:
-                            fb_agent.history = list(self.history)
-                            fb_agent.mode = getattr(self, "mode", "action")
-                            async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
-                                yield (f_tag, f_val1, f_val2)
-                            # Merge fallback agent's token/cost metrics into the primary
-                            # agent so the status footer and session persistence reflect the
-                            # real total spent (including the fallback's own work).
-                            self.tokens_input += getattr(fb_agent, "tokens_input", 0)
-                            self.tokens_output += getattr(fb_agent, "tokens_output", 0)
-                            self.total_tokens += getattr(fb_agent, "total_tokens", 0)
-                            self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
-                            return
-                    raise api_err
+                                if delta.tool_calls:
+                                    if thinking_started:
+                                        dt = time.time() - thinking_t0
+                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        thinking_started = False
+
+                                    for tc in delta.tool_calls:
+                                        idx = tc.index
+                                        if idx not in tool_calls_dict:
+                                            tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
+                                        if tc.id:
+                                            tool_calls_dict[idx]["id"] = tc.id
+                                        if tc.function:
+                                            if tc.function.name:
+                                                tool_calls_dict[idx]["name"] = tc.function.name
+                                            if tc.function.arguments:
+                                                tool_calls_dict[idx]["arguments"] += tc.function.arguments
+                        # Stream completed successfully
+                        break
+                    except Exception as api_err:
+                        is_retryable = self._is_retryable_error(api_err)
+                        if is_retryable and attempt < max_retries:
+                            import random
+                            delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
+                            jitter = random.uniform(0, 0.5 * delay)
+                            actual_delay = delay + jitter
+                            yield ("thinking", f"[Retry {attempt}/{max_retries}] Provider '{self.provider_key}' error ({api_err}). Retrying in {actual_delay:.1f}s...", "")
+                            await asyncio.sleep(actual_delay)
+                            continue
+
+                        fb_prov = getattr(self, "fallback_provider", None)
+                        if fb_prov:
+                            yield ("thinking", f"Provider '{self.provider_key}' error ({api_err}). Switching to fallback provider '{fb_prov}'...", "")
+                            from core.provider_manager import ProviderManager
+                            pm = ProviderManager()
+                            fb_agent = pm.create_agent_for_provider(fb_prov)
+                            if fb_agent:
+                                fb_agent.history = list(self.history)
+                                fb_agent.mode = getattr(self, "mode", "action")
+                                async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
+                                    yield (f_tag, f_val1, f_val2)
+                                # Merge fallback agent's token/cost metrics into the primary
+                                # agent so the status footer and session persistence reflect the
+                                # real total spent (including the fallback's own work).
+                                self.tokens_input += getattr(fb_agent, "tokens_input", 0)
+                                self.tokens_output += getattr(fb_agent, "tokens_output", 0)
+                                self.total_tokens += getattr(fb_agent, "total_tokens", 0)
+                                self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
+                                return
+                        raise api_err
 
                 pricing = catalog.get_model_pricing(self.provider_key, self.model)
                 p_prompt = pricing.get("prompt", 0.0)

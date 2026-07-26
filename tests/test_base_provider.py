@@ -402,7 +402,84 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(agent_openai.cost_usd, 1.2, places=6)
         self.assertLess(agent_anthropic.cost_usd, agent_openai.cost_usd)
 
+    def test_is_retryable_error(self):
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")
+
+        # Retryable errors
+        self.assertTrue(agent._is_retryable_error(RuntimeError("Stream chunk timeout: No response received from provider 'test' for 30.0s.")))
+        self.assertTrue(agent._is_retryable_error(TimeoutError("Connection timed out")))
+        self.assertTrue(agent._is_retryable_error(Exception("HTTP 429 Too Many Requests")))
+        self.assertTrue(agent._is_retryable_error(Exception("HTTP 502 Bad Gateway")))
+
+        # Non-retryable errors
+        self.assertFalse(agent._is_retryable_error(Exception("Invalid API key provided")))
+        self.assertFalse(agent._is_retryable_error(Exception("HTTP 401 Unauthorized")))
+        self.assertFalse(agent._is_retryable_error(Exception("context_length_exceeded: maximum context length is 4096 tokens")))
+
+    async def test_stream_steps_retry_success(self):
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01)
+        self.addAsyncCleanup(agent.close)
+
+        mock_delta = unittest.mock.MagicMock()
+        mock_delta.reasoning_content = None
+        mock_delta.reasoning = None
+        mock_delta.model_extra = None
+        mock_delta.content = "hello after retry"
+        mock_delta.tool_calls = None
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.delta = mock_delta
+        text_chunk = unittest.mock.MagicMock(spec=["choices"])
+        text_chunk.choices = [mock_choice]
+
+        async def mock_aiter(*args, **kwargs):
+            yield text_chunk
+
+        mock_response = unittest.mock.MagicMock()
+        mock_response.__aiter__ = mock_aiter
+
+        attempts = 0
+        async def mock_create(*args, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise RuntimeError("Stream chunk timeout: No response received from provider 'tprov' for 30.0s.")
+            return mock_response
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
+            events = []
+            async for evt in agent.stream_steps("test"):
+                events.append(evt)
+
+        self.assertEqual(attempts, 2)
+        # Verify retry notice was yielded to UI
+        retry_notices = [e for e in events if e[0] == "thinking" and "[Retry 1/3]" in e[1]]
+        self.assertEqual(len(retry_notices), 1)
+        # Verify bot_text event
+        bot_texts = [e for e in events if e[0] == "bot_text"]
+        self.assertTrue(any("hello after retry" in e[1] for e in bot_texts))
+
+    async def test_stream_steps_non_retryable_fails_immediately(self):
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01)
+        self.addAsyncCleanup(agent.close)
+
+        attempts = 0
+        async def mock_create(*args, **kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise Exception("Invalid API key provided")
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
+            events = []
+            async for evt in agent.stream_steps("test"):
+                events.append(evt)
+
+        self.assertEqual(attempts, 1)
+        api_errors = [e for e in events if e[0] == "bot_text" and "**API Error:**" in e[1]]
+        self.assertEqual(len(api_errors), 1)
+        self.assertIn("Invalid API key", api_errors[0][1])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

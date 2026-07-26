@@ -215,6 +215,10 @@ class ProviderManager:
                 "fallback_provider": pdata.get("fallback_provider"),
                 "max_tokens": pdata.get("max_tokens"),
                 "max_steps": pdata.get("max_steps"),
+                "max_retries": pdata.get("max_retries", 3),
+                "retry_delay": pdata.get("retry_delay", 1.0),
+                "retry_backoff": pdata.get("retry_backoff", 2.0),
+                "max_retry_delay": pdata.get("max_retry_delay", 10.0),
                 "disabled": pkey in disabled_set,
                 "source": "json",
             }
@@ -363,6 +367,10 @@ class ProviderManager:
             fallback_provider=target_provider.get("fallback_provider"),
             max_tokens=target_provider.get("max_tokens") or 8192,
             max_steps=target_provider.get("max_steps") or 50,
+            max_retries=target_provider.get("max_retries", 3),
+            retry_delay=target_provider.get("retry_delay", 1.0),
+            retry_backoff=target_provider.get("retry_backoff", 2.0),
+            max_retry_delay=target_provider.get("max_retry_delay", 10.0),
         )
 
     def create_active_agent(self):
