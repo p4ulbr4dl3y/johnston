@@ -10,10 +10,20 @@ class MockAgent:
     def __init__(self, mode="action"):
         self.mode = mode
         self.compact_called = False
+        self.history = []
+        self.tokens_input = 0
+        self.tokens_output = 0
+        self.tokens_cache_read = 0
+        self.last_context_tokens = 0
+        self.total_tokens = 0
+        self.cost_usd = 0.0
 
     async def compact_history(self):
         self.compact_called = True
         return True, "History compacted"
+
+    def clear_history(self):
+        self.history = []
 
 
 class MockChatView:
@@ -78,6 +88,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_command_selected_idx_zero(self):
         from core.commands import RewindCommand
         app = MockApp()
+        app.agent.history = [{"role": "user", "content": "First message"}]
+        app.agent.tokens_input = 4000
+        app.agent.tokens_output = 3000
+        app.agent.tokens_cache_read = 2000
+        app.agent.last_context_tokens = 9000
+        app.agent.total_tokens = 7000
+        app.agent.cost_usd = 0.12
         app.chat_view.get_user_messages = lambda: [(0, "First message")]
         rolled_back_target = []
         app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
@@ -99,6 +116,14 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(rolled_back_target, [-1])
         self.assertEqual(mock_input.text, "First message")
+        self.assertEqual(app.agent.history, [])
+        self.assertEqual(app.agent.tokens_input, 0)
+        self.assertEqual(app.agent.tokens_output, 0)
+        self.assertEqual(app.agent.tokens_cache_read, 0)
+        self.assertEqual(app.agent.last_context_tokens, 0)
+        self.assertEqual(app.agent.total_tokens, 0)
+        self.assertEqual(app.agent.cost_usd, 0.0)
+        self.assertTrue(app.status_refreshed)
 
     async def test_unknown_command(self):
         app = MockApp()
