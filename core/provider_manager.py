@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_DIR, PROVIDERS_JSON_FILE, USER_PROVIDERS_DIR
+from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 
 johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 core_dir = os.path.dirname(os.path.abspath(__file__))
@@ -143,8 +143,6 @@ class ProviderManager:
         self.ensure_config_dir()
 
     def ensure_config_dir(self):
-        os.makedirs(PROVIDERS_DIR, exist_ok=True)
-        os.makedirs(USER_PROVIDERS_DIR, exist_ok=True)
         os.makedirs(CONFIG_DIR, exist_ok=True)
 
         if not os.path.exists(PROVIDERS_JSON_FILE):

@@ -11,9 +11,9 @@ dependencies = [
     "textual>=8.0.0",
     "openai>=1.0.0",
     "httpx>=0.25.0",
+    "rich",
+    "pygments",
     "markdown-it-py",
-    "linkify-it-py",
-    "mdit-py-plugins",
     "pillow>=12.3.0",
     "markitdown>=0.1.0",
 ]
@@ -22,10 +22,27 @@ dependencies = [
 johnston = "app:main"
 
 [tool.hatch.build]
-exclude = ["dist", "tests"]
+exclude = [
+    ".github",
+    ".johnston",
+    ".ruff_cache",
+    ".serena",
+    "AGENTS.md",
+    "dist",
+    "install.ps1",
+    "install.sh",
+    "tests",
+    "uv.lock",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+only-include = [
+    "app.py",
+    "app.tcss",
+    "core",
+    "tools",
+    "widgets",
+]
 
 [dependency-groups]
 dev = [
@@ -42,3 +59,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "app.py" = ["E402"]
+
+[tool.deptry.package_module_name_map]
+"markdown-it-py" = ["markdown_it"]
+pillow = ["PIL"]

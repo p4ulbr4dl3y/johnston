@@ -12,7 +12,6 @@ class TestProviderManagerJson(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             json_file = os.path.join(tmpdir, "providers.json")
             config_file = os.path.join(tmpdir, "config.json")
-            prov_dir = os.path.join(tmpdir, "providers")
 
             sample_data = {
                 "custom_json": {
@@ -27,8 +26,7 @@ class TestProviderManagerJson(unittest.TestCase):
 
             with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), \
                  patch("core.provider_manager.CONFIG_FILE", config_file), \
-                 patch("core.provider_manager.PROVIDERS_DIR", prov_dir), \
-                 patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                  patch("core.provider_manager.CONFIG_DIR", tmpdir):
                 pm = ProviderManager()
                 providers = pm.load_providers()
 
@@ -47,7 +45,6 @@ class TestProviderManagerJson(unittest.TestCase):
             with tempfile.TemporaryDirectory() as tmpdir:
                 json_file = os.path.join(tmpdir, "providers.json")
                 config_file = os.path.join(tmpdir, "config.json")
-                prov_dir = os.path.join(tmpdir, "providers")
 
                 sample_data = {
                     "no_models_endpoint": {
@@ -64,8 +61,7 @@ class TestProviderManagerJson(unittest.TestCase):
 
                 with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), \
                      patch("core.provider_manager.CONFIG_FILE", config_file), \
-                     patch("core.provider_manager.PROVIDERS_DIR", prov_dir), \
-                     patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                          patch("core.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     models = await pm.fetch_models_for_provider("no_models_endpoint", force_refresh=True)
                     self.assertEqual(models, ["model-1", "model-2", "model-3"])

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROVIDERS_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
+with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
     from core.provider_manager import ProviderManager
 
 class TestProviderManager(unittest.TestCase):
@@ -14,12 +14,10 @@ class TestProviderManager(unittest.TestCase):
 
         # Patch config values inside provider_manager
         self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
-        self.providers_dir_patcher = patch("core.provider_manager.PROVIDERS_DIR", os.path.join(self.test_dir, "providers"))
         self.config_file_patcher = patch("core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
         self.providers_json_patcher = patch("core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json"))
 
         self.config_dir_patcher.start()
-        self.providers_dir_patcher.start()
         self.config_file_patcher.start()
         self.providers_json_patcher.start()
 
@@ -27,13 +25,12 @@ class TestProviderManager(unittest.TestCase):
 
     def tearDown(self):
         self.config_dir_patcher.stop()
-        self.providers_dir_patcher.stop()
         self.config_file_patcher.stop()
         self.providers_json_patcher.stop()
         shutil.rmtree(self.test_dir)
 
     def test_ensure_config_dir(self):
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers")))
+        self.assertTrue(os.path.exists(self.test_dir))
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers.json")))
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "config.json")))
 

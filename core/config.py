@@ -4,8 +4,6 @@ from core.platform_utils import johnston_config_dir
 
 CONFIG_DIR = str(johnston_config_dir())
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROVIDERS_DIR = os.path.join(PROJECT_DIR, "providers")
-USER_PROVIDERS_DIR = os.path.join(CONFIG_DIR, "providers")
 PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")

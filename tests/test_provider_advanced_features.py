@@ -43,15 +43,14 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
 }""")
             with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
-                    with patch("core.provider_manager.PROVIDERS_DIR", os.path.join(tmpdir, "providers")):
-                        pm = ProviderManager()
-                        agent = pm.create_agent_for_provider("test_custom")
-                        self.assertIsNotNone(agent)
-                        self.assertEqual(agent.headers, {"X-Test": "123"})
-                        self.assertEqual(agent.extra_body, {"top_p": 0.9})
-                        self.assertEqual(agent.reasoning_effort, "medium")
-                        self.assertEqual(agent.chunk_timeout, 20.0)
-                        self.assertEqual(agent.fallback_provider, "opencode")
+                    pm = ProviderManager()
+                    agent = pm.create_agent_for_provider("test_custom")
+                    self.assertIsNotNone(agent)
+                    self.assertEqual(agent.headers, {"X-Test": "123"})
+                    self.assertEqual(agent.extra_body, {"top_p": 0.9})
+                    self.assertEqual(agent.reasoning_effort, "medium")
+                    self.assertEqual(agent.chunk_timeout, 20.0)
+                    self.assertEqual(agent.fallback_provider, "opencode")
 
     def test_provider_disabling(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,11 +100,10 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
 }""")
             with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
-                    with patch("core.provider_manager.PROVIDERS_DIR", os.path.join(tmpdir, "providers")):
-                        pm = ProviderManager()
-                        agent = pm.create_agent_for_provider("test_no_max")
-                        self.assertIsNotNone(agent)
-                        self.assertEqual(agent.max_tokens, 8192)
+                    pm = ProviderManager()
+                    agent = pm.create_agent_for_provider("test_no_max")
+                    self.assertIsNotNone(agent)
+                    self.assertEqual(agent.max_tokens, 8192)
 
 
 if __name__ == "__main__":

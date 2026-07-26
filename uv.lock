@@ -378,12 +378,12 @@ version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
-    { name = "linkify-it-py" },
     { name = "markdown-it-py" },
     { name = "markitdown" },
-    { name = "mdit-py-plugins" },
     { name = "openai" },
     { name = "pillow" },
+    { name = "pygments" },
+    { name = "rich" },
     { name = "textual" },
 ]
 
@@ -395,12 +395,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.25.0" },
-    { name = "linkify-it-py" },
     { name = "markdown-it-py" },
     { name = "markitdown", specifier = ">=0.1.0" },
-    { name = "mdit-py-plugins" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pillow", specifier = ">=12.3.0" },
+    { name = "pygments" },
+    { name = "rich" },
     { name = "textual", specifier = ">=8.0.0" },
 ]
 
