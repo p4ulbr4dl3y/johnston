@@ -621,7 +621,7 @@ class ToolCallWidget(Vertical):
 
         clean_code_lines = []
         for line in lines:
-            cleaned_line = re.sub(r"^\s*\d+\s*\|\s?", "", line)
+            cleaned_line = re.sub(r"^(?:\s*\d+\s*\|\s?)+", "", line)
             clean_code_lines.append(cleaned_line)
 
         return "\n".join(clean_code_lines), start_line, file_path

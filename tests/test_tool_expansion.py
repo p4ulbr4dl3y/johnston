@@ -155,6 +155,13 @@ class TestToolExpansion(unittest.TestCase):
         self.assertFalse(tw.is_expanded)
         self.assertFalse(tw.md_widget.display)
 
+    def test_format_read_content_strips_nested_line_numbers(self):
+        widget = ToolCallWidget(tool_type="read", target="test.log")
+        raw = "    150 |     150 | ### Uh oh!"
+        clean, start, path = widget._format_read_content(raw, "test.log")
+        self.assertEqual(clean, "### Uh oh!")
+
+
 
     def test_shell_tool_output_escapes_invalid_rich_markup(self):
         widget = ToolCallWidget(
