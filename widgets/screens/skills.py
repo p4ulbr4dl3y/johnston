@@ -71,7 +71,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
                 yield OptionList(*self.options)
             else:
                 yield Markdown("*No skills found in ~/.johnston/skills/ or .johnston/skills/*", classes="modal-body")
-            yield Label("enter: view detail • esc: cancel • ↑/↓: navigate", id="modal-hint")
+            yield Label("enter: activate • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
     def on_mount(self) -> None:
         if self.options:
@@ -84,16 +84,6 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.skills):
-            target_skill = self.skills[event.option_index]
-
-            def on_detail_close(activate: bool | None) -> None:
-                if activate:
-                    self.dismiss(target_skill)
-                else:
-                    opt_list = self.query_one(OptionList)
-                    opt_list.focus()
-                    opt_list.highlighted = event.option_index
-
-            self.app.push_screen(SkillDetailScreen(target_skill), callback=on_detail_close)
+            self.dismiss(self.skills[event.option_index])
         else:
             self.dismiss(None)

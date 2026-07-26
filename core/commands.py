@@ -306,10 +306,13 @@ class SkillsCommand(BaseCommand):
             return
 
         def on_skill_selected(selected_skill: dict | None) -> None:
+            chat_input = app.query_one("#message-input", ChatInput)
             if selected_skill:
                 s_name = selected_skill["name"]
-                app.generate_ai_response(f"Load and apply the skill '{s_name}'.", show_in_ui=True)
-            app.query_one("#message-input", ChatInput).focus()
+                chat_input.load_text(f"/{s_name} ")
+                lines = chat_input.text.split("\n")
+                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+            chat_input.focus()
 
         app.push_screen(SkillsScreen(), callback=on_skill_selected)
 
