@@ -30,7 +30,6 @@ class BashTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Terminal command to execute"},
-                    "skip_confirm": {"type": "boolean", "description": "If true, skip the user confirmation prompt for destructive commands (use only for safe, repeated operations)"},
                     "no_background": {"type": "boolean", "description": "If true, block until the command finishes instead of moving long-running commands to the background"}
                 },
                 "required": ["command"]

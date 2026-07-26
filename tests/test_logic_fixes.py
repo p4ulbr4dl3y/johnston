@@ -6,6 +6,7 @@ import unittest.mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.base_provider import BaseAgent
+from core.mode_manager import ModeDefinition
 from core.subagent_tracker import SubagentTracker
 from tools.ask_user import AskUserTool
 
@@ -91,6 +92,23 @@ class TestImagePayloadPreservation(unittest.IsolatedAsyncioTestCase):
         agent.history = copy_history + [{"role": "user", "content": "next turn"}]
         agent._restore_image_payloads()
         self.assertEqual(agent.history[0]["content"], original_content)
+
+
+class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
+    async def test_read_only_blocks_write_aliases(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
+        self.addAsyncCleanup(agent.close)
+        mode_def = ModeDefinition("explore", "Explore", read_only=True)
+        err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, mode_def)
+        self.assertIsNotNone(err)
+        self.assertIn("disabled", err)
+
+    async def test_disallowed_tools_blocks_aliases(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
+        self.addAsyncCleanup(agent.close)
+        mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["bash"])
+        err = agent._tool_policy_error("shell", {"command": "pwd"}, mode_def)
+        self.assertEqual(err, "Error: Tool 'bash' is disabled in Locked mode.")
 
 
 class TestFallbackMetricsMerge(unittest.IsolatedAsyncioTestCase):

@@ -9,7 +9,7 @@ from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import PromptBuilder
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
-from tools.registry import execute_tool
+from tools.registry import ALIAS_MAP, execute_tool
 
 
 class BaseAgent:
@@ -257,6 +257,55 @@ class BaseAgent:
             if tid and tid in payload_map:
                 msg["content"] = payload_map[tid]
 
+    def _canonical_tool_name(self, tool_name: str) -> str:
+        clean_name = (tool_name or "").strip()
+        return ALIAS_MAP.get(clean_name.lower(), clean_name)
+
+    def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
+        canonical_name = self._canonical_tool_name(tool_name).lower()
+        disallowed = {t.lower() for t in getattr(mode_def, "disallowed_tools", [])}
+
+        if getattr(mode_def, "read_only", False):
+            disallowed.update({"create", "edit"})
+
+        if canonical_name not in disallowed:
+            return None
+
+        if canonical_name in {"create", "edit"}:
+            f_path = args.get("path") or args.get("file") or ""
+            if f_path.endswith("plan.md") or ".johnston/plans" in f_path or ".johnston\\plans" in f_path:
+                return None
+            if f_path:
+                return f"Error: Editing code file '{f_path}' is disabled in {mode_def.name} mode."
+            return f"Error: Editing is disabled in {mode_def.name} mode."
+
+        return f"Error: Tool '{self._canonical_tool_name(tool_name)}' is disabled in {mode_def.name} mode."
+
+    async def _compact_messages_if_needed(
+        self,
+        messages: List[Dict[str, Any]],
+        sys_overhead: int,
+        threshold: int,
+    ) -> Tuple[List[Dict[str, Any]], bool]:
+        if len(messages) <= 5:
+            return messages, False
+
+        current_context = sys_overhead + estimate_tokens(messages[1:])
+        if current_context <= threshold:
+            self.last_context_tokens = current_context
+            return messages, False
+
+        self.history = messages[1:]
+        self._restore_image_payloads()
+        success, _ = await self.compact_history()
+        if not success:
+            self.last_context_tokens = current_context
+            return messages, False
+
+        compacted_history = self.sanitize_history_for_model(self.history)
+        self._optimize_history_images(compacted_history)
+        return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True
+
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
@@ -271,11 +320,13 @@ class BaseAgent:
         # context silently overflow before this threshold ever triggers.
         threshold = int(getattr(self, "context_limit", 32000) * 0.75)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
+        compacted_this_turn = False
         if len(self.history) > 4 and (estimate_tokens(self.history) + sys_overhead) > threshold:
             yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
             try:
                 success, _ = await self.compact_history()
                 if success:
+                    compacted_this_turn = True
                     yield ("compaction_divider", "Session Compacted", "")
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
@@ -325,19 +376,21 @@ class BaseAgent:
         try:
             max_steps = getattr(self, "max_steps", 50)
             step_count = 0
+            active_prompt_mode = agent_mode
             while True:
                 step_count += 1
                 if step_count > max_steps:
                     yield ("thinking", f"Reached maximum agent loop steps ({max_steps}). Stopping to prevent runaway tool execution.", "")
                     break
                 current_mode = getattr(self, "mode", "action")
-                agent_mode = current_mode
-                builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
-                sys_prompt = builder.build_system_prompt()
-                all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
-                self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
-                if messages and messages[0].get("role") == "system":
-                    messages[0]["content"] = sys_prompt
+                if current_mode != active_prompt_mode:
+                    active_prompt_mode = current_mode
+                    builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task)
+                    sys_prompt = builder.build_system_prompt()
+                    all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                    self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
+                    if messages and messages[0].get("role") == "system":
+                        messages[0]["content"] = sys_prompt
 
                 full_assistant_text = ""
                 step_usage = None
@@ -591,12 +644,9 @@ class BaseAgent:
                     from core.mode_manager import ModeManager
                     current_mode = getattr(self, "mode", "action").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
-                    if mode_def.read_only and t_name in ("edit", "create", "Edit", "Create"):
-                        f_path = args.get("path") or args.get("file") or ""
-                        if not (f_path.endswith("plan.md") or ".johnston/plans" in f_path or "plans/" in f_path):
-                            tool_result = f"Error: Editing code file '{f_path}' is disabled in {mode_def.name} mode. Instruct the user to switch to Action mode (via Shift+Tab or /action) to apply changes."
-                        else:
-                            tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
+                    policy_error = self._tool_policy_error(t_name, args, mode_def)
+                    if policy_error:
+                        tool_result = policy_error
                     else:
                         tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
 
@@ -629,8 +679,16 @@ class BaseAgent:
                         "content": content_str
                     })
 
-            self.history = messages[1:]
-            self._restore_image_payloads()
+                self.history = messages[1:]
+                self._restore_image_payloads()
+                messages, compacted_in_loop = (
+                    (messages, False)
+                    if compacted_this_turn
+                    else await self._compact_messages_if_needed(messages, self._last_sys_tokens, threshold)
+                )
+                if compacted_in_loop:
+                    compacted_this_turn = True
+                    yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:
             error_msg = f"**API Error:** `{err}`"
@@ -872,4 +930,3 @@ class BaseAgent:
             return True, f"History compacted successfully ({b_str} → {a_str} tokens)"
         except Exception as e:
             return False, f"Compaction error: {e}"
-

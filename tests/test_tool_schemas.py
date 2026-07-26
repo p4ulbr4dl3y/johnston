@@ -25,7 +25,7 @@ class TestToolSchemas(unittest.TestCase):
     def test_bash_schema_documents_background_and_params(self):
         from tools.bash import BashTool
         props = BashTool.schema["function"]["parameters"]["properties"]
-        self.assertIn("skip_confirm", props)
+        self.assertNotIn("skip_confirm", props)
         self.assertIn("no_background", props)
         self.assertIn("60 seconds", BashTool.schema["function"]["description"])
 
