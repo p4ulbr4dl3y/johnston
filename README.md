@@ -6,7 +6,6 @@
   | | (_) | | | | | | \__ \ | || (_) | | | |   
   | |\___/|_| |_|_| |_|___/  \__\___/|_| |_|   
  /_/                                           
-
     Python Terminal-based AI Assistant CLI
 </pre></div>
 
