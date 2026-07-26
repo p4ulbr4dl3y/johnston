@@ -385,10 +385,10 @@ class ToolCallWidget(Vertical):
                     target_str = self.target
             else:
                 target_str = self.target
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({target_str})")
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({self.target})")
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(self.target))})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
             tool_name = self.args.get("tool") or "call_mcp_tool"
             server = self.args.get("server") or ""
@@ -675,7 +675,7 @@ class ToolCallWidget(Vertical):
                         rendered = self._format_code_with_line_numbers(content)
                         self.content_widget.update(rendered)
                 else:
-                    self.content_widget.update(self.result_text or "(No content)")
+                    self.content_widget.update(escape(self.result_text or "(No content)"))
             elif self.tool_type in ("edit", "Edit"):
                 diff_text = self.result_text.strip()
                 if not diff_text or "@@" not in diff_text:
@@ -695,7 +695,7 @@ class ToolCallWidget(Vertical):
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
                     self.content_widget.update(formatted_diff)
                 else:
-                    self.content_widget.update(self.result_text or "(No diff)")
+                    self.content_widget.update(escape(self.result_text or "(No diff)"))
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text
                 default_target = self.args.get("url") or file_path or "page.md"
@@ -728,12 +728,12 @@ class ToolCallWidget(Vertical):
                         rendered = self._format_code_with_line_numbers(clean_code)
                         self.content_widget.update(rendered)
                 else:
-                    self.content_widget.update(self.result_text or "(No content)")
+                    self.content_widget.update(escape(self.result_text or "(No content)"))
             elif self.tool_type in ("bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     output_text = "(Running command...)"
-                self.content_widget.update(output_text)
+                self.content_widget.update(escape(output_text))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 server = self.args.get("server", "")
                 tool = self.args.get("tool", "")
@@ -758,9 +758,9 @@ class ToolCallWidget(Vertical):
                     )
                     self.content_widget.update(syntax)
                 except Exception:
-                    self.content_widget.update(full_display)
+                    self.content_widget.update(escape(full_display))
             else:
-                self.content_widget.update(self.result_text or "(No result)")
+                self.content_widget.update(escape(self.result_text or "(No result)"))
         except Exception:
             pass
 

@@ -156,5 +156,17 @@ class TestToolExpansion(unittest.TestCase):
         self.assertFalse(tw.md_widget.display)
 
 
+    def test_bash_tool_output_escapes_invalid_rich_markup(self):
+        widget = ToolCallWidget(
+            tool_type="bash",
+            target="python -m pytest",
+            result_text="Found error: [tag=e1]\n",
+            args={"command": "python -m pytest"}
+        )
+        widget.toggle_expanded()
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertEqual(content, r"Found error: \[tag=e1]")
+
+
 if __name__ == "__main__":
     unittest.main()
