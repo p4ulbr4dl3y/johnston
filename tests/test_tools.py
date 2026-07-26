@@ -2,7 +2,6 @@ import os
 import tempfile
 import unittest
 
-from core.rtk_manager import rewrite_cmd
 from tools.bash import BashTool
 from tools.create import CreateTool
 from tools.edit import EditTool
@@ -132,15 +131,6 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Command with output and exit code
         res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
         self.assertIn("error msg", res_err)
-
-    def test_rtk_rewrite_cmd(self):
-        # Test rtk rewrite behavior
-        cmd = "git status"
-        rewritten = rewrite_cmd(cmd)
-        if rewritten != cmd:
-            self.assertTrue(rewritten.startswith("rtk "))
-        # Testing rtk command passthrough
-        self.assertEqual(rewrite_cmd("rtk git status"), "rtk git status")
 
     async def test_linter_tool(self):
         # Test run_linter helper function

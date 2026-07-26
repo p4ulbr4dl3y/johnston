@@ -26,14 +26,6 @@ else
     uv tool install --force johnston
 fi
 
-# 3. Optional dependency notice (rtk)
-if ! command -v rtk >/dev/null 2>&1; then
-    echo ""
-    echo "[INFO] Optional tool 'rtk' not found."
-    echo "       Johnston works without it, but rtk enables CLI output token compression."
-    echo "       To install rtk: cargo install rtk (or see https://github.com/rtk-org/rtk)"
-fi
-
 echo ""
 echo "=== Installation complete! ==="
 echo "Run 'johnston' to start Johnston."
