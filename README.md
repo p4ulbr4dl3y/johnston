@@ -9,7 +9,7 @@
  /_/                                           
 </pre>
 
-<p align="center"><strong>Python Terminal-based AI Assistant CLI</strong></p>
+<p align="center"><code>Python Terminal-based AI Assistant CLI</code></p>
 </div>
 
 ## Quick Start
