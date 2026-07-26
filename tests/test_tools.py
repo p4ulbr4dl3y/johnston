@@ -133,12 +133,36 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("error msg", res_err)
 
     async def test_linter_tool(self):
-        # Test run_linter helper function
-        file_path = os.path.join(self.test_dir, "syntax.py")
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write("import os\nimport sys\n")
-        res = await run_linter(file_path)
-        self.assertIsInstance(res, str)
+        syntax_path = os.path.join(self.test_dir, "syntax.py")
+        with open(syntax_path, "w", encoding="utf-8") as f:
+            f.write("def broken(:\n    pass\n")
+
+        syntax_res = await run_linter(syntax_path)
+        self.assertIn("[Linter Feedback]", syntax_res)
+        self.assertIn("invalid-syntax", syntax_res)
+
+        undefined_path = os.path.join(self.test_dir, "undefined.py")
+        with open(undefined_path, "w", encoding="utf-8") as f:
+            f.write("print(missing_name)\n")
+
+        undefined_res = await run_linter(undefined_path)
+        self.assertIn("[Linter Feedback]", undefined_res)
+        self.assertIn("F821", undefined_res)
+
+        long_line_path = os.path.join(self.test_dir, "long_line.py")
+        long_value = "a" * 160
+        with open(long_line_path, "w", encoding="utf-8") as f:
+            f.write(f"value = '{long_value}'\nprint(value)\n")
+
+        long_line_res = await run_linter(long_line_path)
+        self.assertEqual("", long_line_res)
+
+        import_order_path = os.path.join(self.test_dir, "import_order.py")
+        with open(import_order_path, "w", encoding="utf-8") as f:
+            f.write("import sys\nimport os\n\nprint(os.name, sys.version)\n")
+
+        import_order_res = await run_linter(import_order_path)
+        self.assertEqual("", import_order_res)
 
     async def test_tool_aliases_and_case(self):
         from tools.registry import execute_tool
