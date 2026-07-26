@@ -389,6 +389,9 @@ Include only information that would help another agent continue correctly:
 - verification status, including tests or checks run
 - known risks, blockers, or assumptions
 
+If there is little or no prior session context, say that explicitly.
+Do not infer completed work, inspected files, decisions, or verification that are not present in the conversation.
+
 Prefer short sections and bullets. Be specific enough that another agent can resume without rereading the whole conversation."""
 
 

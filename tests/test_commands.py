@@ -142,6 +142,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         self.assertIn("handoff note", app.ai_prompts[0][0])
         self.assertIn("Do not create, edit, or delete files", app.ai_prompts[0][0])
+        self.assertIn("little or no prior session context", app.ai_prompts[0][0])
 
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
