@@ -1,5 +1,4 @@
-<div align="center">
-<pre>
+<div align="center"><pre>
    _       _                 _                 
   (_)     | |               | |                
    _  ___ | |__  _ __  ___ _| |_ ___  _ __     
@@ -7,10 +6,9 @@
   | | (_) | | | | | | \__ \ | || (_) | | | |   
   | |\___/|_| |_|_| |_|___/  \__\___/|_| |_|   
  /_/                                           
-</pre>
 
-<p align="center"><code>Python Terminal-based AI Assistant CLI</code></p>
-</div>
+    Python Terminal-based AI Assistant CLI
+</pre></div>
 
 ## Quick Start
 
