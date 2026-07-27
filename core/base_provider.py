@@ -123,7 +123,7 @@ class BaseAgent:
         chunk_timeout: float = 30.0,
         fallback_provider: str = None,
         max_tokens: int = 8192,
-        max_steps: int = 50,
+        max_steps: int = None,
         max_tool_calls: int = 200,
         max_wall_seconds: float = 30 * 60,
         max_retries: int = 3,
