@@ -143,7 +143,9 @@ All unit tests are isolated in [tests/](file:///Users/yegor/johnston/tests/).
 
 * **Run tests**:
   ```bash
-  uv run python -m unittest discover -s tests
+  uv run pytest
+  # or
+  uv run python -m unittest discover -s tests/core -s tests/tools -s tests/ui -s tests/adapters
   ```
 * **Run linter**:
   ```bash

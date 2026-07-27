@@ -84,7 +84,10 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
 
     async def test_skill_slash_command_execution(self):
         from core.commands import handle_slash_command
-        from tests.test_commands import MockApp
+        try:
+            from tests.core.test_commands import MockApp
+        except ImportError:
+            from core.test_commands import MockApp
 
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-architect configure MCP")
