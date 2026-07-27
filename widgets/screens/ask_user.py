@@ -100,14 +100,16 @@ class QuestionScreen(ModalScreen[dict]):
         self.submit_answer()
 
     def on_key(self, event: events.Key) -> None:
-        if event.key == "up" and self.raw_options:
+        if event.key in ("up", "key_up") and self.raw_options:
             try:
                 input_field = self.query_one("#write-in-input", Input)
-                if self.focused is input_field:
-                    opt_list = self.query_one("#options-list", OptionList)
-                    opt_list.highlighted = len(self.options) - 2
+                opt_list = self.query_one("#options-list", OptionList)
+                if input_field.has_focus or opt_list.highlighted == len(self.options) - 1:
+                    input_field.display = False
+                    opt_list.highlighted = max(0, len(self.options) - 2)
                     opt_list.focus()
                     event.stop()
+                    event.prevent_default()
             except Exception:
                 pass
 
