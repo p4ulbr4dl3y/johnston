@@ -297,6 +297,17 @@ class RewindCommand(BaseCommand):
                     if hasattr(app.agent, attr):
                         setattr(app.agent, attr, value)
 
+                # Restore Git checkpoint state if available
+                checkpoint_restored = False
+                curr_sid = getattr(app, "current_session_id", None)
+                if curr_sid:
+                    try:
+                        from core.git_checkpoint import GitCheckpointManager
+                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, selected_idx)
+                        GitCheckpointManager.purge_checkpoints_after(curr_sid, selected_idx)
+                    except Exception as e:
+                        print(f"Git checkpoint restore failed: {e}")
+
                 app.refresh_status_footer()
                 app.save_current_session()
 
@@ -306,7 +317,10 @@ class RewindCommand(BaseCommand):
                 lines = chat_input.text.split("\n")
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
 
-                app.notify("Chat rolled back! Message loaded into input field.")
+                if checkpoint_restored:
+                    app.notify("Chat and git state rolled back! Message loaded into input field.")
+                else:
+                    app.notify("Chat rolled back! Message loaded into input field.")
             app.query_one("#message-input").focus()
 
         app.push_screen(RewindScreen(user_msgs), callback=on_rewind_selected)
