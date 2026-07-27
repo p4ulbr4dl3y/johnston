@@ -381,9 +381,10 @@ class AskUserWizardScreen(ModalScreen[str]):
             summary = ""
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question_text", "")
-                ans_info = self.answers.get(idx, {"answer": "No response"})
-                ans_val = ans_info.get("answer") or "No response"
-                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_val}\n\n"
+                ans_info = self.answers.get(idx, {})
+                ans_val = ans_info.get("answer", "")
+                ans_display = ans_val if ans_val else "(No response)"
+                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_display}\n\n"
 
             title_md.update("### **Confirm your answers**\n\n" + summary)
             opt_list.display = False
@@ -446,13 +447,13 @@ class AskUserWizardScreen(ModalScreen[str]):
         if self.q_idx < len(self.questions):
             if not self.raw_options:
                 val = self.query_one("#write-in-input", Input).value.strip()
-                answer = val if val else "No response"
+                answer = val
             else:
                 opt_list = self.query_one("#options-list", OptionList)
                 idx = opt_list.highlighted
                 if idx == len(self.options) - 1:
                     val = self.query_one("#write-in-input", Input).value.strip()
-                    answer = val if val else "No response"
+                    answer = val
                 else:
                     answer = self.options[idx] if idx is not None and idx < len(self.options) else ""
 
@@ -463,10 +464,12 @@ class AskUserWizardScreen(ModalScreen[str]):
             out_summary = ""
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question_text", "")
-                ans_info = self.answers.get(idx, {"answer": "No response"})
-                ans_val = ans_info.get("answer") or "No response"
-                out_summary += f"Question: {q_clean}\nAnswer: {ans_val}\n"
+                ans_info = self.answers.get(idx, {})
+                ans_val = ans_info.get("answer", "")
+                ans_display = ans_val if ans_val else "(No response)"
+                out_summary += f"Question: {q_clean}\nAnswer: {ans_display}\n"
             self.dismiss(out_summary.strip())
+
 
 
 
