@@ -132,6 +132,11 @@ class SessionManager:
         filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
         if os.path.exists(filepath):
             os.remove(filepath)
+        try:
+            from core.git_checkpoint import GitCheckpointManager
+            GitCheckpointManager.delete_session_checkpoints(session_id, project_path=self.project_path)
+        except Exception:
+            pass
 
     def get_active_session_id(self) -> Optional[str]:
         """Returns ID of last active session or None if none exist"""

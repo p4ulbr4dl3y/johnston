@@ -534,6 +534,15 @@ class JohnstonApp(App):
         if show_in_ui:
             await chat_view.add_user_message(user_text)
             self.save_current_session()
+            curr_sid = getattr(self, "current_session_id", None)
+            if curr_sid:
+                user_msgs = chat_view.get_user_messages()
+                msg_idx = len(user_msgs) - 1
+                try:
+                    from core.git_checkpoint import GitCheckpointManager
+                    GitCheckpointManager.create_checkpoint(curr_sid, msg_idx)
+                except Exception as e:
+                    print(f"Git checkpoint creation failed: {e}")
 
         full_prompt = self.prepare_prompt_with_attachments(user_text)
 
