@@ -47,7 +47,7 @@ class AskUserTool(BaseTool):
         if not questions_list and question:
             questions_list = [{"question_text": question, "options": []}]
 
-        if ctx.app and questions_list and isinstance(questions_list, list):
+        if ctx.app and hasattr(ctx.app, "push_screen") and questions_list and isinstance(questions_list, list):
             try:
                 from widgets.modal_screens import ConfirmScreen, QuestionScreen
                 answers = {}

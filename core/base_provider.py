@@ -821,19 +821,21 @@ class BaseAgent:
                         else:
                             tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
-                        tool_app = getattr(self, "app", None) or self
+                        tool_app = getattr(self, "app", None)
                         previous_policy_approved = getattr(
                             tool_app, "_johnston_policy_approved", False
-                        )
-                        setattr(tool_app, "_johnston_policy_approved", policy_approved)
+                        ) if tool_app else False
+                        if tool_app:
+                            setattr(tool_app, "_johnston_policy_approved", policy_approved)
                         try:
                             tool_result = await execute_tool(t_name, args, app=tool_app)
                         finally:
-                            setattr(
-                                tool_app,
-                                "_johnston_policy_approved",
-                                previous_policy_approved,
-                            )
+                            if tool_app:
+                                setattr(
+                                    tool_app,
+                                    "_johnston_policy_approved",
+                                    previous_policy_approved,
+                                )
                             append_tool_result(
                             mode=current_mode,
                             tool=t_name,
