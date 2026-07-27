@@ -172,7 +172,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_background(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-bg", "Task", "prompt", "general", True)
+        self.tracker.create_session("sub-bg", "Task", "prompt", "general", True)
 
         class MockSubagent:
             def __init__(self):

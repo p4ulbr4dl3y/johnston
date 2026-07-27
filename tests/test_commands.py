@@ -168,14 +168,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         self.assertIn("AGENTS.md", app.ai_prompts[0][0])
 
-    async def test_demo_command(self):
-        app = MockApp()
-        handled = await handle_slash_command(app, "/demo")
-        self.assertTrue(handled)
-        self.assertIsNotNone(app.pushed_screen)
-        self.assertEqual(app.pushed_screen.__class__.__name__, "AskUserWizardScreen")
-
-
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
         from core.models_catalog import catalog

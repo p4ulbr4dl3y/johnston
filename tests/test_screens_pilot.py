@@ -2,20 +2,18 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.widgets import OptionList
 
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
-from widgets.screens.model import ModelScreen, VisionWarningScreen
+from widgets.screens.model import ModelScreen
 from widgets.screens.policy import PolicyScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
-from widgets.screens.subagent_screen import SubagentViewScreen
-
 from widgets.screens.subagents import SubagentsScreen
-from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
+from widgets.screens.tasks import TasksListScreen
 
 
 class DummyHostApp(App[None]):
@@ -155,11 +153,11 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_subagents_screen_pilot(self):
-        from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
+        from core.subagent_tracker import SubagentTracker
         tracker = SubagentTracker.get_instance()
         tracker.storage_dir = self.test_dir
         tracker.sessions.clear()
-        sess = tracker.create_session("sub-p1", "Pilot subagent", "do work", "general", False)
+        tracker.create_session("sub-p1", "Pilot subagent", "do work", "general", False)
 
         try:
             screen = SubagentsScreen()
@@ -218,7 +216,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
         from widgets.screens.ask_user import AskUserWizardScreen
-        from textual.widgets import OptionList
 
         questions = [
             {"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}

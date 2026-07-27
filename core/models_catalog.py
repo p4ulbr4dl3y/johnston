@@ -18,7 +18,6 @@ MODELS_DEV_URL = "https://models.dev/api.json"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_catalog_cache.json")
-LEGACY_CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "openrouter_catalog.json")
 CACHE_TTL = 86400  # 24 hours
 
 DEFAULT_CONTEXT_LIMIT = 128000
@@ -71,7 +70,7 @@ class ModelsCatalog:
             pass
 
     def load_cache(self) -> bool:
-        target_file = CACHE_FILE if os.path.exists(CACHE_FILE) else (LEGACY_CACHE_FILE if os.path.exists(LEGACY_CACHE_FILE) else None)
+        target_file = CACHE_FILE if os.path.exists(CACHE_FILE) else None
         if target_file:
             try:
                 with open(target_file, "r", encoding="utf-8") as f:

@@ -1,6 +1,6 @@
 import unittest
 
-from core.bash_guard import analyze_bash_command
+from core.shell_guard import analyze_bash_command
 
 
 class TestBashGuard(unittest.TestCase):

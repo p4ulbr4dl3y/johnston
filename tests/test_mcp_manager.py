@@ -246,6 +246,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
     def test_client_start_initialize_and_call_tool(self):
         from unittest.mock import MagicMock
+
         from core.mcp_manager import MCPProcessClient
 
         client = MCPProcessClient("mock_server", "echo hello", cwd=self.test_dir, env={"TEST_ENV": "1"})
@@ -259,7 +260,6 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         mock_proc.stdout = mock_stdout
         mock_proc.poll.return_value = None
 
-        import subprocess
         with unittest.mock.patch("subprocess.Popen", return_value=mock_proc):
             with unittest.mock.patch("os.set_blocking"):
                 # Mock _read_response for initialize and list_tools
