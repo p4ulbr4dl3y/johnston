@@ -90,6 +90,13 @@ class ShellTool(BaseTool):
 
         if supports_pty():
             try:
+                import signal
+                if hasattr(signal, "SIGHUP"):
+                    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+            except Exception:
+                pass
+
+            try:
                 import pty
 
                 master_fd, slave_fd = pty.openpty()
