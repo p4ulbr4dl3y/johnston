@@ -537,6 +537,17 @@ class ExploreCommand(BaseCommand):
             app.refresh_status_footer()
 
 
+class PolicyCommand(BaseCommand):
+    name = "/policy"
+    aliases = ["/rules", "/permissions"]
+    description = "Manage tool & capability security policies"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.policy import PolicyScreen
+
+        app.push_screen(PolicyScreen())
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -549,6 +560,7 @@ COMMAND_CLASSES = [
     SubagentsCommand,
     SkillsCommand,
     MCPCommand,
+    PolicyCommand,
     InitCommand,
     HandoffCommand,
     CompactCommand,

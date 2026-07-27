@@ -87,3 +87,40 @@ def get_policy_config(path: str = POLICY_CONFIG_PATH) -> PolicyConfig:
         tool_actions=tool_actions,
         budgets=budgets,
     )
+
+
+def save_policy_config(config_data: dict[str, Any], path: str = POLICY_CONFIG_PATH) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=2, ensure_ascii=False)
+
+
+def set_policy_action(
+    key_type: str, item_name: str, action: str, path: str = POLICY_CONFIG_PATH
+) -> str:
+    action = action.strip().lower()
+    if action not in {"allow", "ask", "block"}:
+        action = "allow"
+    data = _load_json(path)
+    section = "tools" if key_type == "tool" else "capabilities"
+    if section not in data or not isinstance(data[section], dict):
+        data[section] = {}
+    data[section][item_name] = action
+    save_policy_config(data, path)
+    return action
+
+
+def toggle_policy_action(
+    key_type: str, item_name: str, path: str = POLICY_CONFIG_PATH
+) -> str:
+    data = _load_json(path)
+    section = "tools" if key_type == "tool" else "capabilities"
+    current_map = data.get(section, {}) if isinstance(data.get(section), dict) else {}
+    current = current_map.get(item_name, "allow")
+    if isinstance(current, dict):
+        current = current.get("action", "allow")
+    current = str(current).lower()
+    next_action_map = {"allow": "ask", "ask": "block", "block": "allow"}
+    new_action = next_action_map.get(current, "allow")
+    return set_policy_action(key_type, item_name, new_action, path)
+

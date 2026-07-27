@@ -166,5 +166,36 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertIn("fs_read", names)
 
 
+class TestPolicyConfigSaveAndToggle(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.old_cwd = os.getcwd()
+        os.chdir(self.tmp.name)
+
+    def tearDown(self):
+        os.chdir(self.old_cwd)
+        self.tmp.cleanup()
+
+    def test_set_and_toggle_policy_action(self):
+        from core.policy_config import (
+            get_policy_config,
+            set_policy_action,
+            toggle_policy_action,
+        )
+
+        res = set_policy_action("tool", "shell", "ask")
+        self.assertEqual(res, "ask")
+
+        cfg = get_policy_config()
+        self.assertEqual(cfg.tool_actions.get("shell"), "ask")
+
+        toggled = toggle_policy_action("tool", "shell")
+        self.assertEqual(toggled, "block")
+
+        toggled2 = toggle_policy_action("tool", "shell")
+        self.assertEqual(toggled2, "allow")
+
+
 if __name__ == "__main__":
     unittest.main()
+
