@@ -13,8 +13,8 @@ class RewindScreen(BaseSelectionScreen[int]):
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
             opt = f"{clean[:50]}..." if len(clean) > 50 else clean
             opt = opt or "(empty message)"
-            if diff_stat:
-                opt = f"{opt}  [{diff_stat}]"
+            stat_label = diff_stat or "no checkpoint"
+            opt = f"{opt}  [{stat_label}]"
             options.append(opt)
 
         items = [msg[0] for msg in user_messages]

@@ -15,4 +15,4 @@ class TestRewindScreen(unittest.TestCase):
         self.assertNotIn("\r", screen.raw_options[0])
         self.assertIn("@/Users/yegor/testing/interactive_test.sh не чита", screen.raw_options[0])
         self.assertNotIn("\n", screen.raw_options[1])
-        self.assertEqual(screen.raw_options[1], "line 1 line 2 line 3")
+        self.assertEqual(screen.raw_options[1], "line 1 line 2 line 3  [no checkpoint]")
