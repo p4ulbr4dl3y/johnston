@@ -8,6 +8,19 @@ from textual.widgets import Input, Label, Markdown, OptionList
 class WriteInInput(Input):
     """Custom Input widget that handles Up key to return focus to OptionList"""
 
+    def _on_focus(self, event: events.Focus) -> None:
+        super()._on_focus(event)
+        val_len = len(self.value)
+        self.cursor_position = val_len
+        try:
+            from textual.widgets._input import Selection
+            self.selection = Selection(val_len, val_len)
+        except Exception:
+            try:
+                self.selection = (val_len, val_len)
+            except Exception:
+                pass
+
     def _on_key(self, event: events.Key) -> None:
         if event.key in ("up", "key_up"):
             if self.screen and hasattr(self.screen, "focus_options_list"):
@@ -43,6 +56,24 @@ class QuestionScreen(ModalScreen[dict]):
             yield OptionList(id="options-list")
             yield WriteInInput(placeholder="Type response here and press Enter...", id="write-in-input")
             yield Label("enter: select • ←: back • →: next • esc: cancel", id="modal-hint")
+
+    def focus_write_in_input(self) -> None:
+        try:
+            input_field = self.query_one("#write-in-input", Input)
+            input_field.display = True
+            input_field.focus()
+            val_len = len(input_field.value)
+            input_field.cursor_position = val_len
+            try:
+                from textual.widgets._input import Selection
+                input_field.selection = Selection(val_len, val_len)
+            except Exception:
+                try:
+                    input_field.selection = (val_len, val_len)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def focus_options_list(self) -> None:
         if not self.raw_options:
@@ -87,7 +118,7 @@ class QuestionScreen(ModalScreen[dict]):
         opt_list.highlighted = highlight_idx
 
         if highlight_idx == len(self.options) - 1:
-            input_field.focus()
+            self.focus_write_in_input()
         else:
             opt_list.focus()
 
@@ -97,8 +128,7 @@ class QuestionScreen(ModalScreen[dict]):
         try:
             input_field = self.query_one("#write-in-input", Input)
             if event.option_index == len(self.options) - 1:
-                input_field.display = True
-                input_field.focus()
+                self.focus_write_in_input()
             else:
                 input_field.display = False
         except Exception:
@@ -114,7 +144,7 @@ class QuestionScreen(ModalScreen[dict]):
             if event.option_index != len(self.options) - 1:
                 self.submit_answer()
             else:
-                self.query_one("#write-in-input", Input).focus()
+                self.focus_write_in_input()
         except Exception:
             pass
 
