@@ -216,10 +216,41 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Question: Pick color", str(app.dismiss_result))
             self.assertIn("Answer: Red", str(app.dismiss_result))
 
+    async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
+        from widgets.screens.ask_user import AskUserWizardScreen
+        from textual.widgets import OptionList
 
+        questions = [
+            {"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            opt_list = screen.query_one("#options-list", OptionList)
+
+            # Move down to "Item 1" (index 1)
+            await pilot.press("down")
+            await pilot.pause()
+            self.assertEqual(opt_list.highlighted, 1)
+
+            # Select Item 1 with Space
+            await pilot.press("space")
+            await pilot.pause()
+            self.assertEqual(screen.answers.get(0, {}).get("answer"), "Item 1")
+            self.assertEqual(opt_list.highlighted, 1)
+
+            # Deselect Item 1 with Space
+            await pilot.press("space")
+            await pilot.pause()
+            self.assertEqual(screen.answers.get(0, {}).get("answer"), "")
+            # Assert highlight index remains at 1 (did NOT reset to 0!)
+            self.assertEqual(opt_list.highlighted, 1)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
