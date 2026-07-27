@@ -148,6 +148,9 @@ class PolicyScreen(ModalScreen[None]):
             self.app.refresh_status_footer()
         self.dismiss(None)
 
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.action_toggle_action()
+
     def action_toggle_action(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)
         highlighted = opt_list.highlighted
