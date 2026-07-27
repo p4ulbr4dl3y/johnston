@@ -354,8 +354,6 @@ class AskUserWizardScreen(ModalScreen[str]):
             if self.raw_options:
                 opt_list.display = True
                 opt_list.clear_options()
-                for opt in self.options:
-                    opt_list.add_option(opt)
 
                 highlight_idx = 0
                 if prev_answer:
@@ -366,12 +364,18 @@ class AskUserWizardScreen(ModalScreen[str]):
                         input_field.value = prev_answer
                         input_field.display = True
 
+                for idx, opt in enumerate(self.options):
+                    is_selected = bool(prev_answer and ((idx < len(self.raw_options) and prev_answer == self.raw_options[idx]) or (idx == len(self.options) - 1 and prev_answer not in self.raw_options)))
+                    tag = r"\[✓]" if is_selected else r"\[ ]"
+                    opt_list.add_option(f"{tag} {opt}")
+
                 opt_list.highlighted = highlight_idx
                 if highlight_idx == len(self.options) - 1:
                     self.focus_write_in_input()
                 else:
                     input_field.display = False
                     opt_list.focus()
+
             else:
                 opt_list.display = False
                 input_field.display = True
