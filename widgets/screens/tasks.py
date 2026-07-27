@@ -123,7 +123,11 @@ class TasksListScreen(ModalScreen[None]):
         if idx is not None and idx < len(self.app.background_tasks):
             task = self.app.background_tasks[idx]
             if task.is_running:
-                await task.kill()
+                import inspect
+
+                res = task.kill()
+                if inspect.isawaitable(res):
+                    await res
                 self.app.notify(f"Task {task.task_id} terminated.")
                 if not task.is_background:
                     from tools.context import ToolContext
