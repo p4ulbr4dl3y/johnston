@@ -2,7 +2,7 @@ import difflib
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool, resolve_path
+from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.linter import run_linter
 
 
@@ -49,8 +49,7 @@ class EditTool(BaseTool):
         new_content = content.replace(old_string, new_string, 1)
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(new_content)
+            atomic_write_text(path, new_content)
         except Exception as e:
             return f"Error writing file '{path}': {e}"
 

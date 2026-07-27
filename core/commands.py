@@ -513,6 +513,30 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
+class TraceCommand(BaseCommand):
+    name = "/trace"
+    aliases = ["/debug-trace"]
+    description = "Show recent harness trace summary"
+
+    async def execute(self, app) -> None:
+        from core.trace import format_trace_summary
+
+        summary = format_trace_summary()
+        app.notify(summary, timeout=10)
+
+
+class RollbackCommand(BaseCommand):
+    name = "/rollback"
+    aliases = ["/undo-tool"]
+    description = "Rollback the last mutating tool transaction"
+
+    async def execute(self, app) -> None:
+        from core.trace import rollback_last_transaction
+
+        ok, msg = rollback_last_transaction()
+        app.notify(msg, severity="information" if ok else "warning", timeout=10)
+
+
 class ActionCommand(BaseCommand):
     name = "/action"
     aliases = ["/build", "/code"]
@@ -552,6 +576,8 @@ COMMAND_CLASSES = [
     InitCommand,
     HandoffCommand,
     CompactCommand,
+    TraceCommand,
+    RollbackCommand,
     ActionCommand,
     ExploreCommand,
 ]

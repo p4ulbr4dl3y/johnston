@@ -8,6 +8,9 @@ class BudgetLimits:
     max_tool_calls: int = 200
     max_wall_seconds: float = 30 * 60
     max_tool_result_chars: int = 120_000
+    max_writes: int = 50
+    max_changed_files: int = 200
+    max_diff_lines: int = 5000
 
 
 @dataclass(frozen=True)
@@ -30,6 +33,9 @@ class BudgetState:
         self.started_at = time.monotonic()
         self.steps = 0
         self.tool_calls = 0
+        self.writes = 0
+        self.changed_files = 0
+        self.diff_lines = 0
 
     def before_step(self) -> BudgetDecision:
         if self.steps >= self.limits.max_steps:
@@ -43,7 +49,7 @@ class BudgetState:
         self.steps += 1
         return BudgetDecision.allow()
 
-    def before_tool_call(self) -> BudgetDecision:
+    def before_tool_call(self, capabilities: set[str] | None = None) -> BudgetDecision:
         if self.tool_calls >= self.limits.max_tool_calls:
             return BudgetDecision.block(
                 f"Reached maximum tool-call budget ({self.limits.max_tool_calls})."
@@ -52,7 +58,27 @@ class BudgetState:
             return BudgetDecision.block(
                 f"Reached maximum wall-clock budget ({self.limits.max_wall_seconds:g}s)."
             )
+        capabilities = capabilities or set()
+        if "fs.write" in capabilities and self.writes >= self.limits.max_writes:
+            return BudgetDecision.block(
+                f"Reached maximum write budget ({self.limits.max_writes})."
+            )
         self.tool_calls += 1
+        if "fs.write" in capabilities:
+            self.writes += 1
+        return BudgetDecision.allow()
+
+    def record_diff(self, *, changed_files: int = 0, diff_lines: int = 0) -> BudgetDecision:
+        self.changed_files += max(0, changed_files)
+        self.diff_lines += max(0, diff_lines)
+        if self.changed_files > self.limits.max_changed_files:
+            return BudgetDecision.block(
+                f"Changed-files budget exceeded ({self.changed_files}/{self.limits.max_changed_files})."
+            )
+        if self.diff_lines > self.limits.max_diff_lines:
+            return BudgetDecision.block(
+                f"Diff-lines budget exceeded ({self.diff_lines}/{self.limits.max_diff_lines})."
+            )
         return BudgetDecision.allow()
 
     def summarize(self) -> dict[str, int | float]:
@@ -61,6 +87,12 @@ class BudgetState:
             "max_steps": self.limits.max_steps,
             "tool_calls": self.tool_calls,
             "max_tool_calls": self.limits.max_tool_calls,
+            "writes": self.writes,
+            "max_writes": self.limits.max_writes,
+            "changed_files": self.changed_files,
+            "max_changed_files": self.limits.max_changed_files,
+            "diff_lines": self.diff_lines,
+            "max_diff_lines": self.limits.max_diff_lines,
             "elapsed_seconds": round(time.monotonic() - self.started_at, 3),
             "max_wall_seconds": self.limits.max_wall_seconds,
         }

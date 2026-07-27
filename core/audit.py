@@ -57,6 +57,7 @@ def append_tool_decision(
     decision: str,
     reason: str,
     capabilities: set[str] | list[str] | tuple[str, ...] = (),
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     record: dict[str, Any] = {
         "event": "tool_decision",
@@ -65,6 +66,7 @@ def append_tool_decision(
         "decision": decision,
         "reason": reason,
         "capabilities": sorted(capabilities),
+        **(metadata or {}),
     }
     append_trace_event(record)
     try:
@@ -81,6 +83,7 @@ def append_tool_result(
     tool: str,
     result: Any,
     budget: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     append_trace_event(
         {
@@ -90,5 +93,6 @@ def append_tool_result(
             "result_hash": _hash(result),
             "result_preview": _preview(result),
             "budget": budget or {},
+            **(metadata or {}),
         }
     )

@@ -5,7 +5,7 @@ import unittest
 
 from core.audit import append_tool_result
 from core.budgets import BudgetLimits, BudgetState
-from core.trace import summarize_trace
+from core.trace import rollback_last_transaction, summarize_trace
 
 
 class TestHarnessRuntime(unittest.TestCase):
@@ -46,3 +46,10 @@ class TestHarnessRuntime(unittest.TestCase):
                 self.assertEqual(summary["tools"], {"shell": 1})
             finally:
                 os.chdir(old_cwd)
+
+    def test_rollback_without_checkpoint_is_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, msg = rollback_last_transaction(os.path.join(tmp, "missing.jsonl"))
+
+        self.assertFalse(ok)
+        self.assertIn("No transaction checkpoint", msg)

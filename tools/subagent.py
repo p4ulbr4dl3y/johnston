@@ -91,6 +91,21 @@ class SubagentTool(BaseTool):
 
         # Disable nested Task tool calls (recursion guard)
         subagent.allow_task = False
+        parent_agent = getattr(ctx.app, "agent", None)
+        if parent_agent is not None:
+            def numeric_limit(obj, name: str, default: int | float) -> int | float:
+                value = getattr(obj, name, default)
+                return value if isinstance(value, (int, float)) else default
+
+            subagent.max_steps = min(numeric_limit(subagent, "max_steps", 50), numeric_limit(parent_agent, "max_steps", 50))
+            subagent.max_tool_calls = min(
+                numeric_limit(subagent, "max_tool_calls", 200),
+                numeric_limit(parent_agent, "max_tool_calls", 200),
+            )
+            subagent.max_wall_seconds = min(
+                numeric_limit(subagent, "max_wall_seconds", 30 * 60),
+                numeric_limit(parent_agent, "max_wall_seconds", 30 * 60),
+            )
         original_tools = getattr(subagent, "tools", []) or []
         subagent.tools = [
             t for t in original_tools
