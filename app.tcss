@@ -414,6 +414,21 @@ ModalScreen {
     padding: 0;
 }
 
+#modal-dialog TabbedContent {
+    background: #18181b;
+    height: auto;
+}
+
+#modal-dialog ContentSwitcher {
+    height: auto;
+    background: #18181b;
+}
+
+#modal-dialog TabPane {
+    padding: 0;
+    background: #18181b;
+}
+
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus {
     height: auto;

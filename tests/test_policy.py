@@ -195,6 +195,20 @@ class TestPolicyConfigSaveAndToggle(unittest.TestCase):
         toggled2 = toggle_policy_action("tool", "shell")
         self.assertEqual(toggled2, "allow")
 
+    def test_set_and_cycle_budget_limit(self):
+        from core.policy_config import (
+            cycle_budget_limit,
+            get_policy_config,
+            set_budget_limit,
+        )
+
+        set_budget_limit("max_steps", 50)
+        cfg = get_policy_config()
+        self.assertEqual(cfg.budgets.max_steps, 50)
+
+        next_val = cycle_budget_limit("max_steps")
+        self.assertEqual(next_val, 100)
+
 
 if __name__ == "__main__":
     unittest.main()
