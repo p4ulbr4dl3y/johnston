@@ -30,13 +30,49 @@ class WriteInInput(Input):
         self.call_after_refresh(self._clear_selection)
 
     async def _on_key(self, event: events.Key) -> None:
-        if event.key in ("up", "key_up"):
-            if self.screen and hasattr(self.screen, "focus_options_list"):
-                getattr(self.screen, "focus_options_list")()
+        key = event.key
+        cursor = self.cursor_position
+        val_len = len(self.value)
+
+        if key in ("up", "key_up"):
+            if self.screen and getattr(self.screen, "raw_options", None):
+                if hasattr(self.screen, "focus_options_list"):
+                    getattr(self.screen, "focus_options_list")()
+                    event.stop()
+                    event.prevent_default()
+                    return
+            else:
+                if self.screen and hasattr(self.screen, "action_go_back"):
+                    getattr(self.screen, "action_go_back")()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
+        elif key in ("down", "key_down"):
+            if self.screen and hasattr(self.screen, "action_go_next"):
+                getattr(self.screen, "action_go_next")()
                 event.stop()
                 event.prevent_default()
                 return
+
+        elif key in ("left", "key_left"):
+            if cursor == 0:
+                if self.screen and hasattr(self.screen, "action_go_back"):
+                    getattr(self.screen, "action_go_back")()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
+        elif key in ("right", "key_right"):
+            if cursor == val_len:
+                if self.screen and hasattr(self.screen, "action_go_next"):
+                    getattr(self.screen, "action_go_next")()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
         await super()._on_key(event)
+
 
 
 
