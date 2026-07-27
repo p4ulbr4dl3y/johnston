@@ -744,6 +744,16 @@ class BaseAgent:
                 # some providers, so sort explicitly by the tool-call index key.
                 ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
 
+                # Deduplicate identical tool calls streamed by proxy/noisy providers
+                unique_calls = []
+                seen_signatures = set()
+                for tc in ordered_calls:
+                    sig = (tc["name"], tc["arguments"].strip())
+                    if sig not in seen_signatures:
+                        seen_signatures.add(sig)
+                        unique_calls.append(tc)
+                ordered_calls = unique_calls
+
                 assistant_tool_msg = {
                     "role": "assistant",
                     "content": full_assistant_text or None,
