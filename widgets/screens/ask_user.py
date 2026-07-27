@@ -32,6 +32,8 @@ class QuestionScreen(ModalScreen[dict]):
             yield Label("enter: select • ←: back • →: next • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
+        import time
+        self._mount_time = time.time()
         opt_list = self.query_one("#options-list", OptionList)
         input_field = self.query_one("#write-in-input", Input)
 
@@ -80,6 +82,9 @@ class QuestionScreen(ModalScreen[dict]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if not self.raw_options:
             return
+        import time
+        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
+            return
         try:
             if event.option_index != len(self.options) - 1:
                 self.submit_answer()
@@ -89,6 +94,9 @@ class QuestionScreen(ModalScreen[dict]):
             pass
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        import time
+        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
+            return
         self.submit_answer()
 
     def on_key(self, event: events.Key) -> None:
