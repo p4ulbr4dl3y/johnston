@@ -381,8 +381,9 @@ class AskUserWizardScreen(ModalScreen[str]):
             summary = ""
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question_text", "")
-                ans_info = self.answers.get(idx, {"answer": "Skipped"})
-                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_info['answer']}\n\n"
+                ans_info = self.answers.get(idx, {"answer": "No response"})
+                ans_val = ans_info.get("answer") or "No response"
+                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_val}\n\n"
 
             title_md.update("### **Confirm your answers**\n\n" + summary)
             opt_list.display = False
@@ -451,7 +452,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                 idx = opt_list.highlighted
                 if idx == len(self.options) - 1:
                     val = self.query_one("#write-in-input", Input).value.strip()
-                    answer = val if val else "Custom answer"
+                    answer = val if val else "No response"
                 else:
                     answer = self.options[idx] if idx is not None and idx < len(self.options) else ""
 
@@ -462,9 +463,12 @@ class AskUserWizardScreen(ModalScreen[str]):
             out_summary = ""
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question_text", "")
-                ans_info = self.answers.get(idx, {"answer": "Skipped"})
-                out_summary += f"Question: {q_clean}\nAnswer: {ans_info['answer']}\n"
+                ans_info = self.answers.get(idx, {"answer": "No response"})
+                ans_val = ans_info.get("answer") or "No response"
+                out_summary += f"Question: {q_clean}\nAnswer: {ans_val}\n"
             self.dismiss(out_summary.strip())
+
+
 
     def action_cancel(self) -> None:
         self.dismiss("Cancelled by user.")
