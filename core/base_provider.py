@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
+from core.budgets import BudgetLimits, BudgetState
 from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
@@ -122,6 +123,8 @@ class BaseAgent:
         fallback_provider: str = None,
         max_tokens: int = 8192,
         max_steps: int = 50,
+        max_tool_calls: int = 200,
+        max_wall_seconds: float = 30 * 60,
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
@@ -145,6 +148,8 @@ class BaseAgent:
         self.fallback_provider = fallback_provider
         self.max_tokens = max_tokens
         self.max_steps = max_steps
+        self.max_tool_calls = max_tool_calls
+        self.max_wall_seconds = max_wall_seconds
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.retry_backoff = retry_backoff
@@ -362,7 +367,39 @@ class BaseAgent:
         if decision.allowed:
             return None
         canonical_name = self._canonical_tool_name(tool_name)
+        if getattr(decision, "action", "block") == "ask":
+            return f"Error: Tool '{canonical_name}' requires approval by policy: {decision.reason}"
         return f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
+
+    async def _request_policy_approval(self, tool_name: str, args: Dict[str, Any], reason: str) -> bool:
+        app = getattr(self, "app", None)
+        if app is None:
+            return False
+        try:
+            import asyncio
+
+            future: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
+            canonical_name = self._canonical_tool_name(tool_name)
+            if canonical_name == "shell":
+                from widgets.modal_screens import BashConfirmScreen
+
+                screen = BashConfirmScreen(command=str(args.get("command", "")), reason=reason)
+            else:
+                from widgets.modal_screens import ConfirmScreen
+
+                target = args.get("tool") or canonical_name
+                screen = ConfirmScreen(
+                    f"Policy approval required for `{target}`.\n\nReason: {reason}"
+                )
+
+            def on_dismiss(result: Any) -> None:
+                if not future.done():
+                    future.set_result(bool(result) and result != "cancel")
+
+            app.push_screen(screen, callback=on_dismiss)
+            return bool(await future)
+        except Exception:
+            return False
 
     async def _compact_messages_if_needed(
         self,
@@ -457,13 +494,18 @@ class BaseAgent:
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
-            max_steps = getattr(self, "max_steps", 50)
-            step_count = 0
+            budget = BudgetState(
+                BudgetLimits(
+                    max_steps=getattr(self, "max_steps", 50),
+                    max_tool_calls=getattr(self, "max_tool_calls", 200),
+                    max_wall_seconds=getattr(self, "max_wall_seconds", 30 * 60),
+                )
+            )
             active_prompt_mode = agent_mode
             while True:
-                step_count += 1
-                if step_count > max_steps:
-                    yield ("thinking", f"Reached maximum agent loop steps ({max_steps}). Stopping to prevent runaway tool execution.", "")
+                budget_decision = budget.before_step()
+                if not budget_decision.allowed:
+                    yield ("thinking", f"{budget_decision.reason} Stopping to prevent runaway tool execution.", "")
                     break
                 current_mode = getattr(self, "mode", "action")
                 if current_mode != active_prompt_mode:
@@ -729,22 +771,42 @@ class BaseAgent:
                     from core.mode_manager import ModeManager
                     current_mode = getattr(self, "mode", "action").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
-                    from core.audit import append_tool_decision
-                    from core.policy import policy_engine
+                    from core.audit import append_tool_decision, append_tool_result
+                    from core.policy import PolicyDecision, policy_engine
 
-                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                    tool_budget_decision = budget.before_tool_call()
+                    if not tool_budget_decision.allowed:
+                        decision = PolicyDecision.block(tool_budget_decision.reason)
+                    else:
+                        decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                        if getattr(decision, "action", "block") == "ask":
+                            approved = await self._request_policy_approval(t_name, args, decision.reason)
+                            if approved:
+                                args = {**args, "policy_approved": True}
+                                if self._canonical_tool_name(t_name) == "shell":
+                                    args["skip_confirm"] = True
+                                decision = policy_engine.tool_call_decision(t_name, args, mode_def)
                     append_tool_decision(
                         mode=current_mode,
                         tool=t_name,
-                        decision="allow" if decision.allowed else "block",
+                        decision=getattr(decision, "action", "allow" if decision.allowed else "block"),
                         reason=decision.reason,
                         capabilities=decision.capabilities,
                     )
                     if not decision.allowed:
                         canonical_name = self._canonical_tool_name(t_name)
-                        tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
+                        if getattr(decision, "action", "block") == "ask":
+                            tool_result = f"Error: Tool '{canonical_name}' rejected by user approval policy: {decision.reason}"
+                        else:
+                            tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
                         tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
+                    append_tool_result(
+                        mode=current_mode,
+                        tool=t_name,
+                        result=tool_result,
+                        budget=budget.summarize(),
+                    )
 
                     tool_ui_result = tool_result
                     tool_content = tool_result

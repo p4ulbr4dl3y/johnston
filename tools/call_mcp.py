@@ -49,7 +49,12 @@ class CallMCPTool(BaseTool):
         mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
         decision = policy_engine.tool_call_decision(
             "call_mcp_tool",
-            {"server": server, "tool": tool, "arguments": arguments},
+            {
+                "server": server,
+                "tool": tool,
+                "arguments": arguments,
+                "policy_approved": args.get("policy_approved", False),
+            },
             mode_def,
         )
         if not decision.allowed:
