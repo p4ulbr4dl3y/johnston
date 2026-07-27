@@ -208,3 +208,80 @@ class SubagentTracker:
         # 3. Fallback: reload disk sessions and search all sessions
         self._load_all_sessions()
         return self._search_in_list(list(self.sessions.values()), identifier, clean_id)
+
+
+def record_subagent_step(step: tuple, session: SubagentSessionData, text_accumulator: list[str]) -> None:
+    """Records a subagent execution step event into the session event history."""
+    import math
+
+    etype = step[0]
+    val1 = step[1] if len(step) > 1 else ""
+    val2 = step[2] if len(step) > 2 else ""
+    val3 = step[3] if len(step) > 3 else None
+
+    if etype == "thinking_start":
+        session.add_event({"type": "thinking_start", "val1": val1})
+    elif etype == "thinking_delta":
+        session.add_event({"type": "thinking_delta", "val1": val1})
+    elif etype == "thinking_end":
+        try:
+            dur = float(val1)
+            if not math.isfinite(dur):
+                dur = 0.0
+        except (ValueError, TypeError):
+            dur = 0.0
+        session.add_event({"type": "thinking_end", "duration": dur, "content": val2})
+    elif etype == "tool":
+        targs = val3 if isinstance(val3, dict) else {}
+        session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
+    elif etype == "tool_result":
+        session.add_event({"type": "tool_result", "result_text": val1})
+    elif etype == "bot_chunk":
+        session.add_event({"type": "bot_chunk", "text": val1})
+        text_accumulator[0] += val1
+    elif etype == "bot_delta":
+        session.add_event({"type": "bot_delta", "text": val1})
+        text_accumulator[0] = val1
+    elif etype in ("bot_text", "outro"):
+        session.add_event({"type": "bot_text", "text": val1})
+        text_accumulator[0] = val1
+
+
+def merge_subagent_metrics(subagent: Any, context: Any) -> None:
+    """Merges token consumption and cost metrics from subagent into parent app agent."""
+    def _val(obj: Any, attr: str, default: Any = 0) -> Any:
+        v = getattr(obj, attr, default)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return v
+        return default
+
+    if context.app and getattr(context.app, "agent", None):
+        main_agent = context.app.agent
+        last_in = _val(subagent, "_merged_tokens_input", 0)
+        last_out = _val(subagent, "_merged_tokens_output", 0)
+        last_tot = _val(subagent, "_merged_total_tokens", 0)
+        last_cost = _val(subagent, "_merged_cost_usd", 0.0)
+
+        cur_in = _val(subagent, "tokens_input", 0)
+        cur_out = _val(subagent, "tokens_output", 0)
+        cur_tot = _val(subagent, "total_tokens", 0)
+        cur_cost = _val(subagent, "cost_usd", 0.0)
+
+        delta_in = cur_in - last_in
+        delta_out = cur_out - last_out
+        delta_tot = cur_tot - last_tot
+        delta_cost = cur_cost - last_cost
+
+        if delta_in > 0:
+            main_agent.tokens_input = _val(main_agent, "tokens_input", 0) + delta_in
+        if delta_out > 0:
+            main_agent.tokens_output = _val(main_agent, "tokens_output", 0) + delta_out
+        if delta_tot > 0:
+            main_agent.total_tokens = _val(main_agent, "total_tokens", 0) + delta_tot
+        if delta_cost > 0:
+            main_agent.cost_usd = _val(main_agent, "cost_usd", 0.0) + delta_cost
+
+        subagent._merged_tokens_input = cur_in
+        subagent._merged_tokens_output = cur_out
+        subagent._merged_total_tokens = cur_tot
+        subagent._merged_cost_usd = cur_cost

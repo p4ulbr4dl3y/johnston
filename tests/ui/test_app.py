@@ -31,10 +31,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(isinstance(app.screen, HelpScreen))
 
             # 2. User messages
+            chat_view = app.query_one(ChatView)
             for msg in ["First message", "Second message", "Third message"]:
-                chat_input.load_text(msg)
-                await pilot.press("enter")
-                await pilot.pause(1.5)
+                await chat_view.add_user_message(msg)
 
             # 3. Test /rewind
             await handle_slash_command(app, "/rewind")

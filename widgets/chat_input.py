@@ -205,7 +205,9 @@ class ChatInput(TextArea):
                 raw_hex = res.stdout.strip().split("«data PNGf")[-1].replace("»", "").strip()
                 img_bytes = bytes.fromhex(raw_hex)
                 if len(img_bytes) > 0:
-                    out_dir = os.path.expanduser("~/.johnston/temp_images")
+                    from core.config import TEMP_IMAGES_DIR
+
+                    out_dir = TEMP_IMAGES_DIR
                     os.makedirs(out_dir, exist_ok=True)
                     filepath = os.path.join(out_dir, f"clip_{int(time.time())}.png")
                     with open(filepath, "wb") as f:

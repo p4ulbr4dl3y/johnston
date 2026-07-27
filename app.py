@@ -18,6 +18,10 @@ from widgets.patch import apply_textual_patches
 apply_textual_patches()
 
 
+import logging
+
+logger = logging.getLogger("johnston.app")
+
 from cli import (
     get_version,
     main,
@@ -112,6 +116,7 @@ class JohnstonApp(App):
         if not hasattr(self, "agent") or not self.agent:
             return
         from core.mode_manager import ModeManager
+
         available_modes = list(ModeManager.get_instance().load_modes().keys())
         curr = getattr(self.agent, "mode", "action").lower()
         next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
@@ -145,18 +150,19 @@ class JohnstonApp(App):
                 elif hasattr(task, "process") and task.process:
                     try:
                         task.process.terminate()
-                    except Exception:
-                        pass
+                    except Exception as err:
+                        logger.debug(f"Process termination error: {err}")
                 if hasattr(task, "read_task") and task.read_task:
                     task.read_task.cancel()
-            except Exception:
-                pass
+            except Exception as err:
+                logger.debug(f"Task cleanup error: {err}")
 
         try:
             from core.mcp_manager import get_mcp_manager
+
             get_mcp_manager().stop_all()
-        except Exception:
-            pass
+        except Exception as err:
+            logger.debug(f"MCP cleanup error: {err}")
 
     def refresh_status_footer(self) -> None:
         """Refresh status bar with directory, provider, model, context, tokens, and cost"""

@@ -440,7 +440,9 @@ class BaseAgent:
         # exceeds 75% of the context window. Counting history alone ignores the system
         # prompt / tool schema overhead (often 2-4k tokens), which would let the real
         # context silently overflow before this threshold ever triggers.
-        threshold = int(getattr(self, "context_limit", 32000) * 0.75)
+        from core.config import CONTEXT_COMPACTION_THRESHOLD_RATIO, DEFAULT_CONTEXT_LIMIT
+
+        threshold = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * CONTEXT_COMPACTION_THRESHOLD_RATIO)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
         compacted_this_turn = False
         if len(self.history) > 4 and (estimate_tokens(self.history) + sys_overhead) > threshold:
