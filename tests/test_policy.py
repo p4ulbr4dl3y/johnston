@@ -61,6 +61,25 @@ class TestPolicyEngine(unittest.TestCase):
 
         self.assertTrue(decision.allowed)
 
+    def test_explore_allows_windows_read_only_shell(self):
+        mode_def = ModeManager.get_instance().get_mode("explore")
+
+        for command in (
+            "dir",
+            "type README.md",
+            "where python",
+            "Get-Content README.md",
+            "Select-String policy README.md",
+            r"C:\Windows\System32\where.exe python",
+        ):
+            with self.subTest(command=command):
+                decision = policy_engine.tool_call_decision(
+                    "shell",
+                    {"command": command},
+                    mode_def,
+                )
+                self.assertTrue(decision.allowed, decision.reason)
+
     def test_action_shell_destructive_requires_approval(self):
         mode_def = ModeManager.get_instance().get_mode("action")
         decision = policy_engine.tool_call_decision(
@@ -91,8 +110,9 @@ class TestPolicyEngine(unittest.TestCase):
         mode_def = ModeManager.get_instance().get_mode("action")
         decision = policy_engine.tool_call_decision(
             "shell",
-            {"command": "rm -rf build", "policy_approved": True},
+            {"command": "rm -rf build"},
             mode_def,
+            approved=True,
         )
 
         self.assertTrue(decision.allowed)
@@ -102,6 +122,9 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertFalse(shell_command_is_read_only("git checkout main"))
         self.assertFalse(shell_command_is_read_only("echo x > file.txt"))
         self.assertFalse(shell_command_is_read_only("echo $(touch x)"))
+        self.assertFalse(shell_command_is_read_only("del out.txt"))
+        self.assertFalse(shell_command_is_read_only("Remove-Item out.txt"))
+        self.assertFalse(shell_command_is_read_only("Set-Content out.txt hi"))
 
     def test_prompt_builder_filters_write_tools_in_explore(self):
         names = [
@@ -166,6 +189,78 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertIn("fs_read", names)
 
 
+    def test_tool_config_ask_applies_to_regular_tools(self):
+        from core.policy_config import set_policy_action
+
+        set_policy_action("tool", "edit", "ask")
+        mode_def = ModeManager.get_instance().get_mode("action")
+
+        decision = policy_engine.tool_call_decision(
+            "edit",
+            {"path": "x.txt", "old_string": "a", "new_string": "b"},
+            mode_def,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.action, "ask")
+
+    def test_tool_config_block_applies_to_regular_tools(self):
+        from core.policy_config import set_policy_action
+
+        set_policy_action("tool", "read", "block")
+        mode_def = ModeManager.get_instance().get_mode("action")
+
+        decision = policy_engine.tool_call_decision(
+            "read",
+            {"path": "x.txt"},
+            mode_def,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.action, "block")
+
+    def test_capability_config_uses_strictest_action(self):
+        from core.policy_config import PolicyConfig
+
+        cfg = PolicyConfig(
+            capability_actions={"fs.read": "allow", "fs.write": "block"}
+        )
+
+        self.assertEqual(
+            cfg.action_for(
+                tool="edit", capabilities={"fs.read", "fs.write"}, default="allow"
+            ),
+            "block",
+        )
+
+    def test_model_supplied_policy_approved_is_ignored(self):
+        mode_def = ModeManager.get_instance().get_mode("action")
+
+        decision = policy_engine.tool_call_decision(
+            "shell",
+            {"command": "rm -rf /tmp/nope", "policy_approved": True},
+            mode_def,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.action, "ask")
+
+    def test_runtime_approval_allows_asked_tool(self):
+        from core.policy_config import set_policy_action
+
+        set_policy_action("tool", "edit", "ask")
+        mode_def = ModeManager.get_instance().get_mode("action")
+
+        decision = policy_engine.tool_call_decision(
+            "edit",
+            {"path": "x.txt", "old_string": "a", "new_string": "b"},
+            mode_def,
+            approved=True,
+        )
+
+        self.assertTrue(decision.allowed)
+
+
 class TestPolicyConfigSaveAndToggle(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -212,4 +307,3 @@ class TestPolicyConfigSaveAndToggle(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -11,6 +11,7 @@ class ToolAttempt:
     tool: str
     args: dict[str, Any] = field(default_factory=dict)
     expect: str = "allow"
+    approved: bool = False
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,9 @@ def run_harness_scenario(scenario: HarnessScenario) -> HarnessEvalResult:
             actual = "block"
             reason = budget_decision.reason
         else:
-            decision = policy_engine.tool_call_decision(attempt.tool, attempt.args, mode_def)
+            decision = policy_engine.tool_call_decision(
+                attempt.tool, attempt.args, mode_def, approved=attempt.approved
+            )
             actual = getattr(decision, "action", "allow" if decision.allowed else "block")
             reason = decision.reason
 
@@ -72,7 +75,7 @@ def default_harness_scenarios() -> list[HarnessScenario]:
             mode="action",
             attempts=(
                 ToolAttempt("shell", {"command": "rm -rf build"}, "ask"),
-                ToolAttempt("shell", {"command": "rm -rf build", "policy_approved": True}, "allow"),
+                ToolAttempt("shell", {"command": "rm -rf build"}, "allow", approved=True),
             ),
         ),
         HarnessScenario(

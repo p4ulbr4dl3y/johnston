@@ -1,25 +1,42 @@
+import ntpath
 import os
 import re
 import shlex
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from core.bash_guard import analyze_shell_command
 from core.policy_config import get_policy_config
+from core.shell_guard import analyze_shell_command
 
 READ_ONLY_SHELL_COMMANDS = {
     "cat",
+    "cd",
+    "dir",
+    "echo",
     "find",
+    "get-childitem",
+    "get-command",
+    "get-content",
+    "get-item",
+    "get-location",
     "git",
     "grep",
     "head",
     "ls",
+    "measure-object",
+    "more",
     "pwd",
     "rg",
     "sed",
+    "select-string",
+    "sort-object",
     "tail",
+    "type",
     "tree",
+    "ver",
     "wc",
+    "where",
+    "where-object",
 }
 
 READ_ONLY_GIT_SUBCOMMANDS = {
@@ -33,9 +50,12 @@ READ_ONLY_GIT_SUBCOMMANDS = {
 READ_ONLY_PACKAGE_RUNNERS = {"pytest", "ruff", "mypy", "pyright", "tsc"}
 
 SHELL_WRITE_TOKENS = re.compile(
-    r"(^|[\s;&|])("
-    r"rm|rmdir|mv|cp|dd|mkfs|truncate|touch|chmod|chown|sudo|su|"
-    r"git\s+(checkout|clean|commit|merge|pull|push|rebase|reset|restore|switch)|"
+        r"(^|[\s;&|])("
+        r"rm|rmdir|mv|cp|dd|mkfs|truncate|touch|chmod|chown|sudo|su|"
+        r"del|erase|copy|xcopy|robocopy|move|ren|rename|md|mkdir|"
+        r"remove-item|new-item|set-content|add-content|clear-content|"
+        r"copy-item|move-item|rename-item|set-item|"
+        r"git\s+(checkout|clean|commit|merge|pull|push|rebase|reset|restore|switch)|"
     r"npm\s+(install|publish|update)|pnpm\s+(install|publish|update)|"
     r"yarn\s+(add|install|publish|upgrade)|uv\s+(add|remove|sync)|"
     r"pip\s+install|python\s+-c|python3\s+-c"
@@ -116,9 +136,20 @@ def resolve_workspace_path(path_str: str | None, *, root: str | None = None) -> 
         candidate = os.path.abspath(os.path.expanduser(path_str))
     real_root = os.path.realpath(root or workspace_root())
     real_candidate = os.path.realpath(candidate)
-    if real_candidate != real_root and not real_candidate.startswith(real_root + os.sep):
+    comparable_root = os.path.normcase(real_root)
+    comparable_candidate = os.path.normcase(real_candidate)
+    if comparable_candidate != comparable_root and not comparable_candidate.startswith(
+        comparable_root + os.sep
+    ):
         raise PermissionError(f"Path '{candidate}' is outside workspace '{real_root}'.")
     return candidate
+
+
+def _shell_command_name(raw_command: str) -> str:
+    command = ntpath.basename(os.path.basename(raw_command)).lower()
+    if command.endswith((".exe", ".cmd", ".bat", ".ps1")):
+        command = command.rsplit(".", 1)[0]
+    return command
 
 
 def shell_command_is_read_only(command: str) -> bool:
@@ -136,14 +167,16 @@ def shell_command_is_read_only(command: str) -> bool:
         if not segment:
             continue
         try:
-            parts = shlex.split(segment)
+            parts = shlex.split(
+                segment, posix=not bool(re.match(r"^[A-Za-z]:\\", segment))
+            )
         except ValueError:
             return False
         if not parts:
             continue
         if _is_read_only_test_command(parts):
             continue
-        cmd = os.path.basename(parts[0])
+        cmd = _shell_command_name(parts[0])
         if cmd not in READ_ONLY_SHELL_COMMANDS:
             return False
         if cmd == "git":
@@ -157,11 +190,11 @@ def shell_command_is_read_only(command: str) -> bool:
 def _is_read_only_test_command(parts: list[str]) -> bool:
     if not parts:
         return False
-    cmd = os.path.basename(parts[0])
+    cmd = _shell_command_name(parts[0])
     if cmd in READ_ONLY_PACKAGE_RUNNERS:
         return cmd != "ruff" or "check" in parts
     if cmd == "uv" and len(parts) >= 4 and parts[1] == "run":
-        runner = os.path.basename(parts[2])
+        runner = _shell_command_name(parts[2])
         if runner == "python" and len(parts) >= 5 and parts[3] == "-m":
             return parts[4] in {"unittest", "pytest", "mypy"}
         return runner in READ_ONLY_PACKAGE_RUNNERS
@@ -188,9 +221,24 @@ class PolicyEngine:
         capabilities = self.capabilities_for_tool(canonical)
         if not capabilities:
             return PolicyDecision.block(f"Tool '{tool_name}' has no declared capabilities.")
-        return self._mode_decision(canonical, capabilities, mode_def)
+        mode_decision = self._mode_decision(canonical, capabilities, mode_def)
+        if not mode_decision.allowed:
+            return mode_decision
+        action = get_policy_config().action_for(
+            tool=canonical, capabilities=capabilities, default="allow"
+        )
+        if action == "block":
+            return PolicyDecision.block("Tool is blocked by policy config.", capabilities)
+        return mode_decision
 
-    def tool_call_decision(self, tool_name: str, args: dict[str, Any], mode_def: Any) -> PolicyDecision:
+    def tool_call_decision(
+        self,
+        tool_name: str,
+        args: dict[str, Any],
+        mode_def: Any,
+        *,
+        approved: bool = False,
+    ) -> PolicyDecision:
         canonical = canonical_tool_name(tool_name)
         capabilities = self.capabilities_for_tool(canonical)
         policy_config = get_policy_config()
@@ -209,6 +257,14 @@ class PolicyEngine:
                 except PermissionError as exc:
                     return PolicyDecision.block(str(exc), capabilities)
 
+        config_action = policy_config.action_for(
+            tool=canonical, capabilities=capabilities, default="allow"
+        )
+        if config_action == "block":
+            return PolicyDecision.block("Tool is blocked by policy config.", capabilities)
+        if config_action == "ask" and not approved:
+            return PolicyDecision.ask("Tool requires approval by policy config.", capabilities)
+
         if canonical == "shell":
             command = args.get("command", "")
             if getattr(mode_def, "read_only", False):
@@ -218,7 +274,7 @@ class PolicyEngine:
                     )
             else:
                 is_safe, reason = analyze_shell_command(command)
-                if not is_safe and not args.get("policy_approved"):
+                if not is_safe and not approved:
                     action = policy_config.action_for(tool=canonical, capabilities=capabilities, default="ask")
                     if action == "allow":
                         return PolicyDecision.allow(capabilities)
@@ -238,9 +294,9 @@ class PolicyEngine:
             action = policy_config.action_for(tool=canonical, capabilities=mcp_caps, default="allow")
             if action == "block":
                 return PolicyDecision.block("MCP tool is blocked by policy config.", mcp_caps)
-            if action == "ask" and not args.get("policy_approved"):
+            if action == "ask" and not approved:
                 return PolicyDecision.ask("MCP tool requires approval by policy config.", mcp_caps)
-            if "network.fetch" in mcp_caps and not args.get("policy_approved"):
+            if "network.fetch" in mcp_caps and not approved:
                 action = policy_config.action_for(tool=canonical, capabilities=mcp_caps, default="ask")
                 if action == "block":
                     return PolicyDecision.block("MCP tool can access the network.", mcp_caps)

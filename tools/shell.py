@@ -6,7 +6,6 @@ import time
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask
-from core.bash_guard import analyze_shell_command
 from core.platform_utils import (
     is_windows,
     shell_env,
@@ -14,6 +13,7 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     supports_pty,
 )
+from core.shell_guard import analyze_shell_command
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)

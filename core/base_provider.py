@@ -858,14 +858,17 @@ class BaseAgent:
                     from core.audit import append_tool_decision, append_tool_result
                     from core.policy import PolicyDecision, policy_engine
 
-                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
-                    if getattr(decision, "action", "block") == "ask":
-                        approved = await self._request_policy_approval(t_name, args, decision.reason)
-                        if approved:
-                            args = {**args, "policy_approved": True}
-                            if self._canonical_tool_name(t_name) == "shell":
-                                args["skip_confirm"] = True
-                            decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                policy_approved = False
+                decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                if getattr(decision, "action", "block") == "ask":
+                    approved = await self._request_policy_approval(t_name, args, decision.reason)
+                    if approved:
+                        policy_approved = True
+                        if self._canonical_tool_name(t_name) == "shell":
+                            args = {**args, "skip_confirm": True}
+                        decision = policy_engine.tool_call_decision(
+                            t_name, args, mode_def, approved=True
+                        )
                     tool_budget_decision = budget.before_tool_call(decision.capabilities)
                     if not tool_budget_decision.allowed:
                         decision = PolicyDecision.block(tool_budget_decision.reason, decision.capabilities)
@@ -889,7 +892,19 @@ class BaseAgent:
                             tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
                         checkpoint = self._create_tool_checkpoint(t_name, args, decision.capabilities)
-                        tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
+                    tool_app = getattr(self, "app", None) or self
+                    previous_policy_approved = getattr(
+                        tool_app, "_johnston_policy_approved", False
+                    )
+                    setattr(tool_app, "_johnston_policy_approved", policy_approved)
+                    try:
+                        tool_result = await execute_tool(t_name, args, app=tool_app)
+                    finally:
+                        setattr(
+                            tool_app,
+                            "_johnston_policy_approved",
+                            previous_policy_approved,
+                        )
                         if checkpoint:
                             tool_result += self._finalize_tool_checkpoint(checkpoint, budget)
                     append_tool_result(
