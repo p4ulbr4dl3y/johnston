@@ -276,7 +276,8 @@ class ToolCallWidget(Vertical):
         self.icon_name = tool_type
         self.is_expanded = False
 
-        header_cls = "tool-header tool-header-expandable" if self.is_expandable() else "tool-header"
+        is_clickable = self.is_expandable() or self.tool_type.lower() in ("subagent", "task")
+        header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
 
@@ -414,6 +415,17 @@ class ToolCallWidget(Vertical):
                 self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(self.target)})")
 
     def on_click(self, event) -> None:
+        if self.tool_type.lower() in ("subagent", "task"):
+            task_id = self.args.get("task_id") if isinstance(self.args, dict) else None
+            identifier = task_id or self.target
+            try:
+                from widgets.screens.subagent_screen import SubagentViewScreen
+                self.app.push_screen(SubagentViewScreen(identifier))
+            except Exception:
+                pass
+            event.stop()
+            return
+
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
