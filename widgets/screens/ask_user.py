@@ -5,6 +5,19 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
 
+class WriteInInput(Input):
+    """Custom Input widget that handles Up key to return focus to OptionList"""
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("up", "key_up"):
+            if self.screen and hasattr(self.screen, "focus_options_list"):
+                getattr(self.screen, "focus_options_list")()
+                event.stop()
+                event.prevent_default()
+                return
+        super()._on_key(event)
+
+
 class QuestionScreen(ModalScreen[dict]):
     """Modal screen for selecting options or typing custom input without buttons"""
     ALLOW_SELECT = False
@@ -28,8 +41,20 @@ class QuestionScreen(ModalScreen[dict]):
         with Vertical(id="modal-dialog"):
             yield Markdown(self.title, classes="modal-markdown")
             yield OptionList(id="options-list")
-            yield Input(placeholder="Type response here and press Enter...", id="write-in-input")
+            yield WriteInInput(placeholder="Type response here and press Enter...", id="write-in-input")
             yield Label("enter: select • ←: back • →: next • esc: cancel", id="modal-hint")
+
+    def focus_options_list(self) -> None:
+        if not self.raw_options:
+            return
+        try:
+            input_field = self.query_one("#write-in-input", Input)
+            opt_list = self.query_one("#options-list", OptionList)
+            input_field.display = False
+            opt_list.highlighted = max(0, len(self.options) - 2)
+            opt_list.focus()
+        except Exception:
+            pass
 
     def on_mount(self) -> None:
         import time
@@ -101,17 +126,9 @@ class QuestionScreen(ModalScreen[dict]):
 
     def on_key(self, event: events.Key) -> None:
         if event.key in ("up", "key_up") and self.raw_options:
-            try:
-                input_field = self.query_one("#write-in-input", Input)
-                opt_list = self.query_one("#options-list", OptionList)
-                if input_field.has_focus or opt_list.highlighted == len(self.options) - 1:
-                    input_field.display = False
-                    opt_list.highlighted = max(0, len(self.options) - 2)
-                    opt_list.focus()
-                    event.stop()
-                    event.prevent_default()
-            except Exception:
-                pass
+            self.focus_options_list()
+            event.stop()
+            event.prevent_default()
 
     def action_cancel(self) -> None:
         self.dismiss({"status": "cancelled", "answer": "Cancelled"})
