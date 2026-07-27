@@ -8,23 +8,27 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-        python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: windows-latest
+            python-version: "3.14"
+          - os: macos-latest
+            python-version: "3.14"
 
     steps:
       - name: Checkout repository
@@ -45,3 +49,22 @@ jobs:
 
       - name: Test
         run: uv run python -m unittest discover -s tests
+
+      - name: Test Install Script (Bash)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x install.sh
+          ./install.sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Test Install Script (PowerShell)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          .\install.ps1
+          echo "$env:USERPROFILE\.local\bin" >> $env:GITHUB_PATH
+
+      - name: Verify CLI Binary
+        run: |
+          johnston --version
+          johnston --modes
