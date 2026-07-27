@@ -251,8 +251,6 @@ MarkdownFence #code-content {
     padding: 0 1;
     background: #18181b;
 }
-    background: #18181b;
-}
 
 /* OptionList Base Styles */
 OptionList {
