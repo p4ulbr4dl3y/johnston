@@ -34,7 +34,7 @@ class TestFileSuggestions(unittest.TestCase):
         prompt = app.prepare_prompt_with_attachments("Check @AGENTS.md and fix")
         self.assertIn("Check @AGENTS.md and fix", prompt)
         self.assertIn("--- Attached File: AGENTS.md ---", prompt)
-        self.assertIn("AI Agents and Providers in Johnston", prompt)
+        self.assertIn("Repository Guidelines", prompt)
 
     def test_pasted_file_path_formatting(self):
         chat_input = ChatInput()
