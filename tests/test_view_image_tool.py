@@ -142,16 +142,25 @@ class TestProcessAndEncodeImage(unittest.TestCase):
 
 
 class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.old_cwd = os.getcwd()
+        os.chdir(self.temp_dir.name)
+
+    def tearDown(self):
+        os.chdir(self.old_cwd)
+        self.temp_dir.cleanup()
+
     async def test_file_not_found(self):
         tool = ViewImageTool()
-        res = await tool.execute({"path": "/nonexistent/path/image.png"})
+        res = await tool.execute({"path": "missing.png"})
         self.assertIn("Error", res)
         self.assertIn("not found", res)
 
     async def test_unsupported_format(self):
         import tempfile
         tool = ViewImageTool()
-        with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False, dir=".") as f:
             f.write(b"binary data")
             temp_path = f.name
         try:
@@ -166,7 +175,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
         import tempfile
         tool = ViewImageTool()
         svg_content = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>'
-        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False, mode="w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False, mode="w", encoding="utf-8", dir=".") as f:
             f.write(svg_content)
             temp_path = f.name
         try:
@@ -180,7 +189,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
     async def test_svg_read_error(self):
         import tempfile
         tool = ViewImageTool()
-        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False, dir=".") as f:
             f.write(b"\xff\xfe invalid binary")
             temp_path = f.name
         try:
@@ -198,7 +207,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
         from core.models_catalog import catalog
 
         tool = ViewImageTool()
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=".") as f:
             temp_path = f.name
         try:
             old_fallback = catalog.get_fallback_vision_model()

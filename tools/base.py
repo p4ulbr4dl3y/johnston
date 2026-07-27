@@ -1,6 +1,7 @@
 import os
 from typing import Any, Dict
 
+from core.policy import resolve_workspace_path
 from tools.context import ToolContext
 
 IGNORE_DIRS = {
@@ -22,10 +23,8 @@ IGNORE_EXTENSIONS = {
 
 
 def resolve_path(path_str: str | None = None) -> str:
-    """Expands user tilde and returns absolute filepath or current working directory."""
-    if not path_str:
-        return os.getcwd()
-    return os.path.abspath(os.path.expanduser(path_str))
+    """Resolves a path and enforces the current workspace boundary."""
+    return resolve_workspace_path(path_str)
 
 
 def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: bool = True) -> str:

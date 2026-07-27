@@ -108,7 +108,9 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(agent.close)
         mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["shell"])
         err = agent._tool_policy_error("shell", {"command": "pwd"}, mode_def)
-        self.assertEqual(err, "Error: Tool 'shell' is disabled in Locked mode.")
+        self.assertIn("blocked by policy", err)
+        self.assertIn("shell", err)
+        self.assertIn("Locked mode", err)
 
 
 class TestFallbackMetricsMerge(unittest.IsolatedAsyncioTestCase):

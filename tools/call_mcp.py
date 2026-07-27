@@ -42,6 +42,18 @@ class CallMCPTool(BaseTool):
 
         if not server or not tool:
             return "Error: Both 'server' and 'tool' parameters are required."
+        from core.mode_manager import ModeManager
+        from core.policy import policy_engine
+
+        mode = getattr(app, "mode", "action") if app is not None else "action"
+        mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
+        decision = policy_engine.tool_call_decision(
+            "call_mcp_tool",
+            {"server": server, "tool": tool, "arguments": arguments},
+            mode_def,
+        )
+        if not decision.allowed:
+            return f"Error: MCP tool '{server}.{tool}' blocked by policy: {decision.reason}"
 
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()

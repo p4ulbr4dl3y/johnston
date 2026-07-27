@@ -458,6 +458,39 @@ class MCPManager:
 
         return tools
 
+    def get_tool_capabilities(self, server_name: str, tool_name: str) -> List[str]:
+        """Returns configured capabilities for an MCP tool.
+
+        Unknown MCP tools intentionally return an empty list; policy treats that
+        as blocked until the project/global MCP config classifies the tool.
+        """
+        for server in self.load_servers():
+            if server.get("name") != server_name:
+                continue
+            caps_cfg = server.get("capabilities") or {}
+            caps = caps_cfg.get(tool_name)
+            if caps is None:
+                caps = caps_cfg.get(f"{server_name}__{tool_name}")
+            if isinstance(caps, str):
+                return [caps]
+            if isinstance(caps, list):
+                return [str(c) for c in caps if str(c).strip()]
+            return []
+        return []
+
+    def get_capabilities_for_exposed_tool(self, exposed_name: str) -> List[str]:
+        if "__" in exposed_name:
+            server_name, tool_name = exposed_name.split("__", 1)
+            return self.get_tool_capabilities(server_name, tool_name)
+
+        matches: List[str] = []
+        for server in self.load_servers():
+            server_name = server.get("name", "")
+            caps = self.get_tool_capabilities(server_name, exposed_name)
+            if caps:
+                matches.extend(caps)
+        return sorted(set(matches))
+
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None, timeout: Optional[float] = None) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.

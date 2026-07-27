@@ -31,10 +31,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         ToolContext._instance = None
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
+        self.old_cwd = os.getcwd()
+        os.chdir(self.test_dir)
 
     def tearDown(self):
         from tools.context import ToolContext
         ToolContext._instance = None
+        os.chdir(self.old_cwd)
         self.temp_dir.cleanup()
 
     async def test_read_tool(self):
