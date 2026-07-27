@@ -869,9 +869,20 @@ class ChatView(VerticalScroll):
             for w in welcome:
                 w.remove()
 
+    async def _wait_until_attached(self, timeout: float = 2.0) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+            t0 = loop.time()
+            while not self.is_attached and (loop.time() - t0 < timeout):
+                await asyncio.sleep(0.05)
+        except Exception:
+            pass
+
     async def add_user_message(self, text: str) -> UserMessage:
         self.clear_welcome()
         msg = UserMessage(text)
+        if not self.is_attached:
+            await self._wait_until_attached()
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
@@ -879,6 +890,8 @@ class ChatView(VerticalScroll):
     async def add_bot_message(self) -> BotMessage:
         self.clear_welcome()
         msg = BotMessage()
+        if not self.is_attached:
+            await self._wait_until_attached()
         await self.mount(msg)
         self.scroll_end(animate=True)
         return msg
@@ -886,6 +899,8 @@ class ChatView(VerticalScroll):
     async def add_thinking_widget(self, thinking_text: str = "Thinking...") -> ThinkingWidget:
         self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
+        if not self.is_attached:
+            await self._wait_until_attached()
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget
@@ -894,6 +909,8 @@ class ChatView(VerticalScroll):
         self.clear_welcome()
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
+        if not self.is_attached:
+            await self._wait_until_attached()
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget
@@ -901,6 +918,8 @@ class ChatView(VerticalScroll):
     async def add_compaction_divider(self, text: str = "Session Compacted") -> CompactionDivider:
         self.clear_welcome()
         widget = CompactionDivider(text)
+        if not self.is_attached:
+            await self._wait_until_attached()
         await self.mount(widget)
         self.scroll_end(animate=True)
         return widget
