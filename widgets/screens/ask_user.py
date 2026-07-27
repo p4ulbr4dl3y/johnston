@@ -29,14 +29,15 @@ class WriteInInput(Input):
         self._clear_selection()
         self.call_after_refresh(self._clear_selection)
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if event.key in ("up", "key_up"):
             if self.screen and hasattr(self.screen, "focus_options_list"):
                 getattr(self.screen, "focus_options_list")()
                 event.stop()
                 event.prevent_default()
                 return
-        super()._on_key(event)
+        await super()._on_key(event)
+
 
 
 class QuestionScreen(ModalScreen[dict]):
@@ -245,3 +246,186 @@ class ConfirmScreen(ModalScreen[str]):
 
     def action_quit(self) -> None:
         self.app.exit()
+
+
+class AskUserWizardScreen(ModalScreen[str]):
+    """Unified modal screen that handles multi-question wizard without flickering."""
+
+    ALLOW_SELECT = False
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+        ("left", "go_back", "Back"),
+        ("right", "go_next", "Next"),
+        ("enter", "go_next", "Next / Confirm"),
+        ("ctrl+c", "quit", "Exit"),
+    ]
+
+
+    def __init__(self, questions: list[dict]):
+        super().__init__()
+        self.questions = questions or []
+        self.answers = {}
+        self.q_idx = 0
+        self.raw_options = []
+        self.options = []
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal-dialog"):
+            yield Markdown("", id="wizard-title", classes="modal-markdown")
+            yield OptionList(id="options-list")
+            yield WriteInInput(placeholder="Type response here and press Enter...", id="write-in-input")
+            yield Label("", id="modal-hint")
+
+    def on_mount(self) -> None:
+        import time
+        self._mount_time = time.time()
+        self.update_step()
+
+    def update_step(self) -> None:
+        title_md = self.query_one("#wizard-title", Markdown)
+        opt_list = self.query_one("#options-list", OptionList)
+        input_field = self.query_one("#write-in-input", Input)
+        hint = self.query_one("#modal-hint", Label)
+
+        if self.q_idx < len(self.questions):
+            q = self.questions[self.q_idx]
+            q_text = q.get("question_text", "")
+            title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n\n{q_text}")
+            hint.update("enter: select • ←: back • →: next • esc: cancel")
+
+            self.raw_options = q.get("options") or []
+            self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
+            prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
+
+            if self.raw_options:
+                opt_list.display = True
+                opt_list.clear_options()
+                for opt in self.options:
+                    opt_list.add_option(opt)
+
+                highlight_idx = 0
+                if prev_answer:
+                    if prev_answer in self.raw_options:
+                        highlight_idx = self.raw_options.index(prev_answer)
+                    else:
+                        highlight_idx = len(self.options) - 1
+                        input_field.value = prev_answer
+                        input_field.display = True
+
+                opt_list.highlighted = highlight_idx
+                if highlight_idx == len(self.options) - 1:
+                    self.focus_write_in_input()
+                else:
+                    input_field.display = False
+                    opt_list.focus()
+            else:
+                opt_list.display = False
+                input_field.display = True
+                input_field.value = prev_answer
+                input_field.focus()
+        else:
+            summary = ""
+            for idx, q in enumerate(self.questions):
+                q_clean = q.get("question_text", "")
+                ans_info = self.answers.get(idx, {"answer": "Skipped"})
+                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_info['answer']}\n\n"
+
+            title_md.update("### **Confirm your answers**\n\n" + summary)
+            opt_list.display = False
+            input_field.display = False
+            hint.update("enter: confirm • ←: back • esc: cancel")
+
+    def focus_write_in_input(self) -> None:
+        try:
+            input_field = self.query_one("#write-in-input", Input)
+            input_field.display = True
+            input_field.focus()
+        except Exception:
+            pass
+
+    def focus_options_list(self) -> None:
+        if not self.raw_options:
+            return
+        try:
+            input_field = self.query_one("#write-in-input", Input)
+            opt_list = self.query_one("#options-list", OptionList)
+            input_field.display = False
+            opt_list.highlighted = max(0, len(self.options) - 2)
+            opt_list.focus()
+        except Exception:
+            pass
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if not self.is_mounted or not self.raw_options or self.q_idx >= len(self.questions):
+            return
+        try:
+            input_field = self.query_one("#write-in-input", Input)
+            if event.option_index == len(self.options) - 1:
+                self.focus_write_in_input()
+            else:
+                input_field.display = False
+        except Exception:
+            pass
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if not self.raw_options or self.q_idx >= len(self.questions):
+            return
+        import time
+        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
+            return
+        if event.option_index != len(self.options) - 1:
+            self.submit_current_step()
+        else:
+            self.focus_write_in_input()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        import time
+        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
+            return
+        self.submit_current_step()
+
+    def submit_current_step(self) -> None:
+        if self.q_idx < len(self.questions):
+            if not self.raw_options:
+                val = self.query_one("#write-in-input", Input).value.strip()
+                answer = val if val else "No response"
+            else:
+                opt_list = self.query_one("#options-list", OptionList)
+                idx = opt_list.highlighted
+                if idx == len(self.options) - 1:
+                    val = self.query_one("#write-in-input", Input).value.strip()
+                    answer = val if val else "Custom answer"
+                else:
+                    answer = self.options[idx] if idx is not None and idx < len(self.options) else ""
+
+            self.answers[self.q_idx] = {"answer": answer}
+            self.q_idx += 1
+            self.update_step()
+        else:
+            out_summary = ""
+            for idx, q in enumerate(self.questions):
+                q_clean = q.get("question_text", "")
+                ans_info = self.answers.get(idx, {"answer": "Skipped"})
+                out_summary += f"Question: {q_clean}\nAnswer: {ans_info['answer']}\n"
+            self.dismiss(out_summary.strip())
+
+    def action_cancel(self) -> None:
+        self.dismiss("Cancelled by user.")
+
+    def action_go_back(self) -> None:
+        if self.q_idx > 0:
+            self.q_idx -= 1
+            self.update_step()
+
+    def action_go_next(self) -> None:
+        self.submit_current_step()
+
+    def action_quit(self) -> None:
+        self.app.exit()
+
+    def on_key(self, event: events.Key) -> None:
+        if event.key in ("up", "key_up") and self.raw_options and self.q_idx < len(self.questions):
+            self.focus_options_list()
+            event.stop()
+            event.prevent_default()
+

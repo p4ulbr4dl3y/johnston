@@ -53,7 +53,7 @@ class HelpScreen(ModalScreen[None]):
             yield Markdown(COMMANDS_MD, id="help-markdown", classes="modal-markdown")
             yield Label("←/→ or tab: switch • esc: close", id="modal-hint")
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):
             self.active_tab = 1 if self.active_tab == 0 else 0
             md_widget = self.query_one("#help-markdown", Markdown)
@@ -61,7 +61,8 @@ class HelpScreen(ModalScreen[None]):
             event.prevent_default()
             event.stop()
             return
-        super()._on_key(event)
+        await super()._on_key(event)
+
 
     def action_close(self) -> None:
         self.dismiss(None)

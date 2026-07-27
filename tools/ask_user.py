@@ -49,84 +49,22 @@ class AskUserTool(BaseTool):
 
         if ctx.app and hasattr(ctx.app, "push_screen") and questions_list and isinstance(questions_list, list):
             try:
-                from widgets.modal_screens import ConfirmScreen, QuestionScreen
-                answers = {}
-                q_idx = 0
-                cancelled = False
-                while q_idx <= len(questions_list):
-                    if q_idx < len(questions_list):
-                        q = questions_list[q_idx]
-                        num_text = f"### **Question {q_idx+1}/{len(questions_list)}**"
-                        q_text = q.get("question_text", "")
-                        opts = q.get("options") or []
-                        prev_val = answers.get(q_idx, {}).get("answer", "")
+                from widgets.screens.ask_user import AskUserWizardScreen
+                screen = AskUserWizardScreen(questions_list)
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
 
-                        screen = QuestionScreen(
-                            num_text=num_text,
-                            question_text=q_text,
-                            options=opts,
-                            current_val=prev_val
-                        )
-                        loop = asyncio.get_running_loop()
-                        future = loop.create_future()
-                        def on_dismiss(result):
-                            if not future.done():
-                                future.set_result(result)
-                        ctx.app.push_screen(screen, callback=on_dismiss)
-                        res = await future
+                def on_dismiss(result):
+                    if not future.done():
+                        future.set_result(result)
 
-                        if not res or res.get("status") == "cancelled":
-                            cancelled = True
-                            break
-                        elif res.get("status") == "back":
-                            if q_idx > 0:
-                                q_idx -= 1
-                        elif res.get("status") == "next":
-                            answers[q_idx] = res
-                            q_idx += 1
-                            await asyncio.sleep(0.3)
-                        else:
-                            # Unknown status from the screen: avoid an infinite loop by
-                            # treating it as a cancellation rather than re-prompting forever.
-                            cancelled = True
-                            break
-                    else:
-                        summary = ""
-                        for idx in range(len(questions_list)):
-                            q_clean = questions_list[idx].get("question_text", "")
-                            ans_info = answers.get(idx, {"status": "skipped", "answer": "Skipped"})
-                            summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_info['answer']}\n\n"
-
-                        screen = ConfirmScreen(summary)
-                        loop = asyncio.get_running_loop()
-                        future = loop.create_future()
-                        def on_dismiss_confirm(result):
-                            if not future.done():
-                                future.set_result(result)
-                        ctx.app.push_screen(screen, callback=on_dismiss_confirm)
-                        res = await future
-
-                        if not res or res == "cancelled":
-                            cancelled = True
-                            break
-                        elif res == "back":
-                            q_idx = len(questions_list) - 1
-                        elif res == "confirm":
-                            q_idx += 1
-                        else:
-                            # Unknown status: avoid an infinite loop by cancelling.
-                            cancelled = True
-                            break
-
-                if cancelled:
-                    return "Cancelled by user."
-
-                out_summary = ""
-                for idx in range(len(questions_list)):
-                    q_clean = questions_list[idx].get("question_text", "")
-                    ans_info = answers.get(idx, {"status": "skipped", "answer": "Skipped"})
-                    out_summary += f"Question: {q_clean}\nAnswer: {ans_info['answer']}\n"
-                return out_summary.strip()
+                ctx.app.push_screen(screen, callback=on_dismiss)
+                res = await future
+                if isinstance(res, str) and res.strip() and res != "cancelled":
+                    return res
+                return "Cancelled by user."
             except Exception as e:
                 return f"Error prompting user: {e}"
         return "Error: App instance not available or no valid questions provided."
+
+
