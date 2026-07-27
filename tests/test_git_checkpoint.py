@@ -31,10 +31,14 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertFalse(GitCheckpointManager.is_git_repo(self.tmp_dir))
         sha_no_init = GitCheckpointManager.create_checkpoint("s1", 0, project_path=self.tmp_dir, auto_init=False)
         self.assertIsNone(sha_no_init)
+        # Non-git repo must return None even with auto_init=True
         sha_auto = GitCheckpointManager.create_checkpoint("s1", 0, project_path=self.tmp_dir, auto_init=True)
-        self.assertIsNotNone(sha_auto)
-        # Verify that .git folder was NOT created inside the user project directory
-        self.assertFalse(os.path.exists(os.path.join(self.tmp_dir, ".git")))
+        self.assertIsNone(sha_auto)
+
+    def test_home_and_root_dirs(self):
+        home_dir = os.path.expanduser("~")
+        self.assertFalse(GitCheckpointManager.is_valid_checkpoint_target(home_dir))
+        self.assertFalse(GitCheckpointManager.is_valid_checkpoint_target("/"))
 
     def test_create_and_restore_checkpoint(self):
         repo_path = self._init_git_repo()

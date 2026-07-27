@@ -288,8 +288,10 @@ class MCPManager:
             except Exception:
                 pass
 
-        # 2. Load project
-        if os.path.exists(self.project_file):
+        # 2. Load project (only if distinct from global_file)
+        real_global = os.path.realpath(self.global_file)
+        real_project = os.path.realpath(self.project_file)
+        if os.path.exists(self.project_file) and real_project != real_global:
             try:
                 with open(self.project_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
