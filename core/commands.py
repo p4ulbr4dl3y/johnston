@@ -548,6 +548,34 @@ class PolicyCommand(BaseCommand):
         app.push_screen(PolicyScreen())
 
 
+class DemoCommand(BaseCommand):
+    name = "/demo"
+    aliases = ["/askdemo", "/testmodal"]
+    description = "Test and preview the AskUser wizard modal"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.ask_user import AskUserWizardScreen
+
+        questions = [
+            {
+                "question_text": "Как вам обновленная модалка AskUser?",
+                "options": ["Отлично, верстка ровная", "Есть замечания", "Вернуть стандартную"],
+            },
+            {
+                "question_text": "Введите ваши предложения или отзыв:",
+                "options": [],
+            },
+        ]
+
+        def on_demo_finished(result: str | None) -> None:
+            if result and result != "Cancelled by user.":
+                app.notify("AskUser demo completed!")
+            else:
+                app.notify("AskUser demo cancelled", severity="warning")
+
+        app.push_screen(AskUserWizardScreen(questions), callback=on_demo_finished)
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -566,7 +594,9 @@ COMMAND_CLASSES = [
     CompactCommand,
     ActionCommand,
     ExploreCommand,
+    DemoCommand,
 ]
+
 
 
 COMMAND_REGISTRY = {}
