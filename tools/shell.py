@@ -199,7 +199,7 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes."
+            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Do NOT poll status with manage_task; stop calling tools and wait for completion."
 
     async def _create_windows_process(self, command: str, env: dict[str, str]):
         shell = shell_executable()
