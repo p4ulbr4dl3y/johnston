@@ -306,8 +306,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/help", COMMAND_REGISTRY)
         self.assertIn("/connect", COMMAND_REGISTRY)
-        self.assertIn("/demo", COMMAND_REGISTRY)
-        self.assertIn("/fake", COMMAND_REGISTRY)
 
     def test_alias_suggestions_formatting(self):
         from widgets.command_suggestions import get_all_command_suggestions
