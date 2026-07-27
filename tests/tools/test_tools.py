@@ -286,6 +286,40 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("return 100", content)
         self.assertIn("return 200", content)
 
+    async def test_read_tool_800_line_window_and_hint(self):
+        file_path = os.path.join(self.test_dir, "long_file.txt")
+        # Create a file with 1000 lines
+        lines = [f"Line {i}\n" for i in range(1, 1001)]
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+
+        tool = ReadTool()
+        res = await tool.execute({"path": file_path})
+        self.assertIn("=== Lines 1-800 of 1000", res)
+        self.assertIn("[Hint: File has 1000 lines. Use start_line=801 end_line=1000 to read next chunk.]", res)
+        self.assertIn("Line 800", res)
+        self.assertNotIn("Line 801", res)
+
+    async def test_read_tool_doc_caching(self):
+        from tools.read import clear_doc_cache, convert_doc_to_markdown_sync
+        clear_doc_cache()
+        pdf_path = os.path.join(self.test_dir, "cached_doc.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(b"%PDF-1.7 mock content")
+
+        from unittest.mock import patch
+        with patch("tools.read.set_cached_doc_markdown") as mock_set:
+            with patch("markitdown.MarkItDown") as mock_md_cls:
+                mock_md = mock_md_cls.return_value
+                mock_res = type("Result", (), {"text_content": "# Cached Doc Header\nDoc text"})()
+                mock_md.convert.return_value = mock_res
+
+                res1 = convert_doc_to_markdown_sync(pdf_path)
+                self.assertIn("Cached Doc Header", res1)
+                self.assertTrue(mock_set.called)
+
+        clear_doc_cache()
+
 
 if __name__ == "__main__":
     unittest.main()
