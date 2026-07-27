@@ -168,7 +168,15 @@ class SubagentTracker:
             if clean_prompt == clean_id:
                 return sess
 
-        # No exact match: do NOT fall back to the last session. A loose fallback risks
-        # killing or inspecting the wrong subagent when the user gives a vague identifier.
-        # Require an explicit, unambiguous id/description/prompt instead.
+        # If clean_id was truncated with '...', try prefix/fuzzy matching
+        if "..." in clean_id:
+            parts = [p.strip() for p in clean_id.split("...") if p.strip()]
+            for sess in candidates:
+                clean_desc = sess.description.strip('"\' `')
+                if parts and all(p in clean_desc for p in parts):
+                    return sess
+                clean_prompt = sess.prompt.strip('"\' `')
+                if parts and all(p in clean_prompt for p in parts):
+                    return sess
+
         return None

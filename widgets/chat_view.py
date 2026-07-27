@@ -416,8 +416,9 @@ class ToolCallWidget(Vertical):
 
     def on_click(self, event) -> None:
         if self.tool_type.lower() in ("subagent", "task"):
-            task_id = self.args.get("task_id") if isinstance(self.args, dict) else None
-            identifier = task_id or self.target
+            args = self.args if isinstance(self.args, dict) else {}
+            task_id = args.get("task_id") or getattr(self, "subagent_task_id", None)
+            identifier = task_id or args.get("description") or args.get("prompt") or self.target
             try:
                 from widgets.screens.subagent_screen import SubagentViewScreen
                 self.app.push_screen(SubagentViewScreen(identifier))

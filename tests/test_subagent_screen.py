@@ -71,6 +71,13 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertTrue(any(e.get("text") == "persisted output" for e in reloaded.events))
 
 
+    def test_find_session_truncated_description(self):
+        sess = self.tracker.create_session("task-trunc", "Explore test setup and verify runner", "full prompt text", "explore", False)
+        found = self.tracker.find_session_by_description_or_id('"Explore test setup...runner"')
+        self.assertEqual(found, sess)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
