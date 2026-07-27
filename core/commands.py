@@ -269,12 +269,13 @@ class RewindCommand(BaseCommand):
             return
 
         curr_sid = getattr(app, "current_session_id", None)
+        proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
         msgs_with_stats = []
         if curr_sid:
             try:
                 from core.git_checkpoint import GitCheckpointManager
                 for seq_idx, (child_idx, text) in enumerate(user_msgs):
-                    stat = GitCheckpointManager.get_diff_stats(curr_sid, seq_idx) or ""
+                    stat = GitCheckpointManager.get_diff_stats(curr_sid, seq_idx, project_path=proj_path) or ""
                     msgs_with_stats.append((child_idx, text, stat))
             except Exception:
                 msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
@@ -317,8 +318,8 @@ class RewindCommand(BaseCommand):
                 if curr_sid:
                     try:
                         from core.git_checkpoint import GitCheckpointManager
-                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx)
-                        GitCheckpointManager.purge_checkpoints_after(curr_sid, seq_idx)
+                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx, project_path=proj_path)
+                        GitCheckpointManager.purge_checkpoints_after(curr_sid, seq_idx, project_path=proj_path)
                     except Exception as e:
                         print(f"Git checkpoint restore failed: {e}")
 
