@@ -551,38 +551,6 @@ class PolicyCommand(BaseCommand):
         app.push_screen(PolicyScreen())
 
 
-class DemoCommand(BaseCommand):
-    name = "/demo"
-    aliases = ["/askdemo", "/testmodal"]
-    description = "Run real AskUser tool modal with multiple questions"
-
-    async def execute(self, app) -> None:
-        from tools.ask_user import AskUserTool
-
-        questions = [
-            {
-                "question_text": "Вопрос 1/3: Какая тема интерфейса вам ближе?",
-                "options": ["Monochrome Dark (#09090b)", "Zinc Slate (#18181b)", "System High Contrast"],
-            },
-            {
-                "question_text": "Вопрос 2/3: Какой провайдер вы используете чаще всего?",
-                "options": ["OpenCode (DeepSeek-V4)", "ClinePass", "OpenAI / Custom API"],
-            },
-            {
-                "question_text": "Вопрос 3/3: Введите ваши замечания по интерфейсу:",
-                "options": [],
-            },
-        ]
-
-        tool = AskUserTool()
-        result = await tool.execute({"questions": questions}, app=app)
-        if result == "Cancelled by user.":
-            app.notify("AskUser demo cancelled", severity="warning")
-        else:
-            app.notify("AskUser demo completed!")
-
-
-
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -601,7 +569,6 @@ COMMAND_CLASSES = [
     CompactCommand,
     ActionCommand,
     ExploreCommand,
-    DemoCommand,
 ]
 
 

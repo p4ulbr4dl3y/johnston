@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from core.bash_guard import analyze_shell_command
 from core.platform_utils import johnston_config_dir, supports_pty
+from core.shell_guard import analyze_shell_command
 
 
 class TestShellGuard(unittest.TestCase):

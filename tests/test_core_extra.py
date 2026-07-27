@@ -8,7 +8,6 @@ from core.background_task import BackgroundSubagent, BackgroundTask
 from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
 
 
-
 class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
     async def test_background_task_completion_callback(self):
         cb_called = False
@@ -179,7 +178,6 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertFalse(cat.supports_vision("provider", "custom-model-vision"))
 
     def test_save_and_load_cache(self):
-        import tempfile
         cat = ModelsCatalog()
         cat._limits = {"test/m1": 100000}
         cat._vision = ["test/m1"]

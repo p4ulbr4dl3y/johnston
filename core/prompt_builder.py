@@ -229,7 +229,7 @@ class PromptBuilder:
             ).allowed
         ]
 
-        if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent", "Task", "task") for t in all_tools):
+        if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent") for t in all_tools):
             all_tools.append(SubagentTool.schema)
 
         return [

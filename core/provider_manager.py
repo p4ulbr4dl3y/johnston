@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import sys
 import time
 from typing import Any, Dict, List
 
@@ -9,14 +8,6 @@ import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.thinking_effort import normalize_thinking_effort
-
-johnston_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-core_dir = os.path.dirname(os.path.abspath(__file__))
-if johnston_dir not in sys.path:
-    sys.path.insert(0, johnston_dir)
-if core_dir not in sys.path:
-    sys.path.insert(0, core_dir)
-
 
 DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "opencode": {
