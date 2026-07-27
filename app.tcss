@@ -192,6 +192,41 @@ MarkdownBlock {
     padding: 0;
 }
 
+MarkdownBlockQuote {
+    height: auto;
+    margin: 1 0 0 0;
+    padding: 0 1;
+    background: #18181b;
+    border-left: solid #71717a;
+}
+
+MarkdownBlockQuote MarkdownParagraph {
+    margin: 0;
+    padding: 0;
+}
+
+MarkdownBlockQuote MarkdownBlockQuote {
+    margin: 0 0 0 2;
+    padding: 0 0 0 1;
+    border-left: solid #3f3f46;
+    background: transparent;
+}
+
+MarkdownHeader {
+    margin: 1 0 0 0;
+}
+
+MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4, MarkdownH5, MarkdownH6 {
+    margin: 0;
+}
+
+MarkdownHorizontalRule {
+    border-bottom: solid #27272a;
+    height: 1;
+    margin: 1 0 0 0;
+    padding: 0;
+}
+
 Markdown BulletList {
     height: auto;
     margin: 0;

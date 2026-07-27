@@ -30,6 +30,11 @@ class MockChatView:
     def __init__(self, children=None):
         self.children = children or []
 
+    async def add_bot_message(self):
+        msg = MockBotMessage("")
+        self.children.append(msg)
+        return msg
+
 
 class MockBotMessage:
     def __init__(self, content):
@@ -43,7 +48,7 @@ class MockApp:
         self.notified = []
         self.status_refreshed = False
         self.ai_prompts = []
-        self.chat_view = ChatView()
+        self.chat_view = MockChatView()
 
     def notify(self, msg: str, severity: str = "info"):
         self.notified.append((msg, severity))
