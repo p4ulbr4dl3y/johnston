@@ -8,7 +8,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         options = []
         for s in sessions:
             title = " ".join(str(s.get('title', '')).replace("\n", " ").replace("\r", " ").split())
-            options.append(f"{title} ({s.get('message_count', 0)} msgs)")
+            options.append(f"{title} \\[{s.get('message_count', 0)} msgs]")
 
         items = [s["id"] for s in sessions]
         default_val = items[0] if items else ""
