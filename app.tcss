@@ -206,9 +206,9 @@ Markdown OrderedList {
 
 MarkdownFence {
     background: #18181b;
-    margin: 1 1 1 0;
+    margin: 1 0;
     padding: 0;
-    border-left: solid #3f3f46;
+    border: none;
     height: auto;
     scrollbar-size: 0 0;
 }
@@ -556,6 +556,12 @@ MarkdownBlockQuote {
     color: #e4e4e7;
     margin: 1 0;
     padding: 0 1;
+}
+
+MarkdownBlockQuote MarkdownFence {
+    border: none;
+    margin: 0;
+    background: transparent;
 }
 
 /* Markdown Inline Code - Clean Monochrome Slate (White text on dark zinc background) */
