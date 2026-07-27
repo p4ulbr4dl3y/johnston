@@ -2,3 +2,16 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Caches
+.ruff_cache/
+.pytest_cache/
+
+# Local folders
+.serena/
+.johnston/
