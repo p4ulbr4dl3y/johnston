@@ -549,9 +549,9 @@ MarkdownHorizontalRule {
     margin-bottom: 1;
 }
 
-/* Markdown Blockquote - Clean Monochrome Slate (Subtle zinc left border + Dark Card) */
+/* Markdown Blockquote - Clean Monochrome Slate (Dark Card without extra vertical lines) */
 MarkdownBlockQuote {
-    border-left: solid #52525b;
+    border-left: none;
     background: #18181b;
     color: #e4e4e7;
     margin: 1 0;
