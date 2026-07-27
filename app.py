@@ -539,8 +539,9 @@ class JohnstonApp(App):
                 user_msgs = chat_view.get_user_messages()
                 msg_idx = len(user_msgs) - 1
                 try:
+                    proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
                     from core.git_checkpoint import GitCheckpointManager
-                    GitCheckpointManager.create_checkpoint(curr_sid, msg_idx)
+                    GitCheckpointManager.create_checkpoint(curr_sid, msg_idx, project_path=proj_path)
                 except Exception as e:
                     print(f"Git checkpoint creation failed: {e}")
 
