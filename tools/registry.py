@@ -5,7 +5,7 @@ from tools.ask_user import AskUserTool
 from tools.base import BaseTool
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
-from tools.edit import EditTool
+from tools.edit import EditTool, MultiReplaceFileContentTool, ReplaceFileContentTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
@@ -19,6 +19,8 @@ TOOL_CLASSES = [
     ReadTool,
     CreateTool,
     EditTool,
+    ReplaceFileContentTool,
+    MultiReplaceFileContentTool,
     ShellTool,
     AskUserTool,
     SkillTool,
@@ -40,9 +42,11 @@ ALIAS_MAP: Dict[str, str] = {
     "read_file": "read",
     "view_file": "read",
     "cat": "read",
-    "str_replace_editor": "edit",
+    "str_replace_editor": "replace_file_content",
     "update_file": "edit",
     "modify_file": "edit",
+    "replace": "replace_file_content",
+    "multi_replace": "multi_replace_file_content",
     "terminal": "shell",
     "exec": "shell",
     "run_command": "shell",
