@@ -516,5 +516,12 @@ class AskUserWizardScreen(ModalScreen[str]):
     def action_quit(self) -> None:
         self.app.exit()
 
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("tab", "shift+tab", "backtab", "shift_tab"):
+            event.prevent_default()
+            event.stop()
+            return
+
+
 
 
