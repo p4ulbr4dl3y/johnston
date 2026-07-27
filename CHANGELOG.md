@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.2](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.1...johnston-v0.2.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* await read_task before closing pty transport in ShellTool ([b00c955](https://github.com/p4ulbr4dl3y/johnston/commit/b00c95593d44ba55b322221fce404150aaa96dd8))
+* ignore SIGHUP signal on PTY to prevent runner shutdown on Linux ([ffa5534](https://github.com/p4ulbr4dl3y/johnston/commit/ffa5534bc693ed48d582422f7bcd330098951c29))
+* remove secondary raw os.read on PTY EIO to fix Linux asyncio transport cleanup ([05120e8](https://github.com/p4ulbr4dl3y/johnston/commit/05120e8aee5a22d516ac86719c89be62c1b7337b))
+* remove start_new_session in PTY branch to prevent Linux TTY driver SIGHUP signal to runner ([5503476](https://github.com/p4ulbr4dl3y/johnston/commit/55034766e44e95890880e68922d58f190618756e))
+* resolve PTY transport file descriptor leak ([3fa1457](https://github.com/p4ulbr4dl3y/johnston/commit/3fa1457dcbb19eb32d84d0cd4851c7855ecd648c))
+* validate pid in terminate_process to prevent os.killpg(0) self-termination on Linux ([6d390fc](https://github.com/p4ulbr4dl3y/johnston/commit/6d390fcf7d8a4b31c87a8318d2ffa543a10c7e95))
+
 ## [0.2.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.0...johnston-v0.2.1) (2026-07-26)
 
 
