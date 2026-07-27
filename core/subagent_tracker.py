@@ -145,19 +145,12 @@ class SubagentTracker:
             return list(self.sessions.values())
         return [s for s in self.sessions.values() if s.session_id == session_id]
 
-    def find_session_by_description_or_id(
-        self, identifier: str, session_id: Optional[str] = None
+    def _search_in_list(
+        self, candidates: List[SubagentSessionData], identifier: str, clean_id: str
     ) -> Optional[SubagentSessionData]:
-        candidates = self.get_sessions_for_session(session_id)
-        if not identifier:
-            return candidates[-1] if candidates else None
-
         if identifier in self.sessions:
-            cand = self.sessions[identifier]
-            if not session_id or not cand.session_id or cand.session_id == session_id:
-                return cand
+            return self.sessions[identifier]
 
-        clean_id = identifier.strip('"\' `')
         for sess in candidates:
             if sess.task_id == identifier or sess.task_id == clean_id:
                 return sess
@@ -168,7 +161,7 @@ class SubagentTracker:
             if clean_prompt == clean_id:
                 return sess
 
-        # If clean_id was truncated with '...', try prefix/fuzzy matching
+        # Ellipsis matching
         if "..." in clean_id:
             parts = [p.strip() for p in clean_id.split("...") if p.strip()]
             for sess in candidates:
@@ -179,7 +172,7 @@ class SubagentTracker:
                 if parts and all(p in clean_prompt for p in parts):
                     return sess
 
-        # Substring / prefix / case-insensitive matching fallback for partial descriptions
+        # Substring / prefix / case-insensitive matching fallback
         clean_id_lower = clean_id.lower()
         if len(clean_id_lower) >= 3:
             for sess in candidates:
@@ -191,3 +184,27 @@ class SubagentTracker:
                     return sess
 
         return None
+
+    def find_session_by_description_or_id(
+        self, identifier: str, session_id: Optional[str] = None
+    ) -> Optional[SubagentSessionData]:
+        candidates = self.get_sessions_for_session(session_id)
+        if not identifier:
+            return candidates[-1] if candidates else None
+
+        clean_id = identifier.strip('"\' `')
+
+        # 1. Search in session_id candidates
+        res = self._search_in_list(candidates, identifier, clean_id)
+        if res:
+            return res
+
+        # 2. If restricted by session_id, fallback to all in-memory sessions
+        if session_id:
+            res = self._search_in_list(list(self.sessions.values()), identifier, clean_id)
+            if res:
+                return res
+
+        # 3. Fallback: reload disk sessions and search all sessions
+        self._load_all_sessions()
+        return self._search_in_list(list(self.sessions.values()), identifier, clean_id)
