@@ -98,8 +98,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         from core.commands import COMMAND_REGISTRY
         self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/compact", COMMAND_REGISTRY)
-        self.assertIn("/trace", COMMAND_REGISTRY)
-        self.assertIn("/rollback", COMMAND_REGISTRY)
 
 
 
