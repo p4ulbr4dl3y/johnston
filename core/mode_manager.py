@@ -14,6 +14,10 @@ class ModeDefinition:
         read_only: bool = False,
         prompt: str = "",
         disallowed_tools: Optional[List[str]] = None,
+        allowed_capabilities: Optional[List[str]] = None,
+        denied_capabilities: Optional[List[str]] = None,
+        allowed_shell_commands: Optional[List[str]] = None,
+        workspace_allowlist: Optional[List[str]] = None,
         source: str = "builtin",
     ):
         self.key = key.lower().strip()
@@ -22,6 +26,10 @@ class ModeDefinition:
         self.read_only = read_only
         self.prompt = prompt
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
+        self.allowed_capabilities = [c.strip() for c in (allowed_capabilities or [])]
+        self.denied_capabilities = [c.strip() for c in (denied_capabilities or [])]
+        self.allowed_shell_commands = [c.strip() for c in (allowed_shell_commands or [])]
+        self.workspace_allowlist = [p.strip() for p in (workspace_allowlist or [])]
         self.source = source
 
 
@@ -31,6 +39,17 @@ BUILTIN_MODES = {
         name="Action",
         description="Execution and implementation mode. Full editing, shell, and task permissions.",
         read_only=False,
+        allowed_capabilities=[
+            "agent.delegate",
+            "fs.read",
+            "fs.write",
+            "mcp.call",
+            "network.fetch",
+            "shell.exec",
+            "skill.read",
+            "task.manage",
+            "user.prompt",
+        ],
         prompt=(
             "[MODE: ACTION]\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n"
@@ -48,6 +67,16 @@ BUILTIN_MODES = {
         name="Explore",
         description="Read-only mode for Q&A, research, code explanation, architecture review, and planning.",
         read_only=True,
+        allowed_capabilities=[
+            "agent.delegate",
+            "fs.read",
+            "network.fetch",
+            "shell.exec",
+            "skill.read",
+            "task.manage",
+            "user.prompt",
+        ],
+        denied_capabilities=["fs.write", "mcp.call"],
         prompt=(
             "[MODE: EXPLORE]\n"
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
@@ -126,6 +155,10 @@ class ModeManager:
                 read_only=bool(data.get("read_only", False)),
                 prompt=data.get("prompt", ""),
                 disallowed_tools=data.get("disallowed_tools", []),
+                allowed_capabilities=data.get("allowed_capabilities", []),
+                denied_capabilities=data.get("denied_capabilities", []),
+                allowed_shell_commands=data.get("allowed_shell_commands", []),
+                workspace_allowlist=data.get("workspace_allowlist", []),
                 source=source,
             )
         except Exception:
@@ -162,6 +195,13 @@ class ModeManager:
                 cleaned = disallowed_raw.strip("[]")
                 disallowed_tools = [t.strip() for t in cleaned.split(",") if t.strip()]
 
+            def _parse_list(key: str) -> List[str]:
+                raw_val = meta.get(key, "")
+                if not raw_val:
+                    return []
+                cleaned_val = raw_val.strip("[]")
+                return [v.strip() for v in cleaned_val.split(",") if v.strip()]
+
             return ModeDefinition(
                 key=key,
                 name=name,
@@ -169,6 +209,10 @@ class ModeManager:
                 read_only=read_only_val,
                 prompt=prompt,
                 disallowed_tools=disallowed_tools,
+                allowed_capabilities=_parse_list("allowed_capabilities"),
+                denied_capabilities=_parse_list("denied_capabilities"),
+                allowed_shell_commands=_parse_list("allowed_shell_commands"),
+                workspace_allowlist=_parse_list("workspace_allowlist"),
                 source=source,
             )
         except Exception:

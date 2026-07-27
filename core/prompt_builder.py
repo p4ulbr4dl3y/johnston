@@ -206,8 +206,15 @@ class PromptBuilder:
     def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
         from core.mode_manager import ModeManager
+        from core.policy import policy_engine
 
-        mcp_tools = get_mcp_manager().get_active_tools()
+        mcp_mgr = get_mcp_manager()
+        mcp_tools = []
+        for t in mcp_mgr.get_active_tools():
+            server = t.get("_mcp_server", "")
+            tool_name = t.get("_mcp_tool_name", "")
+            if server and tool_name and mcp_mgr.get_tool_capabilities(server, tool_name):
+                mcp_tools.append(t)
         clean_mcp_tools = [
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
         ]
@@ -215,16 +222,19 @@ class PromptBuilder:
         all_tools = list(self.base_tools) + clean_mcp_tools
 
         mode_def = ModeManager.get_instance().get_mode(self.mode)
-        if mode_def.read_only or mode_def.disallowed_tools:
-            disallowed = set(t.lower() for t in mode_def.disallowed_tools)
-            if mode_def.read_only:
-                disallowed.update({"create", "edit"})
-            all_tools = [
-                t for t in all_tools
-                if t.get("function", {}).get("name", "").lower() not in disallowed
-            ]
+        all_tools = [
+            t for t in all_tools
+            if policy_engine.tool_allowed_in_prompt(
+                t.get("function", {}).get("name", ""), mode_def
+            ).allowed
+        ]
 
         if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent", "Task", "task") for t in all_tools):
             all_tools.append(SubagentTool.schema)
 
-        return all_tools
+        return [
+            t for t in all_tools
+            if policy_engine.tool_allowed_in_prompt(
+                t.get("function", {}).get("name", ""), mode_def
+            ).allowed
+        ]

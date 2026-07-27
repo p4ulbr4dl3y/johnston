@@ -27,6 +27,7 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
     async def test_successful_call(self):
         tool = CallMCPTool()
         mock_mgr = MagicMock()
+        mock_mgr.get_tool_capabilities.return_value = ["fs.read"]
         mock_mgr.call_tool.return_value = "MCP tool result text"
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):
@@ -38,6 +39,7 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
     async def test_call_returns_none(self):
         tool = CallMCPTool()
         mock_mgr = MagicMock()
+        mock_mgr.get_tool_capabilities.return_value = ["fs.read"]
         mock_mgr.call_tool.return_value = None
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):
@@ -50,6 +52,7 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
     async def test_arguments_default_empty(self):
         tool = CallMCPTool()
         mock_mgr = MagicMock()
+        mock_mgr.get_tool_capabilities.return_value = ["fs.read"]
         mock_mgr.call_tool.return_value = "ok"
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):

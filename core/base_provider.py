@@ -356,24 +356,13 @@ class BaseAgent:
         return ALIAS_MAP.get(clean_name.lower(), clean_name)
 
     def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
-        canonical_name = self._canonical_tool_name(tool_name).lower()
-        disallowed = {t.lower() for t in getattr(mode_def, "disallowed_tools", [])}
+        from core.policy import policy_engine
 
-        if getattr(mode_def, "read_only", False):
-            disallowed.update({"create", "edit"})
-
-        if canonical_name not in disallowed:
+        decision = policy_engine.tool_call_decision(tool_name, args, mode_def)
+        if decision.allowed:
             return None
-
-        if canonical_name in {"create", "edit"}:
-            f_path = args.get("path") or args.get("file") or ""
-            if f_path.endswith("plan.md") or ".johnston/plans" in f_path or ".johnston\\plans" in f_path:
-                return None
-            if f_path:
-                return f"Error: Editing code file '{f_path}' is disabled in {mode_def.name} mode."
-            return f"Error: Editing is disabled in {mode_def.name} mode."
-
-        return f"Error: Tool '{self._canonical_tool_name(tool_name)}' is disabled in {mode_def.name} mode."
+        canonical_name = self._canonical_tool_name(tool_name)
+        return f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
 
     async def _compact_messages_if_needed(
         self,
@@ -740,9 +729,20 @@ class BaseAgent:
                     from core.mode_manager import ModeManager
                     current_mode = getattr(self, "mode", "action").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
-                    policy_error = self._tool_policy_error(t_name, args, mode_def)
-                    if policy_error:
-                        tool_result = policy_error
+                    from core.audit import append_tool_decision
+                    from core.policy import policy_engine
+
+                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                    append_tool_decision(
+                        mode=current_mode,
+                        tool=t_name,
+                        decision="allow" if decision.allowed else "block",
+                        reason=decision.reason,
+                        capabilities=decision.capabilities,
+                    )
+                    if not decision.allowed:
+                        canonical_name = self._canonical_tool_name(t_name)
+                        tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
                         tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
 
