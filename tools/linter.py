@@ -62,6 +62,7 @@ async def _exec_cmd(cmd: list[str]) -> Optional[str]:
                 return stdout.decode("utf-8", errors="replace").strip()
         except asyncio.TimeoutError:
             proc.kill()
+            await proc.wait()
             return None
     except Exception:
         return None

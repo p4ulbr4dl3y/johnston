@@ -44,10 +44,26 @@ class AskUserTool(BaseTool):
         if not questions_list or not isinstance(questions_list, list):
             return "Error: Invalid or missing 'questions' list."
 
+        validated_questions = []
+        for q in questions_list:
+            if not isinstance(q, dict):
+                continue
+            q_text = str(q.get("question_text") or q.get("question") or "").strip()
+            options = q.get("options")
+            if not q_text or not isinstance(options, list):
+                continue
+            validated_questions.append({
+                "question_text": q_text,
+                "options": [str(opt) for opt in options]
+            })
+
+        if not validated_questions:
+            return "Error: Invalid or missing 'questions' list."
+
         if ctx.app and hasattr(ctx.app, "push_screen"):
             try:
                 from widgets.screens.ask_user import AskUserWizardScreen
-                screen = AskUserWizardScreen(questions_list)
+                screen = AskUserWizardScreen(validated_questions)
                 loop = asyncio.get_running_loop()
                 future = loop.create_future()
 

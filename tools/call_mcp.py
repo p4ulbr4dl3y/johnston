@@ -65,8 +65,11 @@ class CallMCPTool(BaseTool):
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
 
-        res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
-        if res is not None:
-            return res
+        try:
+            res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
+            if res is not None:
+                return res
+        except Exception as e:
+            return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}"
 
         return f"Error: Failed to execute MCP tool '{tool}' on server '{server}'. Server or tool not found."

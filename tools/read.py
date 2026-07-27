@@ -14,6 +14,8 @@ DOC_EXTENSIONS = {
     ".pdf", ".docx", ".pptx", ".xlsx", ".epub"
 }
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+
 
 def convert_doc_to_markdown_sync(path: str) -> str:
     """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
@@ -63,6 +65,13 @@ class ReadTool(BaseTool):
         path = resolve_path(args.get("path"))
         if not os.path.exists(path):
             return f"Error: file '{path}' not found."
+
+        try:
+            file_size = os.path.getsize(path)
+            if file_size > MAX_FILE_SIZE:
+                return f"Error: file '{path}' exceeds maximum readable size of {MAX_FILE_SIZE // (1024*1024)}MB."
+        except OSError as e:
+            return f"Error checking file '{path}': {e}"
 
         ext = os.path.splitext(path)[1].lower()
 
