@@ -293,8 +293,10 @@ class AskUserWizardScreen(ModalScreen[str]):
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
         ("enter", "go_next", "Next / Confirm"),
+        ("space", "toggle_selection", "Toggle Selection"),
         ("ctrl+c", "quit", "Exit"),
     ]
+
 
 
     def __init__(self, questions: list[dict]):
@@ -345,7 +347,8 @@ class AskUserWizardScreen(ModalScreen[str]):
             q = self.questions[self.q_idx]
             q_text = q.get("question_text", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n\n{q_text}")
-            hint.update("enter: select • ←: back • →: next • esc: cancel")
+            hint.update("enter: confirm • space: toggle • ←: back • →: next • esc: cancel")
+
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
@@ -477,6 +480,25 @@ class AskUserWizardScreen(ModalScreen[str]):
 
 
 
+    def action_toggle_selection(self) -> None:
+        if not self.raw_options or self.q_idx >= len(self.questions):
+            return
+        try:
+            opt_list = self.query_one("#options-list", OptionList)
+            if not opt_list.has_focus:
+                return
+            idx = opt_list.highlighted
+            if idx is not None and idx < len(self.raw_options):
+                chosen = self.raw_options[idx]
+                current_ans = self.answers.get(self.q_idx, {}).get("answer", "")
+                if current_ans == chosen:
+                    self.answers[self.q_idx] = {"answer": ""}
+                else:
+                    self.answers[self.q_idx] = {"answer": chosen}
+                self.update_step()
+        except Exception:
+            pass
+
     def action_cancel(self) -> None:
         self.dismiss("Cancelled by user.")
 
@@ -490,5 +512,6 @@ class AskUserWizardScreen(ModalScreen[str]):
 
     def action_quit(self) -> None:
         self.app.exit()
+
 
 
