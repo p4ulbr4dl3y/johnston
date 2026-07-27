@@ -417,6 +417,37 @@ ModalScreen {
 #modal-dialog TabbedContent {
     background: #18181b;
     height: auto;
+    margin-top: 1;
+}
+
+#modal-dialog Tabs {
+    background: #18181b;
+    border-bottom: solid #27272a;
+    height: 1;
+    min-height: 1;
+}
+
+#modal-dialog Tab {
+    color: #71717a;
+    background: #18181b;
+    padding: 0 2;
+    height: 1;
+    min-height: 1;
+}
+
+#modal-dialog Tab:hover {
+    color: #e4e4e7;
+}
+
+#modal-dialog Tab.-active {
+    color: #ffffff;
+    background: #18181b;
+    text-style: bold;
+}
+
+#modal-dialog Tabs .underline {
+    color: #ffffff;
+    background: #ffffff;
 }
 
 #modal-dialog ContentSwitcher {
