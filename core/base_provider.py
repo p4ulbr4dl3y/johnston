@@ -1,7 +1,6 @@
 import ast
 import asyncio
 import json
-import os
 import re
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -403,75 +402,6 @@ class BaseAgent:
         except Exception:
             return False
 
-    def _create_tool_checkpoint(self, tool_name: str, args: Dict[str, Any], capabilities: set[str]) -> dict[str, Any] | None:
-        if "fs.write" not in capabilities:
-            return None
-        app = getattr(self, "app", None)
-        session_id = str(getattr(app, "current_session_id", "") or f"agent_{id(self)}")
-        message_index = int(time.time() * 1000)
-        try:
-            from core.audit import append_trace_event
-            from core.git_checkpoint import GitCheckpointManager
-
-            checkpoint_sha = GitCheckpointManager.create_checkpoint(
-                session_id,
-                message_index,
-                project_path=os.getcwd(),
-            )
-            if not checkpoint_sha:
-                return None
-            checkpoint = {
-                "session_id": session_id,
-                "message_index": message_index,
-                "checkpoint_sha": checkpoint_sha,
-                "tool": self._canonical_tool_name(tool_name),
-                "target": args.get("path") or args.get("file") or args.get("image_path") or "",
-            }
-            append_trace_event({"event": "transaction_checkpoint", **checkpoint})
-            return checkpoint
-        except Exception:
-            return None
-
-    def _finalize_tool_checkpoint(self, checkpoint: dict[str, Any], budget: BudgetState) -> str:
-        try:
-            from core.audit import append_trace_event
-            from core.git_checkpoint import GitCheckpointManager
-
-            diff_stats = GitCheckpointManager.get_diff_stats(
-                checkpoint["session_id"],
-                checkpoint["message_index"],
-                project_path=os.getcwd(),
-            )
-            diff_lines = 0
-            if isinstance(diff_stats, str):
-                match = re.search(r"\+(\d+)\s*/\s*-(\d+)", diff_stats)
-                if match:
-                    diff_lines = int(match.group(1)) + int(match.group(2))
-            changed_files = 1 if diff_stats and diff_stats != "no changes" else 0
-            decision = budget.record_diff(changed_files=changed_files, diff_lines=diff_lines)
-            rolled_back = False
-            if not decision.allowed:
-                rolled_back = GitCheckpointManager.restore_checkpoint(
-                    checkpoint["session_id"],
-                    checkpoint["message_index"],
-                    project_path=os.getcwd(),
-                )
-            append_trace_event(
-                {
-                    "event": "transaction_result",
-                    **checkpoint,
-                    "diff_stats": diff_stats,
-                    "budget": budget.summarize(),
-                    "rolled_back": rolled_back,
-                    "reason": "" if decision.allowed else decision.reason,
-                }
-            )
-            if not decision.allowed:
-                suffix = " Mutation was rolled back." if rolled_back else " Rollback failed."
-                return f"\nError: {decision.reason}{suffix}"
-        except Exception:
-            return ""
-        return ""
 
     async def _compact_messages_if_needed(
         self,
@@ -891,33 +821,30 @@ class BaseAgent:
                         else:
                             tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
-                        checkpoint = self._create_tool_checkpoint(t_name, args, decision.capabilities)
-                    tool_app = getattr(self, "app", None) or self
-                    previous_policy_approved = getattr(
-                        tool_app, "_johnston_policy_approved", False
-                    )
-                    setattr(tool_app, "_johnston_policy_approved", policy_approved)
-                    try:
-                        tool_result = await execute_tool(t_name, args, app=tool_app)
-                    finally:
-                        setattr(
-                            tool_app,
-                            "_johnston_policy_approved",
-                            previous_policy_approved,
+                        tool_app = getattr(self, "app", None) or self
+                        previous_policy_approved = getattr(
+                            tool_app, "_johnston_policy_approved", False
                         )
-                        if checkpoint:
-                            tool_result += self._finalize_tool_checkpoint(checkpoint, budget)
-                    append_tool_result(
-                        mode=current_mode,
-                        tool=t_name,
-                        result=tool_result,
-                        budget=budget.summarize(),
-                        metadata={
-                            "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
-                            "step": budget.steps,
-                            "tool_call": budget.tool_calls,
-                        },
-                    )
+                        setattr(tool_app, "_johnston_policy_approved", policy_approved)
+                        try:
+                            tool_result = await execute_tool(t_name, args, app=tool_app)
+                        finally:
+                            setattr(
+                                tool_app,
+                                "_johnston_policy_approved",
+                                previous_policy_approved,
+                            )
+                            append_tool_result(
+                            mode=current_mode,
+                            tool=t_name,
+                            result=tool_result,
+                            budget=budget.summarize(),
+                            metadata={
+                                "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
+                                "step": budget.steps,
+                                "tool_call": budget.tool_calls,
+                            },
+                        )
 
                     tool_ui_result = tool_result
                     tool_content = tool_result
