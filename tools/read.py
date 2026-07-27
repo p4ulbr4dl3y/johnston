@@ -2,7 +2,8 @@ import asyncio
 import os
 import shutil
 import subprocess
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Tuple
 
 from tools.base import BaseTool, resolve_path
 
@@ -15,26 +16,71 @@ DOC_EXTENSIONS = {
 }
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+_DOC_CACHE: Dict[str, Tuple[float, float, str]] = {}  # key: path, val: (mtime, timestamp, md_text)
+MAX_DOC_CACHE = 50
+DOC_CACHE_TTL = 600.0  # 10 minutes
+
+
+def clear_doc_cache() -> None:
+    _DOC_CACHE.clear()
+
+
+def get_cached_doc_markdown(path: str) -> str | None:
+    try:
+        mtime = os.path.getmtime(path)
+    except Exception:
+        return None
+
+    if path in _DOC_CACHE:
+        cached_mtime, cached_ts, text = _DOC_CACHE[path]
+        if cached_mtime == mtime and (time.monotonic() - cached_ts < DOC_CACHE_TTL):
+            return text
+        del _DOC_CACHE[path]
+    return None
+
+
+def set_cached_doc_markdown(path: str, text: str) -> None:
+    try:
+        mtime = os.path.getmtime(path)
+    except Exception:
+        return
+
+    if len(_DOC_CACHE) >= MAX_DOC_CACHE:
+        oldest_key = min(_DOC_CACHE.keys(), key=lambda k: _DOC_CACHE[k][1])
+        del _DOC_CACHE[oldest_key]
+
+    _DOC_CACHE[path] = (mtime, time.monotonic(), text)
 
 
 def convert_doc_to_markdown_sync(path: str) -> str:
     """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
+    cached = get_cached_doc_markdown(path)
+    if cached is not None:
+        return cached
+
+    result_text = None
+
     # 1. Try Python API
     try:
         from markitdown import MarkItDown
         md = MarkItDown()
         result = md.convert(path)
         if result and getattr(result, "text_content", None) is not None:
-            return result.text_content
+            result_text = result.text_content
     except Exception:
         pass
 
     # 2. Try CLI fallback
-    cli_path = shutil.which("markitdown")
-    if cli_path:
-        res = subprocess.run([cli_path, path], capture_output=True, text=True, timeout=30)
-        if res.returncode == 0 and res.stdout:
-            return res.stdout
+    if result_text is None:
+        cli_path = shutil.which("markitdown")
+        if cli_path:
+            res = subprocess.run([cli_path, path], capture_output=True, text=True, timeout=30)
+            if res.returncode == 0 and res.stdout:
+                result_text = res.stdout
+
+    if result_text is not None:
+        set_cached_doc_markdown(path, result_text)
+        return result_text
 
     raise RuntimeError(
         f"Unable to convert '{path}' with markitdown. "
@@ -44,7 +90,11 @@ def convert_doc_to_markdown_sync(path: str) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read file content cleanly. Automatically converts PDF/DOCX/XLSX/PPTX to Markdown. Specify path, and optionally start_line and end_line for line range pagination (1-indexed)."
+    description = (
+        "Read file content cleanly with 800-line window pagination. "
+        "Automatically converts PDF/DOCX/XLSX/PPTX to Markdown with caching. "
+        "Specify path, and optionally start_line, end_line (1-indexed), or content_offset (bytes)."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -54,7 +104,8 @@ class ReadTool(BaseTool):
                 "properties": {
                     "path": {"type": "string", "description": "Absolute or relative file path"},
                     "start_line": {"type": "integer", "description": "Start line number (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line number (inclusive)"}
+                    "end_line": {"type": "integer", "description": "End line number (inclusive)"},
+                    "content_offset": {"type": "integer", "description": "Byte offset into file content"}
                 },
                 "required": ["path"]
             }
@@ -91,8 +142,20 @@ class ReadTool(BaseTool):
                 return f"Error converting document '{path}' to Markdown: {e}"
         else:
             try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.readlines()
+                content_offset = args.get("content_offset")
+                if content_offset is not None:
+                    try:
+                        content_offset = max(0, int(content_offset))
+                    except (ValueError, TypeError):
+                        content_offset = 0
+
+                with open(path, "rb") as f:
+                    if content_offset:
+                        f.seek(content_offset)
+                    raw_bytes = f.read()
+
+                text_content = raw_bytes.decode("utf-8", errors="replace")
+                lines = text_content.splitlines(keepends=True)
             except Exception as e:
                 return f"Error reading file '{path}': {e}"
 
@@ -102,16 +165,10 @@ class ReadTool(BaseTool):
         end_line = args.get("end_line")
 
         raw_lines = [line.rstrip("\r\n") for line in lines]
-        formatted = format_line_pagination(
+        return format_line_pagination(
             raw_lines,
             start_line=start_line,
             end_line=end_line,
-            max_chars=8000,
-            hint=f"File has {len(lines)} lines. Use start_line/end_line to read specific ranges.",
+            max_chars=32000,
+            path=path,
         )
-
-        if start_line is not None or end_line is not None:
-            s_val = start_line or 1
-            e_val = end_line or len(lines)
-            return f"=== Lines {s_val}-{min(e_val, len(lines))} of {len(lines)} in {path} ===\n{formatted}"
-        return formatted
