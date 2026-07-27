@@ -39,15 +39,11 @@ class AskUserTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         questions_list = args.get("questions")
-        question = args.get("question", "")
 
-        if isinstance(questions_list, dict):
-            questions_list = [questions_list]
+        if not questions_list or not isinstance(questions_list, list):
+            return "Error: Invalid or missing 'questions' list."
 
-        if not questions_list and question:
-            questions_list = [{"question_text": question, "options": []}]
-
-        if ctx.app and hasattr(ctx.app, "push_screen") and questions_list and isinstance(questions_list, list):
+        if ctx.app and hasattr(ctx.app, "push_screen"):
             try:
                 from widgets.screens.ask_user import AskUserWizardScreen
                 screen = AskUserWizardScreen(questions_list)
@@ -65,6 +61,7 @@ class AskUserTool(BaseTool):
                 return "Cancelled by user."
             except Exception as e:
                 return f"Error prompting user: {e}"
-        return "Error: App instance not available or no valid questions provided."
+        return "Error: App instance not available."
+
 
 
