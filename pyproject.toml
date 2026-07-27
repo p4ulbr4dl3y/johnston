@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-johnston = "app:main"
+johnston = "cli:main"
 
 [tool.hatch.build]
 exclude = [
@@ -39,6 +39,7 @@ exclude = [
 only-include = [
     "app.py",
     "app.tcss",
+    "cli.py",
     "core",
     "tools",
     "widgets",
@@ -47,7 +48,18 @@ only-include = [
 [dependency-groups]
 dev = [
     "coverage>=7.0.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
     "ruff>=0.15.22",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
 ]
 
 [tool.ruff]

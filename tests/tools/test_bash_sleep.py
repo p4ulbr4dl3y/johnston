@@ -72,8 +72,8 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
 
         mock_app.push_screen = mock_push_screen
 
-        res = await tool.execute({"command": "rm -rf /nonexistent_test_dir_12345"}, app=mock_app)
-        self.assertIsInstance(res, str)
+        res = await tool.execute({"command": "echo 'safe_accepted'"}, app=mock_app)
+        self.assertIn("safe_accepted", res)
 
 
 if __name__ == "__main__":
