@@ -381,11 +381,12 @@ class AskUserWizardScreen(ModalScreen[str]):
         try:
             input_field = self.query_one("#write-in-input", Input)
             if event.option_index == len(self.options) - 1:
-                input_field.display = True
+                self.focus_write_in_input()
             else:
                 input_field.display = False
         except Exception:
             pass
+
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if not self.raw_options or self.q_idx >= len(self.questions):
