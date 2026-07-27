@@ -45,17 +45,19 @@ class CallMCPTool(BaseTool):
         from core.mode_manager import ModeManager
         from core.policy import policy_engine
 
-        mode = getattr(app, "mode", "action") if app is not None else "action"
+        app_obj = getattr(app, "app", app)
+        mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
         mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
+        approved = bool(getattr(app_obj, "_johnston_policy_approved", False))
         decision = policy_engine.tool_call_decision(
             "call_mcp_tool",
             {
                 "server": server,
                 "tool": tool,
                 "arguments": arguments,
-                "policy_approved": args.get("policy_approved", False),
             },
             mode_def,
+            approved=approved,
         )
         if not decision.allowed:
             return f"Error: MCP tool '{server}.{tool}' blocked by policy: {decision.reason}"

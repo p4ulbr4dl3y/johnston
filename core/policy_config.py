@@ -6,6 +6,7 @@ from typing import Any
 from core.budgets import BudgetLimits
 
 POLICY_CONFIG_PATH = os.path.join(".johnston", "policy.json")
+ACTION_PRIORITY = {"allow": 0, "ask": 1, "block": 2}
 
 
 @dataclass(frozen=True)
@@ -15,14 +16,16 @@ class PolicyConfig:
     budgets: BudgetLimits = field(default_factory=BudgetLimits)
 
     def action_for(self, *, tool: str, capabilities: set[str], default: str) -> str:
+        actions = [default]
         tool_action = self.tool_actions.get(tool)
         if tool_action:
-            return tool_action
-        for capability in sorted(capabilities):
-            action = self.capability_actions.get(capability)
-            if action:
-                return action
-        return default
+            actions.append(tool_action)
+        actions.extend(
+            action
+            for capability in capabilities
+            if (action := self.capability_actions.get(capability))
+        )
+        return max(actions, key=lambda action: ACTION_PRIORITY.get(action, 0))
 
 
 def _clean_action(value: Any) -> str | None:
@@ -162,5 +165,4 @@ def cycle_budget_limit(limit_name: str, path: str = POLICY_CONFIG_PATH) -> Any:
         next_val = presets[0]
 
     return set_budget_limit(limit_name, next_val, path)
-
 
