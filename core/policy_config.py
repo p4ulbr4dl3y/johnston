@@ -124,3 +124,43 @@ def toggle_policy_action(
     new_action = next_action_map.get(current, "allow")
     return set_policy_action(key_type, item_name, new_action, path)
 
+
+def set_budget_limit(
+    limit_name: str, value: int | float | None, path: str = POLICY_CONFIG_PATH
+) -> Any:
+    data = _load_json(path)
+    if "budgets" not in data or not isinstance(data["budgets"], dict):
+        data["budgets"] = {}
+    if value is None or (isinstance(value, (int, float)) and value < 0):
+        data["budgets"].pop(limit_name, None)
+    else:
+        data["budgets"][limit_name] = value
+    save_policy_config(data, path)
+    return value
+
+
+def cycle_budget_limit(limit_name: str, path: str = POLICY_CONFIG_PATH) -> Any:
+    data = _load_json(path)
+    raw_budgets = data.get("budgets", {}) if isinstance(data.get("budgets"), dict) else {}
+    current = raw_budgets.get(limit_name)
+
+    preset_map: dict[str, list[Any]] = {
+        "max_steps": [None, 50, 100, 200],
+        "max_tool_calls": [None, 100, 200, 500],
+        "max_wall_seconds": [None, 900, 1800, 3600],
+        "max_writes": [None, 20, 50, 100],
+        "max_changed_files": [None, 50, 100, 200],
+        "max_diff_lines": [None, 1000, 5000, 10000],
+        "max_tool_result_chars": [None, 50000, 120000, 250000],
+    }
+
+    presets = preset_map.get(limit_name, [None, 50, 100])
+    try:
+        idx = presets.index(current)
+        next_val = presets[(idx + 1) % len(presets)]
+    except ValueError:
+        next_val = presets[0]
+
+    return set_budget_limit(limit_name, next_val, path)
+
+
