@@ -48,4 +48,5 @@ jobs:
 
       - name: Publish package to PyPI
         if: ${{ steps.release.outputs.release_created }}
+        continue-on-error: true
         uses: pypa/gh-action-pypi-publish@release/v1
