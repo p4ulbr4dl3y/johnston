@@ -14,29 +14,29 @@ from core.policy_config import (
 )
 
 DEFAULT_POLICY_ITEMS = [
-    {"type": "tool", "name": "shell", "desc": "Execute shell commands"},
-    {"type": "tool", "name": "read", "desc": "Read workspace files"},
-    {"type": "tool", "name": "create", "desc": "Create workspace files"},
-    {"type": "tool", "name": "edit", "desc": "Edit workspace files"},
-    {"type": "tool", "name": "ask_user", "desc": "Prompt user interactively"},
-    {"type": "tool", "name": "call_mcp_tool", "desc": "Execute MCP tools"},
-    {"type": "tool", "name": "manage_task", "desc": "Manage background tasks"},
-    {"type": "tool", "name": "subagent", "desc": "Launch subagents"},
-    {"type": "capability", "name": "fs.read", "desc": "Filesystem read access"},
-    {"type": "capability", "name": "fs.write", "desc": "Filesystem write access"},
-    {"type": "capability", "name": "shell.execute", "desc": "Shell command capability"},
-    {"type": "capability", "name": "net.connect", "desc": "Network connectivity capability"},
-    {"type": "capability", "name": "user.prompt", "desc": "User prompt capability"},
+    {"type": "tool", "name": "shell", "title": "Shell Commands", "desc": "Execute terminal commands"},
+    {"type": "tool", "name": "read", "title": "Read Files", "desc": "Read workspace files"},
+    {"type": "tool", "name": "create", "title": "Create Files", "desc": "Create new files in workspace"},
+    {"type": "tool", "name": "edit", "title": "Edit Files", "desc": "Modify existing workspace files"},
+    {"type": "tool", "name": "ask_user", "title": "Ask User", "desc": "Prompt user for input"},
+    {"type": "tool", "name": "call_mcp_tool", "title": "MCP Tools", "desc": "Execute external MCP server tools"},
+    {"type": "tool", "name": "manage_task", "title": "Background Tasks", "desc": "Manage async background tasks"},
+    {"type": "tool", "name": "subagent", "title": "Subagents", "desc": "Launch subagent workers"},
+    {"type": "capability", "name": "fs.read", "title": "Filesystem Read", "desc": "Read access capability"},
+    {"type": "capability", "name": "fs.write", "title": "Filesystem Write", "desc": "Write access capability"},
+    {"type": "capability", "name": "shell.execute", "title": "Shell Execution", "desc": "Shell process execution capability"},
+    {"type": "capability", "name": "net.connect", "title": "Network Access", "desc": "Network connection capability"},
+    {"type": "capability", "name": "user.prompt", "title": "User Interaction", "desc": "Interactive prompt capability"},
 ]
 
 DEFAULT_BUDGET_ITEMS = [
-    {"name": "max_steps", "desc": "Agent loop max steps"},
-    {"name": "max_tool_calls", "desc": "Max tool calls per session"},
-    {"name": "max_wall_seconds", "desc": "Max execution time (sec)"},
-    {"name": "max_writes", "desc": "Max file write operations"},
-    {"name": "max_changed_files", "desc": "Max changed files count"},
-    {"name": "max_diff_lines", "desc": "Max total diff lines"},
-    {"name": "max_tool_result_chars", "desc": "Max tool output characters"},
+    {"name": "max_steps", "title": "Max Loop Steps", "desc": "Max agent iteration steps"},
+    {"name": "max_tool_calls", "title": "Max Tool Calls", "desc": "Max tool executions per session"},
+    {"name": "max_wall_seconds", "title": "Execution Timeout", "desc": "Max runtime duration in seconds"},
+    {"name": "max_writes", "title": "Max File Writes", "desc": "Max file write operations"},
+    {"name": "max_changed_files", "title": "Max Changed Files", "desc": "Max modified files limit"},
+    {"name": "max_diff_lines", "title": "Max Diff Lines", "desc": "Max modified line changes limit"},
+    {"name": "max_tool_result_chars", "title": "Max Output Length", "desc": "Max tool result character limit"},
 ]
 
 
@@ -79,6 +79,7 @@ class PolicyScreen(ModalScreen[None]):
             for item in self.items:
                 ktype = item["type"]
                 name = item["name"]
+                title = item.get("title", name)
                 desc = item["desc"]
 
                 if ktype == "tool":
@@ -89,16 +90,17 @@ class PolicyScreen(ModalScreen[None]):
                     kind_tag = r"\[CAP]"
 
                 act_tag = rf"\[{action.upper()}]"
-                options.append(f"{act_tag} {kind_tag} {name} — {desc}")
+                options.append(f"{act_tag} {kind_tag} {title} — {desc}")
                 items.append(item)
         else:
             for item in self.budget_items:
                 name = item["name"]
+                title = item.get("title", name)
                 desc = item["desc"]
                 val = getattr(config.budgets, name, None)
                 val_str = "UNLIMITED" if val is None else str(val)
                 tag = rf"\[{val_str}]"
-                options.append(f"{tag} {name} — {desc}")
+                options.append(f"{tag} {title} — {desc}")
                 items.append(item)
 
         return options, items
