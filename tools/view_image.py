@@ -1,8 +1,7 @@
-import base64
-import mimetypes
 import os
 from typing import Any, Dict
 
+from core.media import create_data_url, encode_image_to_b64
 from core.models_catalog import catalog
 from tools.base import BaseTool, resolve_path
 
@@ -12,40 +11,8 @@ def process_and_encode_image(image_path: str, max_dim: int = 1568) -> tuple[str,
     Reads image, auto-resizes if dimensions exceed max_dim (1568px),
     compresses to optimized JPEG (quality 85), and returns (b64_url, mime_type).
     """
-    ext = os.path.splitext(image_path)[1].lower()
-    try:
-        import io
-
-        from PIL import Image, ImageOps
-        with Image.open(image_path) as img:
-            img = ImageOps.exif_transpose(img)
-            w, h = img.size
-            if w > max_dim or h > max_dim:
-                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-
-            # Flatten alpha channel onto white background for optimal compression
-            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
-                bg = Image.new("RGB", img.size, (255, 255, 255))
-                if img.mode != "RGBA":
-                    img = img.convert("RGBA")
-                bg.paste(img, mask=img.split()[3])
-                img = bg
-            elif img.mode != "RGB":
-                img = img.convert("RGB")
-
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=85, optimize=True)
-            mime_type = "image/jpeg"
-
-            b64_data = base64.b64encode(buf.getvalue()).decode("utf-8")
-            return f"data:{mime_type};base64,{b64_data}", mime_type
-    except Exception:
-        mime_type, _ = mimetypes.guess_type(image_path)
-        if not mime_type or not mime_type.startswith("image/"):
-            mime_type = f"image/{ext.lstrip('.')}" if ext in (".png", ".jpeg", ".gif", ".webp") else "image/png"
-        with open(image_path, "rb") as f:
-            b64_data = base64.b64encode(f.read()).decode("utf-8")
-        return f"data:{mime_type};base64,{b64_data}", mime_type
+    mime_type, b64_data = encode_image_to_b64(image_path, max_dim=max_dim, quality=85)
+    return create_data_url(mime_type, b64_data), mime_type
 
 
 async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:

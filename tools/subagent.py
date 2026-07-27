@@ -1,5 +1,4 @@
 import asyncio
-import math
 import uuid
 from typing import Any, Dict
 
@@ -133,62 +132,14 @@ class SubagentTool(BaseTool):
                 if t.get("function", {}).get("name") in definition.tools
             ]
 
-        def _record_step(step, acc):
-            etype = step[0]
-            val1 = step[1] if len(step) > 1 else ""
-            val2 = step[2] if len(step) > 2 else ""
-            val3 = step[3] if len(step) > 3 else None
+        from core.subagent_tracker import merge_subagent_metrics, record_subagent_step
 
-            if etype == "thinking_start":
-                session.add_event({"type": "thinking_start", "val1": val1})
-            elif etype == "thinking_delta":
-                session.add_event({"type": "thinking_delta", "val1": val1})
-            elif etype == "thinking_end":
-                try:
-                    dur = float(val1)
-                    if not math.isfinite(dur):
-                        dur = 0.0
-                except Exception:
-                    dur = 0.0
-                session.add_event({"type": "thinking_end", "duration": dur, "content": val2})
-            elif etype == "tool":
-                targs = val3 if isinstance(val3, dict) else {}
-                session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
-            elif etype == "tool_result":
-                session.add_event({"type": "tool_result", "result_text": val1})
-            elif etype == "bot_chunk":
-                session.add_event({"type": "bot_chunk", "text": val1})
-                acc[0] += val1
-            elif etype == "bot_delta":
-                session.add_event({"type": "bot_delta", "text": val1})
-                acc[0] = val1
-            elif etype in ("bot_text", "outro"):
-                session.add_event({"type": "bot_text", "text": val1})
-                acc[0] = val1
+        def _record_step(step, acc):
+            record_subagent_step(step, session, acc)
 
         def _merge_metrics():
-            if ctx.app and hasattr(ctx.app, "agent") and ctx.app.agent:
-                main_agent = ctx.app.agent
-                last_in = getattr(subagent, "_merged_tokens_input", 0)
-                last_out = getattr(subagent, "_merged_tokens_output", 0)
-                last_tot = getattr(subagent, "_merged_total_tokens", 0)
-                last_cost = getattr(subagent, "_merged_cost_usd", 0.0)
-
-                cur_in = getattr(subagent, "tokens_input", 0)
-                cur_out = getattr(subagent, "tokens_output", 0)
-                cur_tot = getattr(subagent, "total_tokens", 0)
-                cur_cost = getattr(subagent, "cost_usd", 0.0)
-
-                main_agent.tokens_input += (cur_in - last_in)
-                main_agent.tokens_output += (cur_out - last_out)
-                main_agent.total_tokens += (cur_tot - last_tot)
-                main_agent.cost_usd += (cur_cost - last_cost)
-
-                subagent._merged_tokens_input = cur_in
-                subagent._merged_tokens_output = cur_out
-                subagent._merged_total_tokens = cur_tot
-                subagent._merged_cost_usd = cur_cost
-                ctx.refresh_status()
+            merge_subagent_metrics(subagent, ctx)
+            ctx.refresh_status()
 
         if run_in_background:
             async def _run_bg():

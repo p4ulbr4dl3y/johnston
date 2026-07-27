@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -127,22 +127,22 @@ class WebFetchTool(BaseTool):
                     text_content = content_bytes.decode("utf-8", errors="replace")
                     lines = text_content.splitlines(keepends=True)
 
-        start = args.get("start_line")
-        end = args.get("end_line")
+        from tools.utils import format_line_pagination
 
-        def _fmt_line(idx: int, line_str: str) -> str:
-            if not line_str.endswith("\n"):
-                line_str = line_str + "\n"
-            return f"{idx:5d} | {line_str}"
+        start_line = args.get("start_line")
+        end_line = args.get("end_line")
 
-        if start is not None or end is not None:
-            s_idx = max(0, (start or 1) - 1)
-            e_idx = end if end is not None else len(lines)
-            sliced = lines[s_idx:e_idx]
-            formatted_lines = [_fmt_line(s_idx + i + 1, line) for i, line in enumerate(sliced)]
-            content = "".join(formatted_lines)
-            return f"=== Lines {s_idx+1}-{min(e_idx, len(lines))} of {len(lines)} in {url} ===\n{content}"
+        raw_lines = [line.rstrip("\r\n") for line in lines]
+        formatted = format_line_pagination(
+            raw_lines,
+            start_line=start_line,
+            end_line=end_line,
+            max_chars=8000,
+            hint=f"URL output has {len(lines)} lines. Use start_line/end_line to read specific ranges.",
+        )
 
-        formatted_lines = [_fmt_line(i + 1, line) for i, line in enumerate(lines)]
-        content = "".join(formatted_lines)
-        return truncate_output(content, max_chars=8000, hint=f"URL output has {len(lines)} lines. Use start_line/end_line to read specific ranges.")
+        if start_line is not None or end_line is not None:
+            s_val = start_line or 1
+            e_val = end_line or len(lines)
+            return f"=== Lines {s_val}-{min(e_val, len(lines))} of {len(lines)} in {url} ===\n{formatted}"
+        return formatted

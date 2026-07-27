@@ -32,11 +32,19 @@ def _hash(value: Any) -> str:
 
 
 def append_audit_event(event: dict[str, Any]) -> None:
+    from core.config import AUDIT_LOG_FILE
+
     try:
-        os.makedirs(".johnston", exist_ok=True)
+        targets = {AUDIT_LOG_FILE, os.path.join(".johnston", "audit.jsonl")}
         record = {"ts": time.time(), **event}
-        with open(os.path.join(".johnston", "audit.jsonl"), "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+        line = json.dumps(record, ensure_ascii=False, default=str) + "\n"
+        for t in targets:
+            try:
+                os.makedirs(os.path.dirname(t), exist_ok=True)
+                with open(t, "a", encoding="utf-8") as f:
+                    f.write(line)
+            except Exception:
+                pass
     except Exception:
         pass
 

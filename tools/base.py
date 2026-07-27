@@ -49,7 +49,9 @@ def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: 
     if len(text) <= max_chars:
         return text
 
-    log_path = os.path.expanduser("~/.johnston/logs/last_tool.log")
+    from core.config import LAST_TOOL_LOG_FILE
+
+    log_path = LAST_TOOL_LOG_FILE
     if save_log:
         try:
             os.makedirs(os.path.dirname(log_path), exist_ok=True)
