@@ -548,6 +548,83 @@ class PolicyCommand(BaseCommand):
         app.push_screen(PolicyScreen())
 
 
+class DemoCommand(BaseCommand):
+    name = "/demo"
+    aliases = ["/fake"]
+    description = "Load interactive fake agent session (0 tokens spent)"
+
+    async def execute(self, app) -> None:
+        for w in [w for w in app.workers if w.is_running]:
+            w.cancel()
+        app.is_generating = False
+        app.message_queue.clear()
+
+        from core.subagent_tracker import SubagentTracker
+        tracker = SubagentTracker.get_instance()
+        demo_task_id = "subagent-demo"
+        demo_sess = tracker.create_session(
+            demo_task_id,
+            "Explore project architecture",
+            "Explore codebase and summarize architecture",
+            "explore",
+            False,
+            session_id=app.current_session_id
+        )
+        demo_sess.events.clear()
+        demo_sess.add_event({"type": "user", "text": "Explore codebase architecture"})
+        demo_sess.add_event({"type": "thinking_start", "val1": "Scanning project tree and config files..."})
+        demo_sess.add_event({"type": "thinking_end", "duration": 0.42, "content": "Project uses Textual framework with modular provider architecture."})
+        demo_sess.add_event({"type": "tool", "tool_type": "read", "target": "AGENTS.md", "args": {"path": "AGENTS.md"}})
+        demo_sess.add_event({"type": "tool_result", "result_text": "AGENTS.md instructions loaded successfully."})
+        demo_sess.add_event({"type": "bot_text", "text": "### **Результат исследования:**\n- **Проект**: Johnston AI Client (Textual TUI)\n- **Архитектура**: BaseAgent, PromptBuilder, SubagentTracker\n- **Статус**: Готов к работе."})
+        demo_sess.finish("completed")
+
+        from widgets.chat_view import ChatView
+        chat_view = app.query_one(ChatView)
+        await chat_view.remove_children()
+        chat_view.clear_welcome()
+
+        await chat_view.add_user_message("Запусти демонстрационную сессию и исследуй проект")
+
+        tw = await chat_view.add_thinking_widget()
+        tw.finish_thinking(0.42, "Checking workspace status, subagent tracker, and active tools without calling LLM API...")
+
+        tool1 = await chat_view.add_tool_call(
+            "subagent",
+            "Explore project architecture",
+            result_text="<task_result>\nИсследование архитектуры завершено успешно.\n</task_result>",
+            args={"description": "Explore project architecture", "task_id": demo_task_id, "subagent_type": "explore"}
+        )
+        setattr(tool1, "subagent_task_id", demo_task_id)
+
+        await chat_view.add_tool_call(
+            "shell",
+            "git status",
+            result_text="On branch main\nYour branch is up to date with 'origin/main'.\nnothing to commit, working tree clean",
+            args={"command": "git status"}
+        )
+
+        await chat_view.add_tool_call(
+            "read",
+            "AGENTS.md",
+            result_text="# AI Agents in Johnston\nJohnston uses modular agent architecture...",
+            args={"path": "AGENTS.md"}
+        )
+
+        bot_msg = await chat_view.add_bot_message()
+        bot_msg.content = (
+            "### 🚀 **Демонстрационная фейковая сессия активна!** (0 токенов потрачено)\n\n"
+            "Все виджеты интерактивны:\n"
+            "- ⚙ **Subagent**: кликни по плашке `subagent` выше, чтобы открыть модалку логов просмотра!\n"
+            "- ⚙ **Shell / Read**: кликни, чтобы развернуть вызовы инструментов.\n"
+            "- 💡 `/subagents`: открывает список субагентов.\n"
+            "- 💡 `/tasks`: открывает фоновые задачи."
+        )
+
+        app.refresh_status_footer()
+        app.notify("Фейковая демо-сессия загружена (0 токенов потрачено)")
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -566,6 +643,7 @@ COMMAND_CLASSES = [
     CompactCommand,
     ActionCommand,
     ExploreCommand,
+    DemoCommand,
 ]
 
 
