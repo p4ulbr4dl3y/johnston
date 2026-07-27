@@ -237,6 +237,14 @@ class AnthropicAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
+                if getattr(resp, "status_code", 200) >= 400:
+                    err_bytes = await resp.aread()
+                    err_body = err_bytes.decode("utf-8", errors="replace")
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}: {err_body}",
+                        request=resp.request,
+                        response=resp,
+                    )
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
@@ -426,6 +434,14 @@ class GeminiAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
+                if getattr(resp, "status_code", 200) >= 400:
+                    err_bytes = await resp.aread()
+                    err_body = err_bytes.decode("utf-8", errors="replace")
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}: {err_body}",
+                        request=resp.request,
+                        response=resp,
+                    )
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
@@ -529,6 +545,14 @@ class OllamaAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
+                if getattr(resp, "status_code", 200) >= 400:
+                    err_bytes = await resp.aread()
+                    err_body = err_bytes.decode("utf-8", errors="replace")
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {resp.status_code}: {err_body}",
+                        request=resp.request,
+                        response=resp,
+                    )
                 async for line in resp.aiter_lines():
                     if not line:
                         continue
