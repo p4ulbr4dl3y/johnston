@@ -80,7 +80,6 @@ class PolicyScreen(ModalScreen[None]):
                 ktype = item["type"]
                 name = item["name"]
                 title = item.get("title", name)
-                desc = item["desc"]
 
                 if ktype == "tool":
                     action = config.tool_actions.get(name, "allow")
@@ -90,17 +89,16 @@ class PolicyScreen(ModalScreen[None]):
                     kind_tag = r"\[CAP]"
 
                 act_tag = rf"\[{action.upper()}]"
-                options.append(f"{act_tag} {kind_tag} {title} — {desc}")
+                options.append(f"{act_tag} {kind_tag} {title}")
                 items.append(item)
         else:
             for item in self.budget_items:
                 name = item["name"]
                 title = item.get("title", name)
-                desc = item["desc"]
                 val = getattr(config.budgets, name, None)
                 val_str = "UNLIMITED" if val is None else str(val)
                 tag = rf"\[{val_str}]"
-                options.append(f"{tag} {title} — {desc}")
+                options.append(f"{tag} {title}")
                 items.append(item)
 
         return options, items
