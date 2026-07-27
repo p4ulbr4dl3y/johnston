@@ -1,5 +1,74 @@
 # Changelog
 
+## [0.4.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.3.0...johnston-v0.4.0) (2026-07-27)
+
+
+### Features
+
+* add /demo slash command for instant AskUser modal preview ([6f910ae](https://github.com/p4ulbr4dl3y/johnston/commit/6f910ae86026700c3039baa00e8353f6aa5ce1c3))
+* add /policy slash command and modal screen for security rule configuration ([08c3ad0](https://github.com/p4ulbr4dl3y/johnston/commit/08c3ad054fb4a7c49343eb3b5f41e359f9347cdb))
+* add harness budgets and trace evals ([77636e4](https://github.com/p4ulbr4dl3y/johnston/commit/77636e4f5291104b0886beb3a3609548cb34f0b6))
+* add tabbed UI in PolicyScreen with dedicated Resource Budgets tab ([3783e30](https://github.com/p4ulbr4dl3y/johnston/commit/3783e3008719dd7770f2b1a4f1d2de597b6ee806))
+* add transactional harness controls ([ab52666](https://github.com/p4ulbr4dl3y/johnston/commit/ab5266654e734b18cadb5b4c2c8f0833ba6b6c8a))
+* **ask_user:** allow toggling/deselecting options with Space key ([237845c](https://github.com/p4ulbr4dl3y/johnston/commit/237845c2603d22be5ad6a072c66e81ebe517337d))
+* **commands:** add /demo command for 0-token interactive fake agent session ([cc1f25b](https://github.com/p4ulbr4dl3y/johnston/commit/cc1f25b8405665a4940e4b43da8925eb083f62ab))
+* **commands:** add 2-minute background shell task loop to /demo for testing background tasks ([fe5369e](https://github.com/p4ulbr4dl3y/johnston/commit/fe5369ef6af130c37b8fba48c2b26f5c7df9a1b2))
+* **commands:** add ask_user tool call and interactive QuestionScreen modal popup to /demo ([261f188](https://github.com/p4ulbr4dl3y/johnston/commit/261f1881764d8d202d303d8bd741045a702891f0))
+* **demo:** run real AskUserTool with 3 multi-option questions in /demo ([cd1d307](https://github.com/p4ulbr4dl3y/johnston/commit/cd1d3076eaf1f43143269215aa4c21c25483e92e))
+* harden agent harness policy ([bfa8de1](https://github.com/p4ulbr4dl3y/johnston/commit/bfa8de18fcb3c9461279ea2981aea98aa29dec3b))
+* make budget limits optional and unlimited by default ([ec5c943](https://github.com/p4ulbr4dl3y/johnston/commit/ec5c94322b40efdba3c02b72c2bdd633b6633ff4))
+* remove /rollback and /trace commands ([efd1025](https://github.com/p4ulbr4dl3y/johnston/commit/efd1025a4c403d01f57176f2b96f55eebf38274b))
+
+
+### Bug Fixes
+
+* **app:** execute slash commands via asyncio.create_task to avoid blocking Textual event pump ([842eb19](https://github.com/p4ulbr4dl3y/johnston/commit/842eb190b5f5fac59712a76f88fa792b899ec094))
+* **ask_user:** automatically focus write-in input field when navigating to Write-in option ([0bbde9b](https://github.com/p4ulbr4dl3y/johnston/commit/0bbde9b6233d665ebf855e7857a50c791ebc36e5))
+* **ask_user:** do not insert 'No response' text into input field state ([9321fae](https://github.com/p4ulbr4dl3y/johnston/commit/9321faeadbbeddd5af97796632cd1a575268b7e4))
+* **ask_user:** eliminate modal flicker with single AskUserWizardScreen ([a6ee728](https://github.com/p4ulbr4dl3y/johnston/commit/a6ee728041ff0ea1df5b11bb5a648e8c9a6b5908))
+* **ask_user:** enable full arrow key navigation (left/right/up/down) inside WriteInInput ([fbbc97c](https://github.com/p4ulbr4dl3y/johnston/commit/fbbc97cec420fd8bb2cd13b251024cb7a1e181b6))
+* **ask_user:** preserve current option highlight index when deselecting an answer ([5902a5a](https://github.com/p4ulbr4dl3y/johnston/commit/5902a5a1357aa257021d1f55694df31fbaae6475))
+* **ask_user:** prevent Enter key bleed across multi-question wizard screens ([c0259c1](https://github.com/p4ulbr4dl3y/johnston/commit/c0259c14694a785ab2b076580f53676e5c8f7470))
+* **ask_user:** prevent focus escape via Tab/Shift+Tab keys in AskUserWizardScreen ([f2827b4](https://github.com/p4ulbr4dl3y/johnston/commit/f2827b4096eabc6e23c9b372798ba043e299dd35))
+* **ask_user:** record 'No response' in Answer output without pre-filling the input field ([161a081](https://github.com/p4ulbr4dl3y/johnston/commit/161a08138cd60ad261bc36087803cd4ec281d401))
+* **ask_user:** render escaped [✓] and [ ] status badges for options in OptionList ([ca2b2ab](https://github.com/p4ulbr4dl3y/johnston/commit/ca2b2ab837fec2a9fe45238f3b09498133b7da8a))
+* escape bracket markup tags in PolicyScreen options ([86f59f7](https://github.com/p4ulbr4dl3y/johnston/commit/86f59f75947616e9b943ea36c8a1b186c0dd282e))
+* handle OptionSelected event in PolicyScreen for Enter key selection ([6d1a27a](https://github.com/p4ulbr4dl3y/johnston/commit/6d1a27aa938cc54e71c17a1522ad4403a6b5116d))
+* harden shell policy enforcement ([9cbb52a](https://github.com/p4ulbr4dl3y/johnston/commit/9cbb52aad6944007edb121bb8445a6e1063937ee))
+* pass active thinking effort to status footer ([356d277](https://github.com/p4ulbr4dl3y/johnston/commit/356d277dd53bef683229689fba69c839e7af82de))
+* prevent background polling and improve ask_user schema ([fc5c3f5](https://github.com/p4ulbr4dl3y/johnston/commit/fc5c3f5e864d83bf4c000fbaf97c6d5d8aa6dc81))
+* prevent root directory freezes and fix MCP scope resolution ([219c9eb](https://github.com/p4ulbr4dl3y/johnston/commit/219c9eb29b0ab26f7e308952a0eebce676009ade))
+* **provider:** deduplicate duplicate tool calls streamed in single response step ([c072f9a](https://github.com/p4ulbr4dl3y/johnston/commit/c072f9a7d74e016ea2e541161611768f67560300))
+* **provider:** fix indentation error in tool execution loop inside BaseAgent.stream_steps ([b5da41a](https://github.com/p4ulbr4dl3y/johnston/commit/b5da41af329af0679f7bb4627d9839348a533849))
+* remove /rules alias from PolicyCommand ([7c64868](https://github.com/p4ulbr4dl3y/johnston/commit/7c6486869199fee56dc369cc4d43f97b665734b4))
+* remove trace rollback logic ([07c35d6](https://github.com/p4ulbr4dl3y/johnston/commit/07c35d69ae5169a8b8d3312b22178d0f7a0f1137))
+* **subagent:** add 3-stage fallback lookup (session candidates -&gt; all sessions -> disk reload) ([0b6a81c](https://github.com/p4ulbr4dl3y/johnston/commit/0b6a81cb332e07c72c731fff078260328696738f))
+* **subagent:** add substring and prefix matching fallback for subagent session lookups ([b1bd676](https://github.com/p4ulbr4dl3y/johnston/commit/b1bd67642e1728f28206bc2219f0818830205476))
+* **subagents:** add disk reload and session fallback to /subagents screen ([22634d5](https://github.com/p4ulbr4dl3y/johnston/commit/22634d5802d5e08600fd004588015fed064c191c))
+* **tcss:** clean up MarkdownFence and nested MarkdownBlockQuote borders ([47af2a1](https://github.com/p4ulbr4dl3y/johnston/commit/47af2a12993676e5b56ebf3c802daee006ca17b0))
+* **tcss:** override text-style to none !important to prevent double-inversion in Input component selection ([c1f000e](https://github.com/p4ulbr4dl3y/johnston/commit/c1f000e70be4e1f814e953f3ac3c0f34c7b259c8))
+* **tcss:** remove trailing duplicate closing brace in app.tcss ([47fba03](https://github.com/p4ulbr4dl3y/johnston/commit/47fba0333d7e080141002460398ebac08ca8e55c))
+* **tools:** fix AskUserTool execution when agent.app is missing or not a UI instance ([4d4dcf7](https://github.com/p4ulbr4dl3y/johnston/commit/4d4dcf74379b174500559a18af4232518a1f1eae))
+* **ui:** add _wait_until_attached check to ChatView mount methods to prevent MountError ([1901411](https://github.com/p4ulbr4dl3y/johnston/commit/19014113d62865829484dfe02869d219d6e95a1a))
+* **ui:** add 250ms mount debounce to QuestionScreen to prevent accidental trailing Enter key auto-submit ([4be26fd](https://github.com/p4ulbr4dl3y/johnston/commit/4be26fd4ea5ccbb678127a1b699da86cc5126d83))
+* **ui:** clear text selection and set cursor position to end on WriteInInput focus ([53474ef](https://github.com/p4ulbr4dl3y/johnston/commit/53474efa6b8030a5cab1604f48523176a620a899))
+* **ui:** enable Up arrow navigation from write-in input back to OptionList ([4d9e05b](https://github.com/p4ulbr4dl3y/johnston/commit/4d9e05b1a697c18dfe5cb3af538c8e5725457e15))
+* **ui:** ensure reliable modal focus and resolve test hanging in DemoCommand ([5540ed8](https://github.com/p4ulbr4dl3y/johnston/commit/5540ed89203f91308606ac87bb19730339027136))
+* **ui:** handle awaitable and mock objects safely in TasksListScreen kill action ([1597f5e](https://github.com/p4ulbr4dl3y/johnston/commit/1597f5e371e4bf002d3e4ab76da35dd7c256a14a))
+* **ui:** instantiate CustomMarkdownFence properly in Markdown initialization ([fcccfc7](https://github.com/p4ulbr4dl3y/johnston/commit/fcccfc77d7b3f65b877e5b4315086031c0906611))
+* **ui:** override select_all and add call_after_refresh to prevent blue text selection on WriteInInput focus ([585c4d2](https://github.com/p4ulbr4dl3y/johnston/commit/585c4d28e0d092c7f9285a3c6ed320bf135e32c8))
+* **ui:** refine markdown blockquote nesting and header spacing in TCSS ([0155c15](https://github.com/p4ulbr4dl3y/johnston/commit/0155c1509ad542fba0c9568914102652329ef1cb))
+* **ui:** resolve subagent screen lookup by handling truncated description labels and task_id fallback ([f576278](https://github.com/p4ulbr4dl3y/johnston/commit/f57627819eba400ed6dbe87bb9e24957842c3afd))
+* **ui:** restore click handler to open SubagentViewScreen for subagent and task tools ([d754c0d](https://github.com/p4ulbr4dl3y/johnston/commit/d754c0d13cea4e584623cb77beae408d57b10983))
+* **ui:** truncate option list item text to prevent multi-line wrapping in rewind and resume screens ([56ddeef](https://github.com/p4ulbr4dl3y/johnston/commit/56ddeefe8083de4263bdb50b5d24946ad5636848))
+* **ui:** use WriteInInput subclass to intercept Up arrow and return focus to OptionList ([27d30e2](https://github.com/p4ulbr4dl3y/johnston/commit/27d30e275c723251af8a4cfaeb0a3ad888a1660b))
+
+
+### Documentation
+
+* **ask_user:** instruct LLMs to list recommended options first with (Recommended) prefix ([cef02e2](https://github.com/p4ulbr4dl3y/johnston/commit/cef02e2c811e4b569be73f40bc0dac21eeac48ff))
+* update AGENTS.md repository guidelines ([dad9ff0](https://github.com/p4ulbr4dl3y/johnston/commit/dad9ff076b829f16f62c6215f8478759955c061c))
+
 ## [0.3.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.2...johnston-v0.3.0) (2026-07-27)
 
 
