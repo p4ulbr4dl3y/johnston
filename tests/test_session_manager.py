@@ -100,5 +100,44 @@ class TestSessionManager(unittest.TestCase):
         self.sm.set_active_session_id(sid)
         self.assertEqual(self.sm.get_active_session_id(), sid)
 
+class TestSessionManagerRegression(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
+        self.config_dir_patcher = patch("core.session_manager.CONFIG_DIR", os.path.join(self.test_dir, "config"))
+        self.projects_dir_patcher.start()
+        self.config_dir_patcher.start()
+        self.project_path = os.path.join(self.test_dir, "my_project")
+        os.makedirs(self.project_path, exist_ok=True)
+        self.sm = SessionManager(project_path=self.project_path)
+
+    def tearDown(self):
+        self.projects_dir_patcher.stop()
+        self.config_dir_patcher.stop()
+        shutil.rmtree(self.test_dir)
+
+    def test_load_session_returns_none_for_malformed_json(self):
+        bad_path = os.path.join(self.sm.sessions_dir, "broken.json")
+        with open(bad_path, "w", encoding="utf-8") as f:
+            f.write("{not json")
+
+        self.assertIsNone(self.sm.load_session("broken"))
+
+    def test_list_sessions_ignores_malformed_json_without_deleting_it(self):
+        bad_path = os.path.join(self.sm.sessions_dir, "broken.json")
+        with open(bad_path, "w", encoding="utf-8") as f:
+            f.write("{not json")
+
+        self.assertEqual(self.sm.list_sessions(), [])
+        self.assertTrue(os.path.exists(bad_path))
+
+    def test_save_session_without_messages_does_not_create_file_or_active_session(self):
+        sid = self.sm.generate_session_id()
+        self.sm.save_session(sid, {"id": sid, "ui_messages": [], "agent_history": []})
+
+        self.assertFalse(os.path.exists(os.path.join(self.sm.sessions_dir, f"{sid}.json")))
+        self.assertIsNone(self.sm.get_active_session_id())
+
+
 if __name__ == "__main__":
     unittest.main()

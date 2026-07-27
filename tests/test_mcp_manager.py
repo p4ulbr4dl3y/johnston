@@ -136,5 +136,48 @@ class TestMCPManager(unittest.TestCase):
         self.assertEqual(res, "executed lazyServer:lazy_tool")
 
 
+class TestMCPManagerRegression(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_disabled_server_tools_are_not_exposed_or_callable(self):
+        class DummyClient:
+            def __init__(self, name):
+                self.name = name
+                self.tools = [{"name": "search", "description": "Search", "inputSchema": {"type": "object"}}]
+
+            def call_tool(self, name, args, timeout=None):
+                return f"{self.name}:{name}:{args}:{timeout}"
+
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.clients = {"enabled": DummyClient("enabled"), "disabled": DummyClient("disabled")}
+        mm.load_servers = lambda: [
+            {"name": "enabled", "command": "python", "disabled": False, "mode": "eager"},
+            {"name": "disabled", "command": "python", "disabled": True, "mode": "eager"},
+        ]
+
+        names = [t["function"]["name"] for t in mm.get_active_tools(mode="all")]
+
+        self.assertEqual(names, ["search"])
+        self.assertEqual(mm.call_tool("search", {"q": "x"}), "enabled:search:{'q': 'x'}:None")
+        self.assertIsNone(mm.call_tool("disabled__search", {"q": "x"}))
+
+    def test_namespaced_capabilities_are_resolved(self):
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.load_servers = lambda: [
+            {
+                "name": "serverA",
+                "command": "python",
+                "disabled": False,
+                "capabilities": {"serverA__search": ["network", "read"]},
+            }
+        ]
+
+        self.assertEqual(mm.get_capabilities_for_exposed_tool("serverA__search"), ["network", "read"])
+
+
 if __name__ == "__main__":
     unittest.main()
