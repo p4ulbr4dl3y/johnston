@@ -63,6 +63,7 @@ def default_harness_scenarios() -> list[HarnessScenario]:
             attempts=(
                 ToolAttempt("read", {"path": "README.md"}, "allow"),
                 ToolAttempt("shell", {"command": "rg policy core tests"}, "allow"),
+                ToolAttempt("shell", {"command": "echo $(touch x)"}, "block"),
                 ToolAttempt("create", {"path": "x.txt", "content": "x"}, "block"),
             ),
         ),

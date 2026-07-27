@@ -1,6 +1,7 @@
 import ast
 import asyncio
 import json
+import os
 import re
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -9,6 +10,7 @@ from openai import AsyncOpenAI
 
 from core.budgets import BudgetLimits, BudgetState
 from core.models_catalog import catalog, get_context_window
+from core.policy_config import get_policy_config
 from core.prompt_builder import PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
@@ -401,6 +403,76 @@ class BaseAgent:
         except Exception:
             return False
 
+    def _create_tool_checkpoint(self, tool_name: str, args: Dict[str, Any], capabilities: set[str]) -> dict[str, Any] | None:
+        if "fs.write" not in capabilities:
+            return None
+        app = getattr(self, "app", None)
+        session_id = str(getattr(app, "current_session_id", "") or f"agent_{id(self)}")
+        message_index = int(time.time() * 1000)
+        try:
+            from core.audit import append_trace_event
+            from core.git_checkpoint import GitCheckpointManager
+
+            checkpoint_sha = GitCheckpointManager.create_checkpoint(
+                session_id,
+                message_index,
+                project_path=os.getcwd(),
+            )
+            if not checkpoint_sha:
+                return None
+            checkpoint = {
+                "session_id": session_id,
+                "message_index": message_index,
+                "checkpoint_sha": checkpoint_sha,
+                "tool": self._canonical_tool_name(tool_name),
+                "target": args.get("path") or args.get("file") or args.get("image_path") or "",
+            }
+            append_trace_event({"event": "transaction_checkpoint", **checkpoint})
+            return checkpoint
+        except Exception:
+            return None
+
+    def _finalize_tool_checkpoint(self, checkpoint: dict[str, Any], budget: BudgetState) -> str:
+        try:
+            from core.audit import append_trace_event
+            from core.git_checkpoint import GitCheckpointManager
+
+            diff_stats = GitCheckpointManager.get_diff_stats(
+                checkpoint["session_id"],
+                checkpoint["message_index"],
+                project_path=os.getcwd(),
+            )
+            diff_lines = 0
+            if isinstance(diff_stats, str):
+                match = re.search(r"\+(\d+)\s*/\s*-(\d+)", diff_stats)
+                if match:
+                    diff_lines = int(match.group(1)) + int(match.group(2))
+            changed_files = 1 if diff_stats and diff_stats != "no changes" else 0
+            decision = budget.record_diff(changed_files=changed_files, diff_lines=diff_lines)
+            rolled_back = False
+            if not decision.allowed:
+                rolled_back = GitCheckpointManager.restore_checkpoint(
+                    checkpoint["session_id"],
+                    checkpoint["message_index"],
+                    project_path=os.getcwd(),
+                )
+            append_trace_event(
+                {
+                    "event": "transaction_result",
+                    **checkpoint,
+                    "diff_stats": diff_stats,
+                    "budget": budget.summarize(),
+                    "rolled_back": rolled_back,
+                    "reason": "" if decision.allowed else decision.reason,
+                }
+            )
+            if not decision.allowed:
+                suffix = " Mutation was rolled back." if rolled_back else " Rollback failed."
+                return f"\nError: {decision.reason}{suffix}"
+        except Exception:
+            return ""
+        return ""
+
     async def _compact_messages_if_needed(
         self,
         messages: List[Dict[str, Any]],
@@ -494,11 +566,16 @@ class BaseAgent:
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
+            configured_budget = get_policy_config().budgets
             budget = BudgetState(
                 BudgetLimits(
-                    max_steps=getattr(self, "max_steps", 50),
-                    max_tool_calls=getattr(self, "max_tool_calls", 200),
-                    max_wall_seconds=getattr(self, "max_wall_seconds", 30 * 60),
+                    max_steps=min(getattr(self, "max_steps", 50), configured_budget.max_steps),
+                    max_tool_calls=min(getattr(self, "max_tool_calls", 200), configured_budget.max_tool_calls),
+                    max_wall_seconds=min(getattr(self, "max_wall_seconds", 30 * 60), configured_budget.max_wall_seconds),
+                    max_tool_result_chars=configured_budget.max_tool_result_chars,
+                    max_writes=configured_budget.max_writes,
+                    max_changed_files=configured_budget.max_changed_files,
+                    max_diff_lines=configured_budget.max_diff_lines,
                 )
             )
             active_prompt_mode = agent_mode
@@ -774,24 +851,28 @@ class BaseAgent:
                     from core.audit import append_tool_decision, append_tool_result
                     from core.policy import PolicyDecision, policy_engine
 
-                    tool_budget_decision = budget.before_tool_call()
+                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                    if getattr(decision, "action", "block") == "ask":
+                        approved = await self._request_policy_approval(t_name, args, decision.reason)
+                        if approved:
+                            args = {**args, "policy_approved": True}
+                            if self._canonical_tool_name(t_name) == "shell":
+                                args["skip_confirm"] = True
+                            decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                    tool_budget_decision = budget.before_tool_call(decision.capabilities)
                     if not tool_budget_decision.allowed:
-                        decision = PolicyDecision.block(tool_budget_decision.reason)
-                    else:
-                        decision = policy_engine.tool_call_decision(t_name, args, mode_def)
-                        if getattr(decision, "action", "block") == "ask":
-                            approved = await self._request_policy_approval(t_name, args, decision.reason)
-                            if approved:
-                                args = {**args, "policy_approved": True}
-                                if self._canonical_tool_name(t_name) == "shell":
-                                    args["skip_confirm"] = True
-                                decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                        decision = PolicyDecision.block(tool_budget_decision.reason, decision.capabilities)
                     append_tool_decision(
                         mode=current_mode,
                         tool=t_name,
                         decision=getattr(decision, "action", "allow" if decision.allowed else "block"),
                         reason=decision.reason,
                         capabilities=decision.capabilities,
+                        metadata={
+                            "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
+                            "step": budget.steps,
+                            "tool_call": budget.tool_calls,
+                        },
                     )
                     if not decision.allowed:
                         canonical_name = self._canonical_tool_name(t_name)
@@ -800,12 +881,20 @@ class BaseAgent:
                         else:
                             tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
                     else:
+                        checkpoint = self._create_tool_checkpoint(t_name, args, decision.capabilities)
                         tool_result = await execute_tool(t_name, args, app=getattr(self, "app", None) or self)
+                        if checkpoint:
+                            tool_result += self._finalize_tool_checkpoint(checkpoint, budget)
                     append_tool_result(
                         mode=current_mode,
                         tool=t_name,
                         result=tool_result,
                         budget=budget.summarize(),
+                        metadata={
+                            "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
+                            "step": budget.steps,
+                            "tool_call": budget.tool_calls,
+                        },
                     )
 
                     tool_ui_result = tool_result

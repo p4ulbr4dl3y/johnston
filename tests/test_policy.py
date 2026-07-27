@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -71,6 +72,21 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertEqual(decision.action, "ask")
 
+    def test_policy_config_can_block_shell_tool(self):
+        os.makedirs(".johnston", exist_ok=True)
+        with open(os.path.join(".johnston", "policy.json"), "w", encoding="utf-8") as f:
+            json.dump({"tools": {"shell": {"action": "block"}}}, f)
+
+        mode_def = ModeManager.get_instance().get_mode("action")
+        decision = policy_engine.tool_call_decision(
+            "shell",
+            {"command": "rm -rf build"},
+            mode_def,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.action, "block")
+
     def test_action_shell_destructive_allows_after_approval(self):
         mode_def = ModeManager.get_instance().get_mode("action")
         decision = policy_engine.tool_call_decision(
@@ -85,6 +101,7 @@ class TestPolicyEngine(unittest.TestCase):
         self.assertFalse(shell_command_is_read_only("python -c \"open('x','w').write('y')\""))
         self.assertFalse(shell_command_is_read_only("git checkout main"))
         self.assertFalse(shell_command_is_read_only("echo x > file.txt"))
+        self.assertFalse(shell_command_is_read_only("echo $(touch x)"))
 
     def test_prompt_builder_filters_write_tools_in_explore(self):
         names = [

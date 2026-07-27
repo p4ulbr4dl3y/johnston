@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from core.bash_guard import analyze_shell_command
+from core.policy_config import get_policy_config
 
 READ_ONLY_SHELL_COMMANDS = {
     "cat",
@@ -124,6 +125,8 @@ def shell_command_is_read_only(command: str) -> bool:
     command = (command or "").strip()
     if not command:
         return False
+    if "$(" in command or "`" in command:
+        return False
     if SHELL_REDIRECT_TOKENS.search(command) or SHELL_WRITE_TOKENS.search(command):
         return False
 
@@ -190,6 +193,7 @@ class PolicyEngine:
     def tool_call_decision(self, tool_name: str, args: dict[str, Any], mode_def: Any) -> PolicyDecision:
         canonical = canonical_tool_name(tool_name)
         capabilities = self.capabilities_for_tool(canonical)
+        policy_config = get_policy_config()
         if not capabilities:
             return PolicyDecision.block(f"Tool '{tool_name}' has no declared capabilities.")
 
@@ -215,6 +219,11 @@ class PolicyEngine:
             else:
                 is_safe, reason = analyze_shell_command(command)
                 if not is_safe and not args.get("policy_approved"):
+                    action = policy_config.action_for(tool=canonical, capabilities=capabilities, default="ask")
+                    if action == "allow":
+                        return PolicyDecision.allow(capabilities)
+                    if action == "block":
+                        return PolicyDecision.block(reason, capabilities)
                     return PolicyDecision.ask(reason, capabilities)
 
         if canonical == "call_mcp_tool":
@@ -226,8 +235,17 @@ class PolicyEngine:
             mcp_mode_decision = self._mode_decision(canonical, mcp_caps, mode_def)
             if not mcp_mode_decision.allowed:
                 return mcp_mode_decision
+            action = policy_config.action_for(tool=canonical, capabilities=mcp_caps, default="allow")
+            if action == "block":
+                return PolicyDecision.block("MCP tool is blocked by policy config.", mcp_caps)
+            if action == "ask" and not args.get("policy_approved"):
+                return PolicyDecision.ask("MCP tool requires approval by policy config.", mcp_caps)
             if "network.fetch" in mcp_caps and not args.get("policy_approved"):
-                return PolicyDecision.ask("MCP tool can access the network.", mcp_caps)
+                action = policy_config.action_for(tool=canonical, capabilities=mcp_caps, default="ask")
+                if action == "block":
+                    return PolicyDecision.block("MCP tool can access the network.", mcp_caps)
+                if action == "ask":
+                    return PolicyDecision.ask("MCP tool can access the network.", mcp_caps)
 
         return PolicyDecision.allow(capabilities)
 

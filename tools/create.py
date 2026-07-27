@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from tools.base import BaseTool, resolve_path
+from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.linter import run_linter
 
 
@@ -28,8 +28,7 @@ class CreateTool(BaseTool):
         content = args.get("content", "").rstrip("\r\n")
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            atomic_write_text(path, content)
             linter_output = await run_linter(path)
             return f"Success: file '{path}' saved ({len(content)} bytes).{linter_output}"
         except Exception as e:
