@@ -204,6 +204,7 @@ Markdown OrderedList {
     padding: 0;
 }
 
+CustomMarkdownFence,
 MarkdownFence {
     background: #18181b;
     margin: 1 0;
@@ -214,18 +215,21 @@ MarkdownFence {
 }
 
 
+CustomMarkdownFence .fence-header,
 MarkdownFence .fence-header {
     height: 1;
     background: #27272a;
     padding: 0 0 0 1;
 }
 
+CustomMarkdownFence .fence-lang,
 MarkdownFence .fence-lang {
     color: #a1a1aa;
     text-style: bold;
     width: 1fr;
 }
 
+CustomMarkdownFence .fence-copy-btn,
 MarkdownFence .fence-copy-btn {
     height: 1;
     min-width: 6;
@@ -236,13 +240,17 @@ MarkdownFence .fence-copy-btn {
     margin: 0;
 }
 
+CustomMarkdownFence .fence-copy-btn:hover,
 MarkdownFence .fence-copy-btn:hover {
     background: #ffffff;
     color: #09090b;
 }
 
+CustomMarkdownFence #code-content,
 MarkdownFence #code-content {
     padding: 0 1;
+    background: #18181b;
+}
     background: #18181b;
 }
 

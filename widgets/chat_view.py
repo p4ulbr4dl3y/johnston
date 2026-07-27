@@ -85,9 +85,10 @@ _old_markdown_init = Markdown.__init__
 def _new_markdown_init(self, *args, **kwargs):
     if "parser_factory" not in kwargs or kwargs["parser_factory"] is None:
         kwargs["parser_factory"] = _custom_markdown_parser_factory
-    _old_markdown_init(self, *args, **kwargs)
+    self.BLOCKS = dict(self.BLOCKS)
     self.BLOCKS["fence"] = CustomMarkdownFence
     self.BLOCKS["code_block"] = CustomMarkdownFence
+    _old_markdown_init(self, *args, **kwargs)
 Markdown.__init__ = _new_markdown_init
 
 
