@@ -611,18 +611,48 @@ class DemoCommand(BaseCommand):
             args={"path": "AGENTS.md"}
         )
 
+        await chat_view.add_tool_call(
+            "ask_user",
+            "Какой фреймворк добавить в проект?",
+            result_text="Question: Какой фреймворк добавить в проект?\nAnswer: FastAPI (рекомендуется)",
+            args={
+                "questions": [
+                    {
+                        "question_text": "Какой фреймворк добавить в проект?",
+                        "options": ["FastAPI (рекомендуется)", "Django", "Flask", "Aiohttp"]
+                    }
+                ]
+            }
+        )
+
         bot_msg = await chat_view.add_bot_message()
         bot_msg.content = (
             "### 🚀 **Демонстрационная фейковая сессия активна!** (0 токенов потрачено)\n\n"
             "Все виджеты интерактивны:\n"
+            "- ❓ **AskUser**: открыто интерактивное модальное окно с выбором опций!\n"
             "- ⚙ **Subagent**: кликни по плашке `subagent` выше, чтобы открыть модалку логов просмотра!\n"
-            "- ⚙ **Shell / Read**: кликни, чтобы развернуть вызовы инструментов.\n"
+            "- ⚙ **Shell / Read / AskUser**: кликни по плашкам, чтобы развернуть вызовы инструментов.\n"
             "- 💡 `/subagents`: открывает список субагентов.\n"
             "- 💡 `/tasks`: открывает фоновые задачи."
         )
 
         app.refresh_status_footer()
         app.notify("Фейковая демо-сессия загружена (0 токенов потрачено)")
+
+        try:
+            from widgets.modal_screens import QuestionScreen
+            screen = QuestionScreen(
+                num_text="### **Demo Question 1/1**",
+                question_text="Какой фреймворк или библиотеку добавить в проект?",
+                options=["FastAPI (рекомендуется)", "Django", "Flask", "Aiohttp"],
+                current_val="FastAPI (рекомендуется)"
+            )
+            def on_demo_q_dismiss(res):
+                if res and isinstance(res, dict) and res.get("answer"):
+                    app.notify(f"Демо ask_user ответ: {res['answer']}")
+            app.push_screen(screen, callback=on_demo_q_dismiss)
+        except Exception:
+            pass
 
 
 COMMAND_CLASSES = [
