@@ -69,13 +69,13 @@ class PolicyScreen(ModalScreen[None]):
 
             if ktype == "tool":
                 action = config.tool_actions.get(name, "allow")
+                kind_tag = r"\[TOOL]"
             else:
                 action = config.capability_actions.get(name, "allow")
+                kind_tag = r"\[CAP]"
 
-            action_upper = action.upper()
-            prefix = f"[{action_upper}]".ljust(7)
-            kind_tag = f"[{ktype.upper()}]".ljust(14)
-            opt_list.add_option(f"{prefix} {kind_tag} {name} — {desc}")
+            act_tag = rf"\[{action.upper()}]"
+            opt_list.add_option(f"{act_tag} {kind_tag} {name} — {desc}")
 
         opt_list.focus()
 
