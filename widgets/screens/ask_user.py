@@ -358,7 +358,8 @@ class AskUserWizardScreen(ModalScreen[str]):
                 opt_list.display = True
                 opt_list.clear_options()
 
-                highlight_idx = 0
+                current_highlight = opt_list.highlighted
+                highlight_idx = current_highlight if current_highlight is not None else 0
                 if prev_answer:
                     if prev_answer in self.raw_options:
                         highlight_idx = self.raw_options.index(prev_answer)
@@ -366,6 +367,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                         highlight_idx = len(self.options) - 1
                         input_field.value = prev_answer
                         input_field.display = True
+
 
                 for idx, opt in enumerate(self.options):
                     is_selected = bool(prev_answer and ((idx < len(self.raw_options) and prev_answer == self.raw_options[idx]) or (idx == len(self.options) - 1 and prev_answer not in self.raw_options)))
