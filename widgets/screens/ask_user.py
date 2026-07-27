@@ -280,6 +280,24 @@ class AskUserWizardScreen(ModalScreen[str]):
         import time
         self._mount_time = time.time()
         self.update_step()
+        self.call_after_refresh(self._force_modal_focus)
+        self.set_timer(0.05, self._force_modal_focus)
+
+    def _force_modal_focus(self) -> None:
+        if not self.is_mounted:
+            return
+        if self.q_idx < len(self.questions):
+            if self.raw_options:
+                try:
+                    self.query_one("#options-list", OptionList).focus()
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.query_one("#write-in-input", Input).focus()
+                except Exception:
+                    pass
+
 
     def update_step(self) -> None:
         title_md = self.query_one("#wizard-title", Markdown)
@@ -334,6 +352,8 @@ class AskUserWizardScreen(ModalScreen[str]):
             opt_list.display = False
             input_field.display = False
             hint.update("enter: confirm • ←: back • esc: cancel")
+            self.focus()
+
 
     def focus_write_in_input(self) -> None:
         try:
@@ -361,7 +381,7 @@ class AskUserWizardScreen(ModalScreen[str]):
         try:
             input_field = self.query_one("#write-in-input", Input)
             if event.option_index == len(self.options) - 1:
-                self.focus_write_in_input()
+                input_field.display = True
             else:
                 input_field.display = False
         except Exception:
@@ -423,9 +443,4 @@ class AskUserWizardScreen(ModalScreen[str]):
     def action_quit(self) -> None:
         self.app.exit()
 
-    def on_key(self, event: events.Key) -> None:
-        if event.key in ("up", "key_up") and self.raw_options and self.q_idx < len(self.questions):
-            self.focus_options_list()
-            event.stop()
-            event.prevent_default()
 

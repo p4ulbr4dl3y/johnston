@@ -67,6 +67,9 @@ class MockApp:
 
     def push_screen(self, screen, callback=None):
         self.pushed_screen = screen
+        if callback:
+            callback("Demo finished")
+
 
     def query_one(self, target, default=None):
         if target == ChatView or target == "#chat-view":
