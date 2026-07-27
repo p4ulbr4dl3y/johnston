@@ -273,21 +273,23 @@ class RewindCommand(BaseCommand):
         if curr_sid:
             try:
                 from core.git_checkpoint import GitCheckpointManager
-                for idx, text in user_msgs:
-                    stat = GitCheckpointManager.get_diff_stats(curr_sid, idx) or ""
-                    msgs_with_stats.append((idx, text, stat))
+                for seq_idx, (child_idx, text) in enumerate(user_msgs):
+                    stat = GitCheckpointManager.get_diff_stats(curr_sid, seq_idx) or ""
+                    msgs_with_stats.append((child_idx, text, stat))
             except Exception:
-                msgs_with_stats = [(idx, text, "") for idx, text in user_msgs]
+                msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
         else:
-            msgs_with_stats = [(idx, text, "") for idx, text in user_msgs]
+            msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
-                # Find original text of message being rolled back to
+                # Find original text and sequence index of message being rolled back to
                 msg_text = ""
-                for idx, text in user_msgs:
-                    if idx == selected_idx:
+                seq_idx = 0
+                for i, (child_idx, text) in enumerate(user_msgs):
+                    if child_idx == selected_idx:
                         msg_text = text
+                        seq_idx = i
                         break
 
                 # Rollback chat to position immediately preceding selected message
@@ -315,8 +317,8 @@ class RewindCommand(BaseCommand):
                 if curr_sid:
                     try:
                         from core.git_checkpoint import GitCheckpointManager
-                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, selected_idx)
-                        GitCheckpointManager.purge_checkpoints_after(curr_sid, selected_idx)
+                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx)
+                        GitCheckpointManager.purge_checkpoints_after(curr_sid, seq_idx)
                     except Exception as e:
                         print(f"Git checkpoint restore failed: {e}")
 
