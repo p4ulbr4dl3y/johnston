@@ -54,10 +54,7 @@ BUILTIN_MODES = {
             "[MODE: ACTION]\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n"
             "Rules:\n"
-            "1. Research First & Read Before Edit: Inspect codebase and target files before modifying.\n"
-            "2. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
-            "3. Minimal Comments: Write comments ONLY when the WHY is non-obvious. Never explain WHAT code does.\n"
-            "4. Empirical Verification: ALWAYS verify changes using tests or execution commands before concluding. Never claim tests pass if any test fails."
+            "1. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction."
         ),
         disallowed_tools=[],
         source="builtin",

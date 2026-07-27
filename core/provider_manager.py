@@ -406,7 +406,6 @@ class ProviderManager:
             api_key=stored_key or target_provider.get("api_key", ""),
             model=model_val,
             base_url=target_provider.get("base_url", ""),
-            system_prompt=target_provider.get("system_prompt", "You write code and execute tasks."),
             provider_key=target_provider["key"],
             api_type=target_provider.get("api_type", "openai"),
             headers=target_provider.get("headers"),
