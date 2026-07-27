@@ -110,7 +110,18 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertIsInstance(content, Syntax)
         self.assertEqual(content.start_line, 5)
-        self.assertEqual(content.code, "def foo():\n    return 'bar'\n")
+        self.assertEqual(content.code, "def foo():\n    return 'bar'")
+
+    def test_create_tool_content_strips_trailing_newline(self):
+        widget = ToolCallWidget(
+            tool_type="create",
+            target="test.html",
+            args={"path": "test.html", "content": "<html>\n<body>\n</body>\n</html>\n"}
+        )
+        widget.toggle_expanded()
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Syntax)
+        self.assertEqual(content.code, "<html>\n<body>\n</body>\n</html>")
 
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")

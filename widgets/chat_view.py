@@ -661,6 +661,7 @@ class ToolCallWidget(Vertical):
                             content = None
 
                 if content is not None:
+                    content = content.rstrip("\r\n")
                     lexer = self._guess_lexer(file_path)
                     try:
                         syntax = Syntax(
@@ -713,6 +714,7 @@ class ToolCallWidget(Vertical):
                         clean_code = ""
 
                 if clean_code:
+                    clean_code = clean_code.rstrip("\r\n")
                     lexer = self._guess_lexer(fpath)
                     try:
                         syntax = Syntax(

@@ -566,16 +566,23 @@ class BaseAgent:
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
 
         try:
+            def _resolve_limit(agent_val: Any, conf_val: Any) -> Any:
+                if agent_val is None:
+                    return conf_val
+                if conf_val is None:
+                    return agent_val
+                return min(agent_val, conf_val)
+
             configured_budget = get_policy_config().budgets
             budget = BudgetState(
                 BudgetLimits(
-                    max_steps=min(getattr(self, "max_steps", 50), configured_budget.max_steps),
-                    max_tool_calls=min(getattr(self, "max_tool_calls", 200), configured_budget.max_tool_calls),
-                    max_wall_seconds=min(getattr(self, "max_wall_seconds", 30 * 60), configured_budget.max_wall_seconds),
-                    max_tool_result_chars=configured_budget.max_tool_result_chars,
-                    max_writes=configured_budget.max_writes,
-                    max_changed_files=configured_budget.max_changed_files,
-                    max_diff_lines=configured_budget.max_diff_lines,
+                    max_steps=_resolve_limit(getattr(self, "max_steps", None), configured_budget.max_steps),
+                    max_tool_calls=_resolve_limit(getattr(self, "max_tool_calls", None), configured_budget.max_tool_calls),
+                    max_wall_seconds=_resolve_limit(getattr(self, "max_wall_seconds", None), configured_budget.max_wall_seconds),
+                    max_tool_result_chars=_resolve_limit(getattr(self, "max_tool_result_chars", None), configured_budget.max_tool_result_chars),
+                    max_writes=_resolve_limit(getattr(self, "max_writes", None), configured_budget.max_writes),
+                    max_changed_files=_resolve_limit(getattr(self, "max_changed_files", None), configured_budget.max_changed_files),
+                    max_diff_lines=_resolve_limit(getattr(self, "max_diff_lines", None), configured_budget.max_diff_lines),
                 )
             )
             active_prompt_mode = agent_mode
