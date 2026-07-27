@@ -124,7 +124,6 @@ class ShellTool(BaseTool):
                     stderr=slave_fd,
                     env=env,
                     close_fds=True,
-                    **shell_subprocess_kwargs(),
                 )
             finally:
                 if slave_fd is not None:
