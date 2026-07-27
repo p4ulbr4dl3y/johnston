@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.2...johnston-v0.3.0) (2026-07-27)
+
+
+### Features
+
+* add shadow git checkpoint system for /rewind ([e47b7ae](https://github.com/p4ulbr4dl3y/johnston/commit/e47b7ae2a1ae71cecddeb8705ffa3dd59041acb5))
+* auto init git and display fallback checkpoint status labels in rewind modal ([878431c](https://github.com/p4ulbr4dl3y/johnston/commit/878431c39b60b3b908113ab253f360c3734ce5d0))
+* format API error messages cleanly across all provider adapters ([2ca9761](https://github.com/p4ulbr4dl3y/johnston/commit/2ca97612e4d0d11c105e19cf60d1d73fd6455ee1))
+* show git diff stats in rewind modal ([97a2279](https://github.com/p4ulbr4dl3y/johnston/commit/97a22792c530e09e1794d7e444c6e8daf5c0ae3d))
+
+
+### Bug Fixes
+
+* adjust rewind modal option width truncation so diff stat labels fit on screen ([9fe2e26](https://github.com/p4ulbr4dl3y/johnston/commit/9fe2e26afd288391e25f0f6a55c6ba82b3d74251))
+* cap supported python version to &lt;3.14 for onnxruntime compatibility ([d6854e8](https://github.com/p4ulbr4dl3y/johnston/commit/d6854e8fe52a6db6552cd0f04723b196cc5561c4))
+* pass explicit project_path to GitCheckpointManager ([2ee6428](https://github.com/p4ulbr4dl3y/johnston/commit/2ee6428876f7c7caca42bec1dac99c3d4157e737))
+* set max_text_len to 45 for rewind screen ([afad92b](https://github.com/p4ulbr4dl3y/johnston/commit/afad92b4ada63a686e509988fc081e23f9e780ac))
+* use parentheses formatting for diff stat labels to prevent Rich markup stripping ([3335de0](https://github.com/p4ulbr4dl3y/johnston/commit/3335de0db098911051783f58167c1192f5968384))
+* use sequential message index for git checkpoint lookup in /rewind ([4eb724a](https://github.com/p4ulbr4dl3y/johnston/commit/4eb724af579a5134a31981d5f96c31c7897c4c1a))
+
 ## [0.2.2](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.2.1...johnston-v0.2.2) (2026-07-27)
 
 
