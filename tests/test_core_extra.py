@@ -37,6 +37,7 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
 
     async def test_background_task_kill(self):
         mock_proc = MagicMock()
+        mock_proc.pid = 99999
         mock_proc.terminate = MagicMock()
         mock_proc.wait = MagicMock(return_value=asyncio.sleep(0.01))
 

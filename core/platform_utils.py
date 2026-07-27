@@ -61,7 +61,11 @@ async def terminate_process(process: Any, timeout: float = 1.0) -> None:
             process.terminate()
         else:
             try:
-                os.killpg(process.pid, signal.SIGTERM)
+                pid = getattr(process, "pid", None)
+                if isinstance(pid, int) and pid > 0:
+                    os.killpg(pid, signal.SIGTERM)
+                else:
+                    process.terminate()
             except Exception:
                 process.terminate()
         await asyncio.wait_for(process.wait(), timeout=timeout)
