@@ -13,6 +13,18 @@ def format_line_pagination(
     if total_lines == 0:
         return ""
 
+    if start_line is not None:
+        try:
+            start_line = int(start_line)
+        except (ValueError, TypeError):
+            start_line = None
+
+    if end_line is not None:
+        try:
+            end_line = int(end_line)
+        except (ValueError, TypeError):
+            end_line = None
+
     start = 1
     if start_line is not None:
         start = max(1, min(start_line, total_lines))

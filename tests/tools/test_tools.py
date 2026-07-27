@@ -189,6 +189,31 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_shell = await execute_tool("shell", {"command": "echo 'shell command'"})
         self.assertIn("shell command", res_shell)
 
+    async def test_read_tool_max_size_limit(self):
+        tool = ReadTool()
+        file_path = os.path.join(self.test_dir, "large_file.txt")
+        with open(file_path, "w") as f:
+            f.write("dummy")
+        from unittest.mock import patch
+        with patch("os.path.getsize", return_value=20 * 1024 * 1024):
+            res = await tool.execute({"path": file_path})
+            self.assertIn("exceeds maximum readable size", res)
+
+    async def test_format_line_pagination_string_args(self):
+        from tools.utils import format_line_pagination
+        lines = ["line 1", "line 2", "line 3", "line 4"]
+        res = format_line_pagination(lines, start_line="2", end_line="3")
+        self.assertIn("line 2", res)
+        self.assertIn("line 3", res)
+        self.assertNotIn("line 1", res)
+
+    async def test_ask_user_validation(self):
+        from tools.ask_user import AskUserTool
+        tool = AskUserTool()
+        # Invalid questions structure
+        res = await tool.execute({"questions": [{"invalid_key": "foo"}]})
+        self.assertIn("Error: Invalid or missing 'questions' list.", res)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -120,34 +120,48 @@ class ShellTool(BaseTool):
                 reader = None
                 transport = None
 
-        if is_windows():
-            p = await self._create_windows_process(cmd, env)
-        elif use_pty:
-            try:
+        try:
+            if is_windows():
+                p = await self._create_windows_process(cmd, env)
+            elif use_pty:
+                try:
+                    p = await asyncio.create_subprocess_shell(
+                        cmd,
+                        stdin=slave_fd,
+                        stdout=slave_fd,
+                        stderr=slave_fd,
+                        env=env,
+                        close_fds=True,
+                    )
+                finally:
+                    if slave_fd is not None:
+                        try:
+                            os.close(slave_fd)
+                        except Exception:
+                            pass
+                        slave_fd = None
+            else:
                 p = await asyncio.create_subprocess_shell(
                     cmd,
-                    stdin=slave_fd,
-                    stdout=slave_fd,
-                    stderr=slave_fd,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
                     env=env,
-                    close_fds=True,
+                    executable=shell_executable(),
+                    **shell_subprocess_kwargs(),
                 )
-            finally:
-                if slave_fd is not None:
-                    try:
-                        os.close(slave_fd)
-                    except Exception:
-                        pass
-        else:
-            p = await asyncio.create_subprocess_shell(
-                cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-                executable=shell_executable(),
-                **shell_subprocess_kwargs(),
-            )
+        except Exception:
+            if transport:
+                try:
+                    transport.close()
+                except Exception:
+                    pass
+            elif master_fd is not None:
+                try:
+                    os.close(master_fd)
+                except Exception:
+                    pass
+            raise
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
