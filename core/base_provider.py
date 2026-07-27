@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from core.budgets import BudgetLimits, BudgetState
 from core.models_catalog import catalog, get_context_window
 from core.policy_config import get_policy_config
-from core.prompt_builder import PromptBuilder
+from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
@@ -112,7 +112,7 @@ class BaseAgent:
         api_key: str = "",
         model: str = "",
         base_url: str = "",
-        system_prompt: str = "You write code and execute tasks.",
+        system_prompt: Optional[str] = None,
         tools: List[Dict[str, Any]] = None,
         provider_key: str = "opencode",
         api_type: str = "openai",
@@ -137,7 +137,7 @@ class BaseAgent:
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
-        self.system_prompt = system_prompt
+        self.system_prompt = system_prompt if system_prompt is not None else DEFAULT_SYSTEM_PROMPT
         self.tools = tools
         self.provider_key = provider_key
         self.api_type = api_type
