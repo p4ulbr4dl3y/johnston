@@ -271,15 +271,18 @@ class RewindCommand(BaseCommand):
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
         msgs_with_stats = []
-        if curr_sid:
-            try:
-                from core.git_checkpoint import GitCheckpointManager
+        checkpoints_enabled = False
+
+        try:
+            from core.git_checkpoint import GitCheckpointManager
+            checkpoints_enabled = GitCheckpointManager.is_valid_checkpoint_target(proj_path)
+            if curr_sid and checkpoints_enabled:
                 for seq_idx, (child_idx, text) in enumerate(user_msgs):
                     stat = GitCheckpointManager.get_diff_stats(curr_sid, seq_idx, project_path=proj_path) or ""
                     msgs_with_stats.append((child_idx, text, stat))
-            except Exception:
+            else:
                 msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
-        else:
+        except Exception:
             msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
 
         def on_rewind_selected(selected_idx: int | None) -> None:
@@ -338,7 +341,7 @@ class RewindCommand(BaseCommand):
                     app.notify("Chat rolled back! Message loaded into input field.")
             app.query_one("#message-input").focus()
 
-        app.push_screen(RewindScreen(msgs_with_stats), callback=on_rewind_selected)
+        app.push_screen(RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected)
 
 
 class ResumeCommand(BaseCommand):

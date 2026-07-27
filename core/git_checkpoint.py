@@ -84,6 +84,19 @@ class GitCheckpointManager:
         return True
 
     @classmethod
+    def is_valid_checkpoint_target(cls, project_path: Optional[str] = None) -> bool:
+        """Checks if target path is a valid git workspace and NOT home or system root directory."""
+        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        home = os.path.realpath(os.path.expanduser("~"))
+
+        # Block home dir and any drive/system root ('/', 'C:\', 'D:\', etc.)
+        if cwd == home or os.path.dirname(cwd) == cwd:
+            return False
+
+        res = cls._run_git(["rev-parse", "--is-inside-work-tree"], cwd=cwd)
+        return res.returncode == 0 and res.stdout.strip() == "true"
+
+    @classmethod
     def create_checkpoint(
         cls,
         session_id: str,
@@ -96,6 +109,9 @@ class GitCheckpointManager:
         Saves commit SHA in refs/johnston/checkpoints/<session_id>/<message_index> inside shadow repo.
         Returns commit SHA if created, None if not initialized and auto_init=False.
         """
+        if not cls.is_valid_checkpoint_target(project_path):
+            return None
+
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
         if auto_init:
             if not cls.ensure_git_repo(cwd):

@@ -54,6 +54,13 @@ class CommandSuggestions(OptionList):
 
         files_list = []
         cwd = os.getcwd()
+        real_cwd = os.path.realpath(cwd)
+        home = os.path.realpath(os.path.expanduser("~"))
+
+        # Block home dir and any drive/system root ('/', 'C:\', 'D:\', etc.)
+        if real_cwd == home or os.path.dirname(real_cwd) == real_cwd:
+            return []
+
         ignore_dirs = {
             ".git", ".venv", "venv", "__pycache__", ".johnston",
             "node_modules", ".mypy_cache", ".pytest_cache", ".idea",

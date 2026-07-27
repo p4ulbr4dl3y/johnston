@@ -60,6 +60,27 @@ class TestMCPManager(unittest.TestCase):
         p_server = next(s for s in updated_servers if s["name"] == "project-server")
         self.assertTrue(p_server["disabled"])
 
+    def test_same_file_global_and_project(self):
+        mcp_file = os.path.join(self.test_dir, "mcp.json")
+        with open(mcp_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "mcpServers": {
+                    "my-server": {
+                        "command": "python",
+                        "args": ["-m", "mcp_server"]
+                    }
+                }
+            }, f)
+
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.global_file = mcp_file
+        mm.project_file = mcp_file
+
+        servers = mm.load_servers()
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers[0]["name"], "my-server")
+        self.assertEqual(servers[0]["scope"], "global")
+
     def test_mcp_command_registered(self):
         self.assertIn("/mcp", COMMAND_REGISTRY)
 
