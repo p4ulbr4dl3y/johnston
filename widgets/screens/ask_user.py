@@ -6,10 +6,9 @@ from textual.widgets import Input, Label, Markdown, OptionList
 
 
 class WriteInInput(Input):
-    """Custom Input widget that handles Up key to return focus to OptionList"""
+    """Custom Input widget that handles Up key to return focus to OptionList and prevents select-all"""
 
-    def _on_focus(self, event: events.Focus) -> None:
-        super()._on_focus(event)
+    def _clear_selection(self) -> None:
         val_len = len(self.value)
         self.cursor_position = val_len
         try:
@@ -20,6 +19,15 @@ class WriteInInput(Input):
                 self.selection = (val_len, val_len)
             except Exception:
                 pass
+
+    def select_all(self) -> None:
+        """Override select_all to prevent blue text selection on focus"""
+        self._clear_selection()
+
+    def _on_focus(self, event: events.Focus) -> None:
+        super()._on_focus(event)
+        self._clear_selection()
+        self.call_after_refresh(self._clear_selection)
 
     def _on_key(self, event: events.Key) -> None:
         if event.key in ("up", "key_up"):
