@@ -58,6 +58,14 @@ class SubagentViewScreen(ModalScreen[None]):
             self.run_worker(_no_sess())
             return
 
+        try:
+            desc = self.session.description or self.task_id_or_desc
+            status = self.session.status.lower()
+            title_md = self.query_one(".modal-markdown", Markdown)
+            title_md.update(f"### **Subagent:** `{desc}` • {status}")
+        except Exception:
+            pass
+
         # Start queue processing worker loop
         self.queue_task = asyncio.create_task(self._process_queue())
 
