@@ -10,9 +10,9 @@ Input > .selection,
 #write-in-input > .input--selection,
 #modal-search-input > .input--selection,
 #api-key-input > .input--selection {
-    background: #ffffff;
-    color: #09090b;
-    text-style: reverse;
+    background: #ffffff !important;
+    color: #09090b !important;
+    text-style: none !important;
 }
 
 Screen {
