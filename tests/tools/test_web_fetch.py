@@ -41,6 +41,12 @@ def _make_stream_client(content_bytes, content_type="text/html", status_code=200
 
 
 class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        WebFetchTool.clear_cache()
+
+    def tearDown(self):
+        WebFetchTool.clear_cache()
+
     async def test_invalid_url_scheme(self):
         tool = WebFetchTool()
         res = await tool.execute({"url": "ftp://example.com"})
@@ -114,6 +120,40 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/big"})
         self.assertIn("exceeds max allowed size", res)
+
+    @patch("httpx.AsyncClient")
+    async def test_caching_behavior(self, mock_client_cls):
+        body = b"<html><body><h1>Cached Content</h1></body></html>"
+        mock_client = _make_stream_client(body, "text/html")
+        mock_client_cls.return_value = mock_client
+
+        tool = WebFetchTool()
+        url = "https://example.com/cache-me"
+
+        res1 = await tool.execute({"url": url})
+        self.assertIn("Cached Content", res1)
+        self.assertEqual(mock_client_cls.call_count, 1)
+
+        # Second call should use cache and not instantiate AsyncClient again
+        res2 = await tool.execute({"url": url})
+        self.assertIn("Cached Content", res2)
+        self.assertEqual(mock_client_cls.call_count, 1)
+
+    @patch("httpx.AsyncClient")
+    async def test_no_cache_flag_bypasses_cache(self, mock_client_cls):
+        body = b"<html><body><h1>Fresh Content</h1></body></html>"
+        mock_client = _make_stream_client(body, "text/html")
+        mock_client_cls.return_value = mock_client
+
+        tool = WebFetchTool()
+        url = "https://example.com/no-cache-test"
+
+        await tool.execute({"url": url})
+        self.assertEqual(mock_client_cls.call_count, 1)
+
+        # Passing no_cache=True should bypass cache and fetch again
+        await tool.execute({"url": url, "no_cache": True})
+        self.assertEqual(mock_client_cls.call_count, 2)
 
 
 if __name__ == "__main__":
