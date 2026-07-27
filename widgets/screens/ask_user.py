@@ -170,7 +170,14 @@ class ConfirmScreen(ModalScreen[str]):
             yield Markdown("### **Confirm your answers**\n\n" + self.summary, classes="modal-markdown")
             yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
 
+    def on_mount(self) -> None:
+        import time
+        self._mount_time = time.time()
+
     def action_confirm(self) -> None:
+        import time
+        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
+            return
         self.dismiss("confirm")
 
     def action_go_back(self) -> None:

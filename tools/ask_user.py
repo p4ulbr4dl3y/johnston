@@ -84,6 +84,7 @@ class AskUserTool(BaseTool):
                         elif res.get("status") == "next":
                             answers[q_idx] = res
                             q_idx += 1
+                            await asyncio.sleep(0.3)
                         else:
                             # Unknown status from the screen: avoid an infinite loop by
                             # treating it as a cancellation rather than re-prompting forever.
