@@ -4,6 +4,8 @@ import shlex
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from core.bash_guard import analyze_shell_command
+
 READ_ONLY_SHELL_COMMANDS = {
     "cat",
     "find",
@@ -80,14 +82,19 @@ class PolicyDecision:
     allowed: bool
     reason: str = ""
     capabilities: set[str] = field(default_factory=set)
+    action: str = "allow"
 
     @classmethod
     def allow(cls, capabilities: Iterable[str] = (), reason: str = "Allowed") -> "PolicyDecision":
-        return cls(True, reason, set(capabilities))
+        return cls(True, reason, set(capabilities), "allow")
 
     @classmethod
     def block(cls, reason: str, capabilities: Iterable[str] = ()) -> "PolicyDecision":
-        return cls(False, reason, set(capabilities))
+        return cls(False, reason, set(capabilities), "block")
+
+    @classmethod
+    def ask(cls, reason: str, capabilities: Iterable[str] = ()) -> "PolicyDecision":
+        return cls(False, reason, set(capabilities), "ask")
 
 
 def canonical_tool_name(name: str) -> str:
@@ -198,12 +205,17 @@ class PolicyEngine:
                 except PermissionError as exc:
                     return PolicyDecision.block(str(exc), capabilities)
 
-        if canonical == "shell" and getattr(mode_def, "read_only", False):
+        if canonical == "shell":
             command = args.get("command", "")
-            if not shell_command_is_read_only(command):
-                return PolicyDecision.block(
-                    "Shell command is not allowed in read-only mode.", capabilities
-                )
+            if getattr(mode_def, "read_only", False):
+                if not shell_command_is_read_only(command):
+                    return PolicyDecision.block(
+                        "Shell command is not allowed in read-only mode.", capabilities
+                    )
+            else:
+                is_safe, reason = analyze_shell_command(command)
+                if not is_safe and not args.get("policy_approved"):
+                    return PolicyDecision.ask(reason, capabilities)
 
         if canonical == "call_mcp_tool":
             mcp_caps = self._mcp_capabilities(args)
@@ -214,6 +226,8 @@ class PolicyEngine:
             mcp_mode_decision = self._mode_decision(canonical, mcp_caps, mode_def)
             if not mcp_mode_decision.allowed:
                 return mcp_mode_decision
+            if "network.fetch" in mcp_caps and not args.get("policy_approved"):
+                return PolicyDecision.ask("MCP tool can access the network.", mcp_caps)
 
         return PolicyDecision.allow(capabilities)
 

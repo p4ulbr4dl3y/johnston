@@ -60,6 +60,27 @@ class TestPolicyEngine(unittest.TestCase):
 
         self.assertTrue(decision.allowed)
 
+    def test_action_shell_destructive_requires_approval(self):
+        mode_def = ModeManager.get_instance().get_mode("action")
+        decision = policy_engine.tool_call_decision(
+            "shell",
+            {"command": "rm -rf build"},
+            mode_def,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.action, "ask")
+
+    def test_action_shell_destructive_allows_after_approval(self):
+        mode_def = ModeManager.get_instance().get_mode("action")
+        decision = policy_engine.tool_call_decision(
+            "shell",
+            {"command": "rm -rf build", "policy_approved": True},
+            mode_def,
+        )
+
+        self.assertTrue(decision.allowed)
+
     def test_explore_blocks_shell_write_patterns(self):
         self.assertFalse(shell_command_is_read_only("python -c \"open('x','w').write('y')\""))
         self.assertFalse(shell_command_is_read_only("git checkout main"))
