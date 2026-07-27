@@ -539,7 +539,7 @@ class ExploreCommand(BaseCommand):
 
 class PolicyCommand(BaseCommand):
     name = "/policy"
-    aliases = ["/rules", "/permissions"]
+    aliases = ["/permissions"]
     description = "Manage tool & capability security policies"
 
     async def execute(self, app) -> None:
