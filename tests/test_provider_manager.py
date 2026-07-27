@@ -1,9 +1,11 @@
+import asyncio
 import json
 import os
 import shutil
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
+
 
 with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
     from core.provider_manager import ProviderManager
@@ -102,6 +104,40 @@ class TestProviderManager(unittest.TestCase):
         agent2 = pm.create_active_agent()
         self.assertEqual(agent2.model, "model-2")
 
+    def test_disabled_providers(self):
+        self.pm.set_provider_disabled("groq", True)
+        disabled = self.pm.get_disabled_providers()
+        self.assertIn("groq", disabled)
+
+        provs = self.pm.load_providers(include_disabled=False)
+        self.assertNotIn("groq", provs)
+
+        self.pm.set_provider_disabled("groq", False)
+        self.assertNotIn("groq", self.pm.get_disabled_providers())
+
+    def test_thinking_effort(self):
+        self.pm.set_provider_thinking_effort("openai", "gpt-4o", "high")
+        eff = self.pm.get_provider_thinking_effort("openai", "gpt-4o")
+        self.assertEqual(eff, "high")
+
+        self.pm.set_provider_thinking_effort("openai", "gpt-4o", "")
+        eff_empty = self.pm.get_provider_thinking_effort("openai", "gpt-4o")
+        self.assertEqual(eff_empty, "")
+
+    @patch("httpx.AsyncClient")
+    def test_fetch_models_grouped(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"data": [{"id": "m1"}]}
+        mock_client.get = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value.__aenter__.return_value = mock_client
+
+        res = asyncio.run(self.pm.fetch_models_grouped(force_refresh=True, connected_only=False))
+        self.assertIn("opencode", res)
+
+
 
 if __name__ == "__main__":
     unittest.main()
+

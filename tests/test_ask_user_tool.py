@@ -44,13 +44,70 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Error prompting user", res)
 
-    async def test_empty_questions_with_app(self):
+    async def test_successful_interactive_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-        res = await tool.execute({"questions": []}, app=mock_app)
-        self.assertIn("Error", res)
-        self.assertIn("no valid questions", res)
+
+        call_count = 0
+        def mock_push_screen(screen, callback=None):
+            nonlocal call_count
+            call_count += 1
+            if callback:
+                if call_count == 1:
+                    callback({"status": "next", "answer": "Option A"})
+                elif call_count == 2:
+                    callback("confirm")
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"questions": [{"question_text": "Choose item", "options": ["Option A", "Option B"]}]},
+            app=mock_app
+        )
+        self.assertIn("Question: Choose item", res)
+        self.assertIn("Answer: Option A", res)
+
+    async def test_cancelled_flow(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        def mock_push_screen(screen, callback=None):
+            if callback:
+                callback({"status": "cancelled"})
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"questions": [{"question_text": "Cancel this?", "options": []}]},
+            app=mock_app
+        )
+        self.assertEqual(res, "Cancelled by user.")
+
+    async def test_back_button_and_unknown_status(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        step = 0
+        def mock_push_screen(screen, callback=None):
+            nonlocal step
+            step += 1
+            if callback:
+                if step == 1:
+                    callback({"status": "next", "answer": "Ans 1"})
+                elif step == 2:
+                    callback({"status": "back"})
+                elif step == 3:
+                    callback({"status": "unknown_bogus"})
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"questions": [
+                {"question_text": "Q1", "options": []},
+                {"question_text": "Q2", "options": []}
+            ]},
+            app=mock_app
+        )
+        self.assertEqual(res, "Cancelled by user.")
 
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -179,5 +179,113 @@ class TestMCPManagerRegression(unittest.TestCase):
         self.assertEqual(mm.get_capabilities_for_exposed_tool("serverA__search"), ["network", "read"])
 
 
+class TestMCPProcessClientAndExtra(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.old_cwd = os.getcwd()
+        os.chdir(self.test_dir)
+
+    def tearDown(self):
+        os.chdir(self.old_cwd)
+        shutil.rmtree(self.test_dir)
+
+    def test_get_mcp_manager_singleton(self):
+        from core.mcp_manager import get_mcp_manager
+        inst1 = get_mcp_manager(self.test_dir)
+        self.assertEqual(inst1.project_dir, os.path.realpath(self.test_dir))
+        dir2 = tempfile.mkdtemp()
+        try:
+            inst2 = get_mcp_manager(dir2)
+            self.assertEqual(inst2.project_dir, os.path.realpath(dir2))
+        finally:
+            shutil.rmtree(dir2)
+
+    def test_toggle_mode(self):
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
+        with open(mm.global_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "mcpServers": {
+                    "test-server": {
+                        "command": "python",
+                        "mode": "eager"
+                    }
+                }
+            }, f)
+
+        res_mode = mm.toggle_mode("test-server")
+        self.assertEqual(res_mode, "lazy")
+
+        res_mode2 = mm.toggle_mode("test-server")
+        self.assertEqual(res_mode2, "eager")
+
+        # Non-existent server
+        res_none = mm.toggle_mode("nonexistent")
+        self.assertEqual(res_none, "eager")
+
+    def test_client_start_initialize_and_call_tool(self):
+        from unittest.mock import MagicMock
+        from core.mcp_manager import MCPProcessClient
+
+        client = MCPProcessClient("mock_server", "echo hello", cwd=self.test_dir, env={"TEST_ENV": "1"})
+
+        # Mock Popen process with pipes
+        mock_proc = MagicMock()
+        mock_stdin = MagicMock()
+        mock_stdout = MagicMock()
+        mock_stdout.fileno.return_value = 10
+        mock_proc.stdin = mock_stdin
+        mock_proc.stdout = mock_stdout
+        mock_proc.poll.return_value = None
+
+        import subprocess
+        with unittest.mock.patch("subprocess.Popen", return_value=mock_proc):
+            with unittest.mock.patch("os.set_blocking"):
+                # Mock _read_response for initialize and list_tools
+                init_res = {"jsonrpc": "2.0", "id": 1, "result": {"capabilities": {}}}
+                list_res = {"jsonrpc": "2.0", "id": 2, "result": {"tools": [{"name": "foo", "description": "foo tool"}]}}
+
+                read_responses = [init_res, list_res]
+                def mock_read(req_id=None, timeout=None):
+                    if read_responses:
+                        return read_responses.pop(0)
+                    return None
+
+                client._read_response = mock_read
+                started = client.start()
+                self.assertTrue(started)
+                self.assertEqual(len(client.tools), 1)
+                self.assertEqual(client.tools[0]["name"], "foo")
+
+                # Test call_tool success
+                call_res = {"jsonrpc": "2.0", "id": 3, "result": {"content": [{"type": "text", "text": "hello result"}]}}
+                read_responses = [call_res, list_res]
+                res_str = client.call_tool("foo", {"arg": 1})
+                self.assertEqual(res_str, "hello result")
+
+                # Test call_tool error response
+                err_res = {"jsonrpc": "2.0", "id": 4, "error": {"message": "Invalid args"}}
+                read_responses = [err_res]
+                res_err = client.call_tool("foo", {})
+                self.assertIn("MCP Error: Invalid args", res_err)
+
+                # Test call_tool no response timeout
+                read_responses = [None]
+                res_timeout = client.call_tool("foo", {})
+                self.assertIn("No response from MCP server", res_timeout)
+
+                # Test stop
+                client.stop()
+                self.assertTrue(client._stopped)
+
+    def test_client_call_tool_not_running(self):
+        from core.mcp_manager import MCPProcessClient
+        client = MCPProcessClient("dead_server", ["invalid_command_xyz_12345"])
+        client.start = lambda: False
+        res = client.call_tool("foo", {})
+        self.assertIn("is not running", res)
+
+
 if __name__ == "__main__":
     unittest.main()
+

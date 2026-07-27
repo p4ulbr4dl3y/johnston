@@ -30,3 +30,52 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
 
         res = await tool.execute({"command": "sleep 0.05 && echo 'done'"}, app=mock_app)
         self.assertIn("done", res)
+
+    async def test_no_background_flag(self):
+        tool = ShellTool()
+        mock_app = MagicMock()
+        mock_app.tool_context = ToolContext(mock_app)
+
+        res = await tool.execute({"command": "echo 'nobg'", "no_background": True}, app=mock_app)
+        self.assertIn("nobg", res)
+
+    async def test_empty_output_command(self):
+        tool = ShellTool()
+        mock_app = MagicMock()
+        mock_app.tool_context = ToolContext(mock_app)
+
+        res = await tool.execute({"command": "true"}, app=mock_app)
+        self.assertIn("Command executed with no output", res)
+
+    async def test_unsafe_command_rejected_by_user(self):
+        tool = ShellTool()
+        mock_app = MagicMock()
+        mock_app.tool_context = ToolContext(mock_app)
+
+        def mock_push_screen(screen, callback=None):
+            if callback:
+                callback(False)
+
+        mock_app.push_screen = mock_push_screen
+
+        res = await tool.execute({"command": "rm -rf /"}, app=mock_app)
+        self.assertIn("Command execution rejected by user", res)
+
+    async def test_unsafe_command_accepted_by_user(self):
+        tool = ShellTool()
+        mock_app = MagicMock()
+        mock_app.tool_context = ToolContext(mock_app)
+
+        def mock_push_screen(screen, callback=None):
+            if callback:
+                callback(True)
+
+        mock_app.push_screen = mock_push_screen
+
+        res = await tool.execute({"command": "rm -rf /nonexistent_test_dir_12345"}, app=mock_app)
+        self.assertIsInstance(res, str)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
