@@ -69,5 +69,51 @@ class TestProviderManagerJson(unittest.TestCase):
         asyncio.run(_test())
 
 
+class TestProviderManagerJsonRegression(unittest.TestCase):
+    def test_invalid_providers_json_falls_back_to_defaults(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_file = os.path.join(tmpdir, "providers.json")
+            config_file = os.path.join(tmpdir, "config.json")
+            with open(json_file, "w", encoding="utf-8") as f:
+                f.write("{not json")
+
+            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), patch(
+                "core.provider_manager.CONFIG_FILE", config_file
+            ), patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                pm = ProviderManager()
+                providers = pm.load_providers()
+
+        self.assertIn("opencode", providers)
+        self.assertIn("openai", providers)
+
+    def test_saved_model_overrides_json_default_model(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            json_file = os.path.join(tmpdir, "providers.json")
+            config_file = os.path.join(tmpdir, "config.json")
+            with open(json_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "custom_json": {
+                            "key": "custom_json",
+                            "name": "Custom JSON LLM",
+                            "base_url": "http://localhost:8080/v1",
+                            "model": "default-model",
+                            "models": ["default-model", "saved-model"],
+                        }
+                    },
+                    f,
+                )
+
+            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), patch(
+                "core.provider_manager.CONFIG_FILE", config_file
+            ), patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                pm = ProviderManager()
+                pm.set_provider_model("custom_json", "saved-model")
+                pm.set_active_provider_key("custom_json")
+                agent = pm.create_active_agent()
+
+        self.assertEqual(agent.model, "saved-model")
+
+
 if __name__ == "__main__":
     unittest.main()

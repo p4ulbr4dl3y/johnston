@@ -439,5 +439,47 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(usage[0][1]["prompt_tokens"], 100)
 
 
+class TestAdapterNormalizationRegression(unittest.TestCase):
+    def test_gemini_malformed_tool_arguments_fall_back_to_empty_object(self):
+        _, contents = GeminiAdapter()._to_gemini(
+            [
+                {
+                    "role": "assistant",
+                    "content": "calling tool",
+                    "tool_calls": [{"id": "call_1", "function": {"name": "run", "arguments": "{not json"}}],
+                }
+            ]
+        )
+
+        self.assertEqual(contents[0]["parts"][1]["functionCall"], {"name": "run", "args": {}})
+
+    def test_anthropic_tool_result_without_prior_assistant_is_user_turn(self):
+        system_prompt, messages = AnthropicAdapter._to_anthropic_messages(
+            [{"role": "tool", "tool_call_id": "call_1", "name": "read", "content": "file contents"}]
+        )
+
+        self.assertEqual(system_prompt, "")
+        self.assertEqual(messages[0]["role"], "user")
+        self.assertEqual(messages[0]["content"][0]["tool_use_id"], "call_1")
+        self.assertEqual(messages[0]["content"][0]["content"], "file contents")
+
+    def test_ollama_preserves_assistant_multimodal_content(self):
+        messages = OllamaAdapter._to_ollama_messages(
+            [
+                {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "text", "text": "caption"},
+                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+                    ],
+                }
+            ]
+        )
+
+        self.assertEqual(messages[0]["role"], "assistant")
+        self.assertEqual(messages[0]["content"][0]["text"], "caption")
+        self.assertEqual(messages[0]["content"][1]["image_url"]["url"], "data:image/png;base64,abc")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,8 @@
+import os
+import tempfile
 import unittest
 
-from tools.registry import TOOL_CLASSES, get_default_tools
+from tools.registry import TOOL_CLASSES, execute_tool, get_default_tools
 
 
 class TestToolSchemas(unittest.TestCase):
@@ -42,6 +44,24 @@ class TestToolSchemas(unittest.TestCase):
         from tools.subagent import SubagentTool
         props = SubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("task_id", props)
+
+
+class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
+    async def test_execute_tool_resolves_file_aliases(self):
+        fd, path = tempfile.mkstemp(dir=os.getcwd())
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write("alias read content")
+
+            res = await execute_tool("read_file", {"path": path})
+            self.assertIn("alias read content", res)
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    async def test_execute_tool_unknown_tool_is_reported(self):
+        res = await execute_tool("definitely_not_a_tool", {})
+        self.assertEqual(res, "Unknown tool: definitely_not_a_tool")
 
 
 if __name__ == "__main__":
