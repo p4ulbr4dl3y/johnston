@@ -1,8 +1,17 @@
-/* Dynamic True Color Inversion Selection (Original text color becomes selection bg) */
+/* Dynamic True Color Inversion Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
 .text-area--selection,
+.input--selection,
 Screen > .screen--selection,
-TextArea > .text-area--selection {
+TextArea > .text-area--selection,
+Input > .input--selection,
+Input > .selection,
+#message-input > .text-area--selection,
+#write-in-input > .input--selection,
+#modal-search-input > .input--selection,
+#api-key-input > .input--selection {
+    background: #ffffff;
+    color: #09090b;
     text-style: reverse;
 }
 
