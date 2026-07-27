@@ -40,6 +40,7 @@ class SubagentsScreen(ModalScreen[None]):
         self.refresh_list()
 
     def refresh_list(self) -> None:
+        self.st._load_all_sessions()
         opt_list = self.query_one("#subagents-option-list", OptionList)
         opt_list.clear_options()
 
@@ -49,6 +50,8 @@ class SubagentsScreen(ModalScreen[None]):
             curr_session_id = None
 
         self.sessions = self.st.get_sessions_for_session(curr_session_id)
+        if not self.sessions and curr_session_id:
+            self.sessions = self.st.get_sessions_for_session(None)
 
         if not self.sessions:
             opt_list.add_option(Text("No subagents registered for this session.", style=THEME_MUTED))
