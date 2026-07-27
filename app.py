@@ -175,6 +175,10 @@ class JohnstonApp(App):
 
             agent_mode = getattr(self.agent, "mode", "action")
 
+            thinking_effort = "auto"
+            if hasattr(self.pm, "get_provider_thinking_effort"):
+                thinking_effort = self.pm.get_provider_thinking_effort(pkey, model_name) or "auto"
+
             footer.update_status(
                 provider_key=pkey,
                 model_name=model_name,
@@ -186,6 +190,7 @@ class JohnstonApp(App):
                 context_window=metrics.get("context", "128k"),
                 context_limit=metrics.get("context_limit", 128000),
                 cost_usd=metrics.get("cost_usd", 0.0),
+                thinking_effort=thinking_effort,
                 skills_count=skills_count,
                 mcp_active=mcp_active,
                 mcp_total=mcp_total

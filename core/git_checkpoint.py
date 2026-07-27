@@ -1,17 +1,21 @@
+import hashlib
 import os
-import shutil
 import subprocess
 from typing import List, Optional
 
+from core.platform_utils import johnston_config_dir
+
 
 class GitCheckpointManager:
-    """Manages isolated shadow Git checkpoints for chat sessions using custom refs.
+    """Manages isolated shadow Git checkpoints for chat sessions using custom refs and external shadow repos.
 
     Checkpoints capture the exact workspace state (tracked + untracked files)
-    before each user message without altering current branch git log or status.
+    before each user message in a separate shadow Git repository located in ~/.johnston/shadow_repos/
+    without altering current project directory or git state.
     """
 
     REF_PREFIX = "refs/johnston/checkpoints"
+    EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
     @staticmethod
     def _run_git(args: List[str], cwd: str, env: Optional[dict] = None) -> subprocess.CompletedProcess:
@@ -24,10 +28,19 @@ class GitCheckpointManager:
         )
 
     @classmethod
-    def is_git_repo(cls, project_path: Optional[str] = None) -> bool:
+    def _get_shadow_dir(cls, project_path: Optional[str] = None) -> tuple[str, str]:
         cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
-        res = cls._run_git(["rev-parse", "--is-inside-work-tree"], cwd=cwd)
-        return res.returncode == 0 and res.stdout.strip() == "true"
+        hash_id = hashlib.md5(cwd.encode("utf-8")).hexdigest()
+        shadow_dir = os.path.join(str(johnston_config_dir()), "shadow_repos", f"{hash_id}.git")
+        return shadow_dir, cwd
+
+    @classmethod
+    def is_git_repo(cls, project_path: Optional[str] = None) -> bool:
+        shadow_dir, _ = cls._get_shadow_dir(project_path)
+        if not os.path.exists(shadow_dir):
+            return False
+        res = cls._run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
+        return res.returncode == 0
 
     @classmethod
     def get_ref_name(cls, session_id: str, message_index: int) -> str:
@@ -35,21 +48,39 @@ class GitCheckpointManager:
 
     @classmethod
     def ensure_git_repo(cls, project_path: Optional[str] = None) -> bool:
-        """Ensures working directory is a git repository with at least one HEAD commit."""
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
-        if not cls.is_git_repo(cwd):
-            init_res = cls._run_git(["init"], cwd=cwd)
+        """Ensures an isolated shadow Git repository exists in ~/.johnston/shadow_repos for the project path."""
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        os.makedirs(shadow_dir, exist_ok=True)
+
+        rev_res = cls._run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
+        if rev_res.returncode != 0:
+            init_res = cls._run_git(["init", "--bare"], cwd=shadow_dir)
             if init_res.returncode != 0:
                 return False
-            cls._run_git(["config", "user.name", "Johnston AI"], cwd=cwd)
-            cls._run_git(["config", "user.email", "johnston@local"], cwd=cwd)
 
-        head_res = cls._run_git(["rev-parse", "HEAD"], cwd=cwd)
+        cls._run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
+        cls._run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
+
+        head_res = cls._run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
         if head_res.returncode != 0:
-            cls._run_git(["config", "user.name", "Johnston AI"], cwd=cwd)
-            cls._run_git(["config", "user.email", "johnston@local"], cwd=cwd)
-            commit_res = cls._run_git(["commit", "--allow-empty", "-m", "Initial commit by Johnston"], cwd=cwd)
-            return commit_res.returncode == 0
+            mktree_res = subprocess.run(
+                ["git", "mktree"],
+                cwd=shadow_dir,
+                input="",
+                capture_output=True,
+                text=True,
+            )
+            empty_tree_sha = mktree_res.stdout.strip() if mktree_res.returncode == 0 else cls.EMPTY_TREE_SHA
+            commit_res = cls._run_git(
+                ["commit-tree", empty_tree_sha, "-m", "Initial commit by Johnston"],
+                cwd=shadow_dir,
+            )
+            if commit_res.returncode != 0:
+                return False
+            commit_sha = commit_res.stdout.strip()
+            cls._run_git(["update-ref", "refs/heads/main", commit_sha], cwd=shadow_dir)
+            cls._run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=shadow_dir)
+
         return True
 
     @classmethod
@@ -60,12 +91,12 @@ class GitCheckpointManager:
         project_path: Optional[str] = None,
         auto_init: bool = True,
     ) -> Optional[str]:
-        """Creates a shadow git commit containing tracked & untracked working tree state
+        """Creates a shadow git commit containing tracked & untracked working tree state.
 
-        Saves commit SHA in refs/johnston/checkpoints/<session_id>/<message_index>.
-        Returns commit SHA if created, None if not in a git repo.
+        Saves commit SHA in refs/johnston/checkpoints/<session_id>/<message_index> inside shadow repo.
+        Returns commit SHA if created, None if not initialized and auto_init=False.
         """
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
         if auto_init:
             if not cls.ensure_git_repo(cwd):
                 return None
@@ -75,32 +106,18 @@ class GitCheckpointManager:
 
         ref_name = cls.get_ref_name(session_id, message_index)
 
-        # Check HEAD SHA
-        head_res = cls._run_git(["rev-parse", "HEAD"], cwd=cwd)
+        head_res = cls._run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
         if head_res.returncode != 0:
             return None
         head_sha = head_res.stdout.strip()
 
-        # Create shadow index file to include all working tree changes (tracked + untracked)
-        git_dir_res = cls._run_git(["rev-parse", "--git-dir"], cwd=cwd)
-        if git_dir_res.returncode != 0:
-            return None
-        git_dir = os.path.abspath(os.path.join(cwd, git_dir_res.stdout.strip()))
-
-        tmp_index = os.path.join(git_dir, f"johnston_tmp_index_{os.getpid()}")
-        orig_index = os.path.join(git_dir, "index")
-
-        if os.path.exists(orig_index):
-            try:
-                shutil.copy(orig_index, tmp_index)
-            except Exception:
-                pass
-
+        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}")
         env = os.environ.copy()
+        env["GIT_DIR"] = shadow_dir
+        env["GIT_WORK_TREE"] = cwd
         env["GIT_INDEX_FILE"] = tmp_index
 
         try:
-            # Stage all untracked & tracked changes into temporary index
             cls._run_git(["add", "-A"], cwd=cwd, env=env)
             tree_res = cls._run_git(["write-tree"], cwd=cwd, env=env)
             if tree_res.returncode != 0:
@@ -109,15 +126,14 @@ class GitCheckpointManager:
 
             commit_res = cls._run_git(
                 ["commit-tree", tree_sha, "-p", head_sha, "-m", f"Johnston Checkpoint {session_id}:{message_index}"],
-                cwd=cwd,
+                cwd=shadow_dir,
                 env=env,
             )
             if commit_res.returncode != 0:
                 return None
             commit_sha = commit_res.stdout.strip()
 
-            # Store in custom ref
-            ref_res = cls._run_git(["update-ref", ref_name, commit_sha], cwd=cwd)
+            ref_res = cls._run_git(["update-ref", ref_name, commit_sha], cwd=shadow_dir)
             if ref_res.returncode == 0:
                 return commit_sha
             return None
@@ -135,19 +151,18 @@ class GitCheckpointManager:
         message_index: int,
         project_path: Optional[str] = None,
     ) -> bool:
-        """Restores repository working tree and HEAD state to saved checkpoint."""
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        """Restores repository working tree state to saved checkpoint."""
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
         if not cls.is_git_repo(cwd):
             return False
 
         ref_name = cls.get_ref_name(session_id, message_index)
-        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=cwd)
+        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
         if rev_res.returncode != 0:
             return False
         commit_sha = rev_res.stdout.strip()
 
-        # Parse commit object to get base parent commit (HEAD at checkpoint time)
-        cat_res = cls._run_git(["cat-file", "-p", commit_sha], cwd=cwd)
+        cat_res = cls._run_git(["cat-file", "-p", commit_sha], cwd=shadow_dir)
         if cat_res.returncode != 0:
             return False
 
@@ -157,15 +172,18 @@ class GitCheckpointManager:
                 parent_sha = line.split()[1]
                 break
 
+        env = os.environ.copy()
+        env["GIT_DIR"] = shadow_dir
+        env["GIT_WORK_TREE"] = cwd
+
         try:
-            # 1. Reset HEAD to parent commit SHA
-            cls._run_git(["reset", "--hard", parent_sha], cwd=cwd)
-            # 2. Remove any untracked files created after checkpoint
-            cls._run_git(["clean", "-fd"], cwd=cwd)
-            # 3. Read tree from checkpoint commit into working directory
-            cls._run_git(["read-tree", "--reset", "-u", commit_sha], cwd=cwd)
-            # 4. Unstage changes so working tree mirrors exact index/untracked state
-            cls._run_git(["reset"], cwd=cwd)
+            res1 = cls._run_git(["read-tree", "--reset", "-u", commit_sha], cwd=cwd, env=env)
+            if res1.returncode != 0:
+                return False
+
+            cls._run_git(["clean", "-fd"], cwd=cwd, env=env)
+            cls._run_git(["update-ref", "HEAD", parent_sha], cwd=shadow_dir)
+            cls._run_git(["reset"], cwd=cwd, env=env)
             return True
         except Exception:
             return False
@@ -178,11 +196,11 @@ class GitCheckpointManager:
         project_path: Optional[str] = None,
     ) -> None:
         """Deletes checkpoints with index > target_message_index for given session."""
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
         if not cls.is_git_repo(cwd):
             return
 
-        refs_res = cls._run_git(["for-each-ref", "--format=%(refname)", f"{cls.REF_PREFIX}/{session_id}/*"], cwd=cwd)
+        refs_res = cls._run_git(["for-each-ref", "--format=%(refname)", f"{cls.REF_PREFIX}/{session_id}/*"], cwd=shadow_dir)
         if refs_res.returncode != 0 or not refs_res.stdout.strip():
             return
 
@@ -194,7 +212,7 @@ class GitCheckpointManager:
                 idx_str = ref.rstrip("/").split("/")[-1]
                 idx = int(idx_str)
                 if idx > target_message_index:
-                    cls._run_git(["update-ref", "-d", ref], cwd=cwd)
+                    cls._run_git(["update-ref", "-d", ref], cwd=shadow_dir)
             except ValueError:
                 pass
 
@@ -209,31 +227,20 @@ class GitCheckpointManager:
 
         Returns string formatted like '+12 / -4', 'no changes', or None if checkpoint doesn't exist.
         """
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
         if not cls.is_git_repo(cwd):
             return None
 
         ref_name = cls.get_ref_name(session_id, message_index)
-        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=cwd)
+        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
         if rev_res.returncode != 0:
             return None
         commit_sha = rev_res.stdout.strip()
 
-        git_dir_res = cls._run_git(["rev-parse", "--git-dir"], cwd=cwd)
-        if git_dir_res.returncode != 0:
-            return None
-        git_dir = os.path.abspath(os.path.join(cwd, git_dir_res.stdout.strip()))
-
-        tmp_index = os.path.join(git_dir, f"johnston_diff_tmp_index_{os.getpid()}")
-        orig_index = os.path.join(git_dir, "index")
-
-        if os.path.exists(orig_index):
-            try:
-                shutil.copy(orig_index, tmp_index)
-            except Exception:
-                pass
-
+        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}")
         env = os.environ.copy()
+        env["GIT_DIR"] = shadow_dir
+        env["GIT_WORK_TREE"] = cwd
         env["GIT_INDEX_FILE"] = tmp_index
 
         try:
@@ -269,3 +276,4 @@ class GitCheckpointManager:
     ) -> None:
         """Deletes all checkpoints for given session."""
         cls.purge_checkpoints_after(session_id, -1, project_path=project_path)
+
