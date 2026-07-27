@@ -29,10 +29,10 @@ class TestGitCheckpointManager(unittest.TestCase):
 
     def test_non_git_repo(self):
         self.assertFalse(GitCheckpointManager.is_git_repo(self.tmp_dir))
-        sha = GitCheckpointManager.create_checkpoint("s1", 0, project_path=self.tmp_dir)
-        self.assertIsNone(sha)
-        res = GitCheckpointManager.restore_checkpoint("s1", 0, project_path=self.tmp_dir)
-        self.assertFalse(res)
+        sha_no_init = GitCheckpointManager.create_checkpoint("s1", 0, project_path=self.tmp_dir, auto_init=False)
+        self.assertIsNone(sha_no_init)
+        sha_auto = GitCheckpointManager.create_checkpoint("s1", 0, project_path=self.tmp_dir, auto_init=True)
+        self.assertIsNotNone(sha_auto)
 
     def test_create_and_restore_checkpoint(self):
         repo_path = self._init_git_repo()

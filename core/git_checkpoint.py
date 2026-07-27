@@ -34,11 +34,31 @@ class GitCheckpointManager:
         return f"{cls.REF_PREFIX}/{session_id}/{message_index}"
 
     @classmethod
+    def ensure_git_repo(cls, project_path: Optional[str] = None) -> bool:
+        """Ensures working directory is a git repository with at least one HEAD commit."""
+        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        if not cls.is_git_repo(cwd):
+            init_res = cls._run_git(["init"], cwd=cwd)
+            if init_res.returncode != 0:
+                return False
+            cls._run_git(["config", "user.name", "Johnston AI"], cwd=cwd)
+            cls._run_git(["config", "user.email", "johnston@local"], cwd=cwd)
+
+        head_res = cls._run_git(["rev-parse", "HEAD"], cwd=cwd)
+        if head_res.returncode != 0:
+            cls._run_git(["config", "user.name", "Johnston AI"], cwd=cwd)
+            cls._run_git(["config", "user.email", "johnston@local"], cwd=cwd)
+            commit_res = cls._run_git(["commit", "--allow-empty", "-m", "Initial commit by Johnston"], cwd=cwd)
+            return commit_res.returncode == 0
+        return True
+
+    @classmethod
     def create_checkpoint(
         cls,
         session_id: str,
         message_index: int,
         project_path: Optional[str] = None,
+        auto_init: bool = True,
     ) -> Optional[str]:
         """Creates a shadow git commit containing tracked & untracked working tree state
 
@@ -46,15 +66,18 @@ class GitCheckpointManager:
         Returns commit SHA if created, None if not in a git repo.
         """
         cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
-        if not cls.is_git_repo(cwd):
-            return None
+        if auto_init:
+            if not cls.ensure_git_repo(cwd):
+                return None
+        else:
+            if not cls.is_git_repo(cwd):
+                return None
 
         ref_name = cls.get_ref_name(session_id, message_index)
 
         # Check HEAD SHA
         head_res = cls._run_git(["rev-parse", "HEAD"], cwd=cwd)
         if head_res.returncode != 0:
-            # Empty repo with no commits yet
             return None
         head_sha = head_res.stdout.strip()
 
