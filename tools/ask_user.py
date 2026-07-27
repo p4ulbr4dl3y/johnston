@@ -24,8 +24,9 @@ class AskUserTool(BaseTool):
                                 "options": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "List of selectable options"
+                                    "description": "List of selectable options. If recommending an option, list it first and prefix with '(Recommended)'."
                                 }
+
                             },
                             "required": ["question_text"]
                         }
