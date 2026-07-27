@@ -268,6 +268,19 @@ class RewindCommand(BaseCommand):
             app.notify("History is empty: no messages to rollback", severity="warning")
             return
 
+        curr_sid = getattr(app, "current_session_id", None)
+        msgs_with_stats = []
+        if curr_sid:
+            try:
+                from core.git_checkpoint import GitCheckpointManager
+                for idx, text in user_msgs:
+                    stat = GitCheckpointManager.get_diff_stats(curr_sid, idx) or ""
+                    msgs_with_stats.append((idx, text, stat))
+            except Exception:
+                msgs_with_stats = [(idx, text, "") for idx, text in user_msgs]
+        else:
+            msgs_with_stats = [(idx, text, "") for idx, text in user_msgs]
+
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
                 # Find original text of message being rolled back to
@@ -299,7 +312,6 @@ class RewindCommand(BaseCommand):
 
                 # Restore Git checkpoint state if available
                 checkpoint_restored = False
-                curr_sid = getattr(app, "current_session_id", None)
                 if curr_sid:
                     try:
                         from core.git_checkpoint import GitCheckpointManager
@@ -323,7 +335,7 @@ class RewindCommand(BaseCommand):
                     app.notify("Chat rolled back! Message loaded into input field.")
             app.query_one("#message-input").focus()
 
-        app.push_screen(RewindScreen(user_msgs), callback=on_rewind_selected)
+        app.push_screen(RewindScreen(msgs_with_stats), callback=on_rewind_selected)
 
 
 class ResumeCommand(BaseCommand):
