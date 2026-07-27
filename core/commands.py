@@ -604,6 +604,27 @@ class DemoCommand(BaseCommand):
             args={"command": "git status"}
         )
 
+        bg_cmd_str = "for i in {1..120}; do echo \"[demo-bg] step $i/120 - running background loop...\"; sleep 1; done"
+        bg_task_id = "task-demo-bg"
+        try:
+            from core.background_task import TaskManager
+            tm = TaskManager.get_instance()
+            bg_task = tm.start_task(
+                cmd=bg_cmd_str,
+                description="Demo 2-minute background loop",
+                session_id=app.current_session_id
+            )
+            bg_task_id = bg_task.id
+        except Exception:
+            pass
+
+        await chat_view.add_tool_call(
+            "shell",
+            bg_cmd_str,
+            result_text=f"Command is running in the background as task '{bg_task_id}'.\nUse /tasks or ManageTask to inspect progress.",
+            args={"command": bg_cmd_str}
+        )
+
         await chat_view.add_tool_call(
             "read",
             "AGENTS.md",
@@ -629,11 +650,12 @@ class DemoCommand(BaseCommand):
         bot_msg.content = (
             "### 🚀 **Демонстрационная фейковая сессия активна!** (0 токенов потрачено)\n\n"
             "Все виджеты интерактивны:\n"
+            "- ⏱ **Background Task**: запущен реальный фоновый цикл на 2 минуты! Проверь через `/tasks`!\n"
             "- ❓ **AskUser**: открыто интерактивное модальное окно с выбором опций!\n"
             "- ⚙ **Subagent**: кликни по плашке `subagent` выше, чтобы открыть модалку логов просмотра!\n"
             "- ⚙ **Shell / Read / AskUser**: кликни по плашкам, чтобы развернуть вызовы инструментов.\n"
             "- 💡 `/subagents`: открывает список субагентов.\n"
-            "- 💡 `/tasks`: открывает фоновые задачи."
+            "- 💡 `/tasks`: открывает список фоновых задач."
         )
 
         app.refresh_status_footer()
