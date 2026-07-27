@@ -431,6 +431,14 @@ class JohnstonApp(App):
                     self.agent.history = sess.get("agent_history", [])
             self.refresh_status_footer()
 
+    async def _exec_slash_command(self, user_text: str) -> None:
+        try:
+            processed = await handle_slash_command(self, user_text)
+            if not processed:
+                self.notify("Unknown command", severity="warning")
+        except Exception as e:
+            self.notify(f"Error executing command: {e}", severity="error")
+
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new)"""
         user_text = event.value.strip()
@@ -441,15 +449,14 @@ class JohnstonApp(App):
         chat_input.focus()
 
         if user_text.startswith("/"):
-            processed = await handle_slash_command(self, user_text)
-            if not processed:
-                self.notify("Unknown command", severity="warning")
+            asyncio.create_task(self._exec_slash_command(user_text))
             return
 
         if self.is_generating:
             self.message_queue.append((user_text, True))
         else:
             self.trigger_ai_response(user_text, show_in_ui=True)
+
 
     def prepare_prompt_with_attachments(self, user_text: str):
         """Search for @path/to/file and raw paths in user_text and attach text files and images"""
