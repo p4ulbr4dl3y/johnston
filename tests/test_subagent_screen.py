@@ -76,8 +76,14 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         found = self.tracker.find_session_by_description_or_id('"Explore test setup...runner"')
         self.assertEqual(found, sess)
 
+    def test_find_session_substring_description(self):
+        sess = self.tracker.create_session("task-sub", "Test subagent check env for py", "Test subagent check env for python environment", "general", False)
+        found = self.tracker.find_session_by_description_or_id("Test subagent check env")
+        self.assertEqual(found, sess)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

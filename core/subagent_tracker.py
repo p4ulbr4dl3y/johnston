@@ -179,4 +179,15 @@ class SubagentTracker:
                 if parts and all(p in clean_prompt for p in parts):
                     return sess
 
+        # Substring / prefix / case-insensitive matching fallback for partial descriptions
+        clean_id_lower = clean_id.lower()
+        if len(clean_id_lower) >= 3:
+            for sess in candidates:
+                c_desc = sess.description.strip('"\' `').lower()
+                c_prompt = sess.prompt.strip('"\' `').lower()
+                if c_desc and (clean_id_lower in c_desc or c_desc in clean_id_lower):
+                    return sess
+                if c_prompt and (clean_id_lower in c_prompt or c_prompt in clean_id_lower):
+                    return sess
+
         return None
