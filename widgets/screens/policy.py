@@ -45,6 +45,7 @@ class PolicyScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
+        ("tab", "switch_tab", "Switch Tab"),
         ("enter", "toggle_action", "Cycle Setting"),
         ("a", "set_allow", "Allow"),
         ("s", "set_ask", "Ask"),
@@ -69,7 +70,18 @@ class PolicyScreen(ModalScreen[None]):
                     yield OptionList(id="policy-option-list")
                 with TabPane("Resource Budgets", id="tab-budgets"):
                     yield OptionList(id="budget-option-list")
-            yield Label("enter: cycle • a: allow • s: ask • b: block • esc: close", id="modal-hint")
+            yield Label("enter: cycle • tab: switch tab • a: allow • s: ask • b: block • esc: close", id="modal-hint")
+
+    def action_switch_tab(self) -> None:
+        tabs = self.query_one("#policy-tabs", TabbedContent)
+        if tabs.active == "tab-rules":
+            tabs.active = "tab-budgets"
+            opt_list = self.query_one("#budget-option-list", OptionList)
+            opt_list.focus()
+        else:
+            tabs.active = "tab-rules"
+            opt_list = self.query_one("#policy-option-list", OptionList)
+            opt_list.focus()
 
     def on_mount(self) -> None:
         self.refresh_rules_list()
