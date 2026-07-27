@@ -551,29 +551,33 @@ class PolicyCommand(BaseCommand):
 class DemoCommand(BaseCommand):
     name = "/demo"
     aliases = ["/askdemo", "/testmodal"]
-    description = "Test and preview the AskUser wizard modal"
+    description = "Run real AskUser tool modal with multiple questions"
 
     async def execute(self, app) -> None:
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from tools.ask_user import AskUserTool
 
         questions = [
             {
-                "question_text": "Как вам обновленная модалка AskUser?",
-                "options": ["Отлично, верстка ровная", "Есть замечания", "Вернуть стандартную"],
+                "question_text": "Вопрос 1/3: Какая тема интерфейса вам ближе?",
+                "options": ["Monochrome Dark (#09090b)", "Zinc Slate (#18181b)", "System High Contrast"],
             },
             {
-                "question_text": "Введите ваши предложения или отзыв:",
+                "question_text": "Вопрос 2/3: Какой провайдер вы используете чаще всего?",
+                "options": ["OpenCode (DeepSeek-V4)", "ClinePass", "OpenAI / Custom API"],
+            },
+            {
+                "question_text": "Вопрос 3/3: Введите ваши замечания по интерфейсу:",
                 "options": [],
             },
         ]
 
-        def on_demo_finished(result: str | None) -> None:
-            if result and result != "Cancelled by user.":
-                app.notify("AskUser demo completed!")
-            else:
-                app.notify("AskUser demo cancelled", severity="warning")
+        tool = AskUserTool()
+        result = await tool.execute({"questions": questions}, app=app)
+        if result == "Cancelled by user.":
+            app.notify("AskUser demo cancelled", severity="warning")
+        else:
+            app.notify("AskUser demo completed!")
 
-        app.push_screen(AskUserWizardScreen(questions), callback=on_demo_finished)
 
 
 COMMAND_CLASSES = [
