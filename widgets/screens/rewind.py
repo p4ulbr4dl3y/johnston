@@ -11,10 +11,11 @@ class RewindScreen(BaseSelectionScreen[int]):
             diff_stat = msg[2] if len(msg) > 2 else ""
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            opt = f"{clean[:50]}..." if len(clean) > 50 else clean
-            opt = opt or "(empty message)"
+            max_text_len = 40
+            opt_text = f"{clean[:max_text_len]}..." if len(clean) > max_text_len else clean
+            opt_text = opt_text or "(empty message)"
             stat_label = diff_stat or "no checkpoint"
-            opt = f"{opt}  [{stat_label}]"
+            opt = f"{opt_text}  [{stat_label}]"
             options.append(opt)
 
         items = [msg[0] for msg in user_messages]
