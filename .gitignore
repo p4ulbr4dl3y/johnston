@@ -12,6 +12,11 @@ build/
 .ruff_cache/
 .pytest_cache/
 
+# Coverage
+.coverage
+.coverage.*
+
 # Local folders
 .serena/
 .johnston/
+

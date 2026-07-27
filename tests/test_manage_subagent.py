@@ -170,6 +170,47 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Unknown action", res)
         self.assertIn("bogus", res)
 
+    async def test_send_message_background(self):
+        tool = ManageSubagentTool()
+        sess = self.tracker.create_session("sub-bg", "Task", "prompt", "general", True)
+
+        class MockSubagent:
+            def __init__(self):
+                self.app = None
+                self.history = []
+                self.tokens_input = 0
+                self.tokens_output = 0
+                self.total_tokens = 0
+                self.cost_usd = 0.0
+                self._merged_tokens_input = 0
+                self._merged_tokens_output = 0
+                self._merged_total_tokens = 0
+                self._merged_cost_usd = 0.0
+
+            async def stream_steps(self, message):
+                yield ("bot_text", "Background response")
+
+        mock_agent = MockSubagent()
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.project_dir = None
+        mock_app.agent = None
+        mock_app.pm = MagicMock()
+        mock_app.pm.create_active_agent.return_value = mock_agent
+
+        res = await tool.execute({"action": "send_message", "task_id": "sub-bg", "message": "hello bg"}, app=mock_app)
+        self.assertIn("Message sent to background subagent sub-bg", res)
+
+
+    async def test_status_and_kill_missing_task_id(self):
+        tool = ManageSubagentTool()
+        res_st = await tool.execute({"action": "status"})
+        self.assertIn("'task_id' parameter is required", res_st)
+
+        res_kl = await tool.execute({"action": "kill"})
+        self.assertIn("'task_id' parameter is required", res_kl)
+
 
 if __name__ == "__main__":
     unittest.main()
+

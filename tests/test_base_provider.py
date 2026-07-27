@@ -478,6 +478,78 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(api_errors), 1)
         self.assertIn("Invalid API key", api_errors[0][1])
 
+    async def test_stream_steps_tool_call_loop(self):
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")
+        self.addAsyncCleanup(agent.close)
+
+        # Mock tool call chunk
+        tool_call_mock = unittest.mock.MagicMock()
+        tool_call_mock.index = 0
+        tool_call_mock.id = "tc_1"
+        tool_call_mock.function.name = "read"
+        tool_call_mock.function.arguments = '{"path": "test.txt"}'
+
+
+        mock_delta1 = unittest.mock.MagicMock()
+        mock_delta1.reasoning_content = "Thinking about file..."
+        mock_delta1.reasoning = None
+        mock_delta1.model_extra = None
+        mock_delta1.content = None
+        mock_delta1.tool_calls = [tool_call_mock]
+
+        chunk1 = unittest.mock.MagicMock(spec=["choices"])
+        chunk1.choices = [unittest.mock.MagicMock(delta=mock_delta1)]
+
+        mock_delta2 = unittest.mock.MagicMock()
+        mock_delta2.reasoning_content = None
+        mock_delta2.reasoning = None
+        mock_delta2.model_extra = None
+        mock_delta2.content = "File read complete"
+        mock_delta2.tool_calls = None
+
+
+
+        chunk2 = unittest.mock.MagicMock(spec=["choices"])
+        chunk2.choices = [unittest.mock.MagicMock(delta=mock_delta2)]
+
+        async def aiter1(*args, **kwargs):
+            yield chunk1
+
+        async def aiter2(*args, **kwargs):
+            yield chunk2
+
+        resp1 = unittest.mock.MagicMock()
+        resp1.__aiter__ = aiter1
+        resp2 = unittest.mock.MagicMock()
+        resp2.__aiter__ = aiter2
+
+        mock_responses = [resp1, resp2]
+
+        async def mock_create(*args, **kwargs):
+            return mock_responses.pop(0)
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
+            with unittest.mock.patch("core.base_provider.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="file content result"):
+                events = []
+                async for evt in agent.stream_steps("Read file test.txt"):
+                    events.append(evt)
+
+        # Check reasoning content yielded
+        thinking_evts = [e for e in events if e[0] in ("thinking_start", "thinking_delta")]
+        self.assertTrue(len(thinking_evts) > 0)
+        self.assertIn("Thinking about file...", thinking_evts[-1][1])
+
+
+        # Check tool execution yielded
+        tool_evts = [e for e in events if e[0] == "tool"]
+        self.assertEqual(len(tool_evts), 1)
+
+
+        # Check final text
+        bot_texts = [e for e in events if e[0] == "bot_text"]
+        self.assertIn("File read complete", bot_texts[-1][1])
+
 
 if __name__ == "__main__":
     unittest.main()
+

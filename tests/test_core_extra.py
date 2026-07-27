@@ -1,9 +1,12 @@
 import asyncio
+import os
+import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.background_task import BackgroundSubagent, BackgroundTask
 from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
+
 
 
 class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
@@ -161,6 +164,100 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertTrue(cat.is_open_weights("deepseek", "deepseek-v4-pro"))
         self.assertEqual(cat.get_model_description("deepseek", "deepseek-v4-pro"), "Open MoE flagship")
 
+    def test_vision_overrides_and_fallbacks(self):
+        cat = ModelsCatalog()
+        cat.add_vision_override("custom-model-vision")
+        self.assertTrue(cat.supports_vision("provider", "custom-model-vision"))
+        self.assertFalse(cat.is_native_vision("provider", "custom-model-vision"))
+
+        cat.set_fallback_vision_model("provider_x", "model_y")
+        prov, mod = cat.get_fallback_vision_model()
+        self.assertEqual(prov, "provider_x")
+        self.assertEqual(mod, "model_y")
+
+        cat.remove_vision_override("custom-model-vision")
+        self.assertFalse(cat.supports_vision("provider", "custom-model-vision"))
+
+    def test_save_and_load_cache(self):
+        import tempfile
+        cat = ModelsCatalog()
+        cat._limits = {"test/m1": 100000}
+        cat._vision = ["test/m1"]
+        cat._names = {"test/m1": "Test Model 1"}
+        cat._pricing = {"test/m1": {"prompt": 0.001, "completion": 0.002}}
+
+        with tempfile.NamedTemporaryFile("w+", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            with patch("core.models_catalog.CACHE_FILE", tmp_path):
+                cat.save_cache()
+                cat2 = ModelsCatalog()
+                self.assertTrue(cat2.load_cache())
+                self.assertEqual(cat2.get_context_limit("test", "m1"), 100000)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+
+class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
+    async def test_refresh_catalog_mocked(self):
+        cat = ModelsCatalog()
+
+        mdev_json = {
+            "openai": {
+                "models": {
+                    "gpt-4o": {
+                        "name": "GPT-4o",
+                        "description": "Flagship model",
+                        "limit": {"context": 128000, "output": 4096},
+                        "modalities": {"input": ["text", "image"]},
+                        "reasoning": True,
+                        "open_weights": False,
+                        "cost": {"input": 2.5, "output": 10.0}
+                    }
+                }
+            }
+        }
+        openrouter_json = {
+            "data": [
+                {
+                    "id": "anthropic/claude-3.5-sonnet",
+                    "name": "Anthropic: Claude 3.5 Sonnet",
+                    "context_length": 200000,
+                    "input_modalities": ["image"],
+                    "pricing": {"prompt": "0.000003", "completion": "0.000015"}
+                }
+            ]
+        }
+
+        import httpx
+
+        mock_mdev_res = httpx.Response(200, json=mdev_json)
+        mock_or_res = httpx.Response(200, json=openrouter_json)
+
+        def get_mock_res(*args, **kwargs):
+            url = args[0] if args else kwargs.get("url", "")
+            if "models.dev" in url:
+                return mock_mdev_res
+            return mock_or_res
+
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_async_get:
+            mock_async_get.side_effect = get_mock_res
+
+            limits = await cat.refresh()
+            self.assertIn("openai/gpt-4o", limits)
+            self.assertEqual(limits["openai/gpt-4o"], 128000)
+            self.assertTrue(cat.supports_vision("openai", "gpt-4o"))
+            self.assertTrue(cat.is_native_vision("openai", "gpt-4o"))
+            self.assertTrue(cat.supports_reasoning("openai", "gpt-4o"))
+
+            self.assertIn("anthropic/claude-3.5-sonnet", limits)
+            self.assertEqual(limits["anthropic/claude-3.5-sonnet"], 200000)
+
+
+
 
 if __name__ == "__main__":
     unittest.main()
+
