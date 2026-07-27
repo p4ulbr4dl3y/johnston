@@ -1,6 +1,7 @@
 import os
 import unittest
 
+from core.config import LAST_TOOL_LOG_FILE
 from tools.base import truncate_output
 
 
@@ -9,7 +10,7 @@ class TestTruncateOutput(unittest.TestCase):
         large_text = "A" * 5000
         res = truncate_output(large_text, max_chars=1000)
 
-        log_path = os.path.expanduser("~/.johnston/logs/last_tool.log")
+        log_path = LAST_TOOL_LOG_FILE
         self.assertTrue(os.path.exists(log_path))
         self.assertIn("Full output saved to", res)
         self.assertIn("Use read tool to inspect", res)
