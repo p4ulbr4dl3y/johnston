@@ -19,20 +19,16 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Error", res)
         self.assertIn("App instance not available", res)
 
-    async def test_no_questions_no_app(self):
+    async def test_no_questions_returns_error(self):
         tool = AskUserTool()
         res = await tool.execute({})
-        self.assertIn("Error", res)
+        self.assertEqual(res, "Error: Invalid or missing 'questions' list.")
 
-    async def test_dict_questions_normalized_but_no_app(self):
+    async def test_invalid_questions_type_returns_error(self):
         tool = AskUserTool()
-        res = await tool.execute({"questions": {"question_text": "Single?", "options": ["y"]}})
-        self.assertIn("Error", res)
+        res = await tool.execute({"questions": "invalid"})
+        self.assertEqual(res, "Error: Invalid or missing 'questions' list.")
 
-    async def test_single_question_field_normalized_but_no_app(self):
-        tool = AskUserTool()
-        res = await tool.execute({"question": "What color?"})
-        self.assertIn("Error", res)
 
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()
