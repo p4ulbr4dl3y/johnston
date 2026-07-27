@@ -28,7 +28,7 @@ class AskUserTool(BaseTool):
                                 }
 
                             },
-                            "required": ["question_text"]
+                            "required": ["question_text", "options"]
                         }
                     }
                 },

@@ -220,7 +220,7 @@ class ManageSubagentTool(BaseTool):
                 bg_task = asyncio.create_task(_run_msg_bg())
                 session.async_task = bg_task
                 ctx.notify(f"Message sent to background subagent {session.task_id}")
-                return f"Message sent to background subagent {session.task_id}. You will be notified on completion."
+                return f"Message sent to background subagent {session.task_id}. You will be notified on completion. Do NOT poll status with manage_subagent; stop calling tools and wait for completion."
             else:
                 acc = [""]
                 try:

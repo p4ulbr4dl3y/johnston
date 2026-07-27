@@ -226,7 +226,7 @@ class SubagentTool(BaseTool):
 
             return (
                 f"Subagent '{description}' launched in background (Task ID: {task_id}). "
-                "You will be notified automatically when it completes."
+                "You will be notified automatically when it completes. Do NOT poll status with manage_subagent; stop calling tools and wait for completion."
             )
         else:
             # Foreground execution
