@@ -798,17 +798,17 @@ class BaseAgent:
                     from core.audit import append_tool_decision, append_tool_result
                     from core.policy import PolicyDecision, policy_engine
 
-                policy_approved = False
-                decision = policy_engine.tool_call_decision(t_name, args, mode_def)
-                if getattr(decision, "action", "block") == "ask":
-                    approved = await self._request_policy_approval(t_name, args, decision.reason)
-                    if approved:
-                        policy_approved = True
-                        if self._canonical_tool_name(t_name) == "shell":
-                            args = {**args, "skip_confirm": True}
-                        decision = policy_engine.tool_call_decision(
-                            t_name, args, mode_def, approved=True
-                        )
+                    policy_approved = False
+                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
+                    if getattr(decision, "action", "block") == "ask":
+                        approved = await self._request_policy_approval(t_name, args, decision.reason)
+                        if approved:
+                            policy_approved = True
+                            if self._canonical_tool_name(t_name) == "shell":
+                                args = {**args, "skip_confirm": True}
+                            decision = policy_engine.tool_call_decision(
+                                t_name, args, mode_def, approved=True
+                            )
                     tool_budget_decision = budget.before_tool_call(decision.capabilities)
                     if not tool_budget_decision.allowed:
                         decision = PolicyDecision.block(tool_budget_decision.reason, decision.capabilities)
@@ -847,16 +847,16 @@ class BaseAgent:
                                     previous_policy_approved,
                                 )
                             append_tool_result(
-                            mode=current_mode,
-                            tool=t_name,
-                            result=tool_result,
-                            budget=budget.summarize(),
-                            metadata={
-                                "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
-                                "step": budget.steps,
-                                "tool_call": budget.tool_calls,
-                            },
-                        )
+                                mode=current_mode,
+                                tool=t_name,
+                                result=tool_result,
+                                budget=budget.summarize(),
+                                metadata={
+                                    "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
+                                    "step": budget.steps,
+                                    "tool_call": budget.tool_calls,
+                                },
+                            )
 
                     tool_ui_result = tool_result
                     tool_content = tool_result
