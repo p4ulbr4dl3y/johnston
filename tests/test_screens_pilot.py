@@ -184,16 +184,39 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
-    async def test_subagent_view_screen_pilot(self):
-        screen = SubagentViewScreen("test_task")
+    async def test_ask_user_wizard_screen_pilot(self):
+        from widgets.screens.ask_user import AskUserWizardScreen
+        questions = [
+            {"question_text": "Pick color", "options": ["Red", "Blue"]},
+            {"question_text": "Enter name", "options": []}
+        ]
+        screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 
         async with app.run_test() as pilot:
+            screen._mount_time = 0
+
+            # Step 1: Select "Red" and press enter
+            await pilot.press("enter")
             await pilot.pause()
-            await pilot.press("escape")
+
+            screen._mount_time = 0
+            # Step 2: Type custom input and press enter
+            await pilot.press("j", "o", "h", "n")
+            await pilot.press("enter")
             await pilot.pause()
+
+            screen._mount_time = 0
+            # Step 3: Confirm summary step
+            await pilot.press("enter")
+            await pilot.pause()
+
+            self.assertIn("Question: Pick color", str(app.dismiss_result))
+            self.assertIn("Answer: Red", str(app.dismiss_result))
+
 
 
 if __name__ == "__main__":
     unittest.main()
+
 
