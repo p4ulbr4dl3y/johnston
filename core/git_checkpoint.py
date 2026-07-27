@@ -176,6 +176,69 @@ class GitCheckpointManager:
                 pass
 
     @classmethod
+    def get_diff_stats(
+        cls,
+        session_id: str,
+        message_index: int,
+        project_path: Optional[str] = None,
+    ) -> Optional[str]:
+        """Calculates line changes (+additions / -deletions) between target checkpoint and current workspace.
+
+        Returns string formatted like '+12 / -4', 'no changes', or None if checkpoint doesn't exist.
+        """
+        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
+        if not cls.is_git_repo(cwd):
+            return None
+
+        ref_name = cls.get_ref_name(session_id, message_index)
+        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=cwd)
+        if rev_res.returncode != 0:
+            return None
+        commit_sha = rev_res.stdout.strip()
+
+        git_dir_res = cls._run_git(["rev-parse", "--git-dir"], cwd=cwd)
+        if git_dir_res.returncode != 0:
+            return None
+        git_dir = os.path.abspath(os.path.join(cwd, git_dir_res.stdout.strip()))
+
+        tmp_index = os.path.join(git_dir, f"johnston_diff_tmp_index_{os.getpid()}")
+        orig_index = os.path.join(git_dir, "index")
+
+        if os.path.exists(orig_index):
+            try:
+                shutil.copy(orig_index, tmp_index)
+            except Exception:
+                pass
+
+        env = os.environ.copy()
+        env["GIT_INDEX_FILE"] = tmp_index
+
+        try:
+            cls._run_git(["add", "-A"], cwd=cwd, env=env)
+            diff_res = cls._run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env)
+            if diff_res.returncode != 0:
+                return None
+
+            added, deleted = 0, 0
+            for line in diff_res.stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
+                    added += int(parts[0])
+                    deleted += int(parts[1])
+
+            if added == 0 and deleted == 0:
+                return "no changes"
+            return f"+{added} / -{deleted}"
+        except Exception:
+            return None
+        finally:
+            if os.path.exists(tmp_index):
+                try:
+                    os.remove(tmp_index)
+                except Exception:
+                    pass
+
+    @classmethod
     def delete_session_checkpoints(
         cls,
         session_id: str,

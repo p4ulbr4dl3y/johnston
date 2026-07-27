@@ -21,7 +21,7 @@ class TestGitCheckpointManager(unittest.TestCase):
 
         initial_file = os.path.join(self.tmp_dir, "initial.txt")
         with open(initial_file, "w") as f:
-            f.write("initial content")
+            f.write("initial content\n")
 
         subprocess.run(["git", "add", "initial.txt"], cwd=self.tmp_dir, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "initial commit"], cwd=self.tmp_dir, capture_output=True, check=True)
@@ -96,6 +96,22 @@ class TestGitCheckpointManager(unittest.TestCase):
         GitCheckpointManager.create_checkpoint("session_789", 0, project_path=repo_path)
         GitCheckpointManager.delete_session_checkpoints("session_789", project_path=repo_path)
         self.assertFalse(GitCheckpointManager.restore_checkpoint("session_789", 0, project_path=repo_path))
+
+    def test_get_diff_stats(self):
+        repo_path = self._init_git_repo()
+        GitCheckpointManager.create_checkpoint("session_stat", 0, project_path=repo_path)
+
+        # No changes initially
+        stat_same = GitCheckpointManager.get_diff_stats("session_stat", 0, project_path=repo_path)
+        self.assertEqual(stat_same, "no changes")
+
+        # Make modifications
+        mod_file = os.path.join(repo_path, "initial.txt")
+        with open(mod_file, "a") as f:
+            f.write("added line 1\nadded line 2")
+
+        stat_diff = GitCheckpointManager.get_diff_stats("session_stat", 0, project_path=repo_path)
+        self.assertEqual(stat_diff, "+2 / -0")
 
 
 if __name__ == "__main__":
