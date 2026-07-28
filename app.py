@@ -47,6 +47,7 @@ __all__ = [
     "run_headless_prompt",
 ]
 from core.commands import handle_slash_command
+from core.models_catalog import catalog
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionManager
 from widgets.chat_input import ChatInput
@@ -133,12 +134,13 @@ class JohnstonApp(App):
             yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
-        """Instant focus on start and refresh status bar"""
+        """Instant focus on start, background catalog refresh and status bar refresh"""
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):
             self.load_session_ui(self.resume_session_id)
         self.refresh_status_footer()
+        asyncio.create_task(catalog.refresh())
 
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
