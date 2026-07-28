@@ -750,9 +750,13 @@ class ToolCallWidget(Vertical):
                 formatted_plan = self._format_plan_display(plan_items, explanation)
                 self.content_widget.update(formatted_plan)
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
-                raw_text = self.result_text
-                default_target = self.args.get("url") or file_path or "page.md"
-                clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
+                raw_text = self.result_text or ""
+                if raw_text.strip().lower().startswith("error"):
+                    t = Text(raw_text.strip(), style="bold red")
+                    self.content_widget.update(t)
+                else:
+                    default_target = self.args.get("url") or file_path or "page.md"
+                    clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
                 if self.tool_type.lower() == "web_fetch":
                     fpath = "page.md"
 
