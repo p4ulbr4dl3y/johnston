@@ -79,6 +79,7 @@ class JohnstonApp(App):
         resume_session_id: str | None = None,
     ):
         super().__init__()
+        self._disable_tooltips = True
         self.pm = ProviderManager()
         if provider:
             self.pm.set_active_provider_key(provider)
