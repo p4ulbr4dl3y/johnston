@@ -26,8 +26,8 @@ class TaskConsoleScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Console Output: `{self.bg_task.command}`**", classes="modal-markdown")
-            yield RichLog(id="console-log", highlight=True, markup=True)
+            yield Markdown(f"### **Console Output: {self.bg_task.command}**", classes="modal-markdown")
+            yield RichLog(id="console-log", highlight=False, markup=False)
             yield Label("esc: back to tasks", id="modal-hint")
 
     def on_mount(self) -> None:
