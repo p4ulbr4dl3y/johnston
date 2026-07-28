@@ -75,7 +75,7 @@ Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence
 
 def _custom_markdown_parser_factory() -> MarkdownIt:
-    md = MarkdownIt("gfm-like")
+    md = MarkdownIt("gfm-like", {"linkify": False})
     md.validateLink = lambda url: True
     return md
 
