@@ -11,8 +11,6 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         import tempfile
 
         from core.subagent_tracker import SUBAGENTS_DIR
-        from tools.context import ToolContext
-        ToolContext._instance = None
         self.old_dir = SUBAGENTS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -21,8 +19,6 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.tracker.sessions.clear()
 
     async def asyncTearDown(self):
-        from tools.context import ToolContext
-        ToolContext._instance = None
         for sess in list(self.tracker.sessions.values()):
             if sess.async_task and not sess.async_task.done():
                 sess.async_task.cancel()
@@ -87,8 +83,6 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         import tempfile
 
         from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
-        from tools.context import ToolContext
-        ToolContext._instance = None
         self.old_dir = SUBAGENTS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -97,8 +91,6 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.tracker.sessions.clear()
 
     async def asyncTearDown(self):
-        from tools.context import ToolContext
-        ToolContext._instance = None
         for sess in list(self.tracker.sessions.values()):
             if sess.async_task and not sess.async_task.done():
                 sess.async_task.cancel()

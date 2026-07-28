@@ -15,10 +15,6 @@ def supports_pty() -> bool:
     return not is_windows()
 
 
-def new_task_id(prefix: str, counter: int, timestamp_ns: int) -> str:
-    return f"{prefix}_{timestamp_ns}_{counter}"
-
-
 def johnston_config_dir() -> Path:
     if is_windows():
         base = os.environ.get("APPDATA")
