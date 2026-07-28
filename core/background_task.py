@@ -133,6 +133,28 @@ class BackgroundTask:
         except Exception as e:
             return f"Failed to send input to task {self.task_id}: {e}"
 
+    def kill_sync(self):
+        self.is_running = False
+        self.close_pty()
+        if self.process:
+            try:
+                pid = getattr(self.process, "pid", None)
+                if isinstance(pid, int) and pid > 0:
+                    try:
+                        import signal
+                        os.killpg(pid, signal.SIGKILL)
+                    except Exception:
+                        pass
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        if self.read_task and not self.read_task.done():
+            self.read_task.cancel()
+        self.output.append("\n[Task terminated]\n")
+
     async def kill(self):
         self.is_running = False
         self.close_pty()
@@ -153,6 +175,14 @@ class BackgroundSubagent:
         self.is_running = True
         self.is_background = True
         self.async_task = task
+
+    def kill_sync(self):
+        if self.async_task and not self.async_task.done():
+            try:
+                self.async_task.cancel()
+            except Exception:
+                pass
+        self.is_running = False
 
     async def kill(self):
         if self.is_running and self.async_task:
