@@ -602,7 +602,15 @@ async def handle_slash_command(app, command_text: str) -> bool:
                 prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
             else:
                 prompt = f"Load and apply the skill '{skill['name']}'."
-            app.trigger_ai_response(prompt, show_in_ui=True)
+
+            try:
+                from widgets.chat_view import ChatView
+                chat_view = app.query_one(ChatView)
+                import asyncio
+                asyncio.create_task(chat_view.add_user_message(command_text))
+                app.trigger_ai_response(prompt, show_in_ui=False)
+            except Exception:
+                app.trigger_ai_response(prompt, show_in_ui=True)
             return True
 
     return False
