@@ -142,7 +142,7 @@ WelcomeWidget {
     width: 100%;
     height: auto;
     margin: 1 1 0 0;
-    padding: 0 1;
+    padding: 0 1 1 1;
     background: #18181b;
     color: #e4e4e7;
     border-left: solid #3f3f46;
