@@ -1,4 +1,5 @@
 
+import asyncio
 from typing import Any
 
 from core.models_catalog import catalog
@@ -125,7 +126,12 @@ class ModelsCommand(BaseCommand):
     description = "Switch model for providers"
 
     async def execute(self, app) -> None:
-        grouped_models = await app.pm.fetch_models_grouped()
+        results = await asyncio.gather(
+            app.pm.fetch_models_grouped(),
+            catalog.refresh(),
+            return_exceptions=True
+        )
+        grouped_models = results[0] if isinstance(results[0], dict) else {}
         if not grouped_models:
             app.notify("Failed to fetch models", severity="warning")
             return
