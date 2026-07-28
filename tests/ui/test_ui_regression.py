@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import tempfile
@@ -104,6 +105,25 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([type(child).__name__ for child in children[-3:]], ["UserMessage", "BotMessage", "ToolCallWidget"])
             self.assertIsInstance(tool, ToolCallWidget)
             self.assertEqual(chat_view.get_user_messages()[-1][1], "first")
+
+    async def test_safe_update_markdown_handles_cancellation(self):
+        from unittest.mock import PropertyMock
+
+        from textual.widgets import Markdown
+
+        from widgets.chat_view import safe_update_markdown
+
+        md = Markdown("")
+
+        async def dummy_cancelled_coro():
+            raise asyncio.CancelledError()
+
+        mock_update = MagicMock(return_value=dummy_cancelled_coro())
+        md.update = mock_update
+
+        with patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True):
+            safe_update_markdown(md, "test content")
+            await asyncio.sleep(0.01)
 
 
 if __name__ == "__main__":
