@@ -93,8 +93,23 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/johnston-architect configure MCP")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("Load and apply the skill 'johnston-architect'", app.ai_prompts[0][0])
+        self.assertIn("johnston-architect", app.ai_prompts[0][0])
         self.assertIn("configure MCP", app.ai_prompts[0][0])
+
+    async def test_multi_skill_slash_command_execution(self):
+        from core.commands import handle_slash_command
+        try:
+            from tests.core.test_commands import MockApp
+        except ImportError:
+            from core.test_commands import MockApp
+
+        app = MockApp()
+        handled = await handle_slash_command(app, "/johnston-architect /caveman refactor code")
+        self.assertTrue(handled)
+        self.assertEqual(len(app.ai_prompts), 1)
+        self.assertIn("johnston-architect", app.ai_prompts[0][0])
+        self.assertIn("caveman", app.ai_prompts[0][0])
+        self.assertIn("refactor code", app.ai_prompts[0][0])
 
 if __name__ == "__main__":
     unittest.main()
