@@ -362,6 +362,8 @@ class ToolCallWidget(Vertical):
         "view_image": "ViewImage",
         "call_mcp_tool": "CallMCPTool",
         "web_fetch": "WebFetch",
+        "update_plan": "Plan",
+        "plan": "Plan",
     }
 
     SYSTEM_TOOLS = {
@@ -511,6 +513,32 @@ class ToolCallWidget(Vertical):
             return line_texts[:len(code_lines)]
         except Exception:
             return [Text(line) for line in code_lines]
+
+    def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
+        t = Text()
+        if explanation:
+            t.append(f"Rationale: {explanation}\n\n", style="italic dim white")
+
+        completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
+        total = len(plan_items)
+        t.append(f"Plan Progress [{completed}/{total}]\n", style="bold green" if completed == total and total > 0 else "bold cyan")
+
+        for item in plan_items:
+            if not isinstance(item, dict):
+                continue
+            step = item.get("step") or item.get("text") or ""
+            status = str(item.get("status") or "pending").lower()
+
+            if status in ("completed", "done"):
+                t.append("  ✔ ", style="bold green")
+                t.append(f"{step}\n", style="strike dim green")
+            elif status == "in_progress":
+                t.append("  ▶ ", style="bold yellow")
+                t.append(f"{step}\n", style="bold white")
+            else:
+                t.append("  ○ ", style="dim gray")
+                t.append(f"{step}\n", style="dim gray")
+        return t
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
         if "[Linter Feedback]:" in diff_text:
@@ -716,6 +744,11 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(formatted_diff)
                 else:
                     self.content_widget.update(escape(self.result_text or "(No diff)"))
+            elif self.tool_type in ("update_plan", "Plan", "plan"):
+                plan_items = self.args.get("plan") or []
+                explanation = self.args.get("explanation", "")
+                formatted_plan = self._format_plan_display(plan_items, explanation)
+                self.content_widget.update(formatted_plan)
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text
                 default_target = self.args.get("url") or file_path or "page.md"
