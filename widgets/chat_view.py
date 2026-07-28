@@ -105,6 +105,13 @@ MarkdownBlock._get_style = _new_markdown_block_get_style
 
 
 
+def _handle_markdown_task_done(task: asyncio.Task) -> None:
+    try:
+        task.exception()
+    except (asyncio.CancelledError, Exception):
+        pass
+
+
 def safe_update_markdown(widget: Markdown, content: str) -> None:
     """Updates Markdown widget safely without creating unawaited coroutines when unattached."""
     if not getattr(widget, "is_attached", True):
@@ -115,7 +122,8 @@ def safe_update_markdown(widget: Markdown, content: str) -> None:
             try:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
-                    loop.create_task(res)
+                    task = loop.create_task(res)
+                    task.add_done_callback(_handle_markdown_task_done)
             except RuntimeError:
                 pass
     except Exception:
@@ -176,7 +184,7 @@ class BotMessage(Vertical):
             self._update_scheduled = True
             try:
                 loop = asyncio.get_running_loop()
-                loop.call_later(0.05, self._flush_update)
+                loop.call_later(0.1, self._flush_update)
             except Exception:
                 safe_update_markdown(self.md_widget, new_content)
 
