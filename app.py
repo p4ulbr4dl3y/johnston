@@ -177,11 +177,17 @@ class JohnstonApp(App):
             if hasattr(self.agent, "get_metrics"):
                 metrics = self.agent.get_metrics()
 
-            from core.mcp_manager import get_mcp_manager
-            from core.skill_manager import SkillManager
+            now = time.time()
+            if not hasattr(self, "_status_cache_time") or (now - getattr(self, "_status_cache_time", 0)) > 3.0:
+                from core.mcp_manager import get_mcp_manager
+                from core.skill_manager import SkillManager
 
-            skills_count = len(SkillManager().list_skills())
-            mcp_servers = get_mcp_manager().load_servers()
+                self._cached_skills_count = len(SkillManager().list_skills())
+                self._cached_mcp_servers = get_mcp_manager().load_servers()
+                self._status_cache_time = now
+
+            skills_count = getattr(self, "_cached_skills_count", 0)
+            mcp_servers = getattr(self, "_cached_mcp_servers", [])
             mcp_total = len(mcp_servers)
             mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
             active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])

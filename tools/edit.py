@@ -1,3 +1,4 @@
+import asyncio
 import difflib
 import os
 from typing import Any, Dict, List, Tuple
@@ -141,24 +142,20 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     if not path or not os.path.exists(path):
         return f"Error: file '{path}' not found."
 
-    try:
+    def _do_edit():
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
-    except Exception as e:
-        return f"Error reading file '{path}': {e}"
+        new_content, diff = apply_chunk_replacements(content, raw_chunks, path)
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        atomic_write_text(path, new_content)
+        return diff
 
     try:
-        new_content, diff_output = apply_chunk_replacements(content, raw_chunks, path)
+        diff_output = await asyncio.to_thread(_do_edit)
     except ValueError as ve:
         return str(ve)
     except Exception as e:
         return f"Error modifying file '{path}': {e}"
-
-    try:
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        atomic_write_text(path, new_content)
-    except Exception as e:
-        return f"Error writing file '{path}': {e}"
 
     linter_output = await run_linter(path)
     return diff_output + linter_output

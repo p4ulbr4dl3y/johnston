@@ -149,13 +149,15 @@ class ReadTool(BaseTool):
                     except (ValueError, TypeError):
                         content_offset = 0
 
-                with open(path, "rb") as f:
-                    if content_offset:
-                        f.seek(content_offset)
-                    raw_bytes = f.read()
+                def _read_file_lines(file_path: str, offset: int | None):
+                    with open(file_path, "rb") as f:
+                        if offset:
+                            f.seek(offset)
+                        raw_bytes = f.read()
+                    text_content = raw_bytes.decode("utf-8", errors="replace")
+                    return text_content.splitlines(keepends=True)
 
-                text_content = raw_bytes.decode("utf-8", errors="replace")
-                lines = text_content.splitlines(keepends=True)
+                lines = await asyncio.to_thread(_read_file_lines, path, content_offset)
             except Exception as e:
                 return f"Error reading file '{path}': {e}"
 

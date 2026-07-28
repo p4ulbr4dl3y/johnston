@@ -29,13 +29,20 @@ class SubagentSessionData:
         self.async_task: Any = None
 
     def add_event(self, event: Dict[str, Any]) -> None:
-        self.events.append(event)
+        etype = event.get("type", "")
+        if etype in ("bot_chunk", "bot_delta", "thinking_delta") and self.events and self.events[-1].get("type") == etype:
+            last_text = self.events[-1].get("text", "")
+            new_text = event.get("text", "")
+            self.events[-1]["text"] = last_text + new_text
+        else:
+            self.events.append(event)
+
         for cb in list(self.listeners):
             try:
                 cb(event)
             except Exception:
                 pass
-        etype = event.get("type", "")
+
         if etype not in ("bot_chunk", "bot_delta", "thinking_delta"):
             SubagentTracker.get_instance().save_session(self)
 
