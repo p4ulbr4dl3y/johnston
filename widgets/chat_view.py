@@ -539,6 +539,7 @@ class ToolCallWidget(Vertical):
         if explanation:
             t.append(f"Rationale: {explanation}\n\n", style="italic dim #a1a1aa")
 
+        plan_lines = []
         for item in plan_items:
             if not isinstance(item, dict):
                 continue
@@ -546,15 +547,14 @@ class ToolCallWidget(Vertical):
             status = str(item.get("status") or "pending").lower()
 
             if status in ("completed", "done"):
-                t.append("[x] ", style="dim #71717a")
-                t.append(f"{step}\n", style="strike dim #71717a")
+                line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
             elif status == "in_progress":
-                t.append("[>] ", style="bold #ffffff")
-                t.append(f"{step}\n", style="bold #ffffff")
+                line = Text("[>] ", style="bold #ffffff") + Text(step, style="bold #ffffff")
             else:
-                t.append("[ ] ", style="dim #a1a1aa")
-                t.append(f"{step}\n", style="dim #a1a1aa")
-        return t
+                line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
+            plan_lines.append(line)
+
+        return t + Text("\n").join(plan_lines)
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
         if "[Linter Feedback]:" in diff_text:
