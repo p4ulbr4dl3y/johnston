@@ -344,6 +344,10 @@ class ToolCallWidget(Vertical):
         "read": "Read",
         "create": "Create",
         "edit": "Edit",
+        "replace_file_content": "Edit",
+        "multi_replace_file_content": "Edit",
+        "replace": "Edit",
+        "multi_replace": "Edit",
         "shell": "Shell",
         "bash": "Bash",
         "glob": "Glob",
@@ -692,11 +696,11 @@ class ToolCallWidget(Vertical):
                         self.content_widget.update(rendered)
                 else:
                     self.content_widget.update(escape(self.result_text or "(No content)"))
-            elif self.tool_type in ("edit", "Edit"):
+            elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
                 diff_text = self.result_text.strip()
                 if not diff_text or "@@" not in diff_text:
-                    old_s = self.args.get("old_string", "")
-                    new_s = self.args.get("new_string", "")
+                    old_s = self.args.get("old_string") or self.args.get("target_content") or ""
+                    new_s = self.args.get("new_string") or self.args.get("replacement_content") or ""
                     if old_s or new_s:
                         diff_lines = list(difflib.unified_diff(
                             old_s.splitlines(),
