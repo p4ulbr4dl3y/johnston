@@ -49,6 +49,26 @@ class CustomMarkdownTableContent(MarkdownTableContent):
                 )
             self.last_row = row_index
 
+    async def _update_rows(self, updated_rows: list[Any]) -> None:
+        self.styles.grid_size_columns = len(self.headers)
+        await self.query_children(f".cell.row{self.last_row}").remove()
+        new_cells: list[Static] = []
+        for row_index, row in enumerate(updated_rows, self.last_row):
+            for cell in row:
+                new_cells.append(
+                    Static(
+                        cell,
+                        classes=f"row{row_index} cell",
+                    )
+                )
+        self.last_row = row_index
+        await self.mount_all(new_cells)
+
+    def on_mount(self) -> None:
+        self.styles.grid_size_columns = len(self.headers)
+        for child in self.query("*"):
+            child.tooltip = None
+
 
 class CustomMarkdownTable(MarkdownTable):
     """Custom Markdown table block using CustomMarkdownTableContent."""

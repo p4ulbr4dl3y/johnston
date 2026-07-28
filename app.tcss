@@ -360,6 +360,11 @@ OptionList > .option-list--option-blur-highlighted {
     color: #09090b;
 }
 
+/* Suppress hover tooltips globally */
+Tooltip {
+    display: none !important;
+}
+
 /* Notifications (Toast) Docked Top Right - Monochrome Slate */
 ToastRack {
     dock: top;
