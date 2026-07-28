@@ -24,16 +24,6 @@ class SubagentDefinition:
         self.subagent_type = subagent_type or name
         self.source = source
 
-    def to_dict(self) -> Dict[str, str]:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "system_prompt": self.system_prompt,
-            "tools": self.tools,
-            "model": self.model,
-            "subagent_type": self.subagent_type,
-            "source": self.source,
-        }
 
 
 DEFAULT_DEFINITIONS: Dict[str, SubagentDefinition] = {

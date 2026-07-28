@@ -4,23 +4,6 @@ from typing import Any, Dict
 
 from tools.context import ToolContext
 
-IGNORE_DIRS = {
-    ".git", "node_modules", ".venv", "venv", "env", "__pycache__",
-    ".johnston", ".gemini", "dist", "build", "out", "target",
-    "coverage", ".next", ".nuxt", ".output", ".cache", ".pytest_cache",
-    ".ruff_cache", ".idea", ".vscode"
-}
-
-IGNORE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
-    ".pdf", ".zip", ".tar", ".gz", ".7z", ".rar",
-    ".db", ".sqlite", ".sqlite3", ".pyc", ".pyo",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".mp3", ".mp4", ".mov", ".avi", ".mkv", ".wav",
-    ".so", ".dylib", ".dll", ".exe", ".bin", ".o", ".a", ".out",
-    ".ds_store"
-}
-
 
 def resolve_workspace_path(path_str: str | None = None, *, root: str | None = None) -> str:
     real_root = os.path.realpath(root or os.getcwd())

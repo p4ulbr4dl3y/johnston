@@ -3,14 +3,12 @@ import unittest
 
 from core.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
-from tools.context import ToolContext
 from tools.subagent import SubagentTool
 
 
 class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        ToolContext._instance = None
         self.old_dir = SUBAGENTS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -19,7 +17,6 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.tracker.sessions.clear()
 
     async def asyncTearDown(self):
-        ToolContext._instance = None
         for sess in list(self.tracker.sessions.values()):
             if sess.async_task and not sess.async_task.done():
                 sess.async_task.cancel()

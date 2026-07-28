@@ -2,16 +2,9 @@ import unittest
 from unittest.mock import MagicMock
 
 from tools.ask_user import AskUserTool
-from tools.context import ToolContext
 
 
 class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
-
-    def setUp(self):
-        ToolContext._instance = None
-
-    def tearDown(self):
-        ToolContext._instance = None
 
     async def test_no_app_returns_error(self):
         tool = AskUserTool()

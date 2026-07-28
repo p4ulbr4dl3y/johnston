@@ -3,11 +3,6 @@ import math
 import os
 import time
 
-try:
-    import tomllib
-except ImportError:
-    tomllib = None  # type: ignore
-
 from textual import events, work
 from textual.app import App, ComposeResult
 from textual.containers import Vertical

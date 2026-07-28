@@ -2,17 +2,10 @@ import unittest
 from unittest.mock import MagicMock
 
 from core.background_task import BackgroundTask
-from tools.context import ToolContext
 from tools.manage_task import ManageTaskTool
 
 
 class TestManageTaskTool(unittest.IsolatedAsyncioTestCase):
-
-    def setUp(self):
-        ToolContext._instance = None
-
-    def tearDown(self):
-        ToolContext._instance = None
 
     def _make_app(self, tasks=None):
         mock_app = MagicMock()
