@@ -355,6 +355,20 @@ class ModelsCatalog:
         if resolved and resolved in self._limits:
             return self._limits[resolved]
 
+        if provider_id:
+            prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+            if os.path.exists(prov_cache):
+                try:
+                    with open(prov_cache, "r", encoding="utf-8") as f:
+                        cdata = json.load(f)
+                        lims = cdata.get("model_limits", {})
+                        if lims:
+                            res_prov = self._resolve_catalog_key(provider_id, model_id, lims.keys())
+                            if res_prov and res_prov in lims:
+                                return lims[res_prov]
+                except Exception:
+                    pass
+
         return DEFAULT_CONTEXT_LIMIT
 
     def get_output_limit(self, provider_id: str, model_id: str) -> int:
