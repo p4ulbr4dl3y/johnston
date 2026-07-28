@@ -483,7 +483,7 @@ class JohnstonApp(App):
 
         pattern = r'@(?:"([^"]+)"|\'([^\']+)\'|([^\s]+))|(?:^|\s)(/(?:\\ |\S)+|~/(?:\\ |\S)+|file://(?:\\ |\S)+)'
         matches = re.findall(pattern, user_text)
-        if not matches:
+        if user_text.startswith("[System Notification]") or not matches:
             return user_text
 
         text_attachments = []
