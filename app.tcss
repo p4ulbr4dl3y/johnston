@@ -19,17 +19,14 @@ Screen {
     background: #09090b;
     padding: 0;
     margin: 0;
-    scrollbar-size: 1 1;
-    scrollbar-color: #a1a1aa #27272a;
-    scrollbar-color-hover: #ffffff #3f3f46;
-    scrollbar-color-active: #ffffff #52525b;
 }
 
-* {
+Screen, *, ScrollBar {
     scrollbar-size: 1 1;
     scrollbar-color: #a1a1aa #27272a;
     scrollbar-color-hover: #ffffff #3f3f46;
     scrollbar-color-active: #ffffff #52525b;
+    scrollbar-corner-color: #27272a;
 }
 
 #app-container {
@@ -45,7 +42,7 @@ Screen {
     background: #09090b;
     scrollbar-size: 1 1;
     scrollbar-color: #a1a1aa #27272a;
-    scrollbar-color-hover: #ffffff #27272a;
+    scrollbar-color-hover: #ffffff #3f3f46;
     scrollbar-color-active: #ffffff #52525b;
 }
 
@@ -293,8 +290,8 @@ OptionList {
     color: #a1a1aa;
     scrollbar-size: 1 1;
     scrollbar-color: #a1a1aa #27272a;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 OptionList > .option-list--option-highlighted,
@@ -325,6 +322,9 @@ OptionList > .option-list--option-blur-highlighted {
     border: none;
     padding: 0;
     scrollbar-size: 1 1;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted,
@@ -472,9 +472,9 @@ ModalScreen {
     border: none;
     background: #27272a;
     scrollbar-size: 1 1;
-    scrollbar-color: #3f3f46 #27272a;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-color: #a1a1aa #27272a;
+    scrollbar-color-hover: #ffffff #3f3f46;
+    scrollbar-color-active: #ffffff #52525b;
 }
 
 #modal-dialog OptionList > .option-list--option-disabled {
