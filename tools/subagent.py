@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from typing import Any, Dict
 
@@ -41,6 +42,7 @@ class SubagentTool(BaseTool):
                     "prompt": {"type": "string", "description": "Task prompt for the subagent"},
                     "description": {"type": "string", "description": "Short (3-5 words) description"},
                     "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
+                    "workspace": {"type": "string", "description": "Workspace mode: 'inherit' (default) or 'branch' (isolated git worktree)"},
                     "background": {"type": "boolean", "description": "Run asynchronously in background"},
                     "task_id": {"type": "string", "description": "Optional explicit task ID; auto-generated when omitted"}
                 },
@@ -54,6 +56,7 @@ class SubagentTool(BaseTool):
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
         subagent_type = args.get("subagent_type", "general").strip().lower()
+        workspace_mode = args.get("workspace", "inherit").strip().lower()
         run_in_background = bool(args.get("background", False))
 
         if not prompt:
@@ -81,6 +84,18 @@ class SubagentTool(BaseTool):
         if not subagent:
             return "Error: No application context available to spawn subagent."
         subagent.app = ctx.app
+
+        wt_path = None
+        wt_branch = None
+        project_dir = getattr(ctx.app, "project_dir", None) or os.getcwd()
+
+        if workspace_mode in ("branch", "share"):
+            from core.subagent_worktree import SubagentWorktreeManager
+            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, task_id)
+            if wt_path:
+                subagent.project_dir = wt_path
+                subagent.cwd = wt_path
+                ctx.notify(f"Subagent worktree active: {wt_path}")
 
         session = tracker.create_session(
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
@@ -141,6 +156,14 @@ class SubagentTool(BaseTool):
             merge_subagent_metrics(subagent, ctx)
             ctx.refresh_status()
 
+        def _cleanup_worktree_and_append_diff(acc):
+            if wt_path and wt_branch:
+                from core.subagent_worktree import SubagentWorktreeManager
+                diff_text = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
+                if diff_text:
+                    acc[0] += f"\n\n[Worktree Changes in {wt_branch}]:\n{diff_text}"
+                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch)
+
         if run_in_background:
             async def _run_bg():
                 acc = [""]
@@ -155,6 +178,7 @@ class SubagentTool(BaseTool):
                     acc[0] = f"[Subagent error: {err}]"
                     session.finish("error", str(err))
                 finally:
+                    _cleanup_worktree_and_append_diff(acc)
                     _merge_metrics()
                     for t in ctx.background_tasks:
                         if getattr(t, "task_id", "") == task_id:
@@ -188,11 +212,13 @@ class SubagentTool(BaseTool):
                 session.finish("completed")
             except Exception as err:
                 session.finish("error", str(err))
+                _cleanup_worktree_and_append_diff(acc)
                 partial = _truncate_subagent_result(acc[0]).strip()
                 if partial:
                     return f"Subagent execution error: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
                 return f"Subagent execution error: {err}"
             finally:
+                _cleanup_worktree_and_append_diff(acc)
                 _merge_metrics()
 
             result_text = _truncate_subagent_result(acc[0]) or "Subagent finished with no text output."
