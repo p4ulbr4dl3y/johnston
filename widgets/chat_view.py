@@ -808,7 +808,19 @@ class ToolCallWidget(Vertical):
             elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
-                    output_text = "(Running command...)"
+                    is_running = False
+                    if self.app and hasattr(self.app, "background_tasks"):
+                        bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
+                        if bg_match:
+                            tid = bg_match.group(1)
+                            for t in self.app.background_tasks:
+                                if getattr(t, "task_id", "") == tid and getattr(t, "is_running", False):
+                                    is_running = True
+                                    break
+                    if is_running:
+                        output_text = "(Running command...)"
+                    else:
+                        output_text = "(No output)"
                 self.content_widget.update(escape(output_text))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 server = self.args.get("server", "")
