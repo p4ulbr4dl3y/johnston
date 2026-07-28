@@ -199,10 +199,7 @@ class SubagentTool(BaseTool):
             ctx.add_background_task(bg_obj)
             ctx.notify(f"Subagent launched in background (ID: {task_id})")
 
-            return (
-                f"Subagent '{description}' launched in background (Task ID: {task_id}). "
-                "You will be notified automatically when it completes. Do NOT poll status with manage_subagent; stop calling tools and wait for completion."
-            )
+            return f"Subagent '{description}' launched in background (Task ID: {task_id})."
         else:
             # Foreground execution
             acc = [""]

@@ -99,7 +99,11 @@ class BackgroundTask:
 
                 if self.process:
                     try:
-                        await self.process.wait()
+                        if self.process.returncode is None:
+                            try:
+                                await asyncio.wait_for(self.process.wait(), timeout=0.1)
+                            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                                pass
                     except Exception:
                         pass
 

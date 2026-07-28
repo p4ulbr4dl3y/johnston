@@ -7,10 +7,7 @@ class BudgetLimits:
     max_steps: int | None = None
     max_tool_calls: int | None = None
     max_wall_seconds: float | None = None
-    max_tool_result_chars: int | None = None
     max_writes: int | None = None
-    max_changed_files: int | None = None
-    max_diff_lines: int | None = None
 
 
 @dataclass(frozen=True)
@@ -34,8 +31,6 @@ class BudgetState:
         self.steps = 0
         self.tool_calls = 0
         self.writes = 0
-        self.changed_files = 0
-        self.diff_lines = 0
 
     def before_step(self) -> BudgetDecision:
         if self.limits.max_steps is not None and self.steps >= self.limits.max_steps:
@@ -68,19 +63,6 @@ class BudgetState:
             self.writes += 1
         return BudgetDecision.allow()
 
-    def record_diff(self, *, changed_files: int = 0, diff_lines: int = 0) -> BudgetDecision:
-        self.changed_files += max(0, changed_files)
-        self.diff_lines += max(0, diff_lines)
-        if self.limits.max_changed_files is not None and self.changed_files > self.limits.max_changed_files:
-            return BudgetDecision.block(
-                f"Changed-files budget exceeded ({self.changed_files}/{self.limits.max_changed_files})."
-            )
-        if self.limits.max_diff_lines is not None and self.diff_lines > self.limits.max_diff_lines:
-            return BudgetDecision.block(
-                f"Diff-lines budget exceeded ({self.diff_lines}/{self.limits.max_diff_lines})."
-            )
-        return BudgetDecision.allow()
-
     def summarize(self) -> dict[str, int | float | None]:
         return {
             "steps": self.steps,
@@ -89,10 +71,6 @@ class BudgetState:
             "max_tool_calls": self.limits.max_tool_calls,
             "writes": self.writes,
             "max_writes": self.limits.max_writes,
-            "changed_files": self.changed_files,
-            "max_changed_files": self.limits.max_changed_files,
-            "diff_lines": self.diff_lines,
-            "max_diff_lines": self.limits.max_diff_lines,
             "elapsed_seconds": round(time.monotonic() - self.started_at, 3),
             "max_wall_seconds": self.limits.max_wall_seconds,
         }

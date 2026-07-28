@@ -126,7 +126,7 @@ class SubagentRegistry:
         key = subagent_type.lower().strip()
         if key in self.definitions:
             return self.definitions[key]
-        return DEFAULT_DEFINITIONS.get("general", SubagentDefinition("general", "General subagent", ""))
+        return DEFAULT_DEFINITIONS["general"]
 
     def list_definitions(self) -> Dict[str, SubagentDefinition]:
         return self.definitions

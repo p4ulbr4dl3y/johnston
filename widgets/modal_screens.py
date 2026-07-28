@@ -3,7 +3,7 @@ from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen, VisionWarningScreen
-from widgets.screens.providers import ApiKeyInputScreen, ConnectProviderScreen
+from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.rewind import RewindScreen
 from widgets.screens.shell_confirm import ShellConfirmScreen
@@ -17,7 +17,7 @@ __all__ = [
     "ConfirmScreen",
     "ShellConfirmScreen",
     "BaseSelectionScreen",
-    "ConnectProviderScreen",
+    "ProvidersScreen",
     "ApiKeyInputScreen",
     "HelpScreen",
     "MCPScreen",
