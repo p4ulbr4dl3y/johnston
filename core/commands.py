@@ -597,20 +597,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
         sm = SkillManager()
         skill = sm.get_skill(skill_name)
         if skill:
-            extra_text = parts[1].strip() if len(parts) > 1 else ""
-            if extra_text:
-                prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
-            else:
-                prompt = f"Load and apply the skill '{skill['name']}'."
-
-            try:
-                from widgets.chat_view import ChatView
-                chat_view = app.query_one(ChatView)
-                import asyncio
-                asyncio.create_task(chat_view.add_user_message(command_text))
-                app.trigger_ai_response(prompt, show_in_ui=False)
-            except Exception:
-                app.trigger_ai_response(prompt, show_in_ui=True)
+            app.trigger_ai_response(command_text, show_in_ui=True)
             return True
 
     return False
