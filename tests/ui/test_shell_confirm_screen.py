@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.screens.shell_confirm import BashConfirmScreen, ShellConfirmScreen
+from widgets.screens.shell_confirm import ShellConfirmScreen
 
 
 class TestShellConfirmScreen(unittest.TestCase):
@@ -8,9 +8,6 @@ class TestShellConfirmScreen(unittest.TestCase):
         screen = ShellConfirmScreen("rm -rf /tmp/test", "Execution of potentially unsafe command: rm")
         self.assertEqual(screen.command, "rm -rf /tmp/test")
         self.assertIn("rm", screen.reason)
-
-    def test_backward_compatibility_alias(self):
-        self.assertIs(BashConfirmScreen, ShellConfirmScreen)
 
 
 if __name__ == "__main__":

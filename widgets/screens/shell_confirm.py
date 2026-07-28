@@ -40,7 +40,3 @@ class ShellConfirmScreen(ModalScreen[bool]):
 
     def action_quit(self) -> None:
         self.app.exit()
-
-
-# Backward compatibility alias
-BashConfirmScreen = ShellConfirmScreen
