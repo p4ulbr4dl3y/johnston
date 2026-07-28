@@ -57,27 +57,31 @@ class CommandSuggestions(OptionList):
         real_cwd = os.path.realpath(cwd)
         home = os.path.realpath(os.path.expanduser("~"))
 
-        # Block home dir and any drive/system root ('/', 'C:\', 'D:\', etc.)
-        if real_cwd == home or os.path.dirname(real_cwd) == real_cwd:
-            return []
+        is_home_or_root = (real_cwd == home or os.path.dirname(real_cwd) == real_cwd)
+        max_files = 300 if is_home_or_root else 1000
 
         ignore_dirs = {
             ".git", ".venv", "venv", "__pycache__", ".johnston",
             "node_modules", ".mypy_cache", ".pytest_cache", ".idea",
-            ".vscode", "build", "dist", ".gemini", ".next", ".cache"
+            ".vscode", "build", "dist", ".gemini", ".next", ".cache",
+            "Library", ".Trash", "Applications", "Pictures", "Movies", "Music"
         }
         try:
             for root, dirs, files in os.walk(cwd):
-                dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
                 rel_dir = os.path.relpath(root, cwd)
+                depth = 0 if rel_dir == "." else rel_dir.count(os.sep) + 1
+                if is_home_or_root and depth >= 2:
+                    dirs.clear()
+                    continue
+                dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
                 for f in files:
                     if f.startswith(".") or f.endswith(".pyc"):
                         continue
                     rel_path = f if rel_dir == "." else os.path.join(rel_dir, f)
                     files_list.append(rel_path.replace("\\", "/"))
-                    if len(files_list) >= 1000:
+                    if len(files_list) >= max_files:
                         break
-                if len(files_list) >= 1000:
+                if len(files_list) >= max_files:
                     break
         except Exception:
             pass
