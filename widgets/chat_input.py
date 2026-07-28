@@ -266,7 +266,7 @@ class ChatInput(TextArea):
             or text_strip.startswith("file://")
             or os.path.exists(expanded)
         )
-        if not is_path and self.try_paste_clipboard_image():
+        if not is_path and not event.text.strip() and self.try_paste_clipboard_image():
             event.prevent_default()
             event.stop()
             return
