@@ -452,12 +452,18 @@ class JohnstonApp(App):
         try:
             processed = await handle_slash_command(self, user_text)
             if not processed:
-                self.notify("Unknown command", severity="warning")
+                if user_text.startswith("/") and len(user_text.split()) == 1:
+                    self.notify("Unknown command", severity="warning")
+                else:
+                    if self.is_generating:
+                        self.message_queue.append((user_text, True))
+                    else:
+                        self.trigger_ai_response(user_text, show_in_ui=True)
         except Exception as e:
             self.notify(f"Error executing command: {e}", severity="error")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
-        """Handle input and slash commands (/help, /new)"""
+        """Handle input and slash commands (/help, /new, /skills)"""
         user_text = event.value.strip()
         if not user_text:
             return
@@ -465,7 +471,7 @@ class JohnstonApp(App):
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        if user_text.startswith("/"):
+        if "/" in user_text:
             asyncio.create_task(self._exec_slash_command(user_text))
             return
 
