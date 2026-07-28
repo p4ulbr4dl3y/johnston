@@ -21,8 +21,17 @@ Screen {
     margin: 0;
 }
 
-Screen, *, ScrollBar {
-    scrollbar-size: 0 0;
+ScrollBar, ScrollBarCorner {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+Screen, *, ScrollBar, ScrollBarCorner {
+    scrollbar-size: 0 0 !important;
+    scrollbar-size-vertical: 0 !important;
+    scrollbar-size-horizontal: 0 !important;
 }
 
 #app-container {
