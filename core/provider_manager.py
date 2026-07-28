@@ -383,14 +383,6 @@ class ProviderManager:
         model_val = self.get_provider_model(provider_key)
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
 
-        if "module" in target_provider and hasattr(target_provider["module"], "Agent"):
-            kwargs = {}
-            if stored_key:
-                kwargs["api_key"] = stored_key
-            if model_val:
-                kwargs["model"] = model_val
-            return target_provider["module"].Agent(**kwargs)
-
         from core.base_provider import BaseAgent
 
         return BaseAgent(
@@ -424,15 +416,12 @@ class ProviderManager:
             return []
 
         pdata = providers[provider_key]
-        mod = pdata.get("module")
-        base_url = getattr(mod, "BASE_URL", None) if mod else pdata.get("base_url")
-        api_key = self.get_api_key(provider_key) or (getattr(mod, "API_KEY", None) if mod else pdata.get("api_key"))
+        base_url = pdata.get("base_url")
+        api_key = self.get_api_key(provider_key) or pdata.get("api_key")
 
         # If provider has explicit static models list, return it directly
         if pdata.get("models"):
             return list(pdata["models"])
-        if mod and hasattr(mod, "MODELS") and isinstance(mod.MODELS, list):
-            return list(mod.MODELS)
 
         CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -494,12 +483,9 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Universal fallback to static model defined in python module
-        if not models:
-            if mod and hasattr(mod, "MODEL") and mod.MODEL:
-                models = [mod.MODEL]
-            elif pdata.get("model"):
-                models = [pdata["model"]]
+        # Universal fallback to static model
+        if not models and pdata.get("model"):
+            models = [pdata["model"]]
 
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:

@@ -4,9 +4,9 @@ from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView, UserMessage
 from widgets.modal_screens import (
-    ConnectProviderScreen,
     HelpScreen,
     ModelScreen,
+    ProvidersScreen,
     ResumeScreen,
     RewindScreen,
     TasksListScreen,
@@ -58,10 +58,10 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.5)
             self.assertFalse(isinstance(app.screen, ResumeScreen))
 
-            # 5. Test /connect and ConnectProviderScreen
+            # 5. Test /connect and ProvidersScreen
             await handle_slash_command(app, "/connect")
             await pilot.pause(0.5)
-            self.assertIsInstance(app.screen, ConnectProviderScreen)
+            self.assertIsInstance(app.screen, ProvidersScreen)
             await pilot.press("escape")
             await pilot.pause(0.2)
 

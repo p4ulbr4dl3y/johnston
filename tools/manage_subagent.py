@@ -9,7 +9,7 @@ class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
     description = (
         "Manage active and historical subagents for current session. "
-        "Actions: 'list' (view subagents), 'status' (inspect subagent logs/status), "
+        "Actions: 'list' (view subagents), 'status' (inspect subagent logs/status; do not poll running subagents in a loop), "
         "'kill' (terminate a running subagent), or 'send_message' (send a follow-up prompt to ANY subagent, "
         "including COMPLETED ones. Completed subagents WILL resume, process the message, and respond)."
     )
@@ -107,6 +107,8 @@ class ManageSubagentTool(BaseTool):
                 elif etype == "status_change":
                     lines.append(f"  [Status]: {evt.get('status')}")
 
+            if session.status == "running":
+                lines.append("\nNote: Subagent is still running. STOP calling manage_subagent(status) in a loop and end your turn now.")
             return "\n".join(lines)
 
         elif action == "kill":
@@ -171,7 +173,7 @@ class ManageSubagentTool(BaseTool):
                 bg_task = asyncio.create_task(_run_msg_bg())
                 session.async_task = bg_task
                 ctx.notify(f"Message sent to background subagent {session.task_id}")
-                return f"Message sent to background subagent {session.task_id}. You will be notified on completion. Do NOT poll status with manage_subagent; stop calling tools and wait for completion."
+                return f"Message sent to background subagent {session.task_id}."
             else:
                 acc = [""]
                 try:

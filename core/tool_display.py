@@ -7,7 +7,7 @@ def _truncate(target: str, max_len: int = 60) -> str:
     """Collapse whitespace and clip a display label to a UI-friendly length."""
     if not isinstance(target, str):
         return str(target) if target else ""
-    target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
+    target = re.sub(r"\s+", " ", target).strip()
     if len(target) > max_len:
         return target[:25] + "..." + target[-32:]
     return target

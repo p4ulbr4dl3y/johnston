@@ -267,12 +267,6 @@ class JohnstonApp(App):
                 pass
 
         self.call_after_refresh(_scroll_to_bottom)
-        try:
-            loop = asyncio.get_running_loop()
-            loop.call_later(0.1, _scroll_to_bottom)
-            loop.call_later(0.3, _scroll_to_bottom)
-        except Exception:
-            pass
 
         # Restore agent context
         if hasattr(self.agent, "history"):
@@ -635,10 +629,6 @@ class JohnstonApp(App):
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception:
             pass
-
-    def on_background_bash_completed(self, task_id: str, command_str: str, result: str) -> None:
-        self.on_background_shell_completed(task_id, command_str, result)
-
 
 if __name__ == "__main__":
     main()

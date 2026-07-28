@@ -5,7 +5,7 @@ from tools.base import BaseTool
 
 class ManageTaskTool(BaseTool):
     name = "manage_task"
-    description = "Manage background CLI commands spawned via shell. Actions: 'list' (list running commands), 'status' (get command status and output log), 'kill' (terminate command), 'send_input' (send stdin input to running command)."
+    description = "Manage background CLI commands spawned via shell. Actions: 'list' (list running commands), 'status' (get output log for task; do not poll running tasks in a loop), 'kill' (terminate task), 'send_input' (send stdin input to running task)."
     schema = {
         "type": "function",
         "function": {
@@ -45,13 +45,14 @@ class ManageTaskTool(BaseTool):
                 return "Error: task_id parameter required for 'status' action."
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
-                return f"No task found with ID: {task_id}"
+                return f"No task found with ID: {task_id}. Do NOT poll in a loop. Use manage_task(action='list') to see active tasks, or end your turn."
             t = matching[0]
-            status = "RUNNING" if t.is_running else "FINISHED"
             out = "".join(t.output)
             if len(out) > 4000:
                 out = out[-4000:] + "\n... [truncated]"
-            return f"Task ID: {t.task_id}\nStatus: {status}\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
+            if t.is_running:
+                return f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\nNote: Task is still running. STOP calling manage_task(status) in a loop and end your turn now."
+            return f"Task ID: {t.task_id}\nStatus: FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 
         elif action in ("send_input", "input"):
             if not task_id:

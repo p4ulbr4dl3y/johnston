@@ -86,9 +86,6 @@ class ProvidersScreen(BaseSelectionScreen[str]):
         super()._on_key(event)
 
 
-ConnectProviderScreen = ProvidersScreen
-
-
 class ApiKeyInputScreen(ModalScreen[str | None]):
     """Modal API key input screen"""
     ALLOW_SELECT = False

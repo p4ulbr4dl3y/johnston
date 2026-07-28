@@ -369,37 +369,6 @@ class BaseAgent:
             return f"Error: Tool '{clean_name}' is disabled in {mode_def.name} mode."
         return None
 
-    async def _request_policy_approval(self, tool_name: str, args: Dict[str, Any], reason: str) -> bool:
-        app = getattr(self, "app", None)
-        if app is None:
-            return False
-        try:
-            import asyncio
-
-            future: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
-            canonical_name = self._canonical_tool_name(tool_name)
-            if canonical_name == "shell":
-                from widgets.modal_screens import ShellConfirmScreen
-
-                screen = ShellConfirmScreen(command=str(args.get("command", "")), reason=reason)
-            else:
-                from widgets.modal_screens import ConfirmScreen
-
-                target = args.get("tool") or canonical_name
-                screen = ConfirmScreen(
-                    f"Policy approval required for `{target}`.\n\nReason: {reason}"
-                )
-
-            def on_dismiss(result: Any) -> None:
-                if not future.done():
-                    future.set_result(bool(result) and result != "cancel")
-
-            app.push_screen(screen, callback=on_dismiss)
-            return bool(await future)
-        except Exception:
-            return False
-
-
     async def _compact_messages_if_needed(
         self,
         messages: List[Dict[str, Any]],
@@ -508,10 +477,7 @@ class BaseAgent:
                     max_steps=_resolve_limit(getattr(self, "max_steps", None), configured_budget.max_steps),
                     max_tool_calls=_resolve_limit(getattr(self, "max_tool_calls", None), configured_budget.max_tool_calls),
                     max_wall_seconds=_resolve_limit(getattr(self, "max_wall_seconds", None), configured_budget.max_wall_seconds),
-                    max_tool_result_chars=_resolve_limit(getattr(self, "max_tool_result_chars", None), configured_budget.max_tool_result_chars),
                     max_writes=_resolve_limit(getattr(self, "max_writes", None), configured_budget.max_writes),
-                    max_changed_files=_resolve_limit(getattr(self, "max_changed_files", None), configured_budget.max_changed_files),
-                    max_diff_lines=_resolve_limit(getattr(self, "max_diff_lines", None), configured_budget.max_diff_lines),
                 )
             )
             active_prompt_mode = agent_mode

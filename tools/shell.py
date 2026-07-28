@@ -16,7 +16,7 @@ from core.platform_utils import (
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
-_TASK_ID_COUNTER = itertools.count()
+_TASK_ID_COUNTER = itertools.count(1)
 
 
 def _new_task_id() -> str:
@@ -25,7 +25,7 @@ def _new_task_id() -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command. Commands running longer than 10 seconds are automatically moved to the background; use manage_task to inspect, send input, or kill them. Destructive commands require user confirmation."
+    description = "Run a terminal command. Commands running longer than 10 seconds are automatically moved to the background. Destructive commands require user confirmation."
 
     schema = {
         "type": "function",
@@ -175,11 +175,7 @@ class ShellTool(BaseTool):
             reader=reader,
             transport=transport,
         )
-        callback = None
-        if ctx.app:
-            callback = getattr(ctx.app, "on_background_shell_completed", None) or getattr(
-                ctx.app, "on_background_bash_completed", None
-            )
+        callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
         task.start_reading(ctx.app, callback)
 
         no_bg = args.get("no_background", False)
@@ -214,7 +210,7 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-            return f"[Background Task ID: {task_id}] Command is running in the background. You will be notified automatically when it finishes. Do NOT poll status with manage_task; stop calling tools and wait for completion."
+            return f"[Background Task ID: {task_id}] Command is running in background. STOP calling tools now. Inform the user that the command is running in the background and end your turn."
 
     async def _create_windows_process(self, command: str, env: dict[str, str]):
         shell = shell_executable()

@@ -273,13 +273,16 @@ class ModelsCatalog:
         return self._limits
 
     def _get_all_catalog_keys(self) -> Set[str]:
-        keys = set()
-        for d in (self._limits, self._output_limits, self._names, self._descriptions, self._pricing):
-            keys.update(d.keys())
-        keys.update(self._vision)
-        keys.update(self._reasoning)
-        keys.update(self._open_weights)
-        return keys
+        return set().union(
+            self._limits,
+            self._output_limits,
+            self._names,
+            self._descriptions,
+            self._pricing,
+            self._vision,
+            self._reasoning,
+            self._open_weights,
+        )
 
     def _resolve_catalog_key(self, provider_id: str, model_id: str, search_space: Iterable[str] = None) -> str:
         if not model_id:
