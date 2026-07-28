@@ -13,7 +13,7 @@ class TestTruncateOutput(unittest.TestCase):
         log_path = LAST_TOOL_LOG_FILE
         self.assertTrue(os.path.exists(log_path))
         self.assertIn("Full output saved to", res)
-        self.assertIn("Use read tool to inspect", res)
+        self.assertIn("Use read tool or shell (grep/head/tail) to inspect", res)
 
         with open(log_path, "r", encoding="utf-8") as f:
             content = f.read()
