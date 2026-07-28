@@ -474,6 +474,40 @@ class JohnstonApp(App):
         else:
             self.trigger_ai_response(user_text, show_in_ui=True)
 
+    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False) -> None:
+        """Safely trigger AI response generation, or queue prompt if currently generating."""
+        if getattr(self, "is_generating", False):
+            self.message_queue.append((prompt, show_in_ui))
+        else:
+            self.is_generating = True
+            self.generate_ai_response(prompt, show_in_ui=show_in_ui)
+
+    @work(exclusive=True, thread=False)
+    async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
+        """Stream AI response generation with cancellation support via Esc"""
+        if not getattr(self.agent, "model", ""):
+            self.notify("No model selected. Please select a model from /models.", severity="warning")
+            from core.commands import ModelsCommand
+            await ModelsCommand().execute(self)
+            self.is_generating = False
+            return
+
+        self.is_generating = True
+        chat_view = self.query_one(ChatView)
+
+        if show_in_ui:
+            await chat_view.add_user_message(user_text)
+            self.save_current_session()
+            curr_sid = getattr(self, "current_session_id", None)
+            if curr_sid:
+                user_msgs = chat_view.get_user_messages()
+                msg_idx = len(user_msgs) - 1
+                try:
+                    proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
+                    from core.git_checkpoint import GitCheckpointManager
+                    GitCheckpointManager.create_checkpoint(curr_sid, msg_idx, project_path=proj_path)
+                except Exception as e:
+                    print(f"Git checkpoint creation failed: {e}")
 
         full_prompt = user_text
 
