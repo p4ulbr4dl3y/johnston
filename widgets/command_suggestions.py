@@ -96,37 +96,39 @@ class CommandSuggestions(OptionList):
         self.current_matched = []
         self.at_start_idx = -1
 
-        if not full_text:
-            self.display = False
-            return []
+        check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
 
-        # 1. Check for slash command at start of input
-        cleaned = full_text.lstrip().lower()
-        if cleaned.startswith("/") and " " not in cleaned:
-            self.mode = "command"
-            matched_cmds = []
-            all_cmds = get_all_command_suggestions()
-            max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
-            padding = max(16, max_cmd_len + 2)
-            for cmd, desc in all_cmds:
-                if cmd.startswith(cleaned):
-                    matched_cmds.append(cmd)
-                    clean_desc = " ".join(desc.split())
-                    if len(clean_desc) > 60:
-                        clean_desc = clean_desc[:57] + "..."
-                    formatted_line = f"{cmd:<{padding}} {clean_desc}"
-                    self.add_option(formatted_line)
+        # 1. Check for slash command at any position (/command or /skill)
+        slash_idx = check_text.rfind("/")
+        if slash_idx != -1:
+            if slash_idx == 0 or check_text[slash_idx - 1] in " \t\n":
+                query_part = check_text[slash_idx:]
+                if " " not in query_part and "\n" not in query_part:
+                    self.mode = "command"
+                    self.at_start_idx = slash_idx
+                    query_lower = query_part.lower()
+                    matched_cmds = []
+                    all_cmds = get_all_command_suggestions()
+                    max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
+                    padding = max(16, max_cmd_len + 2)
+                    for cmd, desc in all_cmds:
+                        if cmd.lower().startswith(query_lower):
+                            matched_cmds.append(cmd)
+                            clean_desc = " ".join(desc.split())
+                            if len(clean_desc) > 60:
+                                clean_desc = clean_desc[:57] + "..."
+                            formatted_line = f"{cmd:<{padding}} {clean_desc}"
+                            self.add_option(formatted_line)
 
-            self.current_matched = matched_cmds
-            if matched_cmds:
-                self.display = True
-                self.highlighted = 0
-            else:
-                self.display = False
-            return matched_cmds
+                    self.current_matched = matched_cmds
+                    if matched_cmds:
+                        self.display = True
+                        self.highlighted = 0
+                    else:
+                        self.display = False
+                    return matched_cmds
 
         # 2. Check for @file input
-        check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
         at_idx = check_text.rfind("@")
         if at_idx != -1:
             if at_idx == 0 or check_text[at_idx - 1] in " \t\n":
@@ -167,9 +169,7 @@ class CommandSuggestions(OptionList):
                 chat_input = self.app.query_one("#message-input", ChatInput)
                 if self.mode == "command":
                     chosen_cmd = self.current_matched[self.highlighted]
-                    chat_input.load_text(chosen_cmd + " ")
-                    lines = chat_input.text.split("\n")
-                    chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+                    chat_input.apply_suggestion(chosen_cmd, self.at_start_idx)
                 elif self.mode == "file":
                     chosen_file = self.current_matched[self.highlighted]
                     chat_input.apply_file_suggestion(chosen_file, self.at_start_idx)

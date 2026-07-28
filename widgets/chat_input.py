@@ -66,18 +66,23 @@ class ChatInput(TextArea):
 
     def apply_file_suggestion(self, chosen_file: str, at_start_idx: int) -> None:
         """Inserts chosen file path after @ symbol"""
+        prefix = "@" if not chosen_file.startswith("@") else ""
+        self.apply_suggestion(f"{prefix}{chosen_file}", at_start_idx)
+
+    def apply_suggestion(self, inserted_text: str, start_idx: int) -> None:
+        """Inserts chosen suggestion at start_idx with a trailing space"""
         row, col = self.cursor_location
         line_str = self.document.get_line(row)
-        before = line_str[:at_start_idx]
+        before = line_str[:start_idx]
         after = line_str[col:]
-        inserted = f"@{chosen_file} "
+        inserted = inserted_text if inserted_text.endswith(" ") else f"{inserted_text} "
         new_line = before + inserted + after
 
         lines = self.text.split("\n")
         lines[row] = new_line
         self.load_text("\n".join(lines))
 
-        new_col = at_start_idx + len(inserted)
+        new_col = start_idx + len(inserted)
         self.move_cursor((row, new_col))
 
     def _on_input_change(self) -> None:

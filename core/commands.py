@@ -591,26 +591,45 @@ async def handle_slash_command(app, command_text: str) -> bool:
         await cmd_instance.execute(app)
         return True
 
-    # Skill slash command execution (e.g. /caveman [optional text])
-    if normalized_name.startswith("/"):
-        skill_name = normalized_name[1:]
-        sm = SkillManager()
-        skill = sm.get_skill(skill_name)
-        if skill:
-            extra_text = parts[1].strip() if len(parts) > 1 else ""
-            if extra_text:
-                prompt = f"Load and apply the skill '{skill['name']}'.\n\nUser request: {extra_text}"
-            else:
-                prompt = f"Load and apply the skill '{skill['name']}'."
+    # Multi-skill & single-skill slash command execution (e.g. /johnston-architect /caveman request)
+    words = command_text.strip().split()
+    sm = SkillManager()
+    loaded_skills = []
+    other_words = []
 
-            try:
-                from widgets.chat_view import ChatView
-                chat_view = app.query_one(ChatView)
-                import asyncio
-                asyncio.create_task(chat_view.add_user_message(command_text))
-                app.trigger_ai_response(prompt, show_in_ui=False)
-            except Exception:
-                app.trigger_ai_response(prompt, show_in_ui=True)
-            return True
+    for w in words:
+        if w.startswith("/"):
+            raw_sname = w[1:].lower()
+            norm_sname = "".join(homoglyphs.get(c, c) for c in raw_sname)
+            skill = sm.get_skill(norm_sname)
+            if skill:
+                if skill not in loaded_skills:
+                    loaded_skills.append(skill)
+            else:
+                other_words.append(w)
+        else:
+            other_words.append(w)
+
+    if loaded_skills:
+        if len(loaded_skills) == 1:
+            skill_str = f"the skill '{loaded_skills[0]['name']}'"
+        else:
+            s_names = ", ".join(f"'{s['name']}'" for s in loaded_skills)
+            skill_str = f"the skills: {s_names}"
+        user_request = " ".join(other_words).strip()
+        if user_request:
+            prompt = f"Load and apply {skill_str}.\n\nUser request: {user_request}"
+        else:
+            prompt = f"Load and apply {skill_str}."
+
+        try:
+            from widgets.chat_view import ChatView
+            chat_view = app.query_one(ChatView)
+            import asyncio
+            asyncio.create_task(chat_view.add_user_message(command_text))
+            app.trigger_ai_response(prompt, show_in_ui=False)
+        except Exception:
+            app.trigger_ai_response(prompt, show_in_ui=True)
+        return True
 
     return False
