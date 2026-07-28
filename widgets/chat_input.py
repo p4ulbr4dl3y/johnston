@@ -107,6 +107,9 @@ class ChatInput(TextArea):
                 continue
 
             if stripped.startswith("@"):
+                if not stripped.endswith(" "):
+                    stripped = stripped + " "
+                    modified = True
                 new_lines.append(stripped)
             else:
                 clean = stripped.strip("'\"").replace("\\ ", " ")
@@ -119,14 +122,14 @@ class ChatInput(TextArea):
                     or stripped.startswith("file://")
                 )
                 if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
-                    line = f"@{stripped}"
+                    line = f"@{stripped} "
                     modified = True
                 new_lines.append(line)
 
         return "\n".join(new_lines) if modified else pasted_text
 
     def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG image and inserts as [Image #N]"""
+        """Checks clipboard for PNG image and inserts as @filepath """
         import os
         import subprocess
         import time
@@ -151,7 +154,7 @@ class ChatInput(TextArea):
                     with open(filepath, "wb") as f:
                         f.write(img_bytes)
 
-                    self.insert(f"@{filepath}")
+                    self.insert(f"@{filepath} ")
                     self._on_input_change()
                     return True
         except Exception:
