@@ -59,7 +59,11 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         self.current_provider = current_provider
         self.active_tab = initial_tab
 
-        options, items, default_val = self._build_data(initial_tab)
+        self._tabs_cache: Dict[str, Tuple[Any, Any, Any]] = {
+            "all": self._build_data("all"),
+            "vision": self._build_data("vision"),
+        }
+        options, items, default_val = self._tabs_cache[initial_tab]
 
         super().__init__(
             title=self._get_header_title_text(initial_tab),
@@ -188,7 +192,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         except Exception:
             pass
 
-        options, items, default_val = self._build_data(new_tab)
+        options, items, default_val = self._tabs_cache.get(new_tab) or self._build_data(new_tab)
         self.raw_options = options
         self.raw_items = items
         self.default_value = default_val

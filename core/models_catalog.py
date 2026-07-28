@@ -289,7 +289,8 @@ class ModelsCatalog:
         if not space_keys:
             return ""
 
-        cache_key = f"{provider_id}:{model_id}:{hash(frozenset(space_keys))}"
+        space_tag = id(search_space) if search_space is not None else id(self._limits)
+        cache_key = (provider_id, model_id, space_tag, len(space_keys))
         if cache_key in self._match_cache:
             return self._match_cache[cache_key]
 
