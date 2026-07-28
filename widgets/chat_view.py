@@ -539,17 +539,6 @@ class ToolCallWidget(Vertical):
         if explanation:
             t.append(f"Rationale: {explanation}\n\n", style="italic dim #a1a1aa")
 
-        completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
-        total = len(plan_items)
-
-        if total > 0:
-            filled = int((completed / total) * 10)
-            bar = "█" * filled + "░" * (10 - filled)
-            pct = int((completed / total) * 100)
-            t.append("Progress ", style="dim #a1a1aa")
-            t.append(f"[{bar}] ", style="bold #ffffff")
-            t.append(f"{pct}% ({completed}/{total})\n\n", style="dim #a1a1aa")
-
         for item in plan_items:
             if not isinstance(item, dict):
                 continue
@@ -557,14 +546,14 @@ class ToolCallWidget(Vertical):
             status = str(item.get("status") or "pending").lower()
 
             if status in ("completed", "done"):
-                t.append("  ✓ ", style="bold #a1a1aa")
+                t.append("[x] ", style="dim #71717a")
                 t.append(f"{step}\n", style="strike dim #71717a")
             elif status == "in_progress":
-                t.append("  ▶ ", style="bold #ffffff")
+                t.append("[>] ", style="bold #ffffff")
                 t.append(f"{step}\n", style="bold #ffffff")
             else:
-                t.append("  ○ ", style="dim #52525b")
-                t.append(f"{step}\n", style="dim #52525b")
+                t.append("[ ] ", style="dim #a1a1aa")
+                t.append(f"{step}\n", style="dim #a1a1aa")
         return t
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
