@@ -90,8 +90,10 @@ class SubagentViewScreen(ModalScreen[None]):
         while True:
             try:
                 evt = await self.event_queue.get()
-                await self._render_event(evt)
-                self.event_queue.task_done()
+                try:
+                    await self._render_event(evt)
+                finally:
+                    self.event_queue.task_done()
             except asyncio.CancelledError:
                 break
             except Exception:

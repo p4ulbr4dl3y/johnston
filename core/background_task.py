@@ -57,8 +57,14 @@ class BackgroundTask:
 
     def get_formatted_output(self) -> str:
         """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
-        raw = "".join(self.output)
-        return process_carriage_returns(strip_ansi(raw))
+        if not hasattr(self, "_cached_len"):
+            self._cached_len = -1
+            self._cached_formatted = ""
+        if len(self.output) != self._cached_len:
+            raw = "".join(self.output)
+            self._cached_formatted = process_carriage_returns(strip_ansi(raw))
+            self._cached_len = len(self.output)
+        return self._cached_formatted
 
     def start_reading(self, app, on_completed_cb):
         async def _read():
