@@ -142,7 +142,9 @@ class JohnstonApp(App):
         self.is_app_active = False
         for task in getattr(self, "background_tasks", []):
             try:
-                if hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
+                if hasattr(task, "kill_sync"):
+                    task.kill_sync()
+                elif hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
                     asyncio.create_task(task.kill())
                 elif hasattr(task, "process") and task.process:
                     try:
