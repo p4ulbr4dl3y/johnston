@@ -10,7 +10,6 @@ from textual.widgets import OptionList
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
-from widgets.screens.policy import PolicyScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.subagents import SubagentsScreen
 from widgets.screens.tasks import TasksListScreen
@@ -43,33 +42,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
-
-    async def test_policy_screen_pilot_toggle_and_tabs(self):
-        with patch("core.policy_config.POLICY_CONFIG_PATH", os.path.join(self.test_dir, "policy.json")):
-            screen = PolicyScreen(initial_tab="rules")
-            app = DummyHostApp(screen)
-
-
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                # Test pressing 'a' (allow), 's' (ask), 'b' (block)
-                await pilot.press("a")
-                await pilot.press("s")
-                await pilot.press("b")
-                await pilot.pause()
-
-                # Switch tab to budgets
-                await pilot.press("tab")
-                await pilot.pause()
-                self.assertEqual(screen.active_tab, "budgets")
-
-                # Cycle budget limit
-                await pilot.press("enter")
-                await pilot.pause()
-
-                # Close screen
-                await pilot.press("escape")
-                await pilot.pause()
 
     async def test_mcp_screen_pilot(self):
         with patch("widgets.screens.mcp.MCPManager") as mock_mgr_cls:

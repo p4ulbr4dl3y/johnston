@@ -9,7 +9,6 @@ from openai import AsyncOpenAI
 
 from core.budgets import BudgetLimits, BudgetState
 from core.models_catalog import catalog, get_context_window
-from core.policy_config import get_policy_config
 from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
@@ -362,15 +361,13 @@ class BaseAgent:
         return ALIAS_MAP.get(clean_name.lower(), clean_name)
 
     def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
-        from core.policy import policy_engine
-
-        decision = policy_engine.tool_call_decision(tool_name, args, mode_def)
-        if decision.allowed:
+        if not mode_def:
             return None
-        canonical_name = self._canonical_tool_name(tool_name)
-        if getattr(decision, "action", "block") == "ask":
-            return f"Error: Tool '{canonical_name}' requires approval by policy: {decision.reason}"
-        return f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
+        disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
+        clean_name = self._canonical_tool_name(tool_name).lower()
+        if tool_name.lower() in disallowed or clean_name in disallowed:
+            return f"Error: Tool '{clean_name}' is disabled in {mode_def.name} mode."
+        return None
 
     async def _request_policy_approval(self, tool_name: str, args: Dict[str, Any], reason: str) -> bool:
         app = getattr(self, "app", None)
@@ -505,7 +502,7 @@ class BaseAgent:
                     return agent_val
                 return min(agent_val, conf_val)
 
-            configured_budget = get_policy_config().budgets
+            configured_budget = BudgetLimits()
             budget = BudgetState(
                 BudgetLimits(
                     max_steps=_resolve_limit(getattr(self, "max_steps", None), configured_budget.max_steps),
@@ -798,56 +795,41 @@ class BaseAgent:
                     current_mode = getattr(self, "mode", "action").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
                     from core.audit import append_tool_decision, append_tool_result
-                    from core.policy import PolicyDecision, policy_engine
 
-                    policy_approved = False
-                    decision = policy_engine.tool_call_decision(t_name, args, mode_def)
-                    if getattr(decision, "action", "block") == "ask":
-                        approved = await self._request_policy_approval(t_name, args, decision.reason)
-                        if approved:
-                            policy_approved = True
-                            if self._canonical_tool_name(t_name) == "shell":
-                                args = {**args, "skip_confirm": True}
-                            decision = policy_engine.tool_call_decision(
-                                t_name, args, mode_def, approved=True
-                            )
-                    tool_budget_decision = budget.before_tool_call(decision.capabilities)
+                    policy_err = self._tool_policy_error(t_name, args, mode_def)
+                    tool_budget_decision = budget.before_tool_call()
                     if not tool_budget_decision.allowed:
-                        decision = PolicyDecision.block(tool_budget_decision.reason, decision.capabilities)
+                        decision_str = "block"
+                        reason_str = tool_budget_decision.reason
+                        tool_result = f"Error: Tool '{t_name}' blocked by budget: {tool_budget_decision.reason}"
+                    elif policy_err:
+                        decision_str = "block"
+                        reason_str = policy_err
+                        tool_result = policy_err
+                    else:
+                        decision_str = "allow"
+                        reason_str = "Allowed"
+                        tool_result = None
+
                     append_tool_decision(
                         mode=current_mode,
                         tool=t_name,
-                        decision=getattr(decision, "action", "allow" if decision.allowed else "block"),
-                        reason=decision.reason,
-                        capabilities=decision.capabilities,
+                        decision=decision_str,
+                        reason=reason_str,
+                        capabilities=[],
                         metadata={
                             "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
                             "step": budget.steps,
                             "tool_call": budget.tool_calls,
                         },
                     )
-                    if not decision.allowed:
-                        canonical_name = self._canonical_tool_name(t_name)
-                        if getattr(decision, "action", "block") == "ask":
-                            tool_result = f"Error: Tool '{canonical_name}' rejected by user approval policy: {decision.reason}"
-                        else:
-                            tool_result = f"Error: Tool '{canonical_name}' blocked by policy: {decision.reason}"
-                    else:
+
+                    if tool_result is None:
                         tool_app = getattr(self, "app", None)
-                        previous_policy_approved = getattr(
-                            tool_app, "_johnston_policy_approved", False
-                        ) if tool_app else False
-                        if tool_app:
-                            setattr(tool_app, "_johnston_policy_approved", policy_approved)
                         try:
                             tool_result = await execute_tool(t_name, args, app=tool_app)
-                        finally:
-                            if tool_app:
-                                setattr(
-                                    tool_app,
-                                    "_johnston_policy_approved",
-                                    previous_policy_approved,
-                                )
+                        except Exception as e:
+                            tool_result = f"Error executing tool '{t_name}': {e}"
                             append_tool_result(
                                 mode=current_mode,
                                 tool=t_name,
