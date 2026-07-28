@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.5.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.4.0...johnston-v0.5.0) (2026-07-28)
+
+
+### Features
+
+* **core:** add Git Worktree workspace isolation for subagents ([83da834](https://github.com/p4ulbr4dl3y/johnston/commit/83da834116fdd2dfa83a885fa45058a3569c76d0))
+* **shell:** add cross-platform ShellGuard and ShellConfirmScreen for destructive commands ([2ac51a7](https://github.com/p4ulbr4dl3y/johnston/commit/2ac51a7249ef0bc1d1c3b5450f005bfcf4a9ca5b))
+* **tools:** add 800-line pagination windowing and doc caching to ReadTool ([c7ffd23](https://github.com/p4ulbr4dl3y/johnston/commit/c7ffd23fd639132d5f28430313f10dc22456f095))
+* **tools:** add in-memory caching to web_fetch tool ([c8dbdbe](https://github.com/p4ulbr4dl3y/johnston/commit/c8dbdbe6ab2a9883b5641dede7828d730888c566))
+* **tools:** add ReplaceFileContentTool and MultiReplaceFileContentTool with range matching ([d42cb8a](https://github.com/p4ulbr4dl3y/johnston/commit/d42cb8acdc97286fbea2066328cbb91352b3a890))
+* **tools:** add update_plan tool and live plan widget based on OpenAI Codex spec ([eea4d33](https://github.com/p4ulbr4dl3y/johnston/commit/eea4d3328dd973ba1d317f3d19ced6839433b059))
+
+
+### Bug Fixes
+
+* **ask_user:** prevent down arrow in write-in input from advancing wizard step ([1f7b8fd](https://github.com/p4ulbr4dl3y/johnston/commit/1f7b8fdd1acaf8e3d8fee37b8f7eabf1df72387f))
+* **catalog:** add background refresh on app mount and provider cache fallback ([f5c3e33](https://github.com/p4ulbr4dl3y/johnston/commit/f5c3e330fc88797f25d1a7d19c2d066db6e8ad06))
+* **commands:** await both model list and catalog metadata before pushing ModelScreen ([22aab07](https://github.com/p4ulbr4dl3y/johnston/commit/22aab073c85471cf49561842c86d7a7c26a00aa2))
+* **core:** update system prompt and mode rules for chunk editing, update_plan, and worktree isolation ([31d0a4f](https://github.com/p4ulbr4dl3y/johnston/commit/31d0a4f058455fae44d5cd1b97316f5d0597a1ff))
+* **explore:** prohibit ask_user tool calls for mode switching in Explore mode prompt ([470e907](https://github.com/p4ulbr4dl3y/johnston/commit/470e907771fd438b1dbaf48be5f0c5d505912b31))
+* **prompt:** remove edit tool names from base system prompt ([25813a9](https://github.com/p4ulbr4dl3y/johnston/commit/25813a93e5dbec399447e819e98864e2da9f8caa))
+* **tools:** address edge cases, resource leaks, and argument validation ([ea3bd94](https://github.com/p4ulbr4dl3y/johnston/commit/ea3bd94340cabd8990240629157542368197560e))
+* **tools:** update truncate_output hint to suggest shell grep/head/tail filtering ([ac11772](https://github.com/p4ulbr4dl3y/johnston/commit/ac117723e2d54205fa3e178325124071b402da58))
+* **ui:** do not display line numbers for tool error messages ([f591c74](https://github.com/p4ulbr4dl3y/johnston/commit/f591c74289f65f80a7c70b5b17bc17a42381d5d1))
+* **ui:** ensure text paste events do not query OS clipboard image when text is provided ([66d0ee7](https://github.com/p4ulbr4dl3y/johnston/commit/66d0ee7c06e90f32c9fcfccc1c906f5cca80ae3b))
+* **ui:** format update_plan header with step progress and make plan widget expandable ([574706d](https://github.com/p4ulbr4dl3y/johnston/commit/574706d7541083097fdd0862cd997244bb90cc65))
+* **ui:** handle CancelledError in markdown updates and throttle streaming ([a09f862](https://github.com/p4ulbr4dl3y/johnston/commit/a09f862d615f9689a9491cb44add0c62a8e82c1d))
+* **ui:** strip hint lines from tool expansion view while preserving them for model context ([a64eaac](https://github.com/p4ulbr4dl3y/johnston/commit/a64eaac782a24ede495761dfa1376c3b8d0eee88))
+
+
+### Performance Improvements
+
+* **core,ui,tools:** fix event loop disk I/O, regex caching, queue exception safety, and file thread offloading ([a450cfe](https://github.com/p4ulbr4dl3y/johnston/commit/a450cfe3c7410ca8318b4876962181abcf678778))
+* **ui:** prebuild tab options and optimize catalog key lookup for instant tab switching ([b989e95](https://github.com/p4ulbr4dl3y/johnston/commit/b989e95a8ce8476e9088e8e0d64301bf890c3e2b))
+
 ## [0.4.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.3.0...johnston-v0.4.0) (2026-07-27)
 
 
