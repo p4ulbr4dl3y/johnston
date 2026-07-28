@@ -23,9 +23,41 @@ from textual.highlight import HighlightTheme
 from textual.reactive import reactive
 from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
-from textual.widgets._markdown import MarkdownBlock, MarkdownFence
+from textual.widgets._markdown import (
+    MarkdownBlock,
+    MarkdownFence,
+    MarkdownTable,
+    MarkdownTableCellContents,
+    MarkdownTableContent,
+)
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
+
+
+class CustomMarkdownTableContent(MarkdownTableContent):
+    """Custom Markdown table content without cell hover tooltips."""
+
+    def compose(self) -> ComposeResult:
+        for header in self.headers:
+            yield MarkdownTableCellContents(header, classes="header")
+        for row_index, row in enumerate(self.rows, 1):
+            for cell_index, cell in enumerate(row, 1):
+                yield MarkdownTableCellContents(
+                    cell,
+                    classes=f"row{row_index} cell",
+                    name=f"cell{row_index}.{cell_index}",
+                )
+            self.last_row = row_index
+
+
+class CustomMarkdownTable(MarkdownTable):
+    """Custom Markdown table block using CustomMarkdownTableContent."""
+
+    def compose(self) -> ComposeResult:
+        headers, rows = self._get_headers_and_rows()
+        self._headers = headers
+        self._rows = rows
+        yield CustomMarkdownTableContent(headers, rows)
 
 
 class CustomMarkdownFence(MarkdownFence):
@@ -73,6 +105,7 @@ HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
 
 Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence
+Markdown.BLOCKS["table"] = CustomMarkdownTable
 
 def _custom_markdown_parser_factory() -> MarkdownIt:
     md = MarkdownIt("gfm-like", {"linkify": False})
@@ -88,6 +121,7 @@ def _new_markdown_init(self, *args, **kwargs):
     self.BLOCKS = dict(self.BLOCKS)
     self.BLOCKS["fence"] = CustomMarkdownFence
     self.BLOCKS["code_block"] = CustomMarkdownFence
+    self.BLOCKS["table"] = CustomMarkdownTable
     _old_markdown_init(self, *args, **kwargs)
 Markdown.__init__ = _new_markdown_init
 
