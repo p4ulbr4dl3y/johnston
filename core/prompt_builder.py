@@ -98,8 +98,7 @@ Core Principles:
 10. Background CLI Tasks: The system automatically notifies you when background commands finish. Do NOT poll or loop using manage_task; stop calling tools and wait for automatic completion notification or work on unrelated tasks.
 11. Concise Communication: Be direct, clear, and concise. Do not repeat full plan contents after update_plan calls; summarize changes instead.
 12. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list.
-13. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise.
-14. Slash Commands & Skills: When the user enters a slash command matching a skill (e.g. /caveman, /johnston-architect), immediately load and apply the corresponding skill instructions and adopt its requested behavior, output rules, or persona."""
+13. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}

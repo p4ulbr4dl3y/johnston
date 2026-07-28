@@ -92,7 +92,9 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-architect configure MCP")
         self.assertTrue(handled)
-        self.assertEqual(app.ai_prompts[0][0], "/johnston-architect configure MCP")
+        self.assertEqual(len(app.ai_prompts), 1)
+        self.assertIn("Load and apply the skill 'johnston-architect'", app.ai_prompts[0][0])
+        self.assertIn("configure MCP", app.ai_prompts[0][0])
 
 if __name__ == "__main__":
     unittest.main()
