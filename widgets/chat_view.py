@@ -263,8 +263,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "shell", "bash", "read", "web_fetch",
-        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch"
+        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
+        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan"
     }
 
     def is_expandable(self) -> bool:
@@ -402,7 +402,19 @@ class ToolCallWidget(Vertical):
                     target_str = self.target
             else:
                 target_str = self.target
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
+        elif self.tool_type.lower() in ("update_plan", "plan"):
+            plan_items = self.args.get("plan") or []
+            if isinstance(plan_items, list) and plan_items:
+                total = len(plan_items)
+                completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
+                curr_step = next((item.get("step") for item in plan_items if isinstance(item, dict) and item.get("status") == "in_progress"), None)
+                if curr_step:
+                    target_str = f"[{completed}/{total}] {curr_step[:40]}"
+                else:
+                    target_str = f"[{completed}/{total} completed]"
+            else:
+                target_str = "Plan"
+            self.header_label.update(f"⚙ [bold]Plan[/bold]({escape(target_str)})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(self.target))})")
@@ -529,7 +541,12 @@ class ToolCallWidget(Vertical):
 
         completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
         total = len(plan_items)
-        t.append(f"Plan Progress [{completed}/{total}]\n", style="bold green" if completed == total and total > 0 else "bold cyan")
+
+        if total > 0:
+            filled = int((completed / total) * 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            pct = int((completed / total) * 100)
+            t.append(f"Progress [{bar}] {pct}% ({completed}/{total})\n\n", style="bold #4ade80" if completed == total else "bold #38bdf8")
 
         for item in plan_items:
             if not isinstance(item, dict):
@@ -538,14 +555,14 @@ class ToolCallWidget(Vertical):
             status = str(item.get("status") or "pending").lower()
 
             if status in ("completed", "done"):
-                t.append("  ✔ ", style="bold green")
-                t.append(f"{step}\n", style="strike dim green")
+                t.append("  ✔ ", style="bold #4ade80")
+                t.append(f"{step}\n", style="strike dim #9ca3af")
             elif status == "in_progress":
-                t.append("  ▶ ", style="bold yellow")
-                t.append(f"{step}\n", style="bold white")
+                t.append("  ▶ ", style="bold #facc15")
+                t.append(f"{step}\n", style="bold #f4f4f5")
             else:
-                t.append("  ○ ", style="dim gray")
-                t.append(f"{step}\n", style="dim gray")
+                t.append("  ○ ", style="dim #71717a")
+                t.append(f"{step}\n", style="dim #71717a")
         return t
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
