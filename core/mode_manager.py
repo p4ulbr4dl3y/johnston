@@ -85,7 +85,11 @@ BUILTIN_MODES = {
             "- Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
             "- Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab or /action) when ready to implement."
         ),
-        disallowed_tools=["create", "edit", "Create", "Edit"],
+        disallowed_tools=[
+            "create", "edit", "Create", "Edit",
+            "replace_file_content", "multi_replace_file_content",
+            "replace", "multi_replace", "write_file", "save_file"
+        ],
         source="builtin",
     ),
 }
