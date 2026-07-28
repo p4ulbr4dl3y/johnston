@@ -667,6 +667,8 @@ class ToolCallWidget(Vertical):
 
         clean_code_lines = []
         for line in lines:
+            if line.strip().startswith("[Hint:") and line.strip().endswith("]"):
+                continue
             cleaned_line = re.sub(r"^(?:\s*\d+\s*\|\s?)+", "", line)
             clean_code_lines.append(cleaned_line)
 
