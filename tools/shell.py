@@ -13,7 +13,6 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     supports_pty,
 )
-from core.shell_guard import analyze_shell_command
 from tools.base import BaseTool, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
@@ -59,27 +58,6 @@ class ShellTool(BaseTool):
             if not remainder:
                 return f"Slept for {sec} seconds."
             cmd = remainder
-
-        skip_confirm = args.get("skip_confirm", False)
-        is_safe, reason = analyze_shell_command(cmd)
-        if not is_safe and not skip_confirm and ctx.app:
-            try:
-                from widgets.modal_screens import BashConfirmScreen
-
-                screen = BashConfirmScreen(command=cmd, reason=reason)
-                loop = asyncio.get_running_loop()
-                future = loop.create_future()
-
-                def on_dismiss(result: bool) -> None:
-                    if not future.done():
-                        future.set_result(bool(result))
-
-                ctx.app.push_screen(screen, callback=on_dismiss)
-                confirmed = await future
-                if not confirmed:
-                    return "Command execution rejected by user."
-            except Exception as e:
-                return f"Error prompting for command permission: {e}"
 
         env = shell_env()
         master_fd = None

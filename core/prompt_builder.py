@@ -207,15 +207,10 @@ class PromptBuilder:
     def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
         from core.mode_manager import ModeManager
-        from core.policy import policy_engine
+        from tools.registry import ALIAS_MAP
 
         mcp_mgr = get_mcp_manager()
-        mcp_tools = []
-        for t in mcp_mgr.get_active_tools():
-            server = t.get("_mcp_server", "")
-            tool_name = t.get("_mcp_tool_name", "")
-            if server and tool_name and mcp_mgr.get_tool_capabilities(server, tool_name):
-                mcp_tools.append(t)
+        mcp_tools = mcp_mgr.get_active_tools()
         clean_mcp_tools = [
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
         ]
@@ -223,19 +218,23 @@ class PromptBuilder:
         all_tools = list(self.base_tools) + clean_mcp_tools
 
         mode_def = ModeManager.get_instance().get_mode(self.mode)
-        all_tools = [
-            t for t in all_tools
-            if policy_engine.tool_allowed_in_prompt(
-                t.get("function", {}).get("name", ""), mode_def
-            ).allowed
-        ]
+        disallowed = {t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])}
 
-        if self.allow_task and not any(t.get("function", {}).get("name") in ("subagent", "Subagent") for t in all_tools):
-            all_tools.append(SubagentTool.schema)
+        def _tool_allowed(tool_item: Dict[str, Any]) -> bool:
+            t_name = tool_item.get("function", {}).get("name", "").strip()
+            if not t_name:
+                return True
+            clean_name = t_name.lower()
+            if clean_name.startswith("functions."):
+                clean_name = clean_name.split(".", 1)[1]
+            resolved = ALIAS_MAP.get(clean_name, clean_name)
+            return clean_name not in disallowed and resolved not in disallowed
 
-        return [
-            t for t in all_tools
-            if policy_engine.tool_allowed_in_prompt(
-                t.get("function", {}).get("name", ""), mode_def
-            ).allowed
-        ]
+        filtered_tools = [t for t in all_tools if _tool_allowed(t)]
+
+        if self.allow_task and not any(
+            t.get("function", {}).get("name") in ("subagent", "Subagent") for t in filtered_tools
+        ):
+            filtered_tools.append(SubagentTool.schema)
+
+        return [t for t in filtered_tools if _tool_allowed(t)]

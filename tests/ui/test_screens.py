@@ -278,32 +278,6 @@ class TestVisionWarningScreen(unittest.TestCase):
             catalog.set_fallback_vision_model("", "")
 
 
-class TestPolicyScreen(unittest.TestCase):
-    def test_header_title(self):
-        from widgets.screens.policy import PolicyScreen
-        self.assertIn("Rules & Permissions", PolicyScreen._get_header_title_text("rules"))
-        self.assertIn("Resource Budgets", PolicyScreen._get_header_title_text("budgets"))
-
-    def test_build_data_rules_and_budgets(self):
-        from widgets.screens.policy import PolicyScreen
-        s = PolicyScreen(initial_tab="rules")
-        opts_rules, items_rules = s._build_data("rules")
-        self.assertTrue(len(opts_rules) > 0)
-        self.assertEqual(len(opts_rules), len(items_rules))
-
-        opts_budgets, items_budgets = s._build_data("budgets")
-        self.assertTrue(len(opts_budgets) > 0)
-        self.assertEqual(len(opts_budgets), len(items_budgets))
-
-    def test_bindings(self):
-        from widgets.screens.policy import PolicyScreen
-        keys = [b[0] for b in PolicyScreen.BINDINGS]
-        self.assertIn("escape", keys)
-        self.assertIn("a", keys)
-        self.assertIn("s", keys)
-        self.assertIn("b", keys)
-
-
 if __name__ == "__main__":
     unittest.main()
 

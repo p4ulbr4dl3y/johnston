@@ -87,21 +87,14 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return f"Unknown tool: {name}"
 
     from core.mode_manager import ModeManager
-    from core.policy import policy_engine
 
     ctx_or_app = context or app
     app_obj = getattr(ctx_or_app, "app", ctx_or_app)
     mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
     mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
-    approved = bool(getattr(app_obj, "_johnston_policy_approved", False))
-    decision = policy_engine.tool_call_decision(
-        name,
-        args,
-        mode_def,
-        approved=approved,
-    )
-    if not decision.allowed:
-        return f"Error: Tool '{name}' blocked by policy: {decision.reason}"
+    disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
+    if clean_name in disallowed or resolved_name in disallowed:
+        return f"Error: Tool '{name}' is disabled in {mode_def.name} mode."
 
     try:
         mcp_res = await asyncio.to_thread(mcp_mgr.call_tool, name, args)

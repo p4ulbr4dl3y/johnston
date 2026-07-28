@@ -2,7 +2,6 @@ import os
 import tempfile
 from typing import Any, Dict
 
-from core.policy import resolve_workspace_path
 from tools.context import ToolContext
 
 IGNORE_DIRS = {
@@ -21,6 +20,22 @@ IGNORE_EXTENSIONS = {
     ".so", ".dylib", ".dll", ".exe", ".bin", ".o", ".a", ".out",
     ".ds_store"
 }
+
+
+def resolve_workspace_path(path_str: str | None = None, *, root: str | None = None) -> str:
+    real_root = os.path.realpath(root or os.getcwd())
+    if not path_str:
+        candidate = real_root
+    else:
+        candidate = os.path.abspath(os.path.expanduser(path_str))
+    real_candidate = os.path.realpath(candidate)
+    comparable_root = os.path.normcase(real_root)
+    comparable_candidate = os.path.normcase(real_candidate)
+    if comparable_candidate != comparable_root and not comparable_candidate.startswith(
+        comparable_root + os.sep
+    ):
+        raise PermissionError(f"Path '{candidate}' is outside workspace '{real_root}'.")
+    return candidate
 
 
 def resolve_path(path_str: str | None = None) -> str:
