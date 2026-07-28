@@ -32,8 +32,7 @@ class TestFileSuggestions(unittest.TestCase):
         chat_input = ChatInput()
         pasted_img_path = "/var/folders/lg/x662tzs55wj3rpcv4fry/T/test.png"
         formatted_img = chat_input.format_pasted_file_path(pasted_img_path)
-        self.assertEqual(formatted_img, "[Image #1]")
-        self.assertEqual(chat_input.pasted_texts["[Image #1]"], f"@{pasted_img_path}")
+        self.assertEqual(formatted_img, f"@{pasted_img_path}")
 
         pasted_code_path = "/var/folders/lg/x662tzs55wj3rpcv4fry/T/script.py"
         formatted_code = chat_input.format_pasted_file_path(pasted_code_path)

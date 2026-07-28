@@ -80,54 +80,10 @@ class ChatInput(TextArea):
         new_col = at_start_idx + len(inserted)
         self.move_cursor((row, new_col))
 
-    def auto_format_image_tags(self) -> None:
-        """Scans input text for image paths and replaces them with [Image #N]"""
-        import os
-        import re
-
-        text = self.text
-        if not text:
-            return
-
-        pattern = r'(@?(?:/[^\s]+|~/[^\s]+|file://[^\s]+|\S+\.(?:png|jpg|jpeg|gif|webp|bmp|ico|tiff|svg)))'
-        matches = re.findall(pattern, text, flags=re.IGNORECASE)
-        if not matches:
-            return
-
-        modified = False
-        new_text = text
-
-        for raw_match in matches:
-            clean = raw_match.lstrip("@").strip("'\"").replace("\\ ", " ")
-            expanded = os.path.expanduser(clean)
-            ext = os.path.splitext(clean)[1].lower()
-
-            if ext in self.IMAGE_EXTENSIONS and (os.path.exists(expanded) or raw_match.startswith("/") or raw_match.startswith("~/") or raw_match.startswith("file://")):
-                existing_tag = None
-                for tag, val in self.pasted_texts.items():
-                    if tag.startswith("[Image #") and (val == raw_match or val == f"@{clean}" or val == f"@{raw_match.lstrip('@')}"):
-                        existing_tag = tag
-                        break
-
-                if not existing_tag:
-                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
-                    existing_tag = f"[Image #{img_count}]"
-                    self.pasted_texts[existing_tag] = f"@{clean}"
-
-                new_text = new_text.replace(raw_match, existing_tag)
-                modified = True
-
-        if modified and new_text != self.text:
-            row, col = self.cursor_location
-            self.load_text(new_text)
-            lines = new_text.split("\n")
-            self.move_cursor((min(row, len(lines) - 1), len(lines[-1])))
-
     def _on_input_change(self) -> None:
         """Called on any input text change"""
         self.update_height()
         self.update_suggestions()
-        self.auto_format_image_tags()
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
@@ -135,7 +91,7 @@ class ChatInput(TextArea):
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
 
     def format_pasted_file_path(self, pasted_text: str) -> str:
-        """Automatically formats pasted file paths (@file or [Image #N])"""
+        """Automatically formats pasted file paths as @file"""
         import os
         lines = pasted_text.strip().splitlines()
         if not lines:
@@ -151,16 +107,7 @@ class ChatInput(TextArea):
                 continue
 
             if stripped.startswith("@"):
-                path_part = stripped[1:]
-                clean = path_part.strip("'\"").replace("\\ ", " ")
-                expanded = os.path.expanduser(clean)
-                ext = os.path.splitext(clean)[1].lower()
-                if ext in self.IMAGE_EXTENSIONS and os.path.exists(expanded):
-                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
-                    tag = f"[Image #{img_count}]"
-                    self.pasted_texts[tag] = stripped
-                    line = tag
-                    modified = True
+                new_lines.append(stripped)
             else:
                 clean = stripped.strip("'\"").replace("\\ ", " ")
                 expanded = os.path.expanduser(clean)
@@ -172,20 +119,11 @@ class ChatInput(TextArea):
                     or stripped.startswith("file://")
                 )
                 if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
-                    if ext in self.IMAGE_EXTENSIONS:
-                        img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
-                        tag = f"[Image #{img_count}]"
-                        self.pasted_texts[tag] = f"@{stripped}"
-                        line = tag
-                    else:
-                        line = f"@{stripped}"
+                    line = f"@{stripped}"
                     modified = True
+                new_lines.append(line)
 
-            new_lines.append(line)
-
-        if modified:
-            return "\n".join(new_lines)
-        return pasted_text
+        return "\n".join(new_lines) if modified else pasted_text
 
     def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG image and inserts as [Image #N]"""
