@@ -151,10 +151,7 @@ class ChatInput(TextArea):
                     with open(filepath, "wb") as f:
                         f.write(img_bytes)
 
-                    img_count = len([k for k in self.pasted_texts if k.startswith("[Image #")]) + 1
-                    tag = f"[Image #{img_count}]"
-                    self.pasted_texts[tag] = f"@{filepath}"
-                    self.insert(tag)
+                    self.insert(f"@{filepath}")
                     self._on_input_change()
                     return True
         except Exception:
