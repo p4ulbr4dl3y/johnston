@@ -22,11 +22,7 @@ Screen {
 }
 
 Screen, *, ScrollBar {
-    scrollbar-size: 1 1;
-    scrollbar-color: #52525b #09090b;
-    scrollbar-color-hover: #ffffff #18181b;
-    scrollbar-color-active: #ffffff #27272a;
-    scrollbar-corner-color: #09090b;
+    scrollbar-size: 0 0;
 }
 
 #app-container {
@@ -40,10 +36,7 @@ Screen, *, ScrollBar {
     height: 1fr;
     padding: 1 2 1 2;
     background: #09090b;
-    scrollbar-size: 1 1;
-    scrollbar-color: #52525b #09090b;
-    scrollbar-color-hover: #ffffff #18181b;
-    scrollbar-color-active: #ffffff #27272a;
+    scrollbar-size: 0 0;
 }
 
 WelcomeWidget {
@@ -288,10 +281,7 @@ MarkdownFence #code-content {
 OptionList {
     background: #18181b;
     color: #a1a1aa;
-    scrollbar-size: 1 1;
-    scrollbar-color: #52525b #18181b;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-size: 0 0;
 }
 
 OptionList > .option-list--option-highlighted,
@@ -321,10 +311,7 @@ OptionList > .option-list--option-blur-highlighted {
     color: #a1a1aa;
     border: none;
     padding: 0;
-    scrollbar-size: 1 1;
-    scrollbar-color: #52525b #18181b;
-    scrollbar-color-hover: #ffffff #27272a;
-    scrollbar-color-active: #ffffff #3f3f46;
+    scrollbar-size: 0 0;
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted,
@@ -476,10 +463,7 @@ ModalScreen {
     margin-top: 1;
     border: none;
     background: #27272a;
-    scrollbar-size: 1 1;
-    scrollbar-color: #71717a #27272a;
-    scrollbar-color-hover: #ffffff #3f3f46;
-    scrollbar-color-active: #ffffff #52525b;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog OptionList > .option-list--option-disabled {
