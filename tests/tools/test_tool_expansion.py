@@ -172,6 +172,14 @@ class TestToolExpansion(unittest.TestCase):
         clean, start, path = widget._format_read_content(raw, "test.log")
         self.assertEqual(clean, "### Uh oh!")
 
+    def test_format_read_content_strips_hint_lines(self):
+        widget = ToolCallWidget(tool_type="read", target="flappy.html")
+        raw = "=== Lines 1-30 of 187 in flappy.html ===\n[Hint: File has 187 lines. Use start_line=31 end_line=187 to read next chunk.]\n    1 | <!DOCTYPE html>\n    2 | <html>"
+        clean, start, path = widget._format_read_content(raw, "flappy.html")
+        self.assertEqual(clean, "<!DOCTYPE html>\n<html>")
+        self.assertEqual(start, 1)
+        self.assertEqual(path, "flappy.html")
+
 
 
     def test_shell_tool_output_escapes_invalid_rich_markup(self):
