@@ -48,13 +48,6 @@ class WriteInInput(Input):
                     event.prevent_default()
                     return
 
-        elif key in ("down", "key_down"):
-            if self.screen and hasattr(self.screen, "action_go_next"):
-                getattr(self.screen, "action_go_next")()
-                event.stop()
-                event.prevent_default()
-                return
-
         elif key in ("left", "key_left"):
             if cursor == 0:
                 if self.screen and hasattr(self.screen, "action_go_back"):

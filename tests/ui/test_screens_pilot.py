@@ -214,8 +214,35 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("space")
             await pilot.pause()
             self.assertEqual(screen.answers.get(0, {}).get("answer"), "")
-            # Assert highlight index remains at 1 (did NOT reset to 0!)
             self.assertEqual(opt_list.highlighted, 1)
+
+    async def test_write_in_input_down_key_does_not_advance_page(self):
+        from textual.widgets import Input
+
+        from widgets.screens.ask_user import AskUserWizardScreen
+
+        questions = [
+            {"question_text": "Enter custom text", "options": []},
+            {"question_text": "Question 2", "options": []}
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            input_field = screen.query_one("#write-in-input", Input)
+
+            self.assertEqual(screen.q_idx, 0)
+            await pilot.press("a", "b", "c")
+            await pilot.pause()
+
+            # Press down arrow inside input
+            await pilot.press("down")
+            await pilot.pause()
+
+            # Verify q_idx is still 0 (did NOT jump to next page)
+            self.assertEqual(screen.q_idx, 0)
+            self.assertEqual(input_field.value, "abc")
 
 
 if __name__ == "__main__":
