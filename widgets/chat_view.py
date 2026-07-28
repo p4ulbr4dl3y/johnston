@@ -414,7 +414,7 @@ class ToolCallWidget(Vertical):
                     target_str = f"[{completed}/{total} completed]"
             else:
                 target_str = "Plan"
-            self.header_label.update(f"⚙ [bold]Plan[/bold]({escape(target_str)})")
+            self.header_label.update(f"⚙ [bold #ffffff]Plan[/bold #ffffff]({escape(target_str)})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(self.target))})")
@@ -537,7 +537,7 @@ class ToolCallWidget(Vertical):
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()
         if explanation:
-            t.append(f"Rationale: {explanation}\n\n", style="italic dim white")
+            t.append(f"Rationale: {explanation}\n\n", style="italic dim #a1a1aa")
 
         completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
         total = len(plan_items)
@@ -546,7 +546,9 @@ class ToolCallWidget(Vertical):
             filled = int((completed / total) * 10)
             bar = "█" * filled + "░" * (10 - filled)
             pct = int((completed / total) * 100)
-            t.append(f"Progress [{bar}] {pct}% ({completed}/{total})\n\n", style="bold #4ade80" if completed == total else "bold #38bdf8")
+            t.append("Progress ", style="dim #a1a1aa")
+            t.append(f"[{bar}] ", style="bold #ffffff")
+            t.append(f"{pct}% ({completed}/{total})\n\n", style="dim #a1a1aa")
 
         for item in plan_items:
             if not isinstance(item, dict):
@@ -555,14 +557,14 @@ class ToolCallWidget(Vertical):
             status = str(item.get("status") or "pending").lower()
 
             if status in ("completed", "done"):
-                t.append("  ✔ ", style="bold #4ade80")
-                t.append(f"{step}\n", style="strike dim #9ca3af")
+                t.append("  ✓ ", style="bold #a1a1aa")
+                t.append(f"{step}\n", style="strike dim #71717a")
             elif status == "in_progress":
-                t.append("  ▶ ", style="bold #facc15")
-                t.append(f"{step}\n", style="bold #f4f4f5")
+                t.append("  ▶ ", style="bold #ffffff")
+                t.append(f"{step}\n", style="bold #ffffff")
             else:
-                t.append("  ○ ", style="dim #71717a")
-                t.append(f"{step}\n", style="dim #71717a")
+                t.append("  ○ ", style="dim #52525b")
+                t.append(f"{step}\n", style="dim #52525b")
         return t
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
