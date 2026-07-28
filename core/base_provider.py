@@ -379,9 +379,9 @@ class BaseAgent:
             future: asyncio.Future[bool] = asyncio.get_running_loop().create_future()
             canonical_name = self._canonical_tool_name(tool_name)
             if canonical_name == "shell":
-                from widgets.modal_screens import BashConfirmScreen
+                from widgets.modal_screens import ShellConfirmScreen
 
-                screen = BashConfirmScreen(command=str(args.get("command", "")), reason=reason)
+                screen = ShellConfirmScreen(command=str(args.get("command", "")), reason=reason)
             else:
                 from widgets.modal_screens import ConfirmScreen
 

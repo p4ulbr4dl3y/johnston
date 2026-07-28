@@ -113,8 +113,3 @@ def analyze_shell_command(command: str) -> Tuple[bool, str]:
             return False, f"Execution of potentially unsafe command: '{base_bin}'"
 
     return True, "Command is safe"
-
-
-def analyze_bash_command(command: str) -> Tuple[bool, str]:
-    """Backward compatibility alias for analyze_shell_command."""
-    return analyze_shell_command(command)
