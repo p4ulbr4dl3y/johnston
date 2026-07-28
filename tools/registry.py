@@ -12,6 +12,7 @@ from tools.read import ReadTool
 from tools.shell import ShellTool
 from tools.skill import SkillTool
 from tools.subagent import SubagentTool
+from tools.update_plan import UpdatePlanTool
 from tools.view_image import ViewImageTool
 from tools.web_fetch import WebFetchTool
 
@@ -28,6 +29,7 @@ TOOL_CLASSES = [
     ManageTaskTool,
     SubagentTool,
     ManageSubagentTool,
+    UpdatePlanTool,
     ViewImageTool,
     WebFetchTool,
 ]
@@ -51,6 +53,8 @@ ALIAS_MAP: Dict[str, str] = {
     "exec": "shell",
     "run_command": "shell",
     "ask": "ask_user",
+    "plan": "update_plan",
+    "set_plan": "update_plan",
 }
 
 
