@@ -59,6 +59,29 @@ class ShellTool(BaseTool):
                 return f"Slept for {sec} seconds."
             cmd = remainder
 
+        skip_confirm = bool(args.get("skip_confirm", False))
+        from core.shell_guard import analyze_shell_command
+        is_safe, reason = analyze_shell_command(cmd)
+
+        if not is_safe and not skip_confirm and ctx.app:
+            try:
+                from widgets.modal_screens import ShellConfirmScreen
+
+                screen = ShellConfirmScreen(command=cmd, reason=reason)
+                loop = asyncio.get_running_loop()
+                future = loop.create_future()
+
+                def on_dismiss(result: bool) -> None:
+                    if not future.done():
+                        future.set_result(bool(result))
+
+                ctx.app.push_screen(screen, callback=on_dismiss)
+                confirmed = await future
+                if not confirmed:
+                    return "Command execution rejected by user."
+            except Exception as e:
+                return f"Error prompting for command permission: {e}"
+
         env = shell_env()
         master_fd = None
         slave_fd = None
