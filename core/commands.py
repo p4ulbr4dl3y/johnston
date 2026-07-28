@@ -574,9 +574,12 @@ for cls in COMMAND_CLASSES:
         COMMAND_REGISTRY[alias] = cls
 
 async def handle_slash_command(app, command_text: str) -> bool:
-    """Executes command if registered. Returns True if handled."""
-    parts = command_text.strip().split(maxsplit=1)
-    cmd_name = parts[0].lower()
+    """Executes command if registered or skill found. Returns True if handled."""
+    words = command_text.strip().split()
+    if not words:
+        return False
+
+    cmd_name = words[0].lower()
 
     # Normalization of Cyrillic homoglyphs to Latin (to handle layout errors)
     homoglyphs = {
@@ -584,9 +587,8 @@ async def handle_slash_command(app, command_text: str) -> bool:
         'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'
     }
     normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
-    parts[0] = normalized_name
 
-    if normalized_name in COMMAND_REGISTRY:
+    if command_text.strip().startswith("/") and normalized_name in COMMAND_REGISTRY:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()
         await cmd_instance.execute(app)
         return True
