@@ -70,7 +70,7 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
             res = await tool.execute({"server": "fs", "tool": "read_file"})
 
         self.assertIn("Error: Invalid arguments", res)
-        self.assertIn("[MCP Tool Schema Hint for 'read_file']", res)
+        self.assertIn("[Hint: MCP Tool Schema for 'read_file']", res)
         self.assertIn('"path"', res)
 
 
