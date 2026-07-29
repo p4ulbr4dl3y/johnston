@@ -141,6 +141,8 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     path = resolve_path(path_arg)
     if not path or not os.path.exists(path):
         return f"Error: file '{path}' not found."
+    if os.path.isdir(path):
+        return f"Error: '{path}' is a directory, not a file."
 
     def _do_edit():
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -220,7 +222,7 @@ class ReplaceFileContentTool(BaseTool):
                     "end_line": {"type": "integer", "description": "End line number (inclusive)"},
                     "allow_multiple": {"type": "boolean", "description": "If true, replace multiple occurrences"}
                 },
-                "required": []
+                "required": ["target_content", "replacement_content"]
             }
         }
     }
@@ -284,7 +286,7 @@ class MultiReplaceFileContentTool(BaseTool):
                         }
                     }
                 },
-                "required": []
+                "required": ["replacement_chunks"]
             }
         }
     }

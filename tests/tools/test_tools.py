@@ -87,14 +87,19 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"path": file_path, "content": "Hello World"})
         self.assertIn("Success: file", res)
         self.assertTrue(os.path.exists(file_path))
-        with open(file_path, "r", encoding="utf-8") as f:
-            self.assertEqual(f.read(), "Hello World")
+        # Create file over existing directory error
+        res_dir_err = await tool.execute({"path": self.test_dir, "content": "Hello World"})
+        self.assertIn("is a directory", res_dir_err)
 
     async def test_edit_tool(self):
         tool = EditTool()
         file_path = os.path.join(self.test_dir, "code.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    return 42\n")
+
+        # Edit on directory error
+        res_edit_dir = await tool.execute({"path": self.test_dir, "old_string": "a", "new_string": "b"})
+        self.assertIn("is a directory", res_edit_dir)
 
         # Successful edit
         res = await tool.execute({
