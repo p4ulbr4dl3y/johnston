@@ -79,15 +79,19 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
 
         from core.models_catalog import catalog
-        with patch.object(catalog, "save_cache"):
-            catalog.add_vision_override("my-vision-model")
-            catalog.set_fallback_vision_model("my-provider", "my-vision-model")
-            fb_p, fb_m = catalog.get_fallback_vision_model()
-            self.assertEqual(fb_p, "my-provider")
-            self.assertEqual(fb_m, "my-vision-model")
-            catalog.remove_vision_override("my-vision-model")
-            self.assertNotIn("my-vision-model", catalog._user_overrides)
-            catalog.set_fallback_vision_model("", "")
+        orig_fb = catalog.get_fallback_vision_model()
+        try:
+            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
+                catalog.add_vision_override("my-vision-model")
+                catalog.set_fallback_vision_model("my-provider", "my-vision-model")
+                fb_p, fb_m = catalog.get_fallback_vision_model()
+                self.assertEqual(fb_p, "my-provider")
+                self.assertEqual(fb_m, "my-vision-model")
+                catalog.remove_vision_override("my-vision-model")
+                self.assertNotIn("my-vision-model", catalog._user_overrides)
+        finally:
+            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
+                catalog.set_fallback_vision_model(*orig_fb)
 
 
 class TestProcessAndEncodeImage(unittest.TestCase):

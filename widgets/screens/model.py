@@ -20,10 +20,10 @@ class VisionWarningScreen(BaseSelectionScreen[Optional[str]]):
         options = ["Select Dedicated Vision Model"]
         items = ["select_vision"]
 
-        fb_prov, fb_model = catalog.get_fallback_vision_model()
+        fb_prov, fb_model = catalog.get_vision_model()
         if fb_model:
             fb_disp = catalog.get_model_display_name(fb_prov, fb_model)
-            options.append(f"Use Fallback ({fb_disp})")
+            options.append(f"Use Vision Model ({fb_disp})")
             items.append("use_fallback")
 
         options.append("My Model Supports Vision (Force)")
@@ -103,7 +103,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         default_val: Union[str, Tuple[str, str], None] = None
 
         if filter_vision:
-            fb_prov, fb_model = catalog.get_fallback_vision_model()
+            fb_prov, fb_model = catalog.get_vision_model()
             if fb_model:
                 target_prov, target_model = fb_prov, fb_model
             else:

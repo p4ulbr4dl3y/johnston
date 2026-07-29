@@ -55,7 +55,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
     # Option 2: Configured vision model
     if not target_provider_key:
-        fb_prov, fb_model = catalog.get_fallback_vision_model()
+        fb_prov, fb_model = catalog.get_vision_model()
         if fb_model:
             if fb_prov and _provider_is_usable(fb_prov) and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
                 target_provider_key = fb_prov
