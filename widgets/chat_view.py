@@ -784,7 +784,7 @@ class ToolCallWidget(Vertical):
             if line.startswith("-"):
                 num_str = str(old_line).rjust(max_num_digits)
                 line_item = Text()
-                line_item.append(f"{num_str} ", style="dim #71717a")
+                line_item.append(f"{num_str} ", style="#f85149")
                 p_code = Text("- ", style="bold #f85149") + (old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:]))
                 old_idx += 1
                 p_code.pad_right(width)
@@ -795,7 +795,7 @@ class ToolCallWidget(Vertical):
             elif line.startswith("+"):
                 num_str = str(new_line).rjust(max_num_digits)
                 line_item = Text()
-                line_item.append(f"{num_str} ", style="dim #71717a")
+                line_item.append(f"{num_str} ", style="#3fb950")
                 p_code = Text("+ ", style="bold #3fb950") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
                 new_idx += 1
                 p_code.pad_right(width)
@@ -806,7 +806,7 @@ class ToolCallWidget(Vertical):
             elif line.startswith(" "):
                 num_str = str(new_line).rjust(max_num_digits)
                 line_item = Text()
-                line_item.append(f"{num_str} ", style="dim #71717a")
+                line_item.append(f"{num_str} ", style="#6e7681")
                 p_code = Text("  ") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
                 old_idx += 1
                 new_idx += 1
