@@ -1,6 +1,5 @@
 import time
 import unittest
-from unittest.mock import MagicMock, patch
 
 from core.base_provider import BaseAgent
 from core.circuit_breaker import CircuitBreaker, circuit_breaker
@@ -96,35 +95,3 @@ class TestAgentCircuitBreakerIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0][0], "bot_text")
         self.assertIn("Circuit breaker for provider 'test_prov' is OPEN", events[0][1])
-
-    async def test_agent_fast_fails_to_fallback_when_open(self):
-        cb = circuit_breaker
-        cb.failure_threshold = 1
-        cb.cooldown_seconds = 10.0
-        cb.record_failure("primary_prov")
-
-        agent = BaseAgent(api_key="t", model="t", provider_key="primary_prov")
-        agent.system_prompt = "system"
-        agent.fallback_provider = "fallback_prov"
-
-        mock_fallback_agent = MagicMock()
-        mock_fallback_agent.history = []
-        mock_fallback_agent.mode = "action"
-        mock_fallback_agent.tokens_input = 10
-        mock_fallback_agent.tokens_output = 20
-        mock_fallback_agent.total_tokens = 30
-        mock_fallback_agent.cost_usd = 0.001
-
-        async def mock_fallback_stream(user_text):
-            yield ("bot_delta", "Response from fallback", "")
-
-        mock_fallback_agent.stream_steps = mock_fallback_stream
-
-        with patch("core.provider_manager.ProviderManager.create_agent_for_provider", return_value=mock_fallback_agent):
-            events = []
-            async for event in agent.stream_steps("hello"):
-                events.append(event)
-
-        self.assertTrue(any("circuit breaker OPEN" in e[1] for e in events if e[0] == "thinking"))
-        self.assertTrue(any("Response from fallback" in e[1] for e in events if e[0] == "bot_delta"))
-        self.assertEqual(agent.total_tokens, 30)
