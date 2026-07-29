@@ -1,4 +1,3 @@
-from tools.base import truncate_output
 
 DEFAULT_LINE_WINDOW = 800
 
