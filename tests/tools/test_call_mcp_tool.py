@@ -60,6 +60,19 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
 
         mock_mgr.call_tool.assert_called_once_with("t", {}, target_server="srv")
 
+    async def test_call_error_returns_schema_hint(self):
+        tool = CallMCPTool()
+        mock_mgr = MagicMock()
+        mock_mgr.call_tool.return_value = "Error: Invalid arguments"
+        mock_mgr.get_tool_schema.return_value = {"type": "object", "properties": {"path": {"type": "string"}}}
+
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):
+            res = await tool.execute({"server": "fs", "tool": "read_file"})
+
+        self.assertIn("Error: Invalid arguments", res)
+        self.assertIn("[MCP Tool Schema Hint for 'read_file']", res)
+        self.assertIn('"path"', res)
+
 
 if __name__ == "__main__":
     unittest.main()

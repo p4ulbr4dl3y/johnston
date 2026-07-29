@@ -45,9 +45,12 @@ class CallMCPTool(BaseTool):
         mcp_mgr = get_mcp_manager()
 
         def _get_schema_hint() -> str:
-            schema = mcp_mgr.get_tool_schema(server, tool)
-            if schema:
-                return f"\n\n[MCP Tool Schema Hint for '{tool}']:\n{json.dumps(schema, indent=2, ensure_ascii=False)}"
+            try:
+                schema = mcp_mgr.get_tool_schema(server, tool)
+                if isinstance(schema, dict) and schema:
+                    return f"\n\n[MCP Tool Schema Hint for '{tool}']:\n{json.dumps(schema, indent=2, ensure_ascii=False)}"
+            except Exception:
+                pass
             return ""
 
         try:

@@ -327,6 +327,29 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         res = client.call_tool("foo", {})
         self.assertIn("is not running", res)
 
+    def test_lazy_prompt_snippet_with_parameter_signatures(self):
+        mm = MCPManager(project_dir=self.test_dir)
+        mock_tool = {
+            "type": "function",
+            "function": {
+                "name": "open_url",
+                "description": "Open a web URL",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "timeout": {"type": "integer"}
+                    }
+                }
+            },
+            "_mcp_server": "browser",
+            "_mcp_tool_name": "open_url"
+        }
+        mm.get_active_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
+        snippet = mm.get_system_prompt_snippet()
+        self.assertIn("<mcp_servers>", snippet)
+        self.assertIn("- open_url(url, timeout) — Open a web URL", snippet)
+
 
 if __name__ == "__main__":
     unittest.main()
