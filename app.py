@@ -230,43 +230,39 @@ class JohnstonApp(App):
 
         # Restore complete element history in UI (user, bot, thinking, tool)
         saved_ui_msgs = session_data.get("ui_messages", [])
-        for msg in saved_ui_msgs:
-            mtype = msg.get("type")
-            if mtype == "user":
-                text = msg.get("text", "")
-                self.run_worker(chat_view.add_user_message(text))
-            elif mtype == "bot":
-                text = msg.get("text", "")
-                async def add_bot(txt=text):
+        
+        async def _restore_ui_messages(msgs: list):
+            for msg in msgs:
+                mtype = msg.get("type")
+                if mtype == "user":
+                    text = msg.get("text", "")
+                    await chat_view.add_user_message(text)
+                elif mtype == "bot":
+                    text = msg.get("text", "")
                     bm = await chat_view.add_bot_message()
-                    bm.content = txt
-                self.run_worker(add_bot())
-            elif mtype == "thinking":
-                dur = msg.get("duration", 0.0)
-                txt = msg.get("text", "")
-                async def add_thinking(duration=dur, content=txt):
+                    bm.content = text
+                elif mtype == "thinking":
+                    dur = msg.get("duration", 0.0)
+                    txt = msg.get("text", "")
                     tw = await chat_view.add_thinking_widget()
-                    tw.finish_thinking(duration, content)
-                self.run_worker(add_thinking())
-            elif mtype == "tool":
-                ttype = msg.get("tool_type", "")
-                target = msg.get("target", "")
-                rtext = msg.get("result_text", "")
-                targs = msg.get("args", {})
-                self.run_worker(chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs))
-            elif mtype == "compaction_divider":
-                ctxt = msg.get("text", "Session Compacted")
-                self.run_worker(chat_view.add_compaction_divider(ctxt))
+                    tw.finish_thinking(dur, txt)
+                elif mtype == "tool":
+                    ttype = msg.get("tool_type", "")
+                    target = msg.get("target", "")
+                    rtext = msg.get("result_text", "")
+                    targs = msg.get("args", {})
+                    await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs)
+                elif mtype == "compaction_divider":
+                    ctxt = msg.get("text", "Session Compacted")
+                    await chat_view.add_compaction_divider(ctxt)
 
-        chat_view.check_welcome()
-
-        def _scroll_to_bottom():
+            chat_view.check_welcome()
             try:
                 chat_view.scroll_end(animate=False)
             except Exception:
                 pass
 
-        self.call_after_refresh(_scroll_to_bottom)
+        self.run_worker(_restore_ui_messages(saved_ui_msgs))
 
         # Restore agent context
         if hasattr(self.agent, "history"):
