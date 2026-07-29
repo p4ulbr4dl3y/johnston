@@ -117,6 +117,21 @@ class ReadTool(BaseTool):
         if not os.path.exists(path):
             return f"Error: file '{path}' not found."
 
+        if os.path.isdir(path):
+            try:
+                entries = sorted(os.listdir(path))
+                formatted_entries = []
+                for entry in entries:
+                    full_p = os.path.join(path, entry)
+                    if os.path.isdir(full_p):
+                        formatted_entries.append(f"{entry}/")
+                    else:
+                        formatted_entries.append(entry)
+                content = "\n".join(formatted_entries) if formatted_entries else "(empty directory)"
+                return f"Path '{path}' is a directory. Directory contents ({len(entries)} items):\n{content}"
+            except Exception as e:
+                return f"Error listing directory '{path}': {e}"
+
         try:
             file_size = os.path.getsize(path)
             if file_size > MAX_FILE_SIZE:
