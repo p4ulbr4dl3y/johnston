@@ -53,6 +53,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Line 2", res_range)
         self.assertNotIn("Line 5", res_range)
 
+        # Start line out of bounds
+        res_oob = await tool.execute({"path": file_path, "start_line": 50})
+        self.assertIn("exceeds total file line count", res_oob)
+        self.assertIn("[Auto-Fix Hint:", res_oob)
+
         # Non-existent file
         res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
         self.assertIn("Error:", res_err)

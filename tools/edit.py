@@ -98,6 +98,11 @@ def apply_chunk_replacements(
         current_text = "".join(lines)
 
         if s_line is not None or e_line is not None:
+            if s_line is not None and s_line > len(lines):
+                raise ValueError(
+                    f"Error: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
+                    f"[Auto-Fix Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]"
+                )
             start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
             end_idx = e_line if (e_line and e_line <= len(lines)) else len(lines)
 

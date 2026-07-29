@@ -21,7 +21,14 @@ def format_line_pagination(
 
     if start_line is not None:
         try:
-            start_line = int(start_line)
+            start_line_int = int(start_line)
+            if start_line_int > total_lines:
+                path_str = f" in '{path}'" if path else ""
+                return (
+                    f"Error: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
+                    f"[Auto-Fix Hint: File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}]"
+                )
+            start_line = start_line_int
         except (ValueError, TypeError):
             start_line = None
 
