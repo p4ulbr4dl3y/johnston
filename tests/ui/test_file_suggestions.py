@@ -1,6 +1,5 @@
 import unittest
 
-from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 

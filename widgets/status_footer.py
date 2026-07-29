@@ -48,6 +48,7 @@ class StatusFooter(Static):
     def refresh_footer(self) -> None:
         try:
             import time
+
             from core.mcp_manager import get_mcp_manager
             from core.skill_manager import SkillManager
 
