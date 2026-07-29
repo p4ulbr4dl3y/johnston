@@ -7,12 +7,10 @@ from tools.base import BaseTool
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiReplaceFileContentTool, ReplaceFileContentTool
-from tools.get_mcp_schema import GetMCPSchemaTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
-from tools.skill import SkillTool
 from tools.subagent import SubagentTool
 from tools.update_plan import UpdatePlanTool
 from tools.web_fetch import WebFetchTool
@@ -25,9 +23,7 @@ TOOL_CLASSES = [
     MultiReplaceFileContentTool,
     ShellTool,
     AskUserTool,
-    SkillTool,
     CallMCPTool,
-    GetMCPSchemaTool,
     ManageTaskTool,
     SubagentTool,
     ManageSubagentTool,

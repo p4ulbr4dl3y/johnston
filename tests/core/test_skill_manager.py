@@ -4,7 +4,6 @@ import tempfile
 import unittest
 
 from core.skill_manager import SkillManager, parse_frontmatter
-from tools.skill import SkillTool
 
 
 class TestSkillManager(unittest.IsolatedAsyncioTestCase):
@@ -56,19 +55,18 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         finally:
             shutil.rmtree(global_tmp)
 
-    async def test_skill_tool_execution(self):
+    def test_skill_payload_loading(self):
         sm = SkillManager(project_dir=self.test_dir)
         p_skill_dir = os.path.join(sm.project_dir_skills, "linter")
         os.makedirs(p_skill_dir, exist_ok=True)
         with open(os.path.join(p_skill_dir, "SKILL.md"), "w") as f:
             f.write("---\nname: linter\ndescription: Project linter\n---\nLint instructions.")
 
-        tool = SkillTool()
-        res = await tool.execute({"name": "linter"})
+        res = sm.load_skill_payload("linter")
         self.assertIn('<skill_content name="linter">', res)
         self.assertIn("Lint instructions.", res)
 
-        res_missing = await tool.execute({"name": "nonexistent"})
+        res_missing = sm.load_skill_payload("nonexistent")
         self.assertIn("Error: Unable to load skill", res_missing)
 
     def test_skills_command_registered(self):

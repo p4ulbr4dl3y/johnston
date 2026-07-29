@@ -248,8 +248,10 @@ class SkillManager:
         skills = self.list_skills()
         if not skills:
             return ""
-        lines = ["Available skills in system context:"]
+        lines = [
+            "Available skills in system context (read SKILL.md via `read`/`view_file` to activate instructions):"
+        ]
         for s in skills:
             desc = f" - {s['description']}" if s['description'] else ""
-            lines.append(f"- {s['name']} ({s['scope']}){desc}")
+            lines.append(f"- {s['name']} ({s['scope']}, location: {s['location']}){desc}")
         return "\n".join(lines)
