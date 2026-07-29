@@ -247,19 +247,31 @@ def safe_update_markdown(widget: Markdown, content: str) -> None:
 
 
 TOKEN_COLORS = {
-    Token.Keyword: "bold #c678dd",
-    Token.Keyword.Namespace: "bold #c678dd",
+    Token.Keyword: "#c678dd",
+    Token.Keyword.Namespace: "#c678dd",
     Token.Keyword.Type: "#e5c07b",
+    Token.Keyword.Declaration: "#c678dd",
     Token.Name.Function: "#61afef",
     Token.Name.Class: "#e5c07b",
+    Token.Name.Tag: "#e06c75",
+    Token.Name.Attribute: "#d19a66",
+    Token.Name.Property: "#e06c75",
+    Token.Name.Variable: "#e06c75",
+    Token.Name.Constant: "#d19a66",
     Token.Name.Builtin: "#e5c07b",
-    Token.Name: "#f4f4f5",
+    Token.Name.Label: "#61afef",
+    Token.Name.Entity: "#56b6c2",
+    Token.Name.Decorator: "#61afef",
+    Token.Name.Other: "#e06c75",
+    Token.Name: "#e06c75",
     Token.String: "#98c379",
     Token.String.Doc: "#98c379",
     Token.Number: "#d19a66",
+    Token.Number.Hex: "#d19a66",
+    Token.Literal: "#d19a66",
     Token.Operator: "#56b6c2",
     Token.Punctuation: "#abb2bf",
-    Token.Comment: "#5c6370 italic",
+    Token.Comment: "#7f848e italic",
 }
 
 
@@ -715,6 +727,19 @@ class ToolCallWidget(Vertical):
                 old_code_lines.append(line[1:])
                 new_code_lines.append(line[1:])
 
+        full_sample = "\n".join(new_code_lines or old_code_lines)
+        if lexer_name == "html":
+            if any(k in full_sample for k in ("function ", "let ", "const ", "var ", "=>", "return ", "while ", "if (", "clearInterval")):
+                try:
+                    lexer = get_lexer_by_name("javascript")
+                except Exception:
+                    pass
+            elif "{" in full_sample and "}" in full_sample and "<" not in full_sample:
+                try:
+                    lexer = get_lexer_by_name("css")
+                except Exception:
+                    pass
+
         old_texts = self._lex_block_to_line_texts(old_code_lines, lexer)
         new_texts = self._lex_block_to_line_texts(new_code_lines, lexer)
 
@@ -757,32 +782,35 @@ class ToolCallWidget(Vertical):
 
             if line.startswith("-"):
                 num_str = str(old_line).rjust(max_num_digits)
-                prefix = Text(f"{num_str} - ", style="bold #f87171 on #2c1517")
-                code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:])
+                line_item = Text()
+                line_item.append(f"{num_str} ", style="dim #71717a")
+                p_code = Text("- ", style="bold #f85149") + (old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:]))
                 old_idx += 1
-                full_line = prefix + code_text
-                full_line.pad_right(width)
-                full_line.stylize("on #2c1517")
-                formatted_lines.append(full_line)
+                p_code.pad_right(width)
+                p_code.stylize("on #2a1215")
+                line_item.append(p_code)
+                formatted_lines.append(line_item)
                 old_line += 1
             elif line.startswith("+"):
                 num_str = str(new_line).rjust(max_num_digits)
-                prefix = Text(f"{num_str} + ", style="bold #4ade80 on #132e22")
-                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                line_item = Text()
+                line_item.append(f"{num_str} ", style="dim #71717a")
+                p_code = Text("+ ", style="bold #3fb950") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
                 new_idx += 1
-                full_line = prefix + code_text
-                full_line.pad_right(width)
-                full_line.stylize("on #132e22")
-                formatted_lines.append(full_line)
+                p_code.pad_right(width)
+                p_code.stylize("on #12261e")
+                line_item.append(p_code)
+                formatted_lines.append(line_item)
                 new_line += 1
             elif line.startswith(" "):
                 num_str = str(new_line).rjust(max_num_digits)
-                prefix = Text(f"{num_str}   ", style="dim #71717a")
-                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                line_item = Text()
+                line_item.append(f"{num_str} ", style="dim #71717a")
+                p_code = Text("  ") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
                 old_idx += 1
                 new_idx += 1
-                full_line = prefix + code_text
-                formatted_lines.append(full_line)
+                line_item.append(p_code)
+                formatted_lines.append(line_item)
                 old_line += 1
                 new_line += 1
             elif line.startswith("\\"):
