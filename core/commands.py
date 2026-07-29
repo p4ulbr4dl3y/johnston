@@ -155,7 +155,7 @@ class ModelsCommand(BaseCommand):
                     selected_model = item_val
 
                 if is_vision_tab:
-                    catalog.set_fallback_vision_model(selected_prov, selected_model, explicit=True)
+                    catalog.set_fallback_vision_model(selected_prov, selected_model)
                     clean_fb = catalog.get_model_display_name(selected_prov, selected_model)
                     app.notify(f"Fallback Vision model set: {clean_fb}")
                     app.query_one("#message-input", ChatInput).focus()
@@ -179,9 +179,6 @@ class ModelsCommand(BaseCommand):
                 app.refresh_status_footer()
                 clean_selected = catalog.get_model_display_name(selected_prov, selected_model)
                 app.notify(f"Model switched: {clean_selected}")
-
-                if catalog.supports_vision(selected_prov, selected_model):
-                    catalog.set_fallback_vision_model(selected_prov, selected_model, explicit=False)
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)

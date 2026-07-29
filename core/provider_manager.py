@@ -471,8 +471,29 @@ class ProviderManager:
                     ttl = 300 if not cached_models else 86400
                     if age < ttl:
                         return cached_models
+                    if cached_models:
+                        # Return stale cache instantly, update in background
+                        try:
+                            loop = asyncio.get_running_loop()
+                            if loop.is_running():
+                                loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
+                        except RuntimeError:
+                            pass
+                        return cached_models
             except Exception:
                 pass
+
+        # 1b. Fast fallback for uninitialized cache without blocking UI
+        if not force_refresh and not os.path.exists(cache_path):
+            fallback = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
+            if fallback:
+                try:
+                    loop = asyncio.get_running_loop()
+                    if loop.is_running():
+                        loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
+                except RuntimeError:
+                    pass
+                return fallback
 
         # 2. Request models via provider HTTP API
         models = []
