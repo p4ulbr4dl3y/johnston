@@ -31,8 +31,18 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     target_provider_key = None
     target_model = None
 
+    def _provider_is_usable(pkey: str) -> bool:
+        if not pkey or pkey not in providers:
+            return False
+        pinfo = providers[pkey]
+        api_type = pinfo.get("api_type", "openai").lower()
+        if api_type == "ollama":
+            return True
+        key_val = pm.get_api_key(pkey) or pinfo.get("api_key", "")
+        return bool(key_val and str(key_val).strip())
+
     def _provider_has_model(pkey: str, model_id: str) -> bool:
-        if not pkey or not model_id or pkey not in providers:
+        if not pkey or not model_id or not _provider_is_usable(pkey):
             return False
         if pm.get_provider_model(pkey) == model_id:
             return True
@@ -43,21 +53,21 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         # Option 1: Explicitly configured fallback vision model (user lock)
         fb_prov, fb_model = catalog.get_fallback_vision_model()
         if fb_model:
-            if fb_prov and fb_prov in providers and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
+            if fb_prov and _provider_is_usable(fb_prov) and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
                 target_provider_key = fb_prov
                 target_model = fb_model
-            elif active_key in providers and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
+            elif active_key and _provider_is_usable(active_key) and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
                 target_provider_key = active_key
                 target_model = fb_model
 
         # Option 2: Active provider model if it natively supports vision
         if not target_provider_key:
-            if active_key in providers and active_model and catalog.supports_vision(active_key, active_model):
+            if active_key and _provider_is_usable(active_key) and active_model and catalog.supports_vision(active_key, active_model):
                 target_provider_key = active_key
                 target_model = active_model
     else:
         # Option 1: Active provider model if it natively supports vision
-        if active_key in providers and active_model and catalog.supports_vision(active_key, active_model):
+        if active_key and _provider_is_usable(active_key) and active_model and catalog.supports_vision(active_key, active_model):
             target_provider_key = active_key
             target_model = active_model
 
@@ -65,16 +75,18 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         if not target_provider_key:
             fb_prov, fb_model = catalog.get_fallback_vision_model()
             if fb_model:
-                if fb_prov and fb_prov in providers and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
+                if fb_prov and _provider_is_usable(fb_prov) and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
                     target_provider_key = fb_prov
                     target_model = fb_model
-                elif active_key in providers and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
+                elif active_key and _provider_is_usable(active_key) and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
                     target_provider_key = active_key
                     target_model = fb_model
 
-    # Option 3: Search any provider that supports vision
-    if not target_provider_key or target_provider_key not in providers:
+    # Option 3: Search any provider that supports vision and has configured API key
+    if not target_provider_key or not _provider_is_usable(target_provider_key):
         for pkey, pinfo in providers.items():
+            if not _provider_is_usable(pkey):
+                continue
             m_cand = pm.get_provider_model(pkey)
             models_to_check = [m_cand] if m_cand else []
             if pinfo.get("models"):
@@ -88,7 +100,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                 break
 
     if not target_provider_key or not target_model:
-        return f"Error: No vision-capable provider available to analyze image '{image_path}'."
+        return f"Error: No vision-capable provider with configured API key available to analyze image '{image_path}'."
 
     try:
         b64_url, mime_type = process_and_encode_image(image_path, max_dim=1568)
