@@ -26,7 +26,6 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
     active_key = pm.get_active_provider_key()
     active_model = pm.get_provider_model(active_key)
-    is_explicit = catalog.is_fallback_vision_explicit()
 
     target_provider_key = None
     target_model = None
@@ -49,8 +48,13 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         p_models = providers[pkey].get("models") or []
         return model_id in p_models
 
-    if is_explicit:
-        # Option 1: Explicitly configured fallback vision model (user lock)
+    # Option 1: Active provider model if it natively supports vision
+    if active_key and _provider_is_usable(active_key) and active_model and catalog.supports_vision(active_key, active_model):
+        target_provider_key = active_key
+        target_model = active_model
+
+    # Option 2: Configured vision model
+    if not target_provider_key:
         fb_prov, fb_model = catalog.get_fallback_vision_model()
         if fb_model:
             if fb_prov and _provider_is_usable(fb_prov) and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
@@ -59,28 +63,6 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
             elif active_key and _provider_is_usable(active_key) and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
                 target_provider_key = active_key
                 target_model = fb_model
-
-        # Option 2: Active provider model if it natively supports vision
-        if not target_provider_key:
-            if active_key and _provider_is_usable(active_key) and active_model and catalog.supports_vision(active_key, active_model):
-                target_provider_key = active_key
-                target_model = active_model
-    else:
-        # Option 1: Active provider model if it natively supports vision
-        if active_key and _provider_is_usable(active_key) and active_model and catalog.supports_vision(active_key, active_model):
-            target_provider_key = active_key
-            target_model = active_model
-
-        # Option 2: Configured fallback vision model
-        if not target_provider_key:
-            fb_prov, fb_model = catalog.get_fallback_vision_model()
-            if fb_model:
-                if fb_prov and _provider_is_usable(fb_prov) and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
-                    target_provider_key = fb_prov
-                    target_model = fb_model
-                elif active_key and _provider_is_usable(active_key) and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
-                    target_provider_key = active_key
-                    target_model = fb_model
 
     # Option 3: Search any provider that supports vision and has configured API key
     if not target_provider_key or not _provider_is_usable(target_provider_key):

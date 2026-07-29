@@ -54,6 +54,7 @@ class ModelsCatalog:
         self._fallback_vision_model: str = ""
         self._fallback_vision_explicit: bool = False
         self._match_cache: Dict[str, str] = {}
+        self._updated_at: float = 0.0
         self.load_cache()
 
     def _trigger_background_refresh(self):
@@ -90,6 +91,7 @@ class ModelsCatalog:
                     self._fallback_vision_provider = data.get("fallback_vision_provider", "")
                     self._fallback_vision_model = data.get("fallback_vision_model", "")
                     self._fallback_vision_explicit = data.get("fallback_vision_explicit", False)
+                    self._updated_at = float(data.get("updated_at", 0.0))
                 loaded = True
             except Exception:
                 pass
@@ -120,8 +122,10 @@ class ModelsCatalog:
         os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
         temp_file = CACHE_FILE + ".tmp"
         try:
+            now = time.time()
+            self._updated_at = now
             payload = {
-                "updated_at": time.time(),
+                "updated_at": now,
                 "model_limits": model_limits if model_limits is not None else self._limits,
                 "output_limits": self._output_limits,
                 "vision_models": vision_models if vision_models is not None else getattr(self, "_native_vision", self._vision),
@@ -146,7 +150,10 @@ class ModelsCatalog:
                 except Exception:
                     pass
 
-    async def refresh(self) -> Dict[str, int]:
+    async def refresh(self, force: bool = False, max_age: float = 86400) -> Dict[str, int]:
+        if not force and self._limits and (time.time() - getattr(self, "_updated_at", 0.0) < max_age):
+            return self._limits
+
         model_limits: Dict[str, int] = {}
         output_limits: Dict[str, int] = {}
         vision_models: List[str] = []
@@ -504,16 +511,15 @@ class ModelsCatalog:
         self._match_cache.clear()
         self.save_cache()
 
-    def set_fallback_vision_model(self, provider_id: str, model_id: str, explicit: bool = False) -> None:
+    def set_fallback_vision_model(self, provider_id: str, model_id: str) -> None:
         self._fallback_vision_provider = provider_id
         self._fallback_vision_model = model_id
-        self._fallback_vision_explicit = explicit
         if model_id and not self.supports_vision(provider_id, model_id):
             self.add_vision_override(model_id)
         self.save_cache()
-        self._save_vision_config(provider_id, model_id, explicit)
+        self._save_vision_config(provider_id, model_id)
 
-    def _save_vision_config(self, provider_id: str, model_id: str, explicit: bool = False) -> None:
+    def _save_vision_config(self, provider_id: str, model_id: str) -> None:
         try:
             data = {}
             if os.path.exists(CONFIG_FILE):
@@ -523,15 +529,11 @@ class ModelsCatalog:
                 data = {}
             data["fallback_vision_provider"] = provider_id
             data["fallback_vision_model"] = model_id
-            data["fallback_vision_explicit"] = explicit
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception:
             pass
-
-    def is_fallback_vision_explicit(self) -> bool:
-        return getattr(self, "_fallback_vision_explicit", False)
 
     def get_fallback_vision_model(self) -> Tuple[str, str]:
         return getattr(self, "_fallback_vision_provider", ""), getattr(self, "_fallback_vision_model", "")
