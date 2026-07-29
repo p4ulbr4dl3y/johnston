@@ -538,6 +538,21 @@ class MCPManager:
                         return client.call_tool(o_name, arguments, timeout=timeout)
         return None
 
+    def get_tool_schema(self, server_name: str, tool_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Returns the raw parameters inputSchema dict for a specific tool on an MCP server.
+        """
+        active_tools = self.get_active_tools(mode="all")
+        for t in active_tools:
+            s_name = t.get("_mcp_server")
+            o_name = t.get("_mcp_tool_name")
+            fn = t.get("function", {})
+            exposed_name = fn.get("name")
+
+            if s_name == server_name and (o_name == tool_name or exposed_name == tool_name):
+                return fn.get("parameters")
+        return None
+
     def get_system_prompt_snippet(self) -> str:
         """
         Returns a prompt snippet summarizing currently enabled MCP servers.
@@ -559,26 +574,15 @@ class MCPManager:
 
             lazy_lines = [
                 "<mcp_servers>",
-                "The following MCP servers are loaded lazily. Use `call_mcp_tool` (server, tool, arguments) to execute these tools."
+                "The following MCP servers are loaded lazily. Use `get_mcp_schema` (server, tool) to view parameters, and `call_mcp_tool` (server, tool, arguments) to execute."
             ]
             for s_name, t_list in lazy_by_server.items():
                 lazy_lines.append(f"\n# {s_name} (Lazy)")
                 for t in t_list:
                     fn = t.get("function", {})
                     desc = fn.get("description", "")
-                    params = fn.get("parameters", {})
-                    props = params.get("properties", {})
-                    reqs = params.get("required", [])
-
-                    param_parts = []
-                    for prop_name, prop_info in props.items():
-                        p_type = prop_info.get("type", "any")
-                        p_req = "*" if prop_name in reqs else ""
-                        param_parts.append(f"{prop_name}{p_req}: {p_type}")
-
-                    param_sig = f"({', '.join(param_parts)})"
                     desc_str = f" — {desc}" if desc else ""
-                    lazy_lines.append(f"- {fn.get('name')}{param_sig}{desc_str}")
+                    lazy_lines.append(f"- {fn.get('name')}{desc_str}")
             lazy_lines.append("</mcp_servers>")
             sections.append("\n".join(lazy_lines))
 

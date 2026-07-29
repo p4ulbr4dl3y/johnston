@@ -148,7 +148,7 @@ class TestMCPManager(unittest.TestCase):
         snippet = mm.get_system_prompt_snippet()
         self.assertIn("<mcp_servers>", snippet)
         self.assertIn("# lazyServer (Lazy)", snippet)
-        self.assertIn("- lazy_tool() — lazy desc", snippet)
+        self.assertIn("- lazy_tool — lazy desc", snippet)
         self.assertIn("Available Eager MCP tools", snippet)
         self.assertIn("eager_tool", snippet)
 
