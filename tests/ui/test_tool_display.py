@@ -43,6 +43,17 @@ class TestToolDisplay(unittest.TestCase):
         # Capitalized tool names (which OpenAI never sends, but we guard) normalize
         self.assertEqual(extract_tool_display("Shell", {"command": "pwd"}), "pwd")
 
+    def test_replace_file_content_target_file(self):
+        res = extract_tool_display(
+            "replace_file_content",
+            {
+                "TargetFile": "/path/to/index.html",
+                "Instruction": "replace button",
+                "ReplacementContent": "<a>Get Started</a>"
+            }
+        )
+        self.assertEqual(res, "/path/to/index.html")
+
 
 if __name__ == "__main__":
     unittest.main()

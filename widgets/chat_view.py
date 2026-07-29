@@ -392,6 +392,7 @@ class ToolCallWidget(Vertical):
 
     EXPANDABLE_TOOLS = {
         "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan", "analyze_image",
+        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file", "view_file",
         "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan", "AnalyzeImage"
     }
 
@@ -487,6 +488,9 @@ class ToolCallWidget(Vertical):
         "multi_replace_file_content": "Edit",
         "replace": "Edit",
         "multi_replace": "Edit",
+        "write_to_file": "Create",
+        "view_file": "Read",
+        "run_command": "Shell",
         "shell": "Shell",
         "bash": "Bash",
         "glob": "Glob",
@@ -510,6 +514,8 @@ class ToolCallWidget(Vertical):
         "read", "create", "edit", "shell", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
         "subagent", "task", "analyze_image", "web_fetch", "get_mcp_schema",
+        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace",
+        "write_to_file", "view_file", "run_command",
         "Read", "Create", "Edit", "Shell", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
         "Subagent", "Task", "AnalyzeImage", "WebFetch", "GetMCPSchema"
@@ -553,7 +559,9 @@ class ToolCallWidget(Vertical):
             self.header_label.update(f"⚙ [bold]GetMCPSchema[/bold]({escape(str(tool_name))})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(self.target))})")
+            from core.tool_display import extract_tool_display
+            target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
             tool_name = self.args.get("tool") or "call_mcp_tool"
             server = self.args.get("server") or ""
@@ -888,9 +896,9 @@ class ToolCallWidget(Vertical):
 
     def render_content(self) -> None:
         try:
-            file_path = self.args.get("path") or self.args.get("file") or self.target
-            if self.tool_type in ("create", "Create"):
-                content = self.args.get("content")
+            file_path = self.args.get("TargetFile") or self.args.get("target_file") or self.args.get("path") or self.args.get("file") or self.target
+            if self.tool_type in ("create", "Create", "write_to_file"):
+                content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
                 if content is None:
                     if file_path and os.path.isfile(file_path):
                         try:

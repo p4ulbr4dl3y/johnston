@@ -74,13 +74,19 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
             return _truncate(img_path)
         return tool_name
 
-    # Generic: prefer a query/prompt argument when present
+    # Prioritize file path arguments first for file operations
+    for key in ("TargetFile", "target_file", "path", "file", "file_path", "filepath", "filename", "image_path"):
+        val = args.get(key)
+        if isinstance(val, str) and val:
+            return _truncate(val)
+
+    # Generic: prefer a query/prompt argument when present (e.g., search, subagent)
     q_val = args.get("query") or args.get("prompt")
     if isinstance(q_val, str) and q_val:
         return _truncate(f'"{q_val}"')
 
-    # Then prefer meaningful string args in a sensible priority order
-    for key in ("path", "file", "command", "question", "url", "image_path"):
+    # Then other string args (command, question, url)
+    for key in ("command", "question", "url"):
         val = args.get(key)
         if isinstance(val, str) and val:
             return _truncate(val)
