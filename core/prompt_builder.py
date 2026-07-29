@@ -162,7 +162,7 @@ class PromptBuilder:
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
 
-        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %z")
         os_info = f"{platform.system()} {platform.release()}"
         git_info = get_git_info()
 
