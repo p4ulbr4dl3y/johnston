@@ -164,18 +164,22 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(cat.get_model_description("deepseek", "deepseek-v4-pro"), "Open MoE flagship")
 
     def test_vision_overrides_and_fallbacks(self):
-        cat = ModelsCatalog()
-        cat.add_vision_override("custom-model-vision")
-        self.assertTrue(cat.supports_vision("provider", "custom-model-vision"))
-        self.assertFalse(cat.is_native_vision("provider", "custom-model-vision"))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_cfg = os.path.join(tmp_dir, "config.json")
+            tmp_cache = os.path.join(tmp_dir, "cache.json")
+            with patch("core.models_catalog.CONFIG_FILE", tmp_cfg), patch("core.models_catalog.CACHE_FILE", tmp_cache):
+                cat = ModelsCatalog()
+                cat.add_vision_override("custom-model-vision")
+                self.assertTrue(cat.supports_vision("provider", "custom-model-vision"))
+                self.assertFalse(cat.is_native_vision("provider", "custom-model-vision"))
 
-        cat.set_fallback_vision_model("provider_x", "model_y")
-        prov, mod = cat.get_fallback_vision_model()
-        self.assertEqual(prov, "provider_x")
-        self.assertEqual(mod, "model_y")
+                cat.set_fallback_vision_model("provider_x", "model_y")
+                prov, mod = cat.get_fallback_vision_model()
+                self.assertEqual(prov, "provider_x")
+                self.assertEqual(mod, "model_y")
 
-        cat.remove_vision_override("custom-model-vision")
-        self.assertFalse(cat.supports_vision("provider", "custom-model-vision"))
+                cat.remove_vision_override("custom-model-vision")
+                self.assertFalse(cat.supports_vision("provider", "custom-model-vision"))
 
     def test_save_and_load_cache(self):
         cat = ModelsCatalog()
