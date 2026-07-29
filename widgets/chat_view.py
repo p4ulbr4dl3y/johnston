@@ -317,8 +317,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
-        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan"
+        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan", "analyze_image",
+        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan", "AnalyzeImage"
     }
 
     def is_expandable(self) -> bool:
@@ -421,7 +421,7 @@ class ToolCallWidget(Vertical):
         "subagent": "Subagent",
         "manage_subagent": "ManageSubagent",
         "task": "Task",
-        "view_image": "ViewImage",
+        "analyze_image": "AnalyzeImage",
         "call_mcp_tool": "CallMCPTool",
         "web_fetch": "WebFetch",
         "update_plan": "Plan",
@@ -431,17 +431,17 @@ class ToolCallWidget(Vertical):
     SYSTEM_TOOLS = {
         "read", "create", "edit", "shell", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
-        "subagent", "task", "view_image", "web_fetch",
+        "subagent", "task", "analyze_image", "web_fetch",
         "Read", "Create", "Edit", "Shell", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
-        "Subagent", "Task", "ViewImage", "WebFetch"
+        "Subagent", "Task", "AnalyzeImage", "WebFetch"
     }
 
     def render_header(self) -> None:
-        if self.tool_type.lower() in ("view_image", "viewimage"):
-            display_name = "ViewImage"
+        if self.tool_type.lower() in ("analyze_image", "analyzeimage"):
+            display_name = "AnalyzeImage"
             img_path = self.args.get("path") or self.args.get("image_path") or ""
-            prompt_val = self.args.get("prompt") or ""
+            prompt_val = self.args.get("prompt") or self.args.get("question") or ""
             if img_path or prompt_val:
                 import os
                 base_name = os.path.basename(img_path) if img_path else ""
@@ -822,6 +822,25 @@ class ToolCallWidget(Vertical):
                 explanation = self.args.get("explanation", "")
                 formatted_plan = self._format_plan_display(plan_items, explanation)
                 self.content_widget.update(formatted_plan)
+            elif self.tool_type in ("analyze_image", "AnalyzeImage"):
+                raw_text = self.result_text or ""
+                if raw_text.strip().lower().startswith("error"):
+                    t = Text(raw_text.strip(), style="bold #ffffff")
+                    self.content_widget.update(t)
+                else:
+                    clean_code = raw_text.rstrip("\r\n")
+                    try:
+                        syntax = Syntax(
+                            clean_code,
+                            "markdown",
+                            theme="one-dark",
+                            line_numbers=False,
+                            word_wrap=True,
+                            background_color="#18181b"
+                        )
+                        self.content_widget.update(syntax)
+                    except Exception:
+                        self.content_widget.update(escape(clean_code or "(No analysis)"))
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
@@ -1038,7 +1057,7 @@ class ChatView(VerticalScroll):
             p = args.get("path") or target or ""
             ext = os.path.splitext(p)[1].lower() if p else ""
             if ext in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}:
-                tool_type = "view_image"
+                tool_type = "analyze_image"
 
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)

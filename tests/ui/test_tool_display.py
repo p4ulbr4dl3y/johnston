@@ -22,8 +22,8 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("manage_task", {"action": "status", "task_id": "shell_123"})
         self.assertEqual(res, "status shell_123")
 
-    def test_view_image_basename(self):
-        res = extract_tool_display("view_image", {"path": "/tmp/img.png"})
+    def test_analyze_image_basename(self):
+        res = extract_tool_display("analyze_image", {"path": "/tmp/img.png"})
         self.assertEqual(res, "img.png")
 
     def test_unknown_tool_fallback(self):

@@ -3,15 +3,20 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+from tools.analyze_image import (
+    AnalyzeImageTool,
+    analyze_image_with_fallback,
+    process_and_encode_image,
+)
 from tools.read import ReadTool
-from tools.view_image import ViewImageTool, analyze_image_with_fallback
 
 
-class TestViewImageTool(unittest.IsolatedAsyncioTestCase):
+class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
 
-    async def test_view_image_tool(self):
-        # Standard call to ViewImageTool
-        tool = ViewImageTool()
+    async def test_analyze_image_tool(self):
+        # Standard call to AnalyzeImageTool
+        tool = AnalyzeImageTool()
+        self.assertEqual(tool.name, "analyze_image")
         res = await tool.execute({"path": "tests/test_app.py"})
         self.assertIn("Error:", res)  # test_app.py is not an image
 
@@ -92,7 +97,6 @@ class TestProcessAndEncodeImage(unittest.TestCase):
 
         from PIL import Image
 
-        from tools.view_image import process_and_encode_image
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             temp_path = f.name
@@ -111,7 +115,6 @@ class TestProcessAndEncodeImage(unittest.TestCase):
 
         from PIL import Image
 
-        from tools.view_image import process_and_encode_image
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             temp_path = f.name
@@ -127,7 +130,6 @@ class TestProcessAndEncodeImage(unittest.TestCase):
     def test_encode_fallback_non_image(self):
         import tempfile
 
-        from tools.view_image import process_and_encode_image
 
         with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
             f.write(b"not an image at all")
@@ -141,7 +143,7 @@ class TestProcessAndEncodeImage(unittest.TestCase):
                 os.remove(temp_path)
 
 
-class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
+class TestAnalyzeImageToolErrors(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.old_cwd = os.getcwd()
@@ -152,14 +154,14 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
 
     async def test_file_not_found(self):
-        tool = ViewImageTool()
+        tool = AnalyzeImageTool()
         res = await tool.execute({"path": "missing.png"})
         self.assertIn("Error", res)
         self.assertIn("not found", res)
 
     async def test_unsupported_format(self):
         import tempfile
-        tool = ViewImageTool()
+        tool = AnalyzeImageTool()
         with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False, dir=".") as f:
             f.write(b"binary data")
             temp_path = f.name
@@ -173,7 +175,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
 
     async def test_svg_inspection(self):
         import tempfile
-        tool = ViewImageTool()
+        tool = AnalyzeImageTool()
         svg_content = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>'
         with tempfile.NamedTemporaryFile(suffix=".svg", delete=False, mode="w", encoding="utf-8", dir=".") as f:
             f.write(svg_content)
@@ -188,7 +190,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
 
     async def test_svg_read_error(self):
         import tempfile
-        tool = ViewImageTool()
+        tool = AnalyzeImageTool()
         with tempfile.NamedTemporaryFile(suffix=".svg", delete=False, dir=".") as f:
             f.write(b"\xff\xfe invalid binary")
             temp_path = f.name
@@ -206,7 +208,7 @@ class TestViewImageToolErrors(unittest.IsolatedAsyncioTestCase):
 
         from core.models_catalog import catalog
 
-        tool = ViewImageTool()
+        tool = AnalyzeImageTool()
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir=".") as f:
             temp_path = f.name
         try:

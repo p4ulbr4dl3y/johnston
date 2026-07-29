@@ -55,9 +55,9 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
             return _truncate(act)
         return tool_name
 
-    if name == "view_image":
+    if name == "analyze_image":
         img_path = args.get("path") or args.get("image_path") or ""
-        prompt_val = args.get("prompt") or ""
+        prompt_val = args.get("prompt") or args.get("question") or ""
         base_name = os.path.basename(img_path) if img_path else ""
         short_prompt = (prompt_val[:45] + "...") if len(prompt_val) > 45 else prompt_val
         if short_prompt and base_name:
