@@ -754,6 +754,17 @@ class ToolCallWidget(Vertical):
 
         return "\n".join(clean_code_lines), start_line, file_path
 
+    def _fix_markdown_nested_lists(self, text: str) -> str:
+        if not text:
+            return ""
+        lines = text.splitlines()
+        fixed = []
+        for line in lines:
+            # Fix double list markers (e.g. "  - * text" or "1. * text") from LLM transcribing
+            line = re.sub(r"^(\s*(?:[-*]|\d+\.)\s+)[-*]\s+", r"\1", line)
+            fixed.append(line)
+        return "\n".join(fixed)
+
     def _clean_bash_output(self, text: str) -> str:
         if not text:
             return ""
@@ -841,6 +852,7 @@ class ToolCallWidget(Vertical):
                 else:
                     default_target = self.args.get("url") or file_path or "page.md"
                     clean_code, _, _ = self._format_read_content(raw_text, default_target)
+                    clean_code = self._fix_markdown_nested_lists(clean_code)
                     safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
             elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
