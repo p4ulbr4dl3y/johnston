@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any, Dict, Optional
 
 from tools.base import BaseTool
@@ -6,10 +7,7 @@ from tools.base import BaseTool
 
 class CallMCPTool(BaseTool):
     name = "call_mcp_tool"
-    description = (
-        "Call a lazy-loaded MCP tool by server name, tool name, and arguments. "
-        "Use this tool when executing MCP tools listed under lazy MCP servers."
-    )
+    description = "Execute a lazy-loaded MCP tool by server name, tool name, and arguments."
     schema = {
         "type": "function",
         "function": {
@@ -17,18 +15,9 @@ class CallMCPTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "server": {
-                        "type": "string",
-                        "description": "Name of the MCP server"
-                    },
-                    "tool": {
-                        "type": "string",
-                        "description": "Name of the MCP tool to execute"
-                    },
-                    "arguments": {
-                        "type": "object",
-                        "description": "Arguments dictionary for the MCP tool"
-                    }
+                    "server": {"type": "string", "description": "MCP server name"},
+                    "tool": {"type": "string", "description": "MCP tool name"},
+                    "arguments": {"type": "object", "description": "Tool arguments dict"}
                 },
                 "required": ["server", "tool"]
             }
@@ -42,6 +31,7 @@ class CallMCPTool(BaseTool):
 
         if not server or not tool:
             return "Error: Both 'server' and 'tool' parameters are required."
+
         from core.mode_manager import ModeManager
 
         app_obj = getattr(app, "app", app)
@@ -54,11 +44,19 @@ class CallMCPTool(BaseTool):
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
 
+        def _get_schema_hint() -> str:
+            schema = mcp_mgr.get_tool_schema(server, tool)
+            if schema:
+                return f"\n\n[MCP Tool Schema Hint for '{tool}']:\n{json.dumps(schema, indent=2, ensure_ascii=False)}"
+            return ""
+
         try:
             res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
             if res is not None:
+                if isinstance(res, str) and (res.startswith("Error") or "error" in res.lower()):
+                    return res + _get_schema_hint()
                 return res
         except Exception as e:
-            return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}"
+            return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}" + _get_schema_hint()
 
-        return f"Error: Failed to execute MCP tool '{tool}' on server '{server}'. Server or tool not found."
+        return f"Error: Failed to execute MCP tool '{tool}' on server '{server}'. Server or tool not found." + _get_schema_hint()

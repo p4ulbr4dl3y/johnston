@@ -580,9 +580,13 @@ class MCPManager:
                 lazy_lines.append(f"\n# {s_name} (Lazy)")
                 for t in t_list:
                     fn = t.get("function", {})
+                    name = fn.get("name", "")
                     desc = fn.get("description", "")
                     desc_str = f" — {desc}" if desc else ""
-                    lazy_lines.append(f"- {fn.get('name')}{desc_str}")
+                    params = fn.get("parameters", {}).get("properties", {})
+                    param_names = ", ".join(params.keys()) if params else ""
+                    sig = f"{name}({param_names})" if param_names else name
+                    lazy_lines.append(f"- {sig}{desc_str}")
             lazy_lines.append("</mcp_servers>")
             sections.append("\n".join(lazy_lines))
 
