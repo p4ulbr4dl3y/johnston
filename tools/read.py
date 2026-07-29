@@ -90,11 +90,7 @@ def convert_doc_to_markdown_sync(path: str) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = (
-        "Read file content cleanly with 800-line window pagination. "
-        "Automatically converts PDF/DOCX/XLSX/PPTX to Markdown with caching. "
-        "Specify path, and optionally start_line, end_line (1-indexed), or content_offset (bytes)."
-    )
+    description = "Read file contents with 800-line window pagination. Auto-converts PDF/DOCX to Markdown."
     schema = {
         "type": "function",
         "function": {
@@ -102,10 +98,10 @@ class ReadTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "start_line": {"type": "integer", "description": "Start line number (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line number (inclusive)"},
-                    "content_offset": {"type": "integer", "description": "Byte offset into file content"}
+                    "path": {"type": "string", "description": "File path"},
+                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                    "content_offset": {"type": "integer", "description": "Byte offset"}
                 },
                 "required": ["path"]
             }

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from tools.create import CreateTool
-from tools.edit import EditTool
+from tools.edit import ReplaceFileContentTool
 from tools.linter import run_linter
 from tools.read import ReadTool
 from tools.shell import ShellTool
@@ -104,20 +104,20 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("is a directory", res_dir_err)
 
     async def test_edit_tool(self):
-        tool = EditTool()
+        tool = ReplaceFileContentTool()
         file_path = os.path.join(self.test_dir, "code.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    return 42\n")
 
         # Edit on directory error
-        res_edit_dir = await tool.execute({"path": self.test_dir, "old_string": "a", "new_string": "b"})
+        res_edit_dir = await tool.execute({"target_file": self.test_dir, "target_content": "a", "replacement_content": "b"})
         self.assertIn("is a directory", res_edit_dir)
 
         # Successful edit
         res = await tool.execute({
-            "path": file_path,
-            "old_string": "return 42",
-            "new_string": "return 100"
+            "target_file": file_path,
+            "target_content": "return 42",
+            "replacement_content": "return 100"
         })
         self.assertIn("-    return 42", res)
         self.assertIn("+    return 100", res)

@@ -7,12 +7,7 @@ from tools.base import BaseTool
 
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
-    description = (
-        "Manage active and historical subagents for current session. "
-        "Actions: 'list' (view subagents), 'status' (inspect subagent logs/status; do not poll running subagents in a loop), "
-        "'kill' (terminate a running subagent), or 'send_message' (send a follow-up prompt to ANY subagent, "
-        "including COMPLETED ones. Completed subagents WILL resume, process the message, and respond)."
-    )
+    description = "Manage active and historical subagents. Actions: list, status, kill, send_message."
     schema = {
         "type": "function",
         "function": {
@@ -23,19 +18,19 @@ class ManageSubagentTool(BaseTool):
                     "action": {
                         "type": "string",
                         "enum": ["list", "status", "kill", "send_message"],
-                        "description": "Action: 'list', 'status', 'kill', or 'send_message' (resumes ANY subagent, completed or running)"
+                        "description": "Action type"
                     },
                     "task_id": {
                         "type": "string",
-                        "description": "Subagent task_id or description (required for status, kill, send_message)"
+                        "description": "Target subagent task_id or description"
                     },
                     "message": {
                         "type": "string",
-                        "description": "Follow-up message to send to the subagent (works on COMPLETED subagents too, resuming them)"
+                        "description": "Follow-up message for subagent"
                     },
                     "background": {
                         "type": "boolean",
-                        "description": "If true, run follow-up message in background without blocking chat UI"
+                        "description": "Run follow-up message asynchronously"
                     }
                 },
                 "required": ["action"]
