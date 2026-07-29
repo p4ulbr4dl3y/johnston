@@ -31,6 +31,13 @@ class ManageTaskTool(BaseTool):
         if not tasks and not ctx.app:
             return "No background task manager available."
 
+        def _task_not_found_msg(tid: str) -> str:
+            active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
+            if active_ids:
+                ids_str = ", ".join(f"'{i}'" for i in active_ids)
+                return f"No task found with ID: {tid}. [Auto-Fix Hint: Active background task IDs: {ids_str}]"
+            return f"No task found with ID: {tid}. [Auto-Fix Hint: No active background tasks running.]"
+
         if action == "list":
             if not tasks:
                 return "No background tasks currently active."
@@ -45,7 +52,7 @@ class ManageTaskTool(BaseTool):
                 return "Error: task_id parameter required for 'status' action."
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
-                return f"No task found with ID: {task_id}. Do NOT poll in a loop. Use manage_task(action='list') to see active tasks, or end your turn."
+                return _task_not_found_msg(task_id)
             t = matching[0]
             out = "".join(t.output)
             if len(out) > 4000:
@@ -62,7 +69,7 @@ class ManageTaskTool(BaseTool):
                 input_text = ""
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
-                return f"No task found with ID: {task_id}"
+                return _task_not_found_msg(task_id)
             t = matching[0]
             if not getattr(t, "is_running", False):
                 return f"Task {task_id} is not running."
@@ -76,7 +83,7 @@ class ManageTaskTool(BaseTool):
                 return "Error: task_id parameter required for 'kill' action."
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
-                return f"No task found with ID: {task_id}"
+                return _task_not_found_msg(task_id)
             t = matching[0]
             if getattr(t, "is_running", False):
                 try:

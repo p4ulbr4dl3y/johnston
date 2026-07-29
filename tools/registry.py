@@ -88,7 +88,15 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(mcp_mgr.get_capabilities_for_exposed_tool(name))
 
     if not is_mcp:
-        return f"Unknown tool: {name}"
+        import difflib
+        all_candidates = set(REGISTRY.keys()) | set(ALIAS_MAP.keys())
+        matches = difflib.get_close_matches(clean_name, sorted(all_candidates), n=2, cutoff=0.4)
+        hint = ""
+        if matches:
+            resolved_target = ALIAS_MAP.get(matches[0], matches[0])
+            desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
+            hint = f" [Auto-Fix Hint: Did you mean '{matches[0]}'{desc_str}?]"
+        return f"Unknown tool: {name}.{hint}"
 
     from core.mode_manager import ModeManager
 

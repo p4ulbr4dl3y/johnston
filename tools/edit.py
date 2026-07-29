@@ -7,6 +7,34 @@ from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.linter import run_linter
 
 
+def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str:
+    target_lines = [line_item.strip() for line_item in target.splitlines() if line_item.strip()]
+    if not target_lines:
+        return ""
+
+    first_line_target = target_lines[0]
+    file_lines = current_text.splitlines()
+
+    close_lines = difflib.get_close_matches(first_line_target, [line_item.strip() for line_item in file_lines], n=2, cutoff=0.4)
+    if close_lines:
+        match_line_num = 1
+        for idx, line in enumerate(file_lines, start=1):
+            if close_lines[0] in line:
+                match_line_num = idx
+                break
+
+        start_snip = max(1, match_line_num - 2)
+        end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
+        snippet_lines = file_lines[start_snip - 1:end_snip]
+        snippet_str = "\n".join(f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip))
+        return (
+            f"\n\n[Auto-Fix Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
+            f"{snippet_str}\n"
+            f"[Re-try with target_content matching this snippet and pass start_line={start_snip}, end_line={end_snip}]"
+        )
+    return ""
+
+
 def apply_chunk_replacements(
     content: str,
     raw_chunks: List[Dict[str, Any]],
@@ -70,35 +98,25 @@ def apply_chunk_replacements(
         current_text = "".join(lines)
 
         if s_line is not None or e_line is not None:
-            total_lines = len(lines)
-            start_idx = max(0, (s_line or 1) - 1)
-            end_idx = min(total_lines, e_line if e_line is not None else total_lines)
-
-            if start_idx >= total_lines:
-                raise ValueError(f"Error: start_line {s_line} is beyond file line count ({total_lines}).")
+            start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
+            end_idx = e_line if (e_line and e_line <= len(lines)) else len(lines)
 
             sub_lines = lines[start_idx:end_idx]
             sub_text = "".join(sub_lines)
 
             count = sub_text.count(target)
             if count == 0:
-                if target in current_text:
-                    target_first_line = target.splitlines()[0] if target.splitlines() else target
-                    found_line = 1
-                    for l_no, line_str in enumerate(lines, start=1):
-                        if target_first_line in line_str:
-                            found_line = l_no
-                            break
-                    raise ValueError(
-                        f"Error: target_content not found between lines {s_line} and {e_line} in '{path}'. "
-                        f"Target content was found elsewhere around line {found_line}. "
-                        f"Please inspect line numbers with read tool."
-                    )
-                else:
-                    raise ValueError(
-                        f"Error: target_content not found in '{path}'. "
-                        f"Make sure to inspect exact code and whitespace with read tool."
-                    )
+                target_first_line = target.splitlines()[0] if target.splitlines() else target
+                found_line = 1
+                for l_no, line_str in enumerate(lines, start=1):
+                    if target_first_line in line_str:
+                        found_line = l_no
+                        break
+                hint = _generate_fuzzy_match_hint(current_text, target, path)
+                raise ValueError(
+                    f"Error: target_content not found between lines {s_line} and {e_line} in '{path}'. "
+                    f"Target content was found elsewhere around line {found_line}.{hint}"
+                )
 
             if count > 1 and not allow_mult:
                 raise ValueError(
@@ -112,9 +130,9 @@ def apply_chunk_replacements(
         else:
             count = current_text.count(target)
             if count == 0:
+                hint = _generate_fuzzy_match_hint(current_text, target, path)
                 raise ValueError(
-                    f"Error: exact block of text not found in '{path}'. "
-                    f"Make sure to call read tool first to inspect exact lines and indentation."
+                    f"Error: exact block of text not found in '{path}'.{hint}"
                 )
             if count > 1 and not allow_mult:
                 raise ValueError(
