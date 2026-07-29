@@ -785,32 +785,35 @@ class ToolCallWidget(Vertical):
                 num_str = str(old_line).rjust(max_num_digits)
                 line_item = Text()
                 line_item.append(f"{num_str} ", style="#f85149")
-                p_code = Text("- ", style="bold #f85149") + (old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:]))
+                line_item.append("- ", style="bold #f85149")
+                code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:])
                 old_idx += 1
-                p_code.pad_right(width)
-                p_code.stylize("on #2a1215")
-                line_item.append(p_code)
+                line_item.append(code_text)
+                line_item.pad_right(width)
+                line_item.stylize("on #2a1215")
                 formatted_lines.append(line_item)
                 old_line += 1
             elif line.startswith("+"):
                 num_str = str(new_line).rjust(max_num_digits)
                 line_item = Text()
                 line_item.append(f"{num_str} ", style="#3fb950")
-                p_code = Text("+ ", style="bold #3fb950") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
+                line_item.append("+ ", style="bold #3fb950")
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
                 new_idx += 1
-                p_code.pad_right(width)
-                p_code.stylize("on #12261e")
-                line_item.append(p_code)
+                line_item.append(code_text)
+                line_item.pad_right(width)
+                line_item.stylize("on #12261e")
                 formatted_lines.append(line_item)
                 new_line += 1
             elif line.startswith(" "):
                 num_str = str(new_line).rjust(max_num_digits)
                 line_item = Text()
                 line_item.append(f"{num_str} ", style="#6e7681")
-                p_code = Text("  ") + (new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:]))
+                line_item.append("  ")
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
                 old_idx += 1
                 new_idx += 1
-                line_item.append(p_code)
+                line_item.append(code_text)
                 formatted_lines.append(line_item)
                 old_line += 1
                 new_line += 1
