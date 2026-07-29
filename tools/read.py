@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 from tools.base import BaseTool, resolve_path
 
@@ -115,18 +115,27 @@ class ReadTool(BaseTool):
 
         if os.path.isdir(path):
             try:
-                entries = sorted(os.listdir(path))
-                formatted_entries = []
-                for entry in entries:
+                raw_entries = sorted(os.listdir(path))
+                total_count = len(raw_entries)
+                MAX_DIR_ENTRIES = 60
+
+                dirs, files = [], []
+                for entry in raw_entries:
                     full_p = os.path.join(path, entry)
                     if os.path.isdir(full_p):
-                        formatted_entries.append(f"{entry}/")
+                        dirs.append(f"{entry}/")
                     else:
-                        formatted_entries.append(entry)
-                content = "\n".join(formatted_entries) if formatted_entries else "(empty directory)"
+                        files.append(entry)
+
+                formatted = dirs + files
+                if len(formatted) > MAX_DIR_ENTRIES:
+                    shown = formatted[:MAX_DIR_ENTRIES]
+                    content = "\n".join(shown) + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
+                else:
+                    content = "\n".join(formatted) if formatted else "(empty directory)"
+
                 return (
-                    f"Path '{path}' is a directory. [Hint: Use shell commands (e.g. 'ls') to explore directories instead of 'read'.]\n"
-                    f"Directory contents ({len(entries)} items):\n{content}"
+                    f"Path '{path}' is a directory ({total_count} items):\n{content}"
                 )
             except Exception as e:
                 return f"Error listing directory '{path}': {e}"
@@ -143,11 +152,10 @@ class ReadTool(BaseTool):
         # Handle image files via AnalyzeImageTool
         if ext in IMAGE_EXTENSIONS:
             from tools.analyze_image import AnalyzeImageTool
-            return await AnalyzeImageTool().execute(args, app)
+            tool = AnalyzeImageTool()
+            return await tool.execute({"path": path})
 
-        lines: List[str] = []
-
-        # Handle rich documents via markitdown in background thread
+        # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
             try:
                 md_text = await asyncio.to_thread(convert_doc_to_markdown_sync, path)
@@ -185,6 +193,6 @@ class ReadTool(BaseTool):
             raw_lines,
             start_line=start_line,
             end_line=end_line,
-            max_chars=32000,
+            max_chars=14000,
             path=path,
         )
