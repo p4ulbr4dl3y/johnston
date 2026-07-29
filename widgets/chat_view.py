@@ -729,13 +729,14 @@ class ToolCallWidget(Vertical):
 
         full_sample = "\n".join(old_code_lines + new_code_lines)
         if lexer_name == "html":
-            js_keywords = ("function", "let ", "const ", "var ", "=>", "return", "while", "if", "else", "localStorage", "getItem", "setItem", "document.", "console.", "null", "true", "false", "=", ";")
-            if any(k in full_sample for k in js_keywords) and ("<" not in full_sample or "<script" in full_sample):
+            has_html_tags = bool(re.search(r'</?[a-zA-Z][a-zA-Z0-9]*[\s/>]|<!--', full_sample))
+            js_keywords = ("function", "let ", "const ", "var ", "=>", "return", "while", "if", "else", "localStorage", "getItem", "setItem", "document.", "console.", "null", "true", "false", "clearInterval", "setInterval", "addEventListener", "=")
+            if any(k in full_sample for k in js_keywords) and not has_html_tags:
                 try:
                     lexer = get_lexer_by_name("javascript")
                 except Exception:
                     pass
-            elif "{" in full_sample and "}" in full_sample and "<" not in full_sample:
+            elif "{" in full_sample and "}" in full_sample and not has_html_tags:
                 try:
                     lexer = get_lexer_by_name("css")
                 except Exception:
