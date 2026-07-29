@@ -132,23 +132,29 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
 
 class ProviderManager:
     def __init__(self):
-        self._config_cache: dict = {}
-        self._config_mtime: float = 0.0
-        self._providers_cache: dict = {}
-        self._providers_mtime: float = 0.0
+        self.invalidate_cache()
         self.ensure_config_dir()
+
+    def invalidate_cache(self):
+        self._config_cache = {}
+        self._config_mtime = 0.0
+        self._config_file_path = ""
+        self._providers_cache = {}
+        self._providers_mtime = 0.0
+        self._providers_file_path = ""
 
     def _get_config_data(self) -> dict:
         if not os.path.exists(CONFIG_FILE):
             return {}
         try:
             mtime = os.path.getmtime(CONFIG_FILE)
-            if self._config_cache and self._config_mtime == mtime:
+            if self._config_cache and getattr(self, "_config_file_path", "") == CONFIG_FILE and self._config_mtime == mtime:
                 return self._config_cache
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._config_cache = data if isinstance(data, dict) else {}
             self._config_mtime = mtime
+            self._config_file_path = CONFIG_FILE
             return self._config_cache
         except Exception:
             return {}
@@ -160,6 +166,7 @@ class ProviderManager:
             try:
                 with open(PROVIDERS_JSON_FILE, "w", encoding="utf-8") as f:
                     json.dump(DEFAULT_JSON_PROVIDERS, f, indent=2, ensure_ascii=False)
+                self.invalidate_cache()
             except Exception:
                 pass
 
@@ -171,13 +178,14 @@ class ProviderManager:
         if os.path.exists(PROVIDERS_JSON_FILE):
             try:
                 mtime = os.path.getmtime(PROVIDERS_JSON_FILE)
-                if self._providers_cache and self._providers_mtime == mtime:
+                if self._providers_cache and getattr(self, "_providers_file_path", "") == PROVIDERS_JSON_FILE and self._providers_mtime == mtime:
                     data = self._providers_cache
                 else:
                     with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self._providers_cache = data if isinstance(data, dict) else {}
                     self._providers_mtime = mtime
+                    self._providers_file_path = PROVIDERS_JSON_FILE
                 if isinstance(data, dict):
                     for k, v in data.items():
                         if isinstance(v, dict):
@@ -205,6 +213,7 @@ class ProviderManager:
         data["disabled_providers"] = list(disabled_set)
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        self.invalidate_cache()
 
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
         """Loads providers from JSON definitions"""
@@ -255,6 +264,7 @@ class ProviderManager:
         data["active_provider"] = key
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
         if os.path.exists(CONFIG_FILE):
@@ -281,6 +291,7 @@ class ProviderManager:
         data["api_keys"][key] = api_key
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):
         """Saves selected model for provider to config and provider definition"""
@@ -308,6 +319,7 @@ class ProviderManager:
                         json.dump(jdata, f, indent=2, ensure_ascii=False)
             except Exception:
                 pass
+        self.invalidate_cache()
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
         data = {}
@@ -330,6 +342,7 @@ class ProviderManager:
 
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
+        self.invalidate_cache()
 
     def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
         providers = self.load_providers()
