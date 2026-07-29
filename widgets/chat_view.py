@@ -343,6 +343,7 @@ class ToolCallWidget(Vertical):
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
+        self.md_widget = Markdown("", classes="tool-content-md")
 
     def _format_compact_dict(self, d: dict) -> str:
         if not isinstance(d, dict) or not d:
@@ -383,9 +384,11 @@ class ToolCallWidget(Vertical):
     def compose(self) -> ComposeResult:
         yield self.header_label
         yield self.content_widget
+        yield self.md_widget
 
     def on_mount(self) -> None:
         self.content_widget.display = False
+        self.md_widget.display = False
         self.render_header()
 
     def set_result(self, result_text: str) -> None:
@@ -520,9 +523,15 @@ class ToolCallWidget(Vertical):
         self.render_header()
         if self.is_expanded:
             self.render_content()
-            self.content_widget.display = True
+            if self.tool_type.lower() in ("analyze_image", "analyzeimage", "web_fetch", "webfetch"):
+                self.md_widget.display = True
+                self.content_widget.display = False
+            else:
+                self.content_widget.display = True
+                self.md_widget.display = False
         else:
             self.content_widget.display = False
+            self.md_widget.display = False
 
     def _guess_lexer(self, path_str: str) -> str:
         if not path_str:
@@ -822,16 +831,25 @@ class ToolCallWidget(Vertical):
                 explanation = self.args.get("explanation", "")
                 formatted_plan = self._format_plan_display(plan_items, explanation)
                 self.content_widget.update(formatted_plan)
-            elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch", "analyze_image", "AnalyzeImage"):
+            elif self.tool_type in ("analyze_image", "AnalyzeImage", "web_fetch", "WebFetch"):
+                raw_text = self.result_text or ""
+                if raw_text.strip().lower().startswith("error"):
+                    t = Text(raw_text.strip(), style="bold #ffffff")
+                    self.content_widget.update(t)
+                    self.content_widget.display = True
+                    self.md_widget.display = False
+                else:
+                    default_target = self.args.get("url") or file_path or "page.md"
+                    clean_code, _, _ = self._format_read_content(raw_text, default_target)
+                    safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
+            elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                 else:
-                    default_target = self.args.get("url") or file_path or "file.md"
+                    default_target = file_path or "file.txt"
                     clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
-                if self.tool_type.lower() in ("web_fetch", "analyze_image"):
-                    fpath = "file.md"
 
                 if not clean_code.strip() and fpath and os.path.isfile(fpath):
                     try:
