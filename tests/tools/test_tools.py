@@ -230,6 +230,18 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = format_line_pagination(lines, start_line=1, end_line=1200)
         self.assertIn("Lines 1-800 of 1499", res)
 
+    async def test_format_line_pagination_char_limit_line_boundary(self):
+        from tools.utils import format_line_pagination
+        long_line = "x" * 100
+        lines = [long_line for _ in range(500)]
+        # max_chars=300 -> each line formatted is ~109 chars ("    1 | x...x")
+        # 2 complete lines ~219 chars fit, 3 lines exceed 300
+        res = format_line_pagination(lines, start_line=1, max_chars=300)
+        self.assertIn("Lines 1-2 of 500", res)
+        self.assertIn("Use start_line=3", res)
+        self.assertNotIn("Output truncated at", res)
+
+
 
     async def test_ask_user_validation(self):
         from tools.ask_user import AskUserTool
