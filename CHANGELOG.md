@@ -1,5 +1,70 @@
 # Changelog
 
+## [0.6.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.5.0...johnston-v0.6.0) (2026-07-29)
+
+
+### Features
+
+* **core:** add rule 14 for skill slash commands to system prompt core principles ([e302780](https://github.com/p4ulbr4dl3y/johnston/commit/e3027807334fad505409de29859f913d2597db72))
+* **core:** support skills anywhere in user prompt (start, middle, or end) ([425f8ba](https://github.com/p4ulbr4dl3y/johnston/commit/425f8baef1559b5d324751283381000d2b98fd01))
+* **tools:** add hint when read tool is used on directories ([1ad3c98](https://github.com/p4ulbr4dl3y/johnston/commit/1ad3c98f63dbe3c0e085734a066e71de083d16b1))
+* **tools:** auto-list directory contents in ReadTool ([0432523](https://github.com/p4ulbr4dl3y/johnston/commit/04325237b1e0ad80897656e0fd833571835503bf))
+* **tools:** return clean error hint on directory read without dumping contents ([17a4797](https://github.com/p4ulbr4dl3y/johnston/commit/17a47975f0ab48fdf8093018b2812dd49ec05d06))
+* **ui:** support slash suggestions anywhere in prompt and multi-skill execution ([596f027](https://github.com/p4ulbr4dl3y/johnston/commit/596f02745e86f5aa8f94ec4b88fbc728452680ac))
+
+
+### Bug Fixes
+
+* **app:** restore generate_ai_response method structure ([52771d1](https://github.com/p4ulbr4dl3y/johnston/commit/52771d1f8d21bc8b2b737a5bc92fe67e5be9a85b))
+* **core:** invalidate ProviderManager cache on config writes and path changes ([02dcc34](https://github.com/p4ulbr4dl3y/johnston/commit/02dcc34e8f8fd54fc2c560ebd0437416d974dec1))
+* **core:** isolate vision config in test_core_extra to prevent overwriting user config and format vision model exceptions ([fa3112e](https://github.com/p4ulbr4dl3y/johnston/commit/fa3112e773b0bf3c405ba4cd2b4a86d074408660))
+* **core:** kill background processes synchronously on app exit ([ee83d70](https://github.com/p4ulbr4dl3y/johnston/commit/ee83d707927831e345dd8747884b2a154a8c3e99))
+* **core:** prevent prompt file expansion for system notifications ([c981845](https://github.com/p4ulbr4dl3y/johnston/commit/c981845c5b8e0e2aa526144fb806bdd76fa6ded3))
+* **lint:** remove unused imports and organize import blocks ([6619b9d](https://github.com/p4ulbr4dl3y/johnston/commit/6619b9d8f15af773413b4eecf8c2d461a4766a24))
+* **prompt:** strictly forbid models from guessing image contents without calling view_image ([3ba20dc](https://github.com/p4ulbr4dl3y/johnston/commit/3ba20dcc2882713483e02cd96f027e29d53203a8))
+* **session:** restore session ui messages sequentially in single async worker to prevent tool widget race condition ([b7dc060](https://github.com/p4ulbr4dl3y/johnston/commit/b7dc060866e02f3a838a3e60e2244d7a421c294d))
+* **tests:** update analyze_image assertions after header removal ([c7ec5be](https://github.com/p4ulbr4dl3y/johnston/commit/c7ec5be42e4aadb36c36fec49ea7ba15407d6f1a))
+* **tools:** add schema required fields, dir guards for edit/create, and filter explore tools ([ee9f95d](https://github.com/p4ulbr4dl3y/johnston/commit/ee9f95dc3fb72e1719e2d5a116a1cb76320c3c79))
+* **tools:** enforce 800-line cap on format_line_pagination when end_line is specified ([1c036d1](https://github.com/p4ulbr4dl3y/johnston/commit/1c036d13e73e6ef07ddcb7a0ff00bbd566275352))
+* **tools:** remove silent fallback to random providers in analyze_image to prevent unintended token usage ([7576c36](https://github.com/p4ulbr4dl3y/johnston/commit/7576c36592313a794e7547e4aa89498b54399e5a))
+* **tools:** remove strict workspace path restriction ([e8eb779](https://github.com/p4ulbr4dl3y/johnston/commit/e8eb77956ae7459308a5dfadcb587a1d3743c41b))
+* **tools:** require explicit Vision model setting if active model lacks vision support ([40bc187](https://github.com/p4ulbr4dl3y/johnston/commit/40bc18733fa5e2c4a14d6af0499b287c30b54bd5))
+* **tools:** stop line pagination at complete line boundaries before max_chars limit ([4d4a714](https://github.com/p4ulbr4dl3y/johnston/commit/4d4a714bbf8a50adfb18e89e2a3438e3d49c3c92))
+* **ui:** add clean_markdown_for_rendering preprocessor for nested markdown and edge-cases ([59eba55](https://github.com/p4ulbr4dl3y/johnston/commit/59eba55b4f27ca48089c146479802e1eb811cc8a))
+* **ui:** add view_image to EXPANDABLE_TOOLS and tcss styling for full tool widget rendering ([869c94d](https://github.com/p4ulbr4dl3y/johnston/commit/869c94d9a330ca091274a43cdf52525b3dd95fc9))
+* **ui:** append trailing space after file path insertion and paste ([29efbb0](https://github.com/p4ulbr4dl3y/johnston/commit/29efbb0c4a4201e3956627afa71ee35c605ded23))
+* **ui:** call self.header_label.update in render_header for view_image tool widgets ([92afb3c](https://github.com/p4ulbr4dl3y/johnston/commit/92afb3caa57b8f4d56c3f86b6a351656a214a418))
+* **ui:** check background task status before showing running command text ([567dd54](https://github.com/p4ulbr4dl3y/johnston/commit/567dd54c5594ad87793fe21849676df8d4ff2763))
+* **ui:** colorize diff line numbers for added, deleted, and unchanged lines ([91e08ae](https://github.com/p4ulbr4dl3y/johnston/commit/91e08ae81e8a36ee08af8da9fe7b640e02e47c1f))
+* **ui:** disable linkify autolinking for filenames like AGENTS.md ([da0a423](https://github.com/p4ulbr4dl3y/johnston/commit/da0a4236cf26c94e6c158e4e1876f054c3183e9d))
+* **ui:** disable Textual tooltips globally at app level ([d8a0972](https://github.com/p4ulbr4dl3y/johnston/commit/d8a0972e4c907076b320c9645f240a491971a4b9))
+* **ui:** enable shallow file suggestions in home directory ([e630a50](https://github.com/p4ulbr4dl3y/johnston/commit/e630a50d93441d703ca8bc34ac8f7e159b6f5802))
+* **ui:** enhance diff code highlighting and syntax brightness in tool expansion ([0cd3652](https://github.com/p4ulbr4dl3y/johnston/commit/0cd3652c73ad24b494141bd4f92889d1898f9c34))
+* **ui:** extend diff background color bar across full line width including line numbers ([9f5cab8](https://github.com/p4ulbr4dl3y/johnston/commit/9f5cab8360027120b4293cbdee599b16f578b3e5))
+* **ui:** fallback to javascript lexer for non-html snippets in html files to prevent monochrome rendering ([9bf3912](https://github.com/p4ulbr4dl3y/johnston/commit/9bf39127cb75f293465c8b2629cf3d5f2c6a2944))
+* **ui:** hide all scrollbars and scrollbar corners globally ([f0cf4c1](https://github.com/p4ulbr4dl3y/johnston/commit/f0cf4c15705112acaf96f5d351a9a5d435bb3111))
+* **ui:** improve JS lexer detection in HTML diffs for string literal highlighting ([7d59552](https://github.com/p4ulbr4dl3y/johnston/commit/7d5955226d4b3d124eda7d89d7b3c5ed9783c433))
+* **ui:** normalize double list markers in markdown tools ([06312ce](https://github.com/p4ulbr4dl3y/johnston/commit/06312ce2ef3c64d8086b1e1d597219e0cfbb26b1))
+* **ui:** remove black scrollbar track overlays and enable clean seamless layout ([a1fa646](https://github.com/p4ulbr4dl3y/johnston/commit/a1fa646af4a5abba67b93ff03f28e0c5e941bdc6))
+* **ui:** remove expansion support for ViewImage tool ([d8ee534](https://github.com/p4ulbr4dl3y/johnston/commit/d8ee534e2be35e63db5ae8f93d17764d5d2f5d20))
+* **ui:** remove tooltip hover text on markdown table cells ([da0385e](https://github.com/p4ulbr4dl3y/johnston/commit/da0385e59c90fb119ec2cfb8237e7f104cb8228d))
+* **ui:** rename ambiguous variable l in chat_view.py to fix ruff lint error E741 ([9819f56](https://github.com/p4ulbr4dl3y/johnston/commit/9819f561758ff1c7c860dddb6f464a43daa22a8d))
+* **ui:** render clean slash command in UI when invoking skills ([db2a49b](https://github.com/p4ulbr4dl3y/johnston/commit/db2a49bce35d3f4044f8751ef1021c619f97f601))
+* **ui:** render image reads as ViewImage widgets and enforce direct view_image in system prompt ([33383a4](https://github.com/p4ulbr4dl3y/johnston/commit/33383a45d6cc0297ec446caf16374711e5a95b9a))
+* **ui:** suppress tooltips globally and strip table cell tooltips ([521a2ea](https://github.com/p4ulbr4dl3y/johnston/commit/521a2ea441e7b37f9a4bee64d9f8aab442ef2705))
+* **ui:** unify scrollbars and disable task console output formatting ([a02cae1](https://github.com/p4ulbr4dl3y/johnston/commit/a02cae191bb106e45da577bdad8ae1421aa288a7))
+* **ui:** use apply_suggestion for command autocompletion on Enter/Tab instead of load_text ([f3d69fd](https://github.com/p4ulbr4dl3y/johnston/commit/f3d69fdfa0c284adf790b198d3608597f69fb30a))
+* **ui:** use monochrome white style for tool read errors ([dd8dcce](https://github.com/p4ulbr4dl3y/johnston/commit/dd8dcce887d3866902d71f4e9a7bb76242de4c69))
+* **ui:** use regex for html tag detection to prevent js comparison operators from resetting lexer ([b437c5b](https://github.com/p4ulbr4dl3y/johnston/commit/b437c5b2b8402773f17bc9f2838dac401cb7724c))
+* **vision:** filter usable providers by configured API key before resolving fallback vision model ([0e3c2ec](https://github.com/p4ulbr4dl3y/johnston/commit/0e3c2ec09efcb12feedb0b45aebc84ddc3075cd7))
+* **vision:** refactor fallback vision persistence, provider compatibility and catalog caching ([b62116f](https://github.com/p4ulbr4dl3y/johnston/commit/b62116fd96e46cefaefd87b9019c4446af84aebd))
+
+
+### Performance Improvements
+
+* **models:** cache /models modal and simplify vision model selection ([74ce1ac](https://github.com/p4ulbr4dl3y/johnston/commit/74ce1ac3ba89cfaa581e9dc58aeccfa012743ef6))
+* optimize UI threading and disk caching ([c9a64e1](https://github.com/p4ulbr4dl3y/johnston/commit/c9a64e1452cbbbc5cfa2f276ac4fdc47e0069e49))
+
 ## [0.5.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.4.0...johnston-v0.5.0) (2026-07-28)
 
 
