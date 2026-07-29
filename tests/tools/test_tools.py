@@ -63,6 +63,16 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sample.txt", dir_res)
         self.assertIn("Hint:", dir_res)
 
+        # Directory truncation test (>60 items)
+        large_dir = os.path.join(self.test_dir, "large_folder")
+        os.makedirs(large_dir, exist_ok=True)
+        for i in range(70):
+            with open(os.path.join(large_dir, f"file_{i:02d}.txt"), "w") as f:
+                f.write("test")
+        large_dir_res = await tool.execute({"path": large_dir})
+        self.assertIn("items truncated", large_dir_res)
+        self.assertIn("Total: 70 items", large_dir_res)
+
         # External file outside workspace allowed
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as ext_f:
             ext_f.write("External content")
