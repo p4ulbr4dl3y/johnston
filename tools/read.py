@@ -111,7 +111,19 @@ class ReadTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = resolve_path(args.get("path"))
         if not os.path.exists(path):
-            return f"Error: file '{path}' not found."
+            parent_dir = os.path.dirname(path) or "."
+            hint = ""
+            if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
+                import difflib
+                filename = os.path.basename(path)
+                entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
+                matches = difflib.get_close_matches(filename, entries, n=3, cutoff=0.4)
+                if matches:
+                    hint = f" [Auto-Fix Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
+                elif entries:
+                    sample = sorted(entries)[:5]
+                    hint = f" [Auto-Fix Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
+            return f"Error: file '{path}' not found.{hint}"
 
         if os.path.isdir(path):
             try:
