@@ -152,6 +152,24 @@ WelcomeWidget {
     color: #e4e4e7;
 }
 
+/* Distinct Inspector Card Styling for analyze_image and web_fetch expansions */
+.tool-analyze_image .tool-content-md,
+.tool-web_fetch .tool-content-md {
+    width: 100%;
+    height: auto;
+    margin: 1 0 0 0;
+    padding: 1 2;
+    background: #09090b;
+    color: #cbd5e1;
+    border-left: solid #64748b;
+}
+
+.tool-analyze_image .tool-content-md Markdown,
+.tool-web_fetch .tool-content-md Markdown {
+    margin-top: 0;
+    color: #cbd5e1;
+}
+
 .tool-diff-view {
     width: 100%;
     height: auto;
