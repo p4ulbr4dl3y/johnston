@@ -202,18 +202,18 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         return f"Error running vision model for '{image_path}': {e}"
 
 
-class ViewImageTool(BaseTool):
-    name = "view_image"
-    description = "Inspect an image file on disk (png, jpg, webp, gif, svg) to analyze its visual contents (UI screenshots, diagrams, photos)."
+class AnalyzeImageTool(BaseTool):
+    name = "analyze_image"
+    description = "Analyze an image file on disk (png, jpg, webp, gif, svg) to extract visual contents, UI layout, or answer specific questions about the image."
     schema = {
         "type": "function",
         "function": {
-            "name": "view_image",
+            "name": "analyze_image",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute or relative path to image file"},
-                    "prompt": {"type": "string", "description": "Optional specific prompt describing what to inspect in the image"}
+                    "prompt": {"type": "string", "description": "Optional question or specific prompt describing what to inspect in the image"}
                 },
                 "required": ["path"]
             }
@@ -238,13 +238,17 @@ class ViewImageTool(BaseTool):
             except Exception as e:
                 return f"Error reading SVG file '{path}': {e}"
 
-        prompt = args.get("prompt") or "Describe all visual content, text, UI elements, and layout of this image in detail."
+        prompt = args.get("prompt") or args.get("question") or "Describe all visual content, text, UI elements, and layout of this image in detail."
 
         from tools.context import ToolContext
         app_inst = app.app if isinstance(app, ToolContext) else app
 
         # Always route vision inspection through clean isolated Vision pipeline
         return await analyze_image_with_fallback(path, prompt, app_inst)
+
+
+
+
 
 
 

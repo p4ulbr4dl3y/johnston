@@ -141,10 +141,10 @@ class ReadTool(BaseTool):
 
         ext = os.path.splitext(path)[1].lower()
 
-        # Handle image files via ViewImageTool
+        # Handle image files via AnalyzeImageTool
         if ext in IMAGE_EXTENSIONS:
-            from tools.view_image import ViewImageTool
-            return await ViewImageTool().execute(args, app)
+            from tools.analyze_image import AnalyzeImageTool
+            return await AnalyzeImageTool().execute(args, app)
 
         lines: List[str] = []
 
