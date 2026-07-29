@@ -140,7 +140,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                     parts.append(payload)
 
             analysis_text = "".join(parts) if parts else "No content returned from vision model."
-            return f"[Vision Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
+            return analysis_text
 
         import httpx
 
@@ -195,7 +195,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                     else:
                         analysis_text = str(raw_content) if raw_content else "No content in response."
 
-                    return f"[Vision Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
+                    return analysis_text
 
             return f"Error from vision model (HTTP {resp.status_code}): {resp.text[:300]}"
     except Exception as e:
