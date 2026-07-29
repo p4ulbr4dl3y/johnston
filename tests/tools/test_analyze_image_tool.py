@@ -48,7 +48,7 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
         try:
             old_fallback = catalog.get_fallback_vision_model()
             test_model = "test-fallback-vision-model"
-            catalog.set_fallback_vision_model("test-provider", test_model)
+            catalog.set_vision_model("test-provider", test_model)
             mock_resp = MagicMock()
             mock_resp.status_code = 200
             mock_resp.json.return_value = {
@@ -69,7 +69,7 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
                 res = await analyze_image_with_fallback(temp_path, "Describe")
                 self.assertIn("1x1 PNG image", res)
         finally:
-            catalog.set_fallback_vision_model(*old_fallback)
+            catalog.set_vision_model(*old_fallback)
             catalog.remove_vision_override(test_model)
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -83,7 +83,7 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
         try:
             with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
                 catalog.add_vision_override("my-vision-model")
-                catalog.set_fallback_vision_model("my-provider", "my-vision-model")
+                catalog.set_vision_model("my-provider", "my-vision-model")
                 fb_p, fb_m = catalog.get_fallback_vision_model()
                 self.assertEqual(fb_p, "my-provider")
                 self.assertEqual(fb_m, "my-vision-model")
@@ -91,7 +91,7 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("my-vision-model", catalog._user_overrides)
         finally:
             with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_fallback_vision_model(*orig_fb)
+                catalog.set_vision_model(*orig_fb)
 
 
 class TestProcessAndEncodeImage(unittest.TestCase):
@@ -217,7 +217,7 @@ class TestAnalyzeImageToolErrors(unittest.IsolatedAsyncioTestCase):
         try:
             old_fallback = catalog.get_fallback_vision_model()
             test_model = "test-custom-prompt-vision-model"
-            catalog.set_fallback_vision_model("test-provider", test_model)
+            catalog.set_vision_model("test-provider", test_model)
             img = Image.new("RGB", (10, 10), color=(0, 0, 255))
             img.save(temp_path, format="PNG")
             mock_resp = MagicMock()
@@ -237,7 +237,7 @@ class TestAnalyzeImageToolErrors(unittest.IsolatedAsyncioTestCase):
                 res = await tool.execute({"path": temp_path, "prompt": "What color is this?"})
                 self.assertIn("Blue square", res)
         finally:
-            catalog.set_fallback_vision_model(*old_fallback)
+            catalog.set_vision_model(*old_fallback)
             catalog.remove_vision_override(test_model)
             if os.path.exists(temp_path):
                 os.remove(temp_path)

@@ -514,9 +514,6 @@ class ModelsCatalog:
         self.save_cache()
         self._save_vision_config(provider_id, model_id)
 
-    def set_fallback_vision_model(self, provider_id: str, model_id: str, *args, **kwargs) -> None:
-        self.set_vision_model(provider_id, model_id)
-
     def _save_vision_config(self, provider_id: str, model_id: str) -> None:
         try:
             data = {}

@@ -26,25 +26,6 @@ class ToolContext:
             self.app.background_tasks.append(task)
         self.refresh_status()
 
-    def set_agent_mode(self, mode: str) -> None:
-        if self.app:
-            if hasattr(self.app, "agent") and self.app.agent:
-                self.app.agent.mode = mode
-            elif hasattr(self.app, "mode"):
-                self.app.mode = mode
-            self.refresh_status()
-
-    def toggle_agent_mode(self) -> str:
-        if self.app:
-            curr = "action"
-            if hasattr(self.app, "agent") and self.app.agent:
-                curr = getattr(self.app.agent, "mode", "action")
-            elif hasattr(self.app, "mode"):
-                curr = getattr(self.app, "mode", "action")
-            new_mode = "explore" if curr == "action" else "action"
-            self.set_agent_mode(new_mode)
-            return new_mode
-        return "action"
 
     def create_agent(self) -> Any:
         if self.app and hasattr(self.app, "pm"):

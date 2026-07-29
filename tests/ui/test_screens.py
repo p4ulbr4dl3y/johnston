@@ -277,16 +277,16 @@ class TestVisionWarningScreen(unittest.TestCase):
         orig_fb = catalog.get_fallback_vision_model()
         try:
             with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_fallback_vision_model("", "")
+                catalog.set_vision_model("", "")
                 s1 = VisionWarningScreen("gpt-3.5", "OpenAI")
                 self.assertEqual(s1.raw_items, ["select_vision", "force_vision"])
 
-                catalog.set_fallback_vision_model("prov1", "vision-1")
+                catalog.set_vision_model("prov1", "vision-1")
                 s2 = VisionWarningScreen("gpt-3.5", "OpenAI")
                 self.assertEqual(s2.raw_items, ["select_vision", "use_fallback", "force_vision"])
         finally:
             with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_fallback_vision_model(*orig_fb)
+                catalog.set_vision_model(*orig_fb)
 
 
 if __name__ == "__main__":

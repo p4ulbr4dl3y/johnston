@@ -760,35 +760,15 @@ class BaseAgent:
                     from core.mode_manager import ModeManager
                     current_mode = getattr(self, "mode", "action").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
-                    from core.audit import append_tool_decision, append_tool_result
 
                     policy_err = self._tool_policy_error(t_name, args, mode_def)
                     tool_budget_decision = budget.before_tool_call()
                     if not tool_budget_decision.allowed:
-                        decision_str = "block"
-                        reason_str = tool_budget_decision.reason
                         tool_result = f"Error: Tool '{t_name}' blocked by budget: {tool_budget_decision.reason}"
                     elif policy_err:
-                        decision_str = "block"
-                        reason_str = policy_err
                         tool_result = policy_err
                     else:
-                        decision_str = "allow"
-                        reason_str = "Allowed"
                         tool_result = None
-
-                    append_tool_decision(
-                        mode=current_mode,
-                        tool=t_name,
-                        decision=decision_str,
-                        reason=reason_str,
-                        capabilities=[],
-                        metadata={
-                            "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
-                            "step": budget.steps,
-                            "tool_call": budget.tool_calls,
-                        },
-                    )
 
                     if tool_result is None:
                         tool_app = getattr(self, "app", None)
@@ -796,17 +776,6 @@ class BaseAgent:
                             tool_result = await execute_tool(t_name, args, app=tool_app)
                         except Exception as e:
                             tool_result = f"Error executing tool '{t_name}': {e}"
-                            append_tool_result(
-                                mode=current_mode,
-                                tool=t_name,
-                                result=tool_result,
-                                budget=budget.summarize(),
-                                metadata={
-                                    "session_id": str(getattr(getattr(self, "app", None), "current_session_id", "")),
-                                    "step": budget.steps,
-                                    "tool_call": budget.tool_calls,
-                                },
-                            )
 
                     tool_ui_result = tool_result
                     tool_content = tool_result

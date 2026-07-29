@@ -173,7 +173,7 @@ class TestModelsCatalog(unittest.TestCase):
                 self.assertTrue(cat.supports_vision("provider", "custom-model-vision"))
                 self.assertFalse(cat.is_native_vision("provider", "custom-model-vision"))
 
-                cat.set_fallback_vision_model("provider_x", "model_y")
+                cat.set_vision_model("provider_x", "model_y")
                 prov, mod = cat.get_fallback_vision_model()
                 self.assertEqual(prov, "provider_x")
                 self.assertEqual(mod, "model_y")

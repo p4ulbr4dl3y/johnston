@@ -227,7 +227,7 @@ def clean_markdown_for_rendering(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", result)
 
 
-def safe_update_markdown(widget: Markdown, content: str) -> None:
+def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) -> None:
     """Updates Markdown widget safely without creating unawaited coroutines when unattached."""
     if not getattr(widget, "is_attached", True):
         return
@@ -239,11 +239,19 @@ def safe_update_markdown(widget: Markdown, content: str) -> None:
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     task = loop.create_task(res)
-                    task.add_done_callback(_handle_markdown_task_done)
+                    def _done_cb(t: asyncio.Task) -> None:
+                        _handle_markdown_task_done(t)
+                        if on_done:
+                            on_done()
+                    task.add_done_callback(_done_cb)
+                    return
             except RuntimeError:
                 pass
+        if on_done:
+            on_done()
     except Exception:
-        pass
+        if on_done:
+            on_done()
 
 
 TOKEN_COLORS = {
@@ -318,12 +326,15 @@ class BotMessage(Vertical):
 
     def _flush_update(self) -> None:
         self._update_scheduled = False
-        safe_update_markdown(self.md_widget, self.content)
-        try:
-            if isinstance(self.parent, VerticalScroll):
-                self.parent.scroll_end(animate=False)
-        except Exception:
-            pass
+        def _scroll_cb():
+            try:
+                if isinstance(self.parent, VerticalScroll):
+                    is_at_bot = getattr(self.parent, "is_at_bottom", lambda: True)()
+                    if is_at_bot:
+                        self.parent.call_after_refresh(self.parent.scroll_end, animate=False)
+            except Exception:
+                pass
+        safe_update_markdown(self.md_widget, self.content, on_done=_scroll_cb)
 
 
 class ThinkingWidget(Vertical):
@@ -1132,6 +1143,10 @@ class ChatView(VerticalScroll):
         super().__init__(*args, **kwargs)
         self.show_welcome = show_welcome
 
+    def is_at_bottom(self, threshold: int = 3) -> bool:
+        """Returns True if scroll position is at or near the bottom of the container."""
+        return (self.max_scroll_y - self.scroll_y) <= threshold
+
     def on_mount(self) -> None:
         self.check_welcome()
 
@@ -1161,34 +1176,36 @@ class ChatView(VerticalScroll):
         except Exception:
             pass
 
-    async def add_user_message(self, text: str) -> UserMessage:
+    async def add_user_message(self, text: str, animate: bool = True) -> UserMessage:
         self.clear_welcome()
         msg = UserMessage(text)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)
-        self.scroll_end(animate=True)
+        self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
 
-    async def add_bot_message(self) -> BotMessage:
+    async def add_bot_message(self, animate: bool = True) -> BotMessage:
         self.clear_welcome()
         msg = BotMessage()
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)
-        self.scroll_end(animate=True)
+        if not animate or self.is_at_bottom():
+            self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
 
-    async def add_thinking_widget(self, thinking_text: str = "Thinking...") -> ThinkingWidget:
+    async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
         self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        self.scroll_end(animate=True)
+        if not animate or self.is_at_bottom():
+            self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
-    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "", args: dict = None) -> ToolCallWidget:
+    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "", args: dict = None, animate: bool = True) -> ToolCallWidget:
         self.clear_welcome()
         if tool_type.lower() == "read" and args and isinstance(args, dict):
             p = args.get("path") or target or ""
@@ -1201,16 +1218,18 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        self.scroll_end(animate=True)
+        if not animate or self.is_at_bottom():
+            self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
-    async def add_compaction_divider(self, text: str = "Session Compacted") -> CompactionDivider:
+    async def add_compaction_divider(self, text: str = "Session Compacted", animate: bool = True) -> CompactionDivider:
         self.clear_welcome()
         widget = CompactionDivider(text)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        self.scroll_end(animate=True)
+        if not animate or self.is_at_bottom():
+            self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
     def get_user_messages(self) -> list[tuple[int, str]]:

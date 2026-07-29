@@ -201,7 +201,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(pushed_screens), 1)
         finally:
             with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_fallback_vision_model(*orig_fb)
+                catalog.set_vision_model(*orig_fb)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
         from core.commands import ModelsCommand
