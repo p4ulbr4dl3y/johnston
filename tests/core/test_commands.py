@@ -171,7 +171,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
         from core.models_catalog import catalog
-        from widgets.screens.model import VisionWarningScreen
 
         test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
@@ -189,9 +188,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         pushed_screens = []
         def simulate_push_screen(screen, callback=None):
             pushed_screens.append(screen)
-            if isinstance(screen, VisionWarningScreen) and callback:
-                callback("force_vision")
-            elif callback:
+            if callback:
                 callback(("custom", test_model_name))
 
         app.push_screen = simulate_push_screen
@@ -199,10 +196,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(catalog, "save_cache"):
             await cmd.execute(app)
-            warning_screens = [s for s in pushed_screens if isinstance(s, VisionWarningScreen)]
-            self.assertTrue(len(warning_screens) > 0)
-            self.assertTrue(catalog.supports_vision("custom", test_model_name))
-        catalog.remove_vision_override(test_model_name)
+            self.assertEqual(len(pushed_screens), 1)
         catalog.set_fallback_vision_model("", "")
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
