@@ -230,7 +230,7 @@ class JohnstonApp(App):
 
         # Restore complete element history in UI (user, bot, thinking, tool)
         saved_ui_msgs = session_data.get("ui_messages", [])
-        
+
         async def _restore_ui_messages(msgs: list):
             for msg in msgs:
                 mtype = msg.get("type")

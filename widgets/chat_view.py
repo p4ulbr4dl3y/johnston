@@ -317,8 +317,8 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan", "view_image",
-        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan", "ViewImage"
+        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
+        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan"
     }
 
     def is_expandable(self) -> bool:
