@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_URL="https://github.com/p4ulbr4dl3y/johnston.git"
-
 echo "=== Installing Johnston ==="
 
 # 1. Check or install uv

@@ -7,7 +7,6 @@ def format_line_pagination(
     start_line: int | None = None,
     end_line: int | None = None,
     max_chars: int = 32000,
-    hint: str = "",
     path: str = "",
 ) -> str:
     """Formats lines with 1-based line numbers and paginates by start_line/end_line range.
