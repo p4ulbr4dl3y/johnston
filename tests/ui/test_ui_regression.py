@@ -125,6 +125,22 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
             safe_update_markdown(md, "test content")
             await asyncio.sleep(0.01)
 
+    def test_clean_markdown_for_rendering(self):
+        from widgets.chat_view import clean_markdown_for_rendering
+
+        raw = (
+            "3. Section:\n"
+            "   * * Double bullet item\n"
+            " * *Drafting:* label\n"
+            "     > * Blockquote bullet\n"
+            " * Text: *Wait, unpaired star\n"
+        )
+        cleaned = clean_markdown_for_rendering(raw)
+        self.assertIn("   * Double bullet item", cleaned)
+        self.assertIn(" * **Drafting:** label", cleaned)
+        self.assertIn("     > Blockquote bullet", cleaned)
+        self.assertIn(" * Text: Wait, unpaired star", cleaned)
+
 
 if __name__ == "__main__":
     unittest.main()

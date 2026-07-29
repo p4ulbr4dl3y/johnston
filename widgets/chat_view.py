@@ -166,12 +166,74 @@ def _handle_markdown_task_done(task: asyncio.Task) -> None:
         pass
 
 
+def clean_markdown_for_rendering(text: str) -> str:
+    """Preprocesses LLM markdown text to fix common rendering glitches in Textual:
+    - Double bullet markers (e.g. '   * * item' or ' - * item')
+    - Blockquote + bullet markers (e.g. ' > * item')
+    - Word-ending italic colon syntax ('*Text:*' -> '**Text:**')
+    - Unpaired single leading asterisks before words ('*Wait, ...' -> 'Wait, ...')
+    - Excessive list indentation capped to 8 spaces
+    - Unclosed code blocks during streaming
+    """
+    if not text:
+        return ""
+
+    text = text.replace("\r\n", "\n").expandtabs(4)
+    lines = text.splitlines()
+
+    cb_indices = [i for i, l in enumerate(lines) if l.strip().startswith("```")]
+    code_ranges = [(cb_indices[idx], cb_indices[idx + 1]) for idx in range(0, len(cb_indices) - 1, 2)]
+    unclosed_start = cb_indices[-1] if len(cb_indices) % 2 != 0 else None
+
+    def is_in_code(i: int) -> bool:
+        if unclosed_start is not None and i >= unclosed_start:
+            return True
+        for s, e in code_ranges:
+            if s <= i <= e:
+                return True
+        return False
+
+    cleaned = []
+    for i, line in enumerate(lines):
+        if is_in_code(i):
+            cleaned.append(line)
+            continue
+
+        line = re.sub(r"(?<!\*)\*([^*:]+):\*(?!\*)", r"**\1:**", line)
+        line = re.sub(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+", r"\1* ", line)
+        line = re.sub(r"^(\s*>\s*)[-*]\s+", r"\1", line)
+
+        m_list = re.match(r"^(\s*(?:[-*]|\d+\.))\s+(.*)", line)
+        if m_list:
+            prefix, body = m_list.groups()
+            if body.count("*") == 1:
+                body = body.replace("*", "")
+            line = f"{prefix} {body}"
+        elif line.count("*") == 1:
+            line = line.replace("*", "")
+
+        m = re.match(r"^(\s+)([-*]|\d+\.)\s+(.*)", line)
+        if m:
+            indent, marker, content = m.groups()
+            new_indent_len = min(len(indent), 8)
+            line = (" " * new_indent_len) + marker + " " + content
+
+        cleaned.append(line)
+
+    if len(cb_indices) % 2 != 0:
+        cleaned.append("```")
+
+    result = "\n".join(cleaned)
+    return re.sub(r"\n{3,}", "\n\n", result)
+
+
 def safe_update_markdown(widget: Markdown, content: str) -> None:
     """Updates Markdown widget safely without creating unawaited coroutines when unattached."""
     if not getattr(widget, "is_attached", True):
         return
+    cleaned = clean_markdown_for_rendering(content)
     try:
-        res = widget.update(content)
+        res = widget.update(cleaned)
         if inspect.isawaitable(res):
             try:
                 loop = asyncio.get_running_loop()
