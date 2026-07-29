@@ -6,7 +6,7 @@ Supports YAML frontmatter parsing from SKILL.md and *.md files.
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.config import CONFIG_DIR
+from core.config import CONFIG_DIR, DEFAULT_IGNORE_DIRS
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
@@ -158,7 +158,8 @@ class SkillManager:
                 continue
 
             md_files = []
-            for root, _, files in os.walk(dir_path):
+            for root, dirs, files in os.walk(dir_path):
+                dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
                 for f in files:
                     if f.endswith(".md"):
                         md_files.append(os.path.join(root, f))
@@ -216,7 +217,8 @@ class SkillManager:
 
         sampled_files = []
         if is_skill_md and os.path.exists(skill_dir):
-            for root, _, files in os.walk(skill_dir):
+            for root, dirs, files in os.walk(skill_dir):
+                dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
                 for f in sorted(files):
                     if f == "SKILL.md" or f.startswith("."):
                         continue
