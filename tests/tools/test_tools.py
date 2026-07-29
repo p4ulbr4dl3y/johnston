@@ -62,6 +62,17 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("is a directory", dir_res)
         self.assertIn("sample.txt", dir_res)
 
+        # External file outside workspace allowed
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as ext_f:
+            ext_f.write("External content")
+            ext_path = ext_f.name
+        try:
+            ext_res = await tool.execute({"path": ext_path})
+            self.assertIn("External content", ext_res)
+        finally:
+            if os.path.exists(ext_path):
+                os.remove(ext_path)
+
         # Plain text HTML file (read as raw text without markitdown)
         html_path = os.path.join(self.test_dir, "doc.html")
         with open(html_path, "w", encoding="utf-8") as f:
