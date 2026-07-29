@@ -27,11 +27,7 @@ def _truncate_subagent_result(text: str) -> str:
 
 class SubagentTool(BaseTool):
     name = "subagent"
-    description = (
-        "Launch a subagent to perform a task. "
-        "Use subagent_type='explore' for quick codebase searches, or 'general' for multi-step tasks. "
-        "Set background=true to run asynchronously without waiting."
-    )
+    description = "Launch an autonomous subagent for a task."
     schema = {
         "type": "function",
         "function": {
@@ -39,12 +35,12 @@ class SubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Task prompt for the subagent"},
-                    "description": {"type": "string", "description": "Short (3-5 words) description"},
-                    "subagent_type": {"type": "string", "description": "Type of subagent ('general' or 'explore')"},
-                    "workspace": {"type": "string", "description": "Workspace mode: 'inherit' (default) or 'branch' (isolated git worktree)"},
+                    "prompt": {"type": "string", "description": "Task prompt"},
+                    "description": {"type": "string", "description": "Short summary (3-5 words)"},
+                    "subagent_type": {"type": "string", "description": "Subagent type: 'general' or 'explore'"},
+                    "workspace": {"type": "string", "description": "Workspace: 'inherit' or 'branch'"},
                     "background": {"type": "boolean", "description": "Run asynchronously in background"},
-                    "task_id": {"type": "string", "description": "Optional explicit task ID; auto-generated when omitted"}
+                    "task_id": {"type": "string", "description": "Optional task ID"}
                 },
                 "required": ["prompt", "description"]
             }

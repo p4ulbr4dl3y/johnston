@@ -163,48 +163,9 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     return diff_output + linter_output
 
 
-class EditTool(BaseTool):
-    name = "edit"
-    description = (
-        "Replace a block of text (old_string) with new_string in an existing file. "
-        "Optionally specify start_line and end_line for line range matching."
-    )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "edit",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "old_string": {"type": "string", "description": "Exact text block to replace"},
-                    "new_string": {"type": "string", "description": "Replacement text block"},
-                    "start_line": {"type": "integer", "description": "Optional start line number (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "Optional end line number (inclusive)"}
-                },
-                "required": ["path", "old_string", "new_string"]
-            }
-        }
-    }
-
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        path = args.get("path") or args.get("target_file", "")
-        chunk = {
-            "old_string": args.get("old_string", ""),
-            "new_string": args.get("new_string", ""),
-            "start_line": args.get("start_line"),
-            "end_line": args.get("end_line"),
-        }
-        return await _execute_edit_helper(path, [chunk])
-
-
 class ReplaceFileContentTool(BaseTool):
     name = "replace_file_content"
-    description = (
-        "Replace a single contiguous block of code in a file. "
-        "Specify target_file (or path), target_content (or old_string), replacement_content (or new_string), "
-        "and optional line numbers start_line and end_line for precise range matching."
-    )
+    description = "Replace a single contiguous code block in a file."
     schema = {
         "type": "function",
         "function": {
@@ -212,17 +173,14 @@ class ReplaceFileContentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "target_file": {"type": "string", "description": "Alternative key for file path"},
-                    "target_content": {"type": "string", "description": "Exact code block to replace"},
-                    "old_string": {"type": "string", "description": "Alternative key for code block to replace"},
+                    "target_file": {"type": "string", "description": "File path"},
+                    "target_content": {"type": "string", "description": "Code block to replace"},
                     "replacement_content": {"type": "string", "description": "New code block"},
-                    "new_string": {"type": "string", "description": "Alternative key for new code block"},
-                    "start_line": {"type": "integer", "description": "Start line number (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line number (inclusive)"},
-                    "allow_multiple": {"type": "boolean", "description": "If true, replace multiple occurrences"}
+                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                    "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"}
                 },
-                "required": ["target_content", "replacement_content"]
+                "required": ["target_file", "target_content", "replacement_content"]
             }
         }
     }
@@ -243,11 +201,7 @@ class ReplaceFileContentTool(BaseTool):
 
 class MultiReplaceFileContentTool(BaseTool):
     name = "multi_replace_file_content"
-    description = (
-        "Make multiple non-contiguous edits to a single file in one call. "
-        "Specify target_file (or path) and replacement_chunks (or chunks), "
-        "where each chunk specifies target_content, replacement_content, start_line, and end_line."
-    )
+    description = "Replace multiple non-contiguous code blocks in a single file."
     schema = {
         "type": "function",
         "function": {
@@ -255,38 +209,23 @@ class MultiReplaceFileContentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "target_file": {"type": "string", "description": "Alternative key for file path"},
-                    "chunks": {
-                        "type": "array",
-                        "description": "List of replacement chunk objects",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "start_line": {"type": "integer"},
-                                "end_line": {"type": "integer"},
-                                "target_content": {"type": "string"},
-                                "replacement_content": {"type": "string"},
-                                "allow_multiple": {"type": "boolean"}
-                            }
-                        }
-                    },
+                    "target_file": {"type": "string", "description": "File path"},
                     "replacement_chunks": {
                         "type": "array",
-                        "description": "Alternative key for list of replacement chunks",
+                        "description": "List of edit chunks",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "start_line": {"type": "integer"},
-                                "end_line": {"type": "integer"},
                                 "target_content": {"type": "string"},
                                 "replacement_content": {"type": "string"},
+                                "start_line": {"type": "integer"},
+                                "end_line": {"type": "integer"},
                                 "allow_multiple": {"type": "boolean"}
                             }
                         }
                     }
                 },
-                "required": ["replacement_chunks"]
+                "required": ["target_file", "replacement_chunks"]
             }
         }
     }
@@ -295,3 +234,4 @@ class MultiReplaceFileContentTool(BaseTool):
         path = args.get("target_file") or args.get("path", "")
         raw_chunks = args.get("replacement_chunks") or args.get("chunks") or []
         return await _execute_edit_helper(path, raw_chunks)
+

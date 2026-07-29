@@ -170,7 +170,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
 class AnalyzeImageTool(BaseTool):
     name = "analyze_image"
-    description = "Analyze an image file on disk (png, jpg, webp, gif, svg) to extract visual contents, UI layout, or answer specific questions about the image."
+    description = "Inspect visual contents or answer questions about an image file."
     schema = {
         "type": "function",
         "function": {
@@ -178,8 +178,8 @@ class AnalyzeImageTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative path to image file"},
-                    "prompt": {"type": "string", "description": "Optional question or specific prompt describing what to inspect in the image"}
+                    "path": {"type": "string", "description": "Image file path"},
+                    "prompt": {"type": "string", "description": "Optional inspection prompt"}
                 },
                 "required": ["path"]
             }

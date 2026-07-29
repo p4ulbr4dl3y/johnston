@@ -5,7 +5,7 @@ from tools.base import BaseTool
 
 class ManageTaskTool(BaseTool):
     name = "manage_task"
-    description = "Manage background CLI commands spawned via shell. Actions: 'list' (list running commands), 'status' (get output log for task; do not poll running tasks in a loop), 'kill' (terminate task), 'send_input' (send stdin input to running task)."
+    description = "Manage background CLI tasks. Actions: list, status, kill, send_input."
     schema = {
         "type": "function",
         "function": {
@@ -13,9 +13,9 @@ class ManageTaskTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"], "description": "Action: 'list', 'status', 'kill', or 'send_input'"},
-                    "task_id": {"type": "string", "description": "Target background task ID"},
-                    "input": {"type": "string", "description": "Input text to send (required for 'send_input')"}
+                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"], "description": "Action type"},
+                    "task_id": {"type": "string", "description": "Background task ID"},
+                    "input": {"type": "string", "description": "Input text for send_input"}
                 },
                 "required": ["action"]
             }
