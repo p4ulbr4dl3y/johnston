@@ -8,6 +8,7 @@ import json
 import os
 import select
 import subprocess
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -32,6 +33,8 @@ class MCPProcessClient:
         self.tools: List[Dict[str, Any]] = []
         self._stopped = False
         self._buffer = ""
+        self._lock = threading.RLock()
+        self._pending_responses: Dict[int, Dict[str, Any]] = {}
 
     def start(self) -> bool:
         self._stopped = False
@@ -98,8 +101,14 @@ class MCPProcessClient:
         if not self.process or not self.process.stdout or self._stopped:
             return None
 
+        if req_id is not None and req_id in self._pending_responses:
+            return self._pending_responses.pop(req_id)
+
         start_time = time.time()
         while not self._stopped:
+            if req_id is not None and req_id in self._pending_responses:
+                return self._pending_responses.pop(req_id)
+
             while "\n" in self._buffer:
                 line_str, self._buffer = self._buffer.split("\n", 1)
                 line_str = line_str.strip()
@@ -111,7 +120,10 @@ class MCPProcessClient:
                     if "method" in data and "id" not in data:
                         continue
 
-                    if req_id is not None and data.get("id") != req_id:
+                    res_id = data.get("id")
+                    if req_id is not None and res_id != req_id:
+                        if res_id is not None:
+                            self._pending_responses[res_id] = data
                         continue
 
                     return data
@@ -172,60 +184,63 @@ class MCPProcessClient:
         return True
 
     def fetch_tools(self) -> List[Dict[str, Any]]:
-        self.req_id += 1
-        req = {
-            "jsonrpc": "2.0",
-            "id": self.req_id,
-            "method": "tools/list"
-        }
-        self._send(req)
-        res = self._read_response(req_id=self.req_id, timeout=15.0)
-        if res and "result" in res:
-            self.tools = res["result"].get("tools", [])
-        return self.tools
+        with self._lock:
+            self.req_id += 1
+            current_id = self.req_id
+            req = {
+                "jsonrpc": "2.0",
+                "id": current_id,
+                "method": "tools/list"
+            }
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=15.0)
+            if res and "result" in res:
+                self.tools = res["result"].get("tools", [])
+            return self.tools
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
-        if not self.process or self.process.poll() is not None:
-            if not self.start():
-                return f"Error: MCP server '{self.name}' process is not running"
+        with self._lock:
+            if not self.process or self.process.poll() is not None:
+                if not self.start():
+                    return f"Error: MCP server '{self.name}' process is not running"
 
-        self.req_id += 1
-        current_id = self.req_id
-        req = {
-            "jsonrpc": "2.0",
-            "id": current_id,
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
+            self.req_id += 1
+            current_id = self.req_id
+            req = {
+                "jsonrpc": "2.0",
+                "id": current_id,
+                "method": "tools/call",
+                "params": {
+                    "name": tool_name,
+                    "arguments": arguments
+                }
             }
-        }
-        self._send(req)
-        res = self._read_response(req_id=current_id, timeout=timeout)
-        if not res:
-            return f"Error: No response from MCP server '{self.name}'"
-        if "error" in res:
-            return f"MCP Error: {res['error'].get('message', res['error'])}"
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=timeout)
+            if not res:
+                return f"Error: No response from MCP server '{self.name}'"
+            if "error" in res:
+                return f"MCP Error: {res['error'].get('message', res['error'])}"
 
-        result = res.get("result", {})
-        content_items = result.get("content", [])
-        output_parts = []
-        for item in content_items:
-            if item.get("type") == "text":
-                output_parts.append(item.get("text", ""))
-            else:
-                output_parts.append(json.dumps(item, ensure_ascii=False))
+            result = res.get("result", {})
+            content_items = result.get("content", [])
+            output_parts = []
+            for item in content_items:
+                if item.get("type") == "text":
+                    output_parts.append(item.get("text", ""))
+                else:
+                    output_parts.append(json.dumps(item, ensure_ascii=False))
 
-        try:
-            self.fetch_tools()
-        except Exception:
-            pass
+            try:
+                self.fetch_tools()
+            except Exception:
+                pass
 
-        output_text = "\n".join(output_parts).strip()
-        if output_text:
-            return output_text
+            output_text = "\n".join(output_parts).strip()
+            if output_text:
+                return output_text
 
-        return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
+            return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
 
 
 _mcp_manager_instance: Optional["MCPManager"] = None

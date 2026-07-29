@@ -299,6 +299,27 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 client.stop()
                 self.assertTrue(client._stopped)
 
+    def test_out_of_order_responses_buffering(self):
+        from core.mcp_manager import MCPProcessClient
+        client = MCPProcessClient("buffer_test", "echo 1")
+        client.process = unittest.mock.MagicMock()
+        client.process.stdout = unittest.mock.MagicMock()
+
+        # Simulate out of order json lines in buffer
+        # e.g., line 1 is id=2, line 2 is id=1
+        client._buffer = json.dumps({"jsonrpc": "2.0", "id": 2, "result": "res2"}) + "\n" + json.dumps({"jsonrpc": "2.0", "id": 1, "result": "res1"}) + "\n"
+
+        # Request id=1
+        res1 = client._read_response(req_id=1)
+        self.assertIsNotNone(res1)
+        self.assertEqual(res1["id"], 1)
+        self.assertIn(2, client._pending_responses)
+
+        # Request id=2 (should come from _pending_responses)
+        res2 = client._read_response(req_id=2)
+        self.assertIsNotNone(res2)
+        self.assertEqual(res2["id"], 2)
+
     def test_client_call_tool_not_running(self):
         from core.mcp_manager import MCPProcessClient
         client = MCPProcessClient("dead_server", ["invalid_command_xyz_12345"])
