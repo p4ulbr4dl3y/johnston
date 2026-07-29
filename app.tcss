@@ -123,7 +123,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash {
+.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash, .tool-view_image {
     color: #d4d4d8;
 }
 
