@@ -123,7 +123,6 @@ class SkillManager:
 
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
-        os.makedirs(self.project_dir_skills, exist_ok=True)
 
         architect_dir = os.path.join(self.global_dir, "johnston-architect")
         architect_file = os.path.join(architect_dir, "SKILL.md")
