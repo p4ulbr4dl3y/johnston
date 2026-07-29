@@ -456,6 +456,7 @@ class ToolCallWidget(Vertical):
                     target_str = self.target
             else:
                 target_str = self.target
+            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
         elif self.tool_type.lower() in ("update_plan", "plan"):
             plan_items = self.args.get("plan") or []
             if isinstance(plan_items, list) and plan_items:
