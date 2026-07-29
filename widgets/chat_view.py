@@ -1033,6 +1033,12 @@ class ChatView(VerticalScroll):
 
     async def add_tool_call(self, tool_type: str, target: str, result_text: str = "", args: dict = None) -> ToolCallWidget:
         self.clear_welcome()
+        if tool_type.lower() == "read" and args and isinstance(args, dict):
+            p = args.get("path") or target or ""
+            ext = os.path.splitext(p)[1].lower() if p else ""
+            if ext in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}:
+                tool_type = "view_image"
+
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
         if not self.is_attached:
