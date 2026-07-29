@@ -55,6 +55,11 @@ ALIAS_MAP: Dict[str, str] = {
     "ask": "ask_user",
     "plan": "update_plan",
     "set_plan": "update_plan",
+    "inspect_image": "view_image",
+    "analyze_image": "view_image",
+    "read_image": "view_image",
+    "image_view": "view_image",
+    "show_image": "view_image",
 }
 
 

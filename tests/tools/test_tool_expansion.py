@@ -193,6 +193,18 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, r"Found error: \[tag=e1]")
 
+    def test_view_image_not_expandable(self):
+        widget = ToolCallWidget(
+            tool_type="view_image",
+            target="image.png",
+            result_text="[Vision Analysis]: cat",
+            args={"path": "image.png"}
+        )
+        self.assertFalse(widget.is_expandable())
+        widget.toggle_expanded()
+        self.assertFalse(widget.is_expanded)
+
 
 if __name__ == "__main__":
     unittest.main()
+
