@@ -727,9 +727,10 @@ class ToolCallWidget(Vertical):
                 old_code_lines.append(line[1:])
                 new_code_lines.append(line[1:])
 
-        full_sample = "\n".join(new_code_lines or old_code_lines)
+        full_sample = "\n".join(old_code_lines + new_code_lines)
         if lexer_name == "html":
-            if any(k in full_sample for k in ("function ", "let ", "const ", "var ", "=>", "return ", "while ", "if (", "clearInterval")):
+            js_keywords = ("function", "let ", "const ", "var ", "=>", "return", "while", "if", "else", "localStorage", "getItem", "setItem", "document.", "console.", "null", "true", "false", "=", ";")
+            if any(k in full_sample for k in js_keywords) and ("<" not in full_sample or "<script" in full_sample):
                 try:
                     lexer = get_lexer_by_name("javascript")
                 except Exception:
