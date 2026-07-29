@@ -70,7 +70,7 @@ def get_project_instructions_snippet() -> str:
                 if content:
                     if len(content) > 2500:
                         content = content[:2500] + "\n... [Project instructions truncated at 2500 chars]"
-                    found_snippets.append(f"[PROJECT INSTRUCTIONS ({name})]:\n{content}")
+                    found_snippets.append(f"## Project Instructions ({name})\n{content}")
             except Exception:
                 pass
 
@@ -85,7 +85,7 @@ def get_rules_snippet(mode: str = "action") -> str:
 
 DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
 
-Core Principles:
+## Core Principles
 1. Research First: Inspect codebase via shell/read tools before editing. Never guess file paths or signatures.
 2. Read Before Edit: Always read file contents before modifying.
 3. Precision Edits: Use replace_file_content for single edits and multi_replace_file_content for multiple non-adjacent edits.
@@ -167,7 +167,7 @@ class PromptBuilder:
         git_info = get_git_info()
 
         env_lines = [
-            "Environment Metadata:",
+            "## Environment Metadata",
             f"- Working Directory: {cwd}",
             f"- Local Time: {now_str}",
             f"- Operating System: {os_info}"
@@ -186,7 +186,7 @@ class PromptBuilder:
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
-            sys_prompt = f"{sys_prompt}\n\n[USER RULES]\n{rules_snippet}"
+            sys_prompt = f"{sys_prompt}\n\n## User Rules\n{rules_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if mcp_snippet:

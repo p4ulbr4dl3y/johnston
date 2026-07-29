@@ -51,7 +51,7 @@ BUILTIN_MODES = {
             "user.prompt",
         ],
         prompt=(
-            "[MODE: ACTION]\n"
+            "## Execution Mode: ACTION\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n"
             "Rules:\n"
             "1. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction."
@@ -75,7 +75,7 @@ BUILTIN_MODES = {
         ],
         denied_capabilities=["fs.write", "mcp.call"],
         prompt=(
-            "[MODE: EXPLORE]\n"
+            "## Execution Mode: EXPLORE\n"
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n"
             "=== CRITICAL: READ-ONLY MODE — NO CODE MODIFICATIONS ===\n"
             "1. Code modification tools (create, edit) are DISABLED.\n"

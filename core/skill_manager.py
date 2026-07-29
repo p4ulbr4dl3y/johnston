@@ -250,7 +250,8 @@ class SkillManager:
         if not skills:
             return ""
         lines = [
-            "Available skills in system context (read SKILL.md via `read`/`view_file` to activate instructions):"
+            "## Available Skills",
+            "Available skills in system context (read SKILL.md via `read` to activate instructions):"
         ]
         for s in skills:
             desc = f" - {s['description']}" if s['description'] else ""

@@ -126,6 +126,6 @@ class RulesManager:
         matching = []
         for r in rules:
             if r.is_active_for_mode(mode) and r.is_active_for_files(changed_files or []):
-                matching.append(f"[RULE: {r.name}]\n{r.content}")
+                matching.append(f"### Rule: {r.name}\n{r.content}")
 
         return "\n\n".join(matching)

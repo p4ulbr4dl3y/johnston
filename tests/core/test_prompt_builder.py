@@ -8,16 +8,16 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], mode="action")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("System prompt test", sys_prompt)
-        self.assertIn("Environment Metadata:", sys_prompt)
+        self.assertIn("## Environment Metadata", sys_prompt)
         self.assertIn("- Working Directory:", sys_prompt)
         self.assertIn("- Local Time:", sys_prompt)
         self.assertIn("- Operating System:", sys_prompt)
-        self.assertIn("[MODE: ACTION]", sys_prompt)
+        self.assertIn("## Execution Mode: ACTION", sys_prompt)
 
     def test_build_system_prompt_explore_mode(self):
         builder = PromptBuilder("System prompt test", [], mode="explore")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn("[MODE: EXPLORE]", sys_prompt)
+        self.assertIn("## Execution Mode: EXPLORE", sys_prompt)
         self.assertIn("Shift+Tab or /action", sys_prompt)
 
     def test_build_tools_explore_mode_filters_create_edit(self):
@@ -31,7 +31,7 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], mode="action")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn("[PROJECT INSTRUCTIONS", sys_prompt)
+        self.assertIn("## Project Instructions", sys_prompt)
 
     def test_build_system_prompt_explore_filters_write_tools(self):
         pb_exp = PromptBuilder(
@@ -42,7 +42,7 @@ class TestPromptBuilder(unittest.TestCase):
         prompt_exp = pb_exp.build_system_prompt()
         tools_exp = pb_exp.build_tools()
         exp_tool_names = [t["function"]["name"] for t in tools_exp]
-        self.assertIn("[MODE: EXPLORE]", prompt_exp)
+        self.assertIn("## Execution Mode: EXPLORE", prompt_exp)
         self.assertNotIn("create", exp_tool_names)
         self.assertNotIn("edit", exp_tool_names)
         self.assertIn("read", exp_tool_names)
@@ -61,8 +61,8 @@ class TestPromptBuilder(unittest.TestCase):
             with patch("os.getcwd", return_value=tmpdir):
                 builder = PromptBuilder("Test", [], mode="action")
                 prompt = builder.build_system_prompt()
-                self.assertIn("[USER RULES]", prompt)
-                self.assertIn("[RULE: custom_rule]", prompt)
+                self.assertIn("## User Rules", prompt)
+                self.assertIn("### Rule: custom_rule", prompt)
                 self.assertIn("Always use pytest", prompt)
 
     def test_build_system_prompt_env_metadata_last(self):
@@ -70,8 +70,8 @@ class TestPromptBuilder(unittest.TestCase):
         # the stable prefix is prompt-cacheable across turns.
         builder = PromptBuilder("Base instructions marker", [], mode="action")
         prompt = builder.build_system_prompt()
-        self.assertLess(prompt.index("Base instructions marker"), prompt.index("Environment Metadata:"))
-        self.assertLess(prompt.index("[MODE: ACTION]"), prompt.index("Environment Metadata:"))
+        self.assertLess(prompt.index("Base instructions marker"), prompt.index("## Environment Metadata"))
+        self.assertLess(prompt.index("## Execution Mode: ACTION"), prompt.index("## Environment Metadata"))
 
     def test_build_system_prompt_cached_within_ttl(self):
         import time as _time
@@ -95,8 +95,8 @@ class TestPromptBuilder(unittest.TestCase):
         action_prompt = PromptBuilder("Mode invalidate marker", [], mode="action").build_system_prompt()
         explore_prompt = PromptBuilder("Mode invalidate marker", [], mode="explore").build_system_prompt()
         # Different mode -> different cache key -> rebuilt with the explore block
-        self.assertIn("[MODE: ACTION]", action_prompt)
-        self.assertIn("[MODE: EXPLORE]", explore_prompt)
+        self.assertIn("## Execution Mode: ACTION", action_prompt)
+        self.assertIn("## Execution Mode: EXPLORE", explore_prompt)
         self.assertNotEqual(action_prompt, explore_prompt)
 
 
