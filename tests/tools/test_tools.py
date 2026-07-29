@@ -224,6 +224,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("line 3", res)
         self.assertNotIn("line 1", res)
 
+    async def test_format_line_pagination_max_800_cap(self):
+        from tools.utils import format_line_pagination
+        lines = [f"line {i}" for i in range(1, 1500)]
+        res = format_line_pagination(lines, start_line=1, end_line=1200)
+        self.assertIn("Lines 1-800 of 1499", res)
+
+
     async def test_ask_user_validation(self):
         from tools.ask_user import AskUserTool
         tool = AskUserTool()

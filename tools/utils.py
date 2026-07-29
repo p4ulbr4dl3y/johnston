@@ -37,6 +37,7 @@ def format_line_pagination(
 
     if end_line is not None:
         end = max(start, min(end_line, total_lines))
+        end = min(end, start + DEFAULT_LINE_WINDOW - 1)
     else:
         end = min(total_lines, start + DEFAULT_LINE_WINDOW - 1)
 
