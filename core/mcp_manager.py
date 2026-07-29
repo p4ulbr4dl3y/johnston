@@ -573,11 +573,11 @@ class MCPManager:
                 lazy_by_server.setdefault(s_name, []).append(t)
 
             lazy_lines = [
-                "<mcp_servers>",
+                "## MCP Servers",
                 "The following MCP servers are loaded lazily. Use `call_mcp_tool` (server, tool, arguments) to execute."
             ]
             for s_name, t_list in lazy_by_server.items():
-                lazy_lines.append(f"\n# {s_name} (Lazy)")
+                lazy_lines.append(f"\n### {s_name} (Lazy)")
                 for t in t_list:
                     fn = t.get("function", {})
                     name = fn.get("name", "")
@@ -587,11 +587,13 @@ class MCPManager:
                     param_names = ", ".join(params.keys()) if params else ""
                     sig = f"{name}({param_names})" if param_names else name
                     lazy_lines.append(f"- {sig}{desc_str}")
-            lazy_lines.append("</mcp_servers>")
             sections.append("\n".join(lazy_lines))
 
         if eager_tools:
-            eager_lines = ["Available Eager MCP tools in system context:"]
+            eager_lines = [
+                "## Eager MCP Tools",
+                "Available Eager MCP tools in system context:"
+            ]
             for t in eager_tools:
                 fn = t.get("function", {})
                 desc = fn.get("description", "")

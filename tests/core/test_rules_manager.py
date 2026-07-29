@@ -43,7 +43,7 @@ Always run uv instead of pip.""")
             self.assertIn("Always run uv instead of pip.", rule.content)
 
             formatted = rm.get_formatted_rules(mode="action", changed_files=["main.py"], project_dir=tmpdir)
-            self.assertIn("[RULE: python_uv]", formatted)
+            self.assertIn("### Rule: python_uv", formatted)
             self.assertIn("Always run uv instead of pip.", formatted)
 
 

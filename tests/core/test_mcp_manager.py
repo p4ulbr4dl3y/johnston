@@ -146,8 +146,8 @@ class TestMCPManager(unittest.TestCase):
         self.assertEqual(len(all_tools), 2)
 
         snippet = mm.get_system_prompt_snippet()
-        self.assertIn("<mcp_servers>", snippet)
-        self.assertIn("# lazyServer (Lazy)", snippet)
+        self.assertIn("## MCP Servers", snippet)
+        self.assertIn("### lazyServer (Lazy)", snippet)
         self.assertIn("- lazy_tool — lazy desc", snippet)
         self.assertIn("Available Eager MCP tools", snippet)
         self.assertIn("eager_tool", snippet)
@@ -347,7 +347,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         }
         mm.get_active_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
         snippet = mm.get_system_prompt_snippet()
-        self.assertIn("<mcp_servers>", snippet)
+        self.assertIn("## MCP Servers", snippet)
         self.assertIn("- open_url(url, timeout) — Open a web URL", snippet)
 
 
