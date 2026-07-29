@@ -119,10 +119,10 @@ class ReadTool(BaseTool):
                 entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
                 matches = difflib.get_close_matches(filename, entries, n=3, cutoff=0.4)
                 if matches:
-                    hint = f" [Auto-Fix Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
+                    hint = f" [Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
                 elif entries:
                     sample = sorted(entries)[:5]
-                    hint = f" [Auto-Fix Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
+                    hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
             return f"Error: file '{path}' not found.{hint}"
 
         if os.path.isdir(path):

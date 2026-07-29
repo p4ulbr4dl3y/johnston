@@ -35,8 +35,8 @@ class ManageTaskTool(BaseTool):
             active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
             if active_ids:
                 ids_str = ", ".join(f"'{i}'" for i in active_ids)
-                return f"No task found with ID: {tid}. [Auto-Fix Hint: Active background task IDs: {ids_str}]"
-            return f"No task found with ID: {tid}. [Auto-Fix Hint: No active background tasks running.]"
+                return f"No task found with ID: {tid}. [Hint: Active background task IDs: {ids_str}]"
+            return f"No task found with ID: {tid}. [Hint: No active background tasks running.]"
 
         if action == "list":
             if not tasks:
