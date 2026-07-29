@@ -13,7 +13,8 @@ def format_line_pagination(
 ) -> str:
     """Formats lines with 1-based line numbers and paginates by start_line/end_line range.
 
-    Enforces a default max window of 800 lines per call.
+    Enforces a default max window of 800 lines per call and stops at clean line boundaries
+    before exceeding max_chars.
     """
     total_lines = len(lines)
     if total_lines == 0:
@@ -41,23 +42,33 @@ def format_line_pagination(
     else:
         end = min(total_lines, start + DEFAULT_LINE_WINDOW - 1)
 
-    selected = lines[start - 1 : end]
     output = []
-    for i, line in enumerate(selected, start=start):
-        output.append(f"{i:5d} | {line}")
+    current_len = 0
+    actual_end = start - 1
+
+    for i in range(start, end + 1):
+        formatted_line = f"{i:5d} | {lines[i - 1]}"
+        added_len = len(formatted_line) + (1 if output else 0)
+        if current_len + added_len > max_chars:
+            if not output:
+                output.append(formatted_line[:max_chars])
+                actual_end = i
+            break
+        output.append(formatted_line)
+        current_len += added_len
+        actual_end = i
 
     result_body = "\n".join(output)
-    if len(result_body) > max_chars:
-        result_body = truncate_output(result_body, max_chars=max_chars, hint=hint)
 
-    header = f"=== Lines {start}-{end} of {total_lines}"
+    header = f"=== Lines {start}-{actual_end} of {total_lines}"
     if path:
         header += f" in {path}"
     header += " ==="
 
-    if end < total_lines:
-        next_start = end + 1
+    if actual_end < total_lines:
+        next_start = actual_end + 1
         next_end = min(total_lines, next_start + DEFAULT_LINE_WINDOW - 1)
         header += f"\n[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]"
 
     return f"{header}\n{result_body}"
+
