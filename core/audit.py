@@ -36,11 +36,14 @@ def append_audit_event(event: dict[str, Any]) -> None:
 
     try:
         targets = {AUDIT_LOG_FILE, os.path.join(".johnston", "audit.jsonl")}
+
         record = {"ts": time.time(), **event}
         line = json.dumps(record, ensure_ascii=False, default=str) + "\n"
         for t in targets:
             try:
-                os.makedirs(os.path.dirname(t), exist_ok=True)
+                parent = os.path.dirname(t)
+                if parent and not os.path.exists(parent):
+                    os.makedirs(parent, exist_ok=True)
                 with open(t, "a", encoding="utf-8") as f:
                     f.write(line)
             except Exception:

@@ -132,7 +132,26 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
 
 class ProviderManager:
     def __init__(self):
+        self._config_cache: dict = {}
+        self._config_mtime: float = 0.0
+        self._providers_cache: dict = {}
+        self._providers_mtime: float = 0.0
         self.ensure_config_dir()
+
+    def _get_config_data(self) -> dict:
+        if not os.path.exists(CONFIG_FILE):
+            return {}
+        try:
+            mtime = os.path.getmtime(CONFIG_FILE)
+            if self._config_cache and self._config_mtime == mtime:
+                return self._config_cache
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._config_cache = data if isinstance(data, dict) else {}
+            self._config_mtime = mtime
+            return self._config_cache
+        except Exception:
+            return {}
 
     def ensure_config_dir(self):
         os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -151,25 +170,24 @@ class ProviderManager:
         providers = dict(DEFAULT_JSON_PROVIDERS)
         if os.path.exists(PROVIDERS_JSON_FILE):
             try:
-                with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        for k, v in data.items():
-                            if isinstance(v, dict):
-                                providers[k] = v
+                mtime = os.path.getmtime(PROVIDERS_JSON_FILE)
+                if self._providers_cache and self._providers_mtime == mtime:
+                    data = self._providers_cache
+                else:
+                    with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    self._providers_cache = data if isinstance(data, dict) else {}
+                    self._providers_mtime = mtime
+                if isinstance(data, dict):
+                    for k, v in data.items():
+                        if isinstance(v, dict):
+                            providers[k] = v
             except Exception:
                 pass
         return providers
 
     def get_disabled_providers(self) -> List[str]:
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return data.get("disabled_providers", [])
-            except Exception:
-                pass
-        return []
+        return self._get_config_data().get("disabled_providers", [])
 
     def set_provider_disabled(self, key: str, disabled: bool):
         data = {}
@@ -224,14 +242,7 @@ class ProviderManager:
         return providers
 
     def get_active_provider_key(self) -> str:
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return data.get("active_provider", "opencode")
-            except Exception:
-                pass
-        return "opencode"
+        return self._get_config_data().get("active_provider", "opencode")
 
     def set_active_provider_key(self, key: str):
         data = {}

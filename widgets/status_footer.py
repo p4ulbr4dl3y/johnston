@@ -47,6 +47,7 @@ class StatusFooter(Static):
 
     def refresh_footer(self) -> None:
         try:
+            import time
             from core.mcp_manager import get_mcp_manager
             from core.skill_manager import SkillManager
 
@@ -57,8 +58,17 @@ class StatusFooter(Static):
             thinking_effort = display_thinking_effort(getattr(agent, "thinking_effort", None))
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
 
-            skills_count = len(SkillManager().list_skills())
-            mcp_servers = get_mcp_manager().load_servers()
+            now = time.time()
+            if not hasattr(self, "_cached_skills_count") or (now - getattr(self, "_skills_cache_time", 0) > 5.0):
+                self._cached_skills_count = len(SkillManager().list_skills())
+                self._skills_cache_time = now
+            skills_count = self._cached_skills_count
+
+            if not hasattr(self, "_cached_mcp_servers") or (now - getattr(self, "_mcp_cache_time", 0) > 5.0):
+                self._cached_mcp_servers = get_mcp_manager().load_servers()
+                self._mcp_cache_time = now
+            mcp_servers = self._cached_mcp_servers
+
             mcp_total = len(mcp_servers)
             mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
             bg_tasks = getattr(self.app, "background_tasks", [])
