@@ -98,7 +98,8 @@ Core Principles:
 10. Background Execution: When a command or subagent moves to the background, do not poll its status. You will be notified automatically upon completion. Either proceed with other useful tasks if needed, or update the user and end your turn to wait for notification.
 11. Concise Communication: Be direct, clear, and concise. Do not repeat full plan contents after update_plan calls; summarize changes instead.
 12. Dynamic & MCP Tools: You have access to all tools provided in your function definitions (including MCP and Skill tools). Always use available tool functions directly when applicable and do not claim tools are missing if they are in your tool list.
-13. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise."""
+13. Language Matching: Always respond in the language used by the user in their current message unless explicitly requested otherwise.
+14. Image Inspection: When inspecting or reading image files (png, jpg, webp, gif, svg), ALWAYS use view_image directly without calling shell commands first. Verification or reading of image files must be performed with view_image."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
