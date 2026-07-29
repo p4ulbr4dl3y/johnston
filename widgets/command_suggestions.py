@@ -1,4 +1,5 @@
 import os
+import time
 
 from textual.widgets import OptionList
 
@@ -47,9 +48,8 @@ class CommandSuggestions(OptionList):
 
     def get_workspace_files(self) -> list[str]:
         """Gets relative file paths list in current project with 5s caching"""
-        import time
         now = time.time()
-        if self._cached_files and (now - self._cache_time < 5.0):
+        if self._cached_files and (now - self._cache_time < 30.0):
             return self._cached_files
 
         files_list = []

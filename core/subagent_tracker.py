@@ -126,7 +126,7 @@ class SubagentTracker:
             os.makedirs(self.storage_dir, exist_ok=True)
             fpath = os.path.join(self.storage_dir, f"{sess.task_id}.json")
             with open(fpath, "w", encoding="utf-8") as f:
-                json.dump(sess.to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(sess.to_dict(), f, ensure_ascii=False)
         except Exception:
             pass
 

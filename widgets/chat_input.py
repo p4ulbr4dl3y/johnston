@@ -140,13 +140,8 @@ class ChatInput(TextArea):
         import time
 
         try:
-            # If clipboard contains a Finder file reference («class furl»), do not treat as raw image paste
-            info_res = subprocess.run("osascript -e 'clipboard info'", shell=True, capture_output=True, text=True, timeout=2)
-            if info_res.returncode == 0 and "«class furl»" in info_res.stdout:
-                return False
-
-            cmd = "osascript -e 'get the clipboard as «class PNGf»'"
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=2)
+            cmd = "osascript -e 'try' -e 'if (clipboard info as string) contains \"furl\" then return \"FILE\"' -e 'get the clipboard as «class PNGf»' -e 'on error' -e 'return \"\"' -e 'end try'"
+            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=1)
             if res.returncode == 0 and "«data PNGf" in res.stdout:
                 raw_hex = res.stdout.strip().split("«data PNGf")[-1].replace("»", "").strip()
                 img_bytes = bytes.fromhex(raw_hex)

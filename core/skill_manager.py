@@ -111,11 +111,15 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 
 
 class SkillManager:
+    _dirs_ensured: bool = False
+
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
         self.global_dir = GLOBAL_SKILLS_DIR
         self.project_dir_skills = os.path.join(self.project_dir, PROJECT_SKILLS_DIR_NAME)
-        self.ensure_dirs()
+        if not SkillManager._dirs_ensured:
+            self.ensure_dirs()
+            SkillManager._dirs_ensured = True
 
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
