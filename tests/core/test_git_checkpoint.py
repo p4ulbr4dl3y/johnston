@@ -119,6 +119,29 @@ class TestGitCheckpointManager(unittest.TestCase):
         stat_diff = GitCheckpointManager.get_diff_stats("session_stat", 0, project_path=repo_path)
         self.assertEqual(stat_diff, "+2 / -0")
 
+    def test_default_excludes_without_gitignore(self):
+        repo_path = self._init_git_repo()
+        # Create a venv directory and node_modules directory without a .gitignore file
+        venv_dir = os.path.join(repo_path, "venv")
+        os.makedirs(venv_dir, exist_ok=True)
+        with open(os.path.join(venv_dir, "lib.py"), "w") as f:
+            f.write("print('ignored')\n")
+
+        node_dir = os.path.join(repo_path, "node_modules")
+        os.makedirs(node_dir, exist_ok=True)
+        with open(os.path.join(node_dir, "pkg.json"), "w") as f:
+            f.write("{}\n")
+
+        sha = GitCheckpointManager.create_checkpoint("session_excl", 0, project_path=repo_path)
+        self.assertIsNotNone(sha)
+
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+        ls_res = GitCheckpointManager._run_git(["ls-tree", "-r", "--name-only", sha], cwd=shadow_dir)
+        tracked_files = ls_res.stdout.splitlines()
+
+        self.assertNotIn("venv/lib.py", tracked_files)
+        self.assertNotIn("node_modules/pkg.json", tracked_files)
+
 
 if __name__ == "__main__":
     unittest.main()

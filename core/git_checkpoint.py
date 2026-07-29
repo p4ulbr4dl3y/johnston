@@ -16,6 +16,67 @@ class GitCheckpointManager:
 
     REF_PREFIX = "refs/johnston/checkpoints"
     EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    DEFAULT_EXCLUDES = (
+        ".git/\n"
+        ".johnston/\n"
+        "venv/\n"
+        ".venv/\n"
+        "env/\n"
+        ".env/\n"
+        "ENV/\n"
+        "__pycache__/\n"
+        "*.pyc\n"
+        "*.pyo\n"
+        "*.pyd\n"
+        ".pytest_cache/\n"
+        ".mypy_cache/\n"
+        ".ruff_cache/\n"
+        ".coverage\n"
+        "htmlcov/\n"
+        "dist/\n"
+        "build/\n"
+        "eggs/\n"
+        ".eggs/\n"
+        "*.egg-info/\n"
+        "node_modules/\n"
+        ".next/\n"
+        ".nuxt/\n"
+        ".svelte-kit/\n"
+        ".out/\n"
+        ".cache/\n"
+        "bower_components/\n"
+        ".DS_Store\n"
+        "Thumbs.db\n"
+        "*.log\n"
+        "*.tmp\n"
+        "*.temp\n"
+        "tmp/\n"
+    )
+
+    @classmethod
+    def _ensure_shadow_exclude(cls, shadow_dir: str) -> None:
+        info_dir = os.path.join(shadow_dir, "info")
+        exclude_file = os.path.join(info_dir, "exclude")
+        try:
+            os.makedirs(info_dir, exist_ok=True)
+            existing = ""
+            if os.path.exists(exclude_file):
+                with open(exclude_file, "r", encoding="utf-8") as f:
+                    existing = f.read()
+
+            lines = set(line.strip() for line in existing.splitlines() if line.strip())
+            new_lines = []
+            for pattern in cls.DEFAULT_EXCLUDES.strip().splitlines():
+                if pattern not in lines:
+                    new_lines.append(pattern)
+
+            if new_lines:
+                with open(exclude_file, "a", encoding="utf-8") as f:
+                    if existing and not existing.endswith("\n"):
+                        f.write("\n")
+                    f.write("\n".join(new_lines) + "\n")
+        except Exception:
+            pass
 
     @staticmethod
     def _run_git(args: List[str], cwd: str, env: Optional[dict] = None) -> subprocess.CompletedProcess:
@@ -60,6 +121,7 @@ class GitCheckpointManager:
 
         cls._run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
         cls._run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
+        cls._ensure_shadow_exclude(shadow_dir)
 
         head_res = cls._run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
         if head_res.returncode != 0:
