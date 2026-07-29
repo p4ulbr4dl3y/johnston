@@ -174,51 +174,75 @@ class BaseAgent:
             await self.client.close()
 
     def _is_retryable_error(self, err: Exception) -> bool:
+        if err is None:
+            return False
+
         err_str = str(err).lower()
 
+        # 1. HTTP status code check
+        status_code: Optional[int] = getattr(err, "status_code", None)
+        if status_code is None and hasattr(err, "response") and getattr(err, "response", None) is not None:
+            status_code = getattr(err.response, "status_code", None)
+
+        if status_code in (400, 401, 403, 404, 422):
+            return False
+
+        # 2. Non-retryable error terms
         non_retryable_terms = [
             "invalid api key", "unauthorized", "authentication",
             "invalid_api_key", "context_length_exceeded",
             "context window", "maximum context length",
-            "invalid request", "model_not_found", "permission_denied"
+            "invalid request", "model_not_found", "permission_denied",
+            "account_deactivated", "billing_not_active"
         ]
         if any(term in err_str for term in non_retryable_terms):
             return False
 
+        # 3. Known non-retryable OpenAI exception types
         try:
             import openai
-            if isinstance(err, (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError)):
+            if isinstance(err, (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError, openai.NotFoundError)):
                 return False
         except ImportError:
             pass
 
+        # 4. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
+        if status_code in (408, 429, 500, 502, 503, 504, 524, 529):
+            return True
+
+        # 5. Asyncio / Runtime timeout errors
         if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
             if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
                 return True
 
-        retryable_terms = [
-            "timeout", "timed out", "rate limit", "429", "500", "502", "503", "504",
-            "connection", "network", "server error", "reset", "refused", "overloaded",
-            "chunk timeout"
-        ]
-        if any(term in err_str for term in retryable_terms):
-            return True
-
+        # 6. HTTPX exception types
         try:
             import httpx
-            if isinstance(err, (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError)):
-                if isinstance(err, httpx.HTTPStatusError) and err.response.status_code in (401, 400, 403):
+            if isinstance(err, (httpx.TimeoutException, httpx.NetworkError)):
+                return True
+            if isinstance(err, httpx.HTTPStatusError):
+                if err.response.status_code in (401, 400, 403, 404, 422):
                     return False
                 return True
         except ImportError:
             pass
 
+        # 7. OpenAI retryable exception types
         try:
             import openai
             if isinstance(err, (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError)):
                 return True
         except ImportError:
             pass
+
+        # 8. Fallback retryable terms
+        retryable_terms = [
+            "timeout", "timed out", "rate limit", "429", "500", "502", "503", "504", "524", "529",
+            "connection", "network", "server error", "reset", "refused", "overloaded",
+            "chunk timeout", "service unavailable", "gateway timeout"
+        ]
+        if any(term in err_str for term in retryable_terms):
+            return True
 
         return True
 
@@ -503,6 +527,30 @@ class BaseAgent:
                 retry_delay = getattr(self, "retry_delay", 1.0)
                 retry_backoff = getattr(self, "retry_backoff", 2.0)
                 max_retry_delay = getattr(self, "max_retry_delay", 10.0)
+                pkey = getattr(self, "provider_key", "default")
+
+                from core.circuit_breaker import CircuitBreakerOpenError, circuit_breaker
+
+                if not circuit_breaker.allow_request(pkey):
+                    cb_rem = circuit_breaker.remaining_cooldown(pkey)
+                    fb_prov = getattr(self, "fallback_provider", None)
+                    if fb_prov:
+                        yield ("thinking", f"Provider '{pkey}' circuit breaker OPEN ({cb_rem:.1f}s cooldown). Fast-failing to fallback '{fb_prov}'...", "")
+                        from core.provider_manager import ProviderManager
+                        pm = ProviderManager()
+                        fb_agent = pm.create_agent_for_provider(fb_prov)
+                        if fb_agent:
+                            fb_agent.history = list(self.history)
+                            fb_agent.mode = getattr(self, "mode", "action")
+                            async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
+                                yield (f_tag, f_val1, f_val2)
+                            self.tokens_input += getattr(fb_agent, "tokens_input", 0)
+                            self.tokens_output += getattr(fb_agent, "tokens_output", 0)
+                            self.total_tokens += getattr(fb_agent, "total_tokens", 0)
+                            self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
+                            return
+                    else:
+                        raise CircuitBreakerOpenError(pkey, cb_rem)
 
                 attempt = 0
                 while True:
@@ -634,6 +682,7 @@ class BaseAgent:
                                             if tc.function.arguments:
                                                 tool_calls_dict[idx]["arguments"] += tc.function.arguments
                         # Stream completed successfully
+                        circuit_breaker.record_success(pkey)
                         break
                     except Exception as api_err:
                         is_retryable = self._is_retryable_error(api_err)
@@ -642,13 +691,17 @@ class BaseAgent:
                             delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
                             jitter = random.uniform(0, 0.5 * delay)
                             actual_delay = delay + jitter
-                            yield ("thinking", f"[Retry {attempt}/{max_retries}] Provider '{self.provider_key}' error ({api_err}). Retrying in {actual_delay:.1f}s...", "")
+                            if full_assistant_text:
+                                yield ("bot_delta", "", "")
+                            yield ("thinking", f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...", "")
                             await asyncio.sleep(actual_delay)
                             continue
 
+                        circuit_breaker.record_failure(pkey)
+
                         fb_prov = getattr(self, "fallback_provider", None)
                         if fb_prov:
-                            yield ("thinking", f"Provider '{self.provider_key}' error ({api_err}). Switching to fallback provider '{fb_prov}'...", "")
+                            yield ("thinking", f"Provider '{pkey}' error ({api_err}). Switching to fallback provider '{fb_prov}'...", "")
                             from core.provider_manager import ProviderManager
                             pm = ProviderManager()
                             fb_agent = pm.create_agent_for_provider(fb_prov)
