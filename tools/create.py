@@ -25,6 +25,8 @@ class CreateTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         path = resolve_path(args.get("path"))
+        if os.path.isdir(path):
+            return f"Error: '{path}' is a directory, cannot overwrite with file."
         content = args.get("content", "").rstrip("\r\n")
         try:
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)

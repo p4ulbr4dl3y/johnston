@@ -136,9 +136,13 @@ class SubagentTool(BaseTool):
             subagent.model = definition.model
 
         if subagent_type == "explore":
+            edit_tool_names = {
+                "create", "edit", "replace_file_content", "multi_replace_file_content",
+                "Create", "Edit", "Replace_File_Content", "Multi_Replace_File_Content"
+            }
             subagent.tools = [
                 t for t in subagent.tools
-                if t.get("function", {}).get("name") not in ("create", "edit", "Create", "Edit")
+                if t.get("function", {}).get("name") not in edit_tool_names
             ]
 
         if definition.tools:
