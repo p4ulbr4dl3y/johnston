@@ -15,7 +15,6 @@ from widgets.modal_screens import (
     SkillsScreen,
     TasksListScreen,
     ThinkingEffortScreen,
-    VisionWarningScreen,
 )
 
 
@@ -183,57 +182,6 @@ class ModelsCommand(BaseCommand):
 
                 if catalog.supports_vision(selected_prov, selected_model):
                     catalog.set_fallback_vision_model(selected_prov, selected_model, explicit=False)
-                else:
-                    def on_warning_action(action: str | None) -> None:
-                        if action == "select_vision":
-                            catalog.remove_vision_override(selected_model)
-
-                            def on_fallback_vision_selected(fb_selection: Any) -> None:
-                                if fb_selection:
-                                    fb_val = (
-                                        fb_selection[0]
-                                        if isinstance(fb_selection, tuple)
-                                        and len(fb_selection) == 2
-                                        and isinstance(fb_selection[1], bool)
-                                        else fb_selection
-                                    )
-                                    if isinstance(fb_val, (tuple, list)):
-                                        f_prov, f_model = fb_val[0], fb_val[1]
-                                    else:
-                                        f_prov = selected_prov
-                                        f_model = fb_val
-                                    if catalog.supports_vision(f_prov, f_model):
-                                        catalog.set_fallback_vision_model(f_prov, f_model, explicit=True)
-                                        clean_fb = catalog.get_model_display_name(f_prov, f_model)
-                                        app.notify(f"Fallback Vision model set: {clean_fb}")
-                                    else:
-                                        app.notify(f"Selected model does not support Vision: {f_model}", severity="error")
-
-                            app.push_screen(
-                                ModelScreen(grouped_models, selected_model, selected_prov, initial_tab="vision"),
-                                callback=on_fallback_vision_selected,
-                            )
-                        elif action == "force_vision":
-                            catalog.add_vision_override(selected_model)
-                            catalog.set_fallback_vision_model(selected_prov, selected_model, explicit=True)
-                        elif action == "use_fallback":
-                            catalog.remove_vision_override(selected_model)
-                            fb_prov, fb_model = catalog.get_fallback_vision_model()
-                            if not fb_model or not catalog.supports_vision(fb_prov, fb_model):
-                                found_prov = None
-                                found_model = None
-                                for pkey, pinfo in grouped_models.items():
-                                    for m_item in pinfo.get("models", []):
-                                        if catalog.supports_vision(pkey, m_item):
-                                            found_prov = pkey
-                                            found_model = m_item
-                                            break
-                                    if found_prov:
-                                        break
-                                if found_prov and found_model:
-                                    catalog.set_fallback_vision_model(found_prov, found_model, explicit=False)
-
-                    app.push_screen(VisionWarningScreen(selected_model, selected_prov), callback=on_warning_action)
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
