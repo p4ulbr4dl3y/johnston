@@ -60,10 +60,10 @@ class CommandSuggestions(OptionList):
         is_home_or_root = (real_cwd == home or os.path.dirname(real_cwd) == real_cwd)
         max_files = 300 if is_home_or_root else 1000
 
-        ignore_dirs = {
-            ".git", ".venv", "venv", "__pycache__", ".johnston",
-            "node_modules", ".mypy_cache", ".pytest_cache", ".idea",
-            ".vscode", "build", "dist", ".gemini", ".next", ".cache",
+        from core.config import DEFAULT_IGNORE_DIRS
+
+        ignore_dirs = DEFAULT_IGNORE_DIRS | {
+            ".idea", ".vscode", ".gemini", ".cache",
             "Library", ".Trash", "Applications", "Pictures", "Movies", "Music"
         }
         try:
