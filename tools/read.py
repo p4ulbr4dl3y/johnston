@@ -135,7 +135,7 @@ class ReadTool(BaseTool):
                     content = "\n".join(formatted) if formatted else "(empty directory)"
 
                 return (
-                    f"Path '{path}' is a directory ({total_count} items):\n{content}"
+                    f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
                 )
             except Exception as e:
                 return f"Error listing directory '{path}': {e}"
