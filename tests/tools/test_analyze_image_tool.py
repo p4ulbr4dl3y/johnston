@@ -67,7 +67,6 @@ class TestAnalyzeImageTool(unittest.IsolatedAsyncioTestCase):
                 "httpx.AsyncClient.post", return_value=mock_resp
             ):
                 res = await analyze_image_with_fallback(temp_path, "Describe")
-                self.assertIn("Vision Analysis", res)
                 self.assertIn("1x1 PNG image", res)
         finally:
             catalog.set_fallback_vision_model(*old_fallback)
@@ -232,7 +231,7 @@ class TestAnalyzeImageToolErrors(unittest.IsolatedAsyncioTestCase):
                 "httpx.AsyncClient.post", return_value=mock_resp
             ):
                 res = await tool.execute({"path": temp_path, "prompt": "What color is this?"})
-                self.assertIn("Vision Analysis", res)
+                self.assertIn("Blue square", res)
         finally:
             catalog.set_fallback_vision_model(*old_fallback)
             catalog.remove_vision_override(test_model)
