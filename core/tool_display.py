@@ -40,6 +40,10 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
             return _truncate(f'"{q_text[:47] + "..." if len(q_text) > 50 else q_text}"')
         return "ask_user"
 
+    if name == "get_mcp_schema":
+        t = args.get("tool") or args.get("server") or tool_name
+        return _truncate(str(t))
+
     if name == "subagent":
         desc = args.get("description") or args.get("prompt") or ""
         return _truncate(f'"{desc}"') if desc else tool_name
