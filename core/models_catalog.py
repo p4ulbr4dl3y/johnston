@@ -50,9 +50,8 @@ class ModelsCatalog:
         self._names: Dict[str, str] = {}
         self._descriptions: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
-        self._fallback_vision_provider: str = ""
-        self._fallback_vision_model: str = ""
-        self._fallback_vision_explicit: bool = False
+        self._vision_provider: str = ""
+        self._vision_model: str = ""
         self._match_cache: Dict[str, str] = {}
         self._updated_at: float = 0.0
         self.load_cache()
@@ -88,9 +87,8 @@ class ModelsCatalog:
                     self._names = data.get("model_names", {})
                     self._descriptions = data.get("model_descriptions", {})
                     self._pricing = data.get("model_pricing", {})
-                    self._fallback_vision_provider = data.get("fallback_vision_provider", "")
-                    self._fallback_vision_model = data.get("fallback_vision_model", "")
-                    self._fallback_vision_explicit = data.get("fallback_vision_explicit", False)
+                    self._vision_provider = data.get("vision_provider") or data.get("fallback_vision_provider", "")
+                    self._vision_model = data.get("vision_model") or data.get("fallback_vision_model", "")
                     self._updated_at = float(data.get("updated_at", 0.0))
                 loaded = True
             except Exception:
@@ -101,12 +99,10 @@ class ModelsCatalog:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     cfg_data = json.load(f)
                     if isinstance(cfg_data, dict):
-                        fb_m = cfg_data.get("fallback_vision_model")
-                        if fb_m:
-                            self._fallback_vision_model = fb_m
-                            self._fallback_vision_provider = cfg_data.get("fallback_vision_provider", "")
-                            if "fallback_vision_explicit" in cfg_data:
-                                self._fallback_vision_explicit = bool(cfg_data["fallback_vision_explicit"])
+                        vis_m = cfg_data.get("vision_model") or cfg_data.get("fallback_vision_model")
+                        if vis_m:
+                            self._vision_model = vis_m
+                            self._vision_provider = cfg_data.get("vision_provider") or cfg_data.get("fallback_vision_provider", "")
             except Exception:
                 pass
 
@@ -132,9 +128,8 @@ class ModelsCatalog:
                 "reasoning_models": self._reasoning,
                 "open_weights_models": self._open_weights,
                 "user_vision_overrides": self._user_overrides,
-                "fallback_vision_provider": self._fallback_vision_provider,
-                "fallback_vision_model": self._fallback_vision_model,
-                "fallback_vision_explicit": self._fallback_vision_explicit,
+                "vision_provider": self._vision_provider,
+                "vision_model": self._vision_model,
                 "model_names": model_names if model_names is not None else self._names,
                 "model_descriptions": self._descriptions,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
@@ -511,13 +506,16 @@ class ModelsCatalog:
         self._match_cache.clear()
         self.save_cache()
 
-    def set_fallback_vision_model(self, provider_id: str, model_id: str) -> None:
-        self._fallback_vision_provider = provider_id
-        self._fallback_vision_model = model_id
+    def set_vision_model(self, provider_id: str, model_id: str, *args, **kwargs) -> None:
+        self._vision_provider = provider_id
+        self._vision_model = model_id
         if model_id and not self.supports_vision(provider_id, model_id):
             self.add_vision_override(model_id)
         self.save_cache()
         self._save_vision_config(provider_id, model_id)
+
+    def set_fallback_vision_model(self, provider_id: str, model_id: str, *args, **kwargs) -> None:
+        self.set_vision_model(provider_id, model_id)
 
     def _save_vision_config(self, provider_id: str, model_id: str) -> None:
         try:
@@ -527,16 +525,19 @@ class ModelsCatalog:
                     data = json.load(f)
             if not isinstance(data, dict):
                 data = {}
-            data["fallback_vision_provider"] = provider_id
-            data["fallback_vision_model"] = model_id
+            data["vision_provider"] = provider_id
+            data["vision_model"] = model_id
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception:
             pass
 
+    def get_vision_model(self) -> Tuple[str, str]:
+        return getattr(self, "_vision_provider", ""), getattr(self, "_vision_model", "")
+
     def get_fallback_vision_model(self) -> Tuple[str, str]:
-        return getattr(self, "_fallback_vision_provider", ""), getattr(self, "_fallback_vision_model", "")
+        return self.get_vision_model()
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:

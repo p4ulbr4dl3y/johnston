@@ -194,10 +194,14 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.push_screen = simulate_push_screen
         app.query_one = lambda target, default=None: type("MockInput", (), {"focus": lambda self: None})()
 
-        with patch.object(catalog, "save_cache"):
-            await cmd.execute(app)
-            self.assertEqual(len(pushed_screens), 1)
-        catalog.set_fallback_vision_model("", "")
+        orig_fb = catalog.get_fallback_vision_model()
+        try:
+            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
+                await cmd.execute(app)
+                self.assertEqual(len(pushed_screens), 1)
+        finally:
+            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
+                catalog.set_fallback_vision_model(*orig_fb)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
         from core.commands import ModelsCommand

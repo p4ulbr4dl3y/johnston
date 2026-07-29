@@ -26,15 +26,15 @@ class TestVisionModelPersistence(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(os.path.exists(self.config_file))
             with open(self.config_file, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
-            self.assertEqual(cfg.get("fallback_vision_provider"), "test_provider")
-            self.assertEqual(cfg.get("fallback_vision_model"), "custom-vision-v1")
+            self.assertEqual(cfg.get("vision_provider"), "test_provider")
+            self.assertEqual(cfg.get("vision_model"), "custom-vision-v1")
 
             # Reset in-memory state and reload from config_file
-            catalog._fallback_vision_provider = ""
-            catalog._fallback_vision_model = ""
+            catalog._vision_provider = ""
+            catalog._vision_model = ""
             catalog.load_cache()
 
-            prov, mod = catalog.get_fallback_vision_model()
+            prov, mod = catalog.get_vision_model()
             self.assertEqual(prov, "test_provider")
             self.assertEqual(mod, "custom-vision-v1")
 
