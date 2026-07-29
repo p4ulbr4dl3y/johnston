@@ -500,6 +500,7 @@ class ToolCallWidget(Vertical):
         "task": "Task",
         "analyze_image": "AnalyzeImage",
         "call_mcp_tool": "CallMCPTool",
+        "get_mcp_schema": "GetMCPSchema",
         "web_fetch": "WebFetch",
         "update_plan": "Plan",
         "plan": "Plan",
@@ -508,10 +509,10 @@ class ToolCallWidget(Vertical):
     SYSTEM_TOOLS = {
         "read", "create", "edit", "shell", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
-        "subagent", "task", "analyze_image", "web_fetch",
+        "subagent", "task", "analyze_image", "web_fetch", "get_mcp_schema",
         "Read", "Create", "Edit", "Shell", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
-        "Subagent", "Task", "AnalyzeImage", "WebFetch"
+        "Subagent", "Task", "AnalyzeImage", "WebFetch", "GetMCPSchema"
     }
 
     def render_header(self) -> None:
@@ -547,6 +548,9 @@ class ToolCallWidget(Vertical):
             else:
                 target_str = "Plan"
             self.header_label.update(f"⚙ [bold #ffffff]Plan[/bold #ffffff]({escape(target_str)})")
+        elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
+            tool_name = self.args.get("tool") or self.target
+            self.header_label.update(f"⚙ [bold]GetMCPSchema[/bold]({escape(str(tool_name))})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(self.target))})")
@@ -1002,6 +1006,24 @@ class ToolCallWidget(Vertical):
                     else:
                         output_text = "(No output)"
                 self.content_widget.update(escape(output_text))
+            elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
+                server = self.args.get("server", "")
+                tool = self.args.get("tool", "")
+                display_parts = [f"Server: {server}", f"Tool: {tool}"]
+                if self.result_text:
+                    display_parts.append(f"\nSchema:\n{self.result_text.strip()}")
+                full_display = "\n".join(display_parts)
+                try:
+                    syntax = Syntax(
+                        full_display,
+                        "json",
+                        theme="one-dark",
+                        word_wrap=True,
+                        background_color="#18181b"
+                    )
+                    self.content_widget.update(syntax)
+                except Exception:
+                    self.content_widget.update(escape(full_display))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 server = self.args.get("server", "")
                 tool = self.args.get("tool", "")
