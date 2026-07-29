@@ -343,6 +343,7 @@ class ToolCallWidget(Vertical):
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
+        self.md_widget = Markdown("", classes="tool-content-md")
 
     def _format_compact_dict(self, d: dict) -> str:
         if not isinstance(d, dict) or not d:
@@ -383,9 +384,11 @@ class ToolCallWidget(Vertical):
     def compose(self) -> ComposeResult:
         yield self.header_label
         yield self.content_widget
+        yield self.md_widget
 
     def on_mount(self) -> None:
         self.content_widget.display = False
+        self.md_widget.display = False
         self.render_header()
 
     def set_result(self, result_text: str) -> None:
@@ -520,9 +523,15 @@ class ToolCallWidget(Vertical):
         self.render_header()
         if self.is_expanded:
             self.render_content()
-            self.content_widget.display = True
+            if self.tool_type.lower() in ("analyze_image", "analyzeimage"):
+                self.md_widget.display = True
+                self.content_widget.display = False
+            else:
+                self.content_widget.display = True
+                self.md_widget.display = False
         else:
             self.content_widget.display = False
+            self.md_widget.display = False
 
     def _guess_lexer(self, path_str: str) -> str:
         if not path_str:
@@ -827,20 +836,11 @@ class ToolCallWidget(Vertical):
                 if raw_text.strip().lower().startswith("error"):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
+                    self.content_widget.display = True
+                    self.md_widget.display = False
                 else:
                     clean_code = raw_text.rstrip("\r\n")
-                    try:
-                        syntax = Syntax(
-                            clean_code,
-                            "markdown",
-                            theme="one-dark",
-                            line_numbers=False,
-                            word_wrap=True,
-                            background_color="#18181b"
-                        )
-                        self.content_widget.update(syntax)
-                    except Exception:
-                        self.content_widget.update(escape(clean_code or "(No analysis)"))
+                    safe_update_markdown(self.md_widget, clean_code or "(No analysis)")
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
