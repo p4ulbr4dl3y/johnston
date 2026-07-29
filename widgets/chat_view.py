@@ -824,7 +824,7 @@ class ToolCallWidget(Vertical):
             elif self.tool_type in ("read", "Read", "web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
-                    t = Text(raw_text.strip(), style="bold red")
+                    t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                 else:
                     default_target = self.args.get("url") or file_path or "page.md"
