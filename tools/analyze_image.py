@@ -181,7 +181,8 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
             return f"Error from vision model (HTTP {resp.status_code}): {resp.text[:300]}"
     except Exception as e:
-        return f"Error running vision model for '{image_path}': {e}"
+        err_msg = str(e).strip() or type(e).__name__
+        return f"Error running vision model for '{image_path}': {err_msg}"
 
 
 class AnalyzeImageTool(BaseTool):
