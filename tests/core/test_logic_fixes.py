@@ -117,40 +117,7 @@ class TestFallbackMetricsMerge(unittest.IsolatedAsyncioTestCase):
     fallback's token/cost metrics must be merged into the primary agent so the status
     footer and persisted session reflect the real total spent."""
 
-    async def test_fallback_tokens_merged_into_primary(self):
-        class FakeFbAgent:
-            def __init__(self):
-                self.tokens_input = 500
-                self.tokens_output = 100
-                self.total_tokens = 600
-                self.cost_usd = 0.05
-                self.history = []
-                self.mode = "action"
 
-            async def stream_steps(self, prompt):
-                yield ("bot_text", "fallback response", "")
-
-            async def close(self):
-                pass
-
-        agent = BaseAgent(
-            api_key="m", model="m", base_url="http://t", system_prompt="s",
-            tools=[], provider_key="badprov", api_type="openai", fallback_provider="fbprov",
-        )
-        self.addAsyncCleanup(agent.close)
-        fb = FakeFbAgent()
-
-        with patch("core.provider_manager.ProviderManager") as MockPM:
-            MockPM.return_value.create_agent_for_provider.return_value = fb
-            with patch.object(agent.client.chat.completions, "create", new_callable=AsyncMock) as mock_create:
-                mock_create.side_effect = Exception("primary provider down")
-                async for _ in agent.stream_steps("hi"):
-                    pass
-
-        self.assertEqual(agent.tokens_input, 500)
-        self.assertEqual(agent.tokens_output, 100)
-        self.assertEqual(agent.total_tokens, 600)
-        self.assertAlmostEqual(agent.cost_usd, 0.05)
 
 
 class TestAskUserUnknownStatus(unittest.IsolatedAsyncioTestCase):

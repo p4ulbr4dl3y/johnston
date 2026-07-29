@@ -120,7 +120,6 @@ class BaseAgent:
         reasoning_effort: str = None,
         thinking_effort: str = None,
         chunk_timeout: float = 30.0,
-        fallback_provider: str = None,
         max_tokens: int = 8192,
         max_steps: int = None,
         max_tool_calls: int = 200,
@@ -145,7 +144,6 @@ class BaseAgent:
         self.reasoning_effort = reasoning_effort
         self.thinking_effort = normalize_thinking_effort(thinking_effort or reasoning_effort)
         self.chunk_timeout = chunk_timeout
-        self.fallback_provider = fallback_provider
         self.max_tokens = max_tokens
         self.max_steps = max_steps
         self.max_tool_calls = max_tool_calls
@@ -533,24 +531,7 @@ class BaseAgent:
 
                 if not circuit_breaker.allow_request(pkey):
                     cb_rem = circuit_breaker.remaining_cooldown(pkey)
-                    fb_prov = getattr(self, "fallback_provider", None)
-                    if fb_prov:
-                        yield ("thinking", f"Provider '{pkey}' circuit breaker OPEN ({cb_rem:.1f}s cooldown). Fast-failing to fallback '{fb_prov}'...", "")
-                        from core.provider_manager import ProviderManager
-                        pm = ProviderManager()
-                        fb_agent = pm.create_agent_for_provider(fb_prov)
-                        if fb_agent:
-                            fb_agent.history = list(self.history)
-                            fb_agent.mode = getattr(self, "mode", "action")
-                            async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
-                                yield (f_tag, f_val1, f_val2)
-                            self.tokens_input += getattr(fb_agent, "tokens_input", 0)
-                            self.tokens_output += getattr(fb_agent, "tokens_output", 0)
-                            self.total_tokens += getattr(fb_agent, "total_tokens", 0)
-                            self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
-                            return
-                    else:
-                        raise CircuitBreakerOpenError(pkey, cb_rem)
+                    raise CircuitBreakerOpenError(pkey, cb_rem)
 
                 attempt = 0
                 while True:
@@ -698,26 +679,6 @@ class BaseAgent:
                             continue
 
                         circuit_breaker.record_failure(pkey)
-
-                        fb_prov = getattr(self, "fallback_provider", None)
-                        if fb_prov:
-                            yield ("thinking", f"Provider '{pkey}' error ({api_err}). Switching to fallback provider '{fb_prov}'...", "")
-                            from core.provider_manager import ProviderManager
-                            pm = ProviderManager()
-                            fb_agent = pm.create_agent_for_provider(fb_prov)
-                            if fb_agent:
-                                fb_agent.history = list(self.history)
-                                fb_agent.mode = getattr(self, "mode", "action")
-                                async for f_tag, f_val1, f_val2 in fb_agent.stream_steps(user_text):
-                                    yield (f_tag, f_val1, f_val2)
-                                # Merge fallback agent's token/cost metrics into the primary
-                                # agent so the status footer and session persistence reflect the
-                                # real total spent (including the fallback's own work).
-                                self.tokens_input += getattr(fb_agent, "tokens_input", 0)
-                                self.tokens_output += getattr(fb_agent, "tokens_output", 0)
-                                self.total_tokens += getattr(fb_agent, "total_tokens", 0)
-                                self.cost_usd += getattr(fb_agent, "cost_usd", 0.0)
-                                return
                         raise api_err
 
                 pricing = catalog.get_model_pricing(self.provider_key, self.model)

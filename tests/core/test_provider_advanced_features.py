@@ -15,13 +15,11 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             extra_body={"temperature": 0.2},
             reasoning_effort="high",
             chunk_timeout=15.0,
-            fallback_provider="fallback_prov"
         )
         self.assertEqual(agent.headers, {"X-Custom-Header": "TestValue"})
         self.assertEqual(agent.extra_body, {"temperature": 0.2})
         self.assertEqual(agent.reasoning_effort, "high")
         self.assertEqual(agent.chunk_timeout, 15.0)
-        self.assertEqual(agent.fallback_provider, "fallback_prov")
 
     def test_provider_manager_loads_advanced_options(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -37,8 +35,7 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     "headers": {"X-Test": "123"},
     "extra_body": {"top_p": 0.9},
     "reasoning_effort": "medium",
-    "chunk_timeout": 20.0,
-    "fallback_provider": "opencode"
+    "chunk_timeout": 20.0
   }
 }""")
             with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file):
@@ -50,7 +47,6 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(agent.extra_body, {"top_p": 0.9})
                     self.assertEqual(agent.reasoning_effort, "medium")
                     self.assertEqual(agent.chunk_timeout, 20.0)
-                    self.assertEqual(agent.fallback_provider, "opencode")
 
     def test_provider_disabling(self):
         with tempfile.TemporaryDirectory() as tmpdir:
