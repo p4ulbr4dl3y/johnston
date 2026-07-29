@@ -53,7 +53,18 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         target_provider_key = active_key
         target_model = active_model
 
-    # Option 2: Configured vision model
+    # Option 1.5: Active provider has another model that supports vision
+    if not target_provider_key and active_key and _provider_is_usable(active_key):
+        pinfo = providers.get(active_key, {})
+        models_to_check = [pinfo.get("model")] if pinfo.get("model") else []
+        models_to_check.extend(pinfo.get("models") or [])
+        for m_item in models_to_check:
+            if m_item and catalog.supports_vision(active_key, m_item):
+                target_provider_key = active_key
+                target_model = m_item
+                break
+
+    # Option 2: Explicitly configured vision model in settings
     if not target_provider_key:
         fb_prov, fb_model = catalog.get_vision_model()
         if fb_model:
@@ -64,25 +75,8 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
                 target_provider_key = active_key
                 target_model = fb_model
 
-    # Option 3: Search any provider that supports vision and has configured API key
-    if not target_provider_key or not _provider_is_usable(target_provider_key):
-        for pkey, pinfo in providers.items():
-            if not _provider_is_usable(pkey):
-                continue
-            m_cand = pm.get_provider_model(pkey)
-            models_to_check = [m_cand] if m_cand else []
-            if pinfo.get("models"):
-                models_to_check.extend(pinfo["models"])
-            for m_item in models_to_check:
-                if m_item and catalog.supports_vision(pkey, m_item):
-                    target_provider_key = pkey
-                    target_model = m_item
-                    break
-            if target_provider_key:
-                break
-
     if not target_provider_key or not target_model:
-        return f"Error: No vision-capable provider with configured API key available to analyze image '{image_path}'."
+        return f"Error: Active model '{active_model or 'unknown'}' does not support vision, and no Vision model is configured in settings (/model)."
 
     try:
         b64_url, mime_type = process_and_encode_image(image_path, max_dim=1568)
