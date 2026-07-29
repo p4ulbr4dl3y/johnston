@@ -181,7 +181,7 @@ def clean_markdown_for_rendering(text: str) -> str:
     text = text.replace("\r\n", "\n").expandtabs(4)
     lines = text.splitlines()
 
-    cb_indices = [i for i, l in enumerate(lines) if l.strip().startswith("```")]
+    cb_indices = [i for i, line in enumerate(lines) if line.strip().startswith("```")]
     code_ranges = [(cb_indices[idx], cb_indices[idx + 1]) for idx in range(0, len(cb_indices) - 1, 2)]
     unclosed_start = cb_indices[-1] if len(cb_indices) % 2 != 0 else None
 
