@@ -87,9 +87,11 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             return False
         if target_prov and p_key and p_key.lower() != target_prov.lower():
             return False
+
         m_low, t_low = m.lower(), target_model.lower()
-        if m_low == t_low or m_low.split("/")[-1] == t_low.split("/")[-1]:
+        if m_low == t_low:
             return True
+
         clean_m = catalog.get_model_display_name(p_key, m).lower()
         clean_t = catalog.get_model_display_name(target_prov or p_key, target_model).lower()
         return bool(clean_m and clean_t and clean_m == clean_t)
@@ -100,13 +102,14 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         items: List[Union[str, Tuple[str, str], None]] = []
         default_val: Union[str, Tuple[str, str], None] = None
 
-        target_prov = self.current_provider
-        target_model = self.current_model
         if filter_vision:
-            if not (self.current_provider and self.current_model and catalog.supports_vision(self.current_provider, self.current_model)):
-                fb_prov, fb_model = catalog.get_fallback_vision_model()
-                if fb_prov and fb_model:
-                    target_prov, target_model = fb_prov, fb_model
+            fb_prov, fb_model = catalog.get_fallback_vision_model()
+            if fb_model:
+                target_prov, target_model = fb_prov, fb_model
+            else:
+                target_prov, target_model = self.current_provider, self.current_model
+        else:
+            target_prov, target_model = self.current_provider, self.current_model
 
         if isinstance(self.models_data, dict):
             first_group = True
@@ -127,9 +130,8 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 options.append(Option(p_name, disabled=True))
                 items.append(None)
 
-                is_target_prov = bool(target_prov and p_key.lower() == target_prov.lower())
                 active_idx = None
-                if is_target_prov and target_model:
+                if target_model:
                     for idx, m in enumerate(p_models):
                         if self._is_active_model(p_key, m, target_prov, target_model):
                             active_idx = idx
