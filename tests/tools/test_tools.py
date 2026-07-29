@@ -57,10 +57,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
         self.assertIn("Error:", res_err)
 
-        # Directory read (should auto-list directory contents)
+        # Directory read (should auto-list directory contents with hint)
         dir_res = await tool.execute({"path": self.test_dir})
         self.assertIn("is a directory", dir_res)
         self.assertIn("sample.txt", dir_res)
+        self.assertIn("Hint:", dir_res)
 
         # External file outside workspace allowed
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as ext_f:

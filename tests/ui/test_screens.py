@@ -249,11 +249,18 @@ class TestModelScreen(unittest.TestCase):
 
     def test_build_data_vision_tab_active(self):
         models_data = {"prov1": {"name": "P1", "models": ["m1", "m2"]}}
-        with patch.object(catalog, "save_cache"):
-            catalog.add_vision_override("m1")
-            s = ModelScreen(models_data=models_data, current_model="m1", current_provider="prov1", initial_tab="vision")
-            self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
-            catalog.remove_vision_override("m1")
+        orig_fb = catalog.get_vision_model()
+        try:
+            with patch.object(catalog, "save_cache"), \
+                 patch.object(catalog, "_save_vision_config"), \
+                 patch.object(catalog, "_vision", ["m1"]), \
+                 patch.object(catalog, "_native_vision", ["m1"]):
+                catalog.set_vision_model("prov1", "m1")
+                s = ModelScreen(models_data=models_data, current_model="m1", current_provider="prov1", initial_tab="vision")
+                self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
+        finally:
+            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
+                catalog.set_vision_model(*orig_fb)
 
 
 class TestVisionWarningScreen(unittest.TestCase):

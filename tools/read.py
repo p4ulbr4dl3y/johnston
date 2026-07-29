@@ -129,8 +129,8 @@ class ReadTool(BaseTool):
                         formatted_entries.append(entry)
                 content = "\n".join(formatted_entries) if formatted_entries else "(empty directory)"
                 return (
-                    f"Path '{path}' is a directory. Directory contents ({len(entries)} items):\n{content}\n\n"
-                    "[Hint: Use shell commands (e.g. 'ls') or list_dir to explore directories instead of 'read'.]"
+                    f"Path '{path}' is a directory. [Hint: Use shell commands (e.g. 'ls') to explore directories instead of 'read'.]\n"
+                    f"Directory contents ({len(entries)} items):\n{content}"
                 )
             except Exception as e:
                 return f"Error listing directory '{path}': {e}"
