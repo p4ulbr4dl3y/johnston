@@ -96,7 +96,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             resolved_target = ALIAS_MAP.get(matches[0], matches[0])
             desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
             hint = f" [Auto-Fix Hint: Did you mean '{matches[0]}'{desc_str}?]"
-        return f"Unknown tool: {name}.{hint}"
+        return f"Unknown tool: {name}{hint}"
 
     from core.mode_manager import ModeManager
 
