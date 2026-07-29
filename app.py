@@ -236,29 +236,30 @@ class JohnstonApp(App):
                 mtype = msg.get("type")
                 if mtype == "user":
                     text = msg.get("text", "")
-                    await chat_view.add_user_message(text)
+                    await chat_view.add_user_message(text, animate=False)
                 elif mtype == "bot":
                     text = msg.get("text", "")
-                    bm = await chat_view.add_bot_message()
+                    bm = await chat_view.add_bot_message(animate=False)
                     bm.content = text
                 elif mtype == "thinking":
                     dur = msg.get("duration", 0.0)
                     txt = msg.get("text", "")
-                    tw = await chat_view.add_thinking_widget()
+                    tw = await chat_view.add_thinking_widget(animate=False)
                     tw.finish_thinking(dur, txt)
                 elif mtype == "tool":
                     ttype = msg.get("tool_type", "")
                     target = msg.get("target", "")
                     rtext = msg.get("result_text", "")
                     targs = msg.get("args", {})
-                    await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs)
+                    await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
                 elif mtype == "compaction_divider":
                     ctxt = msg.get("text", "Session Compacted")
-                    await chat_view.add_compaction_divider(ctxt)
+                    await chat_view.add_compaction_divider(ctxt, animate=False)
 
             chat_view.check_welcome()
+            await asyncio.sleep(0.15)
             try:
-                chat_view.scroll_end(animate=False)
+                chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
             except Exception:
                 pass
 

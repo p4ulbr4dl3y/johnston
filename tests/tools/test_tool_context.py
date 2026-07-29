@@ -33,10 +33,6 @@ class TestToolContext(unittest.TestCase):
         ctx.notify("test notification")
         self.assertEqual(app.notified, ["test notification"])
 
-        ctx.set_agent_mode("explore")
-        self.assertEqual(app.agent.mode, "explore")
-        self.assertTrue(app.status_refreshed)
-
         ctx.add_background_task("task1")
         self.assertIn("task1", ctx.background_tasks)
 
@@ -48,38 +44,6 @@ class TestToolContext(unittest.TestCase):
         self.assertIsNone(ctx.create_agent())
 
 class TestToolContextAdvanced(unittest.TestCase):
-    def test_toggle_agent_mode_action_to_explore(self):
-        app = MockApp()
-        ctx = ToolContext(app)
-        new_mode = ctx.toggle_agent_mode()
-        self.assertEqual(new_mode, "explore")
-        self.assertEqual(app.agent.mode, "explore")
-
-    def test_toggle_agent_mode_explore_to_action(self):
-        app = MockApp()
-        app.agent.mode = "explore"
-        ctx = ToolContext(app)
-        new_mode = ctx.toggle_agent_mode()
-        self.assertEqual(new_mode, "action")
-        self.assertEqual(app.agent.mode, "action")
-
-    def test_toggle_agent_mode_no_app(self):
-        ctx = ToolContext(None)
-        self.assertEqual(ctx.toggle_agent_mode(), "action")
-
-    def test_toggle_agent_mode_app_with_mode_attr(self):
-        class ModeApp:
-            def __init__(self):
-                self.mode = "action"
-                self.status_refreshed = False
-            def refresh_status_footer(self):
-                self.status_refreshed = True
-        app = ModeApp()
-        ctx = ToolContext(app)
-        new_mode = ctx.toggle_agent_mode()
-        self.assertEqual(new_mode, "explore")
-        self.assertEqual(app.mode, "explore")
-
     def test_trigger_ai_response_with_method(self):
         class RespApp:
             def __init__(self):

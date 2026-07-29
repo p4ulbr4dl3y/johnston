@@ -21,7 +21,7 @@ class TestVisionModelPersistence(unittest.IsolatedAsyncioTestCase):
         with patch("core.models_catalog.CONFIG_FILE", self.config_file), \
              patch("core.models_catalog.CACHE_FILE", self.cache_file):
             catalog = ModelsCatalog()
-            catalog.set_fallback_vision_model("test_provider", "custom-vision-v1")
+            catalog.set_vision_model("test_provider", "custom-vision-v1")
 
             self.assertTrue(os.path.exists(self.config_file))
             with open(self.config_file, "r", encoding="utf-8") as f:
@@ -42,7 +42,7 @@ class TestVisionModelPersistence(unittest.IsolatedAsyncioTestCase):
         with patch("core.models_catalog.CONFIG_FILE", self.config_file), \
              patch("core.models_catalog.CACHE_FILE", self.cache_file):
             catalog = ModelsCatalog()
-            catalog.set_fallback_vision_model("custom_provider", "custom-vision-model")
+            catalog.set_vision_model("custom_provider", "custom-vision-model")
 
             with patch("core.commands.catalog", catalog):
                 class MockApp:

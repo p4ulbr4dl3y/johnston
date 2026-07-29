@@ -14,7 +14,6 @@ SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 LAST_TOOL_LOG_FILE = os.path.join(LOGS_DIR, "last_tool.log")
-AUDIT_LOG_FILE = os.path.join(CONFIG_DIR, "audit.jsonl")
 
 # Agent Execution Limits & Timeouts
 DEFAULT_CONTEXT_LIMIT = 128000
