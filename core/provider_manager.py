@@ -403,7 +403,8 @@ class ProviderManager:
                 raise RuntimeError("No available providers configured.")
 
         target_provider = providers[provider_key]
-        stored_key = self.get_api_key(target_provider["key"])
+        pkey_str = target_provider.get("key", provider_key)
+        stored_key = self.get_api_key(pkey_str)
         model_val = self.get_provider_model(provider_key)
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
 
@@ -413,7 +414,7 @@ class ProviderManager:
             api_key=stored_key or target_provider.get("api_key", ""),
             model=model_val,
             base_url=target_provider.get("base_url", ""),
-            provider_key=target_provider["key"],
+            provider_key=pkey_str,
             api_type=target_provider.get("api_type", "openai"),
             headers=target_provider.get("headers"),
             extra_body=target_provider.get("extra_body"),

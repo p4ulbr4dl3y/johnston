@@ -12,7 +12,7 @@ from typing import Dict, Iterable, List, Set, Tuple
 
 import httpx
 
-from core.config import CONFIG_DIR
+from core.config import CONFIG_DIR, CONFIG_FILE
 
 MODELS_DEV_URL = "https://models.dev/api.json"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -52,6 +52,7 @@ class ModelsCatalog:
         self._pricing: Dict[str, Dict[str, float]] = {}
         self._fallback_vision_provider: str = ""
         self._fallback_vision_model: str = ""
+        self._fallback_vision_explicit: bool = False
         self._match_cache: Dict[str, str] = {}
         self.load_cache()
 
@@ -70,6 +71,7 @@ class ModelsCatalog:
             pass
 
     def load_cache(self) -> bool:
+        loaded = False
         target_file = CACHE_FILE if os.path.exists(CACHE_FILE) else None
         if target_file:
             try:
@@ -78,7 +80,8 @@ class ModelsCatalog:
                     self._limits = data.get("model_limits", {})
                     self._output_limits = data.get("output_limits", {})
                     self._user_overrides = data.get("user_vision_overrides", [])
-                    self._vision = list(set(data.get("vision_models", []) + self._user_overrides))
+                    self._native_vision = data.get("vision_models", [])
+                    self._vision = list(set(self._native_vision + self._user_overrides))
                     self._reasoning = data.get("reasoning_models", [])
                     self._open_weights = data.get("open_weights_models", [])
                     self._names = data.get("model_names", {})
@@ -86,11 +89,26 @@ class ModelsCatalog:
                     self._pricing = data.get("model_pricing", {})
                     self._fallback_vision_provider = data.get("fallback_vision_provider", "")
                     self._fallback_vision_model = data.get("fallback_vision_model", "")
-
-                return True
+                    self._fallback_vision_explicit = data.get("fallback_vision_explicit", False)
+                loaded = True
             except Exception:
                 pass
-        return False
+
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    cfg_data = json.load(f)
+                    if isinstance(cfg_data, dict):
+                        fb_m = cfg_data.get("fallback_vision_model")
+                        if fb_m:
+                            self._fallback_vision_model = fb_m
+                            self._fallback_vision_provider = cfg_data.get("fallback_vision_provider", "")
+                            if "fallback_vision_explicit" in cfg_data:
+                                self._fallback_vision_explicit = bool(cfg_data["fallback_vision_explicit"])
+            except Exception:
+                pass
+
+        return loaded
 
     def save_cache(
         self,
@@ -106,12 +124,13 @@ class ModelsCatalog:
                 "updated_at": time.time(),
                 "model_limits": model_limits if model_limits is not None else self._limits,
                 "output_limits": self._output_limits,
-                "vision_models": vision_models if vision_models is not None else self._vision,
+                "vision_models": vision_models if vision_models is not None else getattr(self, "_native_vision", self._vision),
                 "reasoning_models": self._reasoning,
                 "open_weights_models": self._open_weights,
                 "user_vision_overrides": self._user_overrides,
                 "fallback_vision_provider": self._fallback_vision_provider,
                 "fallback_vision_model": self._fallback_vision_model,
+                "fallback_vision_explicit": self._fallback_vision_explicit,
                 "model_names": model_names if model_names is not None else self._names,
                 "model_descriptions": self._descriptions,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
@@ -252,14 +271,17 @@ class ModelsCatalog:
                 except Exception as e:
                     print(f"Error parsing OpenRouter response: {e}")
 
-            # Merge with user vision overrides
-            for ov in self._user_overrides:
-                if ov not in vision_models:
-                    vision_models.append(ov)
-
             self._limits = model_limits
             self._output_limits = output_limits
-            self._vision = list(set(vision_models))
+            self._native_vision = list(set(vision_models))
+
+            # Merge with user vision overrides
+            merged_vision = list(vision_models)
+            for ov in self._user_overrides:
+                if ov not in merged_vision:
+                    merged_vision.append(ov)
+
+            self._vision = list(set(merged_vision))
             self._reasoning = list(set(reasoning_models))
             self._open_weights = list(set(open_weights_models))
             self._names = model_names
@@ -284,7 +306,7 @@ class ModelsCatalog:
             self._open_weights,
         )
 
-    def _resolve_catalog_key(self, provider_id: str, model_id: str, search_space: Iterable[str] = None) -> str:
+    def _resolve_catalog_key(self, provider_id: str, model_id: str, search_space: Iterable[str] = None, tag: str = "") -> str:
         if not model_id:
             return ""
 
@@ -292,7 +314,28 @@ class ModelsCatalog:
         if not space_keys:
             return ""
 
-        space_tag = id(search_space) if search_space is not None else id(self._limits)
+        if tag:
+            space_tag = tag
+        elif search_space is self._vision:
+            space_tag = "vision"
+        elif search_space is self._reasoning:
+            space_tag = "reasoning"
+        elif search_space is self._open_weights:
+            space_tag = "open_weights"
+        elif search_space is self._limits or (hasattr(search_space, "__self__") and search_space.__self__ is self._limits):
+            space_tag = "limits"
+        elif search_space is self._names or (hasattr(search_space, "__self__") and search_space.__self__ is self._names):
+            space_tag = "names"
+        elif search_space is self._descriptions or (hasattr(search_space, "__self__") and search_space.__self__ is self._descriptions):
+            space_tag = "descriptions"
+        elif search_space is self._pricing or (hasattr(search_space, "__self__") and search_space.__self__ is self._pricing):
+            space_tag = "pricing"
+        elif search_space is self._output_limits or (hasattr(search_space, "__self__") and search_space.__self__ is self._output_limits):
+            space_tag = "output_limits"
+        else:
+            space_obj = getattr(search_space, "__self__", search_space)
+            space_tag = id(space_obj) if space_obj is not None else id(self._limits)
+
         cache_key = (provider_id, model_id, space_tag, len(space_keys))
         if cache_key in self._match_cache:
             return self._match_cache[cache_key]
@@ -355,7 +398,7 @@ class ModelsCatalog:
         if not self._limits and not self._names:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._limits.keys())
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._limits, tag="limits")
         if resolved and resolved in self._limits:
             return self._limits[resolved]
 
@@ -367,7 +410,7 @@ class ModelsCatalog:
                         cdata = json.load(f)
                         lims = cdata.get("model_limits", {})
                         if lims:
-                            res_prov = self._resolve_catalog_key(provider_id, model_id, lims.keys())
+                            res_prov = self._resolve_catalog_key(provider_id, model_id, lims, tag=f"prov_{provider_id}_limits")
                             if res_prov and res_prov in lims:
                                 return lims[res_prov]
                 except Exception:
@@ -379,7 +422,7 @@ class ModelsCatalog:
         if not self._output_limits and not self._limits:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._output_limits.keys())
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._output_limits, tag="output_limits")
         if resolved and resolved in self._output_limits:
             return self._output_limits[resolved]
 
@@ -391,7 +434,7 @@ class ModelsCatalog:
         if not self._vision and not self._limits:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._vision)
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._vision, tag="vision")
         if resolved and resolved in self._vision:
             return True
 
@@ -404,7 +447,7 @@ class ModelsCatalog:
             self.load_cache()
 
         native_list = [m for m in self._vision if m not in self._user_overrides]
-        resolved = self._resolve_catalog_key(provider_id, model_id, native_list)
+        resolved = self._resolve_catalog_key(provider_id, model_id, native_list, tag="native_vision")
         if resolved and resolved in native_list:
             return True
 
@@ -416,7 +459,7 @@ class ModelsCatalog:
         if not self._reasoning and not self._limits:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._reasoning)
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._reasoning, tag="reasoning")
         if resolved and resolved in self._reasoning:
             return True
 
@@ -428,7 +471,7 @@ class ModelsCatalog:
         if not self._open_weights and not self._limits:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._open_weights)
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._open_weights, tag="open_weights")
         if resolved and resolved in self._open_weights:
             return True
 
@@ -439,15 +482,11 @@ class ModelsCatalog:
             return
         if not self._vision and not self._limits:
             self.load_cache()
-        if model_id not in self._user_overrides:
+        m_low = model_id.lower()
+        if m_low not in [m.lower() for m in self._user_overrides]:
             self._user_overrides.append(model_id)
-        if model_id not in self._vision:
+        if m_low not in [m.lower() for m in self._vision]:
             self._vision.append(model_id)
-        m_base = model_id.split("/")[-1].split(":")[0]
-        if m_base not in self._user_overrides:
-            self._user_overrides.append(m_base)
-        if m_base not in self._vision:
-            self._vision.append(m_base)
         self._match_cache.clear()
         self.save_cache()
 
@@ -456,22 +495,43 @@ class ModelsCatalog:
             return
         if not self._vision and not self._limits:
             self.load_cache()
-        m_base = model_id.split("/")[-1].split(":")[0].lower()
-        self._user_overrides = [
-            m for m in self._user_overrides
-            if m.lower() != model_id.lower() and m.split("/")[-1].split(":")[0].lower() != m_base
-        ]
-        self._vision = list(set([
-            m for m in self._vision
-            if m.lower() != model_id.lower() and m.split("/")[-1].split(":")[0].lower() != m_base
-        ] + self._user_overrides))
+        m_low = model_id.lower()
+        self._user_overrides = [m for m in self._user_overrides if m.lower() != m_low]
+        native_models = getattr(self, "_native_vision", None)
+        if native_models is None:
+            native_models = [m for m in self._vision if m.lower() != m_low]
+        self._vision = list(set(native_models + self._user_overrides))
         self._match_cache.clear()
         self.save_cache()
 
-    def set_fallback_vision_model(self, provider_id: str, model_id: str) -> None:
+    def set_fallback_vision_model(self, provider_id: str, model_id: str, explicit: bool = False) -> None:
         self._fallback_vision_provider = provider_id
         self._fallback_vision_model = model_id
+        self._fallback_vision_explicit = explicit
+        if model_id and not self.supports_vision(provider_id, model_id):
+            self.add_vision_override(model_id)
         self.save_cache()
+        self._save_vision_config(provider_id, model_id, explicit)
+
+    def _save_vision_config(self, provider_id: str, model_id: str, explicit: bool = False) -> None:
+        try:
+            data = {}
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+            data["fallback_vision_provider"] = provider_id
+            data["fallback_vision_model"] = model_id
+            data["fallback_vision_explicit"] = explicit
+            os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def is_fallback_vision_explicit(self) -> bool:
+        return getattr(self, "_fallback_vision_explicit", False)
 
     def get_fallback_vision_model(self) -> Tuple[str, str]:
         return getattr(self, "_fallback_vision_provider", ""), getattr(self, "_fallback_vision_model", "")
@@ -480,7 +540,7 @@ class ModelsCatalog:
         if not model_id:
             return ""
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._names.keys())
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._names, tag="names")
         if resolved and resolved in self._names:
             return self._names[resolved]
 
@@ -492,7 +552,7 @@ class ModelsCatalog:
         if not model_id:
             return ""
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._descriptions.keys())
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._descriptions, tag="descriptions")
         if resolved and resolved in self._descriptions:
             return self._descriptions[resolved]
 
@@ -502,7 +562,7 @@ class ModelsCatalog:
         if not self._pricing and not self._limits:
             self.load_cache()
 
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._pricing.keys())
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._pricing, tag="pricing")
         if resolved and resolved in self._pricing:
             return self._pricing[resolved]
 

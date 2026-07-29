@@ -16,9 +16,7 @@ def process_and_encode_image(image_path: str, max_dim: int = 1568) -> tuple[str,
 
 
 async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = None) -> str:
-    """Sends image to fallback Vision model via HTTP request"""
-    import httpx
-
+    """Sends image to Vision model via provider agent API"""
     from core.provider_manager import ProviderManager
     from tools.context import ToolContext
 
@@ -26,39 +24,65 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     pm = getattr(app_inst, "pm", None) or ProviderManager()
     providers = pm.load_providers()
 
+    active_key = pm.get_active_provider_key()
+    active_model = pm.get_provider_model(active_key)
+    is_explicit = catalog.is_fallback_vision_explicit()
+
     target_provider_key = None
     target_model = None
 
-    # Option 1: Configured fallback vision model
-    fb_prov, fb_model = catalog.get_fallback_vision_model()
-    if fb_prov and fb_model and fb_prov in providers:
-        target_provider_key = fb_prov
-        target_model = fb_model
+    def _provider_has_model(pkey: str, model_id: str) -> bool:
+        if not pkey or not model_id or pkey not in providers:
+            return False
+        if pm.get_provider_model(pkey) == model_id:
+            return True
+        p_models = providers[pkey].get("models") or []
+        return model_id in p_models
 
-    # Option 2: Active provider if it supports vision
-    if not target_provider_key:
-        active_key = pm.get_active_provider_key()
-        if active_key in providers:
-            pinfo = providers[active_key]
-            m_candidate = pinfo.get("model", "")
-            if not m_candidate and pinfo.get("models"):
-                m_candidate = pinfo["models"][0]
-            if m_candidate and catalog.supports_vision(active_key, m_candidate):
+    if is_explicit:
+        # Option 1: Explicitly configured fallback vision model (user lock)
+        fb_prov, fb_model = catalog.get_fallback_vision_model()
+        if fb_model:
+            if fb_prov and fb_prov in providers and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
+                target_provider_key = fb_prov
+                target_model = fb_model
+            elif active_key in providers and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
                 target_provider_key = active_key
-                target_model = m_candidate
+                target_model = fb_model
+
+        # Option 2: Active provider model if it natively supports vision
+        if not target_provider_key:
+            if active_key in providers and active_model and catalog.supports_vision(active_key, active_model):
+                target_provider_key = active_key
+                target_model = active_model
+    else:
+        # Option 1: Active provider model if it natively supports vision
+        if active_key in providers and active_model and catalog.supports_vision(active_key, active_model):
+            target_provider_key = active_key
+            target_model = active_model
+
+        # Option 2: Configured fallback vision model
+        if not target_provider_key:
+            fb_prov, fb_model = catalog.get_fallback_vision_model()
+            if fb_model:
+                if fb_prov and fb_prov in providers and _provider_has_model(fb_prov, fb_model) and catalog.supports_vision(fb_prov, fb_model):
+                    target_provider_key = fb_prov
+                    target_model = fb_model
+                elif active_key in providers and _provider_has_model(active_key, fb_model) and catalog.supports_vision(active_key, fb_model):
+                    target_provider_key = active_key
+                    target_model = fb_model
 
     # Option 3: Search any provider that supports vision
-    if not target_provider_key:
+    if not target_provider_key or target_provider_key not in providers:
         for pkey, pinfo in providers.items():
-            models_to_check = []
-            if pinfo.get("model"):
-                models_to_check.append(pinfo["model"])
+            m_cand = pm.get_provider_model(pkey)
+            models_to_check = [m_cand] if m_cand else []
             if pinfo.get("models"):
                 models_to_check.extend(pinfo["models"])
-            for m_candidate in models_to_check:
-                if m_candidate and catalog.supports_vision(pkey, m_candidate):
+            for m_item in models_to_check:
+                if m_item and catalog.supports_vision(pkey, m_item):
                     target_provider_key = pkey
-                    target_model = m_candidate
+                    target_model = m_item
                     break
             if target_provider_key:
                 break
@@ -66,18 +90,49 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
     if not target_provider_key or not target_model:
         return f"Error: No vision-capable provider available to analyze image '{image_path}'."
 
-    pinfo = providers[target_provider_key]
-    base_url = pinfo.get("base_url", "").rstrip("/")
-    api_key = pm.get_api_key(target_provider_key) or pinfo.get("api_key", "")
-
-    if not base_url:
-        return f"Error: Base URL for vision provider '{target_provider_key}' is not configured."
-
-    url = f"{base_url}/chat/completions" if not base_url.endswith("/chat/completions") else base_url
-
     try:
         b64_url, mime_type = process_and_encode_image(image_path, max_dim=1568)
 
+        pinfo = providers[target_provider_key]
+        base_url = pinfo.get("base_url", "").rstrip("/")
+        api_key = pm.get_api_key(target_provider_key) or pinfo.get("api_key", "")
+        api_type = pinfo.get("api_type", "openai").lower()
+
+        if api_type in ("anthropic", "gemini", "ollama"):
+            from core.adapters import get_adapter
+            adapter = get_adapter(api_type)
+
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a visual inspection assistant. Analyze the image accurately with 100% literal precision. Read and transcribe all visible text, UI elements, structure, and visual details without making assumptions or hallucinating unmentioned context."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": b64_url, "detail": "high"}}
+                    ]
+                }
+            ]
+
+            parts = []
+            async for kind, payload in adapter.stream_chat(
+                base_url=base_url,
+                api_key=api_key,
+                model=target_model,
+                messages=messages,
+                max_tokens=4096,
+            ):
+                if kind == "adapter_text":
+                    parts.append(payload)
+
+            analysis_text = "".join(parts) if parts else "No content returned from vision model."
+            return f"[Vision Analysis for {os.path.basename(image_path)}]:\n{analysis_text}"
+
+        import httpx
+
+        url = f"{base_url}/chat/completions" if not base_url.endswith("/chat/completions") else base_url
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -88,6 +143,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
 
         payload = {
             "model": target_model,
+            "max_tokens": 4096,
             "messages": [
                 {
                     "role": "system",
