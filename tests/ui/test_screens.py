@@ -104,10 +104,10 @@ class TestTaskScreens(unittest.TestCase):
 
 
 class TestMCPScreen(unittest.TestCase):
-    @patch("widgets.screens.mcp.MCPManager")
-    def test_init(self, mock_mgr_cls):
+    @patch("widgets.screens.mcp.get_mcp_manager")
+    def test_init(self, mock_get_mgr):
         mock_mgr = MagicMock()
-        mock_mgr_cls.return_value = mock_mgr
+        mock_get_mgr.return_value = mock_mgr
         from widgets.screens.mcp import MCPScreen
         s = MCPScreen()
         self.assertEqual(s.servers, [])

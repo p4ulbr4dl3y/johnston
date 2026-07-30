@@ -5,7 +5,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList
 
-from core.mcp_manager import MCPManager
+from core.mcp_manager import get_mcp_manager, MCPManager
 
 
 class MCPScreen(ModalScreen[None]):
@@ -25,7 +25,7 @@ class MCPScreen(ModalScreen[None]):
 
     def __init__(self):
         super().__init__()
-        self.mm = MCPManager()
+        self.mm = get_mcp_manager()
         self.servers: list[Dict[str, Any]] = []
 
     def compose(self) -> ComposeResult:
@@ -49,15 +49,30 @@ class MCPScreen(ModalScreen[None]):
             opt_list.add_option("*No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)*")
             return
 
+        tools_per_server: Dict[str, int] = {}
+        try:
+            if hasattr(self.mm, "get_active_tools"):
+                active_tools = self.mm.get_active_tools(mode="all")
+                for t in active_tools:
+                    s_name = t.get("_mcp_server")
+                    if s_name:
+                        tools_per_server[s_name] = tools_per_server.get(s_name, 0) + 1
+        except Exception:
+            pass
+
         for s in self.servers:
             disabled = s.get("disabled", False)
             status_tag = r"\[OFF]" if disabled else r"\[ON]"
             scope_tag = rf"\[{s['scope'].upper()}]"
             mode_tag = rf"\[{s.get('mode', 'eager').upper()}]"
-            cmd_info = s.get("url") or s.get("command") or ""
-            if isinstance(cmd_info, list):
-                cmd_info = " ".join(cmd_info)
-            opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {s['name']} — {cmd_info}")
+            
+            tool_cnt = tools_per_server.get(s["name"], 0)
+            if disabled:
+                tool_info = "0 tools"
+            else:
+                tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
+
+            opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {s['name']} — {tool_info}")
 
         opt_list.focus()
 
@@ -91,3 +106,4 @@ class MCPScreen(ModalScreen[None]):
             self.refresh_list()
             opt_list = self.query_one("#mcp-option-list", OptionList)
             opt_list.highlighted = event.option_index
+
