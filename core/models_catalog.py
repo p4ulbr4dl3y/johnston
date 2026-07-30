@@ -525,8 +525,8 @@ class ModelsCatalog:
             data["vision_provider"] = provider_id
             data["vision_model"] = model_id
             os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            from tools.base import atomic_write_json
+            atomic_write_json(CONFIG_FILE, data, indent=2)
         except Exception:
             pass
 

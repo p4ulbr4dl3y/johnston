@@ -123,8 +123,20 @@ class SessionManager:
         if "created_at" not in data:
             data["created_at"] = time.time()
 
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        temp_filepath = f"{filepath}.tmp.{uuid.uuid4().hex[:6]}"
+        try:
+            with open(temp_filepath, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_filepath, filepath)
+        except Exception:
+            if os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                except Exception:
+                    pass
+            raise
 
         self.set_active_session_id(session_id)
 

@@ -10,13 +10,6 @@ from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 
 DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
-    "opencode": {
-        "key": "opencode",
-        "name": "OpenCode",
-        "description": "OpenCode agent provider",
-        "base_url": "https://opencode.ai/zen/go/v1",
-        "api_type": "openai",
-    },
     "openai": {
         "key": "openai",
         "name": "OpenAI",
@@ -47,14 +40,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
         "api_type": "ollama",
-    },
-    "omlx": {
-        "key": "omlx",
-        "name": "oMLX",
-        "description": "Local oMLX server",
-        "base_url": "http://localhost:8000/v1",
-        "model": "gemma-4-E4B-it-MLX-4bit",
-        "api_type": "openai",
     },
     "openrouter": {
         "key": "openrouter",
@@ -159,19 +144,26 @@ class ProviderManager:
         except Exception:
             return {}
 
+    def _save_config(self, data: Dict[str, Any]) -> None:
+        from tools.base import atomic_write_json
+        atomic_write_json(CONFIG_FILE, data, indent=2)
+
+    def _save_providers_json(self, data: Dict[str, Any]) -> None:
+        from tools.base import atomic_write_json
+        atomic_write_json(PROVIDERS_JSON_FILE, data, indent=2)
+
     def ensure_config_dir(self):
         os.makedirs(CONFIG_DIR, exist_ok=True)
 
         if not os.path.exists(PROVIDERS_JSON_FILE):
             try:
-                with open(PROVIDERS_JSON_FILE, "w", encoding="utf-8") as f:
-                    json.dump(DEFAULT_JSON_PROVIDERS, f, indent=2, ensure_ascii=False)
+                self._save_providers_json(DEFAULT_JSON_PROVIDERS)
                 self.invalidate_cache()
             except Exception:
                 pass
 
         if not os.path.exists(CONFIG_FILE):
-            self.set_active_provider_key("opencode")
+            self.set_active_provider_key("openai")
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         providers = dict(DEFAULT_JSON_PROVIDERS)
@@ -211,8 +203,7 @@ class ProviderManager:
         else:
             disabled_set.discard(key)
         data["disabled_providers"] = list(disabled_set)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        self._save_config(data)
         self.invalidate_cache()
 
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
@@ -250,7 +241,7 @@ class ProviderManager:
         return providers
 
     def get_active_provider_key(self) -> str:
-        return self._get_config_data().get("active_provider", "opencode")
+        return self._get_config_data().get("active_provider", "openai")
 
     def set_active_provider_key(self, key: str):
         data = {}
@@ -261,8 +252,7 @@ class ProviderManager:
             except Exception:
                 data = {}
         data["active_provider"] = key
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        self._save_config(data)
         self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
@@ -288,8 +278,7 @@ class ProviderManager:
         if "api_keys" not in data:
             data["api_keys"] = {}
         data["api_keys"][key] = api_key
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        self._save_config(data)
         self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):
@@ -304,8 +293,7 @@ class ProviderManager:
         if "provider_models" not in data:
             data["provider_models"] = {}
         data["provider_models"][key] = model_name
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        self._save_config(data)
 
         # Also update JSON providers file if present
         if os.path.exists(PROVIDERS_JSON_FILE):
@@ -314,8 +302,7 @@ class ProviderManager:
                     jdata = json.load(f)
                 if key in jdata:
                     jdata[key]["model"] = model_name
-                    with open(PROVIDERS_JSON_FILE, "w", encoding="utf-8") as f:
-                        json.dump(jdata, f, indent=2, ensure_ascii=False)
+                    self._save_providers_json(jdata)
             except Exception:
                 pass
         self.invalidate_cache()
@@ -339,8 +326,7 @@ class ProviderManager:
             if not provider_efforts:
                 efforts.pop(provider_key, None)
 
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        self._save_config(data)
         self.invalidate_cache()
 
     def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
@@ -448,7 +434,7 @@ class ProviderManager:
         cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
 
         # If no API key set and not local/built-in provider, invalidate old cache and return empty list
-        if not api_key and provider_key not in ("opencode", "ollama"):
+        if not api_key and provider_key not in ("ollama",):
             if os.path.exists(cache_path):
                 try:
                     os.remove(cache_path)
@@ -530,8 +516,12 @@ class ProviderManager:
 
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump({"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models}, f, indent=2)
+            from tools.base import atomic_write_json
+            atomic_write_json(
+                cache_path,
+                {"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models},
+                indent=2
+            )
         except Exception as e:
             print(f"Error writing models cache: {e}")
 

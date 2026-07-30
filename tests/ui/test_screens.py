@@ -136,9 +136,9 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertIn("AUTH", next(o for o, i in zip(opts, items) if i == "auth"))
         self.assertIn("ON", next(o for o, i in zip(opts, items) if i == "on"))
 
-    def test_opencode_shows_on_without_key(self):
-        s = ProvidersScreen(providers={"opencode": {"key": "opencode", "name": "OpenCode"}}, active_key="", configured_keys={})
-        self.assertIn("ON", s.raw_options[0])
+    def test_provider_without_key_shows_auth(self):
+        s = ProvidersScreen(providers={"custom": {"key": "custom", "name": "Custom"}}, active_key="", configured_keys={})
+        self.assertIn("AUTH", s.raw_options[0])
 
     def test_default_falls_back_to_first(self):
         s = ProvidersScreen(providers={"p1": {"key": "p1", "name": "P1"}}, active_key="nope", configured_keys={})

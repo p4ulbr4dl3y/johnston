@@ -78,7 +78,20 @@ class StatusFooter(Static):
             mcp_servers = self._cached_mcp_servers
 
             mcp_total = len(mcp_servers)
-            mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
+            mcp_mgr = get_mcp_manager()
+            mcp_active = 0
+            for s in mcp_servers:
+                if s.get("disabled", False):
+                    continue
+                s_name = s.get("name")
+                cmd = s.get("command")
+                url = s.get("url")
+                if url and not cmd:
+                    continue
+                client = mcp_mgr.clients.get(s_name) if hasattr(mcp_mgr, "clients") else None
+                if client and getattr(client, "last_error", None):
+                    continue
+                mcp_active += 1
             bg_tasks = getattr(self.app, "background_tasks", [])
             bash_tasks = [t for t in bg_tasks if not getattr(t, "task_id", "").startswith("subagent-")]
             active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False)])

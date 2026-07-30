@@ -198,29 +198,40 @@ class JohnstonApp(App):
         saved_ui_msgs = session_data.get("ui_messages", [])
 
         async def _restore_ui_messages(msgs: list):
-            for msg in msgs:
-                mtype = msg.get("type")
-                if mtype == "user":
-                    text = msg.get("text", "")
-                    await chat_view.add_user_message(text, animate=False)
-                elif mtype == "bot":
-                    text = msg.get("text", "")
-                    bm = await chat_view.add_bot_message(animate=False)
-                    bm.content = text
-                elif mtype == "thinking":
-                    dur = msg.get("duration", 0.0)
-                    txt = msg.get("text", "")
-                    tw = await chat_view.add_thinking_widget(animate=False)
-                    tw.finish_thinking(dur, txt)
-                elif mtype == "tool":
-                    ttype = msg.get("tool_type", "")
-                    target = msg.get("target", "")
-                    rtext = msg.get("result_text", "")
-                    targs = msg.get("args", {})
-                    await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
-                elif mtype == "compaction_divider":
-                    ctxt = msg.get("text", "Session Compacted")
-                    await chat_view.add_compaction_divider(ctxt, animate=False)
+            try:
+                for msg in msgs:
+                    if not isinstance(msg, dict):
+                        continue
+                    try:
+                        mtype = msg.get("type")
+                        if mtype == "user":
+                            text = msg.get("text", "")
+                            await chat_view.add_user_message(text, animate=False)
+                        elif mtype == "bot":
+                            text = msg.get("text", "")
+                            bm = await chat_view.add_bot_message(animate=False)
+                            bm.content = text
+                        elif mtype == "thinking":
+                            dur = msg.get("duration", 0.0)
+                            txt = msg.get("text", "")
+                            tw = await chat_view.add_thinking_widget(animate=False)
+                            tw.finish_thinking(dur, txt)
+                        elif mtype == "tool":
+                            ttype = msg.get("tool_type", "")
+                            target = msg.get("target", "")
+                            rtext = msg.get("result_text", "")
+                            targs = msg.get("args", {})
+                            await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
+                        elif mtype == "compaction_divider":
+                            ctxt = msg.get("text", "Session Compacted")
+                            await chat_view.add_compaction_divider(ctxt, animate=False)
+                    except Exception as err:
+                        print(f"Warning: error restoring UI message item: {err}")
+            except Exception as err:
+                try:
+                    self.notify(f"UI restoration warning: {err}", severity="warning")
+                except Exception:
+                    pass
 
             chat_view.check_welcome()
             await asyncio.sleep(0.15)
@@ -517,6 +528,10 @@ class JohnstonApp(App):
                 elif event_type == "tool_result":
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)
+                    try:
+                        self.save_current_session()
+                    except Exception:
+                        pass
                 elif event_type in ("bot_chunk", "bot_delta"):
                     if val1.strip():
                         if bot_msg is None:
@@ -531,9 +546,17 @@ class JohnstonApp(App):
                             bot_msg = await chat_view.add_bot_message()
                         bot_msg.content = val1
                         bot_msg = None
+                    try:
+                        self.save_current_session()
+                    except Exception:
+                        pass
                 elif event_type == "compaction_divider":
                     await chat_view.add_compaction_divider(val1 or "Session Compacted")
                     self.refresh_status_footer()
+                    try:
+                        self.save_current_session()
+                    except Exception:
+                        pass
         except (asyncio.CancelledError, RuntimeError):
             self.message_queue.clear()
             if thinking_widget:

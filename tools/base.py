@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from typing import Any, Dict
@@ -23,13 +24,21 @@ def atomic_write_text(path: str, content: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp_path, path)
     except Exception:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
         raise
+
+
+def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
+    content = json.dumps(data, indent=indent, ensure_ascii=False)
+    atomic_write_text(path, content)
 
 
 def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: bool = True) -> str:

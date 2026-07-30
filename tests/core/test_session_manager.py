@@ -138,6 +138,20 @@ class TestSessionManagerRegression(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.sm.sessions_dir, f"{sid}.json")))
         self.assertIsNone(self.sm.get_active_session_id())
 
+    def test_atomic_save_session_persists_data_and_cleans_up_tmp(self):
+        sid = self.sm.generate_session_id()
+        data = {"id": sid, "ui_messages": [{"type": "user", "text": "test_atomic"}]}
+        self.sm.save_session(sid, data)
+
+        filepath = os.path.join(self.sm.sessions_dir, f"{sid}.json")
+        self.assertTrue(os.path.exists(filepath))
+        loaded = self.sm.load_session(sid)
+        self.assertEqual(loaded["ui_messages"][0]["text"], "test_atomic")
+
+        # Ensure no leftover .tmp files
+        tmp_files = [f for f in os.listdir(self.sm.sessions_dir) if ".tmp." in f]
+        self.assertEqual(tmp_files, [])
+
 
 if __name__ == "__main__":
     unittest.main()

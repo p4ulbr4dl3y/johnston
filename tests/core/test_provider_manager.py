@@ -37,23 +37,23 @@ class TestProviderManager(unittest.TestCase):
 
     def test_load_providers(self):
         providers = self.pm.load_providers()
-        self.assertIn("opencode", providers)
-        self.assertEqual(providers["opencode"]["name"], "OpenCode")
+        self.assertIn("openai", providers)
+        self.assertEqual(providers["openai"]["name"], "OpenAI")
 
     def test_get_set_active_provider_key(self):
-        self.assertEqual(self.pm.get_active_provider_key(), "opencode")
+        self.assertEqual(self.pm.get_active_provider_key(), "openai")
         self.pm.set_active_provider_key("custom_prov")
         self.assertEqual(self.pm.get_active_provider_key(), "custom_prov")
 
     def test_create_active_agent(self):
         agent = self.pm.create_active_agent()
         self.assertIsNotNone(agent)
-        self.assertEqual(agent.model, "")
+        self.assertEqual(agent.model, "gpt-4o-mini")
 
     def test_api_keys(self):
-        self.assertEqual(self.pm.get_api_key("opencode"), "")
-        self.pm.set_provider_api_key("opencode", "test-key-123")
-        self.assertEqual(self.pm.get_api_key("opencode"), "test-key-123")
+        self.assertEqual(self.pm.get_api_key("openai"), "")
+        self.pm.set_provider_api_key("openai", "test-key-123")
+        self.assertEqual(self.pm.get_api_key("openai"), "test-key-123")
 
     @patch("httpx.AsyncClient")
     async def _async_test_fetch_models(self, mock_client_cls):
@@ -133,7 +133,7 @@ class TestProviderManager(unittest.TestCase):
         mock_client_cls.return_value.__aenter__.return_value = mock_client
 
         res = asyncio.run(self.pm.fetch_models_grouped(force_refresh=True, connected_only=False))
-        self.assertIn("opencode", res)
+        self.assertIn("openai", res)
 
 
 

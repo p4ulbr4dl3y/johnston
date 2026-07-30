@@ -73,11 +73,11 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             with patch("core.provider_manager.CONFIG_FILE", config_file):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
-                    pm.set_provider_disabled("opencode", True)
+                    pm.set_provider_disabled("openai", True)
                     with patch.object(pm, "fetch_models_for_provider", new_callable=AsyncMock) as mock_fetch:
                         mock_fetch.return_value = ["dummy-model"]
                         grouped = await pm.fetch_models_grouped()
-                        self.assertNotIn("opencode", grouped)
+                        self.assertNotIn("openai", grouped)
 
     def test_provider_default_max_tokens_when_unspecified(self):
         # When a provider config omits max_tokens, the agent must fall back to

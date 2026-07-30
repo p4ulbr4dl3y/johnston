@@ -141,8 +141,8 @@ class SkillManager:
         if should_write:
             try:
                 os.makedirs(architect_dir, exist_ok=True)
-                with open(architect_file, "w", encoding="utf-8") as f:
-                    f.write(DEFAULT_ARCHITECT_SKILL_CONTENT.strip())
+                from tools.base import atomic_write_text
+                atomic_write_text(architect_file, DEFAULT_ARCHITECT_SKILL_CONTENT.strip())
             except Exception:
                 pass
 
@@ -274,8 +274,8 @@ class SkillManager:
             else:
                 new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(new_content)
+            from tools.base import atomic_write_text
+            atomic_write_text(filepath, new_content)
 
             return new_hidden
         except Exception:

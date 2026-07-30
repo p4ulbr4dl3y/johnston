@@ -123,10 +123,10 @@ class SubagentTracker:
 
     def save_session(self, sess: SubagentSessionData) -> None:
         try:
+            from tools.base import atomic_write_json
             os.makedirs(self.storage_dir, exist_ok=True)
             fpath = os.path.join(self.storage_dir, f"{sess.task_id}.json")
-            with open(fpath, "w", encoding="utf-8") as f:
-                json.dump(sess.to_dict(), f, ensure_ascii=False)
+            atomic_write_json(fpath, sess.to_dict(), indent=2)
         except Exception:
             pass
 
