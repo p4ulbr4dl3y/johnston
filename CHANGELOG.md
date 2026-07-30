@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.7.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.6.0...johnston-v0.7.0) (2026-07-30)
+
+
+### Features
+
+* **auto-healing:** add out-of-bounds start_line Auto-Fix Hint for read and edit ([2995775](https://github.com/p4ulbr4dl3y/johnston/commit/2995775fe19b9d5c885e859654d81034a978cbb4))
+* **auto-healing:** add self-correction hints for edit, 404 read, unknown tools, and task ids ([b253aae](https://github.com/p4ulbr4dl3y/johnston/commit/b253aae54a39270ae5edfb4ab5aa48803312b119))
+* **core:** add circuit breaker and production-ready retry resilience ([3656813](https://github.com/p4ulbr4dl3y/johnston/commit/3656813e8e71bda3147a90a531034f3a1fe61ca7))
+* **mcp:** add get_mcp_schema tool and streamline lazy mcp prompt snippet ([765524c](https://github.com/p4ulbr4dl3y/johnston/commit/765524c8d2b18f6951ab5dba2d63ce078108d146))
+* **mcp:** add parameter signatures to lazy prompt snippet and auto-hint schema on error ([b4ab52f](https://github.com/p4ulbr4dl3y/johnston/commit/b4ab52fca27a4b2ed13ae1e417b61342e83c0bbb))
+* **ui:** add Ctrl+O keybinding and /expand command for chat blocks ([93ce44b](https://github.com/p4ulbr4dl3y/johnston/commit/93ce44bdeec5d46f46c9c935896bf0e38911a627))
+
+
+### Bug Fixes
+
+* **git-checkpoint:** enforce default exclude rules in shadow repos ([4e7adda](https://github.com/p4ulbr4dl3y/johnston/commit/4e7addad01ad54b90c9101e4c4a0872f8fd21863))
+* **mcp:** add thread safety and pending response buffering to MCPProcessClient ([ac70616](https://github.com/p4ulbr4dl3y/johnston/commit/ac7061615a1170eae02e037cfc22df126f3f28ba))
+* **perf:** fix prompt caching timestamp and optimize read directory listing ([159616c](https://github.com/p4ulbr4dl3y/johnston/commit/159616c46f5c64e2813d0a438ebdaad58b5acc0d))
+* **skills:** stop auto-creating project .johnston/skills directory ([200c4e6](https://github.com/p4ulbr4dl3y/johnston/commit/200c4e66525f3455bb4f45189ee4515d0333bcd6))
+* **test:** include Hint string in read directory output for test compatibility ([866368d](https://github.com/p4ulbr4dl3y/johnston/commit/866368d67dada080546085b2454824a5c15d5880))
+* **test:** remove dot in registry Unknown tool output string for test compatibility ([e38253b](https://github.com/p4ulbr4dl3y/johnston/commit/e38253b4df195df6fcce96cf6a7e06445e861959))
+* **tools:** increase shell background task timeout to 60 seconds ([d246068](https://github.com/p4ulbr4dl3y/johnston/commit/d2460689283bee25bdd91db434b2ee55aaf719f1))
+* **ui:** format GetMCPSchema header with tool name in PascalCase ([aacde7c](https://github.com/p4ulbr4dl3y/johnston/commit/aacde7c2652f22fc4073181f8b46ca640550b4a5))
+* **ui:** improve edit tool diff formatting, lexing and wrapping ([63e8f7c](https://github.com/p4ulbr4dl3y/johnston/commit/63e8f7ce9855cc5fd391e31aadd026a52e3e4714))
+* **ui:** improve shell confirm modal layout and code block styling ([45e7a6b](https://github.com/p4ulbr4dl3y/johnston/commit/45e7a6b2a17d1592a3b75acbbe725f3d2ed55b8f))
+* **ui:** restore tool display labels and syntax highlighting for file edits ([554faa1](https://github.com/p4ulbr4dl3y/johnston/commit/554faa1fd1c66d4d37cbf3b42e9c2e1178a29bbe))
+
 ## [0.6.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.5.0...johnston-v0.6.0) (2026-07-29)
 
 
