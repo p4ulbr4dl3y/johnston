@@ -55,6 +55,36 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         finally:
             shutil.rmtree(global_tmp)
 
+    def test_hidden_skills(self):
+        sm = SkillManager(project_dir=self.test_dir)
+        p_skill_dir = os.path.join(sm.project_dir_skills, "secret-skill")
+        os.makedirs(p_skill_dir, exist_ok=True)
+        with open(os.path.join(p_skill_dir, "SKILL.md"), "w") as f:
+            f.write("---\nname: secret-skill\ndescription: Hidden skill\nhidden: true\n---\nSecret body.")
+
+        # By default list_skills includes hidden skills for UI
+        ui_names = [s["name"] for s in sm.list_skills(include_hidden=True)]
+        self.assertIn("secret-skill", ui_names)
+
+        # for_system_prompt=True excludes hidden skills
+        prompt_names = [s["name"] for s in sm.list_skills(include_hidden=False, for_system_prompt=True)]
+        self.assertNotIn("secret-skill", prompt_names)
+
+        # get_skill loads secret-skill by default
+        hidden_skill = sm.get_skill("secret-skill")
+        self.assertIsNotNone(hidden_skill)
+        self.assertEqual(hidden_skill["name"], "secret-skill")
+
+        # Test toggle_hidden
+        new_hidden_state = sm.toggle_hidden("secret-skill")
+        self.assertFalse(new_hidden_state)
+        updated_skill = sm.get_skill("secret-skill")
+        self.assertFalse(updated_skill["hidden"])
+
+        # Toggle back to hidden
+        re_hidden_state = sm.toggle_hidden("secret-skill")
+        self.assertTrue(re_hidden_state)
+
     def test_skill_payload_loading(self):
         sm = SkillManager(project_dir=self.test_dir)
         p_skill_dir = os.path.join(sm.project_dir_skills, "linter")
