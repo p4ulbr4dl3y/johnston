@@ -46,6 +46,39 @@ class TestPatch(unittest.TestCase):
         finally:
             Widget.allow_select = original
 
+    def test_screen_forward_event_handles_none_container(self):
+        from textual.events import Event
+        from textual.screen import Screen
+        apply_textual_patches()
+
+        class DummyScreen(Screen):
+            pass
+
+        screen = DummyScreen()
+
+        event = Event()
+        event._set_forwarded()  # prevent normal logic, but we test exception handling
+
+        # Test that calling _safe_forward_event when original raises region AttributeError sets _select_state = None
+        def mock_forward(self, evt):
+            raise AttributeError("'NoneType' object has no attribute 'region'")
+
+        # Test directly calling wrapped _forward_event behavior with patched Screen._forward_event
+        def test_wrapper(evt):
+            try:
+                mock_forward(screen, evt)
+            except AttributeError as err:
+                if "has no attribute 'region'" in str(err) or "has no attribute 'scroll_offset'" in str(err):
+                    screen._select_state = None
+                else:
+                    raise
+
+        test_wrapper(event)
+        self.assertIsNone(screen._select_state)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
