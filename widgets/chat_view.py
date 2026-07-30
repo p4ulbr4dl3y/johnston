@@ -386,6 +386,9 @@ class ThinkingWidget(Vertical):
         self.toggle_expanded()
         event.stop()
 
+    def is_expandable(self) -> bool:
+        return True
+
     def toggle_expanded(self) -> None:
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
@@ -394,6 +397,7 @@ class ThinkingWidget(Vertical):
             self.md_widget.display = True
         else:
             self.md_widget.display = False
+
 
 
 class ToolCallWidget(Vertical):
@@ -1297,3 +1301,52 @@ class ChatView(VerticalScroll):
         for child in children[start_idx:]:
             child.remove()
         self.check_welcome()
+
+    def toggle_expand(self, mode: str = "all") -> None:
+        """
+        Expands or collapses expandable widgets in ChatView.
+        Modes:
+        - "all" / "toggle" (default): expand all blocks if any collapsed; otherwise collapse all blocks.
+        - "expand": expand all expandable widgets.
+        - "collapse": collapse all expandable widgets.
+        - "last" / "focus": toggle focused or last expandable widget.
+        """
+        expandables = []
+        for child in self.children:
+            if isinstance(child, ThinkingWidget) and child.is_expandable():
+                expandables.append(child)
+            elif isinstance(child, ToolCallWidget) and child.is_expandable():
+                expandables.append(child)
+
+        if not expandables:
+            return
+
+        mode_clean = (mode or "all").lower().strip()
+
+        if mode_clean in ("collapse", "collapse_all", "close"):
+            for w in expandables:
+                if getattr(w, "is_expanded", False):
+                    w.toggle_expanded()
+        elif mode_clean in ("expand_all", "expand"):
+            for w in expandables:
+                if not getattr(w, "is_expanded", False):
+                    w.toggle_expanded()
+        elif mode_clean in ("last", "focused", "focus"):
+            focused = self.app.focused if hasattr(self, "app") and self.app else None
+            target_widget = None
+            if focused and (isinstance(focused, (ThinkingWidget, ToolCallWidget)) and getattr(focused, "is_expandable", lambda: False)()):
+                target_widget = focused
+            else:
+                target_widget = expandables[-1]
+            if target_widget:
+                target_widget.toggle_expanded()
+        else:
+            any_collapsed = any(not getattr(w, "is_expanded", False) for w in expandables)
+            for w in expandables:
+                if any_collapsed:
+                    if not getattr(w, "is_expanded", False):
+                        w.toggle_expanded()
+                else:
+                    if getattr(w, "is_expanded", False):
+                        w.toggle_expanded()
+

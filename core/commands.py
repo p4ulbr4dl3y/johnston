@@ -516,6 +516,20 @@ class ExploreCommand(BaseCommand):
             app.refresh_status_footer()
 
 
+class ExpandCommand(BaseCommand):
+    name = "/expand"
+    aliases = ["/exp"]
+    description = "Expand or collapse tool call and thinking widgets (all, collapse, or last)"
+
+    async def execute(self, app, args: list[str] | None = None) -> None:
+        try:
+            chat_view = app.query_one(ChatView)
+            submode = args[0].lower() if args and len(args) > 0 else "all"
+            chat_view.toggle_expand(submode)
+        except Exception:
+            pass
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -533,7 +547,9 @@ COMMAND_CLASSES = [
     CompactCommand,
     ActionCommand,
     ExploreCommand,
+    ExpandCommand,
 ]
+
 
 
 
@@ -560,8 +576,12 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
     if command_text.strip().startswith("/") and normalized_name in COMMAND_REGISTRY:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()
-        await cmd_instance.execute(app)
+        try:
+            await cmd_instance.execute(app, args=words[1:])
+        except TypeError:
+            await cmd_instance.execute(app)
         return True
+
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-architect /caveman request)
     words = command_text.strip().split()
