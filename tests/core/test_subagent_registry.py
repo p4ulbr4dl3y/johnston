@@ -14,7 +14,7 @@ class TestSubagentRegistry(unittest.TestCase):
 
         explore_def = registry.get_definition("explore")
         self.assertEqual(explore_def.name, "explore")
-        self.assertIn("[SUBAGENT EXPLORE MODE]", explore_def.system_prompt)
+        self.assertIn("## Subagent Mode: EXPLORE", explore_def.system_prompt)
 
     def test_load_markdown_and_json_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
