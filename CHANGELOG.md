@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.0...johnston-v0.8.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* **core:** prevent global path duplication when cwd is home directory ([e8d5e6e](https://github.com/p4ulbr4dl3y/johnston/commit/e8d5e6e623344e709d761c8f29c3c7580dfd633d))
+* **thinking:** default effort resolution to auto when un-set for UI consistency ([ba678a4](https://github.com/p4ulbr4dl3y/johnston/commit/ba678a4eb947595510dea37a445c18019d089fc9))
+* **ui:** highlight active item initially in ThinkingEffortScreen ([944c245](https://github.com/p4ulbr4dl3y/johnston/commit/944c2459ce745d94adfbea3e878b408448f271b9))
+* **ui:** prevent crash when text selection container is None ([4c38f7b](https://github.com/p4ulbr4dl3y/johnston/commit/4c38f7b82be290923986611a10509c82fdbb5322))
+* **ui:** refactor StatusFooter refresh logic and display skills as N/M ([048a2c0](https://github.com/p4ulbr4dl3y/johnston/commit/048a2c045ba7b1c14dd512677ac38ac36095dec9))
+
 ## [0.8.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.7.0...johnston-v0.8.0) (2026-07-30)
 
 
