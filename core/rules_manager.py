@@ -61,9 +61,14 @@ class RulesManager:
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
         dirs.append((os.path.join(p_dir, ".rules"), "project"))
 
+        scanned_paths = set()
         for dpath, source in dirs:
             if not os.path.isdir(dpath):
                 continue
+            rpath = os.path.realpath(dpath)
+            if rpath in scanned_paths:
+                continue
+            scanned_paths.add(rpath)
             for fname in sorted(os.listdir(dpath)):
                 fpath = os.path.join(dpath, fname)
                 if os.path.isfile(fpath) and (fname.endswith(".md") or fname.endswith(".markdown")):

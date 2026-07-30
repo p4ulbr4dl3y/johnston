@@ -55,6 +55,19 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         finally:
             shutil.rmtree(global_tmp)
 
+    def test_matching_global_and_project_dir_scope(self):
+        sm = SkillManager(project_dir=self.test_dir)
+        sm.global_dir = sm.project_dir_skills
+
+        g_skill_dir = os.path.join(sm.global_dir, "home-skill")
+        os.makedirs(g_skill_dir, exist_ok=True)
+        with open(os.path.join(g_skill_dir, "SKILL.md"), "w") as f:
+            f.write("---\nname: home-skill\ndescription: Home skill\n---\nHome body.")
+
+        skills = sm.list_skills()
+        self.assertEqual(len(skills), 1)
+        self.assertEqual(skills[0]["scope"], "global")
+
     def test_hidden_skills(self):
         sm = SkillManager(project_dir=self.test_dir)
         p_skill_dir = os.path.join(sm.project_dir_skills, "secret-skill")

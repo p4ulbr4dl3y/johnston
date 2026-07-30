@@ -60,6 +60,25 @@ You are a Code Reviewer in Johnston...''')
             self.assertTrue(rev.read_only)
             self.assertIn("You are a Code Reviewer", rev.prompt)
 
+    def test_deduplicate_when_global_and_project_paths_match(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from unittest.mock import patch
+            modes_dir = os.path.join(tmpdir, "modes")
+            os.makedirs(modes_dir, exist_ok=True)
+            json_path = os.path.join(modes_dir, "custom.json")
+            with open(json_path, "w", encoding="utf-8") as f:
+                f.write('{"key":"custom","name":"Custom"}')
+
+            mm = ModeManager()
+            with patch("core.mode_manager.CONFIG_DIR", tmpdir):
+                proj_modes_dir = os.path.join(tmpdir, ".johnston", "modes")
+                os.makedirs(os.path.dirname(proj_modes_dir), exist_ok=True)
+                os.symlink(modes_dir, proj_modes_dir)
+
+                modes = mm.load_modes(project_dir=tmpdir, include_global=True)
+                self.assertIn("custom", modes)
+                self.assertEqual(modes["custom"].source, "global")
+
 
 if __name__ == "__main__":
     unittest.main()

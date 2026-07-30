@@ -156,8 +156,12 @@ class SkillManager:
         Project skills override global skills with the same name.
         """
         skills_map: Dict[str, Dict[str, Any]] = {}
+        real_global = os.path.realpath(self.global_dir)
+        real_project = os.path.realpath(self.project_dir_skills)
 
         for scope, dir_path in [("global", self.global_dir), ("project", self.project_dir_skills)]:
+            if scope == "project" and real_project == real_global:
+                continue
             if not os.path.exists(dir_path):
                 continue
 
