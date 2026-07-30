@@ -398,25 +398,25 @@ class MCPCommand(BaseCommand):
         app.push_screen(MCPScreen())
 
 
-INIT_PROMPT_TEMPLATE = """Create or update `AGENTS.md` for this repository.
+INIT_PROMPT_TEMPLATE = """## Task: Repository Initialization
 
+### Goal
+Create or update `AGENTS.md` for this repository to help future AI sessions avoid mistakes and ramp up quickly.
 
-The goal is a compact instruction file that helps future AI sessions avoid mistakes and ramp up quickly. Every line should answer: "Would an agent likely miss this without help?" If not, leave it out.
+### Investigation Protocol
+Read high-value sources first:
+1. `README*`, root manifests, workspace config, lockfiles
+2. Build, test, lint, formatter, typecheck, and codegen config
+3. CI workflows and pre-commit / task runner config
+4. Existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`)
 
-## How to investigate
-Read the highest-value sources first:
-- `README*`, root manifests, workspace config, lockfiles
-- build, test, lint, formatter, typecheck, and codegen config
-- CI workflows and pre-commit / task runner config
-- existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`)
+If architecture is still unclear, inspect representative code files to find entrypoints and boundaries.
 
-If architecture is still unclear after reading config and docs, inspect representative code files to find real entrypoints and boundaries.
-
-## Writing rules
-Include only high-signal, repo-specific guidance such as:
-- exact commands and shortcuts the agent would otherwise guess wrong
-- architecture notes that are not obvious from filenames
-- conventions that differ from language or framework defaults
+### Writing Rules
+Include high-signal, repo-specific guidance:
+1. Exact commands and shortcuts the agent would otherwise guess wrong
+2. Architecture notes not obvious from filenames
+3. Conventions that differ from language or framework defaults
 
 When in doubt, omit. Prefer short sections and bullets.
 If `AGENTS.md` already exists, improve it in place rather than rewriting blindly."""
@@ -429,23 +429,29 @@ class InitCommand(BaseCommand):
         app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
 
 
-HANDOFF_PROMPT_TEMPLATE = """Prepare a concise handoff note for the next AI session.
+HANDOFF_PROMPT_TEMPLATE = """## Task: Session Continuation Note
 
-Output the handoff in chat only. Do not create, edit, or delete files unless the user explicitly asks for that in a follow-up.
+### Goal
+Create or update `HANDOFF.md` for this repository to enable another agent to continue work seamlessly.
 
-Include only information that would help another agent continue correctly:
-- current goal and user intent
-- relevant decisions and constraints
-- files, modules, or commands already inspected
-- work completed so far
-- remaining tasks or next steps
-- verification status, including tests or checks run
-- known risks, blockers, or assumptions
+### Execution Constraints
+1. Do not output the handoff note in chat. Write or overwrite `HANDOFF.md` in the working directory using file tools.
+2. Output only a brief 1-2 sentence confirmation linking to `HANDOFF.md` in chat.
 
-If there is little or no prior session context, say that explicitly.
-Do not infer completed work, inspected files, decisions, or verification that are not present in the conversation.
+### Core Rules
+Include information required to continue correctly:
+1. Current goal and user intent
+2. Relevant decisions and constraints
+3. Files, modules, or commands already inspected
+4. Work completed so far
+5. Remaining tasks or next steps
+6. Verification status, including tests or checks run
+7. Known risks, blockers, or assumptions
 
-Prefer short sections and bullets. Be specific enough that another agent can resume without rereading the whole conversation."""
+### Writing Rules
+1. If there is little or no prior session context, state that explicitly in the file.
+2. Do not infer completed work, inspected files, decisions, or verification not present in the conversation.
+3. Prefer short sections and bullets. Be specific enough that another agent can resume without rereading the whole conversation."""
 
 
 class HandoffCommand(BaseCommand):
