@@ -87,8 +87,8 @@ class ModelsCatalog:
                     self._names = data.get("model_names", {})
                     self._descriptions = data.get("model_descriptions", {})
                     self._pricing = data.get("model_pricing", {})
-                    self._vision_provider = data.get("vision_provider") or data.get("fallback_vision_provider", "")
-                    self._vision_model = data.get("vision_model") or data.get("fallback_vision_model", "")
+                    self._vision_provider = data.get("vision_provider", "")
+                    self._vision_model = data.get("vision_model", "")
                     self._updated_at = float(data.get("updated_at", 0.0))
                 loaded = True
             except Exception:
@@ -99,10 +99,10 @@ class ModelsCatalog:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                     cfg_data = json.load(f)
                     if isinstance(cfg_data, dict):
-                        vis_m = cfg_data.get("vision_model") or cfg_data.get("fallback_vision_model")
+                        vis_m = cfg_data.get("vision_model")
                         if vis_m:
                             self._vision_model = vis_m
-                            self._vision_provider = cfg_data.get("vision_provider") or cfg_data.get("fallback_vision_provider", "")
+                            self._vision_provider = cfg_data.get("vision_provider", "")
             except Exception:
                 pass
 

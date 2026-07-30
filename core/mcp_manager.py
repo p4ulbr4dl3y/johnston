@@ -312,7 +312,7 @@ class MCPManager:
                         v_copy = dict(v)
                         v_copy["name"] = k
                         v_copy["scope"] = "global"
-                        v_copy["mode"] = v.get("mode") or ("lazy" if v.get("lazy") is True else "eager")
+                        v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
                 pass
@@ -328,7 +328,7 @@ class MCPManager:
                         v_copy = dict(v)
                         v_copy["name"] = k
                         v_copy["scope"] = "project"
-                        v_copy["mode"] = v.get("mode") or ("lazy" if v.get("lazy") is True else "eager")
+                        v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
                 pass

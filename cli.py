@@ -39,10 +39,10 @@ def print_models():
         if not api_key and not models:
             continue
         is_active = "*" if key == active_key else " "
-        name = info.get("name") or info.get("NAME") or key
-        model = info.get("model") or info.get("MODEL") or (models[0] if models else "not configured")
+        name = info.get("name") or key
+        model = info.get("model") or (models[0] if models else "not configured")
         key_status = "[key set]" if api_key else "[no key]"
-        base_url = info.get("base_url") or info.get("BASE_URL") or ""
+        base_url = info.get("base_url") or ""
 
         print(f"{is_active} [{key}] {name} {key_status}")
         if model and model != "not configured":
