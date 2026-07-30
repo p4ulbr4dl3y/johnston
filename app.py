@@ -67,6 +67,7 @@ class JohnstonApp(App):
     BINDINGS = [
         ("ctrl+c", "quit", "Exit"),
         ("ctrl+q", "quit", "Exit"),
+        ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("shift+tab", "toggle_mode", "Toggle Mode"),
         ("backtab", "toggle_mode", "Toggle Mode"),
     ]
@@ -121,6 +122,14 @@ class JohnstonApp(App):
         self.agent.mode = new_mode
         self.mode = new_mode
         self.refresh_status_footer()
+
+    def action_toggle_expand(self) -> None:
+        """Toggle expand on all expandable widgets in chat"""
+        try:
+            chat_view = self.query_one(ChatView)
+            chat_view.toggle_expand("all")
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):

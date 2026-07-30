@@ -12,6 +12,7 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 * `/new` — Start a new chat session
 * `/action` — Switch to Action mode (edits & bash)
 * `/explore` — Switch to Explore mode (read-only)
+* `/expand` — Expand or collapse tool output & thinking
 * `/compact` — Compact session conversation history
 * `/handoff` — Generate session handoff summary
 * `/init` — Guided `AGENTS.md` project setup
@@ -26,6 +27,7 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybindings ]**
 
 * `Shift+Tab` — Toggle Action / Explore mode
+* `Ctrl+O` — Expand / collapse tool output & thinking
 * `Enter` — Send message
 * `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
 * `Ctrl+V` — Paste text or clipboard image

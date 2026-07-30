@@ -330,6 +330,35 @@ class TestToolExpansion(unittest.TestCase):
         self.assertTrue(widget.is_expanded)
 
 
+    def test_chat_view_toggle_expand(self):
+        from unittest.mock import PropertyMock, patch
+
+        from widgets.chat_view import ChatView, ThinkingWidget
+        chat_view = ChatView(show_welcome=False)
+        tw = ThinkingWidget("Some deep thought")
+        tc1 = ToolCallWidget(tool_type="create", target="a.txt", args={"path": "a.txt", "content": "1"})
+        tc2 = ToolCallWidget(tool_type="create", target="b.txt", args={"path": "b.txt", "content": "2"})
+
+        with patch.object(ChatView, "children", new_callable=PropertyMock, return_value=[tw, tc1, tc2]):
+            # Default ("all") -> expands all blocks if any collapsed
+            chat_view.toggle_expand("all")
+            self.assertTrue(tc2.is_expanded)
+            self.assertTrue(tc1.is_expanded)
+            self.assertTrue(tw.is_expanded)
+
+            # Toggling again when all expanded -> collapses all
+            chat_view.toggle_expand("all")
+            self.assertFalse(tc2.is_expanded)
+            self.assertFalse(tc1.is_expanded)
+            self.assertFalse(tw.is_expanded)
+
+            # Mode "last" -> toggles last block only
+            chat_view.toggle_expand("last")
+            self.assertTrue(tc2.is_expanded)
+            self.assertFalse(tc1.is_expanded)
+            self.assertFalse(tw.is_expanded)
+
+
 if __name__ == "__main__":
     unittest.main()
 
