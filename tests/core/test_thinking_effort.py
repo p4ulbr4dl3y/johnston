@@ -63,15 +63,15 @@ class TestThinkingEffortProviderManager(unittest.TestCase):
 
             with unittest.mock.patch.object(pm_mod, "CONFIG_FILE", config_path), unittest.mock.patch.object(
                 pm_mod, "PROVIDERS_JSON_FILE", providers_path
-            ):
+            ), unittest.mock.patch.object(pm_mod, "CONFIG_DIR", tmp):
                 pm = pm_mod.ProviderManager()
-                self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "low")
+                self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "auto")
 
                 pm.set_provider_thinking_effort("custom", "m1", "high")
                 self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "high")
 
                 pm.set_provider_thinking_effort("custom", "m1", "auto")
-                self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "low")
+                self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "auto")
 
 
 class TestThinkingEffortOpenAIRequest(unittest.IsolatedAsyncioTestCase):
