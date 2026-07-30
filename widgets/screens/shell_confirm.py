@@ -20,10 +20,8 @@ class ShellConfirmScreen(ModalScreen[bool]):
         self.reason = reason
 
     def compose(self) -> ComposeResult:
-        reason_text = f"_{self.reason}_\n\n" if self.reason else ""
         content = (
-            "### **Confirm Shell Command**\n\n"
-            f"{reason_text}"
+            "### **Confirm Shell Command**\n"
             "```bash\n"
             f"{self.command}\n"
             "```"

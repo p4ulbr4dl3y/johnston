@@ -444,9 +444,13 @@ ModalScreen {
     border-right: none;
     border-bottom: none;
     color: #f4f4f5;
-    padding: 0 2;
+    padding: 0 1;
     margin: 1 0;
     scrollbar-size: 0 0;
+}
+
+#modal-dialog MarkdownFence * {
+    background: transparent;
 }
 
 #modal-dialog MarkdownFence .fence-header,
@@ -454,15 +458,20 @@ ModalScreen {
     display: none;
 }
 
+#modal-dialog.bash-confirm-dialog .modal-markdown {
+    margin-bottom: 0;
+}
+
 #modal-dialog.bash-confirm-dialog MarkdownFence {
-    border: none;
-    border-left: none;
-    padding: 1 1;
-    margin: 0;
+    background: #27272a;
+    border-left: solid #ffffff;
+    padding: 0 1;
+    margin: 1 0 0 0;
 }
 
 #modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
     padding: 0;
+    background: transparent;
 }
 
 #modal-dialog OptionList,
