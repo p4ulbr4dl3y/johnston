@@ -121,7 +121,7 @@ class TestProviderManager(unittest.TestCase):
 
         self.pm.set_provider_thinking_effort("openai", "gpt-4o", "")
         eff_empty = self.pm.get_provider_thinking_effort("openai", "gpt-4o")
-        self.assertEqual(eff_empty, "")
+        self.assertEqual(eff_empty, "auto")
 
     @patch("httpx.AsyncClient")
     def test_fetch_models_grouped(self, mock_client_cls):

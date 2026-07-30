@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
-from core.thinking_effort import normalize_thinking_effort
+from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 
 DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "opencode": {
@@ -344,11 +344,6 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
-        providers = self.load_providers()
-        provider_default = None
-        if provider_key in providers:
-            provider_default = providers[provider_key].get("reasoning_effort") or providers[provider_key].get("thinking_effort")
-
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -356,11 +351,13 @@ class ProviderManager:
                 efforts = data.get("provider_thinking_efforts", {})
                 provider_efforts = efforts.get(provider_key, {})
                 if model_name and model_name in provider_efforts:
-                    return normalize_thinking_effort(provider_efforts[model_name]) or ""
+                    norm = normalize_thinking_effort(provider_efforts[model_name])
+                    if norm:
+                        return norm
             except Exception:
                 pass
 
-        return normalize_thinking_effort(provider_default) or ""
+        return EFFORT_AUTO
 
     def get_provider_model(self, provider_key: str) -> str:
         """Returns active model for specified provider with priority:
