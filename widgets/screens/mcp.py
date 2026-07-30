@@ -5,7 +5,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList
 
-from core.mcp_manager import get_mcp_manager, MCPManager
+from core.mcp_manager import get_mcp_manager
 
 
 class MCPScreen(ModalScreen[None]):
@@ -65,7 +65,7 @@ class MCPScreen(ModalScreen[None]):
             status_tag = r"\[OFF]" if disabled else r"\[ON]"
             scope_tag = rf"\[{s['scope'].upper()}]"
             mode_tag = rf"\[{s.get('mode', 'eager').upper()}]"
-            
+
             tool_cnt = tools_per_server.get(s["name"], 0)
             if disabled:
                 tool_info = "0 tools"

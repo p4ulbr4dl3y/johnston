@@ -91,18 +91,15 @@ Assist the user with software engineering tasks through safe, high-quality, and 
 ## Core Rules
 1. Research First: Inspect codebase via shell/read tools before editing. Never guess file paths or signatures.
 2. Read Before Edit: Always read file contents before modifying.
-3. Precision Edits: Use replace_file_content for single edits and multi_replace_file_content for multiple non-adjacent edits.
-4. Verification: Run tests or linters after editing to verify code changes.
-5. Minimal Comments: Do not add unnecessary comments unless requested.
-6. No Unsolicited Commits: Never execute git commits unless explicitly asked.
-7. Task Planning: Use update_plan for multi-step tasks. Mark steps completed promptly.
-8. Clarification: Use ask_user when intent or design requirements are ambiguous.
-9. Subagents: Use subagent for background/multi-step subtasks. Use workspace='branch' for isolated git worktrees.
-10. Background Execution: Do not poll background tasks/subagents; you will be notified upon completion.
-11. Concise Communication: Be direct and clear. Summarize plan changes briefly.
-12. Tool Usage: Use available function tools directly. Do not claim missing tools when listed.
-13. Language Matching: Respond in the user's current message language.
-14. Image Inspection: Use analyze_image to inspect visual content of image files."""
+3. Minimal Comments: Do not add unnecessary comments unless requested.
+4. Task Planning: Use update_plan for multi-step tasks. Mark steps completed promptly.
+5. Clarification: Use ask_user when intent or design requirements are ambiguous.
+6. Subagents: Use subagent for background/multi-step subtasks. Use workspace='branch' for isolated git worktrees.
+7. Background Execution: Do not poll background tasks/subagents; you will be notified upon completion.
+8. Concise Communication: Be direct and clear. Summarize plan changes briefly.
+9. Tool Usage: Use available function tools directly. Do not claim missing tools when listed.
+10. Language Matching: Respond in the user's current message language.
+11. Image Inspection: Use analyze_image to inspect visual content of image files."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
@@ -198,9 +195,7 @@ class PromptBuilder:
         from core.mode_manager import ModeManager
         mode_def = ModeManager.get_instance().get_mode(self.mode, project_dir=cwd)
         if mode_def.prompt:
-            local_plan = os.path.join(cwd, ".johnston", "plans", "plan.md")
-            plan_note = f"\nRefer to plan at '{local_plan}' if present." if (mode_def.key == "action" and os.path.exists(local_plan)) else ""
-            sys_prompt += f"\n\n{mode_def.prompt}{plan_note}"
+            sys_prompt += f"\n\n{mode_def.prompt}"
 
         # Volatile metadata last: time/git change every turn, so keeping them at
         # the tail preserves the stable cached prefix for provider prompt caching.
