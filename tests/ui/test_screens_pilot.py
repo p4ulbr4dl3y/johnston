@@ -44,14 +44,14 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         shutil.rmtree(self.test_dir)
 
     async def test_mcp_screen_pilot(self):
-        with patch("widgets.screens.mcp.MCPManager") as mock_mgr_cls:
+        with patch("widgets.screens.mcp.get_mcp_manager") as mock_get_mgr:
             mock_mgr = MagicMock()
             mock_mgr.load_servers.return_value = [
                 {"name": "srv1", "command": "python", "disabled": False, "mode": "eager", "scope": "global"}
             ]
             mock_mgr.toggle_server.return_value = False
             mock_mgr.toggle_mode.return_value = "lazy"
-            mock_mgr_cls.return_value = mock_mgr
+            mock_get_mgr.return_value = mock_mgr
 
             screen = MCPScreen()
             app = DummyHostApp(screen)

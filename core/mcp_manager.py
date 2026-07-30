@@ -116,8 +116,13 @@ class MCPProcessClient:
                     continue
                 try:
                     data = json.loads(line_str)
-                    # Ignore notifications without an id (e.g. notifications/tools/list_changed)
+                    # Handle notifications (e.g. notifications/tools/list_changed)
                     if "method" in data and "id" not in data:
+                        if data.get("method") == "notifications/tools/list_changed":
+                            try:
+                                self.fetch_tools()
+                            except Exception:
+                                pass
                         continue
 
                     res_id = data.get("id")
@@ -449,6 +454,11 @@ class MCPManager:
                     self.clients[name] = client
                 else:
                     continue
+            else:
+                try:
+                    client.fetch_tools()
+                except Exception:
+                    pass
 
             for t in client.tools:
                 t_name = t.get("name")
