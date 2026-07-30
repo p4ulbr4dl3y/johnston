@@ -265,21 +265,27 @@ class RewindCommand(BaseCommand):
                 target_idx = selected_idx - 1
                 chat_view.rollback_to(target_idx)
 
-                if hasattr(app.agent, "clear_history"):
-                    app.agent.clear_history()
-                elif hasattr(app.agent, "history"):
-                    app.agent.history = []
+                if seq_idx == 0:
+                    if hasattr(app.agent, "clear_history"):
+                        app.agent.clear_history()
+                    elif hasattr(app.agent, "history"):
+                        app.agent.history = []
+                    for attr, value in (
+                        ("tokens_input", 0),
+                        ("tokens_output", 0),
+                        ("tokens_cache_read", 0),
+                        ("last_context_tokens", 0),
+                        ("total_tokens", 0),
+                        ("cost_usd", 0.0),
+                    ):
+                        if hasattr(app.agent, attr):
+                            setattr(app.agent, attr, value)
+                else:
+                    if hasattr(app.agent, "truncate_history_to_user_message"):
+                        app.agent.truncate_history_to_user_message(seq_idx)
+                    elif hasattr(app.agent, "history"):
+                        app.agent.history = []
 
-                for attr, value in (
-                    ("tokens_input", 0),
-                    ("tokens_output", 0),
-                    ("tokens_cache_read", 0),
-                    ("last_context_tokens", 0),
-                    ("total_tokens", 0),
-                    ("cost_usd", 0.0),
-                ):
-                    if hasattr(app.agent, attr):
-                        setattr(app.agent, attr, value)
 
                 # Restore Git checkpoint state if available
                 checkpoint_restored = False

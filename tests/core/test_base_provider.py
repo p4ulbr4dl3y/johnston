@@ -247,6 +247,28 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent.clear_history()
         self.assertEqual(agent.cost_usd, 0.0)
 
+    def test_truncate_history_to_user_message(self):
+        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent.history = [
+            {"role": "user", "content": "Msg 0"},
+            {"role": "assistant", "content": "Resp 0"},
+            {"role": "user", "content": "Msg 1"},
+            {"role": "assistant", "content": "Resp 1"},
+            {"role": "user", "content": "Msg 2"},
+            {"role": "assistant", "content": "Resp 2"},
+        ]
+
+        # Truncate to index 1 (keep Msg 0 and Resp 0, drop Msg 1 and later)
+        agent.truncate_history_to_user_message(1)
+        self.assertEqual(len(agent.history), 2)
+        self.assertEqual(agent.history[0]["content"], "Msg 0")
+        self.assertEqual(agent.history[1]["content"], "Resp 0")
+
+        # Truncate to index 0 (clears all)
+        agent.truncate_history_to_user_message(0)
+        self.assertEqual(len(agent.history), 0)
+
+
     async def test_stream_steps_history_updated_on_exception(self):
         agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
         agent.client = unittest.mock.AsyncMock()

@@ -72,9 +72,134 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertIsInstance(content, Text)
         rendered_plain = content.plain
+        self.assertNotIn("@@ -7,1 +9,2 @@", rendered_plain)
         self.assertIn("7 - def multiply(a, b):", rendered_plain)
         self.assertIn("9 + def multiply(a: float, b: float) -> float:", rendered_plain)
         self.assertIn("10 +     return a * b", rendered_plain)
+
+    def test_edit_tool_handles_empty_context_lines(self):
+        diff_text = (
+            "@@ -327,5 +327,6 @@\n"
+            " }, { threshold: 0.1 });\n"
+            "\n"
+            " document.querySelectorAll('.card-hover');\n"
+            "+ // new comment\n"
+            " </script>\n"
+        )
+        widget = ToolCallWidget(
+            tool_type="edit",
+            target="index.html",
+            result_text=diff_text,
+            args={"path": "index.html"}
+        )
+        widget.toggle_expanded()
+        content = getattr(widget.content_widget, "_Static__content")
+        rendered_plain = content.plain
+        self.assertIn("327   }, { threshold: 0.1 });", rendered_plain)
+        self.assertIn("328   ", rendered_plain)
+        self.assertIn("329   document.querySelectorAll('.card-hover');", rendered_plain)
+        self.assertIn("330 +  // new comment", rendered_plain)
+        self.assertIn("331   </script>", rendered_plain)
+
+    def test_edit_tool_html_embedded_javascript_lexing(self):
+        diff_text = (
+            "@@ -327,5 +327,10 @@\n"
+            " }, { threshold: 0.1 });\n"
+            " document.querySelectorAll('.card-hover');\n"
+            "+ // CTA form handler\n"
+            "+ function handleFormSubmit(e) {\n"
+            "+   const form = document.getElementById('cta-form');\n"
+            "+ }\n"
+            " </script>\n"
+            "</body>\n"
+        )
+        widget = ToolCallWidget(
+            tool_type="edit",
+            target="index.html",
+            result_text=diff_text,
+            args={"path": "index.html"}
+        )
+        widget.toggle_expanded()
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Text)
+        # Check that tokens inside function handleFormSubmit have styles applied (not style=None)
+        has_styled_spans = any(span.style is not None for span in content._spans)
+        self.assertTrue(has_styled_spans)
+
+        self.assertEqual(content.overflow, "fold")
+
+    def test_edit_tool_html_tags_rendering(self):
+        diff_text = (
+            "@@ -274,5 +274,5 @@\n"
+            "+ </button>\n"
+            "+ </form>\n"
+            "+ <p id=\"cta-success\">\n"
+            "+ Talk to Sales instead\n"
+            " </div>\n"
+        )
+        widget = ToolCallWidget(
+            tool_type="edit",
+            target="index.html",
+            result_text=diff_text,
+            args={"path": "index.html"}
+        )
+        widget.toggle_expanded()
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Text)
+        rendered_plain = content.plain
+        self.assertIn("274 +  </button>", rendered_plain)
+        self.assertIn("277 +  Talk to Sales instead", rendered_plain)
+
+    def test_edit_tool_pascal_case_args_and_start_line(self):
+        widget = ToolCallWidget(
+            tool_type="replace_file_content",
+            target="index.html",
+            result_text="Successfully replaced content.",
+            args={
+                "TargetFile": "index.html",
+                "TargetContent": "const form = document.getElementById('cta-form');",
+                "ReplacementContent": "// CTA form handler\nconst form = document.getElementById('cta-form');",
+                "StartLine": 330
+            }
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Text)
+        rendered_plain = content.plain
+        self.assertIn("330 + // CTA form handler", rendered_plain)
+        self.assertIn("331   const form = document.getElementById('cta-form');", rendered_plain)
+
+    def test_edit_tool_multi_replace_chunks(self):
+        widget = ToolCallWidget(
+            tool_type="multi_replace_file_content",
+            target="app.py",
+            result_text="",
+            args={
+                "TargetFile": "app.py",
+                "ReplacementChunks": [
+                    {
+                        "TargetContent": "x = 1",
+                        "ReplacementContent": "x = 10",
+                        "StartLine": 15
+                    },
+                    {
+                        "TargetContent": "y = 2",
+                        "ReplacementContent": "y = 20",
+                        "StartLine": 45
+                    }
+                ]
+            }
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Text)
+        rendered_plain = content.plain
+        self.assertIn("15 - x = 1", rendered_plain)
+        self.assertIn("15 + x = 10", rendered_plain)
+        self.assertIn("45 - y = 2", rendered_plain)
+        self.assertIn("45 + y = 20", rendered_plain)
 
     def test_shell_tool_append_output(self):
         widget = ToolCallWidget(

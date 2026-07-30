@@ -133,10 +133,48 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.agent.cost_usd, 0.0)
         self.assertTrue(app.status_refreshed)
 
+    async def test_rewind_command_partial_history_preserved(self):
+        from core.commands import RewindCommand
+        app = MockApp()
+        app.agent.history = [
+            {"role": "user", "content": "Msg 0"},
+            {"role": "assistant", "content": "Resp 0"},
+            {"role": "user", "content": "Msg 1"},
+            {"role": "assistant", "content": "Resp 1"},
+        ]
+        called_truncate = []
+        app.agent.truncate_history_to_user_message = lambda idx: (
+            called_truncate.append(idx),
+            setattr(app.agent, "history", app.agent.history[:2])
+        )
+        app.chat_view.get_user_messages = lambda: [(0, "Msg 0"), (2, "Msg 1")]
+        rolled_back_target = []
+        app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
+
+        mock_input = type("MockInput", (), {
+            "load_text": lambda self, txt: setattr(self, "text", txt),
+            "text": "Msg 1",
+            "move_cursor": lambda self, pos: None,
+            "focus": lambda self: None
+        })()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+        def simulate_on_rewind_selected(screen, callback):
+            callback(2)  # child_idx of Msg 1 (seq_idx = 1)
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        self.assertEqual(rolled_back_target, [1])  # selected_idx - 1 = 1
+        self.assertEqual(called_truncate, [1])      # seq_idx = 1
+        self.assertEqual(len(app.agent.history), 2)
+        self.assertEqual(app.agent.history[0]["content"], "Msg 0")
+
     async def test_unknown_command(self):
         app = MockApp()
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
+
 
     async def test_mode_commands_sync_app_and_agent_mode(self):
         app = MockApp()

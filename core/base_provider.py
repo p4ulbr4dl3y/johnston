@@ -261,6 +261,32 @@ class BaseAgent:
         self.total_tokens = 0
         self.cost_usd = 0.0
 
+    def truncate_history_to_user_message(self, user_msg_index: int) -> None:
+        """Truncates conversation history to immediately before the specified user message index (0-indexed)."""
+        if user_msg_index <= 0 or not self.history:
+            self.clear_history()
+            return
+
+        user_count = 0
+        cutoff_idx = len(self.history)
+        for idx, msg in enumerate(self.history):
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                if isinstance(content, str) and "<conversation-checkpoint>" in content:
+                    continue
+                if user_count == user_msg_index:
+                    cutoff_idx = idx
+                    break
+                user_count += 1
+
+        if user_count >= user_msg_index:
+            self.history = self.history[:cutoff_idx]
+
+        sys_tok = getattr(self, "_last_sys_tokens", 0)
+        hist_tok = estimate_tokens(self.history) if self.history else 0
+        self.last_context_tokens = sys_tok + hist_tok
+
+
     def get_metrics(self) -> Dict[str, Any]:
         ctx_used = getattr(self, "last_context_tokens", 0)
         if ctx_used <= 0:
