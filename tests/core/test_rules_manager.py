@@ -46,6 +46,24 @@ Always run uv instead of pip.""")
             self.assertIn("### Rule: python_uv", formatted)
             self.assertIn("Always run uv instead of pip.", formatted)
 
+    def test_deduplicate_when_global_and_project_paths_match(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from unittest.mock import patch
+            rules_dir = os.path.join(tmpdir, "rules")
+            os.makedirs(rules_dir, exist_ok=True)
+            with open(os.path.join(rules_dir, "rule1.md"), "w", encoding="utf-8") as f:
+                f.write("Rule text")
+
+            rm = RulesManager()
+            with patch("core.rules_manager.CONFIG_DIR", tmpdir):
+                proj_rules_dir = os.path.join(tmpdir, ".johnston", "rules")
+                os.makedirs(os.path.dirname(proj_rules_dir), exist_ok=True)
+                os.symlink(rules_dir, proj_rules_dir)
+
+                rules = rm.load_rules(project_dir=tmpdir, include_global=True)
+                self.assertEqual(len(rules), 1)
+                self.assertEqual(rules[0].source, "global")
+
 
 if __name__ == "__main__":
     unittest.main()

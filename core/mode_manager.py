@@ -124,9 +124,14 @@ class ModeManager:
         p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "modes"), "project"))
 
+        scanned_paths = set()
         for dpath, source in dirs:
             if not os.path.isdir(dpath):
                 continue
+            rpath = os.path.realpath(dpath)
+            if rpath in scanned_paths:
+                continue
+            scanned_paths.add(rpath)
             for fname in sorted(os.listdir(dpath)):
                 fpath = os.path.join(dpath, fname)
                 if not os.path.isfile(fpath):
