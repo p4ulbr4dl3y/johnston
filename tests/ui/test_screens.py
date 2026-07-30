@@ -195,6 +195,25 @@ class TestSkillScreens(unittest.TestCase):
         s = SkillsScreen()
         self.assertEqual(s.options, [])
 
+    @patch("widgets.screens.skills.SkillManager")
+    def test_skills_screen_toggle_hidden(self, mock_sm_cls):
+        mock_sm = MagicMock()
+        mock_sm.list_skills.return_value = [{"name": "skill-a", "scope": "global", "hidden": True}]
+        mock_sm.toggle_hidden.return_value = False
+        mock_sm_cls.return_value = mock_sm
+        from widgets.screens.skills import SkillsScreen
+        s = SkillsScreen()
+        self.assertEqual(len(s.options), 1)
+        self.assertIn("[HIDDEN]", s.options[0])
+
+        s.query_one = MagicMock()
+        mock_opt_list = MagicMock()
+        mock_opt_list.highlighted = 0
+        s.query_one.return_value = mock_opt_list
+
+        s.action_toggle_hidden()
+        mock_sm.toggle_hidden.assert_called_once_with("skill-a")
+
 
 class TestSubagentsScreen(unittest.TestCase):
     def setUp(self):

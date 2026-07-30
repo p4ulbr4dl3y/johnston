@@ -146,7 +146,11 @@ class SkillManager:
             except Exception:
                 pass
 
-    def list_skills(self) -> List[Dict[str, Any]]:
+    def list_skills(
+        self,
+        include_hidden: bool = True,
+        for_system_prompt: bool = False,
+    ) -> List[Dict[str, Any]]:
         """
         Discovers skills in global and project directories.
         Project skills override global skills with the same name.
@@ -189,6 +193,11 @@ class SkillManager:
                     lines = [line.strip("# ").strip() for line in body.splitlines() if line.strip() and not line.startswith("#")]
                     desc = lines[0] if lines else ""
 
+                hidden_val = str(fm.get("hidden", "")).lower()
+                user_invocable_val = str(fm.get("user_invocable", "")).lower()
+
+                is_hidden = hidden_val in ("true", "1", "yes") or user_invocable_val in ("false", "0", "no")
+
                 skills_map[name] = {
                     "name": name,
                     "description": desc,
@@ -196,16 +205,77 @@ class SkillManager:
                     "directory": rel_dir,
                     "content": body.strip(),
                     "scope": scope,
+                    "hidden": is_hidden,
                 }
 
-        return list(skills_map.values())
+        skills = list(skills_map.values())
+        result = []
+        for s in skills:
+            if for_system_prompt and s.get("hidden"):
+                continue
+            if not include_hidden and s.get("hidden"):
+                continue
+            result.append(s)
+        return result
 
-    def get_skill(self, name: str) -> Optional[Dict[str, Any]]:
-        skills = self.list_skills()
+    def get_skill(self, name: str, include_hidden: bool = True) -> Optional[Dict[str, Any]]:
+        skills = self.list_skills(include_hidden=include_hidden)
         for s in skills:
             if s["name"].lower() == name.lower():
                 return s
         return None
+
+    def toggle_hidden(self, name: str) -> bool:
+        """
+        Toggles the 'hidden' attribute of a skill in its frontmatter.
+        Returns True if now hidden, False if visible.
+        """
+        skill = self.get_skill(name, include_hidden=True)
+        if not skill or not skill.get("location"):
+            return False
+
+        filepath = skill["location"]
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            is_currently_hidden = skill.get("hidden", False)
+            new_hidden = not is_currently_hidden
+
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    fm_lines = parts[1].splitlines()
+                    new_fm_lines = []
+                    found_hidden = False
+
+                    for line in fm_lines:
+                        sline = line.strip().lower()
+                        if sline.startswith("hidden:"):
+                            found_hidden = True
+                            new_fm_lines.append(f"hidden: {str(new_hidden).lower()}")
+                        elif sline.startswith("user_invocable:"):
+                            new_fm_lines.append(f"user_invocable: {str(not new_hidden).lower()}")
+                        else:
+                            new_fm_lines.append(line)
+
+                    if not found_hidden:
+                        new_fm_lines.append(f"hidden: {str(new_hidden).lower()}")
+
+                    new_fm_str = "\n".join(line_item for line_item in new_fm_lines if line_item.strip())
+                    body = parts[2].lstrip("\r\n")
+                    new_content = f"---\n{new_fm_str}\n---\n{body}"
+                else:
+                    new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
+            else:
+                new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(new_content)
+
+            return new_hidden
+        except Exception:
+            return skill.get("hidden", False)
 
     def load_skill_payload(self, name: str, file_limit: int = 10) -> str:
         skill = self.get_skill(name)
@@ -246,7 +316,7 @@ class SkillManager:
         )
 
     def get_system_prompt_snippet(self) -> str:
-        skills = self.list_skills()
+        skills = self.list_skills(include_hidden=False, for_system_prompt=True)
         if not skills:
             return ""
         lines = [
