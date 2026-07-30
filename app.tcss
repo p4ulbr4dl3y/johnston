@@ -28,6 +28,10 @@ ScrollBar, ScrollBarCorner {
     height: 0 !important;
 }
 
+Screen {
+    layers: default overlay;
+}
+
 Screen, *, ScrollBar, ScrollBarCorner {
     scrollbar-size: 0 0 !important;
     scrollbar-size-vertical: 0 !important;
@@ -303,15 +307,14 @@ OptionList > .option-list--option-blur-highlighted {
 /* Command Suggestions Popup - Square Solid Dark Border */
 #command-suggestions {
     display: none;
+    layer: overlay;
+    dock: bottom;
+    margin-bottom: 3;
     width: 100%;
     height: auto;
     max-height: 5;
-    margin: 0;
     padding: 0;
-    border-top: solid #27272a;
-    border-left: solid #27272a;
-    border-right: solid #27272a;
-    border-bottom: none;
+    border: solid #27272a;
     background: #18181b;
 }
 
