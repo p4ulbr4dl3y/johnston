@@ -733,35 +733,50 @@ class ToolCallWidget(Vertical):
         old_code_lines = []
         new_code_lines = []
         in_hunk = False
+        hunk_regex = re.compile(r"^@@\s+-\s*(\d+)(?:,\d+)?\s+\+\s*(\d+)(?:,\d+)?\s+@@")
+
         for line in lines:
             if line.startswith("--- ") or line.startswith("+++ "):
                 continue
-            if re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line):
+            if hunk_regex.match(line):
                 in_hunk = True
                 continue
             if not in_hunk:
                 continue
 
+            if line == "":
+                line = " "
+
             if line.startswith("-"):
-                old_code_lines.append(line[1:])
+                old_code_lines.append(line[1:].expandtabs(4))
             elif line.startswith("+"):
-                new_code_lines.append(line[1:])
+                new_code_lines.append(line[1:].expandtabs(4))
             elif line.startswith(" "):
-                old_code_lines.append(line[1:])
-                new_code_lines.append(line[1:])
+                old_code_lines.append(line[1:].expandtabs(4))
+                new_code_lines.append(line[1:].expandtabs(4))
 
         full_sample = "\n".join(old_code_lines + new_code_lines)
-        if lexer_name == "html":
-            has_html_tags = bool(re.search(r'</?[a-zA-Z][a-zA-Z0-9]*[\s/>]|<!--', full_sample))
+        if lexer_name in ("html", "htm", "xhtml", "php", "vue", "svelte"):
+            has_html_tags = bool(re.search(
+                r'</?(?:div|p|a|span|form|button|input|h[1-6]|section|header|footer|ul|li|ol|img|script|style|label|svg|path|body|html|head|main|nav|aside|table|tr|td|th)\b|<!--',
+                full_sample,
+                re.IGNORECASE
+            ))
             if not has_html_tags:
-                if "{" in full_sample and ":" in full_sample and ";" in full_sample and not any(w in full_sample for w in ("function", "let", "const", "var", "if", "return")):
-                    try:
-                        lexer = get_lexer_by_name("css")
-                    except Exception:
-                        pass
-                else:
+                has_script_open = bool(re.search(r'<script[\s>]', full_sample, re.IGNORECASE))
+                has_style_open = bool(re.search(r'<style[\s>]', full_sample, re.IGNORECASE))
+
+                has_js = any(w in full_sample for w in ("function", "let", "const", "var", "if", "return", "=>", "document", "window", "console", "addEventListener", "preventDefault", "classList"))
+                has_css = ("{" in full_sample and ":" in full_sample and ";" in full_sample)
+
+                if has_js and not has_script_open:
                     try:
                         lexer = get_lexer_by_name("javascript")
+                    except Exception:
+                        pass
+                elif has_css and not has_style_open and not has_script_open:
+                    try:
+                        lexer = get_lexer_by_name("css")
                     except Exception:
                         pass
 
@@ -776,24 +791,38 @@ class ToolCallWidget(Vertical):
 
         max_num_digits = 3
         for line in lines:
-            h_match = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            h_match = hunk_regex.match(line)
             if h_match:
                 o_val = int(h_match.group(1))
                 n_val = int(h_match.group(2))
-                max_num_digits = max(max_num_digits, len(str(o_val + 20)), len(str(n_val + 20)))
+                max_num_digits = max(max_num_digits, len(str(o_val + 200)), len(str(n_val + 200)))
 
-        width = 120
-        try:
-            if self.app and self.app.console:
-                width = max(self.app.console.width, 100)
-        except Exception:
-            pass
+        from rich.console import Console as RichConsole
+        console = self.app.console if (self.app and hasattr(self.app, "console") and self.app.console) else RichConsole(width=120)
+        width = max(console.width - 6, 60)
 
-        for idx, line in enumerate(lines):
+        def append_diff_line(num_str: str, symbol: str, code_text: Text, style_bg: str = None, style_fg: str = None):
+            full_line = Text()
+            if style_fg:
+                full_line.append(f"{num_str} ", style=style_fg)
+                full_line.append(f"{symbol} ", style=f"bold {style_fg}")
+            else:
+                full_line.append(f"{num_str} ", style="#6e7681")
+                full_line.append("  ")
+            full_line.append(code_text)
+
+            wrapped = full_line.wrap(console, width, tab_size=4, overflow="fold")
+            for wl in wrapped:
+                if style_bg:
+                    wl.pad_right(width)
+                    wl.stylize(style_bg)
+                formatted_lines.append(wl)
+
+        for line in lines:
             if line.startswith("--- ") or line.startswith("+++ "):
                 continue
 
-            hunk_match = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            hunk_match = hunk_regex.match(line)
             if hunk_match:
                 old_line = int(hunk_match.group(1))
                 new_line = int(hunk_match.group(2))
@@ -805,49 +834,38 @@ class ToolCallWidget(Vertical):
                     formatted_lines.append(Text(line, style="dim"))
                 continue
 
+            if line == "":
+                line = " "
+
             if line.startswith("-"):
                 num_str = str(old_line).rjust(max_num_digits)
-                line_item = Text()
-                line_item.append(f"{num_str} ", style="#f85149")
-                line_item.append("- ", style="bold #f85149")
-                code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:])
+                code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
                 old_idx += 1
-                line_item.append(code_text)
-                line_item.pad_right(width)
-                line_item.stylize("on #2a1215")
-                formatted_lines.append(line_item)
+                append_diff_line(num_str, "-", code_text, style_bg="on #2a1215", style_fg="#f85149")
                 old_line += 1
             elif line.startswith("+"):
                 num_str = str(new_line).rjust(max_num_digits)
-                line_item = Text()
-                line_item.append(f"{num_str} ", style="#3fb950")
-                line_item.append("+ ", style="bold #3fb950")
-                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
                 new_idx += 1
-                line_item.append(code_text)
-                line_item.pad_right(width)
-                line_item.stylize("on #12261e")
-                formatted_lines.append(line_item)
+                append_diff_line(num_str, "+", code_text, style_bg="on #12261e", style_fg="#3fb950")
                 new_line += 1
             elif line.startswith(" "):
                 num_str = str(new_line).rjust(max_num_digits)
-                line_item = Text()
-                line_item.append(f"{num_str} ", style="#6e7681")
-                line_item.append("  ")
-                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:])
+                code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
                 old_idx += 1
                 new_idx += 1
-                line_item.append(code_text)
-                formatted_lines.append(line_item)
+                append_diff_line(num_str, " ", code_text, style_bg=None, style_fg=None)
                 old_line += 1
                 new_line += 1
             elif line.startswith("\\"):
-                formatted_lines.append(Text(line, style="dim"))
+                formatted_lines.append(Text(line, style="dim", overflow="fold"))
             else:
-                formatted_lines.append(Text(line, style="dim"))
+                formatted_lines.append(Text(line, style="dim", overflow="fold"))
                 in_hunk = False
 
-        return Text("\n").join(formatted_lines)
+        res = Text("\n").join(formatted_lines)
+        res.overflow = "fold"
+        return res
 
     def _format_read_content(self, text: str, default_file_path: str) -> tuple[str, int, str]:
         lines = text.splitlines()
@@ -939,17 +957,51 @@ class ToolCallWidget(Vertical):
             elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
                 diff_text = self.result_text.strip()
                 if not diff_text or "@@" not in diff_text:
-                    old_s = self.args.get("old_string") or self.args.get("target_content") or ""
-                    new_s = self.args.get("new_string") or self.args.get("replacement_content") or ""
-                    if old_s or new_s:
-                        diff_lines = list(difflib.unified_diff(
-                            old_s.splitlines(),
-                            new_s.splitlines(),
-                            fromfile=file_path,
-                            tofile=file_path,
-                            lineterm=""
-                        ))
-                        diff_text = "\n".join(diff_lines)
+                    chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks")
+                    diff_parts = []
+                    if chunks and isinstance(chunks, list):
+                        for chunk in chunks:
+                            if isinstance(chunk, dict):
+                                old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or ""
+                                new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or ""
+                                start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
+                                if old_c or new_c:
+                                    d_lines = list(difflib.unified_diff(
+                                        old_c.splitlines(),
+                                        new_c.splitlines(),
+                                        fromfile=file_path or "file",
+                                        tofile=file_path or "file",
+                                        lineterm=""
+                                    ))
+                                    if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
+                                        h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
+                                        if h_m:
+                                            old_cnt = h_m.group(2) or "1"
+                                            new_cnt = h_m.group(4) or "1"
+                                            d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
+                                    diff_parts.extend(d_lines)
+                    else:
+                        old_s = self.args.get("old_string") or self.args.get("target_content") or self.args.get("TargetContent") or ""
+                        new_s = self.args.get("new_string") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
+                        start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
+                        if old_s or new_s:
+                            d_lines = list(difflib.unified_diff(
+                                old_s.splitlines(),
+                                new_s.splitlines(),
+                                fromfile=file_path or "file",
+                                tofile=file_path or "file",
+                                lineterm=""
+                            ))
+                            if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
+                                h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
+                                if h_m:
+                                    old_cnt = h_m.group(2) or "1"
+                                    new_cnt = h_m.group(4) or "1"
+                                    d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
+                            diff_parts.extend(d_lines)
+
+                    if diff_parts:
+                        diff_text = "\n".join(diff_parts)
 
                 if diff_text:
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
