@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.7.0...johnston-v0.8.0) (2026-07-30)
+
+
+### Features
+
+* **skills:** add hidden skill status toggle in UI and prompt filtering ([9bbf2cd](https://github.com/p4ulbr4dl3y/johnston/commit/9bbf2cd3a91e740aeeafe71a4aeb7be1a39e93d6))
+* **ui:** show tool count in MCP modal and support dynamic tools update ([4e843b7](https://github.com/p4ulbr4dl3y/johnston/commit/4e843b7f7401b42c58ae3a3fc01620df7cfffdc1))
+
 ## [0.7.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.6.0...johnston-v0.7.0) (2026-07-30)
 
 
