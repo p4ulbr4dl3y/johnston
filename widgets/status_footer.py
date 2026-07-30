@@ -56,14 +56,21 @@ class StatusFooter(Static):
             pkey = pm.get_active_provider_key() if pm else "default"
             agent = getattr(self.app, "agent", None)
             model_name = getattr(agent, "model", "")
-            thinking_effort = display_thinking_effort(getattr(agent, "thinking_effort", None))
+            if pm and hasattr(pm, "get_provider_thinking_effort"):
+                effort_val = pm.get_provider_thinking_effort(pkey, model_name)
+            else:
+                effort_val = getattr(agent, "thinking_effort", None)
+            thinking_effort = display_thinking_effort(effort_val)
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
 
             now = time.time()
-            if not hasattr(self, "_cached_skills_count") or (now - getattr(self, "_skills_cache_time", 0) > 5.0):
-                self._cached_skills_count = len(SkillManager().list_skills())
+            if not hasattr(self, "_cached_skills") or (now - getattr(self, "_skills_cache_time", 0) > 5.0):
+                all_skills = SkillManager().list_skills(include_hidden=True)
+                skills_total = len(all_skills)
+                skills_visible = sum(1 for s in all_skills if not s.get("hidden"))
+                self._cached_skills = (skills_visible, skills_total)
                 self._skills_cache_time = now
-            skills_count = self._cached_skills_count
+            skills_visible, skills_total = getattr(self, "_cached_skills", (0, 0))
 
             if not hasattr(self, "_cached_mcp_servers") or (now - getattr(self, "_mcp_cache_time", 0) > 5.0):
                 self._cached_mcp_servers = get_mcp_manager().load_servers()
@@ -96,7 +103,8 @@ class StatusFooter(Static):
                 "context_limit": metrics.get("context_limit", 128000),
                 "cost_usd": metrics.get("cost_usd", 0.0),
                 "thinking_effort": thinking_effort,
-                "skills_count": skills_count,
+                "skills_visible": skills_visible,
+                "skills_total": skills_total,
                 "mcp_active": mcp_active,
                 "mcp_total": mcp_total
             }
@@ -120,7 +128,8 @@ class StatusFooter(Static):
         context_limit: int = 128000,
         cost_usd: float = 0.0,
         thinking_effort: str = "auto",
-        skills_count: int = 0,
+        skills_visible: int = 0,
+        skills_total: int = 0,
         mcp_active: int = 0,
         mcp_total: int = 0
     ) -> None:
@@ -188,7 +197,7 @@ class StatusFooter(Static):
             row1_left = "  •  ".join(row1_left_parts)
 
             row1_right_parts = [
-                f"Skills: [{THEME_SECONDARY}]{skills_count}[/]",
+                f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]" if skills_total > 0 else f"Skills: [{THEME_SECONDARY}]0[/]",
                 f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/]"
             ]
             row1_right = "  •  ".join(row1_right_parts)
