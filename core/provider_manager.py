@@ -52,7 +52,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
         "model": "openrouter/free",
-        "models": ["openrouter/free", "deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.5-sonnet"],
+        "models": ["openrouter/free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.5-sonnet"],
         "api_type": "openai",
     },
     "groq": {
@@ -97,7 +97,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "High-throughput cost-efficient model server",
         "base_url": "https://api.deepinfra.com/v1/openai",
         "model": "deepseek-ai/DeepSeek-V3",
-        "models": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1", "meta-llama/Llama-3.3-70B-Instruct"],
+        "models": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-V4-Flash", "deepseek-ai/DeepSeek-R1", "meta-llama/Llama-3.3-70B-Instruct"],
         "api_type": "openai",
     },
     "fireworks": {
