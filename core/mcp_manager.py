@@ -45,6 +45,7 @@ class MCPProcessClient:
         if self.env:
             run_env.update(self.env)
 
+        self.last_error = None
         try:
             self.process = subprocess.Popen(
                 self.cmd,
@@ -62,9 +63,12 @@ class MCPProcessClient:
                 except Exception:
                     pass
             self._buffer = ""
-            return self._initialize()
+            init_ok = self._initialize()
+            if not init_ok and not self.last_error:
+                self.last_error = "Server initialization timed out or returned error"
+            return init_ok
         except Exception as e:
-            print(f"Failed to start MCP server {self.name}: {e}")
+            self.last_error = f"Process start failed: {e}"
             return False
 
     def stop(self):
@@ -180,7 +184,12 @@ class MCPProcessClient:
         }
         self._send(init_req)
         res = self._read_response(req_id=self.req_id, timeout=20.0)
-        if not res or "error" in res:
+        if not res:
+            self.last_error = "Server did not respond to initialize request (timeout)"
+            return False
+        if "error" in res:
+            err_msg = res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
+            self.last_error = f"MCP init error: {err_msg}"
             return False
 
         # Notify initialized
@@ -282,8 +291,8 @@ class MCPManager:
     def ensure_default_configs(self):
         os.makedirs(os.path.dirname(self.global_file), exist_ok=True)
         if not os.path.exists(self.global_file):
-            with open(self.global_file, "w", encoding="utf-8") as f:
-                json.dump({"mcpServers": {}}, f, indent=2)
+            from tools.base import atomic_write_json
+            atomic_write_json(self.global_file, {"mcpServers": {}}, indent=2)
 
     def load_servers(self) -> List[Dict[str, Any]]:
         """
@@ -363,8 +372,8 @@ class MCPManager:
                     "disabled": new_disabled
                 }
 
-            with open(file_to_update, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            from tools.base import atomic_write_json
+            atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
             print(f"Failed to toggle MCP server {name}: {e}")
 
@@ -412,8 +421,8 @@ class MCPManager:
                     "disabled": target.get("disabled", False)
                 }
 
-            with open(file_to_update, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
+            from tools.base import atomic_write_json
+            atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
             print(f"Failed to toggle mode for MCP server {name}: {e}")
 

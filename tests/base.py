@@ -36,14 +36,14 @@ class BaseTestCase(unittest.TestCase):
         mock_agent = MagicMock()
         mock_agent.mode = "action"
         mock_agent.model = "deepseek-v4-flash"
-        mock_agent.provider_key = "opencode"
+        mock_agent.provider_key = "openai"
         mock_agent.tokens_input = 0
         mock_agent.tokens_output = 0
         mock_agent.cost_usd = 0.0
         mock_agent.stream_steps = AsyncMock()
 
         mock_pm = MagicMock()
-        mock_pm.get_active_provider_key.return_value = "opencode"
+        mock_pm.get_active_provider_key.return_value = "openai"
         mock_pm.create_active_agent.return_value = mock_agent
         mock_app.pm = mock_pm
         mock_app.agent = mock_agent

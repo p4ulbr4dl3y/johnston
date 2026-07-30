@@ -157,12 +157,15 @@ class SubagentTool(BaseTool):
             ctx.refresh_status()
 
         def _cleanup_worktree_and_append_diff(acc):
+            nonlocal wt_path, wt_branch
             if wt_path and wt_branch:
                 from core.subagent_worktree import SubagentWorktreeManager
                 diff_text = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
                 if diff_text:
                     acc[0] += f"\n\n[Worktree Changes in {wt_branch}]:\n{diff_text}"
                 SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch)
+                wt_path = None
+                wt_branch = None
 
         if run_in_background:
             async def _run_bg():
@@ -209,7 +212,6 @@ class SubagentTool(BaseTool):
                 session.finish("completed")
             except Exception as err:
                 session.finish("error", str(err))
-                _cleanup_worktree_and_append_diff(acc)
                 partial = _truncate_subagent_result(acc[0]).strip()
                 if partial:
                     return f"Subagent execution error: {err}\n\n<partial_result>\n{partial}\n</partial_result>"

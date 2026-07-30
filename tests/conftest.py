@@ -30,11 +30,11 @@ def mock_app(temp_workspace):
     agent = MagicMock()
     agent.mode = "action"
     agent.model = "deepseek-v4-flash"
-    agent.provider_key = "opencode"
+    agent.provider_key = "openai"
     agent.stream_steps = AsyncMock()
 
     pm = MagicMock()
-    pm.get_active_provider_key.return_value = "opencode"
+    pm.get_active_provider_key.return_value = "openai"
     pm.create_active_agent.return_value = agent
     app.pm = pm
     app.agent = agent

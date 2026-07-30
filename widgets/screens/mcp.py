@@ -62,17 +62,41 @@ class MCPScreen(ModalScreen[None]):
 
         for s in self.servers:
             disabled = s.get("disabled", False)
-            status_tag = r"\[OFF]" if disabled else r"\[ON]"
             scope_tag = rf"\[{s['scope'].upper()}]"
             mode_tag = rf"\[{s.get('mode', 'eager').upper()}]"
+            name = s["name"]
 
-            tool_cnt = tools_per_server.get(s["name"], 0)
             if disabled:
-                tool_info = "0 tools"
-            else:
-                tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
+                status_tag = r"\[OFF]"
+                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name}")
+                continue
 
-            opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {s['name']} — {tool_info}")
+            tool_cnt = tools_per_server.get(name, 0)
+            url = s.get("url")
+            cmd = s.get("command")
+
+            if tool_cnt > 0:
+                status_tag = r"\[ON]"
+                tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
+                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — {tool_info}")
+            elif url and not cmd:
+                status_tag = r"\[ERR]"
+                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — URL unsupported")
+            else:
+                client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
+                err = getattr(client, "last_error", None) if client else None
+                if err and "Process start failed" in err:
+                    status_tag = r"\[ERR]"
+                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Start failed")
+                elif err and "timeout" in err.lower():
+                    status_tag = r"\[ERR]"
+                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Timeout")
+                elif err:
+                    status_tag = r"\[ERR]"
+                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Error")
+                else:
+                    status_tag = r"\[ERR]" if (not cmd and not url) else r"\[ON]"
+                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — 0 tools")
 
         opt_list.focus()
 
@@ -100,10 +124,22 @@ class MCPScreen(ModalScreen[None]):
             s_name = target["name"]
             is_enabled = self.mm.toggle_server(s_name)
             state_str = "enabled" if is_enabled else "disabled"
-            self.app.notify(f"MCP server '{s_name}' {state_str}")
-            if hasattr(self.app, "refresh_status_footer"):
-                self.app.refresh_status_footer()
             self.refresh_list()
             opt_list = self.query_one("#mcp-option-list", OptionList)
             opt_list.highlighted = event.option_index
+
+            url = target.get("url")
+            cmd = target.get("command")
+            if is_enabled and url and not cmd:
+                self.app.notify(f"MCP '{s_name}': HTTP/SSE URL transport not supported yet", severity="warning")
+            else:
+                client = self.mm.clients.get(s_name) if hasattr(self.mm, "clients") else None
+                err = getattr(client, "last_error", None) if client else None
+                if is_enabled and err:
+                    self.app.notify(f"MCP '{s_name}' error: {err}", severity="error")
+                else:
+                    self.app.notify(f"MCP server '{s_name}' {state_str}")
+
+            if hasattr(self.app, "refresh_status_footer"):
+                self.app.refresh_status_footer()
 

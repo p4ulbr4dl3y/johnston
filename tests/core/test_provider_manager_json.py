@@ -83,7 +83,7 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                 pm = ProviderManager()
                 providers = pm.load_providers()
 
-        self.assertIn("opencode", providers)
+        self.assertIn("anthropic", providers)
         self.assertIn("openai", providers)
 
     def test_saved_model_overrides_json_default_model(self):

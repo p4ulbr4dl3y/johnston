@@ -113,7 +113,7 @@ class BaseAgent:
         base_url: str = "",
         system_prompt: Optional[str] = None,
         tools: List[Dict[str, Any]] = None,
-        provider_key: str = "opencode",
+        provider_key: str = "openai",
         api_type: str = "openai",
         headers: Dict[str, str] = None,
         extra_body: Dict[str, Any] = None,
