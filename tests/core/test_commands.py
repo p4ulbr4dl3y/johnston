@@ -354,6 +354,16 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(commands_dict["/model"], "Alias for /models")
         self.assertIn("Manage AI providers", commands_dict["/providers"])
 
+    async def test_handoff_command(self):
+        from core.commands import HandoffCommand
+        app = MockApp()
+        cmd = HandoffCommand()
+        await cmd.execute(app)
+        self.assertEqual(len(app.ai_prompts), 1)
+        prompt, show_in_ui = app.ai_prompts[0]
+        self.assertTrue(show_in_ui)
+        self.assertIn("`HANDOFF.md`", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
