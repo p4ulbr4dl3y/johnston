@@ -20,6 +20,6 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
             "### Thinking Effort",
             options,
             items,
-            EFFORT_AUTO,
+            current,
             show_search=False,
         )
