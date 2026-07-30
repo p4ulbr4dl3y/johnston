@@ -174,55 +174,12 @@ class JohnstonApp(App):
             logger.debug(f"MCP cleanup error: {err}")
 
     def refresh_status_footer(self) -> None:
-        """Refresh status bar with directory, provider, model, context, tokens, and cost"""
+        """Refresh status bar with directory, provider, model, context, tokens, cost, and subagents"""
         try:
             footer = self.query_one("#status-footer", StatusFooter)
-            pkey = self.pm.get_active_provider_key()
-            model_name = getattr(self.agent, "model", "")
-
-            metrics = {}
-            if hasattr(self.agent, "get_metrics"):
-                metrics = self.agent.get_metrics()
-
-            now = time.time()
-            if not hasattr(self, "_status_cache_time") or (now - getattr(self, "_status_cache_time", 0)) > 3.0:
-                from core.mcp_manager import get_mcp_manager
-                from core.skill_manager import SkillManager
-
-                self._cached_skills_count = len(SkillManager().list_skills())
-                self._cached_mcp_servers = get_mcp_manager().load_servers()
-                self._status_cache_time = now
-
-            skills_count = getattr(self, "_cached_skills_count", 0)
-            mcp_servers = getattr(self, "_cached_mcp_servers", [])
-            mcp_total = len(mcp_servers)
-            mcp_active = sum(1 for s in mcp_servers if not s.get("disabled", False))
-            active_bg_tasks = len([t for t in getattr(self, "background_tasks", []) if getattr(t, "is_running", False)])
-
-            agent_mode = getattr(self.agent, "mode", "action")
-
-            thinking_effort = "auto"
-            if hasattr(self.pm, "get_provider_thinking_effort"):
-                thinking_effort = self.pm.get_provider_thinking_effort(pkey, model_name) or "auto"
-
-            footer.update_status(
-                provider_key=pkey,
-                model_name=model_name,
-                agent_mode=agent_mode,
-                directory=os.path.basename(os.path.realpath(os.getcwd())),
-                active_bg_tasks=active_bg_tasks,
-                total_tokens=metrics.get("total_tokens", 0),
-                context_used=metrics.get("context_used", 0),
-                context_window=metrics.get("context", "128k"),
-                context_limit=metrics.get("context_limit", 128000),
-                cost_usd=metrics.get("cost_usd", 0.0),
-                thinking_effort=thinking_effort,
-                skills_count=skills_count,
-                mcp_active=mcp_active,
-                mcp_total=mcp_total
-            )
+            footer.refresh_footer()
         except Exception as e:
-            print(f"Error refreshing status footer: {e}")
+            logger.debug(f"Error refreshing status footer: {e}")
 
     def load_session_ui(self, session_id: str) -> None:
         """Load session state into UI and agent history"""
