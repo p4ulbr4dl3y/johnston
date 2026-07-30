@@ -30,7 +30,7 @@ class BaseCommand:
 class HelpCommand(BaseCommand):
     name = "/help"
     aliases = ["/h", "/?"]
-    description = "Help and keybindings"
+    description = "Show help and keybindings"
 
     async def execute(self, app) -> None:
         app.push_screen(HelpScreen())
@@ -423,7 +423,7 @@ If `AGENTS.md` already exists, improve it in place rather than rewriting blindly
 
 class InitCommand(BaseCommand):
     name = "/init"
-    description = "Guided `AGENTS.md` project setup"
+    description = "Start guided `AGENTS.md` setup"
 
     async def execute(self, app) -> None:
         app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
@@ -507,7 +507,6 @@ class ActionCommand(BaseCommand):
 
 class ExploreCommand(BaseCommand):
     name = "/explore"
-    aliases = ["/plan", "/ask"]
     description = "Switch agent to Explore mode"
 
     async def execute(self, app) -> None:

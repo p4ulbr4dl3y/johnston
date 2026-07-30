@@ -31,7 +31,6 @@ class ShellTool(BaseTool):
         "type": "function",
         "function": {
             "name": "shell",
-            "description": description,
             "parameters": {
                 "type": "object",
                 "properties": {

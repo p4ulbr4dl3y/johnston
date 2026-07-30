@@ -49,8 +49,8 @@ class WebFetchTool(BaseTool):
                 "properties": {
                     "url": {"type": "string", "description": "HTTP or HTTPS URL to fetch"},
                     "raw": {"type": "boolean", "description": "If true, skip Markdown conversion and return raw response text"},
-                    "start_line": {"type": "integer", "description": "Start line number (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line number (inclusive)"},
+                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
                     "no_cache": {"type": "boolean", "description": "If true, bypass cache and perform fresh fetch"}
                 },
                 "required": ["url"]
