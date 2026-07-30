@@ -96,7 +96,7 @@ tools: read, grep, glob
 model: deepseek-v4-flash
 ---
 
-## Subagent: Reviewer
+## Subagent Mode: REVIEWER
 
 Inspect git diffs and code changes. Focus on potential bugs, security issues, and style violations.
 ```
