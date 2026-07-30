@@ -510,9 +510,9 @@ class ProviderManager:
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
-        # Universal fallback to static model
-        if not models and pdata.get("model"):
-            models = [pdata["model"]]
+        # Universal fallback to configured models list or default model
+        if not models:
+            models = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
 
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:
