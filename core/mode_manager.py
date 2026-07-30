@@ -54,8 +54,11 @@ BUILTIN_MODES = {
             "## Execution Mode: ACTION\n\n"
             "### Overview\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
-            "### Core Rules\n"
-            "1. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction."
+            "### Action Rules\n"
+            "1. Precision Edits: Use replace_file_content for single edits and multi_replace_file_content for multiple non-adjacent edits.\n"
+            "2. Verification: Run tests or linters after editing to verify code changes.\n"
+            "3. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
+            "4. No Unsolicited Commits: Never execute git commits unless explicitly asked."
         ),
         disallowed_tools=[],
         source="builtin",

@@ -223,12 +223,13 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
     def test_list_changed_notification(self):
         from unittest.mock import MagicMock, patch
+
         from core.mcp_manager import MCPProcessClient
         client = MCPProcessClient("test", "echo")
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 1
-        
+
         client._buffer = json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}) + "\n" + json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}) + "\n"
         with patch.object(client, "fetch_tools") as mock_fetch:
             res = client._read_response(req_id=1, timeout=0.1)
