@@ -433,14 +433,14 @@ class ProviderManager:
         os.makedirs(CACHE_DIR, exist_ok=True)
         cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
 
-        # If no API key set and not local/built-in provider, invalidate old cache and return empty list
+        # If no API key set and not local/built-in provider, return configured models list for UI display
         if not api_key and provider_key not in ("ollama",):
             if os.path.exists(cache_path):
                 try:
                     os.remove(cache_path)
                 except Exception:
                     pass
-            return []
+            return pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
 
         # 1. Check cache file
         if not force_refresh and os.path.exists(cache_path):
