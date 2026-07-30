@@ -6,7 +6,7 @@ from tools.base import BaseTool
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Updates the task plan. Provide an optional explanation and a list of plan items, "
+        "Update the task plan. Provide an optional explanation and a list of plan items, "
         "each with a step and status ('pending', 'in_progress', 'completed'). "
         "At most one step should be in_progress at a time."
     )
@@ -14,7 +14,6 @@ class UpdatePlanTool(BaseTool):
         "type": "function",
         "function": {
             "name": "update_plan",
-            "description": description,
             "parameters": {
                 "type": "object",
                 "properties": {

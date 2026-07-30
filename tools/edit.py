@@ -238,11 +238,11 @@ class MultiReplaceFileContentTool(BaseTool):
                         "items": {
                             "type": "object",
                             "properties": {
-                                "target_content": {"type": "string"},
-                                "replacement_content": {"type": "string"},
-                                "start_line": {"type": "integer"},
-                                "end_line": {"type": "integer"},
-                                "allow_multiple": {"type": "boolean"}
+                                "target_content": {"type": "string", "description": "Exact text to replace"},
+                                "replacement_content": {"type": "string", "description": "New code block"},
+                                "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                                "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                                "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"}
                             }
                         }
                     }
