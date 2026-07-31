@@ -80,6 +80,114 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         # arguments converted from JSON string to object
         self.assertEqual(tc["function"]["arguments"], {"command": "ls"})
 
+    def test_anthropic_image_tool_result(self):
+        import json
+        img_json = json.dumps({
+            "type": "image",
+            "path": "foo.png",
+            "media_type": "image/jpeg",
+            "base64": "QUFBQQ==",
+            "summary": "[Image file: foo.png (100x100)]"
+        })
+        messages = [
+            {"role": "user", "content": "Read img"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"foo.png"}'}}]},
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+        ]
+        _, final = AnthropicAdapter._to_anthropic_messages(messages)
+        user_tool_turn = final[-1]
+        tr = next(b for b in user_tool_turn["content"] if b.get("type") == "tool_result")
+        self.assertEqual(tr["tool_use_id"], "call_img")
+        blocks = tr["content"]
+        self.assertEqual(blocks[0]["type"], "text")
+        self.assertIn("foo.png", blocks[0]["text"])
+        self.assertEqual(blocks[1]["type"], "image")
+        self.assertEqual(blocks[1]["source"]["data"], "QUFBQQ==")
+
+    def test_gemini_image_tool_result(self):
+        import json
+        img_json = json.dumps({
+            "type": "image",
+            "path": "bar.jpg",
+            "media_type": "image/jpeg",
+            "base64": "QkJCQg==",
+            "summary": "[Image file: bar.jpg (200x200)]"
+        })
+        messages = [
+            {"role": "user", "content": "Read img"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"bar.jpg"}'}}]},
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+        ]
+        _, contents = GeminiAdapter()._to_gemini(messages)
+        # Verify functionResponse and inlineData in a single user turn
+        resp_turn = contents[2]
+        self.assertEqual(resp_turn["role"], "user")
+        fr = next(p for p in resp_turn["parts"] if "functionResponse" in p)
+        self.assertEqual(fr["functionResponse"]["name"], "read")
+        inline_part = next(p for p in resp_turn["parts"] if "inlineData" in p)
+        self.assertEqual(inline_part["inlineData"]["data"], "QkJCQg==")
+
+    def test_openai_format_messages_for_image(self):
+        import json
+
+        from core.adapters import format_messages_for_openai
+        img_json = json.dumps({
+            "type": "image",
+            "path": "baz.png",
+            "media_type": "image/png",
+            "base64": "Q0NDQw==",
+            "summary": "[Image file: baz.png]"
+        })
+        messages = [
+            {"role": "user", "content": "Read img"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"baz.png"}'}}]},
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+        ]
+        formatted = format_messages_for_openai(messages)
+        tool_msg = formatted[2]
+        self.assertEqual(tool_msg["role"], "tool")
+        self.assertEqual(tool_msg["content"], "[Image file: baz.png]")
+
+        user_img_msg = formatted[3]
+        self.assertEqual(user_img_msg["role"], "user")
+        url_part = user_img_msg["content"][1]
+        self.assertEqual(url_part["type"], "image_url")
+        self.assertIn("data:image/png;base64,Q0NDQw==", url_part["image_url"]["url"])
+
+    def test_openai_parallel_tool_calls_image_sequence(self):
+        import json
+        from core.adapters import format_messages_for_openai
+        img_json = json.dumps({
+            "type": "image",
+            "path": "img.png",
+            "media_type": "image/png",
+            "base64": "SU1H",
+            "summary": "[Image file: img.png]"
+        })
+        messages = [
+            {"role": "user", "content": "Run 2 tools"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "call_1", "function": {"name": "read", "arguments": '{"path":"img.png"}'}},
+                    {"id": "call_2", "function": {"name": "shell", "arguments": '{"command":"ls"}'}},
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_1", "name": "read", "content": img_json},
+            {"role": "tool", "tool_call_id": "call_2", "name": "shell", "content": "file1.txt"},
+        ]
+        formatted = format_messages_for_openai(messages)
+        # Verify tool messages stay contiguous directly after assistant:
+        # formatted[0]: user, formatted[1]: assistant, formatted[2]: tool call_1, formatted[3]: tool call_2
+        self.assertEqual(formatted[2]["role"], "tool")
+        self.assertEqual(formatted[2]["tool_call_id"], "call_1")
+        self.assertEqual(formatted[3]["role"], "tool")
+        self.assertEqual(formatted[3]["tool_call_id"], "call_2")
+        # Injected user image message comes AFTER tool batch (index 4)
+        self.assertEqual(formatted[4]["role"], "user")
+        self.assertIn("data:image/png;base64,SU1H", formatted[4]["content"][1]["image_url"]["url"])
+
 
 class _MockUsage:
     def __init__(self, pt, ct, tt):
