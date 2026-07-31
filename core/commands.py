@@ -604,15 +604,15 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
     if loaded_skills:
         if len(loaded_skills) == 1:
-            skill_str = f"the skill '{loaded_skills[0]['name']}'"
+            s = loaded_skills[0]
+            skill_str = f"skill '{s['name']}' from '{s['location']}'"
         else:
-            s_names = ", ".join(f"'{s['name']}'" for s in loaded_skills)
-            skill_str = f"the skills: {s_names}"
+            skill_str = "skills: " + ", ".join(f"'{s['name']}' from '{s['location']}'" for s in loaded_skills)
         user_request = " ".join(other_words).strip()
         if user_request:
-            prompt = f"Load and apply {skill_str}.\n\nUser request: {user_request}"
+            prompt = f"Read and follow instructions for {skill_str}.\n\nUser request: {user_request}"
         else:
-            prompt = f"Load and apply {skill_str}."
+            prompt = f"Read and follow instructions for {skill_str}."
 
         try:
             from widgets.chat_view import ChatView
