@@ -15,7 +15,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenAI",
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
-        "models": ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini"],
         "api_type": "openai",
     },
     "anthropic": {
@@ -23,7 +22,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Anthropic",
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
-        "models": ["claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest", "claude-3-5-haiku-20241022"],
         "api_type": "anthropic",
     },
     "gemini": {
@@ -31,7 +29,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Gemini",
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"],
         "api_type": "gemini",
     },
     "openrouter": {
@@ -39,7 +36,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenRouter",
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
-        "models": ["openrouter/free", "anthropic/claude-3.5-sonnet", "deepseek/deepseek-r1"],
         "api_type": "openai",
     },
     "groq": {
@@ -47,7 +43,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Groq",
         "description": "Ultra-fast Groq LPU inference",
         "base_url": "https://api.groq.com/openai/v1",
-        "models": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "deepseek-r1-distill-llama-70b"],
         "api_type": "openai",
     },
     "xai": {
@@ -55,7 +50,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "xAI",
         "description": "xAI Grok API provider",
         "base_url": "https://api.x.ai/v1",
-        "models": ["grok-2-latest", "grok-2-mini"],
         "api_type": "openai",
     },
     "mistral": {
@@ -63,7 +57,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Mistral",
         "description": "Mistral AI API provider",
         "base_url": "https://api.mistral.ai/v1",
-        "models": ["mistral-large-latest", "mistral-small-latest", "codestral-latest"],
         "api_type": "openai",
     },
     "togetherai": {
@@ -71,7 +64,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Together AI",
         "description": "Together AI open-weight model cloud",
         "base_url": "https://api.together.xyz/v1",
-        "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "meta-llama/Llama-3.2-3B-Instruct-Turbo"],
         "api_type": "openai",
     },
     "deepinfra": {
@@ -79,7 +71,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "DeepInfra",
         "description": "High-throughput cost-efficient model server",
         "base_url": "https://api.deepinfra.com/v1/openai",
-        "models": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1"],
         "api_type": "openai",
     },
     "fireworks": {
@@ -87,7 +78,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Fireworks",
         "description": "Fireworks AI fast open-source inference",
         "base_url": "https://api.fireworks.ai/inference/v1",
-        "models": ["accounts/fireworks/models/deepseek-v3", "accounts/fireworks/models/deepseek-r1"],
         "api_type": "openai",
     },
     "cerebras": {
@@ -95,7 +85,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Cerebras",
         "description": "Cerebras Wafer-Scale Engine high-speed inference",
         "base_url": "https://api.cerebras.ai/v1",
-        "models": ["llama-3.3-70b", "llama3.1-8b"],
         "api_type": "openai",
     },
     "nvidia": {
@@ -103,7 +92,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Nvidia",
         "description": "Nvidia NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
-        "models": ["meta/llama-3.3-70b-instruct", "meta/llama-3.1-8b-instruct"],
         "api_type": "openai",
     },
     "github-copilot": {
@@ -111,7 +99,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "GitHub Copilot",
         "description": "GitHub Copilot Chat API endpoint",
         "base_url": "https://api.githubcopilot.com",
-        "models": ["gpt-4o", "gpt-4o-mini", "claude-3.5-sonnet"],
         "api_type": "openai",
     },
 }
