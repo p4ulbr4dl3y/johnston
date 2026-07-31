@@ -290,7 +290,7 @@ class BaseAgent:
                 if is_img:
                     msg_copy = dict(msg)
                     msg_copy["content"] = (
-                        f"Error reading image '{img_path}': [Hint: Current model/provider does not support image input (vision). Inform the user that your active model cannot view images.]"
+                        f"Error reading image '{img_path}': [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]"
                     )
                     sanitized.append(msg_copy)
                     continue
