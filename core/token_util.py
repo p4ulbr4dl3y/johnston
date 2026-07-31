@@ -29,9 +29,9 @@ def _estimate_text_tokens(text: str) -> int:
     if text.isascii():
         return max(0, round(len(text) / CHARS_PER_TOKEN))
 
-    ascii_n = len(_RE_ASCII.findall(text))
-    cyrillic_n = len(_RE_CYRILLIC.findall(text))
-    cjk_n = len(_RE_CJK.findall(text))
+    ascii_n = sum(1 for _ in _RE_ASCII.finditer(text))
+    cyrillic_n = sum(1 for _ in _RE_CYRILLIC.finditer(text))
+    cjk_n = sum(1 for _ in _RE_CJK.finditer(text))
     other_n = len(text) - ascii_n - cyrillic_n - cjk_n
 
     cost = (

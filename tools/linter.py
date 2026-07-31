@@ -1,7 +1,13 @@
 import asyncio
+import functools
 import os
 import shutil
 from typing import Optional
+
+
+@functools.lru_cache(maxsize=16)
+def _cached_which(cmd: str) -> Optional[str]:
+    return shutil.which(cmd)
 
 
 async def run_linter(path: str) -> str:
@@ -13,9 +19,9 @@ async def run_linter(path: str) -> str:
     errors = []
 
     if ext == ".py":
-        if shutil.which("ruff"):
+        if _cached_which("ruff"):
             output = await _exec_cmd(["ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
-        elif shutil.which("uv"):
+        elif _cached_which("uv"):
             output = await _exec_cmd(["uv", "run", "--no-sync", "ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
         else:
             output = None
@@ -23,7 +29,7 @@ async def run_linter(path: str) -> str:
             errors.append(output)
 
     elif ext in (".ts", ".tsx", ".js", ".jsx", ".json"):
-        if shutil.which("biome"):
+        if _cached_which("biome"):
             output = await _exec_cmd(["biome", "lint", "--only=correctness", path])
             if output:
                 errors.append(output)
