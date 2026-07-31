@@ -69,7 +69,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await handle_slash_command(app, "/models")
             await pilot.pause(0.5)
             self.assertIsInstance(app.screen, ModelScreen)
-            await pilot.press("d", "e", "e", "p", "space", "f", "l", "a", "s", "h")
+            await pilot.press("f", "l", "a", "s", "h")
             await pilot.pause(0.2)
             self.assertGreater(len(app.screen.filtered_items), 0)
             await pilot.press("escape")
