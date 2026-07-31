@@ -375,17 +375,11 @@ class ProviderManager:
 
     def create_agent_for_provider(self, provider_key: str):
         providers = self.load_providers()
-        if provider_key not in providers:
-            if providers:
-                provider_key = list(providers.keys())[0]
-            else:
-                raise RuntimeError("No available providers configured.")
-
-        target_provider = providers[provider_key]
+        target_provider = providers.get(provider_key, {})
         pkey_str = target_provider.get("key", provider_key)
-        stored_key = self.get_api_key(pkey_str)
-        model_val = self.get_provider_model(provider_key)
-        thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
+        stored_key = self.get_api_key(pkey_str) if pkey_str else ""
+        model_val = self.get_provider_model(provider_key) if provider_key else ""
+        thinking_effort = self.get_provider_thinking_effort(provider_key, model_val) if provider_key else EFFORT_AUTO
 
         from core.base_provider import BaseAgent
 

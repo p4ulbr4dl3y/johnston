@@ -206,6 +206,8 @@ class StatusFooter(Static):
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
             elif provider_display:
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › [Select model: /models][/]")
+            else:
+                row1_left_parts.append(f"[{THEME_SECONDARY}][Select provider: /connect][/]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
