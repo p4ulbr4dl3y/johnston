@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -537,6 +537,19 @@ class ProviderManager:
 
         return models
 
+    def is_provider_connected(self, provider_key: str, pdata: Optional[Dict[str, Any]] = None) -> bool:
+        """Returns True if the provider is connected (has API key configured or is local like Ollama/LM Studio)."""
+        if pdata is None:
+            providers = self.load_providers()
+            pdata = providers.get(provider_key, {})
+        if not pdata:
+            return False
+        api_type = str(pdata.get("api_type", "openai")).lower()
+        if api_type in ("ollama", "lmstudio") or pdata.get("requires_key") is False:
+            return True
+        key_val = self.get_api_key(provider_key) or pdata.get("api_key", "")
+        return bool(key_val and str(key_val).strip())
+
     async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True, include_disabled: bool = False) -> Dict[str, Dict[str, Any]]:
         """Returns model dictionaries grouped by provider (only connected/configured providers by default)"""
         providers = self.load_providers(include_disabled=include_disabled)
@@ -544,6 +557,12 @@ class ProviderManager:
             (p_key, p_data) for p_key, p_data in providers.items()
             if include_disabled or not p_data.get("disabled", False)
         ]
+        if connected_only:
+            active_providers = [
+                (p_key, p_data) for p_key, p_data in active_providers
+                if self.is_provider_connected(p_key, p_data)
+            ]
+
         results = await asyncio.gather(*[
             self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
             for p_key, _ in active_providers
@@ -551,7 +570,7 @@ class ProviderManager:
 
         grouped = {}
         for (p_key, p_data), res in zip(active_providers, results):
-            if isinstance(res, list) and (not connected_only or res):
+            if isinstance(res, list) and res:
                 grouped[p_key] = {
                     "name": p_data["name"],
                     "models": res
