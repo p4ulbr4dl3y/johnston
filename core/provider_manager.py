@@ -253,7 +253,7 @@ class ProviderManager:
                         return api_keys[key]
             except Exception:
                 pass
-        return os.getenv(f"{key.upper()}_API_KEY", "")
+        return ""
 
     def set_provider_api_key(self, key: str, api_key: str):
         data = {}
