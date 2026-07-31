@@ -36,11 +36,8 @@ class BaseApiAdapter:
         raise NotImplementedError
 
 
-def format_messages_for_openai(messages: List[Dict[str, Any]], model_id: str = "") -> List[Dict[str, Any]]:
-    """Formats OpenAI tool messages containing image JSON by extracting clean string content for tool role and appending image_url user messages after tool response blocks."""
-    from core.models_catalog import catalog
-    is_vision = catalog.supports_vision("", model_id) if model_id else True
-
+def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Formates OpenAI tool messages containing image JSON by extracting clean string content for tool role and appending image_url user messages after tool response blocks."""
     formatted: List[Dict[str, Any]] = []
     i = 0
     n = len(messages)
@@ -72,33 +69,27 @@ def format_messages_for_openai(messages: List[Dict[str, Any]], model_id: str = "
 
                 if parsed_img and parsed_img.get("base64"):
                     summary_text = parsed_img.get("summary", "[Image content]")
+                    media_type = parsed_img.get("media_type", "image/jpeg")
+                    b64_data = parsed_img.get("base64")
+                    detail_val = parsed_img.get("detail", "high")
 
                     tool_msg = dict(curr_msg)
-                    if is_vision:
-                        tool_msg["content"] = summary_text
-                        tool_batch.append(tool_msg)
+                    tool_msg["content"] = summary_text
+                    tool_batch.append(tool_msg)
 
-                        media_type = parsed_img.get("media_type", "image/jpeg")
-                        b64_data = parsed_img.get("base64")
-                        detail_val = parsed_img.get("detail", "high")
-
-                        pending_user_images.append({
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": f"Image preview ({summary_text}):"},
-                                {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val}}
-                            ]
-                        })
-                    else:
-                        tool_msg["content"] = f"{summary_text}\n[Hint: Active model '{model_id}' does not support image input (vision). Inform the user that your model cannot view images.]"
-                        tool_batch.append(tool_msg)
+                    pending_user_images.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"Image preview ({summary_text}):"},
+                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val}}
+                        ]
+                    })
                 else:
                     tool_batch.append(curr_msg)
                 i += 1
 
             formatted.extend(tool_batch)
-            if is_vision:
-                formatted.extend(pending_user_images)
+            formatted.extend(pending_user_images)
             continue
 
         formatted.append(msg)
