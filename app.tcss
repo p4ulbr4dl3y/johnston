@@ -127,7 +127,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash, .tool-analyze_image {
+.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash {
     color: #d4d4d8;
 }
 

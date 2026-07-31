@@ -1,4 +1,3 @@
-import os
 import re
 from typing import Any, Dict
 
@@ -59,19 +58,6 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
             return _truncate(act)
         return tool_name
 
-    if name == "analyze_image":
-        img_path = args.get("path") or args.get("image_path") or ""
-        prompt_val = args.get("prompt") or args.get("question") or ""
-        base_name = os.path.basename(img_path) if img_path else ""
-        short_prompt = (prompt_val[:45] + "...") if len(prompt_val) > 45 else prompt_val
-        if short_prompt and base_name:
-            return _truncate(f'{base_name} — "{short_prompt}"')
-        if short_prompt:
-            return _truncate(f'"{short_prompt}"')
-        if base_name:
-            return _truncate(base_name)
-        if img_path:
-            return _truncate(img_path)
         return tool_name
 
     # Prioritize file path arguments first for file operations

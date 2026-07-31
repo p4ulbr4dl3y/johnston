@@ -314,7 +314,6 @@ class BaseAgent:
         if not history:
             return []
 
-        is_vision_supported = catalog.supports_vision(self.provider_key, self.model)
         sanitized = []
         known_tool_call_ids = set()
 
@@ -347,62 +346,9 @@ class BaseAgent:
                         "content": f"[Tool Output ({item.get('name', 'tool')}): {item.get('content', '')}]"
                     }
 
-            content = item.get("content")
-            if not is_vision_supported and content:
-                if isinstance(content, list):
-                    new_content = []
-                    for part in content:
-                        if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
-                            new_content.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
-                        else:
-                            new_content.append(part)
-                    item["content"] = new_content
-                elif isinstance(content, str) and "data:image/" in content:
-                    try:
-                        cdata = json.loads(content)
-                        if isinstance(cdata, list):
-                            new_cdata = []
-                            for part in cdata:
-                                if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
-                                    new_cdata.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
-                                else:
-                                    new_cdata.append(part)
-                            item["content"] = json.dumps(new_cdata)
-                    except Exception:
-                        pass
-
             sanitized.append(item)
 
         return sanitized
-
-    def _optimize_history_images(self, history: List[Dict[str, Any]]) -> None:
-        """Replace heavy base64 image_url payloads with short text placeholders IN PLACE
-        on a history copy destined for the API request. Must never mutate self.history
-        directly — that would permanently destroy image data (breaks /rewind and resume)."""
-        for msg in history:
-            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
-                try:
-                    cdata = json.loads(msg["content"])
-                    if isinstance(cdata, list):
-                        txt = next(
-                            (item.get("text") for item in cdata if isinstance(item, dict) and item.get("type") == "text"),
-                            "[Image Loaded & Analyzed]",
-                        )
-                        msg["content"] = f"{txt} (History token optimized)"
-                except Exception:
-                    pass
-
-    def _restore_image_payloads(self) -> None:
-        """Restore original base64 image payloads into self.history after it was rebuilt
-        from the (optimized) API messages list. Uses the snapshot captured at the start
-        of stream_steps so /rewind and session resume see real image data, not placeholders."""
-        payload_map = getattr(self, "_image_payload_map", {})
-        if not payload_map:
-            return
-        for msg in self.history:
-            tid = msg.get("tool_call_id")
-            if tid and tid in payload_map:
-                msg["content"] = payload_map[tid]
 
     def _canonical_tool_name(self, tool_name: str) -> str:
         clean_name = (tool_name or "").strip()
@@ -432,14 +378,12 @@ class BaseAgent:
             return messages, False
 
         self.history = messages[1:]
-        self._restore_image_payloads()
         success, _ = await self.compact_history()
         if not success:
             self.last_context_tokens = current_context
             return messages, False
 
         compacted_history = self.sanitize_history_for_model(self.history)
-        self._optimize_history_images(compacted_history)
         return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True
 
     async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
@@ -469,47 +413,8 @@ class BaseAgent:
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
-        # Snapshot original base64 image payloads keyed by tool_call_id so they can be
-        # restored after the API request. The optimization below replaces them with short
-        # text placeholders on the wire to save context tokens, but self.history (used by
-        # /rewind and session resume) must keep the originals — otherwise images are
-        # permanently lost after the first turn that reuses them.
-        self._image_payload_map: Dict[str, str] = {}
-        for msg in self.history:
-            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
-                tid = msg.get("tool_call_id")
-                if tid and tid not in self._image_payload_map:
-                    self._image_payload_map[tid] = msg["content"]
-
-        is_vis_supported = catalog.supports_vision(getattr(self, "provider_key", ""), getattr(self, "model", ""))
-        user_content: Any = user_text
-        if not is_vis_supported and user_text:
-            if isinstance(user_text, list):
-                new_u = []
-                for part in user_text:
-                    if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
-                        new_u.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
-                    else:
-                        new_u.append(part)
-                user_content = new_u
-            elif isinstance(user_text, str) and "data:image/" in user_text:
-                try:
-                    cdata = json.loads(user_text)
-                    if isinstance(cdata, list):
-                        new_cdata = []
-                        for part in cdata:
-                            if isinstance(part, dict) and part.get("type") in ("image_url", "image"):
-                                new_cdata.append({"type": "text", "text": "[Image attached (vision disabled for active model)]"})
-                            else:
-                                new_cdata.append(part)
-                        user_content = json.dumps(new_cdata)
-                except Exception:
-                    pass
-
         sanitized_history = self.sanitize_history_for_model(self.history)
-        # Optimize heavy base64 image payloads on the API copy only (never on self.history).
-        self._optimize_history_images(sanitized_history)
-        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
+        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
 
         try:
             def _resolve_limit(agent_val: Any, conf_val: Any) -> Any:
@@ -817,27 +722,12 @@ class BaseAgent:
                         except Exception as e:
                             tool_result = f"Error executing tool '{t_name}': {e}"
 
-                    tool_ui_result = tool_result
-                    tool_content = tool_result
+                    yield ("tool_result", tool_result, "")
 
-                    if isinstance(tool_result, str) and tool_result.startswith("{") and '"image_url"' in tool_result:
-                        try:
-                            t_data = json.loads(tool_result)
-                            if "image_url" in t_data:
-                                tool_ui_result = t_data.get("message", f"[Image Loaded: {t_data.get('path')}]")
-                                tool_content = [
-                                    {"type": "text", "text": tool_ui_result},
-                                    {"type": "image_url", "image_url": {"url": t_data["image_url"], "detail": "high"}}
-                                ]
-                        except Exception:
-                            pass
-
-                    yield ("tool_result", tool_ui_result, "")
-
-                    content_str = tool_content
-                    if isinstance(tool_content, (dict, list)):
-                        content_str = json.dumps(tool_content, ensure_ascii=False)
-                    elif tool_content is None:
+                    content_str = tool_result
+                    if isinstance(tool_result, (dict, list)):
+                        content_str = json.dumps(tool_result, ensure_ascii=False)
+                    elif tool_result is None:
                         content_str = ""
 
                     messages.append({
@@ -847,7 +737,6 @@ class BaseAgent:
                     })
 
                 self.history = messages[1:]
-                self._restore_image_payloads()
                 messages, compacted_in_loop = (
                     (messages, False)
                     if compacted_this_turn
@@ -863,7 +752,6 @@ class BaseAgent:
         finally:
             if len(messages) > 1:
                 self.history = messages[1:]
-                self._restore_image_payloads()
 
     async def compact_history(self) -> Tuple[bool, str]:
         """

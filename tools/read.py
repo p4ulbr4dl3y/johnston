@@ -161,11 +161,9 @@ class ReadTool(BaseTool):
 
         ext = os.path.splitext(path)[1].lower()
 
-        # Handle image files via AnalyzeImageTool
+        # Handle image files
         if ext in IMAGE_EXTENSIONS:
-            from tools.analyze_image import AnalyzeImageTool
-            tool = AnalyzeImageTool()
-            return await tool.execute({"path": path})
+            return f"Error: Image files ({ext}) are not supported."
 
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:

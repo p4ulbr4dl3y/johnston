@@ -1,6 +1,5 @@
 import time
 import unittest
-from unittest.mock import patch
 
 from core.commands import COMMAND_REGISTRY, handle_slash_command
 from widgets.chat_view import ChatView
@@ -208,7 +207,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
-        from core.models_catalog import catalog
 
         test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
@@ -232,14 +230,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.push_screen = simulate_push_screen
         app.query_one = lambda target, default=None: type("MockInput", (), {"focus": lambda self: None})()
 
-        orig_fb = catalog.get_fallback_vision_model()
-        try:
-            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                await cmd.execute(app)
-                self.assertEqual(len(pushed_screens), 1)
-        finally:
-            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_vision_model(*orig_fb)
+        await cmd.execute(app)
+        self.assertEqual(len(pushed_screens), 1)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
         from core.commands import ModelsCommand

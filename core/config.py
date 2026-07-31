@@ -12,7 +12,6 @@ SUBAGENT_DEFS_DIR = os.path.join(SUBAGENTS_DIR, "definitions")
 SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
 
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
-TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 LAST_TOOL_LOG_FILE = os.path.join(LOGS_DIR, "last_tool.log")
 
 # Agent Execution Limits & Timeouts

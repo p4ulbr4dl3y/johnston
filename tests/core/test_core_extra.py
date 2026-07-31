@@ -139,14 +139,12 @@ class TestModelsCatalog(unittest.TestCase):
     def test_fuzzy_matching_local_models(self):
         cat = ModelsCatalog()
         cat._limits = {"google/gemma-4-31b": 262144, "gemma-4": 262144}
-        cat._vision = ["google/gemma-4-31b", "gemma-4"]
         cat._reasoning = ["google/gemma-4-31b", "gemma-4"]
 
         # Test exact match
         self.assertEqual(cat.get_context_limit("google", "gemma-4"), 262144)
         # Test fuzzy match with MLX/4bit suffix
         self.assertEqual(cat.get_context_limit("omlx", "gemma-4-E4B-it-MLX-4bit"), 262144)
-        self.assertTrue(cat.supports_vision("omlx", "gemma-4-E4B-it-MLX-4bit"))
         self.assertTrue(cat.supports_reasoning("omlx", "gemma-4-E4B-it-MLX-4bit"))
 
 
@@ -163,28 +161,9 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertTrue(cat.is_open_weights("deepseek", "deepseek-v4-pro"))
         self.assertEqual(cat.get_model_description("deepseek", "deepseek-v4-pro"), "Open MoE flagship")
 
-    def test_vision_overrides_and_fallbacks(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_cfg = os.path.join(tmp_dir, "config.json")
-            tmp_cache = os.path.join(tmp_dir, "cache.json")
-            with patch("core.models_catalog.CONFIG_FILE", tmp_cfg), patch("core.models_catalog.CACHE_FILE", tmp_cache):
-                cat = ModelsCatalog()
-                cat.add_vision_override("custom-model-vision")
-                self.assertTrue(cat.supports_vision("provider", "custom-model-vision"))
-                self.assertFalse(cat.is_native_vision("provider", "custom-model-vision"))
-
-                cat.set_vision_model("provider_x", "model_y")
-                prov, mod = cat.get_fallback_vision_model()
-                self.assertEqual(prov, "provider_x")
-                self.assertEqual(mod, "model_y")
-
-                cat.remove_vision_override("custom-model-vision")
-                self.assertFalse(cat.supports_vision("provider", "custom-model-vision"))
-
     def test_save_and_load_cache(self):
         cat = ModelsCatalog()
         cat._limits = {"test/m1": 100000}
-        cat._vision = ["test/m1"]
         cat._names = {"test/m1": "Test Model 1"}
         cat._pricing = {"test/m1": {"prompt": 0.001, "completion": 0.002}}
 
@@ -213,7 +192,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
                         "name": "GPT-4o",
                         "description": "Flagship model",
                         "limit": {"context": 128000, "output": 4096},
-                        "modalities": {"input": ["text", "image"]},
+                        "modalities": {"input": ["text"]},
                         "reasoning": True,
                         "open_weights": False,
                         "cost": {"input": 2.5, "output": 10.0}
@@ -227,7 +206,6 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
                     "id": "anthropic/claude-3.5-sonnet",
                     "name": "Anthropic: Claude 3.5 Sonnet",
                     "context_length": 200000,
-                    "input_modalities": ["image"],
                     "pricing": {"prompt": "0.000003", "completion": "0.000015"}
                 }
             ]
@@ -250,8 +228,6 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
             limits = await cat.refresh()
             self.assertIn("openai/gpt-4o", limits)
             self.assertEqual(limits["openai/gpt-4o"], 128000)
-            self.assertTrue(cat.supports_vision("openai", "gpt-4o"))
-            self.assertTrue(cat.is_native_vision("openai", "gpt-4o"))
             self.assertTrue(cat.supports_reasoning("openai", "gpt-4o"))
 
             self.assertIn("anthropic/claude-3.5-sonnet", limits)

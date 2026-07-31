@@ -1,6 +1,6 @@
 """
 AI Model Catalog and Context Limit Manager for Johnston.
-Fetches model context limits, vision, reasoning capabilities, and pricing dynamically
+Fetches model context limits, reasoning capabilities, and pricing dynamically
 from models.dev and OpenRouter catalog APIs with local cache fallbacks.
 """
 import asyncio
@@ -8,11 +8,11 @@ import json
 import os
 import re
 import time
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Set
 
 import httpx
 
-from core.config import CONFIG_DIR, CONFIG_FILE
+from core.config import CONFIG_DIR
 
 MODELS_DEV_URL = "https://models.dev/api.json"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -43,15 +43,11 @@ class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
         self._output_limits: Dict[str, int] = {}
-        self._vision: List[str] = []
         self._reasoning: List[str] = []
         self._open_weights: List[str] = []
-        self._user_overrides: List[str] = []
         self._names: Dict[str, str] = {}
         self._descriptions: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
-        self._vision_provider: str = ""
-        self._vision_model: str = ""
         self._match_cache: Dict[str, str] = {}
         self._updated_at: float = 0.0
         self.load_cache()
@@ -79,30 +75,13 @@ class ModelsCatalog:
                     data = json.load(f)
                     self._limits = data.get("model_limits", {})
                     self._output_limits = data.get("output_limits", {})
-                    self._user_overrides = data.get("user_vision_overrides", [])
-                    self._native_vision = data.get("vision_models", [])
-                    self._vision = list(set(self._native_vision + self._user_overrides))
                     self._reasoning = data.get("reasoning_models", [])
                     self._open_weights = data.get("open_weights_models", [])
                     self._names = data.get("model_names", {})
                     self._descriptions = data.get("model_descriptions", {})
                     self._pricing = data.get("model_pricing", {})
-                    self._vision_provider = data.get("vision_provider", "")
-                    self._vision_model = data.get("vision_model", "")
                     self._updated_at = float(data.get("updated_at", 0.0))
                 loaded = True
-            except Exception:
-                pass
-
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    cfg_data = json.load(f)
-                    if isinstance(cfg_data, dict):
-                        vis_m = cfg_data.get("vision_model")
-                        if vis_m:
-                            self._vision_model = vis_m
-                            self._vision_provider = cfg_data.get("vision_provider", "")
             except Exception:
                 pass
 
@@ -111,7 +90,6 @@ class ModelsCatalog:
     def save_cache(
         self,
         model_limits: Dict[str, int] = None,
-        vision_models: List[str] = None,
         model_names: Dict[str, str] = None,
         model_pricing: Dict[str, Dict[str, float]] = None,
     ):
@@ -124,12 +102,8 @@ class ModelsCatalog:
                 "updated_at": now,
                 "model_limits": model_limits if model_limits is not None else self._limits,
                 "output_limits": self._output_limits,
-                "vision_models": vision_models if vision_models is not None else getattr(self, "_native_vision", self._vision),
                 "reasoning_models": self._reasoning,
                 "open_weights_models": self._open_weights,
-                "user_vision_overrides": self._user_overrides,
-                "vision_provider": self._vision_provider,
-                "vision_model": self._vision_model,
                 "model_names": model_names if model_names is not None else self._names,
                 "model_descriptions": self._descriptions,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
@@ -151,7 +125,6 @@ class ModelsCatalog:
 
         model_limits: Dict[str, int] = {}
         output_limits: Dict[str, int] = {}
-        vision_models: List[str] = []
         reasoning_models: List[str] = []
         open_weights_models: List[str] = []
         model_names: Dict[str, str] = {}
@@ -203,11 +176,6 @@ class ModelsCatalog:
                                         output_limits[full_id] = int(out_len)
                                         output_limits[alias_id] = int(out_len)
 
-                                modalities = m_info.get("modalities", {})
-                                input_mods = modalities.get("input", []) if isinstance(modalities, dict) else []
-                                if any(x in input_mods for x in ("image", "vision", "video")):
-                                    vision_models.extend([full_id, alias_id])
-
                                 if m_info.get("reasoning"):
                                     reasoning_models.extend([full_id, alias_id])
 
@@ -253,16 +221,6 @@ class ModelsCatalog:
                                 model_limits.setdefault(m_id, int(ctx))
                                 model_limits.setdefault(short_id, int(ctx))
 
-                            arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
-                            input_mods = (
-                                arch.get("input_modalities")
-                                or m.get("input_modalities")
-                                or m.get("modalities")
-                                or []
-                            )
-                            if any(x in input_mods for x in ("image", "vision")):
-                                vision_models.extend([m_id, short_id])
-
                             pricing_raw = m.get("pricing") if isinstance(m.get("pricing"), dict) else {}
                             p_prompt = float(pricing_raw.get("prompt") or 0.0)
                             p_comp = float(pricing_raw.get("completion") or 0.0)
@@ -275,15 +233,6 @@ class ModelsCatalog:
 
             self._limits = model_limits
             self._output_limits = output_limits
-            self._native_vision = list(set(vision_models))
-
-            # Merge with user vision overrides
-            merged_vision = list(vision_models)
-            for ov in self._user_overrides:
-                if ov not in merged_vision:
-                    merged_vision.append(ov)
-
-            self._vision = list(set(merged_vision))
             self._reasoning = list(set(reasoning_models))
             self._open_weights = list(set(open_weights_models))
             self._names = model_names
@@ -303,7 +252,6 @@ class ModelsCatalog:
             self._names,
             self._descriptions,
             self._pricing,
-            self._vision,
             self._reasoning,
             self._open_weights,
         )
@@ -318,8 +266,6 @@ class ModelsCatalog:
 
         if tag:
             space_tag = tag
-        elif search_space is self._vision:
-            space_tag = "vision"
         elif search_space is self._reasoning:
             space_tag = "reasoning"
         elif search_space is self._open_weights:
@@ -443,31 +389,6 @@ class ModelsCatalog:
 
         return 4096
 
-    def supports_vision(self, provider_id: str, model_id: str) -> bool:
-        if not model_id:
-            return False
-        if not self._vision and not self._limits:
-            self.load_cache()
-
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._vision, tag="vision")
-        if resolved and resolved in self._vision:
-            return True
-
-        return False
-
-    def is_native_vision(self, provider_id: str, model_id: str) -> bool:
-        if not model_id:
-            return False
-        if not self._vision and not self._limits:
-            self.load_cache()
-
-        native_list = [m for m in self._vision if m not in self._user_overrides]
-        resolved = self._resolve_catalog_key(provider_id, model_id, native_list, tag="native_vision")
-        if resolved and resolved in native_list:
-            return True
-
-        return False
-
     def supports_reasoning(self, provider_id: str, model_id: str) -> bool:
         if not model_id:
             return False
@@ -489,65 +410,6 @@ class ModelsCatalog:
         resolved = self._resolve_catalog_key(provider_id, model_id, self._open_weights, tag="open_weights")
         if resolved and resolved in self._open_weights:
             return True
-
-        return False
-
-    def add_vision_override(self, model_id: str) -> None:
-        if not model_id:
-            return
-        if not self._vision and not self._limits:
-            self.load_cache()
-        m_low = model_id.lower()
-        if m_low not in [m.lower() for m in self._user_overrides]:
-            self._user_overrides.append(model_id)
-        if m_low not in [m.lower() for m in self._vision]:
-            self._vision.append(model_id)
-        self._match_cache.clear()
-        self.save_cache()
-
-    def remove_vision_override(self, model_id: str) -> None:
-        if not model_id:
-            return
-        if not self._vision and not self._limits:
-            self.load_cache()
-        m_low = model_id.lower()
-        self._user_overrides = [m for m in self._user_overrides if m.lower() != m_low]
-        native_models = getattr(self, "_native_vision", None)
-        if native_models is None:
-            native_models = [m for m in self._vision if m.lower() != m_low]
-        self._vision = list(set(native_models + self._user_overrides))
-        self._match_cache.clear()
-        self.save_cache()
-
-    def set_vision_model(self, provider_id: str, model_id: str, *args, **kwargs) -> None:
-        self._vision_provider = provider_id
-        self._vision_model = model_id
-        if model_id and not self.supports_vision(provider_id, model_id):
-            self.add_vision_override(model_id)
-        self.save_cache()
-        self._save_vision_config(provider_id, model_id)
-
-    def _save_vision_config(self, provider_id: str, model_id: str) -> None:
-        try:
-            data = {}
-            if os.path.exists(CONFIG_FILE):
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            if not isinstance(data, dict):
-                data = {}
-            data["vision_provider"] = provider_id
-            data["vision_model"] = model_id
-            os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-            from tools.base import atomic_write_json
-            atomic_write_json(CONFIG_FILE, data, indent=2)
-        except Exception:
-            pass
-
-    def get_vision_model(self) -> Tuple[str, str]:
-        return getattr(self, "_vision_provider", ""), getattr(self, "_vision_model", "")
-
-    def get_fallback_vision_model(self) -> Tuple[str, str]:
-        return self.get_vision_model()
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:

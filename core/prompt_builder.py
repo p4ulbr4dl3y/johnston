@@ -98,8 +98,7 @@ Assist the user with software engineering tasks through safe, high-quality, and 
 7. Background Execution: Do not poll background tasks/subagents; you will be notified upon completion.
 8. Concise Communication: Be direct and clear. Summarize plan changes briefly.
 9. Tool Usage: Use available function tools directly. Do not claim missing tools when listed.
-10. Language Matching: Respond in the user's current message language.
-11. Image Inspection: Use analyze_image to inspect visual content of image files."""
+10. Language Matching: Respond in the user's current message language."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
