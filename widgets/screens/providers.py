@@ -58,31 +58,42 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             yield OptionList(*self.filtered_options, id="modal-option-list")
             yield Label("enter: connect • tab: disable/enable • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
-    def _on_key(self, event: events.Key) -> None:
-        if event.key in ("tab", "ctrl+t", "ctrl_t"):
-            opt_list = self.query_one("#modal-option-list", OptionList)
-            idx = opt_list.highlighted
-            if idx is not None and 0 <= idx < len(self.filtered_items):
-                pkey = self.filtered_items[idx]
-                if pkey:
-                    if pkey in self.disabled_set:
-                        self.disabled_set.remove(pkey)
-                        if self.pm:
-                            self.pm.set_provider_disabled(pkey, False)
-                    else:
-                        self.disabled_set.add(pkey)
-                        if self.pm:
-                            self.pm.set_provider_disabled(pkey, True)
+    BINDINGS = [
+        ("tab", "toggle_disabled", "Toggle Disabled"),
+        ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
+    ]
 
-                    options, items = self._build_options()
-                    self.raw_options = options
-                    self.raw_items = items
-                    search_input = self.query_one("#modal-search-input", Input)
-                    self.on_input_changed(Input.Changed(search_input, search_input.value))
-                    opt_list.highlighted = idx
-                    event.prevent_default()
-                    event.stop()
-                    return
+    def action_toggle_disabled(self) -> None:
+        opt_list = self.query_one("#modal-option-list", OptionList)
+        idx = opt_list.highlighted
+        if idx is None and self.filtered_items:
+            idx = 0
+        if idx is not None and 0 <= idx < len(self.filtered_items):
+            pkey = self.filtered_items[idx]
+            if pkey:
+                if pkey in self.disabled_set:
+                    self.disabled_set.remove(pkey)
+                    if self.pm:
+                        self.pm.set_provider_disabled(pkey, False)
+                else:
+                    self.disabled_set.add(pkey)
+                    if self.pm:
+                        self.pm.set_provider_disabled(pkey, True)
+
+                options, items = self._build_options()
+                self.raw_options = options
+                self.raw_items = items
+                search_input = self.query_one("#modal-search-input", Input)
+                self.on_input_changed(Input.Changed(search_input, search_input.value))
+                if self.filtered_items:
+                    opt_list.highlighted = min(idx, len(self.filtered_items) - 1)
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("tab", "ctrl+t", "ctrl_t", "ctrl+i"):
+            self.action_toggle_disabled()
+            event.prevent_default()
+            event.stop()
+            return
         super()._on_key(event)
 
 
