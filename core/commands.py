@@ -100,7 +100,6 @@ class ProvidersCommand(BaseCommand):
                             app.agent.app = app
                         app.mode = current_mode
                         app.refresh_status_footer()
-                        app.notify(f"Connected to provider: {p_name}")
                         if entered_key:
                             asyncio.create_task(ModelsCommand().execute(app))
                         else:

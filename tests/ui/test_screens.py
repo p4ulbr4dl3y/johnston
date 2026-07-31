@@ -142,6 +142,24 @@ class TestProvidersScreen(unittest.TestCase):
         s = ProvidersScreen(providers={"p1": {"key": "p1", "name": "P1"}}, active_key="nope", configured_keys={})
         self.assertEqual(s.default_value, "p1")
 
+    def test_tab_key_toggles_disabled(self):
+        from unittest.mock import MagicMock
+        providers = {"p1": {"key": "p1", "name": "P1"}}
+        pm = MagicMock()
+        s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={}, pm=pm)
+        # Mock query_one and event
+        opt_list = MagicMock()
+        opt_list.highlighted = 0
+        search_input = MagicMock()
+        search_input.value = ""
+        s.query_one = MagicMock(side_effect=lambda id_name, *args: opt_list if "option-list" in id_name else search_input)
+        event = MagicMock(key="tab")
+        s._on_key(event)
+        self.assertIn("p1", s.disabled_set)
+        pm.set_provider_disabled.assert_called_with("p1", True)
+        event.prevent_default.assert_called_once()
+        event.stop.assert_called_once()
+
 
 class TestApiKeyInputScreen(unittest.TestCase):
     def test_init_with_key(self):
