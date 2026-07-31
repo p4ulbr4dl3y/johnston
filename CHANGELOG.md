@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.2](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.1...johnston-v0.8.2) (2026-07-31)
+
+
+### Bug Fixes
+
+* **provider:** add deepseek-v4-flash to default models for search filter test ([ea7d65c](https://github.com/p4ulbr4dl3y/johnston/commit/ea7d65cfa9442583cdf52e34b09a53e1ff2262c6))
+* **provider:** fallback to configured models list when offline or uninitialized ([8650fdc](https://github.com/p4ulbr4dl3y/johnston/commit/8650fdcc0b3a4bdc1fa1d067efca29713a4780e1))
+* **provider:** include default model lists for built-in providers ([7eed28f](https://github.com/p4ulbr4dl3y/johnston/commit/7eed28f5ea216bb8ffb2e3abb0174725b3a862bf))
+* **provider:** return configured models list when API key is not configured ([caf3339](https://github.com/p4ulbr4dl3y/johnston/commit/caf3339de82e51d3e6f1b218bdd4d0a8c92d6894))
+* **provider:** set cheapest default model for each built-in provider ([29ed0ed](https://github.com/p4ulbr4dl3y/johnston/commit/29ed0ed215fc7962a45268c6c4a9a6e69b3f8390))
+
+
+### Documentation
+
+* add configuration guide and remove legacy config options ([a65fa1d](https://github.com/p4ulbr4dl3y/johnston/commit/a65fa1df3c79a33a3a2ec6c12dc5a769f2864a5b))
+* standardize subagent system prompt format in configuration guide ([9aad9c8](https://github.com/p4ulbr4dl3y/johnston/commit/9aad9c8108cdddd13b2b7af09c9a200a85daf6e3))
+
 ## [0.8.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.0...johnston-v0.8.1) (2026-07-30)
 
 
