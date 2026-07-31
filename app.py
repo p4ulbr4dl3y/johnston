@@ -526,9 +526,6 @@ class JohnstonApp(App):
                     print(f"Git checkpoint creation failed: {e}")
 
         full_prompt = user_text
-        if attachments:
-            for att in attachments:
-                full_prompt += f"\n\n[Image file: '{att.path}']"
 
         thinking_widget = None
         current_tool_widget = None
@@ -542,7 +539,7 @@ class JohnstonApp(App):
             except Exception:
                 pass
 
-            async for step in self.agent.stream_steps(full_prompt):
+            async for step in self.agent.stream_steps(full_prompt, attachments=attachments):
                 event_type = step[0]
                 val1 = step[1] if len(step) > 1 else ""
                 val2 = step[2] if len(step) > 2 else ""
