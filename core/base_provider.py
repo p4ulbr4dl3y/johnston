@@ -468,31 +468,30 @@ class BaseAgent:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
         sanitized_history = self.sanitize_history_for_model(self.history)
-        messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
         if attachments:
+            user_content: List[Dict[str, Any]] = [{"type": "text", "text": user_text}]
             for idx, att in enumerate(attachments):
                 att_path = getattr(att, "path", str(att))
                 try:
                     from tools.read import process_image_file_sync
-                    img_data = process_image_file_sync(att_path)
-                    img_json_str = json.dumps(img_data, ensure_ascii=False)
-                    call_id = f"clip_att_{idx}_{int(time.time())}"
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [{
-                            "id": call_id,
-                            "type": "function",
-                            "function": {"name": "read", "arguments": json.dumps({"path": att_path})}
-                        }]
-                    })
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": call_id,
-                        "content": img_json_str
-                    })
+                    img_data_str = process_image_file_sync(att_path)
+                    img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
+                    if isinstance(img_dict, dict) and img_dict.get("base64"):
+                        media_type = img_dict.get("media_type", "image/jpeg")
+                        b64_data = img_dict.get("base64")
+                        detail_val = img_dict.get("detail", "high")
+                        user_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{media_type};base64,{b64_data}",
+                                "detail": detail_val
+                            }
+                        })
                 except Exception as e:
-                    print(f"Error pre-loading attachment image: {e}")
+                    print(f"Error processing attachment image: {e}")
+            messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
+        else:
+            messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
 
         try:
             def _resolve_limit(agent_val: Any, conf_val: Any) -> Any:
