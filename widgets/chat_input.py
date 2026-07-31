@@ -134,25 +134,49 @@ class ChatInput(TextArea):
         return "\n".join(new_lines) if modified else pasted_text
 
     def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG image and inserts as @filepath """
+        """Checks clipboard for PNG/TIFF image and inserts as @filepath"""
+        import base64
+        import io
         import os
         import subprocess
         import time
 
+        from PIL import Image
+
+        jxa_script = """
+ObjC.import("AppKit");
+var pb = $.NSPasteboard.generalPasteboard;
+var imgData = pb.dataForType($.NSPasteboardTypePNG);
+if (imgData.isNil()) {
+    imgData = pb.dataForType($.NSPasteboardTypeTIFF);
+}
+if (!imgData.isNil()) {
+    imgData.base64EncodedStringWithOptions(0).js;
+} else {
+    "";
+}
+"""
         try:
-            cmd = "osascript -e 'try' -e 'if (clipboard info as string) contains \"furl\" then return \"FILE\"' -e 'get the clipboard as «class PNGf»' -e 'on error' -e 'return \"\"' -e 'end try'"
-            res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=1)
-            if res.returncode == 0 and "«data PNGf" in res.stdout:
-                raw_hex = res.stdout.strip().split("«data PNGf")[-1].replace("»", "").strip()
-                img_bytes = bytes.fromhex(raw_hex)
-                if len(img_bytes) > 0:
+            res = subprocess.run(
+                ["osascript", "-l", "JavaScript", "-e", jxa_script],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+            b64_str = res.stdout.strip()
+            if b64_str:
+                raw_bytes = base64.b64decode(b64_str)
+                if len(raw_bytes) > 0:
+                    img = Image.open(io.BytesIO(raw_bytes))
                     from core.config import TEMP_IMAGES_DIR
 
                     out_dir = TEMP_IMAGES_DIR
                     os.makedirs(out_dir, exist_ok=True)
                     filepath = os.path.join(out_dir, f"clip_{int(time.time())}.png")
-                    with open(filepath, "wb") as f:
-                        f.write(img_bytes)
+
+                    if img.mode not in ("RGB", "RGBA"):
+                        img = img.convert("RGB")
+                    img.save(filepath, format="PNG")
 
                     self.insert(f"@{filepath} ")
                     self._on_input_change()
@@ -197,14 +221,11 @@ class ChatInput(TextArea):
         import os
         text_strip = event.text.strip().strip("'\"")
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
-        is_path = (
-            text_strip.startswith("/")
-            or text_strip.startswith("~/")
-            or text_strip.startswith("./")
-            or text_strip.startswith("file://")
-            or os.path.exists(expanded)
+        is_existing_image_path = (
+            os.path.exists(expanded)
+            and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
         )
-        if not is_path and not event.text.strip() and self.try_paste_clipboard_image():
+        if not is_existing_image_path and self.try_paste_clipboard_image():
             event.prevent_default()
             event.stop()
             return
