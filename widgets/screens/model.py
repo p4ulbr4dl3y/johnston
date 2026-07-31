@@ -185,7 +185,16 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             yield OptionList(*self.filtered_options, id="modal-option-list")
             yield Label("←/→: switch tab • enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
 
+    def on_mount(self) -> None:
+        super().on_mount()
+        # Pre-warm secondary tab data in background so switching is 0ms instant
+        other_tab = "vision" if self.active_tab == "all" else "all"
+        if other_tab not in self._tabs_cache:
+            self._tabs_cache[other_tab] = self._build_data(other_tab)
+
     def switch_tab(self, new_tab: str) -> None:
+        if self.active_tab == new_tab:
+            return
         self.active_tab = new_tab
         try:
             title_md = self.query_one("#model-title", Markdown)
@@ -193,7 +202,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         except Exception:
             pass
 
-        options, items, default_val = self._tabs_cache.get(new_tab) or self._build_data(new_tab)
+        if new_tab not in self._tabs_cache:
+            self._tabs_cache[new_tab] = self._build_data(new_tab)
+        options, items, default_val = self._tabs_cache[new_tab]
+
         self.raw_options = options
         self.raw_items = items
         self.default_value = default_val
