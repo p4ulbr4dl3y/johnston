@@ -313,12 +313,7 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         self.assertIsNone(sys_instr)
         self.assertEqual(contents, [])
 
-    def test_gemini_image_data_uri(self):
-        msgs = [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBOR="}}]}]
-        _, contents = GeminiAdapter()._to_gemini(msgs)
-        inline = [p for p in contents[0]["parts"] if "inlineData" in p]
-        self.assertEqual(len(inline), 1)
-        self.assertEqual(inline[0]["inlineData"]["mimeType"], "image/png")
+
 
     def test_gemini_tool_non_dict_content(self):
         _, contents = GeminiAdapter()._to_gemini([{"role": "tool", "name": "shell", "content": 12345}])

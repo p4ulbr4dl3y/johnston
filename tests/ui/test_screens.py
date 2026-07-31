@@ -2,11 +2,9 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.models_catalog import catalog
 from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
-from widgets.screens.model import ModelScreen, VisionWarningScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
@@ -242,70 +240,6 @@ class TestSubagentsScreen(unittest.TestCase):
         keys = [b[0] for b in SubagentsScreen.BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("k", keys)
-
-
-class TestModelScreen(unittest.TestCase):
-    def test_header_title_all_tab(self):
-        self.assertIn("All Models", ModelScreen._get_header_title_text("all"))
-
-    def test_header_title_vision_tab(self):
-        self.assertIn("Vision Models", ModelScreen._get_header_title_text("vision"))
-
-    def test_build_data_list_format(self):
-        s = ModelScreen(models_data=["model-a", "model-b"], current_model="model-a", current_provider="tp")
-        self.assertIn("model-a", s.raw_items)
-        self.assertEqual(s.default_value, "model-a")
-        self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
-
-    def test_build_data_dict_format(self):
-        models_data = {"prov1": {"name": "P1", "models": ["m1", "m2"]}, "prov2": {"name": "P2", "models": ["m3"]}}
-        s = ModelScreen(models_data=models_data, current_model="m2", current_provider="prov1")
-        tuple_items = [i for i in s.raw_items if isinstance(i, tuple)]
-        self.assertTrue(len(tuple_items) >= 3)
-        self.assertEqual(s.default_value[0], "prov1")
-        self.assertEqual(s.default_value[1], "m2")
-        self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
-
-    def test_build_data_vision_tab_active(self):
-        models_data = {"prov1": {"name": "P1", "models": ["m1", "m2"]}}
-        orig_fb = catalog.get_vision_model()
-        try:
-            with patch.object(catalog, "save_cache"), \
-                 patch.object(catalog, "_save_vision_config"), \
-                 patch.object(catalog, "_vision", ["m1"]), \
-                 patch.object(catalog, "_native_vision", ["m1"]):
-                catalog.set_vision_model("prov1", "m1")
-                s = ModelScreen(models_data=models_data, current_model="m1", current_provider="prov1", initial_tab="vision")
-                self.assertTrue(any("[ACTIVE]" in opt for opt in s.raw_options if isinstance(opt, str)))
-        finally:
-            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_vision_model(*orig_fb)
-
-
-class TestVisionWarningScreen(unittest.TestCase):
-    def test_init(self):
-        s = VisionWarningScreen("gpt-3.5", "OpenAI")
-        self.assertEqual(s.model_name, "gpt-3.5")
-        self.assertEqual(s.provider_name, "OpenAI")
-
-    def test_bindings(self):
-        keys = [b[0] for b in VisionWarningScreen.BINDINGS]
-        self.assertIn("escape", keys)
-
-    def test_options(self):
-        orig_fb = catalog.get_fallback_vision_model()
-        try:
-            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_vision_model("", "")
-                s1 = VisionWarningScreen("gpt-3.5", "OpenAI")
-                self.assertEqual(s1.raw_items, ["select_vision", "force_vision"])
-
-                catalog.set_vision_model("prov1", "vision-1")
-                s2 = VisionWarningScreen("gpt-3.5", "OpenAI")
-                self.assertEqual(s2.raw_items, ["select_vision", "use_fallback", "force_vision"])
-        finally:
-            with patch.object(catalog, "save_cache"), patch.object(catalog, "_save_vision_config"):
-                catalog.set_vision_model(*orig_fb)
 
 
 if __name__ == "__main__":

@@ -322,7 +322,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(agent.close)
 
         history = [
-            {"role": "user", "content": [{"type": "text", "text": "Look at this"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,123"}}]},
+            {"role": "user", "content": "Look at this"},
             {"role": "assistant", "content": "Done", "tool_calls": [{"id": "call_1", "function": {"name": "read"}}]},
             {"role": "tool", "tool_call_id": "call_1", "name": "read", "content": "file contents"},
             {"role": "tool", "tool_call_id": "call_orphan", "name": "edit", "content": "orphan content"}
@@ -330,9 +330,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         sanitized = agent.sanitize_history_for_model(history)
         self.assertEqual(len(sanitized), 4)
-
-        # Vision content transformed
-        self.assertEqual(sanitized[0]["content"][1]["text"], "[Image attached (vision disabled for active model)]")
 
         # Valid tool output preserved
         self.assertEqual(sanitized[2]["role"], "tool")

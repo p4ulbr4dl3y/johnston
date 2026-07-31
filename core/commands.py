@@ -138,22 +138,13 @@ class ModelsCommand(BaseCommand):
 
         def on_model_selected(selection: Any) -> None:
             if selection:
-                is_vision_tab = False
-                if isinstance(selection, tuple) and len(selection) == 2 and isinstance(selection[1], bool):
-                    item_val, is_vision_tab = selection[0], selection[1]
-                else:
-                    item_val = selection
+                item_val = selection
 
                 if isinstance(item_val, (tuple, list)):
                     selected_prov, selected_model = item_val[0], item_val[1]
                 else:
                     selected_prov = curr_provider
                     selected_model = item_val
-
-                if is_vision_tab:
-                    catalog.set_vision_model(selected_prov, selected_model)
-                    app.query_one("#message-input", ChatInput).focus()
-                    return
 
                 if selected_prov != app.pm.get_active_provider_key():
                     old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []

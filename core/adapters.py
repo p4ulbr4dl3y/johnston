@@ -323,16 +323,6 @@ class GeminiAdapter(BaseApiAdapter):
                     continue
                 if p.get("type") == "text":
                     parts.append({"text": p.get("text", "")})
-                elif p.get("type") in ("image_url", "image"):
-                    url_obj = p.get("image_url")
-                    url = url_obj.get("url", "") if isinstance(url_obj, dict) else ""
-                    if isinstance(url, str) and url.startswith("data:"):
-                        try:
-                            header, b64 = url.split(",", 1)
-                            mime = header.split(":")[1].split(";")[0]
-                            parts.append({"inlineData": {"mimeType": mime, "data": b64}})
-                        except Exception:
-                            pass
         if role == "model":
             for tc in msg.get("tool_calls") or []:
                 if not isinstance(tc, dict):

@@ -472,7 +472,6 @@ class ProviderManager:
         # 2. Request models via provider HTTP API
         models = []
         model_limits = {}
-        vision_models = []
         should_fetch = pdata.get("fetch_models", True)
         if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
@@ -495,11 +494,6 @@ class ProviderManager:
                                 )
                                 if ctx_len and isinstance(ctx_len, (int, float)):
                                     model_limits[m_id] = int(ctx_len)
-
-                                arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
-                                input_mods = arch.get("input_modalities") or m.get("input_modalities") or m.get("modalities") or []
-                                if "image" in input_mods or "vision" in input_mods:
-                                    vision_models.append(m_id)
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
 
@@ -512,7 +506,7 @@ class ProviderManager:
             from tools.base import atomic_write_json
             atomic_write_json(
                 cache_path,
-                {"updated_at": time.time(), "models": models, "model_limits": model_limits, "vision_models": vision_models},
+                {"updated_at": time.time(), "models": models, "model_limits": model_limits},
                 indent=2
             )
         except Exception as e:
@@ -541,10 +535,12 @@ class ProviderManager:
             if include_disabled or not p_data.get("disabled", False)
         ]
         if connected_only:
-            active_providers = [
+            connected = [
                 (p_key, p_data) for p_key, p_data in active_providers
                 if self.is_provider_connected(p_key, p_data)
             ]
+            if connected:
+                active_providers = connected
 
         results = await asyncio.gather(*[
             self.fetch_models_for_provider(p_key, force_refresh=force_refresh)

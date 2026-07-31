@@ -22,9 +22,7 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("manage_task", {"action": "status", "task_id": "shell_123"})
         self.assertEqual(res, "status shell_123")
 
-    def test_analyze_image_basename(self):
-        res = extract_tool_display("analyze_image", {"path": "/tmp/img.png"})
-        self.assertEqual(res, "img.png")
+
 
     def test_get_mcp_schema_tool_target(self):
         res = extract_tool_display("get_mcp_schema", {"server": "colab", "tool": "search"})

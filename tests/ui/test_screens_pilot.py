@@ -70,17 +70,13 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
                 await pilot.press("escape")
                 await pilot.pause()
 
-    async def test_model_screen_pilot_tab_switching(self):
+    async def test_model_screen_pilot(self):
         models_data = {"prov1": {"name": "Provider 1", "models": ["model-a", "model-b"]}}
         screen = ModelScreen(models_data=models_data, current_model="model-a", current_provider="prov1")
         app = DummyHostApp(screen)
 
         async with app.run_test() as pilot:
             await pilot.pause()
-            # Switch to vision tab
-            await pilot.press("tab")
-            await pilot.pause()
-
             # Close
             await pilot.press("escape")
             await pilot.pause()

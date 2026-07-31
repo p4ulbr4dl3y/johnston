@@ -318,16 +318,7 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, r"Found error: \[tag=e1]")
 
-    def test_analyze_image_expandable(self):
-        widget = ToolCallWidget(
-            tool_type="analyze_image",
-            target="image.png",
-            result_text="[Vision Analysis]: cat",
-            args={"path": "image.png"}
-        )
-        self.assertTrue(widget.is_expandable())
-        widget.toggle_expanded()
-        self.assertTrue(widget.is_expanded)
+
 
 
     def test_chat_view_toggle_expand(self):

@@ -2,7 +2,7 @@ from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
-from widgets.screens.model import ModelScreen, VisionWarningScreen
+from widgets.screens.model import ModelScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.rewind import RewindScreen
@@ -22,7 +22,6 @@ __all__ = [
     "HelpScreen",
     "MCPScreen",
     "ModelScreen",
-    "VisionWarningScreen",
     "ResumeScreen",
     "RewindScreen",
     "SkillDetailScreen",

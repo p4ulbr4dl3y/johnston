@@ -54,44 +54,7 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
                         mock_comp.assert_called_once()
 
 
-class TestImagePayloadPreservation(unittest.IsolatedAsyncioTestCase):
-    """base64 image payloads must be optimized only on the API copy, not destroyed in
-    self.history — otherwise /rewind and session resume lose image data permanently."""
 
-    async def test_optimize_does_not_mutate_self_history(self):
-        import copy
-
-        agent = BaseAgent(api_key="m", model="m", base_url="http://t", system_prompt="s", tools=[])
-        self.addAsyncCleanup(agent.close)
-
-        original_content = json.dumps([
-            {"type": "text", "text": "screenshot of bug"},
-            {"type": "image_url", "image_url": {"url": "data:image/png;base64,ABCDEF"}},
-        ])
-        agent.history = [{"role": "tool", "tool_call_id": "tc1", "content": original_content}]
-
-        # Replicate the snapshot stream_steps takes at the start of a turn.
-        agent._image_payload_map = {}
-        for msg in agent.history:
-            if msg.get("role") == "tool" and isinstance(msg.get("content"), str) and '"image_url"' in msg["content"]:
-                tid = msg.get("tool_call_id")
-                if tid and tid not in agent._image_payload_map:
-                    agent._image_payload_map[tid] = msg["content"]
-
-        copy_history = copy.deepcopy(agent.history)
-        agent._optimize_history_images(copy_history)
-
-        # The API copy is optimized ...
-        self.assertIn("History token optimized", copy_history[0]["content"])
-        # ... but self.history still holds the original base64 payload.
-        self.assertNotIn("History token optimized", agent.history[0]["content"])
-        self.assertEqual(agent.history[0]["content"], original_content)
-
-        # After the API call self.history is rebuilt from the optimized messages list;
-        # _restore_image_payloads must put the original payload back.
-        agent.history = copy_history + [{"role": "user", "content": "next turn"}]
-        agent._restore_image_payloads()
-        self.assertEqual(agent.history[0]["content"], original_content)
 
 
 class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):

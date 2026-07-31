@@ -1,7 +1,6 @@
 import asyncio
 from typing import Any, Dict, Type
 
-from tools.analyze_image import AnalyzeImageTool
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool
 from tools.call_mcp import CallMCPTool
@@ -27,7 +26,6 @@ TOOL_CLASSES = [
     SubagentTool,
     ManageSubagentTool,
     UpdatePlanTool,
-    AnalyzeImageTool,
     WebFetchTool,
 ]
 
@@ -53,12 +51,6 @@ ALIAS_MAP: Dict[str, str] = {
     "ask": "ask_user",
     "plan": "update_plan",
     "set_plan": "update_plan",
-    "view_image": "analyze_image",
-    "inspect_image": "analyze_image",
-    "ask_image": "analyze_image",
-    "read_image": "analyze_image",
-    "image_view": "analyze_image",
-    "show_image": "analyze_image",
     "call_mcp": "call_mcp_tool",
 }
 
