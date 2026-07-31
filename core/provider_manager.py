@@ -34,14 +34,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "model": "gemini-2.0-flash-lite",
         "api_type": "gemini",
     },
-    "ollama": {
-        "key": "ollama",
-        "name": "Ollama",
-        "description": "Local Ollama server",
-        "base_url": "http://localhost:11434/v1",
-        "model": "llama3.2",
-        "api_type": "ollama",
-    },
     "openrouter": {
         "key": "openrouter",
         "name": "OpenRouter",
