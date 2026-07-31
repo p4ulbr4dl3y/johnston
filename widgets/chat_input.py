@@ -8,9 +8,10 @@ class ChatInput(TextArea):
 
     class Submitted(Message):
         """Text submission event"""
-        def __init__(self, value: str) -> None:
+        def __init__(self, value: str, attachments: list = None) -> None:
             super().__init__()
             self.value = value
+            self.attachments = list(attachments or [])
 
     PASTE_LINE_THRESHOLD = 10
 
@@ -20,6 +21,7 @@ class ChatInput(TextArea):
         self.prompt_history_index: int = 0
         self.prompt_draft: str = ""
         self.pasted_texts: dict[str, str] = {}
+        self.clipboard_attachments: list = []
 
     def on_mount(self) -> None:
         self.focus()
@@ -133,8 +135,28 @@ class ChatInput(TextArea):
 
         return "\n".join(new_lines) if modified else pasted_text
 
+    def update_attachment_bar(self) -> None:
+        try:
+            if self.is_mounted and self.app:
+                from widgets.attachment_bar import AttachmentBar
+                bar = self.app.query_one("#attachment-bar", AttachmentBar)
+                bar.update_attachments(self.clipboard_attachments)
+        except Exception:
+            pass
+
+    def clear_clipboard_attachments(self) -> None:
+        import os
+        for att in list(self.clipboard_attachments):
+            if os.path.exists(att.path) and "temp_images" in att.path:
+                try:
+                    os.remove(att.path)
+                except OSError:
+                    pass
+        self.clipboard_attachments.clear()
+        self.update_attachment_bar()
+
     def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG/TIFF/JPEG image or Finder image file and inserts as @filepath"""
+        """Checks clipboard for PNG/TIFF/JPEG image or Finder image file and inserts as attachment"""
         import os
         import subprocess
         import time
@@ -202,8 +224,12 @@ if (!imgData.isNil()) {{
                 except OSError:
                     pass
 
-                self.insert(f"@{final_path} ")
-                self._on_input_change()
+                w, h = img.size
+                sz = os.path.getsize(final_path) / 1024.0
+                from widgets.attachment_bar import ClipboardAttachment
+                att = ClipboardAttachment(final_path, w, h, sz)
+                self.clipboard_attachments.append(att)
+                self.update_attachment_bar()
                 return True
         except Exception:
             pass
@@ -480,10 +506,13 @@ if (!imgData.isNil()) {{
                 pass
 
             text = self.get_full_text()
+            atts = list(self.clipboard_attachments)
+            self.clipboard_attachments.clear()
+            self.update_attachment_bar()
             self.pasted_texts.clear()
             self.add_to_history(text)
             self.load_text("")
-            self.post_message(self.Submitted(text))
+            self.post_message(self.Submitted(text, attachments=atts))
         elif event.key in ("ctrl+enter", "ctrl+j", "shift+enter"):
             event.prevent_default()
             event.stop()

@@ -132,9 +132,11 @@ class JohnstonApp(App):
             pass
 
     def compose(self) -> ComposeResult:
+        from widgets.attachment_bar import AttachmentBar
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
             yield CommandSuggestions(id="command-suggestions")
+            yield AttachmentBar(id="attachment-bar")
             yield ChatInput(id="message-input", show_line_numbers=False)
             yield StatusFooter(id="status-footer")
 
@@ -447,20 +449,26 @@ class JohnstonApp(App):
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
         user_text = event.value.strip()
-        if not user_text:
+        attachments = getattr(event, "attachments", [])
+        if not user_text and not attachments:
             return
 
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        if "/" in user_text:
+        if user_text and "/" in user_text:
             asyncio.create_task(self._exec_slash_command(user_text))
             return
 
+        if not user_text and attachments:
+            user_text = "What is in this image?"
+
+        kwargs = {"attachments": attachments} if attachments else {}
         if self.is_generating:
-            self.message_queue.append((user_text, True))
+            item = (user_text, True, attachments) if attachments else (user_text, True)
+            self.message_queue.append(item)
         else:
-            self.trigger_ai_response(user_text, show_in_ui=True)
+            self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
@@ -475,17 +483,18 @@ class JohnstonApp(App):
             from core.commands import ModelsCommand
             await ModelsCommand().execute(self)
 
-
-    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False) -> None:
+    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
+        item = (prompt, show_in_ui, attachments) if attachments else (prompt, show_in_ui)
         if getattr(self, "is_generating", False):
-            self.message_queue.append((prompt, show_in_ui))
+            self.message_queue.append(item)
         else:
             self.is_generating = True
-            self.generate_ai_response(prompt, show_in_ui=show_in_ui)
+            kwargs = {"attachments": attachments} if attachments else {}
+            self.generate_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
     @work(exclusive=True, thread=False)
-    async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
+    async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
         if not getattr(self.agent, "model", ""):
             act_k = self.pm.get_active_provider_key()
@@ -517,6 +526,9 @@ class JohnstonApp(App):
                     print(f"Git checkpoint creation failed: {e}")
 
         full_prompt = user_text
+        if attachments:
+            for att in attachments:
+                full_prompt += f"\n\n[Image file: '{att.path}']"
 
         thinking_widget = None
         current_tool_widget = None
