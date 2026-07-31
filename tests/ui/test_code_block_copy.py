@@ -24,6 +24,10 @@ class TestCodeBlockCopy(unittest.TestCase):
         mock_app.copy_to_clipboard.assert_called_once_with("x = 42")
         event.stop.assert_called_once()
 
+    def test_custom_markdown_fence_allow_horizontal_scroll(self):
+        fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        self.assertFalse(fence.allow_horizontal_scroll)
+
 
 if __name__ == "__main__":
     unittest.main()

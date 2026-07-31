@@ -249,6 +249,9 @@ MarkdownFence {
     padding: 0;
     border: none;
     height: auto;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden hidden;
     scrollbar-size: 0 0;
 }
 
@@ -256,6 +259,8 @@ MarkdownFence {
 CustomMarkdownFence .fence-header,
 MarkdownFence .fence-header {
     height: 1;
+    width: 100%;
+    max-width: 100%;
     background: #27272a;
     padding: 0 0 0 1;
 }
@@ -264,12 +269,14 @@ CustomMarkdownFence .fence-lang,
 MarkdownFence .fence-lang {
     color: #a1a1aa;
     text-style: bold;
+    height: 1;
     width: 1fr;
 }
 
 CustomMarkdownFence .fence-copy-btn,
 MarkdownFence .fence-copy-btn {
     height: 1;
+    min-height: 1;
     min-width: 6;
     border: none;
     background: #3f3f46;
@@ -286,6 +293,8 @@ MarkdownFence .fence-copy-btn:hover {
 
 CustomMarkdownFence #code-content,
 MarkdownFence #code-content {
+    width: 100%;
+    max-width: 100%;
     padding: 0 1;
     background: #18181b;
 }
