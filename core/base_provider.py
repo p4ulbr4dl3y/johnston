@@ -443,7 +443,8 @@ class BaseAgent:
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
-        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
+        m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
+        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
         self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
@@ -519,7 +520,7 @@ class BaseAgent:
                 current_mode = getattr(self, "mode", "action")
                 if current_mode != active_prompt_mode:
                     active_prompt_mode = current_mode
-                    builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task)
+                    builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name)
                     sys_prompt = builder.build_system_prompt()
                     all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
                     self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
@@ -862,7 +863,8 @@ class BaseAgent:
 
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
-        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
+        m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
+        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
         sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)

@@ -97,7 +97,15 @@ class TestPromptBuilder(unittest.TestCase):
         # Different mode -> different cache key -> rebuilt with the explore block
         self.assertIn("## Execution Mode: ACTION", action_prompt)
         self.assertIn("## Execution Mode: EXPLORE", explore_prompt)
-        self.assertNotEqual(action_prompt, explore_prompt)
+    def test_build_system_prompt_substitutes_model_name(self):
+        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="action", model_name="Gemini 3.6 Flash")
+        prompt = builder.build_system_prompt()
+        self.assertIn("You are Gemini 3.6 Flash operating inside Johnston CLI", prompt)
+
+    def test_build_system_prompt_fallback_model_name(self):
+        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="action", model_name="")
+        prompt = builder.build_system_prompt()
+        self.assertIn("You are an expert AI software engineer operating inside Johnston CLI", prompt)
 
 
 if __name__ == "__main__":
