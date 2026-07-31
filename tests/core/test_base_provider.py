@@ -564,6 +564,28 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         bot_texts = [e for e in events if e[0] == "bot_text"]
         self.assertIn("File read complete", bot_texts[-1][1])
 
+    def test_vision_error_sanitization_and_hint(self):
+        agent = BaseAgent(api_key="t", model="non-vision-model", base_url="http://t", provider_key="tprov")
+        self.addAsyncCleanup(agent.close)
+
+        err = Exception("No endpoints found that support image input")
+        self.assertTrue(agent._is_vision_error(err))
+
+        messages = [
+            {"role": "user", "content": "Look at image"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "c1", "function": {"name": "read", "arguments": '{"path":"1.png"}'}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": '{"type": "image", "path": "1.png", "base64": "QUFB"}'},
+            {"role": "user", "content": [{"type": "text", "text": "Preview:"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB"}}]}
+        ]
+
+        sanitized = agent._sanitize_vision_error_messages(messages)
+        # Verify user image_url message was removed
+        self.assertEqual(len(sanitized), 3)
+        # Verify tool content was replaced with hint
+        tool_msg = sanitized[2]
+        self.assertEqual(tool_msg["role"], "tool")
+        self.assertIn("[Hint: Current model/provider does not support image input (vision). Inform the user that your active model cannot view images.]", tool_msg["content"])
+
 
 if __name__ == "__main__":
     unittest.main()
