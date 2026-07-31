@@ -16,7 +16,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Official OpenAI API provider",
         "base_url": "https://api.openai.com/v1",
         "model": "gpt-4o-mini",
-        "models": ["gpt-4o-mini", "gpt-4o", "gpt-4.5-preview", "o1", "o3-mini"],
         "api_type": "openai",
     },
     "anthropic": {
@@ -25,7 +24,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Anthropic Claude API provider",
         "base_url": "https://api.anthropic.com/v1",
         "model": "claude-3-5-haiku-20241022",
-        "models": ["claude-3-5-haiku-20241022", "claude-3-5-sonnet-20241022", "claude-3-7-sonnet-20250219"],
         "api_type": "anthropic",
     },
     "gemini": {
@@ -34,7 +32,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
         "model": "gemini-2.0-flash",
-        "models": ["gemini-2.0-flash", "gemini-2.0-pro-exp-02-05", "gemini-1.5-pro"],
         "api_type": "gemini",
     },
     "ollama": {
@@ -42,8 +39,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Ollama",
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
-        "model": "llama3.2",
-        "models": ["llama3.2", "qwen2.5-coder", "deepseek-r1"],
         "api_type": "ollama",
     },
     "openrouter": {
@@ -52,7 +47,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "description": "Unified OpenRouter API",
         "base_url": "https://openrouter.ai/api/v1",
         "model": "openrouter/free",
-        "models": ["openrouter/free", "deepseek/deepseek-v4-flash", "deepseek/deepseek-chat", "deepseek/deepseek-r1", "anthropic/claude-3.5-sonnet"],
         "api_type": "openai",
     },
     "groq": {
@@ -60,8 +54,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Groq",
         "description": "Ultra-fast Groq LPU inference",
         "base_url": "https://api.groq.com/openai/v1",
-        "model": "llama-3.3-70b-versatile",
-        "models": ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b", "mixtral-8x7b-32768"],
         "api_type": "openai",
     },
     "xai": {
@@ -69,8 +61,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "xAI",
         "description": "xAI Grok API provider",
         "base_url": "https://api.x.ai/v1",
-        "model": "grok-2-latest",
-        "models": ["grok-2-latest", "grok-beta"],
         "api_type": "openai",
     },
     "mistral": {
@@ -78,8 +68,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Mistral",
         "description": "Mistral AI API provider",
         "base_url": "https://api.mistral.ai/v1",
-        "model": "mistral-large-latest",
-        "models": ["mistral-large-latest", "mistral-small-latest", "codestral-latest"],
         "api_type": "openai",
     },
     "togetherai": {
@@ -87,8 +75,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Together AI",
         "description": "Together AI open-weight model cloud",
         "base_url": "https://api.together.xyz/v1",
-        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        "models": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "deepseek-ai/DeepSeek-R1"],
         "api_type": "openai",
     },
     "deepinfra": {
@@ -96,8 +82,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "DeepInfra",
         "description": "High-throughput cost-efficient model server",
         "base_url": "https://api.deepinfra.com/v1/openai",
-        "model": "deepseek-ai/DeepSeek-V3",
-        "models": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-V4-Flash", "deepseek-ai/DeepSeek-R1", "meta-llama/Llama-3.3-70B-Instruct"],
         "api_type": "openai",
     },
     "fireworks": {
@@ -105,8 +89,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Fireworks",
         "description": "Fireworks AI fast open-source inference",
         "base_url": "https://api.fireworks.ai/inference/v1",
-        "model": "accounts/fireworks/models/deepseek-v3",
-        "models": ["accounts/fireworks/models/deepseek-v3", "accounts/fireworks/models/deepseek-r1"],
         "api_type": "openai",
     },
     "cerebras": {
@@ -114,8 +96,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Cerebras",
         "description": "Cerebras Wafer-Scale Engine high-speed inference",
         "base_url": "https://api.cerebras.ai/v1",
-        "model": "llama-3.3-70b",
-        "models": ["llama-3.3-70b"],
         "api_type": "openai",
     },
     "nvidia": {
@@ -123,8 +103,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Nvidia",
         "description": "Nvidia NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct",
-        "models": ["nvidia/llama-3.1-nemotron-70b-instruct", "deepseek-ai/deepseek-r1"],
         "api_type": "openai",
     },
     "github-copilot": {
@@ -132,8 +110,6 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "GitHub Copilot",
         "description": "GitHub Copilot Chat API endpoint",
         "base_url": "https://api.githubcopilot.com",
-        "model": "gpt-4o",
-        "models": ["gpt-4o", "claude-3.5-sonnet", "o3-mini"],
         "api_type": "openai",
     },
 }
