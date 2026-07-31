@@ -194,21 +194,15 @@ def clean_markdown_for_rendering(text: str) -> str:
     text = text.replace("\r\n", "\n").expandtabs(4)
     lines = text.splitlines()
 
-    cb_indices = [i for i, line in enumerate(lines) if line.strip().startswith("```")]
-    code_ranges = [(cb_indices[idx], cb_indices[idx + 1]) for idx in range(0, len(cb_indices) - 1, 2)]
-    unclosed_start = cb_indices[-1] if len(cb_indices) % 2 != 0 else None
-
-    def is_in_code(i: int) -> bool:
-        if unclosed_start is not None and i >= unclosed_start:
-            return True
-        for s, e in code_ranges:
-            if s <= i <= e:
-                return True
-        return False
-
+    in_code = False
     cleaned = []
-    for i, line in enumerate(lines):
-        if is_in_code(i):
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_code = not in_code
+            cleaned.append(line)
+            continue
+
+        if in_code:
             cleaned.append(line)
             continue
 
@@ -233,7 +227,7 @@ def clean_markdown_for_rendering(text: str) -> str:
 
         cleaned.append(line)
 
-    if len(cb_indices) % 2 != 0:
+    if in_code:
         cleaned.append("```")
 
     result = "\n".join(cleaned)

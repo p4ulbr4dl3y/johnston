@@ -27,7 +27,7 @@ class StatusFooter(Static):
         self.is_generating = generating
         if generating:
             if not self._spinner_timer:
-                self._spinner_timer = self.set_interval(0.1, self._spin)
+                self._spinner_timer = self.set_interval(0.2, self._spin)
         else:
             if self._spinner_timer:
                 self._spinner_timer.stop()
