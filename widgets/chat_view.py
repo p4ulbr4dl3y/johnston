@@ -1236,9 +1236,16 @@ class ChatView(VerticalScroll):
         except Exception:
             pass
 
-    async def add_user_message(self, text: str, animate: bool = True) -> UserMessage:
+    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
         self.clear_welcome()
-        msg = UserMessage(text)
+        if attachments:
+            att_count = len(attachments)
+            img_s = "s" if att_count > 1 else ""
+            display_text = f"{text}\n[dim #a1a1aa]└─ {att_count} image{img_s} attached[/dim #a1a1aa]"
+        else:
+            display_text = text
+
+        msg = UserMessage(display_text)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)

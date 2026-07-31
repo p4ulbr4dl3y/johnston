@@ -510,7 +510,7 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
-            await chat_view.add_user_message(user_text)
+            await chat_view.add_user_message(user_text, attachments=attachments)
             await asyncio.to_thread(self.save_current_session)
             curr_sid = getattr(self, "current_session_id", None)
             if curr_sid:
