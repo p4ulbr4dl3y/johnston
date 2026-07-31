@@ -110,6 +110,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 if is_active:
                     default_val = m
 
+        if not options:
+            options.append(Option("No connected providers. Use /connect to configure API keys", disabled=True))
+            items.append(None)
+
         if default_val is None:
             for it in items:
                 if it is not None:
