@@ -1241,7 +1241,7 @@ class ChatView(VerticalScroll):
         if attachments:
             att_count = len(attachments)
             img_s = "s" if att_count > 1 else ""
-            display_text = f"{text}\n[dim #a1a1aa]└─ {att_count} image{img_s} attached[/dim #a1a1aa]"
+            display_text = f"{text}\n[not bold dim #a1a1aa]└─ {att_count} image{img_s} attached[/not bold dim #a1a1aa]"
         else:
             display_text = text
 
