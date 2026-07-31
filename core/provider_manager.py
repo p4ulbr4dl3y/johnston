@@ -164,9 +164,6 @@ class ProviderManager:
             except Exception:
                 pass
 
-        if not os.path.exists(CONFIG_FILE):
-            self.set_active_provider_key("openai")
-
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         providers = dict(DEFAULT_JSON_PROVIDERS)
         if os.path.exists(PROVIDERS_JSON_FILE):
@@ -245,7 +242,7 @@ class ProviderManager:
         return providers
 
     def get_active_provider_key(self) -> str:
-        return self._get_config_data().get("active_provider", "openai")
+        return self._get_config_data().get("active_provider", "")
 
     def set_active_provider_key(self, key: str):
         data = {}

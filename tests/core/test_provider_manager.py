@@ -33,7 +33,6 @@ class TestProviderManager(unittest.TestCase):
     def test_ensure_config_dir(self):
         self.assertTrue(os.path.exists(self.test_dir))
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "config.json")))
 
     def test_load_providers(self):
         providers = self.pm.load_providers()
@@ -41,7 +40,7 @@ class TestProviderManager(unittest.TestCase):
         self.assertEqual(providers["openai"]["name"], "OpenAI")
 
     def test_get_set_active_provider_key(self):
-        self.assertEqual(self.pm.get_active_provider_key(), "openai")
+        self.assertEqual(self.pm.get_active_provider_key(), "")
         self.pm.set_active_provider_key("custom_prov")
         self.assertEqual(self.pm.get_active_provider_key(), "custom_prov")
 
