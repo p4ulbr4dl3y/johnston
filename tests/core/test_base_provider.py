@@ -584,7 +584,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")
-        self.assertIn("[Hint: Current model/provider does not support image input (vision). Inform the user that your active model cannot view images.]", tool_msg["content"])
+        self.assertIn("[Hint: You do not support vision. Tell user you cannot view images. Do not retry.]", tool_msg["content"])
 
 
 if __name__ == "__main__":
