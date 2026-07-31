@@ -342,6 +342,16 @@ OptionList > .option-list--option-blur-highlighted {
     text-style: bold;
 }
 
+/* Clipboard Attachment Bar Styling - Flat Zinc-900 with monochrome chip */
+#attachment-bar {
+    display: none;
+    width: 100%;
+    height: 1;
+    background: #18181b;
+    color: #a1a1aa;
+    padding: 0 1;
+}
+
 /* Dynamic Auto-Expanding ChatInput - Flat Zinc-900 with bottom padding */
 #message-input {
     width: 100%;

@@ -17,8 +17,8 @@ class ClipboardAttachment:
     @property
     def chip_label(self) -> str:
         if self.width and self.height:
-            return f"📎 [Clipboard Image ({self.width}x{self.height}) ✕]"
-        return "📎 [Clipboard Image ✕]"
+            return f"[bold #ffffff]📎 [Clipboard Image ({self.width}x{self.height}) [dim #a1a1aa]✕[/dim #a1a1aa]][/bold #ffffff]"
+        return "[bold #ffffff]📎 [Clipboard Image [dim #a1a1aa]✕[/dim #a1a1aa]][/bold #ffffff]"
 
 
 class AttachmentBar(Static):
@@ -28,8 +28,8 @@ class AttachmentBar(Static):
     AttachmentBar {
         display: none;
         height: 1;
-        background: $boost;
-        color: $accent;
+        background: #18181b;
+        color: #a1a1aa;
         padding: 0 1;
         content-align: left middle;
     }
