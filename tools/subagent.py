@@ -91,7 +91,6 @@ class SubagentTool(BaseTool):
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
-                ctx.notify(f"Subagent worktree active: {wt_path}")
 
         session = tracker.create_session(
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
@@ -186,6 +185,7 @@ class SubagentTool(BaseTool):
                     for t in ctx.background_tasks:
                         if getattr(t, "task_id", "") == task_id:
                             t.is_running = False
+                    ctx.notify(f"Background subagent completed (ID: {task_id})")
                     ctx.refresh_status()
 
                     result_text = _truncate_subagent_result(acc[0]) or "Completed with no text output."

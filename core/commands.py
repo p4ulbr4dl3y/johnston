@@ -156,8 +156,6 @@ class ModelsCommand(BaseCommand):
 
                 if is_vision_tab:
                     catalog.set_vision_model(selected_prov, selected_model)
-                    clean_fb = catalog.get_model_display_name(selected_prov, selected_model)
-                    app.notify(f"Vision model set: {clean_fb}")
                     app.query_one("#message-input", ChatInput).focus()
                     return
 
@@ -177,8 +175,6 @@ class ModelsCommand(BaseCommand):
                     app.agent.model = selected_model
                 app.pm.set_provider_model(selected_prov, selected_model)
                 app.refresh_status_footer()
-                clean_selected = catalog.get_model_display_name(selected_prov, selected_model)
-                app.notify(f"Model switched: {clean_selected}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
@@ -215,7 +211,6 @@ class ThinkingEffortCommand(BaseCommand):
             app.agent.app = app
             app.mode = current_mode
             app.refresh_status_footer()
-            app.notify(f"Thinking effort: {effort}")
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)
@@ -288,11 +283,10 @@ class RewindCommand(BaseCommand):
 
 
                 # Restore Git checkpoint state if available
-                checkpoint_restored = False
                 if curr_sid:
                     try:
                         from core.git_checkpoint import GitCheckpointManager
-                        checkpoint_restored = GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx, project_path=proj_path)
+                        GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx, project_path=proj_path)
                         GitCheckpointManager.purge_checkpoints_after(curr_sid, seq_idx, project_path=proj_path)
                     except Exception as e:
                         print(f"Git checkpoint restore failed: {e}")
@@ -305,11 +299,6 @@ class RewindCommand(BaseCommand):
                 chat_input.load_text(msg_text)
                 lines = chat_input.text.split("\n")
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
-
-                if checkpoint_restored:
-                    app.notify("Chat and git state rolled back! Message loaded into input field.")
-                else:
-                    app.notify("Chat rolled back! Message loaded into input field.")
             app.query_one("#message-input").focus()
 
         app.push_screen(RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected)
@@ -475,7 +464,6 @@ class CompactCommand(BaseCommand):
         if hasattr(app.agent, "compact_history"):
             success, msg = await app.agent.compact_history()
             if success:
-                app.notify(msg)
                 if hasattr(app, "refresh_status_footer"):
                     app.refresh_status_footer()
                 if hasattr(app, "query_one"):
@@ -487,8 +475,6 @@ class CompactCommand(BaseCommand):
                         pass
                 if hasattr(app, "save_current_session"):
                     app.save_current_session()
-            else:
-                app.notify(msg, severity="warning")
         else:
             app.notify("Active agent does not support context compaction", severity="warning")
 
