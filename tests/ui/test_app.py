@@ -66,13 +66,14 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
 
             # 6. Test /models and model search
-            app.pm.set_provider_api_key("openai", "test-key")
+            from unittest.mock import AsyncMock
+            app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o", "flash"]}})
             await handle_slash_command(app, "/models")
             await pilot.pause(0.5)
             self.assertIsInstance(app.screen, ModelScreen)
             await pilot.press("f", "l", "a", "s", "h")
             await pilot.pause(0.2)
-            self.assertIsNotNone(app.screen.filtered_items)
+            self.assertGreater(len(app.screen.filtered_items), 0)
             await pilot.press("escape")
             await pilot.pause(0.2)
 
@@ -166,8 +167,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(user_msgs[0][1], "Resumed user msg")
 
     async def test_modal_ctrl_c_quit(self):
+        from unittest.mock import AsyncMock
         app = JohnstonApp()
-        app.pm.set_provider_api_key("openai", "test-key")
+        app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o"]}})
         async with app.run_test() as pilot:
             from core.commands import handle_slash_command
             await handle_slash_command(app, "/models")

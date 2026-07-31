@@ -127,6 +127,9 @@ class ModelsCommand(BaseCommand):
     async def execute(self, app) -> None:
         asyncio.create_task(catalog.refresh())
         grouped_models = await app.pm.fetch_models_grouped()
+        if not grouped_models:
+            app.notify("No connected providers. Use /connect to configure API keys", severity="info")
+            return
 
         curr_provider = app.pm.get_active_provider_key()
         curr_model = getattr(app.agent, "model", "") if getattr(app, "agent", None) else ""
