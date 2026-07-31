@@ -63,6 +63,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.sm = SkillManager()
         self.skills: list[Dict[str, Any]] = []
         self.options: list[str] = []
+        self.load_skills()
 
     def load_skills(self) -> None:
         self.skills = self.sm.list_skills(include_hidden=True)
@@ -79,10 +80,11 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
             yield Label("enter: activate • h/tab/m: toggle status • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
-        self.refresh_list()
+        self.refresh_list(force_load=False)
 
-    def refresh_list(self) -> None:
-        self.load_skills()
+    def refresh_list(self, force_load: bool = True) -> None:
+        if force_load:
+            self.load_skills()
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()
