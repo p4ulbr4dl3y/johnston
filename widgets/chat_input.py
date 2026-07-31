@@ -3,6 +3,18 @@ from textual.message import Message
 from textual.widgets import TextArea
 
 
+class ClipboardAttachment:
+    """Represents a clipboard image attachment"""
+
+    def __init__(self, path: str, width: int = 0, height: int = 0, size_kb: float = 0.0):
+        import time
+        self.path = path
+        self.width = width
+        self.height = height
+        self.size_kb = size_kb
+        self.id = f"att_{int(time.time() * 1000)}"
+
+
 class ChatInput(TextArea):
     """Input field with reactive suggestions on character typing"""
 
@@ -225,7 +237,6 @@ if (!imgData.isNil()) {{
 
                 w, h = img.size
                 sz = os.path.getsize(final_path) / 1024.0
-                from widgets.attachment_bar import ClipboardAttachment
                 att = ClipboardAttachment(final_path, w, h, sz)
                 self.clipboard_attachments.append(att)
                 self.update_attachment_bar()
