@@ -83,6 +83,19 @@ class CustomMarkdownTable(MarkdownTable):
 class CustomMarkdownFence(MarkdownFence):
     """Markdown code block with a header line and Copy button."""
 
+    DEFAULT_CSS = """
+    CustomMarkdownFence {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        overflow: hidden hidden;
+    }
+    """
+
+    @property
+    def allow_horizontal_scroll(self) -> bool:
+        return False
+
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "code"
         copy_btn = Button("copy", classes="fence-copy-btn")
