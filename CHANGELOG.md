@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.9.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.2...johnston-v0.9.0) (2026-07-31)
+
+
+### Features
+
+* **commands:** add /detach command and update HelpScreen documentation ([ba0f904](https://github.com/p4ulbr4dl3y/johnston/commit/ba0f904b1a629212fd07660dbe233e1e3f24bb48))
+* **core:** add Image Handling rule to DEFAULT_SYSTEM_PROMPT ([44dc58e](https://github.com/p4ulbr4dl3y/johnston/commit/44dc58eddca954d4208d4c05e29bc2c783349200))
+* **tools:** add image viewing support to read tool with multi-provider vision adapters ([face64e](https://github.com/p4ulbr4dl3y/johnston/commit/face64ee5e893a066f12154b3a3b46893a2d723e))
+* **ui:** add dedicated AttachmentBar and ClipboardAttachment system for clipboard images ([1eb9d15](https://github.com/p4ulbr4dl3y/johnston/commit/1eb9d15794b0e8ea3eb82d6a55de6a41da44d01d))
+* **ui:** display box branch attachment indicator under UserMessage in ChatView ([54e6fd1](https://github.com/p4ulbr4dl3y/johnston/commit/54e6fd1e06dabec0ad5447275120af1322259278))
+
+
+### Bug Fixes
+
+* **commands:** include exact skill file location in prompt ([a1a8a6f](https://github.com/p4ulbr4dl3y/johnston/commit/a1a8a6f5a5dd0e53fa78684e13b0f2ab9f1401f3))
+* **commands:** prevent ModelScreen from opening when no connected models exist ([aad14e4](https://github.com/p4ulbr4dl3y/johnston/commit/aad14e4a3fdaa78006fe9b6b4af1f4ab84bf373a))
+* **commands:** show info notification when no connected providers exist on /models ([b670162](https://github.com/p4ulbr4dl3y/johnston/commit/b670162c384190f6eee7c4e1899b36b0f0ae4e47))
+* **core:** fallback image tool result to text hint on non-vision provider error ([7f3a7bb](https://github.com/p4ulbr4dl3y/johnston/commit/7f3a7bb59fbca2fa113c48e3eaec5322fb5ef566))
+* **core:** format openai image messages in direct base_provider client calls ([231b737](https://github.com/p4ulbr4dl3y/johnston/commit/231b73704c6a6e6f9d55b545a17942cbea5ddf95))
+* **core:** inject hint when reading images with non-vision models ([e0d06a6](https://github.com/p4ulbr4dl3y/johnston/commit/e0d06a60365c4b62fd0ed3be5e4d6b4fd22ec029))
+* **core:** pre-inject attachment images directly into turn history to prevent extra tool calls ([107fc82](https://github.com/p4ulbr4dl3y/johnston/commit/107fc8224ec730a2deaf790281a4ce7ee37bdc47))
+* **core:** update vision error hint to concise token-efficient text ([1a59fc6](https://github.com/p4ulbr4dl3y/johnston/commit/1a59fc6d3c1219b66f85b819cad570d7409a78bf))
+* **notifications:** restrict toast notifications and notify background subagent completion ([4ab1fea](https://github.com/p4ulbr4dl3y/johnston/commit/4ab1fea3dc99d55b7e30b9a252092d6a1ea4c2ba))
+* **provider:** pass image attachments natively in user content array to fix vision model recognition ([5e58881](https://github.com/p4ulbr4dl3y/johnston/commit/5e5888112e04277e654cd14e26bf54de5aece360))
+* **providers:** filter out unconfigured providers in fetch_models_grouped ([73fdc50](https://github.com/p4ulbr4dl3y/johnston/commit/73fdc507e5180697a5ed863af0a380b858f2723e))
+* **providers:** prevent fallback to first provider on empty provider key and render select provider prompt ([db300d6](https://github.com/p4ulbr4dl3y/johnston/commit/db300d6e0f0d7d7e19bd1510b5998a7f36a1e722))
+* **providers:** remove Ollama from default providers ([8361846](https://github.com/p4ulbr4dl3y/johnston/commit/8361846485e88e59373e96ea6a7ef826d57de196))
+* **ui:** define ClipboardAttachment in chat_input and update compact StatusFooter rendering ([215195d](https://github.com/p4ulbr4dl3y/johnston/commit/215195d59274f7d9df690f269d2c0810d1e6e4a3))
+* **ui:** define TEMP_IMAGES_DIR and refine image paste handling ([9d6115f](https://github.com/p4ulbr4dl3y/johnston/commit/9d6115f672fa28a2c2f2d7ae0b6732b52833aa43))
+* **ui:** disable expansion for read tool on image files ([eb46814](https://github.com/p4ulbr4dl3y/johnston/commit/eb46814260f6277da138eb8d3b2b303b0cbfa3bc))
+* **ui:** fix Textual markup parsing error in AttachmentBar ([998190a](https://github.com/p4ulbr4dl3y/johnston/commit/998190a1629c4458348d7a056f8e3d96dcf2b33c))
+* **ui:** improve clipboard image paste using JXA AppKit reader for PNG and TIFF ([f73a0be](https://github.com/p4ulbr4dl3y/johnston/commit/f73a0beac817f5468f47d8e5d8c4e597496dbaba))
+* **ui:** open ModelScreen with clear status message when no providers/models are connected ([7df2ae9](https://github.com/p4ulbr4dl3y/johnston/commit/7df2ae9358eea5d437fb6c9d4dd68a2675536466))
+* **ui:** prevent duplicate skill loading on SkillsScreen mount ([e867ac8](https://github.com/p4ulbr4dl3y/johnston/commit/e867ac8a82023b68fafe5261fe74a8943c341560))
+* **ui:** prevent header layout distortion on long code blocks ([a81865a](https://github.com/p4ulbr4dl3y/johnston/commit/a81865aca12efb1e61d327c34e9edc2ff6501514))
+* **ui:** remove duplicate user message rendering in generate_ai_response ([0a49485](https://github.com/p4ulbr4dl3y/johnston/commit/0a494852c8ff1977a7ad9d5e9f60c1af1b19b136))
+* **ux:** refine provider/model onboarding, status footer, and model catalog formatting ([67cac3a](https://github.com/p4ulbr4dl3y/johnston/commit/67cac3ab8ef3ffd91c5eee8aa5369d07317545df))
+
+
+### Performance Improvements
+
+* **app:** offload save_current_session during response streaming ([435496d](https://github.com/p4ulbr4dl3y/johnston/commit/435496d823f77ce3ba64dec2ba52da926d3074e9))
+* **commands:** make /models command open instantly by non-blocking catalog refresh ([2818d24](https://github.com/p4ulbr4dl3y/johnston/commit/2818d24806a7ef1e63d658f5ad3ff0f7ab28df16))
+* **providers:** strictly eliminate blocking HTTP requests in fetch_models_for_provider when force_refresh is False ([870bf9d](https://github.com/p4ulbr4dl3y/johnston/commit/870bf9df21678cad51a8a66b8a21a4dc3412d72b))
+* **skills:** optimize system prompt snippet for token efficiency ([04ccaa2](https://github.com/p4ulbr4dl3y/johnston/commit/04ccaa2916a552cd869096b77e90c22ac7ecf24a))
+* **tools:** cache shutil.which in linter and use zero-allocation finditer in token_util ([8f5cea7](https://github.com/p4ulbr4dl3y/johnston/commit/8f5cea7b0ebae961a5410be32a232747bdc7f125))
+* **ui:** make MCPScreen open instantly by offloading MCP server process queries ([916d79a](https://github.com/p4ulbr4dl3y/johnston/commit/916d79a7d52412612a0df577efef1b61414f1c9b))
+* **ui:** offload blocking I/O and optimize token estimation and suggestions ([b1c8e7b](https://github.com/p4ulbr4dl3y/johnston/commit/b1c8e7bd95292e3e1784b94ad28e797ec62a917a))
+* **ui:** optimize markdown preprocessing loop, status footer timer, and skills screen loading ([5b55cd5](https://github.com/p4ulbr4dl3y/johnston/commit/5b55cd5c22f1707e59292f6831e56b25a65b41f1))
+* **ui:** optimize ModelScreen rendering and catalog resolution to O(1) slug lookup ([b28f80a](https://github.com/p4ulbr4dl3y/johnston/commit/b28f80ab50debd85c4ecfe3ce28d7aa2bd967338))
+* **ui:** pre-warm secondary tab cache in ModelScreen for 0ms tab switching ([6d17792](https://github.com/p4ulbr4dl3y/johnston/commit/6d177929d5f8a537acc77346b55257213013fca1))
+
 ## [0.8.2](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.1...johnston-v0.8.2) (2026-07-31)
 
 
