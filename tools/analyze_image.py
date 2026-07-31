@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any, Dict
 
@@ -68,7 +69,7 @@ async def analyze_image_with_fallback(image_path: str, prompt: str, app: Any = N
         return f"Error: Active model '{active_model or 'unknown'}' does not support vision, and no Vision model is configured in settings. Please select a Vision model using /model."
 
     try:
-        b64_url, mime_type = process_and_encode_image(image_path, max_dim=1568)
+        b64_url, mime_type = await asyncio.to_thread(process_and_encode_image, image_path, 1568)
 
         pinfo = providers[target_provider_key]
         base_url = pinfo.get("base_url", "").rstrip("/")

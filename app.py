@@ -313,7 +313,11 @@ class JohnstonApp(App):
             "cost_usd": getattr(self.agent, "cost_usd", 0.0),
             "last_context_tokens": getattr(self.agent, "last_context_tokens", 0)
         }
-        self.sm.save_session(self.current_session_id, session_data)
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(asyncio.to_thread(self.sm.save_session, self.current_session_id, session_data))
+        except RuntimeError:
+            self.sm.save_session(self.current_session_id, session_data)
         self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:

@@ -2,6 +2,7 @@
 Token estimation and usage calculation utilities
 """
 import json
+import re
 from typing import Any, Dict
 
 CHARS_PER_TOKEN = 4
@@ -16,26 +17,22 @@ _TOKEN_COST_CYRILLIC = 0.5    # ~2 chars/token
 _TOKEN_COST_CJK = 0.7         # ~1.4 chars/token
 _TOKEN_COST_OTHER = 0.5       # other non-ASCII (latin-extended, emoji, etc.)
 
+_RE_ASCII = re.compile(r"[\x00-\x7F]")
+_RE_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
+_RE_CJK = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
+
 
 def _estimate_text_tokens(text: str) -> int:
     if not text:
         return 0
     # Fast path: pure ASCII (code, JSON, English) keeps the classic 4 chars/token
-    # ratio and is identical to the previous implementation.
     if text.isascii():
         return max(0, round(len(text) / CHARS_PER_TOKEN))
 
-    ascii_n = cyrillic_n = cjk_n = other_n = 0
-    for ch in text:
-        o = ord(ch)
-        if o < 0x80:
-            ascii_n += 1
-        elif 0x0400 <= o <= 0x04FF:
-            cyrillic_n += 1
-        elif (0x4E00 <= o <= 0x9FFF) or (0x3040 <= o <= 0x30FF) or (0xAC00 <= o <= 0xD7AF):
-            cjk_n += 1
-        else:
-            other_n += 1
+    ascii_n = len(_RE_ASCII.findall(text))
+    cyrillic_n = len(_RE_CYRILLIC.findall(text))
+    cjk_n = len(_RE_CJK.findall(text))
+    other_n = len(text) - ascii_n - cyrillic_n - cjk_n
 
     cost = (
         ascii_n * _TOKEN_COST_ASCII

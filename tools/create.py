@@ -1,8 +1,14 @@
+import asyncio
 import os
 from typing import Any, Dict
 
 from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.linter import run_linter
+
+
+def _write_file(path: str, content: str) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    atomic_write_text(path, content)
 
 
 class CreateTool(BaseTool):
@@ -29,8 +35,7 @@ class CreateTool(BaseTool):
             return f"Error: '{path}' is a directory, cannot overwrite with file."
         content = args.get("content", "").rstrip("\r\n")
         try:
-            os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-            atomic_write_text(path, content)
+            await asyncio.to_thread(_write_file, path, content)
             linter_output = await run_linter(path)
             return f"Success: file '{path}' saved ({len(content)} bytes).{linter_output}"
         except Exception as e:

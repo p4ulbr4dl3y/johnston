@@ -6,9 +6,17 @@ from textual.widgets import OptionList
 from core.commands import COMMAND_REGISTRY
 from core.skill_manager import SkillManager
 
+_command_suggestions_cache: list[tuple[str, str]] = []
+_command_suggestions_cache_time: float = 0.0
+
 
 def get_all_command_suggestions() -> list[tuple[str, str]]:
-    """Gets list of (command_name, description) for registered commands and skills"""
+    """Gets list of (command_name, description) for registered commands and skills with 10s cache"""
+    global _command_suggestions_cache, _command_suggestions_cache_time
+    now = time.time()
+    if _command_suggestions_cache and (now - _command_suggestions_cache_time < 10.0):
+        return _command_suggestions_cache
+
     suggestions = []
     registered = set()
 
@@ -29,6 +37,8 @@ def get_all_command_suggestions() -> list[tuple[str, str]]:
     except Exception:
         pass
 
+    _command_suggestions_cache = suggestions
+    _command_suggestions_cache_time = now
     return suggestions
 
 
