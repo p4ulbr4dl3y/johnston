@@ -132,11 +132,9 @@ class JohnstonApp(App):
             pass
 
     def compose(self) -> ComposeResult:
-        from widgets.attachment_bar import AttachmentBar
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
             yield CommandSuggestions(id="command-suggestions")
-            yield AttachmentBar(id="attachment-bar")
             yield ChatInput(id="message-input", show_line_numbers=False)
             yield StatusFooter(id="status-footer")
 
