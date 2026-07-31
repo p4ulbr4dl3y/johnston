@@ -56,16 +56,19 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             res = await self.tool.execute({"command": "rm -rf /"}, app=mock_app)
             self.assertIn("Error prompting for command permission: Screen push failed", res)
 
+    @unittest.skipIf(os.name == "nt", "PTY/SIGHUP not supported on Windows")
     async def test_sighup_exception_handled(self):
         with patch("tools.shell.supports_pty", return_value=True), patch("signal.signal", side_effect=ValueError("Signal error")):
             res = await self.tool.execute({"command": "echo sighup_test"})
             self.assertIn("sighup_test", res)
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_pty_setup_failure_fallback(self):
         with patch("tools.shell.supports_pty", return_value=True), patch("pty.openpty", side_effect=OSError("PTY failed")):
             res = await self.tool.execute({"command": "echo pty_fallback"})
             self.assertIn("pty_fallback", res)
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_pty_setup_fd_cleanup_on_error(self):
         def openpty_mock():
             return 999, 1000
@@ -89,6 +92,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             mock_close.assert_any_call(999)
             mock_close.assert_any_call(1000)
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_pty_slave_fd_close_exception_in_finally(self):
         mock_p = MagicMock()
 
@@ -137,6 +141,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             res = await self.tool.execute({"command": "echo non_pty_test"})
             self.assertIn("non_pty_test", res)
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_subprocess_creation_exception_cleanup_pty(self):
         mock_transport = MagicMock()
 
@@ -158,6 +163,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
                 await self.tool.execute({"command": "echo fail"})
             mock_transport.close.assert_called_once()
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_subprocess_creation_transport_close_exception(self):
         mock_transport = MagicMock()
         mock_transport.close.side_effect = Exception("Transport close error")
@@ -179,6 +185,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(RuntimeError):
                 await self.tool.execute({"command": "echo fail"})
 
+    @unittest.skipIf(os.name == "nt", "PTY not supported on Windows")
     async def test_subprocess_creation_master_fd_cleanup_exception(self):
         with (
             patch("tools.shell.supports_pty", return_value=True),
@@ -193,6 +200,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_subprocess_creation_exception_cleanup_no_transport(self):
         with (
+            patch("tools.shell.is_windows", return_value=False),
             patch("tools.shell.supports_pty", return_value=False),
             patch("asyncio.create_subprocess_shell", side_effect=RuntimeError("Subprocess launch failed")),
         ):
