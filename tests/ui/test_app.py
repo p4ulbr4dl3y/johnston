@@ -66,6 +66,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
 
             # 6. Test /models and model search
+            app.pm.set_provider_api_key("openai", "test-key")
             await handle_slash_command(app, "/models")
             await pilot.pause(0.5)
             self.assertIsInstance(app.screen, ModelScreen)
@@ -166,6 +167,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
     async def test_modal_ctrl_c_quit(self):
         app = JohnstonApp()
+        app.pm.set_provider_api_key("openai", "test-key")
         async with app.run_test() as pilot:
             from core.commands import handle_slash_command
             await handle_slash_command(app, "/models")
