@@ -244,6 +244,60 @@ class BaseAgent:
 
         return True
 
+    def _is_vision_error(self, err: Exception) -> bool:
+        if err is None:
+            return False
+        err_str = str(err).lower()
+        vision_keywords = [
+            "image input",
+            "does not support image",
+            "image_url",
+            "multimodal",
+            "vision",
+            "unsupported image",
+            "no endpoints found that support image",
+            "image input not supported",
+        ]
+        return any(kw in err_str for kw in vision_keywords)
+
+    def _sanitize_vision_error_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        sanitized: List[Dict[str, Any]] = []
+        for msg in messages:
+            if not isinstance(msg, dict):
+                sanitized.append(msg)
+                continue
+
+            role = msg.get("role")
+            content = msg.get("content")
+
+            if role == "user" and isinstance(content, list):
+                has_image_url = any(isinstance(item, dict) and item.get("type") == "image_url" for item in content)
+                if has_image_url:
+                    continue
+
+            if role == "tool":
+                is_img = False
+                img_path = "image"
+                if isinstance(content, dict) and content.get("type") == "image":
+                    is_img = True
+                    img_path = content.get("path", "image")
+                elif isinstance(content, str) and ('"type": "image"' in content or "[Image file:" in content):
+                    is_img = True
+                    path_match = re.search(r"['\"]path['\"]\s*:\s*['\"]([^'\"]+)['\"]", content)
+                    if path_match:
+                        img_path = path_match.group(1)
+
+                if is_img:
+                    msg_copy = dict(msg)
+                    msg_copy["content"] = (
+                        f"Error reading image '{img_path}': [Hint: Current model/provider does not support image input (vision). Inform the user that your active model cannot view images.]"
+                    )
+                    sanitized.append(msg_copy)
+                    continue
+
+            sanitized.append(msg)
+        return sanitized
+
     @property
     def context_limit(self) -> int:
         return catalog.get_context_limit(self.provider_key, self.model)
@@ -599,6 +653,13 @@ class BaseAgent:
                         circuit_breaker.record_success(pkey)
                         break
                     except Exception as api_err:
+                        if self._is_vision_error(api_err):
+                            sanitized = self._sanitize_vision_error_messages(messages)
+                            if len(sanitized) != len(messages) or any(s != m for s, m in zip(sanitized, messages)):
+                                messages = sanitized
+                                yield ("thinking", "Model does not support vision; converted image tool result to hint.", "")
+                                continue
+
                         is_retryable = self._is_retryable_error(api_err)
                         if is_retryable and attempt < max_retries:
                             import random
