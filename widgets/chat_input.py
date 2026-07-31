@@ -167,88 +167,34 @@ class ChatInput(TextArea):
         self.update_attachment_bar()
 
     def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG/TIFF/JPEG image or Finder image file and inserts as attachment"""
+        """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
         import os
-        import subprocess
         import time
 
-        from PIL import Image
-
         from core.config import TEMP_IMAGES_DIR
+        from core.platform_utils import get_clipboard_image_or_file
 
-        out_dir = TEMP_IMAGES_DIR
-        os.makedirs(out_dir, exist_ok=True)
-        tmp_path = os.path.join(out_dir, f"raw_clip_{os.getpid()}.tmp")
+        file_path, img = get_clipboard_image_or_file()
 
-        jxa_script = f"""
-ObjC.import("AppKit");
-var pb = $.NSPasteboard.generalPasteboard;
+        if file_path:
+            self.insert(f"@{file_path} ")
+            self._on_input_change()
+            return True
 
-var files = pb.propertyListForType("NSFilenamesPboardType");
-if (!files.isNil() && files.count > 0) {{
-    var filePath = files.objectAtIndex(0).js;
-    var low = filePath.toLowerCase();
-    if (low.endsWith(".png") || low.endsWith(".jpg") || low.endsWith(".jpeg") ||
-        low.endsWith(".webp") || low.endsWith(".gif") || low.endsWith(".bmp") ||
-        low.endsWith(".tiff") || low.endsWith(".heic") || low.endsWith(".svg")) {{
-        "FILE:" + filePath;
-    }}
-}}
+        if img:
+            out_dir = TEMP_IMAGES_DIR
+            os.makedirs(out_dir, exist_ok=True)
+            final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
+            img.save(final_path, format="PNG")
 
-var imgData = pb.dataForType($.NSPasteboardTypePNG);
-if (imgData.isNil()) {{
-    imgData = pb.dataForType($.NSPasteboardTypeTIFF);
-}}
-if (imgData.isNil()) {{
-    imgData = pb.dataForType($.NSPasteboardTypeJPEG);
-}}
-
-if (!imgData.isNil()) {{
-    imgData.writeToFileAtomically("{tmp_path}", true);
-    "DATA";
-}} else {{
-    "";
-}}
-"""
-        try:
-            res = subprocess.run(
-                ["osascript", "-l", "JavaScript", "-e", jxa_script],
-                capture_output=True,
-                text=True,
-                timeout=3,
-            )
-            out_str = res.stdout.strip()
-            if out_str.startswith("FILE:"):
-                target_file = out_str[5:]
-                self.insert(f"@{target_file} ")
-                self._on_input_change()
-                return True
-
-            if out_str == "DATA" and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-                img = Image.open(tmp_path)
-                final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
-                if img.mode not in ("RGB", "RGBA"):
-                    img = img.convert("RGB")
-                img.save(final_path, format="PNG")
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
-
-                w, h = img.size
-                sz = os.path.getsize(final_path) / 1024.0
-                att = ClipboardAttachment(final_path, w, h, sz)
-                self.clipboard_attachments.append(att)
-                self.update_attachment_bar()
-                return True
-        except Exception:
-            pass
-
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+            w, h = img.size
+            sz = os.path.getsize(final_path) / 1024.0
+            att = ClipboardAttachment(final_path, w, h, sz)
+            self.clipboard_attachments.append(att)
+            self.update_attachment_bar()
+            return True
 
         return False
 
