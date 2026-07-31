@@ -233,7 +233,7 @@ class StatusFooter(Static):
 
             if att_count > 0:
                 img_s = "s" if att_count > 1 else ""
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count} image{img_s} attached (Ctrl+D to detach)[/{THEME_SECONDARY}]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count} image{img_s} attached[/{THEME_SECONDARY}]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
