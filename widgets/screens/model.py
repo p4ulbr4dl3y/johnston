@@ -60,8 +60,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         self.active_tab = initial_tab
 
         self._tabs_cache: Dict[str, Tuple[Any, Any, Any]] = {
-            "all": self._build_data("all"),
-            "vision": self._build_data("vision"),
+            initial_tab: self._build_data(initial_tab),
         }
         options, items, default_val = self._tabs_cache[initial_tab]
 

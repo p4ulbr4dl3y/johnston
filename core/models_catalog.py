@@ -353,12 +353,25 @@ class ModelsCatalog:
             self._match_cache[cache_key] = scoped_id
             return scoped_id
 
-        # Stage 3: Base slug match
+        # Stage 3: Base slug match (O(1) dictionary lookup)
         m_base = model_id.split("/")[-1].split(":")[0].lower()
-        for k in space_keys:
-            if k.split("/")[-1].split(":")[0].lower() == m_base:
-                self._match_cache[cache_key] = k
-                return k
+        if not hasattr(self, "_slug_maps"):
+            self._slug_maps = {}
+
+        slug_key = space_tag
+        if slug_key not in self._slug_maps or self._slug_maps[slug_key][0] != len(space_keys):
+            slug_map = {}
+            for k in space_keys:
+                kb = k.split("/")[-1].split(":")[0].lower()
+                if kb not in slug_map:
+                    slug_map[kb] = k
+            self._slug_maps[slug_key] = (len(space_keys), slug_map)
+
+        slug_map = self._slug_maps[slug_key][1]
+        if m_base in slug_map:
+            match = slug_map[m_base]
+            self._match_cache[cache_key] = match
+            return match
 
         # Stage 4: Fuzzy & Substring Token Match (for local HF/MLX/GGUF models)
         cleaned = re.sub(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)", "", m_base)
