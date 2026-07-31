@@ -440,7 +440,7 @@ class BaseAgent:
         compacted_history = self.sanitize_history_for_model(self.history)
         return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True
 
-    async def stream_steps(self, user_text: str) -> AsyncGenerator[Tuple[str, str, str], None]:
+    async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task)
@@ -469,6 +469,30 @@ class BaseAgent:
 
         sanitized_history = self.sanitize_history_for_model(self.history)
         messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
+        if attachments:
+            for idx, att in enumerate(attachments):
+                att_path = getattr(att, "path", str(att))
+                try:
+                    from tools.read import process_image_file_sync
+                    img_data = process_image_file_sync(att_path)
+                    img_json_str = json.dumps(img_data, ensure_ascii=False)
+                    call_id = f"clip_att_{idx}_{int(time.time())}"
+                    messages.append({
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [{
+                            "id": call_id,
+                            "type": "function",
+                            "function": {"name": "read", "arguments": json.dumps({"path": att_path})}
+                        }]
+                    })
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call_id,
+                        "content": img_json_str
+                    })
+                except Exception as e:
+                    print(f"Error pre-loading attachment image: {e}")
 
         try:
             def _resolve_limit(agent_val: Any, conf_val: Any) -> Any:
