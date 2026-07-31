@@ -36,6 +36,68 @@ class BaseApiAdapter:
         raise NotImplementedError
 
 
+def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Formates OpenAI tool messages containing image JSON by extracting clean string content for tool role and appending image_url user messages after tool response blocks."""
+    formatted: List[Dict[str, Any]] = []
+    i = 0
+    n = len(messages)
+    while i < n:
+        msg = messages[i]
+        if not isinstance(msg, dict):
+            formatted.append(msg)
+            i += 1
+            continue
+
+        role = msg.get("role")
+        if role == "tool":
+            tool_batch: List[Dict[str, Any]] = []
+            pending_user_images: List[Dict[str, Any]] = []
+
+            while i < n and isinstance(messages[i], dict) and messages[i].get("role") == "tool":
+                curr_msg = messages[i]
+                tcontent = curr_msg.get("content", "")
+                parsed_img = None
+                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+                    parsed_img = tcontent
+                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+                    try:
+                        data = json.loads(tcontent)
+                        if isinstance(data, dict) and data.get("type") == "image":
+                            parsed_img = data
+                    except Exception:
+                        pass
+
+                if parsed_img and parsed_img.get("base64"):
+                    summary_text = parsed_img.get("summary", "[Image content]")
+                    media_type = parsed_img.get("media_type", "image/jpeg")
+                    b64_data = parsed_img.get("base64")
+                    detail_val = parsed_img.get("detail", "high")
+
+                    tool_msg = dict(curr_msg)
+                    tool_msg["content"] = summary_text
+                    tool_batch.append(tool_msg)
+
+                    pending_user_images.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"Image preview ({summary_text}):"},
+                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val}}
+                        ]
+                    })
+                else:
+                    tool_batch.append(curr_msg)
+                i += 1
+
+            formatted.extend(tool_batch)
+            formatted.extend(pending_user_images)
+            continue
+
+        formatted.append(msg)
+        i += 1
+
+    return formatted
+
+
 class OpenAIAdapter(BaseApiAdapter):
     """Adapter for OpenAI-compatible Chat Completions API.
 
@@ -57,7 +119,8 @@ class OpenAIAdapter(BaseApiAdapter):
         thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         client = AsyncOpenAI(api_key=api_key or "sk-placeholder", base_url=base_url or "https://api.openai.com/v1")
-        kwargs: Dict[str, Any] = {"model": model, "messages": messages, "stream": True}
+        formatted_msgs = format_messages_for_openai(messages)
+        kwargs: Dict[str, Any] = {"model": model, "messages": formatted_msgs, "stream": True}
         if tools:
             kwargs["tools"] = tools
         if max_tokens and max_tokens > 0:
@@ -135,6 +198,39 @@ class AnthropicAdapter(BaseApiAdapter):
             if role == "tool":
                 tc_id = msg.get("tool_call_id") or ""
                 tcontent = msg.get("content", "")
+
+                parsed_img = None
+                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+                    parsed_img = tcontent
+                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+                    try:
+                        data = json.loads(tcontent)
+                        if isinstance(data, dict) and data.get("type") == "image":
+                            parsed_img = data
+                    except Exception:
+                        pass
+
+                if parsed_img and parsed_img.get("base64"):
+                    summary_text = parsed_img.get("summary", "[Image content]")
+                    media_type = parsed_img.get("media_type", "image/jpeg")
+                    b64_data = parsed_img.get("base64")
+                    pending_tools.append({
+                        "type": "tool_result",
+                        "tool_use_id": tc_id,
+                        "content": [
+                            {"type": "text", "text": summary_text},
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": b64_data,
+                                },
+                            },
+                        ],
+                    })
+                    continue
+
                 if not isinstance(tcontent, str):
                     tcontent = json.dumps(tcontent, ensure_ascii=False)
                 pending_tools.append({
@@ -323,6 +419,13 @@ class GeminiAdapter(BaseApiAdapter):
                     continue
                 if p.get("type") == "text":
                     parts.append({"text": p.get("text", "")})
+                elif p.get("type") == "image_url":
+                    img_url = p.get("image_url", {})
+                    url = img_url.get("url", "") if isinstance(img_url, dict) else str(img_url)
+                    if url.startswith("data:"):
+                        header, b64_data = url.split(",", 1) if "," in url else ("", url)
+                        mime_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
+                        parts.append({"inlineData": {"mimeType": mime_type, "data": b64_data}})
         if role == "model":
             for tc in msg.get("tool_calls") or []:
                 if not isinstance(tc, dict):
@@ -363,6 +466,26 @@ class GeminiAdapter(BaseApiAdapter):
             if role == "tool":
                 name = msg.get("name", "tool")
                 tcontent = msg.get("content", "")
+                parsed_img = None
+                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+                    parsed_img = tcontent
+                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+                    try:
+                        data = json.loads(tcontent)
+                        if isinstance(data, dict) and data.get("type") == "image":
+                            parsed_img = data
+                    except Exception:
+                        pass
+
+                if parsed_img and parsed_img.get("base64"):
+                    summary_text = parsed_img.get("summary", "[Image content]")
+                    media_type = parsed_img.get("media_type", "image/jpeg")
+                    b64_data = parsed_img.get("base64")
+                    pending_tools.append({"functionResponse": {"name": name, "response": {"result": summary_text}}})
+                    pending_tools.append({"text": f"Image preview ({summary_text}):"})
+                    pending_tools.append({"inlineData": {"mimeType": media_type, "data": b64_data}})
+                    continue
+
                 if isinstance(tcontent, str):
                     try:
                         resp_obj = json.loads(tcontent) if tcontent.strip() else {}

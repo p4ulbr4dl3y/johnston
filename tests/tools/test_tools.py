@@ -372,6 +372,52 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         clear_doc_cache()
 
+    async def test_read_tool_image_support(self):
+        import json
+
+        from PIL import Image
+        img_path = os.path.join(self.test_dir, "sample.png")
+        img = Image.new("RGB", (2000, 1000), color=(255, 0, 0))
+        img.save(img_path, format="PNG")
+
+        tool = ReadTool()
+        res = await tool.execute({"path": img_path})
+        data = json.loads(res)
+        self.assertEqual(data["type"], "image")
+        self.assertEqual(data["path"], img_path)
+        self.assertIn("base64", data)
+        self.assertIn("sample.png", data["summary"])
+        # Check resizing to max_dim 1568 (2000x1000 -> 1568x784)
+        self.assertEqual(data["dimensions"], [1568, 784])
+
+    async def test_read_tool_image_detail_modes(self):
+        import json
+
+        from PIL import Image
+        img_path = os.path.join(self.test_dir, "sample_detail.jpg")
+        img = Image.new("RGB", (3000, 3000), color=(0, 255, 0))
+        img.save(img_path, format="JPEG")
+
+        tool = ReadTool()
+        # low detail -> max 512px
+        res_low = await tool.execute({"path": img_path, "detail": "low"})
+        data_low = json.loads(res_low)
+        self.assertEqual(data_low["dimensions"], [512, 512])
+
+        # high detail -> max 2048px
+        res_high = await tool.execute({"path": img_path, "detail": "high"})
+        data_high = json.loads(res_high)
+        self.assertEqual(data_high["dimensions"], [2048, 2048])
+
+    async def test_read_tool_corrupt_image_error(self):
+        corrupt_path = os.path.join(self.test_dir, "corrupt.png")
+        with open(corrupt_path, "wb") as f:
+            f.write(b"not an image file binary junk")
+
+        tool = ReadTool()
+        res = await tool.execute({"path": corrupt_path})
+        self.assertIn("Error reading image file", res)
+
 
 if __name__ == "__main__":
     unittest.main()

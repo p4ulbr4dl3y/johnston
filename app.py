@@ -475,23 +475,6 @@ class JohnstonApp(App):
             from core.commands import ModelsCommand
             await ModelsCommand().execute(self)
 
-    def on_unmount(self) -> None:
-        """Clean up all running MCP servers and background processes when closing application"""
-        self.is_app_active = False
-        for task in getattr(self, "background_tasks", []):
-            try:
-                if hasattr(task, "kill_sync"):
-                    task.kill_sync()
-                elif hasattr(task, "cancel"):
-                    task.cancel()
-            except Exception:
-                pass
-        mcp_manager = getattr(self, "mcp_manager", None)
-        if mcp_manager and hasattr(mcp_manager, "stop_all_servers_sync"):
-            try:
-                mcp_manager.stop_all_servers_sync()
-            except Exception:
-                pass
 
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""

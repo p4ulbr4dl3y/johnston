@@ -152,6 +152,7 @@ class StatusFooter(Static):
         dir_text = f"~/{directory}"
         pm = getattr(self.app, "pm", None)
         provider_display = provider_key
+        is_connected = bool(provider_key)
         if pm:
             providers = pm.load_providers()
             if provider_key in providers:

@@ -88,9 +88,80 @@ def convert_doc_to_markdown_sync(path: str) -> str:
     )
 
 
+def process_image_file_sync(path: str, detail: str | None = None) -> str:
+    """Synchronous worker to load, validate, resize, and convert image files to Base64 JSON."""
+    import base64
+    import io
+    import json
+
+    from PIL import Image
+
+    try:
+        with Image.open(path) as img:
+            img_format = (img.format or "JPEG").upper()
+            w, h = img.size
+
+            if detail == "low":
+                max_dim = 512
+            elif detail in ("high", "original"):
+                max_dim = 2048
+            else:
+                max_dim = 1568  # Ideal token-efficient resolution for vision LLMs
+
+            # Convert color modes
+            if img.mode in ("RGBA", "LA", "P", "PA", "CMYK"):
+                if img.mode in ("RGBA", "LA", "P"):
+                    img = img.convert("RGBA")
+                    bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+                    alpha_composite = Image.alpha_composite(bg, img)
+                    img = alpha_composite.convert("RGB")
+                else:
+                    img = img.convert("RGB")
+                target_format = "JPEG"
+                media_type = "image/jpeg"
+            elif img_format == "PNG" and max(w, h) <= max_dim and os.path.getsize(path) < 1 * 1024 * 1024:
+                img = img.convert("RGB") if img.mode != "RGB" else img
+                target_format = "PNG"
+                media_type = "image/png"
+            else:
+                img = img.convert("RGB") if img.mode != "RGB" else img
+                target_format = "JPEG"
+                media_type = "image/jpeg"
+
+            if max(w, h) > max_dim:
+                ratio = max_dim / float(max(w, h))
+                new_size = (max(1, int(w * ratio)), max(1, int(h * ratio)))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+                w, h = img.size
+
+            buf = io.BytesIO()
+            if target_format == "JPEG":
+                img.save(buf, format="JPEG", quality=85, optimize=True)
+            else:
+                img.save(buf, format="PNG", optimize=True)
+
+            img_bytes = buf.getvalue()
+            b64_str = base64.b64encode(img_bytes).decode("ascii")
+            file_kb = len(img_bytes) / 1024.0
+
+            summary = f"[Image file: '{path}' ({w}x{h} px, format: {target_format}, size: {file_kb:.1f} KB)]"
+
+            return json.dumps({
+                "type": "image",
+                "path": path,
+                "dimensions": [w, h],
+                "media_type": media_type,
+                "base64": b64_str,
+                "detail": detail or "high",
+                "summary": summary,
+            }, ensure_ascii=False)
+    except Exception as e:
+        raise RuntimeError(f"Unable to process image file '{path}': {e}")
+
+
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read file contents with 800-line window pagination. Auto-converts PDF/DOCX to Markdown."
+    description = "Read file contents with 800-line window pagination. Auto-converts PDF/DOCX to Markdown. Supports viewing images (PNG, JPG, WEBP, etc)."
     schema = {
         "type": "function",
         "function": {
@@ -101,7 +172,8 @@ class ReadTool(BaseTool):
                     "path": {"type": "string", "description": "File path"},
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "content_offset": {"type": "integer", "description": "Byte offset"}
+                    "content_offset": {"type": "integer", "description": "Byte offset"},
+                    "detail": {"type": "string", "description": "Image detail level: 'high' (default 1568px), 'low' (512px), or 'original' (2048px)"}
                 },
                 "required": ["path"]
             }
@@ -163,7 +235,12 @@ class ReadTool(BaseTool):
 
         # Handle image files
         if ext in IMAGE_EXTENSIONS:
-            return f"Error: Image files ({ext}) are not supported."
+            try:
+                detail_arg = args.get("detail")
+                image_json = await asyncio.to_thread(process_image_file_sync, path, detail_arg)
+                return image_json
+            except Exception as e:
+                return f"Error reading image file '{path}': {e}"
 
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:

@@ -722,7 +722,18 @@ class BaseAgent:
                         except Exception as e:
                             tool_result = f"Error executing tool '{t_name}': {e}"
 
-                    yield ("tool_result", tool_result, "")
+                    display_result = tool_result
+                    if isinstance(tool_result, str) and (tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]):
+                        try:
+                            parsed_img = json.loads(tool_result)
+                            if isinstance(parsed_img, dict) and parsed_img.get("type") == "image":
+                                display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
+                        except Exception:
+                            pass
+                    elif isinstance(tool_result, dict) and tool_result.get("type") == "image":
+                        display_result = tool_result.get("summary", f"[Image file: {tool_result.get('path')}]")
+
+                    yield ("tool_result", display_result, "")
 
                     content_str = tool_result
                     if isinstance(tool_result, (dict, list)):
