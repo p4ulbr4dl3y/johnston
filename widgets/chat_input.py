@@ -138,9 +138,8 @@ class ChatInput(TextArea):
     def update_attachment_bar(self) -> None:
         try:
             if self.is_mounted and self.app:
-                from widgets.attachment_bar import AttachmentBar
-                bar = self.app.query_one("#attachment-bar", AttachmentBar)
-                bar.update_attachments(self.clipboard_attachments)
+                footer = self.app.query_one("#status-footer")
+                footer.refresh_footer()
         except Exception:
             pass
 
@@ -343,6 +342,12 @@ if (!imgData.isNil()) {{
                 event.prevent_default()
                 event.stop()
                 return
+
+        if event.key in ("ctrl+d", "cmd+d", "ctrl+в", "ctrl+В") and self.clipboard_attachments:
+            self.clear_clipboard_attachments()
+            event.prevent_default()
+            event.stop()
+            return
         # Atomic deletion of pasted block via Backspace/Delete
         if event.key in ("backspace", "delete"):
             if self._handle_tag_deletion(event.key):

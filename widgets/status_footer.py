@@ -212,6 +212,19 @@ class StatusFooter(Static):
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
 
+            att_count = 0
+            try:
+                if self.app:
+                    from widgets.chat_input import ChatInput
+                    chat_input = self.app.query_one("#message-input", ChatInput)
+                    att_count = len(getattr(chat_input, "clipboard_attachments", []))
+            except Exception:
+                pass
+
+            if att_count > 0:
+                img_s = "s" if att_count > 1 else ""
+                row1_left_parts.append(f"[bold #ffffff]📷 {att_count} image{img_s} attached[/bold #ffffff] [{THEME_SECONDARY}](Ctrl+D to detach)[/{THEME_SECONDARY}]")
+
             row1_left = "  •  ".join(row1_left_parts)
 
             row1_right_parts = [
