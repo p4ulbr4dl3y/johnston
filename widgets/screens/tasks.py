@@ -128,7 +128,6 @@ class TasksListScreen(ModalScreen[None]):
                 res = task.kill()
                 if inspect.isawaitable(res):
                     await res
-                self.app.notify(f"Task {task.task_id} terminated.")
                 if not task.is_background:
                     from tools.context import ToolContext
                     out = task.get_formatted_output()
@@ -138,8 +137,6 @@ class TasksListScreen(ModalScreen[None]):
                     )
                     ToolContext(self.app).trigger_ai_response(msg)
                 self.update_tasks_list()
-            else:
-                self.app.notify("Task is already finished.", severity="warning")
 
     def action_close(self) -> None:
         self.dismiss()

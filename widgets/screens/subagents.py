@@ -93,9 +93,6 @@ class SubagentsScreen(ModalScreen[None]):
                     if self.app:
                         self.app.notify(f"Subagent {sess.task_id} terminated.")
                     self.refresh_list()
-                else:
-                    if self.app:
-                        self.app.notify(f"Subagent is already {sess.status}.", severity="warning")
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.sessions):

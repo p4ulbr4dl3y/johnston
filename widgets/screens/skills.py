@@ -105,12 +105,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
             if highlighted is not None and 0 <= highlighted < len(self.skills):
                 target = self.skills[highlighted]
                 s_name = target["name"]
-                new_hidden = self.sm.toggle_hidden(s_name)
-                state_str = "HIDDEN" if new_hidden else "VISIBLE"
-                try:
-                    self.app.notify(f"Skill '{s_name}' set to {state_str}")
-                except Exception:
-                    pass
+                self.sm.toggle_hidden(s_name)
                 self.refresh_list()
                 opt_list.highlighted = highlighted
         except Exception:

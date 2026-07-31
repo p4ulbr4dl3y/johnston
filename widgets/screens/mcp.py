@@ -111,8 +111,7 @@ class MCPScreen(ModalScreen[None]):
         if highlighted is not None and 0 <= highlighted < len(self.servers):
             target = self.servers[highlighted]
             s_name = target["name"]
-            new_mode = self.mm.toggle_mode(s_name)
-            self.app.notify(f"MCP server '{s_name}' mode set to {new_mode.upper()}")
+            self.mm.toggle_mode(s_name)
             if hasattr(self.app, "refresh_status_footer"):
                 self.app.refresh_status_footer()
             self.refresh_list()
@@ -122,23 +121,10 @@ class MCPScreen(ModalScreen[None]):
         if 0 <= event.option_index < len(self.servers):
             target = self.servers[event.option_index]
             s_name = target["name"]
-            is_enabled = self.mm.toggle_server(s_name)
-            state_str = "enabled" if is_enabled else "disabled"
+            self.mm.toggle_server(s_name)
             self.refresh_list()
             opt_list = self.query_one("#mcp-option-list", OptionList)
             opt_list.highlighted = event.option_index
-
-            url = target.get("url")
-            cmd = target.get("command")
-            if is_enabled and url and not cmd:
-                self.app.notify(f"MCP '{s_name}': HTTP/SSE URL transport not supported yet", severity="warning")
-            else:
-                client = self.mm.clients.get(s_name) if hasattr(self.mm, "clients") else None
-                err = getattr(client, "last_error", None) if client else None
-                if is_enabled and err:
-                    self.app.notify(f"MCP '{s_name}' error: {err}", severity="error")
-                else:
-                    self.app.notify(f"MCP server '{s_name}' {state_str}")
 
             if hasattr(self.app, "refresh_status_footer"):
                 self.app.refresh_status_footer()
