@@ -564,7 +564,7 @@ class BaseAgent:
                                     step_usage = payload
                         else:
                             from core.adapters import format_messages_for_openai
-                            formatted_messages = format_messages_for_openai(messages)
+                            formatted_messages = format_messages_for_openai(messages, model_id=self.model)
                             create_kwargs = {
                                 "model": self.model,
                                 "messages": formatted_messages,
