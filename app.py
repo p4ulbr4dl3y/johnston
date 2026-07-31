@@ -487,10 +487,6 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Stream AI response generation with cancellation support via Esc"""
-        chat_view = self.query_one(ChatView)
-        if show_in_ui:
-            await chat_view.add_user_message(user_text)
-
         if not getattr(self.agent, "model", ""):
             act_k = self.pm.get_active_provider_key()
             is_connected = self.pm.is_provider_connected(act_k) if act_k else False
