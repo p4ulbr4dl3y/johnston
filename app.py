@@ -494,9 +494,9 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
-        if not getattr(self.agent, "model", ""):
-            act_k = self.pm.get_active_provider_key()
-            is_connected = self.pm.is_provider_connected(act_k) if act_k else False
+        act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
+        is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
+        if not is_connected or not getattr(self.agent, "model", ""):
             if not is_connected:
                 from core.commands import ProvidersCommand
                 await ProvidersCommand().execute(self)

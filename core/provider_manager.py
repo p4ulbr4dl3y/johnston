@@ -626,11 +626,11 @@ class ProviderManager:
         return models
 
     def is_provider_connected(self, provider_key: str, pdata: Optional[Dict[str, Any]] = None) -> bool:
-        """Returns True if the provider is connected (has API key configured or is local like Ollama/LM Studio)."""
+        """Returns True if the provider is connected and not disabled."""
         if pdata is None:
-            providers = self.load_providers()
+            providers = self.load_providers(include_disabled=True)
             pdata = providers.get(provider_key, {})
-        if not pdata:
+        if not pdata or pdata.get("disabled", False) or provider_key in self.get_disabled_providers():
             return False
         api_type = str(pdata.get("api_type", "openai")).lower()
         if api_type in ("ollama", "lmstudio") or pdata.get("requires_key") is False:
