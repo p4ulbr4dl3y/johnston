@@ -17,8 +17,8 @@ class ClipboardAttachment:
     @property
     def chip_label(self) -> str:
         if self.width and self.height:
-            return f"[bold #ffffff]📎 [Clipboard Image ({self.width}x{self.height}) [dim #a1a1aa]✕[/dim #a1a1aa]][/bold #ffffff]"
-        return "[bold #ffffff]📎 [Clipboard Image [dim #a1a1aa]✕[/dim #a1a1aa]][/bold #ffffff]"
+            return f"📎 [Clipboard Image ({self.width}x{self.height}) ✕]"
+        return "📎 [Clipboard Image ✕]"
 
 
 class AttachmentBar(Static):
