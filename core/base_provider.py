@@ -509,9 +509,11 @@ class BaseAgent:
                                 elif tag == "adapter_usage":
                                     step_usage = payload
                         else:
+                            from core.adapters import format_messages_for_openai
+                            formatted_messages = format_messages_for_openai(messages)
                             create_kwargs = {
                                 "model": self.model,
-                                "messages": messages,
+                                "messages": formatted_messages,
                                 "tools": all_tools if all_tools else None,
                                 "stream": True,
                             }

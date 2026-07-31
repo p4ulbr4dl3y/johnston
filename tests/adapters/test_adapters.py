@@ -156,6 +156,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
 
     def test_openai_parallel_tool_calls_image_sequence(self):
         import json
+
         from core.adapters import format_messages_for_openai
         img_json = json.dumps({
             "type": "image",
