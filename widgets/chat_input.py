@@ -281,7 +281,7 @@ if (!imgData.isNil()) {{
             os.path.exists(expanded)
             and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
         )
-        if not is_existing_image_path and not event.text.strip() and self.try_paste_clipboard_image():
+        if not is_existing_image_path and len(event.text.splitlines()) <= 1 and self.try_paste_clipboard_image():
             event.prevent_default()
             event.stop()
             return
