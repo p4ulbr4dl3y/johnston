@@ -324,10 +324,10 @@ class SkillManager:
         if not skills:
             return ""
         lines = [
-            "## Available Skills",
-            "Available skills in system context (read SKILL.md via `read` to activate instructions):"
+            "## Skills (read SKILL.md on user request or trigger)",
         ]
         for s in skills:
-            desc = f" - {s['description']}" if s['description'] else ""
-            lines.append(f"- {s['name']} ({s['scope']}, location: {s['location']}){desc}")
+            desc = f": {s['description']}" if s['description'] else ""
+            lines.append(f"- `{s['name']}` (`{s['location']}`){desc}")
         return "\n".join(lines)
+
