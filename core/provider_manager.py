@@ -31,7 +31,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Gemini",
         "description": "Google Gemini REST API provider",
         "base_url": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.0-flash-lite",
         "api_type": "gemini",
     },
     "ollama": {
@@ -39,6 +39,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Ollama",
         "description": "Local Ollama server",
         "base_url": "http://localhost:11434/v1",
+        "model": "llama3.2",
         "api_type": "ollama",
     },
     "openrouter": {
@@ -54,6 +55,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Groq",
         "description": "Ultra-fast Groq LPU inference",
         "base_url": "https://api.groq.com/openai/v1",
+        "model": "llama-3.1-8b-instant",
         "api_type": "openai",
     },
     "xai": {
@@ -61,6 +63,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "xAI",
         "description": "xAI Grok API provider",
         "base_url": "https://api.x.ai/v1",
+        "model": "grok-2-mini",
         "api_type": "openai",
     },
     "mistral": {
@@ -68,6 +71,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Mistral",
         "description": "Mistral AI API provider",
         "base_url": "https://api.mistral.ai/v1",
+        "model": "mistral-small-latest",
         "api_type": "openai",
     },
     "togetherai": {
@@ -75,6 +79,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Together AI",
         "description": "Together AI open-weight model cloud",
         "base_url": "https://api.together.xyz/v1",
+        "model": "meta-llama/Llama-3.2-3B-Instruct-Turbo",
         "api_type": "openai",
     },
     "deepinfra": {
@@ -82,6 +87,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "DeepInfra",
         "description": "High-throughput cost-efficient model server",
         "base_url": "https://api.deepinfra.com/v1/openai",
+        "model": "deepseek-ai/DeepSeek-V3",
         "api_type": "openai",
     },
     "fireworks": {
@@ -89,6 +95,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Fireworks",
         "description": "Fireworks AI fast open-source inference",
         "base_url": "https://api.fireworks.ai/inference/v1",
+        "model": "accounts/fireworks/models/deepseek-v3",
         "api_type": "openai",
     },
     "cerebras": {
@@ -96,6 +103,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Cerebras",
         "description": "Cerebras Wafer-Scale Engine high-speed inference",
         "base_url": "https://api.cerebras.ai/v1",
+        "model": "llama3.1-8b",
         "api_type": "openai",
     },
     "nvidia": {
@@ -103,6 +111,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "Nvidia",
         "description": "Nvidia NIM multi-model AI agent",
         "base_url": "https://integrate.api.nvidia.com/v1",
+        "model": "meta/llama-3.1-8b-instruct",
         "api_type": "openai",
     },
     "github-copilot": {
@@ -110,6 +119,7 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "GitHub Copilot",
         "description": "GitHub Copilot Chat API endpoint",
         "base_url": "https://api.githubcopilot.com",
+        "model": "gpt-4o-mini",
         "api_type": "openai",
     },
 }
