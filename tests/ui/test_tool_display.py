@@ -52,6 +52,20 @@ class TestToolDisplay(unittest.TestCase):
         )
         self.assertEqual(res, "/path/to/index.html")
 
+    def test_image_read_not_expandable(self):
+        from widgets.chat_view import ToolCallWidget
+        # Image file target
+        w1 = ToolCallWidget("read", "/path/to/123.png", args={"path": "/path/to/123.png"})
+        self.assertFalse(w1.is_expandable())
+
+        # Text file target
+        w2 = ToolCallWidget("read", "/path/to/main.py", args={"path": "/path/to/main.py"})
+        self.assertTrue(w2.is_expandable())
+
+        # Image result text
+        w3 = ToolCallWidget("read", "file", result_text="[Image file: '123.png' (100x100 px, format: JPEG)]")
+        self.assertFalse(w3.is_expandable())
+
 
 if __name__ == "__main__":
     unittest.main()

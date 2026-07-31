@@ -418,7 +418,17 @@ class ToolCallWidget(Vertical):
         "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan"
     }
 
+    IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
+
     def is_expandable(self) -> bool:
+        if self.tool_type.lower() in ("read", "view_file"):
+            target_path = (self.args.get("path") if isinstance(self.args, dict) else None) or self.target or ""
+            if any(target_path.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):
+                return False
+            if self.result_text:
+                rt = self.result_text.strip()
+                if rt.startswith("[Image file:") or rt.startswith('{"type": "image"') or "format: " in rt.lower() or "px," in rt.lower():
+                    return False
         return self.tool_type in self.EXPANDABLE_TOOLS
 
     def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
@@ -498,6 +508,13 @@ class ToolCallWidget(Vertical):
                 self.result_text = cleaned
         else:
             self.result_text = cleaned
+
+        if not self.is_expandable():
+            self.is_expanded = False
+            self.header_label.remove_class("tool-header-expandable")
+            self.header_label.add_class("tool-header")
+            self.content_widget.display = False
+            self.md_widget.display = False
         self.render_header()
         if self.is_expanded:
             self.render_content()
