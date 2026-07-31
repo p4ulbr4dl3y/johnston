@@ -190,7 +190,7 @@ class StatusFooter(Static):
             except Exception:
                 pass
             if att_count > 0:
-                row1_left_parts.append(f"[bold #ffffff]📷 {att_count}att[/bold #ffffff]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count}att[/{THEME_SECONDARY}]")
             row1_left = " • ".join(row1_left_parts)
             row1_right = f"[{THEME_SECONDARY}]MCP:{mcp_active}[/{THEME_SECONDARY}]" if mcp_total > 0 else ""
 
@@ -233,7 +233,7 @@ class StatusFooter(Static):
 
             if att_count > 0:
                 img_s = "s" if att_count > 1 else ""
-                row1_left_parts.append(f"[bold #ffffff]📷 {att_count} image{img_s} attached[/bold #ffffff] [{THEME_SECONDARY}](Ctrl+D to detach)[/{THEME_SECONDARY}]")
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count} image{img_s} attached (Ctrl+D to detach)[/{THEME_SECONDARY}]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
