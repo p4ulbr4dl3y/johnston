@@ -101,7 +101,10 @@ class ProvidersCommand(BaseCommand):
                         app.mode = current_mode
                         app.refresh_status_footer()
                         app.notify(f"Connected to provider: {p_name}")
-                        open_providers_screen(focus_key=selected_key)
+                        if entered_key:
+                            asyncio.create_task(ModelsCommand().execute(app))
+                        else:
+                            open_providers_screen(focus_key=selected_key)
 
                 app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
 
@@ -128,7 +131,11 @@ class ModelsCommand(BaseCommand):
         asyncio.create_task(catalog.refresh())
         grouped_models = await app.pm.fetch_models_grouped()
         if not grouped_models:
-            app.notify("No connected providers. Use /connect to configure API keys", severity="info")
+            connected = any(app.pm.is_provider_connected(k, v) for k, v in app.pm.load_providers().items())
+            if not connected:
+                await ProvidersCommand().execute(app)
+                return
+            app.notify("Could not fetch models for connected provider. Please check API key or network connection.", severity="warning")
             return
 
         curr_provider = app.pm.get_active_provider_key()

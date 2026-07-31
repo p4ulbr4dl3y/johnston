@@ -146,6 +146,20 @@ class JohnstonApp(App):
             self.load_session_ui(self.resume_session_id)
         self.refresh_status_footer()
         asyncio.create_task(catalog.refresh())
+        asyncio.create_task(self._check_initial_setup())
+
+    async def _check_initial_setup(self) -> None:
+        """Auto-prompt for provider/model selection on first launch if unconfigured"""
+        if getattr(self, "resume_session_id", None) or os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        providers = self.pm.load_providers()
+        connected = any(self.pm.is_provider_connected(k, v) for k, v in providers.items())
+        if not connected:
+            from core.commands import ProvidersCommand
+            await ProvidersCommand().execute(self)
+        elif not getattr(getattr(self, "agent", None), "model", ""):
+            from core.commands import ModelsCommand
+            await ModelsCommand().execute(self)
 
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
@@ -448,6 +462,37 @@ class JohnstonApp(App):
         else:
             self.trigger_ai_response(user_text, show_in_ui=True)
 
+    async def _check_initial_setup(self) -> None:
+        """Auto-prompt for provider/model selection on first launch if unconfigured"""
+        if getattr(self, "resume_session_id", None) or os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        act_k = self.pm.get_active_provider_key()
+        connected = self.pm.is_provider_connected(act_k) if act_k else False
+        if not connected:
+            from core.commands import ProvidersCommand
+            await ProvidersCommand().execute(self)
+        elif not getattr(getattr(self, "agent", None), "model", ""):
+            from core.commands import ModelsCommand
+            await ModelsCommand().execute(self)
+
+    def on_unmount(self) -> None:
+        """Clean up all running MCP servers and background processes when closing application"""
+        self.is_app_active = False
+        for task in getattr(self, "background_tasks", []):
+            try:
+                if hasattr(task, "kill_sync"):
+                    task.kill_sync()
+                elif hasattr(task, "cancel"):
+                    task.cancel()
+            except Exception:
+                pass
+        mcp_manager = getattr(self, "mcp_manager", None)
+        if mcp_manager and hasattr(mcp_manager, "stop_all_servers_sync"):
+            try:
+                mcp_manager.stop_all_servers_sync()
+            except Exception:
+                pass
+
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
         if getattr(self, "is_generating", False):
@@ -459,10 +504,19 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True) -> None:
         """Stream AI response generation with cancellation support via Esc"""
+        chat_view = self.query_one(ChatView)
+        if show_in_ui:
+            await chat_view.add_user_message(user_text)
+
         if not getattr(self.agent, "model", ""):
-            self.notify("No model selected. Please select a model from /models.", severity="warning")
-            from core.commands import ModelsCommand
-            await ModelsCommand().execute(self)
+            act_k = self.pm.get_active_provider_key()
+            is_connected = self.pm.is_provider_connected(act_k) if act_k else False
+            if not is_connected:
+                from core.commands import ProvidersCommand
+                await ProvidersCommand().execute(self)
+            else:
+                from core.commands import ModelsCommand
+                await ModelsCommand().execute(self)
             self.is_generating = False
             return
 

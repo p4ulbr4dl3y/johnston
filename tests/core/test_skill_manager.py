@@ -8,11 +8,13 @@ from core.skill_manager import SkillManager, parse_frontmatter
 
 class TestSkillManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        SkillManager._instance = None
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
 
     def tearDown(self):
+        SkillManager._instance = None
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
 
@@ -130,6 +132,8 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         except ImportError:
             from core.test_commands import MockApp
 
+        os.chdir(self.old_cwd)
+        SkillManager._instance = None
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-architect configure MCP")
         self.assertTrue(handled)
@@ -144,6 +148,8 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         except ImportError:
             from core.test_commands import MockApp
 
+        os.chdir(self.old_cwd)
+        SkillManager._instance = None
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-architect /caveman refactor code")
         self.assertTrue(handled)

@@ -415,13 +415,40 @@ class ModelsCatalog:
         if not model_id:
             return ""
 
+        suffix_tag = ""
+        if ":" in model_id:
+            suffix_raw = model_id.split(":", 1)[1]
+            if suffix_raw and not suffix_raw.startswith("//"):
+                suffix_tag = suffix_raw.strip().capitalize()
+
         resolved = self._resolve_catalog_key(provider_id, model_id, self._names, tag="names")
         if resolved and resolved in self._names:
-            return self._names[resolved]
+            name = self._names[resolved]
+            if ": " in name:
+                name = name.split(": ", 1)[-1]
+            if suffix_tag and f"({suffix_tag})" not in name and suffix_tag.lower() not in name.lower():
+                name += f" ({suffix_tag})"
+            return name
 
         base_raw = model_id.split("/")[-1].split(":")[0]
         parts = base_raw.replace("_", "-").split("-")
-        return " ".join(p.capitalize() if not p.isdigit() and len(p) > 1 else p for p in parts)
+
+        formatted = []
+        for p in parts:
+            p_low = p.lower()
+            if p_low == "gpt":
+                formatted.append("GPT")
+            elif p_low in ("ai", "llm", "db", "ui", "api", "sql", "json"):
+                formatted.append(p.upper())
+            elif p.isdigit() or len(p) <= 1:
+                formatted.append(p)
+            else:
+                formatted.append(p.capitalize())
+
+        res = " ".join(formatted)
+        if suffix_tag and f"({suffix_tag})" not in res:
+            res += f" ({suffix_tag})"
+        return res
 
     def get_model_description(self, provider_id: str, model_id: str) -> str:
         if not model_id:
