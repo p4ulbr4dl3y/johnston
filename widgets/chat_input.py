@@ -134,55 +134,85 @@ class ChatInput(TextArea):
         return "\n".join(new_lines) if modified else pasted_text
 
     def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG/TIFF image and inserts as @filepath"""
-        import base64
-        import io
+        """Checks clipboard for PNG/TIFF/JPEG image or Finder image file and inserts as @filepath"""
         import os
         import subprocess
         import time
 
         from PIL import Image
 
-        jxa_script = """
+        from core.config import TEMP_IMAGES_DIR
+
+        out_dir = TEMP_IMAGES_DIR
+        os.makedirs(out_dir, exist_ok=True)
+        tmp_path = os.path.join(out_dir, f"raw_clip_{os.getpid()}.tmp")
+
+        jxa_script = f"""
 ObjC.import("AppKit");
 var pb = $.NSPasteboard.generalPasteboard;
+
+var files = pb.propertyListForType("NSFilenamesPboardType");
+if (!files.isNil() && files.count > 0) {{
+    var filePath = files.objectAtIndex(0).js;
+    var low = filePath.toLowerCase();
+    if (low.endsWith(".png") || low.endsWith(".jpg") || low.endsWith(".jpeg") ||
+        low.endsWith(".webp") || low.endsWith(".gif") || low.endsWith(".bmp") ||
+        low.endsWith(".tiff") || low.endsWith(".heic") || low.endsWith(".svg")) {{
+        "FILE:" + filePath;
+    }}
+}}
+
 var imgData = pb.dataForType($.NSPasteboardTypePNG);
-if (imgData.isNil()) {
+if (imgData.isNil()) {{
     imgData = pb.dataForType($.NSPasteboardTypeTIFF);
-}
-if (!imgData.isNil()) {
-    imgData.base64EncodedStringWithOptions(0).js;
-} else {
+}}
+if (imgData.isNil()) {{
+    imgData = pb.dataForType($.NSPasteboardTypeJPEG);
+}}
+
+if (!imgData.isNil()) {{
+    imgData.writeToFileAtomically("{tmp_path}", true);
+    "DATA";
+}} else {{
     "";
-}
+}}
 """
         try:
             res = subprocess.run(
                 ["osascript", "-l", "JavaScript", "-e", jxa_script],
                 capture_output=True,
                 text=True,
-                timeout=2,
+                timeout=3,
             )
-            b64_str = res.stdout.strip()
-            if b64_str:
-                raw_bytes = base64.b64decode(b64_str)
-                if len(raw_bytes) > 0:
-                    img = Image.open(io.BytesIO(raw_bytes))
-                    from core.config import TEMP_IMAGES_DIR
+            out_str = res.stdout.strip()
+            if out_str.startswith("FILE:"):
+                target_file = out_str[5:]
+                self.insert(f"@{target_file} ")
+                self._on_input_change()
+                return True
 
-                    out_dir = TEMP_IMAGES_DIR
-                    os.makedirs(out_dir, exist_ok=True)
-                    filepath = os.path.join(out_dir, f"clip_{int(time.time())}.png")
+            if out_str == "DATA" and os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                img = Image.open(tmp_path)
+                final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
+                if img.mode not in ("RGB", "RGBA"):
+                    img = img.convert("RGB")
+                img.save(final_path, format="PNG")
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
-                    if img.mode not in ("RGB", "RGBA"):
-                        img = img.convert("RGB")
-                    img.save(filepath, format="PNG")
-
-                    self.insert(f"@{filepath} ")
-                    self._on_input_change()
-                    return True
+                self.insert(f"@{final_path} ")
+                self._on_input_change()
+                return True
         except Exception:
             pass
+
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
         return False
 
@@ -225,7 +255,7 @@ if (!imgData.isNil()) {
             os.path.exists(expanded)
             and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
         )
-        if not is_existing_image_path and self.try_paste_clipboard_image():
+        if not is_existing_image_path and not event.text.strip() and self.try_paste_clipboard_image():
             event.prevent_default()
             event.stop()
             return
