@@ -510,6 +510,19 @@ class ExpandCommand(BaseCommand):
             pass
 
 
+class DetachCommand(BaseCommand):
+    name = "/detach"
+    aliases = ["/unattach", "/rmatt"]
+    description = "Detach all attached clipboard images"
+
+    async def execute(self, app) -> None:
+        try:
+            chat_input = app.query_one("#message-input", ChatInput)
+            chat_input.clear_clipboard_attachments()
+        except Exception:
+            pass
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -528,6 +541,7 @@ COMMAND_CLASSES = [
     ActionCommand,
     ExploreCommand,
     ExpandCommand,
+    DetachCommand,
 ]
 
 
