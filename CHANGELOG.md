@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.10.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.9.0...johnston-v0.10.0) (2026-07-31)
+
+
+### Features
+
+* **prompt:** insert active model display name into system prompt ([aef22b1](https://github.com/p4ulbr4dl3y/johnston/commit/aef22b17c096ebe91ec3d1121b7d99a1fb330cb4))
+* **providers:** sync providers with opencode and add tab toggle ([5f52a78](https://github.com/p4ulbr4dl3y/johnston/commit/5f52a78c2906b198b84e61d471c42a94e9a45224))
+* **ui:** add cross-platform clipboard image paste support ([b4d65fb](https://github.com/p4ulbr4dl3y/johnston/commit/b4d65fb2b916d7c52e6af9fb755837042f4c7469))
+
+
+### Bug Fixes
+
+* **providers:** make Tab key toggle reliable in ProvidersScreen ([4fc7ab8](https://github.com/p4ulbr4dl3y/johnston/commit/4fc7ab86a0432a0ab12dfad6b49647c41ada6d72))
+* **providers:** treat disabled providers as disconnected and block prompt generation ([661f214](https://github.com/p4ulbr4dl3y/johnston/commit/661f214d9e97650df553aadd6e84357018b8f8e3))
+* **tests:** skip PTY shell tests on Windows ([95e0c0f](https://github.com/p4ulbr4dl3y/johnston/commit/95e0c0f86785414edee31c824d1503c0bbc03d29))
+
 ## [0.9.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.8.2...johnston-v0.9.0) (2026-07-31)
 
 
