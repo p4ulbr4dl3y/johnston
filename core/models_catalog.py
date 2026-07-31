@@ -470,6 +470,20 @@ class ModelsCatalog:
 
         return {"prompt": 0.0, "completion": 0.0}
 
+    def supports_vision(self, provider_id: str, model_id: str) -> bool:
+        if not model_id:
+            return True
+        model_low = model_id.lower()
+        vision_patterns = ["vision", "gpt-4o", "gpt-4-turbo", "claude-3", "gemini", "qwen2.5-vl", "qwen-vl", "llava", "pixtral", "omni", "multimodal"]
+        if any(pat in model_low for pat in vision_patterns):
+            return True
+
+        non_vision_patterns = ["deepseek", "coder", "ling", "glm", "kimi", "minimax"]
+        if any(pat in model_low for pat in non_vision_patterns) and not ("vl" in model_low or "vision" in model_low):
+            return False
+
+        return True
+
 
 catalog = ModelsCatalog()
 
