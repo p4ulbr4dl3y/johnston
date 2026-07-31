@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict
 
 from textual.app import ComposeResult
@@ -40,6 +41,17 @@ class MCPScreen(ModalScreen[None]):
         if self.servers:
             opt_list.highlighted = 0
 
+        # Non-blocking background warmup for unstarted MCP servers
+        asyncio.create_task(self._warmup_tools())
+
+    async def _warmup_tools(self) -> None:
+        try:
+            await asyncio.to_thread(self.mm.get_active_tools, "all")
+            if getattr(self, "is_mounted", True):
+                self.refresh_list()
+        except Exception:
+            pass
+
     def refresh_list(self) -> None:
         self.servers = self.mm.load_servers()
         opt_list = self.query_one("#mcp-option-list", OptionList)
@@ -51,12 +63,10 @@ class MCPScreen(ModalScreen[None]):
 
         tools_per_server: Dict[str, int] = {}
         try:
-            if hasattr(self.mm, "get_active_tools"):
-                active_tools = self.mm.get_active_tools(mode="all")
-                for t in active_tools:
-                    s_name = t.get("_mcp_server")
-                    if s_name:
-                        tools_per_server[s_name] = tools_per_server.get(s_name, 0) + 1
+            if hasattr(self.mm, "clients"):
+                for s_name, client in self.mm.clients.items():
+                    if client and hasattr(client, "tools") and client.tools:
+                        tools_per_server[s_name] = len(client.tools)
         except Exception:
             pass
 
