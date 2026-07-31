@@ -517,6 +517,8 @@ class ProviderManager:
             ]
             if connected:
                 active_providers = connected
+            else:
+                return {}
 
         results = await asyncio.gather(*[
             self.fetch_models_for_provider(p_key, force_refresh=force_refresh)

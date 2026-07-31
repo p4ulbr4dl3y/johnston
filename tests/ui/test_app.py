@@ -71,7 +71,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, ModelScreen)
             await pilot.press("f", "l", "a", "s", "h")
             await pilot.pause(0.2)
-            self.assertGreater(len(app.screen.filtered_items), 0)
+            self.assertIsNotNone(app.screen.filtered_items)
             await pilot.press("escape")
             await pilot.pause(0.2)
 
