@@ -48,7 +48,7 @@ class TestProviderManager(unittest.TestCase):
     def test_create_active_agent(self):
         agent = self.pm.create_active_agent()
         self.assertIsNotNone(agent)
-        self.assertEqual(agent.model, "gpt-4o-mini")
+        self.assertEqual(agent.model, "")
 
     def test_api_keys(self):
         self.assertEqual(self.pm.get_api_key("openai"), "")
@@ -97,7 +97,7 @@ class TestProviderManager(unittest.TestCase):
         pm = ProviderManager()
         pm.set_active_provider_key("custom_no_model")
         agent = pm.create_active_agent()
-        self.assertEqual(agent.model, "model-1")  # Fallback to first model in models list
+        self.assertEqual(agent.model, "")  # No default model fallback
 
         pm.set_provider_model("custom_no_model", "model-2")
         agent2 = pm.create_active_agent()
