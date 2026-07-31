@@ -83,7 +83,7 @@ def get_rules_snippet(mode: str = "action") -> str:
     return RulesManager.get_instance().get_formatted_rules(mode=mode)
 
 
-DEFAULT_SYSTEM_PROMPT = """You are Johnston, an expert AI software engineer pair programming with the user.
+DEFAULT_SYSTEM_PROMPT = """You are {model_name}, an expert AI software engineer operating inside Johnston CLI, pair programming with the user.
 
 ## Primary Goal
 Assist the user with software engineering tasks through safe, high-quality, and precise code modifications and analysis.
@@ -127,11 +127,19 @@ def _instruction_mtimes(cwd: str) -> Tuple:
 class PromptBuilder:
     """Builds composite system prompt and tool definitions accounting for MCP, Skills, and mode (Action/Explore)"""
 
-    def __init__(self, base_system_prompt: str, base_tools: List[Dict[str, Any]], mode: str = "action", allow_task: bool = True):
+    def __init__(
+        self,
+        base_system_prompt: str,
+        base_tools: List[Dict[str, Any]],
+        mode: str = "action",
+        allow_task: bool = True,
+        model_name: str = "",
+    ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
         self.mode = mode
         self.allow_task = allow_task
+        self.model_name = model_name
 
     def build_system_prompt(self) -> str:
         # Cache the fully-built prompt so that across the many tool-call steps of
@@ -144,6 +152,7 @@ class PromptBuilder:
             self.base_system_prompt,
             self.mode,
             self.allow_task,
+            self.model_name,
             cwd,
             _instruction_mtimes(cwd),
         )
@@ -183,6 +192,9 @@ class PromptBuilder:
         # Stable prefix first (cacheable across turns); volatile env metadata
         # last so the longest possible stable prefix can be prompt-cached.
         sys_prompt = self.base_system_prompt
+        if "{model_name}" in sys_prompt:
+            model_label = self.model_name.strip() if self.model_name and self.model_name.strip() else "an expert AI software engineer"
+            sys_prompt = sys_prompt.replace("{model_name}", model_label)
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
