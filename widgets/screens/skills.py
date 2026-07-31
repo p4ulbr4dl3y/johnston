@@ -63,7 +63,6 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.sm = SkillManager()
         self.skills: list[Dict[str, Any]] = []
         self.options: list[str] = []
-        self.load_skills()
 
     def load_skills(self) -> None:
         self.skills = self.sm.list_skills(include_hidden=True)
