@@ -444,39 +444,30 @@ class ProviderManager:
                     pass
             return pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
 
-        # 1. Check cache file
-        if not force_refresh and os.path.exists(cache_path):
+        # 1. Non-blocking fast path when force_refresh is False
+        if not force_refresh:
+            fallback = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
+            cached_models = []
+            if os.path.exists(cache_path):
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        cdata = json.load(f)
+                        age = time.time() - cdata.get("updated_at", 0)
+                        cached_models = cdata.get("models", [])
+                        if age < 86400 and cached_models:
+                            return cached_models
+                except Exception:
+                    pass
+
+            # Trigger background refresh without blocking UI
             try:
-                with open(cache_path, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    age = time.time() - cdata.get("updated_at", 0)
-                    cached_models = cdata.get("models", [])
-                    ttl = 300 if not cached_models else 86400
-                    if age < ttl:
-                        return cached_models
-                    if cached_models:
-                        # Return stale cache instantly, update in background
-                        try:
-                            loop = asyncio.get_running_loop()
-                            if loop.is_running():
-                                loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
-                        except RuntimeError:
-                            pass
-                        return cached_models
-            except Exception:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
+            except RuntimeError:
                 pass
 
-        # 1b. Fast fallback for uninitialized cache without blocking UI
-        if not force_refresh and not os.path.exists(cache_path):
-            fallback = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
-            if fallback:
-                try:
-                    loop = asyncio.get_running_loop()
-                    if loop.is_running():
-                        loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
-                except RuntimeError:
-                    pass
-                return fallback
+            return cached_models or fallback
 
         # 2. Request models via provider HTTP API
         models = []
