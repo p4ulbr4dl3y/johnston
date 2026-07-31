@@ -313,11 +313,7 @@ class JohnstonApp(App):
             "cost_usd": getattr(self.agent, "cost_usd", 0.0),
             "last_context_tokens": getattr(self.agent, "last_context_tokens", 0)
         }
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(asyncio.to_thread(self.sm.save_session, self.current_session_id, session_data))
-        except RuntimeError:
-            self.sm.save_session(self.current_session_id, session_data)
+        self.sm.save_session(self.current_session_id, session_data)
         self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
@@ -475,7 +471,7 @@ class JohnstonApp(App):
 
         if show_in_ui:
             await chat_view.add_user_message(user_text)
-            self.save_current_session()
+            await asyncio.to_thread(self.save_current_session)
             curr_sid = getattr(self, "current_session_id", None)
             if curr_sid:
                 user_msgs = chat_view.get_user_messages()
@@ -533,7 +529,7 @@ class JohnstonApp(App):
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)
                     try:
-                        self.save_current_session()
+                        await asyncio.to_thread(self.save_current_session)
                     except Exception:
                         pass
                 elif event_type in ("bot_chunk", "bot_delta"):
@@ -551,14 +547,14 @@ class JohnstonApp(App):
                         bot_msg.content = val1
                         bot_msg = None
                     try:
-                        self.save_current_session()
+                        await asyncio.to_thread(self.save_current_session)
                     except Exception:
                         pass
                 elif event_type == "compaction_divider":
                     await chat_view.add_compaction_divider(val1 or "Session Compacted")
                     self.refresh_status_footer()
                     try:
-                        self.save_current_session()
+                        await asyncio.to_thread(self.save_current_session)
                     except Exception:
                         pass
         except (asyncio.CancelledError, RuntimeError):
@@ -591,7 +587,7 @@ class JohnstonApp(App):
                 pass
             try:
                 if getattr(self, "is_app_active", True):
-                    self.save_current_session()
+                    await asyncio.to_thread(self.save_current_session)
             except Exception:
                 pass
             # Drain the queue atomically: if a queued message exists, dispatch it WITHOUT
