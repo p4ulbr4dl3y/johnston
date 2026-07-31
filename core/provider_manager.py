@@ -435,6 +435,10 @@ class ProviderManager:
                 except Exception:
                     pass
 
+            # If no cache and no static fallback list, fetch models directly
+            if not cached_models and not fallback and api_key:
+                return await self.fetch_models_for_provider(provider_key, force_refresh=True)
+
             # Trigger background refresh without blocking UI
             try:
                 loop = asyncio.get_running_loop()
@@ -462,6 +466,11 @@ class ProviderManager:
                             if isinstance(m, dict) and "id" in m:
                                 m_id = m["id"]
                                 models.append(m_id)
+                                m_name = m.get("name")
+                                if m_name:
+                                    from core.models_catalog import catalog
+                                    catalog._names[m_id] = m_name
+                                    catalog._names[m_id.split("/")[-1]] = m_name
                                 ctx_len = (
                                     m.get("context_length")
                                     or (m.get("top_provider", {}) or {}).get("context_length")
@@ -472,6 +481,13 @@ class ProviderManager:
                                     model_limits[m_id] = int(ctx_len)
             except Exception as e:
                 print(f"Error fetching models for {provider_key}: {e}")
+
+        if models:
+            try:
+                from core.models_catalog import catalog
+                catalog.save_cache()
+            except Exception:
+                pass
 
         # Universal fallback to configured models list or default model
         if not models:

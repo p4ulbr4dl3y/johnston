@@ -178,36 +178,38 @@ class StatusFooter(Static):
                 f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
                 f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]"
             ]
-            if clean_model:
+            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/{THEME_SECONDARY}]")
             row1_left = " • ".join(row1_left_parts)
             row1_right = f"[{THEME_SECONDARY}]MCP:{mcp_active}[/{THEME_SECONDARY}]" if mcp_total > 0 else ""
 
-            ctx_val = context_used
-            pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
-            pct = min(100.0, max(0.0, pct))
-            pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-            row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/]"
-
-            row2_right_parts = [f"[{THEME_SECONDARY}]{total_tokens:,}t[/]"]
+            if is_connected and bool(model_name):
+                ctx_val = context_used
+                pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
+                pct = min(100.0, max(0.0, pct))
+                pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
+                row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/]"
+                row2_right_parts = [f"[{THEME_SECONDARY}]{total_tokens:,}t[/]"]
+            elif is_connected:
+                row2_left = f"[{THEME_SUBTLE}]Run /models[/{THEME_SUBTLE}]"
+                row2_right_parts = []
+            else:
+                row2_left = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
+                row2_right_parts = []
             if active_bg_tasks > 0:
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks}bg[/]")
             if subagents_active > 0:
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total}sub[/]")
             row2_right = " • ".join(row2_right_parts)
         else:
-            # Line 1: Left (Mode • Project • Provider › Model), Right (Skills • MCP)
             row1_left_parts = [
                 f"[bold {THEME_PRIMARY}]{mode_formatted}[/]",
                 f"[{THEME_SECONDARY}]{dir_text}[/]"
             ]
+            is_connected = pm.is_provider_connected(provider_key) if (pm and provider_key) else False
 
-            if provider_display and clean_model:
+            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
-            elif provider_display:
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › [Select model: /models][/]")
-            else:
-                row1_left_parts.append(f"[{THEME_SECONDARY}][Select provider: /connect][/]")
 
             row1_left = "  •  ".join(row1_left_parts)
 
@@ -218,23 +220,30 @@ class StatusFooter(Static):
             row1_right = "  •  ".join(row1_right_parts)
 
             # Line 2: Left (Context), Right (Tokens • Cost • Activity)
-            ctx_val = context_used
-            pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
-            pct = min(100.0, max(0.0, pct))
-            bar_len = 8
-            filled = int(round((pct / 100) * bar_len))
-            bar_str = "█" * filled + "░" * (bar_len - filled)
-            used_formatted = format_context_tokens(ctx_val)
+            if is_connected and bool(model_name):
+                ctx_val = context_used
+                pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
+                pct = min(100.0, max(0.0, pct))
+                bar_len = 8
+                filled = int(round((pct / 100) * bar_len))
+                bar_str = "█" * filled + "░" * (bar_len - filled)
+                used_formatted = format_context_tokens(ctx_val)
 
-            pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
-            row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/]"
+                pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
+                row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/]"
 
-            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
-            row2_right_parts = [
-                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
-                f"[{THEME_SECONDARY}]{cost_str}[/]",
-                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
-            ]
+                cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+                row2_right_parts = [
+                    f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+                    f"[{THEME_SECONDARY}]{cost_str}[/]",
+                    f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
+                ]
+            elif is_connected:
+                row2_left = f"[{THEME_SUBTLE}]Run /models to select a model.[/{THEME_SUBTLE}]"
+                row2_right_parts = []
+            else:
+                row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
+                row2_right_parts = []
 
             if active_bg_tasks > 0:
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/]")
@@ -247,7 +256,8 @@ class StatusFooter(Static):
         grid.add_column(justify="left")
         grid.add_column(justify="right")
         grid.add_row(row1_left, row1_right)
-        grid.add_row(row2_left, row2_right)
+        if row2_left or row2_right:
+            grid.add_row(row2_left, row2_right)
 
         self.update(grid)
 
