@@ -947,6 +947,20 @@ class BaseAgent:
                     "content": content if isinstance(content, str) else str(content)
                 })
 
+        # Merge consecutive messages with the same role to prevent OpenAI API 400 Bad Request errors
+        merged_history = []
+        for msg in pruned_history:
+            if not merged_history:
+                merged_history.append(dict(msg))
+            else:
+                prev = merged_history[-1]
+                if prev.get("role") == msg.get("role"):
+                    prev_content = str(prev.get("content", ""))
+                    curr_content = str(msg.get("content", ""))
+                    prev["content"] = f"{prev_content}\n\n{curr_content}".strip()
+                else:
+                    merged_history.append(dict(msg))
+
         summary_template = (
             "Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. "
             "Do not include the <template> tags in your response.\n"
@@ -984,13 +998,18 @@ class BaseAgent:
         else:
             prompt_header = "Create a new anchored summary from the conversation history.\n\n"
 
+        user_instruction = "Generate the context summary now based on the above history."
+        if merged_history and merged_history[-1].get("role") == "user":
+            merged_history[-1]["content"] = f"{merged_history[-1].get('content', '')}\n\n[Instruction]: {user_instruction}".strip()
+        else:
+            merged_history.append({"role": "user", "content": user_instruction})
+
         compact_messages = [
             {"role": "system", "content": prompt_header + summary_template}
-        ] + pruned_history + [
-            {"role": "user", "content": "Generate the context summary now based on the above history."}
-        ]
+        ] + merged_history
 
         summary_text = ""
+        last_err = None
         try:
             # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
             try:
@@ -1006,7 +1025,8 @@ class BaseAgent:
                     if event_type == "text" and content:
                         chunks.append(content)
                 summary_text = "".join(chunks).strip()
-            except Exception:
+            except Exception as stream_e:
+                last_err = str(stream_e)
                 summary_text = ""
 
             # 2. Fallback to direct client completions if adapter stream produced no content
@@ -1028,12 +1048,13 @@ class BaseAgent:
                                 msg_obj = getattr(first_choice, "message", None)
                                 if msg_obj:
                                     summary_text = getattr(msg_obj, "content", "") or ""
-                except Exception:
-                    pass
+                except Exception as comp_e:
+                    last_err = str(comp_e)
 
             summary_text = (summary_text or "").strip()
             if not summary_text:
-                return False, "Failed to generate summary (provider returned no content)"
+                err_suffix = f": {last_err}" if last_err else " (provider returned no content)"
+                return False, f"Failed to generate summary{err_suffix}"
 
             # Account for summarizer tokens and cost in cumulative session metrics
             compact_in = estimate_tokens(compact_messages)
