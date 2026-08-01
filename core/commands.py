@@ -467,26 +467,40 @@ class CompactCommand(BaseCommand):
                 except Exception:
                     pass
 
-            success, msg = await app.agent.compact_history()
-            if success:
-                title = "Session Compacted"
-                if msg and "(" in msg and ")" in msg:
-                    tokens_info = msg[msg.find("(") + 1 : msg.rfind(")")]
-                    title = f"Session Compacted ({tokens_info})"
+            app.is_generating = True
+            try:
+                success, msg = await app.agent.compact_history()
+                if success:
+                    title = "Session Compacted"
+                    if msg and "(" in msg and ")" in msg:
+                        tokens_info = msg[msg.find("(") + 1 : msg.rfind(")")]
+                        title = f"Session Compacted ({tokens_info})"
 
-                if divider and hasattr(divider, "update_title"):
-                    divider.update_title(title)
-                elif chat_view and hasattr(chat_view, "add_compaction_divider"):
-                    await chat_view.add_compaction_divider(title)
+                    if divider and hasattr(divider, "update_title"):
+                        divider.update_title(title)
+                    elif chat_view and hasattr(chat_view, "add_compaction_divider"):
+                        await chat_view.add_compaction_divider(title)
 
-                if hasattr(app, "refresh_status_footer"):
-                    app.refresh_status_footer()
-                if hasattr(app, "save_current_session"):
-                    app.save_current_session()
-            else:
-                if divider and hasattr(divider, "update_title"):
-                    divider.update_title(f"Compaction Failed: {msg}")
-                app.notify(msg or "Context compaction failed", severity="warning")
+                    if hasattr(app, "refresh_status_footer"):
+                        app.refresh_status_footer()
+                    if hasattr(app, "save_current_session"):
+                        app.save_current_session()
+                else:
+                    if divider and hasattr(divider, "update_title"):
+                        divider.update_title(f"Compaction Failed: {msg}")
+                    app.notify(msg or "Context compaction failed", severity="warning")
+            finally:
+                if getattr(app, "message_queue", None):
+                    next_item = app.message_queue.pop(0)
+                    prompt = next_item[0]
+                    show_in_ui = next_item[1] if len(next_item) > 1 else True
+                    kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
+                    if hasattr(app, "trigger_ai_response"):
+                        app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
+                    else:
+                        app.is_generating = False
+                else:
+                    app.is_generating = False
         else:
             app.notify("Active agent does not support context compaction", severity="warning")
 
