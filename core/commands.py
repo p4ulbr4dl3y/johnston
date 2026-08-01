@@ -513,55 +513,6 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
-class ActionCommand(BaseCommand):
-    name = "/action"
-    aliases = ["/build", "/code"]
-    description = "Switch agent to Action mode"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "action"
-            app.mode = "action"
-            app.refresh_status_footer()
-
-
-class ExploreCommand(BaseCommand):
-    name = "/explore"
-    description = "Switch agent to Explore mode"
-
-    async def execute(self, app) -> None:
-        if hasattr(app, "agent") and app.agent:
-            app.agent.mode = "explore"
-            app.mode = "explore"
-            app.refresh_status_footer()
-
-
-class ExpandCommand(BaseCommand):
-    name = "/expand"
-    aliases = ["/exp"]
-    description = "Expand or collapse tool call and thinking widgets (all, collapse, or last)"
-
-    async def execute(self, app, args: list[str] | None = None) -> None:
-        try:
-            chat_view = app.query_one(ChatView)
-            submode = args[0].lower() if args and len(args) > 0 else "all"
-            chat_view.toggle_expand(submode)
-        except Exception:
-            pass
-
-
-class DetachCommand(BaseCommand):
-    name = "/detach"
-    aliases = ["/unattach", "/rmatt"]
-    description = "Detach all attached clipboard images"
-
-    async def execute(self, app) -> None:
-        try:
-            chat_input = app.query_one("#message-input", ChatInput)
-            chat_input.clear_clipboard_attachments()
-        except Exception:
-            pass
-
 
 COMMAND_CLASSES = [
     HelpCommand,
@@ -578,10 +529,6 @@ COMMAND_CLASSES = [
     InitCommand,
     HandoffCommand,
     CompactCommand,
-    ActionCommand,
-    ExploreCommand,
-    ExpandCommand,
-    DetachCommand,
 ]
 
 

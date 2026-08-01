@@ -330,6 +330,17 @@ class BotMessage(Vertical):
         yield self.md_widget
 
     def watch_content(self, new_content: str) -> None:
+        is_loading = False
+        try:
+            if isinstance(self.parent, VerticalScroll):
+                is_loading = getattr(self.parent, "_is_loading_session", False)
+        except Exception:
+            pass
+
+        if is_loading:
+            safe_update_markdown(self.md_widget, new_content)
+            return
+
         if not self._update_scheduled:
             self._update_scheduled = True
             try:
@@ -344,7 +355,8 @@ class BotMessage(Vertical):
             try:
                 if isinstance(self.parent, VerticalScroll):
                     is_at_bot = getattr(self.parent, "is_at_bottom", lambda: True)()
-                    if is_at_bot:
+                    is_loading = getattr(self.parent, "_is_loading_session", False)
+                    if is_at_bot and not is_loading:
                         self.parent.call_after_refresh(self.parent.scroll_end, animate=False)
             except Exception:
                 pass
@@ -1238,6 +1250,7 @@ class ChatView(VerticalScroll):
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.show_welcome = show_welcome
+        self._is_loading_session: bool = False
 
     def is_at_bottom(self, threshold: int = 3) -> bool:
         """Returns True if scroll position is at or near the bottom of the container."""
@@ -1285,7 +1298,8 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)
-        self.call_after_refresh(self.scroll_end, animate=animate)
+        if not self._is_loading_session:
+            self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
 
     async def add_bot_message(self, animate: bool = True) -> BotMessage:
@@ -1294,7 +1308,7 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)
-        if not animate or self.is_at_bottom():
+        if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
 
@@ -1304,7 +1318,7 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        if not animate or self.is_at_bottom():
+        if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
@@ -1316,7 +1330,7 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        if not animate or self.is_at_bottom():
+        if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
@@ -1326,7 +1340,7 @@ class ChatView(VerticalScroll):
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)
-        if not animate or self.is_at_bottom():
+        if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 

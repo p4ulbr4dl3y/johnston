@@ -189,22 +189,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(handled)
 
 
-    async def test_mode_commands_sync_app_and_agent_mode(self):
-        app = MockApp()
-
-        handled = await handle_slash_command(app, "/explore")
-        self.assertTrue(handled)
-        self.assertEqual(app.agent.mode, "explore")
-        self.assertEqual(app.mode, "explore")
-        self.assertTrue(app.status_refreshed)
-
-        app.status_refreshed = False
-        handled = await handle_slash_command(app, "/action")
-        self.assertTrue(handled)
-        self.assertEqual(app.agent.mode, "action")
-        self.assertEqual(app.mode, "action")
-        self.assertTrue(app.status_refreshed)
-
     async def test_compact_command(self):
         class DetailedMockAgent(MockAgent):
             async def compact_history(self):

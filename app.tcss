@@ -632,6 +632,12 @@ MarkdownBlock > .code_inline {
     color: #ffffff;
 }
 
+/* Monochrome LoadingIndicator */
+LoadingIndicator {
+    color: #a1a1aa;
+    background: #09090b;
+}
+
 
 
 
