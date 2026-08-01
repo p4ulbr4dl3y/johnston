@@ -32,6 +32,7 @@ class ChatInput(TextArea):
     PASTE_LINE_THRESHOLD = 10
 
     def __init__(self, **kwargs):
+        kwargs.setdefault("soft_wrap", True)
         super().__init__(**kwargs)
         self.prompt_history: list[str] = []
         self.prompt_history_index: int = 0
@@ -63,8 +64,10 @@ class ChatInput(TextArea):
         return text
 
     def update_height(self) -> None:
-        """Dynamic height calculation from 2 to 6 lines"""
-        lines = len(self.text.split("\n"))
+        """Dynamic height calculation from 2 to 6 lines, taking wrapped lines into account"""
+        raw_lines = len(self.text.split("\n"))
+        wrapped_lines = getattr(self.wrapped_document, "height", 1) if hasattr(self, "wrapped_document") else 1
+        lines = max(raw_lines, wrapped_lines)
         target_height = max(2, min(lines + 1, 6))
         h = self.styles.height
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
