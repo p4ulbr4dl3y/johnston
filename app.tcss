@@ -151,14 +151,6 @@ WelcomeWidget {
     border-left: solid #3f3f46;
 }
 
-.tool-running .tool-content, .tool-running .tool-content-md {
-    border-left: solid #e5c07b;
-}
-
-.tool-error .tool-content, .tool-error .tool-content-md {
-    border-left: solid #e06c75;
-}
-
 .tool-call Markdown {
     margin-top: 1;
     color: #e4e4e7;
