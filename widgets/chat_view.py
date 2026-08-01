@@ -452,6 +452,40 @@ class ToolCallWidget(Vertical):
         self.content_widget = Static("", classes="tool-content")
         self.md_widget = Markdown("", classes="tool-content-md")
 
+    def _extract_mcp_call_info(self) -> tuple[str, str, dict]:
+        args = self.args if isinstance(self.args, dict) else {}
+        tool_name = (
+            args.get("tool")
+            or args.get("Tool")
+            or args.get("tool_name")
+            or args.get("ToolName")
+            or args.get("name")
+            or args.get("Name")
+            or "call_mcp_tool"
+        )
+        server = (
+            args.get("server")
+            or args.get("Server")
+            or args.get("server_name")
+            or args.get("ServerName")
+            or ""
+        )
+        mcp_args = None
+        for k in ("arguments", "Arguments", "args", "Args"):
+            if k in args and isinstance(args[k], dict):
+                mcp_args = args[k]
+                break
+
+        if mcp_args is None:
+            meta_keys = {
+                "tool", "Tool", "tool_name", "ToolName", "name", "Name",
+                "server", "Server", "server_name", "ServerName",
+                "arguments", "Arguments", "args", "Args",
+            }
+            mcp_args = {k: v for k, v in args.items() if k not in meta_keys}
+
+        return str(tool_name), str(server), mcp_args
+
     def _format_compact_dict(self, d: dict) -> str:
         if not isinstance(d, dict) or not d:
             return ""
@@ -582,15 +616,10 @@ class ToolCallWidget(Vertical):
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
             self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
-            tool_name = self.args.get("tool") or "call_mcp_tool"
-            server = self.args.get("server") or ""
-            mcp_args = self.args.get("arguments")
-            if not isinstance(mcp_args, dict):
-                mcp_args = {}
-
+            tool_name, server, mcp_args = self._extract_mcp_call_info()
             compact = self._format_compact_dict(mcp_args)
             if not compact:
-                compact = f"{{server: \"{server}\"}}" if server else "{}"
+                compact = f'{{server: "{server}"}}' if server else "{}"
             escaped_compact = escape(compact)
             self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
         else:
@@ -1105,10 +1134,8 @@ class ToolCallWidget(Vertical):
                 except Exception:
                     self.content_widget.update(escape(full_display))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
-                server = self.args.get("server", "")
-                tool = self.args.get("tool", "")
-                mcp_args = self.args.get("arguments", {})
-                display_parts = [f"Server: {server}", f"Tool: {tool}"]
+                tool_name, server, mcp_args = self._extract_mcp_call_info()
+                display_parts = [f"Server: {server}", f"Tool: {tool_name}"]
                 if mcp_args:
                     try:
                         args_json = json.dumps(mcp_args, indent=2, ensure_ascii=False)
