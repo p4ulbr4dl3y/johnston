@@ -1276,12 +1276,12 @@ class ChatView(VerticalScroll):
             for w in welcome:
                 w.remove()
 
-    async def _wait_until_attached(self, timeout: float = 2.0) -> None:
+    async def _wait_until_attached(self, timeout: float = 0.5) -> None:
         try:
             loop = asyncio.get_running_loop()
             t0 = loop.time()
             while not self.is_attached and (loop.time() - t0 < timeout):
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.005)
         except Exception:
             pass
 

@@ -2,6 +2,7 @@ import asyncio
 import math
 import os
 import time
+from typing import Optional
 
 from textual import events, work
 from textual.app import App, ComposeResult
@@ -280,14 +281,16 @@ class JohnstonApp(App):
 
         self.refresh_status_footer()
 
-    def save_current_session(self) -> None:
-        """Save complete UI element state to ~/.johnston/projects/<project>/sessions"""
-        chat_view = self.query_one(ChatView)
-        user_msgs = chat_view.get_user_messages()
+    def _get_current_session_data(self) -> Optional[dict]:
+        """Safely collect UI state on the main thread."""
+        try:
+            chat_view = self.query_one(ChatView)
+        except Exception:
+            return None
 
+        user_msgs = chat_view.get_user_messages()
         if not user_msgs:
-            self.sm.save_session(self.current_session_id, {"ui_messages": []})
-            return
+            return {"ui_messages": []}
 
         first_msg = user_msgs[0][1]
         title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
@@ -320,7 +323,7 @@ class JohnstonApp(App):
 
         agent_history = getattr(self.agent, "history", [])
 
-        session_data = {
+        return {
             "id": self.current_session_id,
             "title": title,
             "ui_messages": ui_messages,
@@ -331,8 +334,20 @@ class JohnstonApp(App):
             "cost_usd": getattr(self.agent, "cost_usd", 0.0),
             "last_context_tokens": getattr(self.agent, "last_context_tokens", 0)
         }
-        self.sm.save_session(self.current_session_id, session_data)
-        self.refresh_status_footer()
+
+    def save_current_session(self) -> None:
+        """Save complete UI element state to ~/.johnston/projects/<project>/sessions"""
+        session_data = self._get_current_session_data()
+        if session_data is not None:
+            self.sm.save_session(self.current_session_id, session_data)
+            self.refresh_status_footer()
+
+    async def save_current_session_async(self) -> None:
+        """Collect session data on main UI thread, then save to disk in background thread."""
+        session_data = self._get_current_session_data()
+        if session_data is not None:
+            await asyncio.to_thread(self.sm.save_session, self.current_session_id, session_data)
+            self.refresh_status_footer()
 
     def on_click(self, event: events.Click) -> None:
         """Any mouse click returns focus to input unless text is selected or interacting with focusable widgets"""
@@ -458,7 +473,7 @@ class JohnstonApp(App):
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        if user_text and "/" in user_text:
+        if user_text and user_text.startswith("/"):
             asyncio.create_task(self._exec_slash_command(user_text))
             return
 
@@ -515,7 +530,7 @@ class JohnstonApp(App):
 
         if show_in_ui:
             await chat_view.add_user_message(user_text, attachments=attachments)
-            await asyncio.to_thread(self.save_current_session)
+            await self.save_current_session_async()
             curr_sid = getattr(self, "current_session_id", None)
             if curr_sid:
                 user_msgs = chat_view.get_user_messages()
@@ -573,7 +588,7 @@ class JohnstonApp(App):
                     if current_tool_widget:
                         current_tool_widget.set_result(val1)
                     try:
-                        await asyncio.to_thread(self.save_current_session)
+                        await self.save_current_session_async()
                     except Exception:
                         pass
                 elif event_type in ("bot_chunk", "bot_delta"):
@@ -591,14 +606,14 @@ class JohnstonApp(App):
                         bot_msg.content = val1
                         bot_msg = None
                     try:
-                        await asyncio.to_thread(self.save_current_session)
+                        await self.save_current_session_async()
                     except Exception:
                         pass
                 elif event_type == "compaction_divider":
                     await chat_view.add_compaction_divider(val1 or "Session Compacted")
                     self.refresh_status_footer()
                     try:
-                        await asyncio.to_thread(self.save_current_session)
+                        await self.save_current_session_async()
                     except Exception:
                         pass
         except (asyncio.CancelledError, RuntimeError):
@@ -631,7 +646,7 @@ class JohnstonApp(App):
                 pass
             try:
                 if getattr(self, "is_app_active", True):
-                    await asyncio.to_thread(self.save_current_session)
+                    await self.save_current_session_async()
             except Exception:
                 pass
             # Drain the queue atomically: if a queued message exists, dispatch it WITHOUT
