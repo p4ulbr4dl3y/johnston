@@ -489,6 +489,31 @@ class ToolCallWidget(Vertical):
         clean = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
         return escape(clean)
 
+    def _format_json_result(self, raw_text: str) -> Syntax | None:
+        if not raw_text or not raw_text.strip():
+            return None
+        text = raw_text.strip()
+        footer = ""
+        if "\n... [Output truncated" in text:
+            parts = text.split("\n... [Output truncated", 1)
+            text_to_parse = parts[0].strip()
+            footer = "\n\n... [Output truncated" + parts[1]
+        else:
+            text_to_parse = text
+
+        try:
+            parsed = json.loads(text_to_parse)
+            pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False) + footer
+            return Syntax(
+                pretty_json,
+                "json",
+                theme="one-dark",
+                word_wrap=True,
+                background_color="#18181b"
+            )
+        except Exception:
+            return None
+
     def _check_is_error(self, text: str) -> bool:
         if isinstance(self.args, dict) and self.args.get("is_error"):
             return True
@@ -1199,21 +1224,18 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(self._clean_markup_text(full_display))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 clean_res = (self.result_text or "(No result)").strip()
-                try:
-                    parsed = json.loads(clean_res)
-                    pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
-                    syntax = Syntax(
-                        pretty_json,
-                        "json",
-                        theme="one-dark",
-                        word_wrap=True,
-                        background_color="#18181b"
-                    )
+                syntax = self._format_json_result(clean_res)
+                if syntax:
                     self.content_widget.update(syntax)
-                except Exception:
+                else:
                     self.content_widget.update(self._clean_markup_text(clean_res))
             else:
-                self.content_widget.update(self._clean_markup_text(self.result_text or "(No result)"))
+                clean_res = (self.result_text or "(No result)").strip()
+                syntax = self._format_json_result(clean_res)
+                if syntax:
+                    self.content_widget.update(syntax)
+                else:
+                    self.content_widget.update(self._clean_markup_text(clean_res))
         except Exception:
             pass
 
