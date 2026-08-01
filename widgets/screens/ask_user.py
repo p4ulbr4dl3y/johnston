@@ -77,6 +77,7 @@ class QuestionScreen(ModalScreen[dict]):
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
         ("ctrl+c", "quit", "Exit"),
+        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self, num_text: str, question_text: str, options: list[str], current_val: str = ""):
@@ -246,6 +247,7 @@ class ConfirmScreen(ModalScreen[str]):
         ("left", "go_back", "Back"),
         ("enter", "confirm", "Confirm"),
         ("ctrl+c", "quit", "Exit"),
+        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self, summary: str):
@@ -288,6 +290,7 @@ class AskUserWizardScreen(ModalScreen[str]):
         ("enter", "go_next", "Next / Confirm"),
         ("space", "toggle_selection", "Toggle Selection"),
         ("ctrl+c", "quit", "Exit"),
+        ("ctrl+q", "quit", "Exit"),
     ]
 
 

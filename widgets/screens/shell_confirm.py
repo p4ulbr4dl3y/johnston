@@ -12,6 +12,7 @@ class ShellConfirmScreen(ModalScreen[bool]):
         ("enter", "confirm", "Confirm"),
         ("escape", "cancel", "Cancel"),
         ("ctrl+c", "quit", "Exit"),
+        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self, command: str, reason: str = ""):
