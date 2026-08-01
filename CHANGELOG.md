@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.12.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.11.0...johnston-v0.12.0) (2026-08-01)
+
+
+### Features
+
+* **ui:** add immediate loading state and token metrics to /compact divider ([0f4b7b5](https://github.com/p4ulbr4dl3y/johnston/commit/0f4b7b5f326cc0289d7d1279244f7574f11cf2ed))
+* **ui:** queue user input during manual /compact and drain queue on finish ([08baac2](https://github.com/p4ulbr4dl3y/johnston/commit/08baac238770e59da1664a7b82d86153fc30f930))
+* **ui:** route all provider API errors to full-width event divider line ([87956c8](https://github.com/p4ulbr4dl3y/johnston/commit/87956c8bab056d317a13153acd00f56b76a8b55a))
+* **ui:** update compaction divider to 'Compaction Cancelled' when cancelled via Esc ([2d07482](https://github.com/p4ulbr4dl3y/johnston/commit/2d07482c5fa221cdce7a8b6f2a164c4c14d971d7))
+
+
+### Bug Fixes
+
+* **compaction:** merge consecutive roles in compact_messages and report actual API errors ([22a9003](https://github.com/p4ulbr4dl3y/johnston/commit/22a90039d75089b7201db157659d3a6a92e3cfa4))
+* **compaction:** move save_current_session to finally block in CompactCommand so failure/cancel divider states persist ([f3b26bb](https://github.com/p4ulbr4dl3y/johnston/commit/f3b26bb8f2f05e18fec3b8df91fd4f47d1d62690))
+* **compaction:** pass base_url, api_key, model to adapter.stream_chat and handle adapter_text tags ([c0fa58a](https://github.com/p4ulbr4dl3y/johnston/commit/c0fa58a375a72842cc8daea5bce5880ba9a20664))
+* **ui:** add Ctrl+C and Ctrl+Q keybindings to HelpScreen ([cf202a7](https://github.com/p4ulbr4dl3y/johnston/commit/cf202a7511fd810b297ea352597a65f7e30ba6bd))
+* **ui:** ensure Ctrl+Q exit keybinding works across all modal screens ([72806bb](https://github.com/p4ulbr4dl3y/johnston/commit/72806bb245a84a415142fbcff7b1639ed717a83a))
+* **ui:** handle task cancellation in _handle_markdown_task_done to suppress exit traceback ([e0bd414](https://github.com/p4ulbr4dl3y/johnston/commit/e0bd41427a18d853279d7172ea253ce191871ac7))
+
+
+### Performance Improvements
+
+* **ui:** replace Markdown with Static in ThinkingWidget for fast rendering ([a27c6fb](https://github.com/p4ulbr4dl3y/johnston/commit/a27c6fbd6133740df8088bc88f5e533efeee6d79))
+
 ## [0.11.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.10.0...johnston-v0.11.0) (2026-08-01)
 
 
