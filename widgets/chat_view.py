@@ -345,7 +345,7 @@ class BotMessage(Vertical):
 
 
 class ThinkingWidget(Vertical):
-    """Thinking widget with Markdown expansion support"""
+    """Thinking widget with fast Static text expansion support"""
     can_focus = False
     ALLOW_SELECT = False
 
@@ -357,20 +357,24 @@ class ThinkingWidget(Vertical):
         self.is_expanded = False
 
         self.header_label = Label("Thinking...", classes="thinking-header")
-        self.md_widget = Markdown("")
+        self.content_widget = Static("", classes="thinking-content")
+
+    @property
+    def md_widget(self) -> Static:
+        return self.content_widget
 
     def compose(self) -> ComposeResult:
         yield self.header_label
-        yield self.md_widget
+        yield self.content_widget
 
     def on_mount(self) -> None:
-        self.md_widget.display = False
+        self.content_widget.display = False
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
             self.thinking_text = content
             if self.is_expanded:
-                safe_update_markdown(self.md_widget, self.thinking_text)
+                self.content_widget.update(self.thinking_text)
 
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
@@ -378,16 +382,14 @@ class ThinkingWidget(Vertical):
         if thinking_content and thinking_content != "Thinking...":
             self.thinking_text = thinking_content
         self.remove_class("thinking-active")
-        if self.thinking_text and self.thinking_text != "Thinking...":
-            safe_update_markdown(self.md_widget, self.thinking_text)
-        else:
-            safe_update_markdown(self.md_widget, "")
+        if self.is_expanded:
+            self.content_widget.update(self.thinking_text or "")
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
         self.header_label.update(f"Thought for {self.duration_seconds:.1f} sec")
         if not self.is_expanded:
-            self.md_widget.display = False
+            self.content_widget.display = False
 
     def on_click(self, event) -> None:
         self.toggle_expanded()
@@ -400,10 +402,10 @@ class ThinkingWidget(Vertical):
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
             if self.thinking_text:
-                safe_update_markdown(self.md_widget, self.thinking_text)
-            self.md_widget.display = True
+                self.content_widget.update(self.thinking_text)
+            self.content_widget.display = True
         else:
-            self.md_widget.display = False
+            self.content_widget.display = False
 
 
 
