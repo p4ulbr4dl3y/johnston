@@ -205,6 +205,8 @@ class JohnstonApp(App):
         self.sm.set_active_session_id(session_id)
 
         chat_view = self.query_one(ChatView)
+        chat_view.loading = True
+        chat_view._is_loading_session = True
         for child in list(chat_view.children):
             child.remove()
 
@@ -249,6 +251,8 @@ class JohnstonApp(App):
 
             chat_view.check_welcome()
             await asyncio.sleep(0.15)
+            chat_view._is_loading_session = False
+            chat_view.loading = False
             try:
                 chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
             except Exception:

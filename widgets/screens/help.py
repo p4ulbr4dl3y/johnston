@@ -10,10 +10,6 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 * `/models` — Switch active model across providers
 * `/thinking` — Set reasoning effort / thinking budget
 * `/new` — Start a new chat session
-* `/action` — Switch to Action mode (edits & bash)
-* `/explore` — Switch to Explore mode (read-only)
-* `/expand` — Expand or collapse tool output & thinking
-* `/detach` — Detach attached clipboard images
 * `/compact` — Compact session conversation history
 * `/handoff` — Generate session handoff summary
 * `/init` — Guided `AGENTS.md` project setup
