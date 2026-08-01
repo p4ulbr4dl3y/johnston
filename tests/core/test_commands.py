@@ -219,6 +219,36 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.chat_view.dividers), 1)
         self.assertEqual(app.chat_view.dividers[0].divider_title, "Session Compacted (12k → 2k tokens)")
 
+    async def test_compact_command_queues_and_drains_input(self):
+        class QueuingMockAgent(MockAgent):
+            def __init__(self, app_ref):
+                super().__init__()
+                self.app_ref = app_ref
+
+            async def compact_history(self):
+                self.compact_called = True
+                # Simulate user sending input during compact_history
+                self.app_ref.message_queue.append(("Queued prompt during compact", True))
+                return True, "History compacted"
+
+        app = MockApp()
+        agent = QueuingMockAgent(app)
+        app.agent = agent
+        app.message_queue = []
+        triggered = []
+
+        def mock_trigger(prompt, show_in_ui=True, **kwargs):
+            triggered.append((prompt, show_in_ui))
+
+        app.trigger_ai_response = mock_trigger
+
+        handled = await handle_slash_command(app, "/compact")
+        self.assertTrue(handled)
+        self.assertTrue(agent.compact_called)
+        self.assertEqual(len(triggered), 1)
+        self.assertEqual(triggered[0], ("Queued prompt during compact", True))
+        self.assertEqual(len(app.message_queue), 0)
+
     async def test_init_command(self):
         app = MockApp()
         handled = await handle_slash_command(app, "/init")
