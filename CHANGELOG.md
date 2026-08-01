@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.11.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.10.0...johnston-v0.11.0) (2026-08-01)
+
+
+### Features
+
+* **tools:** truncate long MCP tool outputs at 8000 chars ([15bbd67](https://github.com/p4ulbr4dl3y/johnston/commit/15bbd67c29a7500d9c6cd4b668753475fa41f907))
+
+
+### Bug Fixes
+
+* **core:** resolve concurrency, adapter, and provider edge-case issues from audit ([6200267](https://github.com/p4ulbr4dl3y/johnston/commit/6200267c477a9c98b6ca19f2cfecedd353c42d5a))
+* **tools:** avoid false line 1 match hint when target content is not found ([add43b7](https://github.com/p4ulbr4dl3y/johnston/commit/add43b7d5736b939e8ae126214b3cc643d0f2403))
+* **tools:** resolve edge case bugs found during codebase audit ([78e55d7](https://github.com/p4ulbr4dl3y/johnston/commit/78e55d71c3984e8884bbe27c28141d333c393af3))
+* **ui:** robust extraction and display for MCP tool calls ([fcf2cfd](https://github.com/p4ulbr4dl3y/johnston/commit/fcf2cfda7e968629fc36f070eb48ba64c2030889))
+
 ## [0.10.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.9.0...johnston-v0.10.0) (2026-07-31)
 
 
