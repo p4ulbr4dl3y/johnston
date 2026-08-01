@@ -379,6 +379,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             with patch.object(app, "query_one", side_effect=Exception("no footer")):
                 ci.update_attachment_bar()  # Should not raise exception
 
+    async def test_sanitize_mouse_artifacts(self):
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        async with app.run_test():
+            ci.load_text("Hello M<65;1272;815M World [<65;1272;815M")
+            self.assertEqual(ci.text, "Hello  World ")
+
 
 if __name__ == "__main__":
     unittest.main()

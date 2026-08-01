@@ -1,6 +1,10 @@
+import re
+
 from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
+
+MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
 
 class ClipboardAttachment:
@@ -99,8 +103,22 @@ class ChatInput(TextArea):
         new_col = start_idx + len(inserted)
         self.move_cursor((row, new_col))
 
+    def sanitize_mouse_artifacts(self) -> None:
+        """Strips accidental raw ANSI mouse tracking escape sequences from the text buffer"""
+        text = self.text
+        if MOUSE_ARTIFACT_REGEX.search(text):
+            clean_text = MOUSE_ARTIFACT_REGEX.sub("", text)
+            row, col = self.cursor_location
+            self.load_text(clean_text)
+            lines = clean_text.split("\n")
+            max_row = max(0, len(lines) - 1)
+            target_row = min(row, max_row)
+            target_col = min(col, len(lines[target_row]))
+            self.move_cursor((target_row, target_col))
+
     def _on_input_change(self) -> None:
         """Called on any input text change"""
+        self.sanitize_mouse_artifacts()
         self.update_height()
         self.update_suggestions()
 
