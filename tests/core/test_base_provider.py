@@ -489,7 +489,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         self.assertEqual(attempts, 1)
-        api_errors = [e for e in events if e[0] == "bot_text" and "**API Error:**" in e[1]]
+        api_errors = [e for e in events if e[0] == "compaction_divider" and "API Error" in e[1]]
         self.assertEqual(len(api_errors), 1)
         self.assertIn("Invalid API key", api_errors[0][1])
 
