@@ -110,7 +110,7 @@ WelcomeWidget {
     color: #ffffff;
 }
 
-.thinking-widget Markdown {
+.thinking-widget Markdown, .thinking-content {
     margin-top: 1;
     color: #a1a1aa;
 }
