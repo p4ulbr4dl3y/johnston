@@ -173,6 +173,8 @@ MarkdownBlock._get_style = _new_markdown_block_get_style
 
 
 def _handle_markdown_task_done(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
     try:
         task.exception()
     except (asyncio.CancelledError, Exception):
