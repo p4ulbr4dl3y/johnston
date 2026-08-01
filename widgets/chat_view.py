@@ -436,7 +436,8 @@ class ToolCallWidget(Vertical):
     EXPANDABLE_TOOLS = {
         "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
         "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file", "view_file",
-        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan"
+        "call_mcp_tool", "call_mcp",
+        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan", "CallMCPTool", "CallMCP"
     }
 
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
@@ -450,6 +451,12 @@ class ToolCallWidget(Vertical):
                 rt = self.result_text.strip()
                 if rt.startswith("[Image file:") or rt.startswith('{"type": "image"') or "format: " in rt.lower() or "px," in rt.lower():
                     return False
+        if self.tool_type.lower() in ("ask_user", "manage_task", "manage_subagent", "subagent", "task"):
+            return False
+        if self.tool_type in self.EXPANDABLE_TOOLS or self.tool_type.lower() in ("call_mcp_tool", "call_mcp"):
+            return True
+        if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
+            return True
         return self.tool_type in self.EXPANDABLE_TOOLS
 
     def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
