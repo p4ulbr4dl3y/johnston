@@ -73,6 +73,18 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("[Hint: MCP Tool Schema for 'read_file']", res)
         self.assertIn('"path"', res)
 
+    async def test_call_truncates_large_output(self):
+        tool = CallMCPTool()
+        mock_mgr = MagicMock()
+        mock_mgr.call_tool.return_value = "x" * 10000
+
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):
+            res = await tool.execute({"server": "srv", "tool": "big_data"})
+
+        self.assertIn("Output truncated at 8000 chars", res)
+        self.assertTrue(res.startswith("x" * 8000))
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Any, Dict, Optional
 
-from tools.base import BaseTool
+from tools.base import BaseTool, truncate_output
 
 
 class CallMCPTool(BaseTool):
@@ -58,7 +58,12 @@ class CallMCPTool(BaseTool):
             if res is not None:
                 if isinstance(res, str) and (res.startswith("Error") or "error" in res.lower()):
                     return res + _get_schema_hint()
-                return res
+                text_res = res if isinstance(res, str) else json.dumps(res, ensure_ascii=False)
+                return truncate_output(
+                    text_res,
+                    max_chars=8000,
+                    hint="Refine parameters or request partial data if complete response is needed."
+                )
         except Exception as e:
             return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}" + _get_schema_hint()
 
