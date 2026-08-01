@@ -42,7 +42,12 @@ class HelpScreen(ModalScreen[None]):
     BINDINGS = [
         ("escape", "close", "Close"),
         ("enter", "close", "Close"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        self.app.exit()
 
     def __init__(self):
         super().__init__()
