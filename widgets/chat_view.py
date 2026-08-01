@@ -11,6 +11,7 @@ import pygments
 from markdown_it import MarkdownIt
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Token
+from rich.console import Group
 from rich.markup import escape
 from rich.rule import Rule
 from rich.syntax import Syntax
@@ -532,7 +533,7 @@ class ToolCallWidget(Vertical):
         except Exception:
             return None
 
-    def _format_json_result(self, raw_text: str) -> Syntax | None:
+    def _format_json_result(self, raw_text: str) -> Syntax | Group | None:
         if not raw_text or not raw_text.strip():
             return None
         text = raw_text.strip()
@@ -540,20 +541,23 @@ class ToolCallWidget(Vertical):
         if "\n... [Output truncated" in text:
             parts = text.split("\n... [Output truncated", 1)
             text_to_parse = parts[0].strip()
-            footer = "\n\n... [Output truncated" + parts[1]
+            footer = "... [Output truncated" + parts[1]
         else:
             text_to_parse = text
 
         parsed = self._try_parse_json(text_to_parse)
         if parsed is not None:
-            pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False) + footer
-            return Syntax(
+            pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
+            syntax = Syntax(
                 pretty_json,
                 "json",
                 theme="one-dark",
                 word_wrap=True,
                 background_color="#18181b"
             )
+            if footer:
+                return Group(syntax, Text("\n" + footer.strip()))
+            return syntax
         return None
 
     def _check_is_error(self, text: str) -> bool:
