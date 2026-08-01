@@ -17,7 +17,7 @@ def format_line_pagination(
     """
     total_lines = len(lines)
     if total_lines == 0:
-        return f"=== 0 lines in {path} ===" if path else ""
+        return f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
 
     if start_line is not None:
         try:

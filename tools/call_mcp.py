@@ -56,7 +56,7 @@ class CallMCPTool(BaseTool):
         try:
             res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
             if res is not None:
-                if isinstance(res, str) and (res.startswith("Error") or "error" in res.lower()):
+                if isinstance(res, str) and (res.startswith("Error") or res.lower().startswith("error")):
                     return res + _get_schema_hint()
                 text_res = res if isinstance(res, str) else json.dumps(res, ensure_ascii=False)
                 return truncate_output(

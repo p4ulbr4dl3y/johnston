@@ -60,7 +60,6 @@ class UpdatePlanTool(BaseTool):
                 continue
             step_text = str(item.get("step") or item.get("text") or "").strip()
             status = str(item.get("status") or "pending").strip().lower()
-
             if status not in ("pending", "in_progress", "completed", "done", "todo"):
                 status = "pending"
             if status in ("done",):

@@ -165,16 +165,11 @@ class WebFetchTool(BaseTool):
         end_line = args.get("end_line")
 
         raw_lines = [line.rstrip("\r\n") for line in lines]
-        formatted = format_line_pagination(
+        return format_line_pagination(
             raw_lines,
             start_line=start_line,
             end_line=end_line,
             max_chars=8000,
+            path=url,
             hint=f"URL output has {len(lines)} lines. Use start_line/end_line to read specific ranges.",
         )
-
-        if start_line is not None or end_line is not None:
-            s_val = start_line or 1
-            e_val = end_line or len(lines)
-            return f"=== Lines {s_val}-{min(e_val, len(lines))} of {len(lines)} in {url} ===\n{formatted}"
-        return formatted

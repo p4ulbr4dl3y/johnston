@@ -17,21 +17,23 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
 
     close_lines = difflib.get_close_matches(first_line_target, [line_item.strip() for line_item in file_lines], n=2, cutoff=0.4)
     if close_lines:
-        match_line_num = 1
+        target_close = close_lines[0]
+        match_line_num = None
         for idx, line in enumerate(file_lines, start=1):
-            if close_lines[0] in line.strip():
+            if target_close == line.strip() or target_close in line.strip():
                 match_line_num = idx
                 break
 
-        start_snip = max(1, match_line_num - 2)
-        end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
-        snippet_lines = file_lines[start_snip - 1:end_snip]
-        snippet_str = "\n".join(f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip))
-        return (
-            f"\n\n[Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
-            f"{snippet_str}\n"
-            f"[Re-try with target_content matching this snippet and pass start_line={start_snip}, end_line={end_snip}]"
-        )
+        if match_line_num is not None:
+            start_snip = max(1, match_line_num - 2)
+            end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
+            snippet_lines = file_lines[start_snip - 1:end_snip]
+            snippet_str = "\n".join(f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip))
+            return (
+                f"\n\n[Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
+                f"{snippet_str}\n"
+                f"[Re-try with target_content matching this snippet and pass start_line={start_snip}, end_line={end_snip}]"
+            )
     return ""
 
 
@@ -129,7 +131,10 @@ def apply_chunk_replacements(
                 )
 
             new_sub_text = sub_text.replace(target, replacement, 1 if not allow_mult else -1)
-            lines[start_idx:end_idx] = new_sub_text.splitlines(keepends=True)
+            sub_replacement_lines = new_sub_text.splitlines(keepends=True)
+            if sub_text.endswith(("\n", "\r")) and sub_replacement_lines and not sub_replacement_lines[-1].endswith(("\n", "\r")):
+                sub_replacement_lines[-1] += "\n"
+            lines[start_idx:end_idx] = sub_replacement_lines
 
         else:
             count = current_text.count(target)
