@@ -1192,20 +1192,12 @@ class ToolCallWidget(Vertical):
                 except Exception:
                     self.content_widget.update(escape(full_display))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
-                tool_name, server, mcp_args = self._extract_mcp_call_info()
-                display_parts = [f"Server: {server}", f"Tool: {tool_name}"]
-                if mcp_args:
-                    try:
-                        args_json = json.dumps(mcp_args, indent=2, ensure_ascii=False)
-                        display_parts.append(f"Arguments:\n{args_json}")
-                    except Exception:
-                        display_parts.append(f"Arguments: {mcp_args}")
-                if self.result_text:
-                    display_parts.append(f"\nResult:\n{self.result_text.strip()}")
-                full_display = "\n".join(display_parts)
+                clean_res = (self.result_text or "(No result)").strip()
                 try:
+                    parsed = json.loads(clean_res)
+                    pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
                     syntax = Syntax(
-                        full_display,
+                        pretty_json,
                         "json",
                         theme="one-dark",
                         word_wrap=True,
@@ -1213,7 +1205,7 @@ class ToolCallWidget(Vertical):
                     )
                     self.content_widget.update(syntax)
                 except Exception:
-                    self.content_widget.update(escape(full_display))
+                    self.content_widget.update(escape(clean_res))
             else:
                 self.content_widget.update(escape(self.result_text or "(No result)"))
         except Exception:
