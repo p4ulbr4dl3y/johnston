@@ -1,6 +1,6 @@
 # Johnston System Configuration & Architecture Guide
 
-Johnston is configured via global settings in `~/.johnston/` and project-level overrides in `<project_root>/.johnston/` (and `.rules/`). Project-level configurations override global configurations with the same name.
+Johnston is configured via global settings in `~/.johnston/` and project-level overrides in `<project_root>/.johnston/`. Project-level configurations override global configurations with the same name.
 
 ---
 
@@ -23,7 +23,6 @@ Johnston is configured via global settings in `~/.johnston/` and project-level o
 │   ├── rules/*.md
 │   ├── skills/<skill_name>/SKILL.md
 │   └── modes/*.md
-└── .rules/*.md                     # Alternative project rules location
 ```
 
 ---
@@ -114,7 +113,7 @@ Inspect git diffs and code changes. Focus on potential bugs, security issues, an
 Inject system prompt rules globally or per-project. Rules can be conditionally triggered by current execution mode or modified file globs.
 
 - **Global location:** `~/.johnston/rules/<name>.md`
-- **Project location:** `.johnston/rules/<name>.md` or `.rules/<name>.md`
+- **Project location:** `.johnston/rules/<name>.md`
 - **CLI Management:** `johnston --rules`
 
 ### Markdown Format Example (`python_style.md`)

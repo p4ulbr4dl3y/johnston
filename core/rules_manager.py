@@ -59,7 +59,6 @@ class RulesManager:
             dirs.append((os.path.join(CONFIG_DIR, "rules"), "global"))
         p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
-        dirs.append((os.path.join(p_dir, ".rules"), "project"))
 
         scanned_paths = set()
         for dpath, source in dirs:

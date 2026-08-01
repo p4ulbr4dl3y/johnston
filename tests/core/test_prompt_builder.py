@@ -53,7 +53,7 @@ class TestPromptBuilder(unittest.TestCase):
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            rules_dir = os.path.join(tmpdir, ".rules")
+            rules_dir = os.path.join(tmpdir, ".johnston", "rules")
             os.makedirs(rules_dir)
             with open(os.path.join(rules_dir, "custom_rule.md"), "w") as f:
                 f.write("Always use pytest")
