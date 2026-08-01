@@ -483,8 +483,6 @@ class CompactCommand(BaseCommand):
 
                     if hasattr(app, "refresh_status_footer"):
                         app.refresh_status_footer()
-                    if hasattr(app, "save_current_session"):
-                        app.save_current_session()
                 else:
                     if divider and hasattr(divider, "update_title"):
                         divider.update_title(f"Compaction Failed: {msg}")
@@ -494,6 +492,12 @@ class CompactCommand(BaseCommand):
                     divider.update_title("Compaction Cancelled")
                 raise
             finally:
+                if hasattr(app, "save_current_session"):
+                    try:
+                        app.save_current_session()
+                    except Exception:
+                        pass
+
                 if getattr(app, "message_queue", None):
                     next_item = app.message_queue.pop(0)
                     prompt = next_item[0]
