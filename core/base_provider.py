@@ -846,7 +846,8 @@ class BaseAgent:
 
         except Exception as err:
             error_msg = format_api_error(err)
-            yield ("bot_text", error_msg, "")
+            clean_msg = error_msg.replace("**API Error:**", "API Error:").replace("**", "").replace("`", "").strip()
+            yield ("compaction_divider", clean_msg, "")
         finally:
             if len(messages) > 1:
                 self.history = messages[1:]
