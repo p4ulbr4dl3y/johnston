@@ -169,7 +169,7 @@ def print_rules():
         found_any = True
 
     if not found_any:
-        print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .rules/).")
+        print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .johnston/rules/).")
 
 
 def print_modes():

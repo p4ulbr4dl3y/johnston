@@ -78,7 +78,7 @@ def get_project_instructions_snippet() -> str:
 
 
 def get_rules_snippet(mode: str = "action") -> str:
-    """Reads rules from ~/.johnston/rules, <cwd>/.johnston/rules, and <cwd>/.rules using RulesManager."""
+    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager."""
     from core.rules_manager import RulesManager
     return RulesManager.get_instance().get_formatted_rules(mode=mode)
 
