@@ -489,6 +489,49 @@ class ToolCallWidget(Vertical):
         clean = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
         return escape(clean)
 
+    def _try_parse_json(self, text: str) -> Any:
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+        if not text or not (text.startswith("{") or text.startswith("[")):
+            return None
+        stack = []
+        in_string = False
+        escaped = False
+        for char in text:
+            if escaped:
+                escaped = False
+                continue
+            if char == '\\':
+                escaped = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if char in '[{':
+                stack.append(char)
+            elif char == ']' and stack and stack[-1] == '[':
+                stack.pop()
+            elif char == '}' and stack and stack[-1] == '{':
+                stack.pop()
+
+        repair = ""
+        if in_string:
+            repair += '"'
+        for opener in reversed(stack):
+            if opener == '[':
+                repair += ']'
+            elif opener == '{':
+                repair += '}'
+
+        try:
+            return json.loads(text + repair)
+        except Exception:
+            return None
+
     def _format_json_result(self, raw_text: str) -> Syntax | None:
         if not raw_text or not raw_text.strip():
             return None
@@ -501,8 +544,8 @@ class ToolCallWidget(Vertical):
         else:
             text_to_parse = text
 
-        try:
-            parsed = json.loads(text_to_parse)
+        parsed = self._try_parse_json(text_to_parse)
+        if parsed is not None:
             pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False) + footer
             return Syntax(
                 pretty_json,
@@ -511,8 +554,7 @@ class ToolCallWidget(Vertical):
                 word_wrap=True,
                 background_color="#18181b"
             )
-        except Exception:
-            return None
+        return None
 
     def _check_is_error(self, text: str) -> bool:
         if isinstance(self.args, dict) and self.args.get("is_error"):
