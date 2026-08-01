@@ -480,7 +480,7 @@ class ToolCallWidget(Vertical):
         is_clickable = self.is_expandable() or self.tool_type.lower() in ("subagent", "task")
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
-        self.content_widget = Static("", classes="tool-content")
+        self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
 
     def _check_is_error(self, text: str) -> bool:
@@ -1048,7 +1048,7 @@ class ToolCallWidget(Vertical):
                         rendered = self._format_code_with_line_numbers(content)
                         self.content_widget.update(rendered)
                 else:
-                    self.content_widget.update(escape(self.result_text or "(No content)"))
+                    self.content_widget.update(Text.from_ansi(self.result_text or "(No content)"))
             elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
                 diff_text = self.result_text.strip()
                 if not diff_text or "@@" not in diff_text:
@@ -1102,7 +1102,7 @@ class ToolCallWidget(Vertical):
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
                     self.content_widget.update(formatted_diff)
                 else:
-                    self.content_widget.update(escape(self.result_text or "(No diff)"))
+                    self.content_widget.update(Text.from_ansi(self.result_text or "(No diff)"))
             elif self.tool_type in ("update_plan", "Plan", "plan"):
                 plan_items = self.args.get("plan") or []
                 explanation = self.args.get("explanation", "")
@@ -1155,7 +1155,7 @@ class ToolCallWidget(Vertical):
                         rendered = self._format_code_with_line_numbers(clean_code)
                         self.content_widget.update(rendered)
                 else:
-                    self.content_widget.update(escape(self.result_text or "(No content)"))
+                    self.content_widget.update(Text.from_ansi(self.result_text or "(No content)"))
             elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
@@ -1172,7 +1172,7 @@ class ToolCallWidget(Vertical):
                         output_text = "(Running command...)"
                     else:
                         output_text = "(No output)"
-                self.content_widget.update(escape(output_text))
+                self.content_widget.update(Text.from_ansi(output_text))
             elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
                 server = self.args.get("server", "")
                 tool = self.args.get("tool", "")
@@ -1190,7 +1190,7 @@ class ToolCallWidget(Vertical):
                     )
                     self.content_widget.update(syntax)
                 except Exception:
-                    self.content_widget.update(escape(full_display))
+                    self.content_widget.update(Text.from_ansi(full_display))
             elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
                 clean_res = (self.result_text or "(No result)").strip()
                 try:
@@ -1205,9 +1205,9 @@ class ToolCallWidget(Vertical):
                     )
                     self.content_widget.update(syntax)
                 except Exception:
-                    self.content_widget.update(escape(clean_res))
+                    self.content_widget.update(Text.from_ansi(clean_res))
             else:
-                self.content_widget.update(escape(self.result_text or "(No result)"))
+                self.content_widget.update(Text.from_ansi(self.result_text or "(No result)"))
         except Exception:
             pass
 
