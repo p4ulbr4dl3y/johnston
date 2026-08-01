@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.13.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.12.0...johnston-v0.13.0) (2026-08-01)
+
+
+### Features
+
+* **ui:** add status colors for tool call headers ([b819705](https://github.com/p4ulbr4dl3y/johnston/commit/b819705faaa5bc9dd78e652458a8bffe4781289c))
+* **ui:** format JSON tool output with multi-line indentation and syntax highlighting ([00965a9](https://github.com/p4ulbr4dl3y/johnston/commit/00965a9f58d08f96dbe6a4ae9677729fa7cd46cc))
+* **ui:** format truncated JSON tool outputs with partial JSON parser ([51c7593](https://github.com/p4ulbr4dl3y/johnston/commit/51c7593ee09e173d24db4c43881d4c1a2716c45d))
+* **ui:** make call_mcp_tool and custom MCP tools expandable ([0f7efa6](https://github.com/p4ulbr4dl3y/johnston/commit/0f7efa625d41d3dc6967bdb056de80d2cbcf0f50))
+* **ui:** render output truncation notice as plain text below JSON syntax block ([5a7f84c](https://github.com/p4ulbr4dl3y/johnston/commit/5a7f84c23b8f7314a355356bcf17df09fb3f7e6c))
+
+
+### Bug Fixes
+
+* **prompt:** enforce strict non-polling rule for async actions ([6aebd0a](https://github.com/p4ulbr4dl3y/johnston/commit/6aebd0afaa2167c0df6db7011eefe2cdc1d1d6bf))
+* **ui:** clean up MCP tool result formatting in UI ([4004f65](https://github.com/p4ulbr4dl3y/johnston/commit/4004f65ef553db475c8c551d582840451cf17ad2))
+* **ui:** disable markup parsing on ToolCallWidget content to prevent Textual MarkupError ([0ecd0d2](https://github.com/p4ulbr4dl3y/johnston/commit/0ecd0d271aa801b3821a92be19146ab97459d5cd))
+* **ui:** prevent MarkupError by disabling markup on tool content and using Text.from_ansi ([59a700a](https://github.com/p4ulbr4dl3y/johnston/commit/59a700abfa59c6bafa37d30b903384c044da2110))
+* **ui:** prevent TUI freeze on message submission ([a98177e](https://github.com/p4ulbr4dl3y/johnston/commit/a98177e5e1d6c35628410920468361755f55b434))
+* **ui:** sanitize ANSI escape codes prior to Rich markup escaping ([bcbe711](https://github.com/p4ulbr4dl3y/johnston/commit/bcbe71151cfd27e7a0dc166efe65ce9139c31883))
+
 ## [0.12.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.11.0...johnston-v0.12.0) (2026-08-01)
 
 
