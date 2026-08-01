@@ -1,6 +1,7 @@
 import hashlib
 import os
 import subprocess
+import uuid
 from typing import List, Optional
 
 from core.platform_utils import johnston_config_dir
@@ -189,7 +190,7 @@ class GitCheckpointManager:
             return None
         head_sha = head_res.stdout.strip()
 
-        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}")
+        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
         env = os.environ.copy()
         env["GIT_DIR"] = shadow_dir
         env["GIT_WORK_TREE"] = cwd
@@ -315,7 +316,7 @@ class GitCheckpointManager:
             return None
         commit_sha = rev_res.stdout.strip()
 
-        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}")
+        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
         env = os.environ.copy()
         env["GIT_DIR"] = shadow_dir
         env["GIT_WORK_TREE"] = cwd

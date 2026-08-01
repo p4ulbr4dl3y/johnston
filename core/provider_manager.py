@@ -443,7 +443,7 @@ class ProviderManager:
                     data = json.load(f)
                 efforts = data.get("provider_thinking_efforts", {})
                 provider_efforts = efforts.get(provider_key, {})
-                if model_name and model_name in provider_efforts:
+                if model_name in provider_efforts:
                     norm = normalize_thinking_effort(provider_efforts[model_name])
                     if norm:
                         return norm

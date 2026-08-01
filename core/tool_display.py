@@ -58,8 +58,6 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
             return _truncate(act)
         return tool_name
 
-        return tool_name
-
     # Prioritize file path arguments first for file operations
     for key in ("TargetFile", "target_file", "path", "file", "file_path", "filepath", "filename", "image_path"):
         val = args.get(key)
