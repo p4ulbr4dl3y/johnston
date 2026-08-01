@@ -40,9 +40,9 @@ class ManageSubagentTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
-        action = args.get("action", "").strip().lower()
-        task_id = args.get("task_id", "").strip()
-        message = args.get("message", "").strip()
+        action = (args.get("action") or "").strip().lower()
+        task_id = (args.get("task_id") or "").strip()
+        message = (args.get("message") or "").strip()
 
         tracker = SubagentTracker.get_instance()
 

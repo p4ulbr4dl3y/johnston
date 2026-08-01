@@ -33,7 +33,7 @@ class CreateTool(BaseTool):
         path = resolve_path(args.get("path"))
         if os.path.isdir(path):
             return f"Error: '{path}' is a directory, cannot overwrite with file."
-        content = args.get("content", "").rstrip("\r\n")
+        content = (args.get("content") or "").rstrip("\r\n")
         try:
             await asyncio.to_thread(_write_file, path, content)
             linter_output = await run_linter(path)
