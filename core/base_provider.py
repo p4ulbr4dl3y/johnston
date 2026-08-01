@@ -1014,16 +1014,18 @@ class BaseAgent:
             # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
             try:
                 from core.adapters import get_adapter
-                adapter = get_adapter(self.api_type)
+                adapter = get_adapter(getattr(self, "api_type", "openai"))
                 chunks = []
-                async for event_type, content, _ in adapter.stream_chat(
-                    client=self.client,
-                    model=self.model,
-                    messages=compact_messages,
-                    tools=[],
+                async for tag, payload in adapter.stream_chat(
+                    getattr(self, "base_url", ""),
+                    getattr(self, "api_key", ""),
+                    getattr(self, "model", ""),
+                    compact_messages,
+                    tools=None,
+                    max_tokens=getattr(self, "max_tokens", 4096),
                 ):
-                    if event_type == "text" and content:
-                        chunks.append(content)
+                    if tag == "adapter_text" and payload:
+                        chunks.append(payload)
                 summary_text = "".join(chunks).strip()
             except Exception as stream_e:
                 last_err = str(stream_e)
