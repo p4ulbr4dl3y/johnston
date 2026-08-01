@@ -19,7 +19,7 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
     if close_lines:
         match_line_num = 1
         for idx, line in enumerate(file_lines, start=1):
-            if close_lines[0] in line:
+            if close_lines[0] in line.strip():
                 match_line_num = idx
                 break
 
@@ -111,15 +111,15 @@ def apply_chunk_replacements(
             count = sub_text.count(target)
             if count == 0:
                 target_first_line = target.splitlines()[0] if target.splitlines() else target
-                found_line = 1
+                found_line = None
                 for l_no, line_str in enumerate(lines, start=1):
                     if target_first_line in line_str:
                         found_line = l_no
                         break
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
+                loc_msg = f" Target content was found elsewhere around line {found_line}." if found_line else ""
                 raise ValueError(
-                    f"Error: target_content not found between lines {s_line} and {e_line} in '{path}'. "
-                    f"Target content was found elsewhere around line {found_line}.{hint}"
+                    f"Error: target_content not found between lines {s_line} and {e_line} in '{path}'.{loc_msg}{hint}"
                 )
 
             if count > 1 and not allow_mult:
