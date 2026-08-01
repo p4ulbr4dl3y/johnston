@@ -77,18 +77,18 @@ class BackgroundTask:
                             break
                         if not chunk:
                             break
-                        text = strip_ansi(chunk.decode("utf-8", errors="replace"))
+                        text = chunk.decode("utf-8", errors="replace")
                     else:
                         line = await self.process.stdout.readline()
                         if not line:
                             break
-                        text = strip_ansi(line.decode("utf-8", errors="replace"))
+                        text = line.decode("utf-8", errors="replace")
 
                     self.output.append(text)
                     if self.widget and hasattr(self.widget, "append_bash_output"):
                         try:
                             if getattr(self.widget, "is_mounted", True):
-                                self.widget.append_bash_output(text)
+                                self.widget.append_bash_output(strip_ansi(text))
                         except Exception:
                             pass
             except Exception:

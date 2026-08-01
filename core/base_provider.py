@@ -992,55 +992,44 @@ class BaseAgent:
 
         summary_text = ""
         try:
-            # 1. Try streaming request first (required by custom providers like OpenCode/Mimo)
+            # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
             try:
-                stream_res = await self.client.chat.completions.create(
+                from core.adapters import get_adapter
+                adapter = get_adapter(self.api_type)
+                chunks = []
+                async for event_type, content, _ in adapter.stream_chat(
+                    client=self.client,
                     model=self.model,
                     messages=compact_messages,
-                    stream=True
-                )
-                chunks = []
-                async for chunk in stream_res:
-                    if chunk is None:
-                        continue
-                    choices = chunk.get("choices") if isinstance(chunk, dict) else getattr(chunk, "choices", None)
-                    if not choices:
-                        continue
-                    first_choice = choices[0]
-                    if not first_choice:
-                        continue
-                    delta = first_choice.get("delta") if isinstance(first_choice, dict) else getattr(first_choice, "delta", None)
-                    if delta:
-                        content = delta.get("content") if isinstance(delta, dict) else getattr(delta, "content", None)
-                        if content:
-                            chunks.append(content)
-                    else:
-                        msg_obj = first_choice.get("message") if isinstance(first_choice, dict) else getattr(first_choice, "message", None)
-                        if msg_obj:
-                            content = msg_obj.get("content") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", None)
-                            if content:
-                                chunks.append(content)
+                    tools=[],
+                ):
+                    if event_type == "text" and content:
+                        chunks.append(content)
                 summary_text = "".join(chunks).strip()
             except Exception:
                 summary_text = ""
 
-            # 2. Fallback to stream=False if streaming produced no content or failed
-            if not summary_text:
-                res = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=compact_messages,
-                    stream=False
-                )
-                if res:
-                    choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
-                    if choices and choices[0]:
-                        first_choice = choices[0]
-                        if isinstance(first_choice, dict):
-                            msg_obj = first_choice.get("message", {})
-                            summary_text = msg_obj.get("content", "") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", "")
-                        else:
-                            msg_obj = getattr(first_choice, "message", None)
-                            summary_text = getattr(msg_obj, "content", "") if msg_obj else ""
+            # 2. Fallback to direct client completions if adapter stream produced no content
+            if not summary_text and hasattr(self.client, "chat") and hasattr(self.client.chat, "completions"):
+                try:
+                    res = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=compact_messages,
+                        stream=False
+                    )
+                    if res:
+                        choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
+                        if choices and choices[0]:
+                            first_choice = choices[0]
+                            if isinstance(first_choice, dict):
+                                msg_obj = first_choice.get("message", {})
+                                summary_text = msg_obj.get("content", "") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", "")
+                            else:
+                                msg_obj = getattr(first_choice, "message", None)
+                                if msg_obj:
+                                    summary_text = getattr(msg_obj, "content", "") or ""
+                except Exception:
+                    pass
 
             summary_text = (summary_text or "").strip()
             if not summary_text:
