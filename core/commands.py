@@ -489,6 +489,10 @@ class CompactCommand(BaseCommand):
                     if divider and hasattr(divider, "update_title"):
                         divider.update_title(f"Compaction Failed: {msg}")
                     app.notify(msg or "Context compaction failed", severity="warning")
+            except asyncio.CancelledError:
+                if divider and hasattr(divider, "update_title"):
+                    divider.update_title("Compaction Cancelled")
+                raise
             finally:
                 if getattr(app, "message_queue", None):
                     next_item = app.message_queue.pop(0)

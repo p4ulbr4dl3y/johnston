@@ -249,6 +249,21 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(triggered[0], ("Queued prompt during compact", True))
         self.assertEqual(len(app.message_queue), 0)
 
+    async def test_compact_command_cancellation_updates_divider(self):
+        import asyncio
+
+        class CancellingMockAgent(MockAgent):
+            async def compact_history(self):
+                raise asyncio.CancelledError()
+
+        agent = CancellingMockAgent()
+        app = MockApp(agent=agent)
+        with self.assertRaises(asyncio.CancelledError):
+            await handle_slash_command(app, "/compact")
+
+        self.assertEqual(len(app.chat_view.dividers), 1)
+        self.assertEqual(app.chat_view.dividers[0].divider_title, "Compaction Cancelled")
+
     async def test_init_command(self):
         app = MockApp()
         handled = await handle_slash_command(app, "/init")
