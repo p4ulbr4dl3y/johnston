@@ -382,7 +382,7 @@ ToastRack {
 Toast {
     background: #18181b;
     color: #f4f4f5;
-    border-left: solid #ffffff;
+    border-left: solid #61afef;
     border-top: none;
     border-right: none;
     border-bottom: none;
@@ -391,19 +391,19 @@ Toast {
 Toast.-information {
     background: #18181b;
     color: #f4f4f5;
-    border-left: solid #ffffff;
+    border-left: solid #61afef;
 }
 
 Toast.-warning {
     background: #18181b;
     color: #f4f4f5;
-    border-left: solid #a1a1aa;
+    border-left: solid #e5c07b;
 }
 
 Toast.-error {
     background: #18181b;
     color: #ffffff;
-    border-left: solid #ffffff;
+    border-left: solid #e06c75;
 }
 
 /* Modal Dialog Styles - Pure Dark Glassmorphism Effect */
