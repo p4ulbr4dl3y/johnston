@@ -466,12 +466,35 @@ class ToolCallWidget(Vertical):
         self.args = args or {}
         self.icon_name = tool_type
         self.is_expanded = False
+        self.status = "running"
+        if result_text:
+            self.status = "error" if self._check_is_error(result_text) else "done"
 
         is_clickable = self.is_expandable() or self.tool_type.lower() in ("subagent", "task")
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content")
         self.md_widget = Markdown("", classes="tool-content-md")
+
+    def _check_is_error(self, text: str) -> bool:
+        if isinstance(self.args, dict) and self.args.get("is_error"):
+            return True
+        if not text:
+            return False
+        cleaned = text.strip().lower()
+        if cleaned.startswith(("error:", "[error]", "exception:", "failed:", "failure:", "fatal:", "permission denied", "command failed")):
+            return True
+        if "traceback (most recent call last):" in cleaned or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
+            return True
+        return False
+
+    def _get_status_color(self) -> str:
+        if self.status == "running":
+            return "#e5c07b"
+        elif self.status == "error":
+            return "#e06c75"
+        else:
+            return "#98c379"
 
     def _extract_mcp_call_info(self) -> tuple[str, str, dict]:
         args = self.args if isinstance(self.args, dict) else {}
@@ -553,16 +576,22 @@ class ToolCallWidget(Vertical):
         self.md_widget.display = False
         self.render_header()
 
-    def set_result(self, result_text: str) -> None:
+    def set_result(self, result_text: str, is_error: bool = False) -> None:
         cleaned = result_text.strip()
         if self.tool_type in ("shell", "Shell", "bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
+                self.status = "running"
                 self.render_header()
                 return
             if cleaned:
                 self.result_text = cleaned
         else:
             self.result_text = cleaned
+
+        if is_error or self._check_is_error(cleaned):
+            self.status = "error"
+        else:
+            self.status = "done"
 
         if not self.is_expandable():
             self.is_expanded = False
@@ -615,6 +644,7 @@ class ToolCallWidget(Vertical):
     }
 
     def render_header(self) -> None:
+        c = self._get_status_color()
         if self.tool_type.lower() in ("update_plan", "plan"):
             plan_items = self.args.get("plan") or []
             if isinstance(plan_items, list) and plan_items:
@@ -627,32 +657,32 @@ class ToolCallWidget(Vertical):
                     target_str = f"[{completed}/{total} completed]"
             else:
                 target_str = "Plan"
-            self.header_label.update(f"⚙ [bold #ffffff]Plan[/bold #ffffff]({escape(target_str)})")
+            self.header_label.update(f"[{c}]⚙ [bold]Plan[/bold][/{c}]({escape(target_str)})")
         elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
             tool_name = self.args.get("tool") or self.target
-            self.header_label.update(f"⚙ [bold]GetMCPSchema[/bold]({escape(str(tool_name))})")
+            self.header_label.update(f"[{c}]⚙ [bold]GetMCPSchema[/bold][/{c}]({escape(str(tool_name))})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             from core.tool_display import extract_tool_display
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
-            self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(str(target_str))})")
+            self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
             tool_name, server, mcp_args = self._extract_mcp_call_info()
             compact = self._format_compact_dict(mcp_args)
             if not compact:
                 compact = f'{{server: "{server}"}}' if server else "{}"
             escaped_compact = escape(compact)
-            self.header_label.update(f"⚙ [bold]{tool_name}[/bold]({escaped_compact})")
+            self.header_label.update(f"[{c}]⚙ [bold]{tool_name}[/bold][/{c}]({escaped_compact})")
         else:
             # Eager MCP tool or custom external tool
             mcp_args = self.args if isinstance(self.args, dict) else {}
             compact = self._format_compact_dict(mcp_args)
             if compact:
                 escaped_compact = escape(compact)
-                self.header_label.update(f"⚙ [bold]{self.tool_type}[/bold]({escaped_compact})")
+                self.header_label.update(f"[{c}]⚙ [bold]{self.tool_type}[/bold][/{c}]({escaped_compact})")
             else:
                 display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
-                self.header_label.update(f"⚙ [bold]{display_name}[/bold]({escape(self.target)})")
+                self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
 
     def on_click(self, event) -> None:
         if self.tool_type.lower() in ("subagent", "task"):
