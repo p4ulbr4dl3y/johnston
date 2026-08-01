@@ -644,8 +644,6 @@ class ToolCallWidget(Vertical):
     }
 
     def render_header(self) -> None:
-        self.remove_class("tool-running", "tool-done", "tool-error")
-        self.add_class(f"tool-{self.status}")
         c = self._get_status_color()
         if self.tool_type.lower() in ("update_plan", "plan"):
             plan_items = self.args.get("plan") or []
