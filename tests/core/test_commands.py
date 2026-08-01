@@ -25,14 +25,28 @@ class MockAgent:
         self.history = []
 
 
+class MockDivider:
+    def __init__(self, title):
+        self.divider_title = title
+
+    def update_title(self, title):
+        self.divider_title = title
+
+
 class MockChatView:
     def __init__(self, children=None):
         self.children = children or []
+        self.dividers = []
 
     async def add_bot_message(self):
         msg = MockBotMessage("")
         self.children.append(msg)
         return msg
+
+    async def add_compaction_divider(self, text="Session Compacted"):
+        d = MockDivider(text)
+        self.dividers.append(d)
+        return d
 
 
 class MockBotMessage:
@@ -192,11 +206,18 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.status_refreshed)
 
     async def test_compact_command(self):
-        agent = MockAgent()
+        class DetailedMockAgent(MockAgent):
+            async def compact_history(self):
+                self.compact_called = True
+                return True, "History compacted successfully (12k → 2k tokens)"
+
+        agent = DetailedMockAgent()
         app = MockApp(agent=agent)
         handled = await handle_slash_command(app, "/compact")
         self.assertTrue(handled)
         self.assertTrue(agent.compact_called)
+        self.assertEqual(len(app.chat_view.dividers), 1)
+        self.assertEqual(app.chat_view.dividers[0].divider_title, "Session Compacted (12k → 2k tokens)")
 
     async def test_init_command(self):
         app = MockApp()

@@ -301,6 +301,11 @@ class CompactionDivider(Static):
         self.divider_title = title
         super().__init__(Rule(title, style="dim #71717a"), classes="compaction-divider")
 
+    def update_title(self, title: str) -> None:
+        self.divider_title = title
+        self.update(Rule(title, style="dim #71717a"))
+
+
 
 class UserMessage(Static):
     """User message"""

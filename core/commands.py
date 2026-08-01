@@ -455,19 +455,38 @@ class CompactCommand(BaseCommand):
             return
 
         if hasattr(app.agent, "compact_history"):
+            chat_view = None
+            divider = None
+            if hasattr(app, "query_one"):
+                try:
+                    from widgets.chat_view import ChatView
+                    cv = app.query_one(ChatView)
+                    if cv and hasattr(cv, "add_compaction_divider"):
+                        chat_view = cv
+                        divider = await chat_view.add_compaction_divider("Compacting session...")
+                except Exception:
+                    pass
+
             success, msg = await app.agent.compact_history()
             if success:
+                title = "Session Compacted"
+                if msg and "(" in msg and ")" in msg:
+                    tokens_info = msg[msg.find("(") + 1 : msg.rfind(")")]
+                    title = f"Session Compacted ({tokens_info})"
+
+                if divider and hasattr(divider, "update_title"):
+                    divider.update_title(title)
+                elif chat_view and hasattr(chat_view, "add_compaction_divider"):
+                    await chat_view.add_compaction_divider(title)
+
                 if hasattr(app, "refresh_status_footer"):
                     app.refresh_status_footer()
-                if hasattr(app, "query_one"):
-                    try:
-                        from widgets.chat_view import ChatView
-                        chat_view = app.query_one(ChatView)
-                        await chat_view.add_compaction_divider("Session Compacted")
-                    except Exception:
-                        pass
                 if hasattr(app, "save_current_session"):
                     app.save_current_session()
+            else:
+                if divider and hasattr(divider, "update_title"):
+                    divider.update_title(f"Compaction Failed: {msg}")
+                app.notify(msg or "Context compaction failed", severity="warning")
         else:
             app.notify("Active agent does not support context compaction", severity="warning")
 
