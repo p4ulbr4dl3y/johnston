@@ -518,14 +518,12 @@ class BaseAgent:
                     yield ("thinking", f"{budget_decision.reason} Stopping to prevent runaway tool execution.", "")
                     break
                 current_mode = getattr(self, "mode", "action")
-                if current_mode != active_prompt_mode:
-                    active_prompt_mode = current_mode
-                    builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name)
-                    sys_prompt = builder.build_system_prompt()
-                    all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
-                    self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
-                    if messages and messages[0].get("role") == "system":
-                        messages[0]["content"] = sys_prompt
+                builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name)
+                sys_prompt = builder.build_system_prompt()
+                all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
+                if messages and messages[0].get("role") == "system":
+                    messages[0]["content"] = sys_prompt
 
                 full_assistant_text = ""
                 step_usage = None
