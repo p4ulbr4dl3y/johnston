@@ -601,6 +601,16 @@ class JohnstonApp(App):
                         await self.save_current_session_async()
                     except Exception:
                         pass
+                elif event_type == "queued_user_message":
+                    q_msg = val1
+                    q_atts = val2 if val2 else None
+                    q_show = val3 if val3 is not None else True
+                    if q_show:
+                        await chat_view.add_user_message(q_msg, attachments=q_atts)
+                        try:
+                            await self.save_current_session_async()
+                        except Exception:
+                            pass
                 elif event_type in ("bot_chunk", "bot_delta"):
                     if val1.strip():
                         if bot_msg is None:
