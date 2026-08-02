@@ -67,7 +67,8 @@ class CallMCPTool(BaseTool):
                 return truncate_output(
                     text_res,
                     max_chars=8000,
-                    hint="Refine parameters or request partial data if complete response is needed."
+                    hint="Refine parameters or request partial data if complete response is needed.",
+                    tool_name=f"mcp_{tool}",
                 )
         except Exception as e:
             return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}" + _get_schema_hint()

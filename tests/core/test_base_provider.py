@@ -586,6 +586,43 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tool_msg["role"], "tool")
         self.assertIn("[Hint: You do not support vision. Tell user you cannot view images. Do not retry.]", tool_msg["content"])
 
+    async def test_stream_cancelled_error_records_tokens(self):
+        import asyncio
+        agent = BaseAgent(api_key="t", model="m", base_url="http://t", provider_key="tprov")
+        self.addAsyncCleanup(agent.close)
+
+        chunk = unittest.mock.MagicMock()
+        chunk.usage = None
+        choice = unittest.mock.MagicMock()
+        delta = unittest.mock.NonCallableMagicMock(spec=["content", "tool_calls", "reasoning_content", "reasoning", "model_extra"])
+        delta.content = "hi"
+        delta.tool_calls = None
+        delta.reasoning_content = None
+        delta.reasoning = None
+        delta.model_extra = {}
+        choice.delta = delta
+        chunk.choices = [choice]
+
+        async def slow_iter():
+            yield chunk
+            while True:
+                await asyncio.sleep(10)
+
+        class MockAsyncStream:
+            def __aiter__(self):
+                return slow_iter()
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock, return_value=MockAsyncStream()):
+            gen = agent.stream_steps("Hello cancelled")
+            await gen.__anext__()
+            try:
+                await gen.athrow(asyncio.CancelledError())
+            except (asyncio.CancelledError, StopAsyncIteration):
+                pass
+
+        self.assertGreater(agent.tokens_input, 0)
+        self.assertGreaterEqual(agent.total_tokens, agent.tokens_input)
+
 
 if __name__ == "__main__":
     unittest.main()

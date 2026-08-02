@@ -190,7 +190,7 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
-            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
+            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
 
         try:
             await asyncio.wait_for(p.wait(), timeout=60.0)
@@ -203,7 +203,7 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
-            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.")
+            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
         except asyncio.TimeoutError:
             task.is_background = True
             ctx.add_background_task(task)

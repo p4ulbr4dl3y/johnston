@@ -676,6 +676,30 @@ class BaseAgent:
                         # Stream completed successfully
                         circuit_breaker.record_success(pkey)
                         break
+                    except asyncio.CancelledError:
+                        pricing = catalog.get_model_pricing(self.provider_key, self.model)
+                        p_prompt = pricing.get("prompt", 0.0)
+                        p_comp = pricing.get("completion", 0.0)
+
+                        if step_usage and step_usage.get("total_tokens", 0) > 0:
+                            in_tok = step_usage["prompt_tokens"]
+                            out_tok = step_usage["completion_tokens"]
+                            cache_read_tok = step_usage.get("cache_read_tokens", 0)
+                            uncached_in = max(0, in_tok - cache_read_tok)
+                            cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
+                            self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
+                        else:
+                            in_tok = prompt_tokens_est
+                            out_tok = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
+                            cache_read_tok = 0
+                            self.cost_usd += (in_tok * p_prompt + out_tok * p_comp)
+
+                        self.tokens_input += in_tok
+                        self.tokens_output += out_tok
+                        self.tokens_cache_read += cache_read_tok
+                        self.last_context_tokens = in_tok
+                        self.total_tokens += (in_tok + out_tok)
+                        raise
                     except Exception as api_err:
                         if self._is_vision_error(api_err):
                             sanitized = self._sanitize_vision_error_messages(messages)

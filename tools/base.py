@@ -41,21 +41,36 @@ def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
     atomic_write_text(path, content)
 
 
-def truncate_output(text: str, max_chars: int = 8000, hint: str = "", save_log: bool = True) -> str:
-    """Truncates text safely if it exceeds max_chars, saving full output to log file."""
+def truncate_output(
+    text: str,
+    max_chars: int = 8000,
+    hint: str = "",
+    save_log: bool = True,
+    tool_name: str = "",
+    tool_id: str = "",
+) -> str:
+    """Truncates text safely if it exceeds max_chars, saving full output to a unique log file."""
     if len(text) <= max_chars:
         return text
 
-    from core.config import LAST_TOOL_LOG_FILE
+    from core.config import LAST_TOOL_LOG_FILE, LOGS_DIR
 
-    log_path = LAST_TOOL_LOG_FILE
     if save_log:
+        import uuid
+        name_prefix = f"{tool_name}_" if tool_name else "tool_"
+        unique_id = tool_id if tool_id else uuid.uuid4().hex[:8]
+        filename = f"{name_prefix}{unique_id}.log"
+        log_path = os.path.join(LOGS_DIR, filename)
         try:
-            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            os.makedirs(LOGS_DIR, exist_ok=True)
             with open(log_path, "w", encoding="utf-8") as f:
+                f.write(text)
+            with open(LAST_TOOL_LOG_FILE, "w", encoding="utf-8") as f:
                 f.write(text)
         except Exception:
             pass
+    else:
+        log_path = LAST_TOOL_LOG_FILE
 
     truncated = text[:max_chars]
     footer = f"\n... [Output truncated at {max_chars} chars."
