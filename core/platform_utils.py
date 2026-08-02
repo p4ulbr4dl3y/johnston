@@ -12,7 +12,7 @@ def is_windows() -> bool:
 
 
 def supports_pty() -> bool:
-    return not is_windows()
+    return False
 
 
 def johnston_config_dir() -> Path:
@@ -44,9 +44,13 @@ def shell_env() -> dict[str, str]:
     env = os.environ.copy()
     env["TERM"] = "dumb"
     env["NO_COLOR"] = "1"
+    env["FORCE_COLOR"] = "0"
     env["PYTHONUNBUFFERED"] = "1"
     env["PAGER"] = "cat"
     env["GIT_PAGER"] = "cat"
+    env["CI"] = "1"
+    env["DEBIAN_FRONTEND"] = "noninteractive"
+    env["CLI_AUTO_PROMPT"] = "0"
     return env
 
 
