@@ -167,7 +167,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait = _mock_wait
 
         async def custom_wait_for(fut, timeout):
-            if timeout == 10.0:
+            if timeout == 60.0:
                 raise asyncio.TimeoutError()
             return await fut
 
