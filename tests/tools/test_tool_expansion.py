@@ -252,8 +252,8 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
 
-        widget.append_bash_output("line 1\n")
-        widget.append_bash_output("line 2\n")
+        widget.append_shell_output("line 1\n")
+        widget.append_shell_output("line 2\n")
 
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, "line 1\nline 2")

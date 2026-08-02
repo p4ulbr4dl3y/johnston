@@ -1079,7 +1079,7 @@ class ToolCallWidget(Vertical):
         cleaned = re.sub(r"Use (manage_task|ManageTask) to inspect[^\n]*", "", cleaned)
         return cleaned.strip()
 
-    def append_bash_output(self, text: str) -> None:
+    def append_shell_output(self, text: str) -> None:
         if not hasattr(self, "_raw_bash_buffer"):
             self._raw_bash_buffer = ""
         self._raw_bash_buffer += text
@@ -1088,6 +1088,8 @@ class ToolCallWidget(Vertical):
         self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
             self.render_content()
+
+    append_bash_output = append_shell_output
 
     def render_content(self) -> None:
         try:
