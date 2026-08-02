@@ -859,7 +859,12 @@ class BaseAgent:
                 tool_app = getattr(self, "app", None)
                 if tool_app and getattr(tool_app, "message_queue", None):
                     # Use a while loop to drain the queue in case multiple are queued
+                    queue_drained_any = False
                     while tool_app.message_queue:
+                        if not queue_drained_any:
+                            yield ("compaction_divider", "Queued Message", "")
+                            queue_drained_any = True
+                            
                         queued_item = tool_app.message_queue.pop(0)
                         q_msg = queued_item[0]
                         q_show = queued_item[1] if len(queued_item) > 1 else True
