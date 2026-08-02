@@ -511,7 +511,6 @@ class BaseAgent:
                     max_writes=_resolve_limit(getattr(self, "max_writes", None), configured_budget.max_writes),
                 )
             )
-            active_prompt_mode = agent_mode
             while True:
                 budget_decision = budget.before_step()
                 if not budget_decision.allowed:
@@ -855,6 +854,45 @@ class BaseAgent:
                         "tool_call_id": t_id,
                         "content": content_str
                     })
+
+                # Check for queued user messages to inject mid-generation
+                tool_app = getattr(self, "app", None)
+                if tool_app and getattr(tool_app, "message_queue", None):
+                    # Use a while loop to drain the queue in case multiple are queued
+                    while tool_app.message_queue:
+                        queued_item = tool_app.message_queue.pop(0)
+                        q_msg = queued_item[0]
+                        q_show = queued_item[1] if len(queued_item) > 1 else True
+                        q_atts = queued_item[2] if len(queued_item) > 2 else None
+
+                        user_content = [{"type": "text", "text": q_msg}]
+                        if q_atts:
+                            for att in q_atts:
+                                att_path = getattr(att, "path", str(att))
+                                try:
+                                    from tools.read import process_image_file_sync
+                                    img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
+                                    img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
+                                    if isinstance(img_dict, dict) and img_dict.get("base64"):
+                                        media_type = img_dict.get("media_type", "image/jpeg")
+                                        b64_data = img_dict.get("base64")
+                                        detail_val = img_dict.get("detail", "high")
+                                        user_content.append({
+                                            "type": "image_url",
+                                            "image_url": {
+                                                "url": f"data:{media_type};base64,{b64_data}",
+                                                "detail": detail_val
+                                            }
+                                        })
+                                except Exception as e:
+                                    print(f"Error processing mid-generation attachment image: {e}")
+
+                        yield ("queued_user_message", q_msg, q_atts, q_show)
+
+                        if len(user_content) == 1:
+                            messages.append({"role": "user", "content": q_msg})
+                        else:
+                            messages.append({"role": "user", "content": user_content})
 
                 self.history = messages[1:]
                 messages, compacted_in_loop = (
