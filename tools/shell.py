@@ -220,7 +220,9 @@ class ShellTool(BaseTool):
                 recent_output_str = "\n\nRecent Output: (No output yet)"
             return (
                 f"[Background Task ID: {task_id}] Command is running in background.{recent_output_str}\n\n"
-                "STOP calling tools now. Inform the user that the command is running in the background and end your turn."
+                "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
+                f"you may call manage_task(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{task_id}') to abort. "
+                "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
             )
         except asyncio.CancelledError:
             if 'task' in locals() and task:
