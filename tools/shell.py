@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import os
 import re
 import time
 from typing import Any, Dict
@@ -11,7 +10,6 @@ from core.platform_utils import (
     shell_env,
     shell_executable,
     shell_subprocess_kwargs,
-    supports_pty,
 )
 from tools.base import BaseTool, truncate_output
 
@@ -82,86 +80,7 @@ class ShellTool(BaseTool):
                 return f"Error prompting for command permission: {e}"
 
         env = shell_env()
-        master_fd = None
-        slave_fd = None
-        reader = None
-        transport = None
-        use_pty = False
-
-        if supports_pty():
-            try:
-                import signal
-                if hasattr(signal, "SIGHUP"):
-                    signal.signal(signal.SIGHUP, signal.SIG_IGN)
-            except Exception:
-                pass
-
-            try:
-                import pty
-
-                master_fd, slave_fd = pty.openpty()
-                os.set_blocking(master_fd, False)
-                loop = asyncio.get_running_loop()
-                reader = asyncio.StreamReader()
-                protocol = asyncio.StreamReaderProtocol(reader)
-                transport, _ = await loop.connect_read_pipe(
-                    lambda: protocol, os.fdopen(master_fd, "rb", buffering=0)
-                )
-                use_pty = True
-            except Exception:
-                for fd in (master_fd, slave_fd):
-                    if fd is not None:
-                        try:
-                            os.close(fd)
-                        except Exception:
-                            pass
-                master_fd = None
-                slave_fd = None
-                reader = None
-                transport = None
-
-        try:
-            if is_windows():
-                p = await self._create_windows_process(cmd, env)
-            elif use_pty:
-                try:
-                    p = await asyncio.create_subprocess_shell(
-                        cmd,
-                        stdin=slave_fd,
-                        stdout=slave_fd,
-                        stderr=slave_fd,
-                        env=env,
-                        close_fds=True,
-                    )
-                finally:
-                    if slave_fd is not None:
-                        try:
-                            os.close(slave_fd)
-                        except Exception:
-                            pass
-                        slave_fd = None
-            else:
-                p = await asyncio.create_subprocess_shell(
-                    cmd,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    env=env,
-                    executable=shell_executable(),
-                    **shell_subprocess_kwargs(),
-                )
-        except Exception:
-            if transport:
-                try:
-                    transport.close()
-                except Exception:
-                    pass
-            elif master_fd is not None:
-                try:
-                    os.close(master_fd)
-                except Exception:
-                    pass
-            raise
+        p = await self._create_std_process(cmd, env)
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
@@ -170,9 +89,6 @@ class ShellTool(BaseTool):
             cmd,
             p,
             widget=target_widget,
-            master_fd=master_fd,
-            reader=reader,
-            transport=transport,
         )
         callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
         task.start_reading(ctx.app, callback)
@@ -246,16 +162,6 @@ class ShellTool(BaseTool):
             env=env,
             executable=shell_executable(),
             **shell_subprocess_kwargs(),
-        )
-
-    async def _create_pty_process(self, command: str, slave_fd: int, env: dict[str, str]):
-        return await asyncio.create_subprocess_shell(
-            command,
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            env=env,
-            close_fds=True,
         )
 
     async def _create_windows_process(self, command: str, env: dict[str, str]):

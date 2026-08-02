@@ -191,9 +191,9 @@ class ChatInput(TextArea):
 
     async def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
+        import asyncio
         import os
         import time
-        import asyncio
 
         from core.config import TEMP_IMAGES_DIR
         from core.platform_utils import get_clipboard_image_or_file
@@ -211,7 +211,7 @@ class ChatInput(TextArea):
             final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            
+
             await asyncio.to_thread(img.save, final_path, format="PNG")
             w, h = img.size
             sz = os.path.getsize(final_path) / 1024.0
@@ -243,7 +243,7 @@ class ChatInput(TextArea):
                 process.kill()
                 await process.wait()
                 return False
-            
+
             if process.returncode == 0 and stdout:
                 text_content = stdout.decode("utf-8")
                 pasted_text = self.format_pasted_file_path(text_content)
@@ -279,7 +279,7 @@ class ChatInput(TextArea):
         if text_strip.startswith("file://"):
             text_strip = text_strip[7:]
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
-        
+
         import asyncio
         exists = await asyncio.to_thread(os.path.exists, expanded)
         is_existing_image_path = (

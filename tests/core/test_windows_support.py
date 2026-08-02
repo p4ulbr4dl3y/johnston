@@ -5,7 +5,13 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from core.platform_utils import get_clipboard_image_or_file, is_image_file, johnston_config_dir, supports_pty
+from core.platform_utils import (
+    get_clipboard_image_or_file,
+    is_image_file,
+    johnston_config_dir,
+    shell_env,
+    supports_pty,
+)
 
 
 class TestPlatformUtils(unittest.TestCase):
@@ -15,9 +21,19 @@ class TestPlatformUtils(unittest.TestCase):
         ):
             self.assertEqual(johnston_config_dir(), Path(r"C:\Users\me\AppData\Roaming") / "johnston")
 
-    def test_windows_does_not_use_pty(self):
-        with patch("core.platform_utils.is_windows", return_value=True):
-            self.assertFalse(supports_pty())
+    def test_supports_pty_returns_false(self):
+        self.assertFalse(supports_pty())
+
+    def test_shell_env_contains_noninteractive_variables(self):
+        env = shell_env()
+        self.assertEqual(env.get("CI"), "1")
+        self.assertEqual(env.get("DEBIAN_FRONTEND"), "noninteractive")
+        self.assertEqual(env.get("FORCE_COLOR"), "0")
+        self.assertEqual(env.get("CLI_AUTO_PROMPT"), "0")
+        self.assertEqual(env.get("PAGER"), "cat")
+        self.assertEqual(env.get("GIT_PAGER"), "cat")
+        self.assertEqual(env.get("TERM"), "dumb")
+        self.assertEqual(env.get("NO_COLOR"), "1")
 
     def test_is_image_file(self):
         self.assertTrue(is_image_file("photo.png"))

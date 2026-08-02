@@ -1,7 +1,6 @@
 import tempfile
 import unittest
-import os
-from unittest.mock import MagicMock, PropertyMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from PIL import Image
 from textual.app import App, ComposeResult
@@ -180,7 +179,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 mock_process.returncode = 0
                 mock_process.communicate.return_value = (b"Hello from clipboard", b"")
                 mock_run.return_value = mock_process
-                
+
                 res = await ci.paste_universal_clipboard()
                 self.assertTrue(res)
                 self.assertEqual(ci.text, "Hello from clipboard")
@@ -191,7 +190,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 mock_process_long.returncode = 0
                 mock_process_long.communicate.return_value = (long_text.encode("utf-8"), b"")
                 mock_run.return_value = mock_process_long
-                
+
                 res_long = await ci.paste_universal_clipboard()
                 self.assertTrue(res_long)
                 self.assertIn("[Pasted text #1 +15 lines]", ci.text)
