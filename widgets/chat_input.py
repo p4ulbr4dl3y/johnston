@@ -212,11 +212,7 @@ class ChatInput(TextArea):
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
             
-            def save_img():
-                img.save(final_path, format="PNG")
-            
-            await asyncio.to_thread(save_img)
-
+            await asyncio.to_thread(img.save, final_path, format="PNG")
             w, h = img.size
             sz = os.path.getsize(final_path) / 1024.0
             att = ClipboardAttachment(final_path, w, h, sz)
@@ -241,7 +237,12 @@ class ChatInput(TextArea):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=2.0)
+            try:
+                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=2.0)
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                return False
             
             if process.returncode == 0 and stdout:
                 text_content = stdout.decode("utf-8")
@@ -279,11 +280,8 @@ class ChatInput(TextArea):
             text_strip = text_strip[7:]
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
         
-        def check_exists():
-            return os.path.exists(expanded)
-            
         import asyncio
-        exists = await asyncio.to_thread(check_exists)
+        exists = await asyncio.to_thread(os.path.exists, expanded)
         is_existing_image_path = (
             exists
             and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
