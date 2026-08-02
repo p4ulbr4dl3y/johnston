@@ -683,5 +683,24 @@ class JohnstonApp(App):
         except Exception:
             pass
 
+    def on_background_shell_prompt(self, task_id: str, command_str: str, output_tail: str) -> None:
+        """Callback when background shell command appears to be waiting for input"""
+        if not getattr(self, "is_app_active", True):
+            return
+        try:
+            self.notify(f"Background command waiting for input (TID: {task_id})", severity="warning")
+            msg = (
+                f"[System Notification] Background command '{command_str}' (TID: {task_id}) appears to be waiting for user input!\n"
+                f"Recent output:\n{output_tail}\n\n"
+                f"Action required: Call manage_task(action='send_input', task_id='{task_id}', input='...') to answer it, "
+                f"or manage_task(action='kill', task_id='{task_id}') to terminate."
+            )
+            if self.is_generating:
+                self.message_queue.append((msg, False))
+            else:
+                self.generate_ai_response(msg, show_in_ui=False)
+        except Exception:
+            pass
+
 if __name__ == "__main__":
     main()
