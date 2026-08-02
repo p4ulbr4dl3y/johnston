@@ -87,6 +87,19 @@ class TestBackgroundTaskSendInput(unittest.IsolatedAsyncioTestCase):
             os.close(r_fd)
             os.close(w_fd)
 
+    async def test_start_reading_captures_unbuffered_prompts(self):
+        import asyncio
+        mock_proc = MagicMock()
+        mock_stdout = asyncio.StreamReader()
+        mock_stdout.feed_data(b"How old are you? ")
+        mock_stdout.feed_eof()
+        mock_proc.stdout = mock_stdout
+
+        t = BackgroundTask("t6", "cmd", mock_proc)
+        t.start_reading(None, None)
+        await t.read_task
+        self.assertEqual(t.get_formatted_output(), "How old are you? ")
+
 
 if __name__ == "__main__":
     unittest.main()
