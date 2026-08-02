@@ -41,6 +41,15 @@ class TestFileSuggestions(unittest.TestCase):
         self.assertEqual(chat_input.format_pasted_file_path(normal_text), normal_text)
         self.assertEqual(chat_input.format_pasted_file_path("Task"), "Task")
 
+        # Test file:// URL scheme
+        self.assertEqual(chat_input.format_pasted_file_path("file:///tmp/script.py"), "@/tmp/script.py ")
+
+        # Test quoted file path
+        self.assertEqual(chat_input.format_pasted_file_path("'/tmp/script.py'"), "@/tmp/script.py ")
+
+        # Test escaped spaces
+        self.assertEqual(chat_input.format_pasted_file_path("/tmp/my\\ folder/script.py"), "@/tmp/my folder/script.py ")
+
 
 if __name__ == "__main__":
     unittest.main()
