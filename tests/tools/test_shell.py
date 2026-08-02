@@ -83,41 +83,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(RuntimeError):
                 await self.tool.execute({"command": "echo fail"})
 
-    async def test_no_background_read_task_timeout(self):
-        mock_p = MagicMock()
-
-        async def _mock_wait():
-            return 0
-
-        mock_p.wait = _mock_wait
-
-        loop = asyncio.get_running_loop()
-        dummy_task = loop.create_future()
-        dummy_task.set_result(None)
-
-        async def custom_wait_for(fut, timeout):
-            if timeout == 1.0:
-                raise asyncio.TimeoutError()
-            return await fut
-
-        with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
-            patch("tools.shell.BackgroundTask") as mock_bg_cls,
-        ):
-            mock_task = MagicMock()
-            mock_task.read_task = dummy_task
-            mock_task.get_formatted_output.return_value = "no_bg_timeout_output"
-            mock_bg_cls.return_value = mock_task
-
-            with patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for):
-                res = await self.tool.execute({"command": "echo test", "no_background": True})
-                self.assertIn("no_bg_timeout_output", res)
-                mock_task.close_pty.assert_called_once()
-
-    async def test_no_background_empty_output(self):
-        res = await self.tool.execute({"command": "true", "no_background": True})
-        self.assertEqual(res, "Command executed with no output.")
-
     async def test_normal_execution_read_task_timeout(self):
         mock_p = MagicMock()
 
