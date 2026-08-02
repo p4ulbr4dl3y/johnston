@@ -12,8 +12,8 @@ def strip_ansi(text: str) -> str:
 
 
 def process_carriage_returns(text: str) -> str:
-    if "\r" not in text:
-        return text
+    if not text:
+        return ""
     lines = text.split("\n")
     processed = []
     for line in lines:
@@ -21,7 +21,16 @@ def process_carriage_returns(text: str) -> str:
             parts = [p for p in line.split("\r") if p]
             line = parts[-1] if parts else ""
         processed.append(line)
-    return "\n".join(processed)
+
+    filtered = []
+    spinner_chars = {"-", "\\", "|", "/", "—"}
+    for line in processed:
+        stripped = line.strip()
+        if stripped in spinner_chars and filtered and filtered[-1].strip() in spinner_chars:
+            filtered[-1] = line
+        else:
+            filtered.append(line)
+    return "\n".join(filtered)
 
 
 class BackgroundTask:

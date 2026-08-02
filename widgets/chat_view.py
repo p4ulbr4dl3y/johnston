@@ -1080,14 +1080,12 @@ class ToolCallWidget(Vertical):
         return cleaned.strip()
 
     def append_bash_output(self, text: str) -> None:
-        cleaned_line = self._clean_bash_output(text)
-        if not cleaned_line:
-            return
-        if not self.result_text:
-            self.result_text = cleaned_line
-        else:
-            sep = "" if self.result_text.endswith("\n") else "\n"
-            self.result_text += sep + cleaned_line
+        if not hasattr(self, "_raw_bash_buffer"):
+            self._raw_bash_buffer = ""
+        self._raw_bash_buffer += text
+        from core.background_task import process_carriage_returns
+        cleaned = self._clean_bash_output(self._raw_bash_buffer)
+        self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
             self.render_content()
 
