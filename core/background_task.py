@@ -39,6 +39,7 @@ class BackgroundTask:
         self.is_running = True
         self.is_background = False
         self.prompt_notified = False
+        self.was_killed = False
         self.read_task = None
         self.widget = widget
         self.master_fd = master_fd
@@ -125,7 +126,7 @@ class BackgroundTask:
                     except Exception:
                         pass
 
-                if self.is_background and on_completed_cb and getattr(app, "is_app_active", True):
+                if self.is_background and not self.was_killed and on_completed_cb and getattr(app, "is_app_active", True):
                     try:
                         out_res = self.get_formatted_output()
                         if len(out_res) > 3000:
@@ -141,6 +142,7 @@ class BackgroundTask:
     async def send_input(self, text: str) -> str:
         if not self.is_running:
             return f"Task {self.task_id} is not running."
+        self.prompt_notified = False
         data = (text + "\n").encode("utf-8")
         try:
             if self.master_fd is not None:
@@ -156,6 +158,7 @@ class BackgroundTask:
             return f"Failed to send input to task {self.task_id}: {e}"
 
     def kill_sync(self):
+        self.was_killed = True
         self.is_running = False
         self.close_pty()
         if self.process:
@@ -178,6 +181,7 @@ class BackgroundTask:
         self.output.append("\n[Task terminated]\n")
 
     async def kill(self):
+        self.was_killed = True
         self.is_running = False
         self.close_pty()
         if self.process:
