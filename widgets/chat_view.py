@@ -1187,10 +1187,14 @@ class ToolCallWidget(Vertical):
                     else:
                         self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
             elif self.tool_type in ("update_plan", "Plan", "plan"):
-                plan_items = self.args.get("plan") or []
-                explanation = self.args.get("explanation", "")
-                formatted_plan = self._format_plan_display(plan_items, explanation)
-                self.content_widget.update(formatted_plan)
+                raw_text = (self.result_text or "").strip()
+                if self.status == "error" or self._check_is_error(raw_text):
+                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
+                else:
+                    plan_items = self.args.get("plan") or []
+                    explanation = self.args.get("explanation", "")
+                    formatted_plan = self._format_plan_display(plan_items, explanation)
+                    self.content_widget.update(formatted_plan)
             elif self.tool_type in ("web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
