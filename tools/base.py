@@ -103,7 +103,14 @@ class BaseTool:
     def _ensure_context(self, ctx_or_app: Any) -> ToolContext:
         if isinstance(ctx_or_app, ToolContext):
             return ctx_or_app
-        return ToolContext(ctx_or_app)
+        if not ctx_or_app:
+            return ToolContext(app=None)
+        if hasattr(ctx_or_app, "app") and not hasattr(ctx_or_app, "push_screen") and getattr(ctx_or_app, "app", None) is not None:
+            app = ctx_or_app.app
+        else:
+            app = ctx_or_app
+        is_sub = getattr(ctx_or_app, "is_subagent", False) or (getattr(app, "is_subagent", False) if app else False)
+        return ToolContext(app=app, is_subagent=is_sub)
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         raise NotImplementedError

@@ -4,12 +4,13 @@ import re
 import time
 from typing import Any, Dict
 
-from core.background_task import BackgroundTask
+from core.background_task import BackgroundTask, process_carriage_returns, strip_ansi
 from core.platform_utils import (
     is_windows,
     shell_env,
     shell_executable,
     shell_subprocess_kwargs,
+    terminate_process,
 )
 from tools.base import BaseTool, truncate_output
 
@@ -23,7 +24,7 @@ def _new_task_id() -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command. Commands running longer than 10 seconds are automatically moved to the background. Destructive commands require user confirmation."
+    description = "Run a terminal command. Commands running longer than timeout (default 60s) are automatically moved to the background. Destructive commands require user confirmation."
 
     schema = {
         "type": "function",
@@ -33,6 +34,7 @@ class ShellTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Terminal command to run"},
+                    "timeout": {"type": "integer", "description": "Optional timeout in seconds (default: 60, max: 300)"},
                 },
                 "required": ["command"],
             },
@@ -43,10 +45,18 @@ class ShellTool(BaseTool):
         ctx = self._ensure_context(app)
         cmd = args.get("command", "").strip()
 
+        raw_timeout = args.get("timeout", 60)
+        try:
+            timeout = max(1, min(int(raw_timeout), 300))
+        except (ValueError, TypeError):
+            timeout = 60
+
         m = SLEEP_CHAIN_REGEX.match(cmd)
         if m:
             sec = float(m.group(1))
             remainder = (m.group(2) or "").strip()
+            if sec > timeout:
+                return f"Error: sleep duration ({sec}s) exceeds timeout ({timeout}s)."
             await asyncio.sleep(sec)
             if not remainder:
                 return f"Slept for {sec} seconds."
@@ -78,6 +88,48 @@ class ShellTool(BaseTool):
         env = shell_env()
         p = await self._create_std_process(cmd, env)
 
+        # Synchronous execution mode for subagents (no background task)
+        if ctx.is_subagent:
+            output_chunks = []
+
+            async def _read_stream(stream):
+                if not stream:
+                    return
+                while True:
+                    try:
+                        chunk = await stream.read(1024)
+                        if not chunk:
+                            break
+                        output_chunks.append(chunk.decode("utf-8", errors="replace"))
+                    except Exception:
+                        break
+
+            read_task = asyncio.create_task(_read_stream(p.stdout))
+            try:
+                await asyncio.wait_for(p.wait(), timeout=float(timeout))
+                if read_task:
+                    try:
+                        await asyncio.wait_for(read_task, timeout=2.0)
+                    except asyncio.TimeoutError:
+                        pass
+                res = process_carriage_returns(strip_ansi("".join(output_chunks)))
+                if not res.strip():
+                    return "Command executed with no output."
+                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
+            except asyncio.TimeoutError:
+                await terminate_process(p)
+                if read_task:
+                    try:
+                        await asyncio.wait_for(read_task, timeout=1.0)
+                    except Exception:
+                        pass
+                raw_out = process_carriage_returns(strip_ansi("".join(output_chunks)))
+                partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
+                return f"Error: Command timed out after {timeout} seconds and was terminated.{partial_str}"
+            except asyncio.CancelledError:
+                await terminate_process(p)
+                raise
+
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
         task = BackgroundTask(
@@ -90,7 +142,7 @@ class ShellTool(BaseTool):
         task.start_reading(ctx.app, callback)
 
         try:
-            await asyncio.wait_for(p.wait(), timeout=60.0)
+            await asyncio.wait_for(p.wait(), timeout=float(timeout))
             if task.read_task:
                 try:
                     await asyncio.wait_for(task.read_task, timeout=2.0)

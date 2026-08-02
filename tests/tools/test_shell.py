@@ -121,6 +121,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
         mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
 
@@ -184,6 +185,43 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
                 env={"ENV": "1"},
                 **shell_subprocess_kwargs(),
             )
+
+    async def test_subagent_shell_execution_success(self):
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        res = await self.tool.execute({"command": "echo subagent_test", "timeout": 10}, app=mock_ctx)
+        self.assertIn("subagent_test", res)
+        mock_ctx.add_background_task.assert_not_called()
+
+    async def test_subagent_shell_execution_timeout(self):
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+
+        def _mock_wait():
+            fut = asyncio.Future()
+            fut.set_result(0)
+            return fut
+
+        mock_p.wait = _mock_wait
+
+        async def custom_wait_for(fut, timeout):
+            if timeout == 5.0:
+                raise asyncio.TimeoutError()
+            return await fut
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
+            patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
+            self.assertIn("Error: Command timed out after 5 seconds and was terminated.", res)
+            mock_term.assert_called_once()
+            mock_ctx.add_background_task.assert_not_called()
 
 
 if __name__ == "__main__":

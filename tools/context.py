@@ -4,8 +4,9 @@ from typing import Any, List
 class ToolContext:
     """Unified execution context for tools (isolates UI from business logic)"""
 
-    def __init__(self, app: Any = None):
+    def __init__(self, app: Any = None, is_subagent: bool = False):
         self.app = app
+        self.is_subagent = is_subagent or (getattr(app, "is_subagent", False) if app else False)
 
     def notify(self, message: str) -> None:
         if self.app and hasattr(self.app, "notify"):
