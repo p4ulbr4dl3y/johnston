@@ -156,13 +156,7 @@ class MCPProcessClient:
                 text=True,
                 bufsize=1
             )
-            if self.process.stdout:
-                try:
-                    os.set_blocking(self.process.stdout.fileno(), False)
-                except Exception:
-                    pass
             self._buffer = ""
-            self._start_async_reader()
             init_ok = self._initialize()
             if not init_ok and not self.last_error:
                 self.last_error = "Server initialization timed out or returned error"
@@ -250,6 +244,13 @@ class MCPProcessClient:
         while not self._stopped:
             if req_id is not None and req_id in self._pending_responses:
                 return self._pending_responses.pop(req_id)
+
+            if self._read_task and not self._read_task.done():
+                elapsed = time.time() - start_time
+                if timeout is not None and elapsed >= timeout:
+                    return None
+                time.sleep(0.01)
+                continue
 
             while "\n" in self._buffer:
                 line_str, self._buffer = self._buffer.split("\n", 1)
@@ -423,7 +424,7 @@ class MCPProcessClient:
             return self.call_tool(tool_name, arguments, timeout=timeout)
 
         if not self.process or self.process.poll() is not None:
-            if not self.start():
+            if not await self.start_async():
                 return f"Error: MCP server '{self.name}' process is not running"
 
         self._start_async_reader()
