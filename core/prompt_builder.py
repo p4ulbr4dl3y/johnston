@@ -25,6 +25,21 @@ def get_git_info() -> str:
     now = time.time()
     if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
         return _GIT_INFO_CACHE["val"]
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        if _GIT_INFO_CACHE["val"]:
+            return _GIT_INFO_CACHE["val"]
+        # Fast path if no cache yet and loop running: run via to_thread or short return
+        try:
+            loop.create_task(get_git_info_async())
+        except Exception:
+            pass
+        return _GIT_INFO_CACHE.get("val", "")
+
     val = _compute_git_info()
     _GIT_INFO_CACHE["ts"] = now
     _GIT_INFO_CACHE["val"] = val

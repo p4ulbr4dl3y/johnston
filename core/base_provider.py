@@ -242,7 +242,7 @@ class BaseAgent:
         if any(term in err_str for term in retryable_terms):
             return True
 
-        return True
+        return False
 
     def _is_vision_error(self, err: Exception) -> bool:
         if err is None:
@@ -475,7 +475,7 @@ class BaseAgent:
                 att_path = getattr(att, "path", str(att))
                 try:
                     from tools.read import process_image_file_sync
-                    img_data_str = process_image_file_sync(att_path)
+                    img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
                     img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
                     if isinstance(img_dict, dict) and img_dict.get("base64"):
                         media_type = img_dict.get("media_type", "image/jpeg")

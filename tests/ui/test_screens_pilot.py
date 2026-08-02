@@ -216,11 +216,11 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
                     await screen.action_kill_task()
                 self.assertFalse(task_sub.is_running)
 
-                # Kill second task (sync kill, foreground -> triggers AI notification)
+                # Kill second task
                 mock_opt_list.highlighted = 1
                 with patch.object(screen, "query_one", return_value=mock_opt_list):
                     await screen.action_kill_task()
-                mock_tc.trigger_ai_response.assert_called_once()
+                mock_tc.trigger_ai_response.assert_not_called()
 
                 # Test update_tasks_list when current_highlighted >= len(tasks)
                 mock_opt_list.highlighted = 99

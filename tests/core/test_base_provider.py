@@ -606,7 +606,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         async def slow_iter():
             yield chunk
             while True:
-                await asyncio.sleep(10)
+                await asyncio.sleep(0.01)
 
         class MockAsyncStream:
             def __aiter__(self):
