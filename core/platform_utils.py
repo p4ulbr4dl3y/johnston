@@ -45,6 +45,8 @@ def shell_env() -> dict[str, str]:
     env["TERM"] = "dumb"
     env["NO_COLOR"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
+    env["PAGER"] = "cat"
+    env["GIT_PAGER"] = "cat"
     return env
 
 
