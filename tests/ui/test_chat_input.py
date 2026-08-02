@@ -1,6 +1,7 @@
 import tempfile
 import unittest
-from unittest.mock import MagicMock, PropertyMock, patch
+import os
+from unittest.mock import MagicMock, PropertyMock, patch, AsyncMock
 
 from PIL import Image
 from textual.app import App, ComposeResult
@@ -163,7 +164,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             with patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)), \
                  patch("os.makedirs"), patch("os.path.getsize", return_value=512), \
                  patch.object(Image.Image, "save") as mock_save:
-                res = ci.try_paste_clipboard_image()
+                res = await ci.try_paste_clipboard_image()
                 self.assertTrue(res)
                 mock_save.assert_called_once()
                 self.assertEqual(len(ci.clipboard_attachments), 1)
@@ -173,17 +174,25 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app = DummyChatApp(ci)
         async with app.run_test():
             with patch.object(ci, "try_paste_clipboard_image", return_value=False), \
-                 patch("subprocess.run") as mock_run:
+                 patch("asyncio.create_subprocess_exec") as mock_run:
                 # Short text paste
-                mock_run.return_value = MagicMock(returncode=0, stdout="Hello from clipboard")
-                res = ci.paste_universal_clipboard()
+                mock_process = AsyncMock()
+                mock_process.returncode = 0
+                mock_process.communicate.return_value = (b"Hello from clipboard", b"")
+                mock_run.return_value = mock_process
+                
+                res = await ci.paste_universal_clipboard()
                 self.assertTrue(res)
                 self.assertEqual(ci.text, "Hello from clipboard")
 
                 # Long text paste > 10 lines
                 long_text = "\n".join([f"Line {i}" for i in range(15)])
-                mock_run.return_value = MagicMock(returncode=0, stdout=long_text)
-                res_long = ci.paste_universal_clipboard()
+                mock_process_long = AsyncMock()
+                mock_process_long.returncode = 0
+                mock_process_long.communicate.return_value = (long_text.encode("utf-8"), b"")
+                mock_run.return_value = mock_process_long
+                
+                res_long = await ci.paste_universal_clipboard()
                 self.assertTrue(res_long)
                 self.assertIn("[Pasted text #1 +15 lines]", ci.text)
 
@@ -196,7 +205,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event.prevent_default = MagicMock()
                 event.stop = MagicMock()
 
-                ci.on_paste(event)
+                await ci.on_paste(event)
                 event.prevent_default.assert_called_once()
                 event.stop.assert_called_once()
                 self.assertIn("[Pasted text #1 +12 lines]", ci.text)
@@ -211,26 +220,26 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
             # Press Up key at line 0 -> load "Second query"
             event_up = Key("up", "up")
-            ci._on_key(event_up)
+            await ci._on_key(event_up)
             self.assertEqual(ci.text, "Second query")
 
             # Press Up key again -> load "First query"
-            ci._on_key(event_up)
+            await ci._on_key(event_up)
             self.assertEqual(ci.text, "First query")
 
             # Press Up key again -> wraps around to draft
-            ci._on_key(event_up)
+            await ci._on_key(event_up)
             self.assertEqual(ci.text, "Draft text")
 
             # Press Down key -> load "First query"
             event_down = Key("down", "down")
-            ci._on_key(event_down)
+            await ci._on_key(event_down)
             self.assertEqual(ci.text, "First query")
 
-            ci._on_key(event_down)
+            await ci._on_key(event_down)
             self.assertEqual(ci.text, "Second query")
 
-            ci._on_key(event_down)
+            await ci._on_key(event_down)
             self.assertEqual(ci.text, "Draft text")
 
     async def test_key_shortcuts(self):
@@ -242,21 +251,21 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event = Key("ctrl+c", "ctrl+c")
                 event.prevent_default = MagicMock()
                 event.stop = MagicMock()
-                ci._on_key(event)
+                await ci._on_key(event)
                 mock_exit.assert_called_once()
 
             # shift+tab -> toggle mode
             event_st = Key("shift+tab", "shift+tab")
             event_st.prevent_default = MagicMock()
             event_st.stop = MagicMock()
-            ci._on_key(event_st)
+            await ci._on_key(event_st)
             self.assertTrue(app.mode_toggled)
 
             # ctrl+enter -> insert newline
             event_ce = Key("ctrl+enter", "ctrl+enter")
             event_ce.prevent_default = MagicMock()
             event_ce.stop = MagicMock()
-            ci._on_key(event_ce)
+            await ci._on_key(event_ce)
             self.assertEqual(ci.text, "\n")
 
     async def test_escape_cancels_workers(self):
@@ -269,7 +278,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event = Key("escape", "escape")
                 event.prevent_default = MagicMock()
                 event.stop = MagicMock()
-                ci._on_key(event)
+                await ci._on_key(event)
                 mock_worker.cancel.assert_called_once()
                 event.prevent_default.assert_called_once()
 
@@ -281,7 +290,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             event_enter = Key("enter", "enter")
             event_enter.prevent_default = MagicMock()
             event_enter.stop = MagicMock()
-            ci._on_key(event_enter)
+            await ci._on_key(event_enter)
             await pilot.pause()
 
             self.assertEqual(len(app.submitted_messages), 1)
@@ -307,7 +316,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event_tab = Key("tab", "tab")
                 event_tab.prevent_default = MagicMock()
                 event_tab.stop = MagicMock()
-                ci._on_key(event_tab)
+                await ci._on_key(event_tab)
                 self.assertEqual(ci.text, "/help ")
                 self.assertFalse(mock_suggestions.display)
 
@@ -316,20 +325,20 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event_up = Key("up", "up")
                 event_up.prevent_default = MagicMock()
                 event_up.stop = MagicMock()
-                ci._on_key(event_up)
+                await ci._on_key(event_up)
                 mock_suggestions.action_cursor_up.assert_called_once()
 
                 event_down = Key("down", "down")
                 event_down.prevent_default = MagicMock()
                 event_down.stop = MagicMock()
-                ci._on_key(event_down)
+                await ci._on_key(event_down)
                 mock_suggestions.action_cursor_down.assert_called_once()
 
                 # Escape hides suggestions
                 event_esc = Key("escape", "escape")
                 event_esc.prevent_default = MagicMock()
                 event_esc.stop = MagicMock()
-                ci._on_key(event_esc)
+                await ci._on_key(event_esc)
                 self.assertFalse(mock_suggestions.display)
 
                 # Test file suggestion mode with Enter key
@@ -341,7 +350,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event_enter = Key("enter", "enter")
                 event_enter.prevent_default = MagicMock()
                 event_enter.stop = MagicMock()
-                ci._on_key(event_enter)
+                await ci._on_key(event_enter)
                 self.assertIn("@main.py", ci.text)
 
     async def test_ctrl_d_and_ctrl_v(self):
@@ -355,7 +364,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             event_d = Key("ctrl+d", "ctrl+d")
             event_d.prevent_default = MagicMock()
             event_d.stop = MagicMock()
-            ci._on_key(event_d)
+            await ci._on_key(event_d)
             self.assertEqual(len(ci.clipboard_attachments), 0)
 
             # ctrl+v triggers try_paste_clipboard_image
@@ -363,7 +372,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event_v = Key("ctrl+v", "ctrl+v")
                 event_v.prevent_default = MagicMock()
                 event_v.stop = MagicMock()
-                ci._on_key(event_v)
+                await ci._on_key(event_v)
                 mock_paste.assert_called_once()
 
     async def test_update_attachment_bar_and_error_handling(self):

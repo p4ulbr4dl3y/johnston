@@ -189,15 +189,16 @@ class ChatInput(TextArea):
         self.clipboard_attachments.clear()
         self.update_attachment_bar()
 
-    def try_paste_clipboard_image(self) -> bool:
+    async def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
         import os
         import time
+        import asyncio
 
         from core.config import TEMP_IMAGES_DIR
         from core.platform_utils import get_clipboard_image_or_file
 
-        file_path, img = get_clipboard_image_or_file()
+        file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)
 
         if file_path:
             self.insert(f"@{file_path} ")
@@ -210,7 +211,11 @@ class ChatInput(TextArea):
             final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
             if img.mode not in ("RGB", "RGBA"):
                 img = img.convert("RGB")
-            img.save(final_path, format="PNG")
+            
+            def save_img():
+                img.save(final_path, format="PNG")
+            
+            await asyncio.to_thread(save_img)
 
             w, h = img.size
             sz = os.path.getsize(final_path) / 1024.0
@@ -221,19 +226,25 @@ class ChatInput(TextArea):
 
         return False
 
-    def paste_universal_clipboard(self) -> bool:
+    async def paste_universal_clipboard(self) -> bool:
         """Universal clipboard paste (image or text)"""
-        import subprocess
+        import asyncio
 
         # 1. Try pasting image from clipboard
-        if self.try_paste_clipboard_image():
+        if await self.try_paste_clipboard_image():
             return True
 
         # 2. If no image, read text from clipboard
         try:
-            res = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=2)
-            if res.returncode == 0 and res.stdout:
-                text_content = res.stdout
+            process = await asyncio.create_subprocess_exec(
+                "pbpaste",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=2.0)
+            
+            if process.returncode == 0 and stdout:
+                text_content = stdout.decode("utf-8")
                 pasted_text = self.format_pasted_file_path(text_content)
                 lines = pasted_text.splitlines()
 
@@ -252,7 +263,7 @@ class ChatInput(TextArea):
 
         return False
 
-    def on_paste(self, event: events.Paste) -> None:
+    async def on_paste(self, event: events.Paste) -> None:
         import os
         event.prevent_default()
         event.stop()
@@ -267,13 +278,19 @@ class ChatInput(TextArea):
         if text_strip.startswith("file://"):
             text_strip = text_strip[7:]
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
+        
+        def check_exists():
+            return os.path.exists(expanded)
+            
+        import asyncio
+        exists = await asyncio.to_thread(check_exists)
         is_existing_image_path = (
-            os.path.exists(expanded)
+            exists
             and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
         )
 
         if not is_existing_image_path and not event.text.strip():
-            if self.try_paste_clipboard_image():
+            if await self.try_paste_clipboard_image():
                 return
 
         lines = pasted_text.splitlines()
@@ -322,9 +339,9 @@ class ChatInput(TextArea):
 
         return False
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if event.key in ("ctrl+v", "cmd+v", "ctrl+м", "ctrl+m"):
-            if self.try_paste_clipboard_image():
+            if await self.try_paste_clipboard_image():
                 event.prevent_default()
                 event.stop()
                 return

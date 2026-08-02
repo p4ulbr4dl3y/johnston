@@ -107,7 +107,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.load_text("")
             from textual import events
 
-            chat_input.on_paste(events.Paste("hello\n" * 15))
+            await chat_input.on_paste(events.Paste("hello\n" * 15))
             await pilot.pause(0.1)
             self.assertIn("[Pasted text #1 +15 lines]", chat_input.text)
             self.assertEqual(chat_input.get_full_text(), "hello\n" * 15)
