@@ -129,7 +129,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(res1, f"@{tmp_path} ")
 
             res2 = ci.format_pasted_file_path(f"'{tmp_path}'")
-            self.assertEqual(res2, f"@'{tmp_path}' ")
+            self.assertEqual(res2, f"@{tmp_path} ")
 
             res3 = ci.format_pasted_file_path("./local_file.py")
             self.assertEqual(res3, "@./local_file.py ")

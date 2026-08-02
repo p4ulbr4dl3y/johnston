@@ -152,17 +152,19 @@ class ChatInput(TextArea):
                     modified = True
                 new_lines.append(stripped)
             else:
-                clean = stripped.strip("'\"").replace("\\ ", " ")
+                clean = stripped.strip("'\"")
+                if clean.startswith("file://"):
+                    clean = clean[7:]
+                clean = clean.replace("\\ ", " ")
                 expanded = os.path.expanduser(clean)
                 ext = os.path.splitext(clean)[1].lower()
                 is_explicit_path = (
-                    stripped.startswith("/")
-                    or stripped.startswith("~/")
-                    or stripped.startswith("./")
-                    or stripped.startswith("file://")
+                    clean.startswith("/")
+                    or clean.startswith("~/")
+                    or clean.startswith("./")
                 )
                 if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
-                    line = f"@{stripped} "
+                    line = f"@{clean} "
                     modified = True
                 new_lines.append(line)
 
@@ -252,30 +254,36 @@ class ChatInput(TextArea):
 
     def on_paste(self, event: events.Paste) -> None:
         import os
+        event.prevent_default()
+        event.stop()
+
+        pasted_text = self.format_pasted_file_path(event.text)
+        if pasted_text.startswith("@"):
+            self.insert(pasted_text)
+            self._on_input_change()
+            return
+
         text_strip = event.text.strip().strip("'\"")
+        if text_strip.startswith("file://"):
+            text_strip = text_strip[7:]
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
         is_existing_image_path = (
             os.path.exists(expanded)
             and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
         )
-        if not is_existing_image_path and len(event.text.splitlines()) <= 1 and self.try_paste_clipboard_image():
-            event.prevent_default()
-            event.stop()
-            return
 
-        pasted_text = self.format_pasted_file_path(event.text)
+        if not is_existing_image_path and not event.text.strip():
+            if self.try_paste_clipboard_image():
+                return
+
         lines = pasted_text.splitlines()
         if len(lines) > self.PASTE_LINE_THRESHOLD:
-            event.prevent_default()
-            event.stop()
             idx = len(self.pasted_texts) + 1
             tag = f"[Pasted text #{idx} +{len(lines)} lines]"
             self.pasted_texts[tag] = pasted_text
             self.insert(tag)
             self._on_input_change()
         else:
-            event.prevent_default()
-            event.stop()
             self.insert(pasted_text)
             self._on_input_change()
 
