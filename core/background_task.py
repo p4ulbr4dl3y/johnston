@@ -80,10 +80,10 @@ class BackgroundTask:
                             break
                         text = chunk.decode("utf-8", errors="replace")
                     else:
-                        line = await self.process.stdout.readline()
-                        if not line:
+                        chunk = await self.process.stdout.read(1024)
+                        if not chunk:
                             break
-                        text = line.decode("utf-8", errors="replace")
+                        text = chunk.decode("utf-8", errors="replace")
 
                     self.output.append(text)
                     if self.widget and hasattr(self.widget, "append_bash_output"):

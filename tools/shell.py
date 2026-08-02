@@ -109,7 +109,7 @@ class ShellTool(BaseTool):
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
 
         try:
-            await asyncio.wait_for(p.wait(), timeout=60.0)
+            await asyncio.wait_for(p.wait(), timeout=10.0)
             if task.read_task:
                 try:
                     await asyncio.wait_for(task.read_task, timeout=2.0)
