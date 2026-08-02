@@ -65,13 +65,20 @@ WelcomeWidget {
     text-style: bold;
 }
 
-/* User Message - Pure White Accent */
 .user-msg {
     width: 100%;
     height: auto;
+    align: right top;
     margin-top: 1;
+}
+
+.user-msg-bubble {
+    width: auto;
+    max-width: 85%;
+    padding: 1 2;
+    background: #18181b;
     color: #ffffff;
-    text-style: bold;
+    text-align: left;
 }
 
 /* Bot Message Container - Off-white Text */

@@ -308,13 +308,13 @@ class CompactionDivider(Static):
 
 
 
-class UserMessage(Static):
+class UserMessage(Horizontal):
     """User message"""
     can_focus = False
 
     def __init__(self, content: str):
         self.raw_text = content
-        super().__init__(content, classes="user-msg")
+        super().__init__(Static(content, classes="user-msg-bubble"), classes="user-msg")
 
 
 class BotMessage(Vertical):
@@ -1099,87 +1099,95 @@ class ToolCallWidget(Vertical):
         try:
             file_path = self.args.get("TargetFile") or self.args.get("target_file") or self.args.get("path") or self.args.get("file") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
-                content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
-                if content is None:
-                    if file_path and os.path.isfile(file_path):
+                raw_text = (self.result_text or "").strip()
+                if self.status == "error" or self._check_is_error(raw_text):
+                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
+                else:
+                    content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
+                    if content is None:
+                        if file_path and os.path.isfile(file_path):
+                            try:
+                                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                                    content = f.read()
+                            except Exception:
+                                content = None
+
+                    if content is not None:
+                        content = content.rstrip("\r\n")
+                        lexer = self._guess_lexer(file_path)
                         try:
-                            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                                content = f.read()
+                            syntax = Syntax(
+                                content,
+                                lexer,
+                                theme="one-dark",
+                                line_numbers=True,
+                                word_wrap=True,
+                                background_color="#18181b"
+                            )
+                            self.content_widget.update(syntax)
                         except Exception:
-                            content = None
-
-                if content is not None:
-                    content = content.rstrip("\r\n")
-                    lexer = self._guess_lexer(file_path)
-                    try:
-                        syntax = Syntax(
-                            content,
-                            lexer,
-                            theme="one-dark",
-                            line_numbers=True,
-                            word_wrap=True,
-                            background_color="#18181b"
-                        )
-                        self.content_widget.update(syntax)
-                    except Exception:
-                        rendered = self._format_code_with_line_numbers(content)
-                        self.content_widget.update(rendered)
-                else:
-                    self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
-            elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
-                diff_text = self.result_text.strip()
-                if not diff_text or "@@" not in diff_text:
-                    chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks")
-                    diff_parts = []
-                    if chunks and isinstance(chunks, list):
-                        for chunk in chunks:
-                            if isinstance(chunk, dict):
-                                old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or ""
-                                new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or ""
-                                start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
-                                if old_c or new_c:
-                                    d_lines = list(difflib.unified_diff(
-                                        old_c.splitlines(),
-                                        new_c.splitlines(),
-                                        fromfile=file_path or "file",
-                                        tofile=file_path or "file",
-                                        lineterm=""
-                                    ))
-                                    if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                                        h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                                        if h_m:
-                                            old_cnt = h_m.group(2) or "1"
-                                            new_cnt = h_m.group(4) or "1"
-                                            d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                                    diff_parts.extend(d_lines)
+                            rendered = self._format_code_with_line_numbers(content)
+                            self.content_widget.update(rendered)
                     else:
-                        old_s = self.args.get("old_string") or self.args.get("target_content") or self.args.get("TargetContent") or ""
-                        new_s = self.args.get("new_string") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
-                        start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
-                        if old_s or new_s:
-                            d_lines = list(difflib.unified_diff(
-                                old_s.splitlines(),
-                                new_s.splitlines(),
-                                fromfile=file_path or "file",
-                                tofile=file_path or "file",
-                                lineterm=""
-                            ))
-                            if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                                h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                                if h_m:
-                                    old_cnt = h_m.group(2) or "1"
-                                    new_cnt = h_m.group(4) or "1"
-                                    d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                            diff_parts.extend(d_lines)
-
-                    if diff_parts:
-                        diff_text = "\n".join(diff_parts)
-
-                if diff_text:
-                    formatted_diff = self._format_edit_diff(diff_text, file_path)
-                    self.content_widget.update(formatted_diff)
+                        self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
+            elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
+                raw_text = (self.result_text or "").strip()
+                if self.status == "error" or self._check_is_error(raw_text):
+                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 else:
-                    self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
+                    diff_text = raw_text
+                    if not diff_text or "@@" not in diff_text:
+                        chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks")
+                        diff_parts = []
+                        if chunks and isinstance(chunks, list):
+                            for chunk in chunks:
+                                if isinstance(chunk, dict):
+                                    old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or ""
+                                    new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or ""
+                                    start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
+                                    if old_c or new_c:
+                                        d_lines = list(difflib.unified_diff(
+                                            old_c.splitlines(),
+                                            new_c.splitlines(),
+                                            fromfile=file_path or "file",
+                                            tofile=file_path or "file",
+                                            lineterm=""
+                                        ))
+                                        if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
+                                            h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
+                                            if h_m:
+                                                old_cnt = h_m.group(2) or "1"
+                                                new_cnt = h_m.group(4) or "1"
+                                                d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
+                                        diff_parts.extend(d_lines)
+                        else:
+                            old_s = self.args.get("old_string") or self.args.get("target_content") or self.args.get("TargetContent") or ""
+                            new_s = self.args.get("new_string") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
+                            start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
+                            if old_s or new_s:
+                                d_lines = list(difflib.unified_diff(
+                                    old_s.splitlines(),
+                                    new_s.splitlines(),
+                                    fromfile=file_path or "file",
+                                    tofile=file_path or "file",
+                                    lineterm=""
+                                ))
+                                if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
+                                    h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
+                                    if h_m:
+                                        old_cnt = h_m.group(2) or "1"
+                                        new_cnt = h_m.group(4) or "1"
+                                        d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
+                                diff_parts.extend(d_lines)
+
+                        if diff_parts:
+                            diff_text = "\n".join(diff_parts)
+
+                    if diff_text:
+                        formatted_diff = self._format_edit_diff(diff_text, file_path)
+                        self.content_widget.update(formatted_diff)
+                    else:
+                        self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
             elif self.tool_type in ("update_plan", "Plan", "plan"):
                 plan_items = self.args.get("plan") or []
                 explanation = self.args.get("explanation", "")
