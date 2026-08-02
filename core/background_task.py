@@ -95,12 +95,14 @@ class BackgroundTask:
                         text = chunk.decode("utf-8", errors="replace")
 
                     self.output.append(text)
-                    if self.widget and hasattr(self.widget, "append_bash_output"):
-                        try:
-                            if getattr(self.widget, "is_mounted", True):
-                                self.widget.append_bash_output(strip_ansi(text))
-                        except Exception:
-                            pass
+                    if self.widget:
+                        func = getattr(self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None))
+                        if func:
+                            try:
+                                if getattr(self.widget, "is_mounted", True):
+                                    func(strip_ansi(text))
+                            except Exception:
+                                pass
             except Exception:
                 pass
             finally:
