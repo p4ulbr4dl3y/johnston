@@ -58,7 +58,12 @@ class ManageTaskTool(BaseTool):
             if len(out) > 4000:
                 out = "... [Output truncated, showing last 4000 chars]\n" + out[-4000:]
             if t.is_running:
-                return f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\nNote: Task is still running. STOP calling manage_task(status) in a loop and end your turn now."
+                return (
+                    f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\n"
+                    "Note: If Recent Output shows an interactive prompt (e.g., asking for input, confirmation [y/N], or 'Press RETURN'), "
+                    f"you may call manage_task(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{t.task_id}') to abort. "
+                    "Otherwise, STOP calling manage_task(status) in a loop and end your turn now."
+                )
             return f"Task ID: {t.task_id}\nStatus: FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 
         elif action in ("send_input", "input"):
