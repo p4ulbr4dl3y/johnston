@@ -417,6 +417,11 @@ class ThinkingWidget(Vertical):
         event.stop()
 
     def is_expandable(self) -> bool:
+        try:
+            if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
+                return False
+        except Exception:
+            pass
         return True
 
     def toggle_expanded(self) -> None:
@@ -445,6 +450,11 @@ class ToolCallWidget(Vertical):
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
 
     def is_expandable(self) -> bool:
+        try:
+            if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
+                return False
+        except Exception:
+            pass
         if self.tool_type.lower() in ("read", "view_file"):
             target_path = (self.args.get("path") if isinstance(self.args, dict) else None) or self.target or ""
             if any(target_path.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):

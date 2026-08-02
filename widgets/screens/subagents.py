@@ -61,8 +61,8 @@ class SubagentsScreen(ModalScreen[None]):
                 status_style = THEME_PRIMARY if st == "running" else THEME_MUTED
 
                 desc = sess.description or sess.prompt or sess.task_id
-                if len(desc) > 38:
-                    desc = desc[:35] + "..."
+                if len(desc) > 75:
+                    desc = desc[:72] + "..."
 
                 opt_text = Text()
                 opt_text.append(desc)

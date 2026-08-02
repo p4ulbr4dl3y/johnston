@@ -70,11 +70,19 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(len(events_received), 2)
         self.assertEqual(sess.status, "completed")
 
+    def test_bot_delta_cumulative_text_handling(self):
+        sess = self.tracker.create_session("task-delta", "delta subagent", "prompt", "explore", True)
+        sess.add_event({"type": "bot_delta", "text": "Hello"})
+        sess.add_event({"type": "bot_delta", "text": "Hello world"})
+        self.assertEqual(len(sess.events), 1)
+        self.assertEqual(sess.events[0]["text"], "Hello world")
+
     def test_subagent_view_screen_initialization(self):
         sess = self.tracker.create_session("task-789", "my subagent", "do something", "general", False)
         screen = SubagentViewScreen("task-789")
         self.assertEqual(screen.session, sess)
         self.assertEqual(screen.task_id_or_desc, "task-789")
+        self.assertFalse(screen.ALLOW_SELECT)
 
     def test_session_persistence(self):
         sess = self.tracker.create_session("task-persist", "Persistent Agent", "save to disk", "explore", False)
@@ -195,6 +203,25 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await screen._render_event({"type": "bot_chunk", "text": "fresh chunk"})
             self.assertEqual(screen.bot_msg.content, "fresh chunk")
 
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_subagent_screen_widgets_not_expandable(self):
+        sess = self.tracker.create_session("task-select", "Select Agent", "prompt", "general", False)
+        sess.add_event({"type": "thinking_start", "val1": "thinking..."})
+        sess.add_event({"type": "thinking_end", "duration": 1.0, "content": "thought done"})
+        sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py"})
+
+        screen = SubagentViewScreen("task-select")
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            from widgets.chat_view import ThinkingWidget, ToolCallWidget
+            tw = screen.query_one(ThinkingWidget)
+            tc = screen.query_one(ToolCallWidget)
+            self.assertFalse(tw.is_expandable())
+            self.assertFalse(tc.is_expandable())
             await pilot.press("escape")
             await pilot.pause()
 

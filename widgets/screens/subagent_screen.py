@@ -10,7 +10,7 @@ from widgets.chat_view import ChatView
 
 
 class SubagentViewScreen(ModalScreen[None]):
-    """Modal screen for watching subagent execution in a full chat window without an input panel."""
+    """Modal screen for watching subagent execution in a full chat window without input panel."""
 
     ALLOW_SELECT = False
     BINDINGS = [
@@ -66,15 +66,38 @@ class SubagentViewScreen(ModalScreen[None]):
         except Exception:
             pass
 
-        # Start queue processing worker loop
-        self.queue_task = asyncio.create_task(self._process_queue())
+        self.run_worker(self._load_history_session())
 
-        # Put recorded events in queue
-        for evt in list(self.session.events):
-            self.event_queue.put_nowait(evt)
+    async def _load_history_session(self) -> None:
+        chat_view = self.query_one("#subagent-chat-view", ChatView)
+        chat_view.loading = True
+        chat_view._is_loading_session = True
 
-        # Attach live listener for background updates
-        self.session.add_listener(self._on_live_event)
+        for child in list(chat_view.children):
+            child.remove()
+        self.thinking_widget = None
+        self.current_tool_widget = None
+        self.bot_msg = None
+
+        if self.session:
+            history_events = list(self.session.events)
+            for evt in history_events:
+                await self._render_event(evt, animate=False)
+
+        await asyncio.sleep(0.1)
+        chat_view._is_loading_session = False
+        chat_view.loading = False
+        try:
+            chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
+        except Exception:
+            pass
+
+        if not self.queue_task or self.queue_task.done():
+            self.queue_task = asyncio.create_task(self._process_queue())
+
+        if self.session:
+            self.session.remove_listener(self._on_live_event)
+            self.session.add_listener(self._on_live_event)
 
     def on_unmount(self) -> None:
         if self.queue_task and not self.queue_task.done():
@@ -99,14 +122,14 @@ class SubagentViewScreen(ModalScreen[None]):
             except Exception:
                 pass
 
-    async def _render_event(self, evt: dict) -> None:
+    async def _render_event(self, evt: dict, animate: bool = True) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         etype = evt.get("type")
 
         if etype == "user":
-            await chat_view.add_user_message(evt.get("text", ""))
+            await chat_view.add_user_message(evt.get("text", ""), animate=animate)
         elif etype == "thinking_start":
-            self.thinking_widget = await chat_view.add_thinking_widget(evt.get("val1", ""))
+            self.thinking_widget = await chat_view.add_thinking_widget(evt.get("val1", ""), animate=animate)
         elif etype == "thinking_delta":
             if self.thinking_widget:
                 self.thinking_widget.update_thinking(evt.get("val1", ""))
@@ -122,7 +145,7 @@ class SubagentViewScreen(ModalScreen[None]):
                     pass
             self.bot_msg = None
             self.current_tool_widget = await chat_view.add_tool_call(
-                evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {})
+                evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {}), animate=animate
             )
         elif etype == "tool_result":
             if self.current_tool_widget:
@@ -131,19 +154,19 @@ class SubagentViewScreen(ModalScreen[None]):
             txt = evt.get("text", "")
             if txt:
                 if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message()
+                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
                 self.bot_msg.content = txt
         elif etype == "bot_chunk":
             txt = evt.get("text", "")
             if txt:
                 if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message()
+                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
                 self.bot_msg.content += txt
         elif etype == "bot_text":
             txt = evt.get("text", "")
             if txt:
                 if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message()
+                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
                 self.bot_msg.content = txt
                 self.bot_msg = None
         elif etype == "status_change":
