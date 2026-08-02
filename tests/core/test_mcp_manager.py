@@ -393,6 +393,41 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
         finally:
             shutil.rmtree(test_dir)
 
+    async def test_call_tool_async_after_sync_start(self):
+        import sys
+
+        from core.mcp_manager import MCPProcessClient
+
+        # Python script that reads JSON-RPC requests from stdin and responds
+        script = (
+            "import sys, json\n"
+            "for line in sys.stdin:\n"
+            "    data = json.loads(line)\n"
+            "    msg_id = data.get('id')\n"
+            "    method = data.get('method')\n"
+            "    if method == 'initialize':\n"
+            "        res = {'jsonrpc': '2.0', 'id': msg_id, 'result': {'protocolVersion': '2024-11-05'}}\n"
+            "    elif method == 'tools/list':\n"
+            "        res = {'jsonrpc': '2.0', 'id': msg_id, 'result': {'tools': [{'name': 'echo', 'description': 'Echo'}]}}\n"
+            "    elif method == 'tools/call':\n"
+            "        res = {'jsonrpc': '2.0', 'id': msg_id, 'result': {'content': [{'type': 'text', 'text': 'ok'}]}}\n"
+            "    else:\n"
+            "        continue\n"
+            "    sys.stdout.write(json.dumps(res) + '\\n')\n"
+            "    sys.stdout.flush()\n"
+        )
+        test_dir = tempfile.mkdtemp()
+        try:
+            client = MCPProcessClient("mock_py", [sys.executable, "-c", script], cwd=test_dir)
+            self.assertTrue(client.start())
+            self.assertEqual(len(client.tools), 1)
+
+            res = await client.call_tool_async("echo", {})
+            self.assertEqual(res, "ok")
+            client.stop()
+        finally:
+            shutil.rmtree(test_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
