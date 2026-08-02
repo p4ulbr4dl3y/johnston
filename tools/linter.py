@@ -70,6 +70,12 @@ async def _exec_cmd(cmd: list[str]) -> Optional[str]:
             proc.kill()
             await proc.wait()
             return None
+        except asyncio.CancelledError:
+            proc.kill()
+            await proc.wait()
+            raise
+    except asyncio.CancelledError:
+        raise
     except Exception:
         return None
     return None

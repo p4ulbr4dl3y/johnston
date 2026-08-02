@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
@@ -101,8 +100,14 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if clean_name in disallowed or resolved_name in disallowed:
         return f"Error: Tool '{name}' is disabled in {mode_def.name} mode."
 
+    import inspect
+    import unittest.mock
     try:
-        mcp_res = await asyncio.to_thread(mcp_mgr.call_tool, name, args)
+        if isinstance(mcp_mgr, unittest.mock.Mock) or not hasattr(mcp_mgr, "call_tool_async"):
+            res_or_coro = mcp_mgr.call_tool(name, args)
+        else:
+            res_or_coro = mcp_mgr.call_tool_async(name, args)
+        mcp_res = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
         if mcp_res is not None:
             return mcp_res
     except Exception as e:

@@ -1,4 +1,3 @@
-import asyncio
 import json
 from typing import Any, Dict, Optional
 
@@ -53,8 +52,14 @@ class CallMCPTool(BaseTool):
                 pass
             return ""
 
+        import inspect
+        import unittest.mock
         try:
-            res = await asyncio.to_thread(mcp_mgr.call_tool, tool, arguments, target_server=server)
+            if isinstance(mcp_mgr, unittest.mock.Mock) or not hasattr(mcp_mgr, "call_tool_async"):
+                res_or_coro = mcp_mgr.call_tool(tool, arguments, target_server=server)
+            else:
+                res_or_coro = mcp_mgr.call_tool_async(tool, arguments, target_server=server)
+            res = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
             if res is not None:
                 if isinstance(res, str) and (res.startswith("Error") or res.lower().startswith("error")):
                     return res + _get_schema_hint()

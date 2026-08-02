@@ -366,6 +366,34 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         self.assertIn("- open_url(url, timeout) — Open a web URL", snippet)
 
 
+class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
+    async def test_async_cancellation_does_not_deadlock(self):
+        import asyncio
+        from unittest.mock import MagicMock
+
+        from core.mcp_manager import MCPProcessClient
+
+        test_dir = tempfile.mkdtemp()
+        try:
+            client = MCPProcessClient("mock_async", "echo hello", cwd=test_dir)
+            client.process = MagicMock()
+            client.process.poll.return_value = None
+            client.process.stdin = MagicMock()
+
+            task = asyncio.create_task(client.call_tool_async("run_code", {"cell": 1}))
+            await asyncio.sleep(0.01)
+
+            self.assertIn(1, client._pending_futures)
+            task.cancel()
+
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+            self.assertNotIn(1, client._pending_futures)
+        finally:
+            shutil.rmtree(test_dir)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -72,9 +72,19 @@ class AskUserTool(BaseTool):
                         future.set_result(result)
 
                 ctx.app.push_screen(screen, callback=on_dismiss)
-                res = await future
+                try:
+                    res = await future
+                finally:
+                    if getattr(screen, "is_mounted", False):
+                        try:
+                            screen.dismiss("cancelled")
+                        except Exception:
+                            pass
+
                 if isinstance(res, str) and res.strip() and res != "cancelled":
                     return res
+                return "Cancelled by user."
+            except asyncio.CancelledError:
                 return "Cancelled by user."
             except Exception as e:
                 return f"Error prompting user: {e}"
