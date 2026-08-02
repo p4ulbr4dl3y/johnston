@@ -39,7 +39,6 @@ class SubagentTool(BaseTool):
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "subagent_type": {"type": "string", "description": "Subagent type: 'general' or 'explore'"},
                     "workspace": {"type": "string", "description": "Workspace: 'inherit' or 'branch'"},
-                    "background": {"type": "boolean", "description": "Run asynchronously in background"},
                     "task_id": {"type": "string", "description": "Optional task ID"}
                 },
                 "required": ["prompt", "description"]
@@ -53,7 +52,7 @@ class SubagentTool(BaseTool):
         description = args.get("description", prompt[:30] or "subagent task").strip()
         subagent_type = args.get("subagent_type", "general").strip().lower()
         workspace_mode = args.get("workspace", "inherit").strip().lower()
-        run_in_background = bool(args.get("background", False))
+        run_in_background = True
 
         if not prompt:
             return "Error: 'prompt' argument is required for subagent tool."
