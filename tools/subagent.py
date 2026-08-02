@@ -210,6 +210,9 @@ class SubagentTool(BaseTool):
                 async for step in subagent.stream_steps(prompt):
                     _record_step(step, acc)
                 session.finish("completed")
+            except asyncio.CancelledError:
+                session.finish("cancelled", "Cancelled by user")
+                raise
             except Exception as err:
                 session.finish("error", str(err))
                 partial = _truncate_subagent_result(acc[0]).strip()

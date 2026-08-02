@@ -277,15 +277,20 @@ class RewindCommand(BaseCommand):
 
                 # Restore Git checkpoint state if available
                 if curr_sid:
-                    try:
-                        from core.git_checkpoint import GitCheckpointManager
-                        GitCheckpointManager.restore_checkpoint(curr_sid, seq_idx, project_path=proj_path)
-                        GitCheckpointManager.purge_checkpoints_after(curr_sid, seq_idx, project_path=proj_path)
-                    except Exception as e:
-                        print(f"Git checkpoint restore failed: {e}")
+                    async def _restore_git_bg():
+                        try:
+                            from core.git_checkpoint import GitCheckpointManager
+                            await asyncio.to_thread(GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path)
+                            await asyncio.to_thread(GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path)
+                        except Exception as e:
+                            print(f"Git checkpoint restore failed: {e}")
+                    asyncio.create_task(_restore_git_bg())
 
                 app.refresh_status_footer()
-                app.save_current_session()
+                if hasattr(app, "save_current_session_async"):
+                    asyncio.create_task(app.save_current_session_async())
+                else:
+                    app.save_current_session()
 
                 # Load text into input field
                 chat_input = app.query_one("#message-input")

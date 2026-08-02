@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 import platform
@@ -25,6 +26,16 @@ def get_git_info() -> str:
     if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
         return _GIT_INFO_CACHE["val"]
     val = _compute_git_info()
+    _GIT_INFO_CACHE["ts"] = now
+    _GIT_INFO_CACHE["val"] = val
+    return val
+
+
+async def get_git_info_async() -> str:
+    now = time.time()
+    if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
+        return _GIT_INFO_CACHE["val"]
+    val = await asyncio.to_thread(_compute_git_info)
     _GIT_INFO_CACHE["ts"] = now
     _GIT_INFO_CACHE["val"] = val
     return val

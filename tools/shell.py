@@ -210,6 +210,39 @@ class ShellTool(BaseTool):
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
             return f"[Background Task ID: {task_id}] Command is running in background. STOP calling tools now. Inform the user that the command is running in the background and end your turn."
+        except asyncio.CancelledError:
+            if 'task' in locals() and task:
+                task.kill_sync()
+                task.close_pty()
+            elif 'p' in locals() and p:
+                try:
+                    p.kill()
+                except Exception:
+                    pass
+            raise
+
+    async def _create_std_process(self, command: str, env: dict[str, str]):
+        if is_windows():
+            return await self._create_windows_process(command, env)
+        return await asyncio.create_subprocess_shell(
+            command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=env,
+            executable=shell_executable(),
+            **shell_subprocess_kwargs(),
+        )
+
+    async def _create_pty_process(self, command: str, slave_fd: int, env: dict[str, str]):
+        return await asyncio.create_subprocess_shell(
+            command,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            env=env,
+            close_fds=True,
+        )
 
     async def _create_windows_process(self, command: str, env: dict[str, str]):
         shell = shell_executable()
