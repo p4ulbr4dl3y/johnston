@@ -629,6 +629,14 @@ class JohnstonApp(App):
                 if partial:
                     self.agent.history.append({"role": "assistant", "content": partial})
                 self.agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+                try:
+                    from core.token_util import estimate_tokens
+                    sys_tok = getattr(self.agent, "_last_sys_tokens", 0)
+                    hist_tok = estimate_tokens(self.agent.history)
+                    self.agent.last_context_tokens = sys_tok + hist_tok
+                    self.refresh_status_footer()
+                except Exception:
+                    pass
             try:
                 await chat_view.add_compaction_divider("Response Interrupted")
             except Exception:

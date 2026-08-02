@@ -101,6 +101,34 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("330 +  // new comment", rendered_plain)
         self.assertIn("331   </script>", rendered_plain)
 
+    def test_edit_tool_error_display(self):
+        error_text = "Error: target_content not found between lines 10 and 20 in 'test.py'."
+        widget = ToolCallWidget(
+            tool_type="edit",
+            target="test.py",
+            result_text=error_text,
+            args={"path": "test.py", "target_content": "foo", "replacement_content": "bar"}
+        )
+        widget.set_result(error_text)
+        widget.toggle_expanded()
+        self.assertEqual(widget.status, "error")
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertEqual(content, error_text)
+
+    def test_create_tool_error_display(self):
+        error_text = "Error: '/some/dir' is a directory, cannot overwrite with file."
+        widget = ToolCallWidget(
+            tool_type="create",
+            target="/some/dir",
+            result_text=error_text,
+            args={"path": "/some/dir", "content": "some content"}
+        )
+        widget.set_result(error_text)
+        widget.toggle_expanded()
+        self.assertEqual(widget.status, "error")
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertEqual(content, error_text)
+
     def test_edit_tool_html_embedded_javascript_lexing(self):
         diff_text = (
             "@@ -327,5 +327,10 @@\n"
