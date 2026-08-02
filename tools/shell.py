@@ -209,7 +209,19 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
-            return f"[Background Task ID: {task_id}] Command is running in background. STOP calling tools now. Inform the user that the command is running in the background and end your turn."
+            raw_out = task.get_formatted_output()
+            if raw_out.strip():
+                if len(raw_out) > 2000:
+                    out_tail = "... [Output truncated, showing last 2000 chars]\n" + raw_out[-2000:]
+                else:
+                    out_tail = raw_out
+                recent_output_str = f"\n\nRecent Output:\n{out_tail}"
+            else:
+                recent_output_str = "\n\nRecent Output: (No output yet)"
+            return (
+                f"[Background Task ID: {task_id}] Command is running in background.{recent_output_str}\n\n"
+                "STOP calling tools now. Inform the user that the command is running in the background and end your turn."
+            )
         except asyncio.CancelledError:
             if 'task' in locals() and task:
                 task.kill_sync()

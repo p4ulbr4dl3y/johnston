@@ -54,9 +54,9 @@ class ManageTaskTool(BaseTool):
             if not matching:
                 return _task_not_found_msg(task_id)
             t = matching[0]
-            out = "".join(t.output)
+            out = t.get_formatted_output() if hasattr(t, "get_formatted_output") else "".join(t.output)
             if len(out) > 4000:
-                out = out[-4000:] + "\n... [truncated]"
+                out = "... [Output truncated, showing last 4000 chars]\n" + out[-4000:]
             if t.is_running:
                 return f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\nNote: Task is still running. STOP calling manage_task(status) in a loop and end your turn now."
             return f"Task ID: {t.task_id}\nStatus: FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
