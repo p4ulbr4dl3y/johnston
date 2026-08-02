@@ -67,6 +67,37 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("edit", tool_names)
         self.assertIn("read-only exploration subagent", mock_agent.system_prompt)
 
+    async def test_subagent_tool_exclusion_of_manage_task_and_recursion_guards(self):
+        from unittest.mock import MagicMock
+        tool = SubagentTool()
+
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [
+            {"function": {"name": "read"}},
+            {"function": {"name": "shell"}},
+            {"function": {"name": "subagent"}},
+            {"function": {"name": "manage_task"}},
+        ]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        await tool.execute({"prompt": "run task", "subagent_type": "general"})
+
+        self.assertTrue(mock_agent.is_subagent)
+        tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
+        self.assertIn("read", tool_names)
+        self.assertIn("shell", tool_names)
+        self.assertNotIn("subagent", tool_names)
+        self.assertNotIn("manage_task", tool_names)
+
     def test_truncate_subagent_result_short(self):
         from tools.subagent import _truncate_subagent_result
         self.assertEqual(_truncate_subagent_result("short result"), "short result")

@@ -79,6 +79,7 @@ class SubagentTool(BaseTool):
         if not subagent:
             return "Error: No application context available to spawn subagent."
         subagent.app = ctx.app
+        subagent.is_subagent = True
 
         wt_path = None
         wt_branch = None
@@ -97,7 +98,7 @@ class SubagentTool(BaseTool):
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 
-        # Disable nested Task tool calls (recursion guard)
+        # Disable nested Task tool calls (recursion guard) and background task management
         subagent.allow_task = False
         parent_agent = getattr(ctx.app, "agent", None)
         if parent_agent is not None:
@@ -115,9 +116,10 @@ class SubagentTool(BaseTool):
                 numeric_limit(parent_agent, "max_wall_seconds", 30 * 60),
             )
         original_tools = getattr(subagent, "tools", []) or []
+        excluded_tools = {"subagent", "Subagent", "Task", "task", "manage_task", "ManageTask"}
         subagent.tools = [
             t for t in original_tools
-            if t.get("function", {}).get("name") not in ("subagent", "Subagent", "Task", "task")
+            if t.get("function", {}).get("name") not in excluded_tools
         ]
 
         from core.subagent_registry import SubagentRegistry
@@ -144,6 +146,20 @@ class SubagentTool(BaseTool):
                 t for t in subagent.tools
                 if t.get("function", {}).get("name") in definition.tools
             ]
+
+        import copy
+        subagent_tools_custom = []
+        for t in subagent.tools:
+            if isinstance(t, dict) and t.get("function", {}).get("name") == "shell":
+                t_copy = copy.deepcopy(t)
+                t_copy["function"]["description"] = (
+                    "Run a synchronous terminal command with a configurable timeout (default 60s, max 300s). "
+                    "Processes terminate on timeout. Always use non-interactive flags (e.g. -y, --non-interactive) to prevent hanging."
+                )
+                subagent_tools_custom.append(t_copy)
+            else:
+                subagent_tools_custom.append(t)
+        subagent.tools = subagent_tools_custom
 
         from core.subagent_tracker import merge_subagent_metrics, record_subagent_step
 
