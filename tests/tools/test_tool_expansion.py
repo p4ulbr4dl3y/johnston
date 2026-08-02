@@ -377,6 +377,53 @@ class TestToolExpansion(unittest.TestCase):
             self.assertFalse(tc1.is_expanded)
             self.assertFalse(tw.is_expanded)
 
+    def test_guess_lexer_cleans_urls(self):
+        widget = ToolCallWidget(tool_type="web_fetch", target="https://example.com/script.py?v=2#L10")
+        self.assertEqual(widget._guess_lexer("https://example.com/script.py?v=2#L10"), "python")
+        self.assertEqual(widget._guess_lexer("https://example.com/style.css?query=abc"), "css")
+        self.assertEqual(widget._guess_lexer("https://example.com/data.json"), "json")
+
+    def test_web_fetch_python_code_uses_syntax_widget(self):
+        raw_output = (
+            "=== Lines 1-2 of 2 in https://huggingface.co/org/repo/raw/main/modeling.py?token=123 ===\n"
+            "    1 | target_aspect_ratio = 1\n"
+            "    2 | print(target_aspect_ratio)\n"
+        )
+        url = "https://huggingface.co/org/repo/raw/main/modeling.py?token=123"
+        widget = ToolCallWidget(
+            tool_type="web_fetch",
+            target=url,
+            result_text=raw_output,
+            args={"url": url}
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+        self.assertTrue(widget.content_widget.display)
+        self.assertFalse(widget.md_widget.display)
+
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertIsInstance(content, Syntax)
+        self.assertEqual(content.lexer.name, "Python")
+        self.assertEqual(content.code, "target_aspect_ratio = 1\nprint(target_aspect_ratio)")
+
+    def test_web_fetch_html_document_uses_md_widget(self):
+        raw_output = (
+            "=== Lines 1-2 of 2 in https://example.com/doc.html ===\n"
+            "    1 | # Documentation\n"
+            "    2 | This is converted markdown.\n"
+        )
+        url = "https://example.com/doc.html"
+        widget = ToolCallWidget(
+            tool_type="web_fetch",
+            target=url,
+            result_text=raw_output,
+            args={"url": url}
+        )
+        widget.toggle_expanded()
+        self.assertTrue(widget.is_expanded)
+        self.assertTrue(widget.md_widget.display)
+        self.assertFalse(widget.content_widget.display)
+
 
 if __name__ == "__main__":
     unittest.main()

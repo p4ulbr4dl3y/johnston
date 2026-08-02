@@ -6,6 +6,7 @@ import os
 import re
 import warnings
 from typing import Any
+from urllib.parse import urlparse
 
 import pygments
 from markdown_it import MarkdownIt
@@ -792,12 +793,6 @@ class ToolCallWidget(Vertical):
         self.render_header()
         if self.is_expanded:
             self.render_content()
-            if self.tool_type.lower() in ("web_fetch", "webfetch"):
-                self.md_widget.display = True
-                self.content_widget.display = False
-            else:
-                self.content_widget.display = True
-                self.md_widget.display = False
         else:
             self.content_widget.display = False
             self.md_widget.display = False
@@ -805,7 +800,8 @@ class ToolCallWidget(Vertical):
     def _guess_lexer(self, path_str: str) -> str:
         if not path_str:
             return "text"
-        ext = os.path.splitext(path_str)[1].lower().lstrip(".")
+        clean_path = urlparse(path_str).path if path_str.startswith(("http://", "https://")) else path_str
+        ext = os.path.splitext(clean_path)[1].lower().lstrip(".")
         mapping = {
             "py": "python",
             "js": "javascript",
@@ -1097,6 +1093,8 @@ class ToolCallWidget(Vertical):
 
     def render_content(self) -> None:
         try:
+            self.content_widget.display = True
+            self.md_widget.display = False
             file_path = self.args.get("TargetFile") or self.args.get("target_file") or self.args.get("path") or self.args.get("file") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
@@ -1202,45 +1200,83 @@ class ToolCallWidget(Vertical):
                     self.md_widget.display = False
                 else:
                     default_target = self.args.get("url") or file_path or "page.md"
-                    clean_code, _, _ = self._format_read_content(raw_text, default_target)
-                    clean_code = self._fix_markdown_nested_lists(clean_code)
-                    safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
+                    clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
+                    lexer = self._guess_lexer(fpath)
+                    raw_mode = bool(self.args.get("raw", False))
+
+                    is_code_file = lexer not in ("markdown", "text") and lexer != "html"
+                    if is_code_file or raw_mode:
+                        if clean_code:
+                            clean_code = clean_code.rstrip("\r\n")
+                            try:
+                                syntax = Syntax(
+                                    clean_code,
+                                    lexer if lexer != "html" else "html",
+                                    theme="one-dark",
+                                    line_numbers=True,
+                                    start_line=start_line,
+                                    word_wrap=True,
+                                    background_color="#18181b"
+                                )
+                                self.content_widget.update(syntax)
+                            except Exception:
+                                rendered = self._format_code_with_line_numbers(clean_code)
+                                self.content_widget.update(rendered)
+                        else:
+                            self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
+                        self.content_widget.display = True
+                        self.md_widget.display = False
+                    else:
+                        clean_code = self._fix_markdown_nested_lists(clean_code)
+                        safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
+                        self.md_widget.display = True
+                        self.content_widget.display = False
             elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
+                    self.content_widget.display = True
+                    self.md_widget.display = False
                 else:
                     default_target = file_path or "file.txt"
                     clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
 
-                if not clean_code.strip() and fpath and os.path.isfile(fpath):
-                    try:
-                        with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                            clean_code = f.read()
-                            start_line = 1
-                    except Exception:
-                        clean_code = ""
+                    if not clean_code.strip() and fpath and os.path.isfile(fpath):
+                        try:
+                            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                                clean_code = f.read()
+                                start_line = 1
+                        except Exception:
+                            clean_code = ""
 
-                if clean_code:
-                    clean_code = clean_code.rstrip("\r\n")
                     lexer = self._guess_lexer(fpath)
-                    try:
-                        syntax = Syntax(
-                            clean_code,
-                            lexer,
-                            theme="one-dark",
-                            line_numbers=True,
-                            start_line=start_line,
-                            word_wrap=True,
-                            background_color="#18181b"
-                        )
-                        self.content_widget.update(syntax)
-                    except Exception:
-                        rendered = self._format_code_with_line_numbers(clean_code)
-                        self.content_widget.update(rendered)
-                else:
-                    self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
+                    if lexer == "markdown":
+                        clean_code = self._fix_markdown_nested_lists(clean_code)
+                        safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
+                        self.md_widget.display = True
+                        self.content_widget.display = False
+                    else:
+                        if clean_code:
+                            clean_code = clean_code.rstrip("\r\n")
+                            try:
+                                syntax = Syntax(
+                                    clean_code,
+                                    lexer,
+                                    theme="one-dark",
+                                    line_numbers=True,
+                                    start_line=start_line,
+                                    word_wrap=True,
+                                    background_color="#18181b"
+                                )
+                                self.content_widget.update(syntax)
+                            except Exception:
+                                rendered = self._format_code_with_line_numbers(clean_code)
+                                self.content_widget.update(rendered)
+                        else:
+                            self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
+                        self.content_widget.display = True
+                        self.md_widget.display = False
             elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
