@@ -20,7 +20,7 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
 
         # Create dummy subprocess mock with stdout
         mock_proc = MagicMock()
-        mock_proc.wait = MagicMock(return_value=asyncio.sleep(0.01))
+        mock_proc.wait = AsyncMock(return_value=0)
 
         # Create stdout stream
         reader = asyncio.StreamReader()
@@ -41,7 +41,7 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         mock_proc = MagicMock()
         mock_proc.pid = 99999
         mock_proc.terminate = MagicMock()
-        mock_proc.wait = MagicMock(return_value=asyncio.sleep(0.01))
+        mock_proc.wait = AsyncMock(return_value=0)
 
         bg_task = BackgroundTask("task_2", "sleep 100", mock_proc)
         await bg_task.kill()
@@ -54,7 +54,7 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         mock_proc = MagicMock()
         mock_stdin = MagicMock()
         mock_stdin.write = MagicMock()
-        mock_stdin.drain = MagicMock(return_value=asyncio.sleep(0))
+        mock_stdin.drain = AsyncMock(return_value=None)
         mock_proc.stdin = mock_stdin
 
         bg_task = BackgroundTask("task_3", "interactive_cmd", mock_proc)

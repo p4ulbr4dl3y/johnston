@@ -14,7 +14,7 @@ class TestCircuitBreaker(unittest.TestCase):
         circuit_breaker.reset()
 
     def test_state_transitions(self):
-        cb = CircuitBreaker(failure_threshold=3, cooldown_seconds=0.2)
+        cb = CircuitBreaker(failure_threshold=3, cooldown_seconds=0.01)
         provider = "test_prov"
 
         self.assertEqual(cb.get_state(provider), "CLOSED")
@@ -31,7 +31,7 @@ class TestCircuitBreaker(unittest.TestCase):
         self.assertGreater(cb.remaining_cooldown(provider), 0.0)
 
         # Wait for cooldown to expire
-        time.sleep(0.25)
+        time.sleep(0.015)
         self.assertEqual(cb.get_state(provider), "HALF_OPEN")
         self.assertTrue(cb.allow_request(provider))
 
@@ -41,14 +41,14 @@ class TestCircuitBreaker(unittest.TestCase):
         self.assertEqual(cb.remaining_cooldown(provider), 0.0)
 
     def test_half_open_failure_reopens_immediately(self):
-        cb = CircuitBreaker(failure_threshold=3, cooldown_seconds=0.1)
+        cb = CircuitBreaker(failure_threshold=3, cooldown_seconds=0.01)
         provider = "test_prov"
 
         for _ in range(3):
             cb.record_failure(provider)
         self.assertEqual(cb.get_state(provider), "OPEN")
 
-        time.sleep(0.15)
+        time.sleep(0.015)
         self.assertEqual(cb.get_state(provider), "HALF_OPEN")
 
         cb.record_failure(provider)

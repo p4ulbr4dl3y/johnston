@@ -158,11 +158,14 @@ class MCPProcessClient:
             )
             self._buffer = ""
             init_ok = self._initialize()
-            if not init_ok and not self.last_error:
-                self.last_error = "Server initialization timed out or returned error"
+            if not init_ok:
+                if not self.last_error:
+                    self.last_error = "Server initialization timed out or returned error"
+                self.stop()
             return init_ok
         except Exception as e:
             self.last_error = f"Process start failed: {e}"
+            self.stop()
             return False
 
     async def start_async(self) -> bool:
@@ -189,11 +192,14 @@ class MCPProcessClient:
             )
             self._start_async_reader()
             init_ok = await self._initialize_async()
-            if not init_ok and not self.last_error:
-                self.last_error = "Server initialization timed out or returned error"
+            if not init_ok:
+                if not self.last_error:
+                    self.last_error = "Server initialization timed out or returned error"
+                self.stop()
             return init_ok
         except Exception as e:
             self.last_error = f"Process start failed: {e}"
+            self.stop()
             return False
 
     def stop(self):
@@ -321,7 +327,7 @@ class MCPProcessClient:
             }
         }
         self._send(init_req)
-        res = self._read_response(req_id=self.req_id, timeout=20.0)
+        res = self._read_response(req_id=self.req_id, timeout=5.0)
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
@@ -339,7 +345,7 @@ class MCPProcessClient:
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {"name": "johnston", "version": "1.0.0"}
-        }, timeout=20.0)
+        }, timeout=5.0)
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
@@ -362,13 +368,13 @@ class MCPProcessClient:
                 "method": "tools/list"
             }
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=15.0)
+            res = self._read_response(req_id=current_id, timeout=5.0)
             if res and "result" in res:
                 self.tools = res["result"].get("tools", [])
             return self.tools
 
     async def fetch_tools_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("tools/list", timeout=15.0)
+        res = await self._send_request_async("tools/list", timeout=5.0)
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
         return self.tools
@@ -693,12 +699,16 @@ class MCPManager:
 
             client = self.clients.get(name)
             if not client:
+                if s_mode == "lazy" and mode not in ("lazy", "all"):
+                    continue
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
                 if client.start():
                     self.clients[name] = client
                 else:
                     continue
             else:
+                if s_mode == "lazy" and mode not in ("lazy", "all"):
+                    continue
                 try:
                     client.fetch_tools()
                 except Exception:
@@ -755,12 +765,16 @@ class MCPManager:
 
             client = self.clients.get(name)
             if not client:
+                if s_mode == "lazy" and mode not in ("lazy", "all"):
+                    continue
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
                 if await client.start_async():
                     self.clients[name] = client
                 else:
                     continue
             else:
+                if s_mode == "lazy" and mode not in ("lazy", "all"):
+                    continue
                 try:
                     await client.fetch_tools_async()
                 except Exception:

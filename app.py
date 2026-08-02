@@ -182,6 +182,11 @@ class JohnstonApp(App):
                 logger.debug(f"Task cleanup error: {err}")
 
         try:
+            self.save_current_session()
+        except Exception as err:
+            logger.debug(f"Unmount session save error: {err}")
+
+        try:
             from core.mcp_manager import get_mcp_manager
 
             get_mcp_manager().stop_all()
@@ -342,8 +347,13 @@ class JohnstonApp(App):
             self.sm.save_session(self.current_session_id, session_data)
             self.refresh_status_footer()
 
-    async def save_current_session_async(self) -> None:
+    async def save_current_session_async(self, force: bool = False) -> None:
         """Collect session data on main UI thread, then save to disk in background thread."""
+        now = time.time()
+        last_save = getattr(self, "_last_session_save_time", 0.0)
+        if not force and (now - last_save < 1.5):
+            return
+        self._last_session_save_time = now
         session_data = self._get_current_session_data()
         if session_data is not None:
             await asyncio.to_thread(self.sm.save_session, self.current_session_id, session_data)
@@ -654,7 +664,7 @@ class JohnstonApp(App):
                 pass
             try:
                 if getattr(self, "is_app_active", True):
-                    await self.save_current_session_async()
+                    await self.save_current_session_async(force=True)
             except Exception:
                 pass
             # Drain the queue atomically: if a queued message exists, dispatch it WITHOUT

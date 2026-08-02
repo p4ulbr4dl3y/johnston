@@ -128,14 +128,6 @@ class TasksListScreen(ModalScreen[None]):
                 res = task.kill()
                 if inspect.isawaitable(res):
                     await res
-                if not task.is_background:
-                    from tools.context import ToolContext
-                    out = task.get_formatted_output()
-                    msg = (
-                        f"[System Notification] Background task '{task.command}' (ID: {task.task_id}) was killed by user.\n"
-                        f"<task_result>\n{out.strip() or '[Task terminated by user]'}\n</task_result>"
-                    )
-                    ToolContext(self.app).trigger_ai_response(msg)
                 self.update_tasks_list()
 
     def action_close(self) -> None:
