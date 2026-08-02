@@ -31,9 +31,12 @@ class SubagentSessionData:
     def add_event(self, event: Dict[str, Any]) -> None:
         etype = event.get("type", "")
         if etype in ("bot_chunk", "bot_delta", "thinking_delta") and self.events and self.events[-1].get("type") == etype:
-            last_text = self.events[-1].get("text", "")
             new_text = event.get("text", "")
-            self.events[-1]["text"] = last_text + new_text
+            if etype == "bot_delta":
+                self.events[-1]["text"] = new_text
+            else:
+                last_text = self.events[-1].get("text", "")
+                self.events[-1]["text"] = last_text + new_text
         else:
             self.events.append(event)
 

@@ -81,6 +81,10 @@ WelcomeWidget {
     text-align: left;
 }
 
+#modal-dialog .user-msg-bubble {
+    background: #27272a;
+}
+
 /* Bot Message Container - Off-white Text */
 .bot-msg {
     width: 100%;
@@ -430,6 +434,18 @@ ModalScreen {
     overflow-y: auto;
 }
 
+SubagentViewScreen #modal-dialog {
+    width: 95%;
+    max-width: 140;
+    height: 90%;
+    max-height: 90%;
+}
+
+SubagentsScreen #modal-dialog {
+    width: 90%;
+    max-width: 100;
+}
+
 .modal-title {
     width: 100%;
     text-align: center;
@@ -643,6 +659,11 @@ MarkdownBlock > .code_inline {
 LoadingIndicator {
     color: #a1a1aa;
     background: #09090b;
+}
+
+ModalScreen LoadingIndicator,
+#modal-dialog LoadingIndicator {
+    background: #18181b;
 }
 
 
