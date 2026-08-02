@@ -129,6 +129,20 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, error_text)
 
+    def test_update_plan_error_display(self):
+        error_text = "Error: 'plan' parameter must be a non-empty list of items."
+        widget = ToolCallWidget(
+            tool_type="update_plan",
+            target="plan",
+            result_text=error_text,
+            args={"plan": []}
+        )
+        widget.set_result(error_text)
+        widget.toggle_expanded()
+        self.assertEqual(widget.status, "error")
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertEqual(content, error_text)
+
     def test_edit_tool_html_embedded_javascript_lexing(self):
         diff_text = (
             "@@ -327,5 +327,10 @@\n"
