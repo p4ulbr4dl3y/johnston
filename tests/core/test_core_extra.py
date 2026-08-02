@@ -37,31 +37,6 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(cb_called)
         self.assertIn("Line 1\nLine 2\n", captured_res)
 
-    async def test_background_task_prompt_callback(self):
-        prompt_called = False
-        captured_tail = ""
-
-        def on_prompt(task_id, cmd, tail):
-            nonlocal prompt_called, captured_tail
-            prompt_called = True
-            captured_tail = tail
-
-        mock_proc = MagicMock()
-        mock_proc.wait = MagicMock(return_value=asyncio.sleep(0.01))
-
-        reader = asyncio.StreamReader()
-        reader.feed_data(b"WARNING: terminal is not fully functional\nPress RETURN to continue\n")
-        reader.feed_eof()
-        mock_proc.stdout = reader
-
-        bg_task = BackgroundTask("task_prompt", "git log", mock_proc)
-        bg_task.is_background = True
-        read_task = bg_task.start_reading(app=None, on_completed_cb=None, on_prompt_cb=on_prompt)
-        await read_task
-
-        self.assertTrue(prompt_called)
-        self.assertIn("Press RETURN to continue", captured_tail)
-
     async def test_background_task_kill(self):
         mock_proc = MagicMock()
         mock_proc.pid = 99999

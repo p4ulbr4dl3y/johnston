@@ -24,11 +24,6 @@ def process_carriage_returns(text: str) -> str:
     return "\n".join(processed)
 
 
-INTERACTIVE_PROMPT_REGEX = re.compile(
-    r'(?:Press RETURN|\[y/N\]|\[Y/n\]|\(y/n\)|\(Y/N\)|[Ff]ile to patch|[Pp]assword:|[Pp]assphrase:|[Cc]onfirm\?|\[y/n/q\])',
-)
-
-
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
     def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None):
@@ -38,7 +33,6 @@ class BackgroundTask:
         self.output = []
         self.is_running = True
         self.is_background = False
-        self.prompt_notified = False
         self.was_killed = False
         self.read_task = None
         self.widget = widget
@@ -73,9 +67,7 @@ class BackgroundTask:
             self._cached_len = len(self.output)
         return self._cached_formatted
 
-    def start_reading(self, app, on_completed_cb, on_prompt_cb=None):
-        prompt_callback = on_prompt_cb or getattr(app, "on_background_shell_prompt", None)
-
+    def start_reading(self, app, on_completed_cb):
         async def _read():
             try:
                 while True:
@@ -100,16 +92,6 @@ class BackgroundTask:
                                 self.widget.append_bash_output(strip_ansi(text))
                         except Exception:
                             pass
-
-                    if self.is_background and not self.prompt_notified and prompt_callback and getattr(app, "is_app_active", True):
-                        formatted = self.get_formatted_output()
-                        tail = formatted[-500:]
-                        if INTERACTIVE_PROMPT_REGEX.search(tail):
-                            self.prompt_notified = True
-                            try:
-                                prompt_callback(self.task_id, self.command, tail)
-                            except Exception:
-                                pass
             except Exception:
                 pass
             finally:
@@ -142,7 +124,6 @@ class BackgroundTask:
     async def send_input(self, text: str) -> str:
         if not self.is_running:
             return f"Task {self.task_id} is not running."
-        self.prompt_notified = False
         data = (text + "\n").encode("utf-8")
         try:
             if self.master_fd is not None:
