@@ -191,8 +191,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "do research", "description": "research task"}, app=app)
-        self.assertIn("<task_result>", res)
-        self.assertIn("Subagent answer for: do research", res)
+        self.assertIn("launched in background", res)
 
     async def test_task_tool_background(self):
         class DummySubAgent:
