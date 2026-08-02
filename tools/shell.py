@@ -33,10 +33,6 @@ class ShellTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Terminal command to run"},
-                    "no_background": {
-                        "type": "boolean",
-                        "description": "If true, block until the command finishes instead of moving long-running commands to the background.",
-                    },
                 },
                 "required": ["command"],
             },
@@ -92,21 +88,6 @@ class ShellTool(BaseTool):
         )
         callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
         task.start_reading(ctx.app, callback)
-
-        no_bg = args.get("no_background", False)
-        if no_bg:
-            await p.wait()
-            if task.read_task:
-                try:
-                    await asyncio.wait_for(task.read_task, timeout=1.0)
-                except asyncio.TimeoutError:
-                    pass
-            task.close_pty()
-            await asyncio.sleep(0.02)
-            res = task.get_formatted_output()
-            if not res.strip():
-                return "Command executed with no output."
-            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
 
         try:
             await asyncio.wait_for(p.wait(), timeout=60.0)
