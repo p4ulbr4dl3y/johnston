@@ -1001,7 +1001,7 @@ class ToolCallWidget(Vertical):
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()
         if explanation:
-            t.append(f"Rationale: {explanation}\n\n", style="italic dim #a1a1aa")
+            t.append(f"{explanation}\n\n", style="bold #ffffff")
 
         plan_lines = []
         for item in plan_items:
@@ -1013,7 +1013,7 @@ class ToolCallWidget(Vertical):
             if status in ("completed", "done"):
                 line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
             elif status == "in_progress":
-                line = Text("[>] ", style="bold #ffffff") + Text(step, style="bold #ffffff")
+                line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
             else:
                 line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
             plan_lines.append(line)
