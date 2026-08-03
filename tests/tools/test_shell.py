@@ -132,6 +132,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait = _mock_wait
 
         with (
+            patch("tools.shell.shell_executable", return_value="/bin/sh"),
             patch("asyncio.create_subprocess_shell", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
@@ -225,6 +226,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p = MagicMock()
 
         with (
+            patch("tools.shell.shell_executable", return_value="/bin/sh"),
             patch("asyncio.create_subprocess_shell", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
