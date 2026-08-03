@@ -24,6 +24,7 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybindings ]**
 
 * `Shift+Tab` — Toggle Action / Explore mode
+* `Ctrl+B` — Move active shell tasks to background
 * `Ctrl+O` — Expand / collapse tool output & thinking
 * `Enter` — Send message
 * `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
