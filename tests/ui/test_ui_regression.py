@@ -145,17 +145,17 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
         from widgets.chat_view import ToolCallWidget
 
         # Case 1: Standard lowercase keys
-        item = ToolCallWidget("call_mcp_tool", "", "", args={"server": "colab", "tool": "add_cell", "arguments": {"x": 1}})
+        item = ToolCallWidget("call_mcp", "", "", args={"server": "colab", "tool": "add_cell", "arguments": {"x": 1}})
         tool, server, args = item._extract_mcp_call_info()
         self.assertEqual((tool, server, args), ("add_cell", "colab", {"x": 1}))
 
         # Case 2: PascalCase keys (ToolName / ServerName / Arguments)
-        item2 = ToolCallWidget("call_mcp_tool", "", "", args={"ServerName": "colab-mcp", "ToolName": "run_cell", "Arguments": {"y": 2}})
+        item2 = ToolCallWidget("call_mcp", "", "", args={"ServerName": "colab-mcp", "ToolName": "run_cell", "Arguments": {"y": 2}})
         tool2, server2, args2 = item2._extract_mcp_call_info()
         self.assertEqual((tool2, server2, args2), ("run_cell", "colab-mcp", {"y": 2}))
 
         # Case 3: Missing tool name key, top-level arguments
-        item3 = ToolCallWidget("call_mcp_tool", "", "", args={"server": "colab", "code": "print(1)"})
+        item3 = ToolCallWidget("call_mcp", "", "", args={"server": "colab", "code": "print(1)"})
         tool3, server3, args3 = item3._extract_mcp_call_info()
         self.assertEqual((tool3, server3, args3), ("call_mcp", "colab", {"code": "print(1)"}))
 

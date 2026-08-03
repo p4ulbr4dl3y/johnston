@@ -22,6 +22,13 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         res_alias = await execute_tool("cat", {"path": "nonexistent_abc_123.txt"})
         self.assertIn("Error:", res_alias)
 
+        # Test additional aliases resolution
+        from tools.registry import ALIAS_MAP
+        self.assertEqual(ALIAS_MAP["edit_file"], "edit")
+        self.assertEqual(ALIAS_MAP["spawn_subagent"], "invoke_subagent")
+        self.assertEqual(ALIAS_MAP["mcp"], "call_mcp")
+        self.assertEqual(ALIAS_MAP["fetch"], "web_fetch")
+
     async def test_execute_tool_execution_exception(self):
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
             res = await execute_tool("read", {"path": "foo.txt"})
