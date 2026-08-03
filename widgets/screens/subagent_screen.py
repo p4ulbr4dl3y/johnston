@@ -33,10 +33,8 @@ class SubagentViewScreen(ModalScreen[None]):
         self.queue_task = None
 
     def compose(self) -> ComposeResult:
-        desc = self.session.description if self.session else self.task_id_or_desc
-        status = self.session.status.lower() if self.session else "not found"
         with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Subagent:** `{desc}` • {status}", classes="modal-markdown")
+            yield Markdown("### **Subagent Details**", classes="modal-markdown")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield Label("esc: close window", id="modal-hint")
 
@@ -58,13 +56,7 @@ class SubagentViewScreen(ModalScreen[None]):
             self.run_worker(_no_sess())
             return
 
-        try:
-            desc = self.session.description or self.task_id_or_desc
-            status = self.session.status.lower()
-            title_md = self.query_one(".modal-markdown", Markdown)
-            title_md.update(f"### **Subagent:** `{desc}` • {status}")
-        except Exception:
-            pass
+
 
         self.run_worker(self._load_history_session())
 
@@ -170,13 +162,7 @@ class SubagentViewScreen(ModalScreen[None]):
                 self.bot_msg.content = txt
                 self.bot_msg = None
         elif etype == "status_change":
-            status = evt.get("status", "").lower()
-            try:
-                desc = self.session.description if self.session else self.task_id_or_desc
-                title_md = self.query_one(".modal-markdown", Markdown)
-                title_md.update(f"### **Subagent:** `{desc}` • {status}")
-            except Exception:
-                pass
+            pass
 
     def action_close(self) -> None:
         self.dismiss()

@@ -57,18 +57,14 @@ class SubagentsScreen(ModalScreen[None]):
             opt_list.add_option(Text("No subagents registered for this session.", style=THEME_MUTED))
         else:
             for sess in self.sessions:
-                st = sess.status.lower()
-                status_style = "bold" if st == "running" else THEME_MUTED
+                st = (sess.status or "unknown").upper()
+                status_tag = f"\\[{st}]"
 
                 desc = sess.description or sess.prompt or sess.task_id
                 if len(desc) > 75:
                     desc = desc[:72] + "..."
 
-                opt_text = Text()
-                opt_text.append(desc)
-                opt_text.append(" | ")
-                opt_text.append(st, style=status_style)
-                opt_list.add_option(opt_text)
+                opt_list.add_option(f"{status_tag} {desc}")
 
         if opt_list.option_count > 0:
             opt_list.highlighted = 0
