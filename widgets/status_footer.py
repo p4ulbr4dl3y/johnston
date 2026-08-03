@@ -4,7 +4,7 @@ from rich.table import Table
 from textual.widgets import Static
 
 from core.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
-from core.models_catalog import format_context_tokens
+from core.models_catalog import catalog, format_context_tokens
 from core.thinking_effort import display_thinking_effort
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -56,6 +56,13 @@ class StatusFooter(Static):
             pkey = pm.get_active_provider_key() if pm else "default"
             agent = getattr(self.app, "agent", None)
             model_name = getattr(agent, "model", "")
+            providers = pm.load_providers() if pm else {}
+            provider_info = providers.get(pkey, {}) if isinstance(providers, dict) else {}
+            provider_display = provider_info.get("name", pkey) if provider_info else pkey
+            is_connected = pm.is_provider_connected(pkey, provider_info) if (pm and pkey) else False
+            clean_model = catalog.get_model_display_name(pkey, model_name)
+            if not clean_model:
+                clean_model = "[Select model: /models]"
             if pm and hasattr(pm, "get_provider_thinking_effort"):
                 effort_val = pm.get_provider_thinking_effort(pkey, model_name)
             else:
@@ -104,7 +111,10 @@ class StatusFooter(Static):
 
             kwargs = {
                 "provider_key": pkey,
+                "provider_display": provider_display,
+                "is_connected": is_connected,
                 "model_name": model_name,
+                "clean_model": clean_model,
                 "agent_mode": agent_mode,
                 "directory": os.path.basename(os.path.realpath(os.getcwd())),
                 "active_bg_tasks": active_bg_tasks,
@@ -129,7 +139,10 @@ class StatusFooter(Static):
     def update_status(
         self,
         provider_key: str,
+        provider_display: str | None = None,
+        is_connected: bool | None = None,
         model_name: str = "",
+        clean_model: str | None = None,
         agent_mode: str = "action",
         directory: str = "",
         active_bg_tasks: int = 0,
@@ -150,20 +163,15 @@ class StatusFooter(Static):
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
 
         dir_text = f"~/{directory}"
-        pm = getattr(self.app, "pm", None)
-        provider_display = provider_key
-        is_connected = bool(provider_key)
-        if pm:
-            providers = pm.load_providers()
-            if provider_key in providers:
-                provider_display = providers[provider_key].get("name", provider_key)
-        elif provider_key:
-            provider_display = provider_key.capitalize()
-
-        from core.models_catalog import catalog
-        clean_model = catalog.get_model_display_name(provider_key, model_name)
-        if not clean_model:
-            clean_model = "[Select model: /models]"
+        if provider_display is None:
+            provider_display = provider_key.capitalize() if provider_key else ""
+        if is_connected is None:
+            pm = getattr(self.app, "pm", None)
+            is_connected = pm.is_provider_connected(provider_key) if (pm and provider_key) else bool(provider_key)
+        if clean_model is None:
+            clean_model = catalog.get_model_display_name(provider_key, model_name)
+            if not clean_model:
+                clean_model = "[Select model: /models]"
         mode_str = agent_mode.capitalize()
         if self.is_generating:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
@@ -217,8 +225,6 @@ class StatusFooter(Static):
                 f"[bold {THEME_PRIMARY}]{mode_formatted}[/]",
                 f"[{THEME_SECONDARY}]{dir_text}[/]"
             ]
-            is_connected = pm.is_provider_connected(provider_key) if (pm and provider_key) else False
-
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
 

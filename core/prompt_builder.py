@@ -247,7 +247,7 @@ class PromptBuilder:
         from tools.registry import ALIAS_MAP
 
         mcp_mgr = get_mcp_manager()
-        mcp_tools = mcp_mgr.get_active_tools()
+        mcp_tools = mcp_mgr.get_cached_tools()
         clean_mcp_tools = [
             {"type": t["type"], "function": t["function"]} for t in mcp_tools
         ]

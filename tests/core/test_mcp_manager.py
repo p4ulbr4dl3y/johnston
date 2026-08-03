@@ -360,7 +360,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
             "_mcp_server": "browser",
             "_mcp_tool_name": "open_url"
         }
-        mm.get_active_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
+        mm.get_cached_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
         snippet = mm.get_system_prompt_snippet()
         self.assertIn("## MCP Servers", snippet)
         self.assertIn("- open_url(url, timeout) — Open a web URL", snippet)
@@ -431,4 +431,3 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

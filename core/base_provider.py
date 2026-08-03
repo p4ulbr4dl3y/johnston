@@ -1,6 +1,7 @@
 import ast
 import asyncio
 import json
+import os
 import re
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -444,6 +445,10 @@ class BaseAgent:
         agent_mode = getattr(self, "mode", "action")
         allow_task = getattr(self, "allow_task", True)
         m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            from core.mcp_manager import get_mcp_manager
+
+            await get_mcp_manager().ensure_tools_ready_async()
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))

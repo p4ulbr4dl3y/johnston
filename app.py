@@ -232,7 +232,7 @@ class JohnstonApp(App):
                         elif mtype == "bot":
                             text = msg.get("text", "")
                             bm = await chat_view.add_bot_message(animate=False)
-                            bm.content = text
+                            await bm.set_final_content(text)
                         elif mtype == "thinking":
                             dur = msg.get("duration", 0.0)
                             txt = msg.get("text", "")
@@ -247,6 +247,8 @@ class JohnstonApp(App):
                         elif mtype == "compaction_divider":
                             ctxt = msg.get("text", "Session Compacted")
                             await chat_view.add_compaction_divider(ctxt, animate=False)
+                        if len(chat_view.children) % 5 == 0:
+                            await asyncio.sleep(0)
                     except Exception as err:
                         print(f"Warning: error restoring UI message item: {err}")
             except Exception as err:
@@ -588,8 +590,11 @@ class JohnstonApp(App):
                         thinking_widget.finish_thinking(duration, val2)
                     thinking_widget = None
                 elif event_type == "tool":
-                    if bot_msg and not bot_msg.content.strip():
-                        bot_msg.remove()
+                    if bot_msg:
+                        if not bot_msg.content.strip():
+                            bot_msg.remove()
+                        else:
+                            await bot_msg.finalize_stream()
                     bot_msg = None
                     targs = val3 if isinstance(val3, dict) else {}
                     current_tool_widget = await chat_view.add_tool_call(val1, val2, args=targs)
@@ -616,14 +621,14 @@ class JohnstonApp(App):
                         if bot_msg is None:
                             bot_msg = await chat_view.add_bot_message()
                         if event_type == "bot_delta":
-                            bot_msg.content = val1
+                            bot_msg.set_stream_content(val1)
                         else:
-                            bot_msg.content += val1
+                            bot_msg.set_stream_content(bot_msg.content + val1)
                 elif event_type in ("bot_text", "outro"):
                     if val1.strip():
                         if bot_msg is None:
                             bot_msg = await chat_view.add_bot_message()
-                        bot_msg.content = val1
+                        await bot_msg.finalize_stream(val1)
                         bot_msg = None
                     try:
                         await self.save_current_session_async()
@@ -642,6 +647,11 @@ class JohnstonApp(App):
                 try:
                     duration = time.time() - start_time
                     thinking_widget.finish_thinking(duration)
+                except Exception:
+                    pass
+            if bot_msg and bot_msg.content.strip():
+                try:
+                    await bot_msg.finalize_stream()
                 except Exception:
                     pass
             if hasattr(self, "agent") and hasattr(self.agent, "history"):

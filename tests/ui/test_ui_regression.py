@@ -125,6 +125,65 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
             safe_update_markdown(md, "test content")
             await asyncio.sleep(0.01)
 
+    async def test_streaming_bot_message_renders_markdown_only_once_at_end(self):
+        app = JohnstonApp()
+
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            bot = await chat_view.add_bot_message(animate=False)
+            await pilot.pause()
+
+            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
+                markdown_update.return_value = None
+                for idx in range(100):
+                    bot.set_stream_content(f"stream chunk {idx}")
+
+                await pilot.pause(0.1)
+                markdown_update.assert_not_awaited()
+                self.assertTrue(bot.stream_widget.display)
+                self.assertFalse(bot.md_widget.display)
+
+                await bot.finalize_stream()
+
+                markdown_update.assert_awaited_once_with("stream chunk 99")
+                self.assertFalse(bot.stream_widget.display)
+                self.assertTrue(bot.md_widget.display)
+
+    async def test_typing_runs_one_input_change_per_key(self):
+        app = JohnstonApp()
+
+        async with app.run_test() as pilot:
+            chat_input = app.query_one("#message-input", ChatInput)
+            change_count = 0
+            original = chat_input._on_input_change
+
+            def count_change():
+                nonlocal change_count
+                change_count += 1
+                return original()
+
+            chat_input._on_input_change = count_change
+            await pilot.press(*list("abcdefghij"))
+            await pilot.pause(0.1)
+
+            self.assertEqual(change_count, 10)
+
+    async def test_large_bot_message_uses_single_static_renderable(self):
+        app = JohnstonApp()
+
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            bot = await chat_view.add_bot_message(animate=False)
+            await pilot.pause()
+
+            large_markdown = ("## Section\n\n- item\n\n" * 400).strip()
+            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
+                await bot.set_final_content(large_markdown)
+
+            markdown_update.assert_not_awaited()
+            self.assertTrue(bot.stream_widget.display)
+            self.assertFalse(bot.md_widget.display)
+
     def test_clean_markdown_for_rendering(self):
         from widgets.chat_view import clean_markdown_for_rendering
 
@@ -162,4 +221,3 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

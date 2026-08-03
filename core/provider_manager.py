@@ -363,16 +363,7 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    api_keys = data.get("api_keys", {})
-                    if key in api_keys and api_keys[key]:
-                        return api_keys[key]
-            except Exception:
-                pass
-        return ""
+        return self._get_config_data().get("api_keys", {}).get(key, "")
 
     def set_provider_api_key(self, key: str, api_key: str):
         data = {}
@@ -437,18 +428,12 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                efforts = data.get("provider_thinking_efforts", {})
-                provider_efforts = efforts.get(provider_key, {})
-                if model_name in provider_efforts:
-                    norm = normalize_thinking_effort(provider_efforts[model_name])
-                    if norm:
-                        return norm
-            except Exception:
-                pass
+        efforts = self._get_config_data().get("provider_thinking_efforts", {})
+        provider_efforts = efforts.get(provider_key, {})
+        if model_name in provider_efforts:
+            norm = normalize_thinking_effort(provider_efforts[model_name])
+            if norm:
+                return norm
 
         return EFFORT_AUTO
 
@@ -464,15 +449,9 @@ class ProviderManager:
 
         target_provider = providers[provider_key]
 
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    p_models = cdata.get("provider_models", {})
-                    if provider_key in p_models and p_models[provider_key]:
-                        return p_models[provider_key]
-            except Exception:
-                pass
+        p_models = self._get_config_data().get("provider_models", {})
+        if provider_key in p_models and p_models[provider_key]:
+            return p_models[provider_key]
 
         if target_provider.get("model"):
             return target_provider["model"]
