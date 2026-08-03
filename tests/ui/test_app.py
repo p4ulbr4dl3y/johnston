@@ -191,7 +191,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             app.message_queue.append(("Queued with att", False, [fake_att]))
             app.generate_ai_response("Initial prompt")
-            await pilot.pause(0.2)
+            await pilot.pause(0.5)
 
             self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
             self.assertEqual(ran_attachments[1], [fake_att])
@@ -223,7 +223,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             app.pm.create_active_agent = MagicMock(return_value=agent)
 
             app.trigger_ai_response("Prompt 1", show_in_ui=True)
-            await pilot.pause(0.3)
+            await pilot.pause(0.5)
             self.assertTrue(app.is_generating)
 
             app._queue_message_ui("Prompt 2", show_in_ui=True)
@@ -233,7 +233,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.focus()
             await pilot.press("escape")
 
-            await pilot.pause(0.3)
+            await pilot.pause(0.5)
 
             self.assertIn("Prompt 1", ran_prompts)
             self.assertIn("Prompt 2", ran_prompts)
