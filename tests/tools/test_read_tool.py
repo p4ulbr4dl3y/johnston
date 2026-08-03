@@ -213,6 +213,17 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             res_err = await tool.execute({"path": file_path})
             self.assertIn("Error reading file", res_err)
 
+    @patch("tools.web_fetch.WebFetchTool.execute")
+    async def test_read_http_url_delegates_to_web_fetch(self, mock_web_execute):
+        mock_web_execute.return_value = "# Web Page Content"
+        tool = ReadTool()
+        res = await tool.execute({"path": "https://example.com/page.html"})
+
+        self.assertEqual(res, "# Web Page Content")
+        mock_web_execute.assert_called_once()
+        args, kwargs = mock_web_execute.call_args
+        self.assertEqual(args[0], {"url": "https://example.com/page.html", "raw": False})
+
 
 if __name__ == "__main__":
     unittest.main()

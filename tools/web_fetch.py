@@ -1,12 +1,11 @@
 import asyncio
 import os
 import tempfile
-import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict
 
 import httpx
 
-from tools.base import BaseTool
+from tools.base import BaseTool, truncate_output
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -15,8 +14,6 @@ DEFAULT_USER_AGENT = (
 )
 
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB limit
-DEFAULT_CACHE_TTL = 300.0  # 5 minutes in seconds
-MAX_CACHE_ENTRIES = 100
 
 
 def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> str:
@@ -37,8 +34,7 @@ def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> 
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch content from a web URL. Automatically converts HTML/PDF/DOCX to Markdown cleanly. Specify url, and optionally raw, start_line, end_line, no_cache."
-    _cache: Dict[str, Tuple[float, bytes, str]] = {}
+    description = "Fetch content from a web URL. Automatically converts HTML/PDF/DOCX to Markdown cleanly. Specify url, and optionally raw."
 
     schema = {
         "type": "function",
@@ -48,35 +44,12 @@ class WebFetchTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "HTTP or HTTPS URL to fetch"},
-                    "raw": {"type": "boolean", "description": "If true, skip Markdown conversion and return raw response text"},
-                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "no_cache": {"type": "boolean", "description": "If true, bypass cache and perform fresh fetch"}
+                    "raw": {"type": "boolean", "description": "If true, skip Markdown conversion and return raw response text"}
                 },
                 "required": ["url"]
             }
         }
     }
-
-    @classmethod
-    def clear_cache(cls) -> None:
-        cls._cache.clear()
-
-    @classmethod
-    def _get_from_cache(cls, url: str, ttl: float = DEFAULT_CACHE_TTL) -> Tuple[bytes, str] | None:
-        if url in cls._cache:
-            ts, content_bytes, content_type = cls._cache[url]
-            if time.monotonic() - ts < ttl:
-                return content_bytes, content_type
-            del cls._cache[url]
-        return None
-
-    @classmethod
-    def _put_in_cache(cls, url: str, content_bytes: bytes, content_type: str) -> None:
-        if len(cls._cache) >= MAX_CACHE_ENTRIES:
-            oldest_key = min(cls._cache.keys(), key=lambda k: cls._cache[k][0])
-            del cls._cache[oldest_key]
-        cls._cache[url] = (time.monotonic(), content_bytes, content_type)
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         self._ensure_context(app)
@@ -88,56 +61,45 @@ class WebFetchTool(BaseTool):
             return f"Error: invalid URL scheme for '{url}'. Must start with http:// or https://."
 
         raw_mode = bool(args.get("raw", False))
-        no_cache = bool(args.get("no_cache", False))
 
-        cached = None if no_cache else self._get_from_cache(url)
-        if cached is not None:
-            content_bytes, content_type = cached
-        else:
-            headers = {
-                "User-Agent": DEFAULT_USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-            }
+        headers = {
+            "User-Agent": DEFAULT_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+        }
 
-            content_bytes = b""
-            content_type = ""
-            try:
-                async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
-                    async with client.stream("GET", url, headers=headers) as response:
-                        response.raise_for_status()
-                        content_type = response.headers.get("content-type", "").lower()
-                        # Pre-check Content-Length to fail fast on oversized responses.
-                        cl = response.headers.get("content-length")
-                        if cl:
-                            try:
-                                if int(cl) > MAX_RESPONSE_SIZE:
-                                    return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
-                            except ValueError:
-                                pass
-                        # Stream the body with a hard cap so an oversized or chunked
-                        # response cannot exhaust memory before the size check can trigger.
-                        total = 0
-                        chunks = []
-                        async for chunk in response.aiter_bytes():
-                            total += len(chunk)
-                            if total > MAX_RESPONSE_SIZE:
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
+                async with client.stream("GET", url, headers=headers) as response:
+                    response.raise_for_status()
+                    content_type = response.headers.get("content-type", "").lower()
+                    # Pre-check Content-Length to fail fast on oversized responses.
+                    cl = response.headers.get("content-length")
+                    if cl:
+                        try:
+                            if int(cl) > MAX_RESPONSE_SIZE:
                                 return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
-                            chunks.append(chunk)
-                        content_bytes = b"".join(chunks)
-                        self._put_in_cache(url, content_bytes, content_type)
-            except httpx.HTTPStatusError as e:
-                return f"Error fetching '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
-            except httpx.TimeoutException:
-                return f"Error fetching '{url}': Request timed out after 20 seconds."
-            except Exception as e:
-                return f"Error fetching '{url}': {e}"
-
-        lines: List[str] = []
+                        except ValueError:
+                            pass
+                    # Stream the body with a hard cap so an oversized or chunked
+                    # response cannot exhaust memory before the size check can trigger.
+                    total = 0
+                    chunks = []
+                    async for chunk in response.aiter_bytes():
+                        total += len(chunk)
+                        if total > MAX_RESPONSE_SIZE:
+                            return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
+                        chunks.append(chunk)
+                    content_bytes = b"".join(chunks)
+        except httpx.HTTPStatusError as e:
+            return f"Error fetching '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
+        except httpx.TimeoutException:
+            return f"Error fetching '{url}': Request timed out after 20 seconds."
+        except Exception as e:
+            return f"Error fetching '{url}': {e}"
 
         if raw_mode:
             text_content = content_bytes.decode("utf-8", errors="replace")
-            lines = text_content.splitlines(keepends=True)
         else:
             if "application/pdf" in content_type or url.lower().endswith(".pdf"):
                 suffix = ".pdf"
@@ -150,26 +112,15 @@ class WebFetchTool(BaseTool):
 
             if "json" in content_type or "text/plain" in content_type:
                 text_content = content_bytes.decode("utf-8", errors="replace")
-                lines = text_content.splitlines(keepends=True)
             else:
                 try:
-                    md_text = await asyncio.to_thread(_convert_content_to_md_sync, content_bytes, suffix)
-                    lines = md_text.splitlines(keepends=True)
+                    text_content = await asyncio.to_thread(_convert_content_to_md_sync, content_bytes, suffix)
                 except Exception:
                     text_content = content_bytes.decode("utf-8", errors="replace")
-                    lines = text_content.splitlines(keepends=True)
 
-        from tools.utils import format_line_pagination
-
-        start_line = args.get("start_line")
-        end_line = args.get("end_line")
-
-        raw_lines = [line.rstrip("\r\n") for line in lines]
-        return format_line_pagination(
-            raw_lines,
-            start_line=start_line,
-            end_line=end_line,
+        return truncate_output(
+            text_content,
             max_chars=8000,
-            path=url,
-            hint=f"URL output has {len(lines)} lines. Use start_line/end_line to read specific ranges.",
+            tool_name="web_fetch",
         )
+
