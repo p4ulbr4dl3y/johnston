@@ -37,6 +37,15 @@ from textual.widgets._markdown import (
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
 
 
+def to_snake_case(name: str) -> str:
+    if not name:
+        return ""
+    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", str(name))
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)
+    s = re.sub(r"[-\s]+", "_", s)
+    return s.lower()
+
+
 class CustomMarkdownTableContent(MarkdownTableContent):
     """Custom Markdown table content without cell hover tooltips."""
 
@@ -880,26 +889,32 @@ class ToolCallWidget(Vertical):
             self.header_label.update(f"[{c}]⚙ [bold]Plan[/bold][/{c}]({escape(target_str)})")
         elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
             tool_name = self.args.get("tool") or self.target
-            self.header_label.update(f"[{c}]⚙ [bold]GetMCPSchema[/bold][/{c}]({escape(str(tool_name))})")
+            tool_name_snake = to_snake_case(str(tool_name))
+            compact = self._format_compact_dict(self.args if isinstance(self.args, dict) else {})
+            escaped_compact = escape(compact) if compact else "{}"
+            self.header_label.update(f"[{c}]⚙ [bold]get_mcp_schema[/bold][/{c}]({escaped_compact})")
+        elif self.tool_type.lower() in ("call_mcp", "call_mcp_tool", "callmcp", "callmcptool"):
+            tool_name, server, mcp_args = self._extract_mcp_call_info()
+            tool_name_snake = to_snake_case(str(tool_name))
+            compact = self._format_compact_dict(mcp_args)
+            if not compact:
+                compact = f'{{server: "{server}"}}' if server else "{}"
+            escaped_compact = escape(compact)
+            self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "invoke_subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             from core.tool_display import extract_tool_display
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
             self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
-        elif self.tool_type in ("call_mcp", "call_mcp_tool", "CallMCPTool", "CallMCP"):
-            tool_name, server, mcp_args = self._extract_mcp_call_info()
-            compact = self._format_compact_dict(mcp_args)
-            if not compact:
-                compact = f'{{server: "{server}"}}' if server else "{}"
-            escaped_compact = escape(compact)
-            self.header_label.update(f"[{c}]⚙ [bold]{tool_name}[/bold][/{c}]({escaped_compact})")
         else:
             # Eager MCP tool or custom external tool
             mcp_args = self.args if isinstance(self.args, dict) else {}
             compact = self._format_compact_dict(mcp_args)
-            if compact:
+            is_mcp = self.tool_type.startswith("mcp_") or getattr(self, "is_mcp", False)
+            if compact or is_mcp:
+                tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
                 escaped_compact = escape(compact)
-                self.header_label.update(f"[{c}]⚙ [bold]{self.tool_type}[/bold][/{c}]({escaped_compact})")
+                self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
             else:
                 display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
                 self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
