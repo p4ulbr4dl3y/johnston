@@ -38,10 +38,15 @@ ALIAS_MAP: Dict[str, str] = {
     "read_file": "read",
     "view_file": "read",
     "cat": "read",
+    "edit_file": "edit",
     "replace_file_content": "edit",
     "multi_replace_file_content": "multi_edit",
     "subagent": "invoke_subagent",
+    "spawn_subagent": "invoke_subagent",
+    "run_subagent": "invoke_subagent",
     "call_mcp_tool": "call_mcp",
+    "mcp": "call_mcp",
+    "execute_mcp": "call_mcp",
     "update_file": "edit",
     "modify_file": "edit",
     "str_replace_editor": "edit",
@@ -51,8 +56,12 @@ ALIAS_MAP: Dict[str, str] = {
     "exec": "shell",
     "run_command": "shell",
     "ask": "ask_user",
+    "ask_question": "ask_user",
     "plan": "update_plan",
     "set_plan": "update_plan",
+    "fetch": "web_fetch",
+    "fetch_url": "web_fetch",
+    "browse": "web_fetch",
 }
 
 

@@ -194,7 +194,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_edit_tool_pascal_case_args_and_start_line(self):
         widget = ToolCallWidget(
-            tool_type="replace_file_content",
+            tool_type="edit",
             target="index.html",
             result_text="Successfully replaced content.",
             args={
@@ -214,7 +214,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_edit_tool_multi_replace_chunks(self):
         widget = ToolCallWidget(
-            tool_type="multi_replace_file_content",
+            tool_type="multi_edit",
             target="app.py",
             result_text="",
             args={
