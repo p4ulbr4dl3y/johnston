@@ -553,6 +553,15 @@ class DiffRenderable:
         return getattr(self._text, name)
 
 
+class ToolScrollBox(Vertical):
+    """Horizontal scroll box for tool code/diff view that absorbs vertical scroll events to prevent chat jumping"""
+    def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        event.stop()
+
+    def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        event.stop()
+
+
 class ToolCallWidget(Vertical):
     """Tool call widget (Create, Read, Edit, Shell) with expansion support"""
     can_focus = False
@@ -606,7 +615,7 @@ class ToolCallWidget(Vertical):
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
-        self.scroll_box = Vertical(self.content_widget, self.md_widget, classes="tool-scroll-box")
+        self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes="tool-scroll-box")
 
     def _clean_markup_text(self, text: str) -> str:
         if not text:
