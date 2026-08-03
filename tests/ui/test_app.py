@@ -164,6 +164,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_ai_response_queue_draining_and_attachments(self):
         from unittest.mock import MagicMock
+
         from core.base_provider import BaseAgent
 
         app = JohnstonApp()
@@ -200,6 +201,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
         from unittest.mock import MagicMock
+
         from core.base_provider import BaseAgent
 
         app = JohnstonApp()

@@ -8,7 +8,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual._context import active_app
 
-from widgets.chat_view import ToolCallWidget, DiffRenderable
+from widgets.chat_view import DiffRenderable, ToolCallWidget
 
 
 class TestToolExpansion(unittest.TestCase):

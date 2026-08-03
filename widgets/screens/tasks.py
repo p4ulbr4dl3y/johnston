@@ -4,7 +4,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList, RichLog
 
-from core.config import THEME_MUTED, THEME_PRIMARY
+from core.config import THEME_MUTED
 
 
 class TaskConsoleScreen(ModalScreen[None]):
