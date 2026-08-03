@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.14.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.13.0...johnston-v0.14.0) (2026-08-03)
+
+
+### Features
+
+* **core:** auto-notify agent when background command requests interactive input ([131c97a](https://github.com/p4ulbr4dl3y/johnston/commit/131c97aef7ec9c906d7b4af9089779e2376ca0c8))
+* **core:** process queued messages after each step in generation loop ([dc9bb5d](https://github.com/p4ulbr4dl3y/johnston/commit/dc9bb5dafb67dd702de5a739a77fddba912c0686))
+* **tools:** add intuitive tool aliases (edit_file, spawn_subagent, mcp, fetch, etc.) ([cf43232](https://github.com/p4ulbr4dl3y/johnston/commit/cf43232df46df54c2073082338e2a6abf96722cb))
+* **tools:** guide agent to use send_input when interactive prompt is detected ([d41aeda](https://github.com/p4ulbr4dl3y/johnston/commit/d41aedaf23457cb92ac787788a6baf4f814099e4))
+* **tools:** include recent output tail on background task timeout ([4988dce](https://github.com/p4ulbr4dl3y/johnston/commit/4988dcedb2e051da6e0bb0c987a00f4244637234))
+* **tools:** separate shell tool descriptions and enforce synchronous execution for subagents ([a2520db](https://github.com/p4ulbr4dl3y/johnston/commit/a2520dbbda782d612d408eb8cdb264490b4014d8))
+* **ui:** add visual divider for queued messages injected mid-generation ([126f0ab](https://github.com/p4ulbr4dl3y/johnston/commit/126f0ab39b90a19b6e93fe1a12880179b5b61fb2))
+* **ui:** right-align user message bubble with left-aligned text ([8c50340](https://github.com/p4ulbr4dl3y/johnston/commit/8c50340fb451d37500bc41043bde08f29d542536))
+
+
+### Bug Fixes
+
+* **core:** prevent test hangs in retry logic and MCP server init ([8e3ae03](https://github.com/p4ulbr4dl3y/johnston/commit/8e3ae036e53645080308debd2971f6e68c51b95d))
+* **core:** rebuild prompt and tools per step for dynamic MCP registration ([46c0abe](https://github.com/p4ulbr4dl3y/johnston/commit/46c0abe967fd02123a1b6297f84d27931a6b5def))
+* **core:** record tokens and update context on response interrupt ([afcb5c2](https://github.com/p4ulbr4dl3y/johnston/commit/afcb5c2fd09bda3730d48e3fc088bb1ca878966f))
+* **core:** reset prompt_notified on send_input to support multi-prompt interactive commands ([e3ca1dd](https://github.com/p4ulbr4dl3y/johnston/commit/e3ca1ddf7b2e5d121f02378dc3a4dc71d130c307))
+* **core:** set PAGER=cat and GIT_PAGER=cat in shell_env to prevent interactive terminal hangs ([e9c6008](https://github.com/p4ulbr4dl3y/johnston/commit/e9c6008905fff913489a30e06f4a8a59597baf5c))
+* **mcp,core,tools:** implement async multiplexed MCP transport and fix TUI deadlocks on cancellation ([1a2ffd4](https://github.com/p4ulbr4dl3y/johnston/commit/1a2ffd42bc2dc04a74d19084eaf20bf9bcf00402))
+* **mcp:** handle win32 pipe reading in MCPProcessClient ([804aa16](https://github.com/p4ulbr4dl3y/johnston/commit/804aa167e258a79586e2f873e0d9403e1b72aa25))
+* **mcp:** restore blocking stdout and resolve sync-async event loop deadlocks ([10ecded](https://github.com/p4ulbr4dl3y/johnston/commit/10ecded894daeea40a9185262077d84a2f4a3b07))
+* **shell:** read background stdout chunks instead of readline to capture interactive prompts without trailing newlines ([f946b2a](https://github.com/p4ulbr4dl3y/johnston/commit/f946b2a4d3ac8690faecd5db6b94a61d5c1760e0))
+* **shell:** remove no_background parameter to prevent sync process hanging ([7a76167](https://github.com/p4ulbr4dl3y/johnston/commit/7a76167f0aa8344743a70e755d3a837c366d52f6))
+* **shell:** standardize execution on standard pipes and hide system notification queued dividers ([e8da9da](https://github.com/p4ulbr4dl3y/johnston/commit/e8da9daca12d22306882cdc2e575f4eab03ed4d9))
+* **subagent:** force asynchronous background execution for subagents to prevent main agent blocking ([d5cd965](https://github.com/p4ulbr4dl3y/johnston/commit/d5cd965de45af2957b9a4674b0d8ce6f5544761b))
+* **ui:** address reviewer feedback for clipboard pasting ([a61aca8](https://github.com/p4ulbr4dl3y/johnston/commit/a61aca804aeb337642f1b1c20dfc286ff0e41db5))
+* **ui:** collapse carriage returns and suppress terminal spinner animation spam ([63ef175](https://github.com/p4ulbr4dl3y/johnston/commit/63ef175f421ca1bd7480b43d2df077e65dee6124))
+* **ui:** enable soft wrapping and line count height in ChatInput ([9b5d5f9](https://github.com/p4ulbr4dl3y/johnston/commit/9b5d5f9fe242e062c83b25c9bcc0384680c31d32))
+* **ui:** handle file drag-and-drop and paste formatting into [@path](https://github.com/path) ([1dce5c2](https://github.com/p4ulbr4dl3y/johnston/commit/1dce5c22c1014421e0ea05a66b5fbb910f6a2073))
+* **ui:** improve subagent modal layout, session loading, and streaming text handling ([f22f392](https://github.com/p4ulbr4dl3y/johnston/commit/f22f3920b54e5cfdd50b5e644d443e68e0a343e6))
+* **ui:** render error text when update_plan fails ([f24de3d](https://github.com/p4ulbr4dl3y/johnston/commit/f24de3d84ff4044eb42e24ad19db4718456b8524))
+* **ui:** smart Markdown vs Syntax rendering for web_fetch tool ([324a9bd](https://github.com/p4ulbr4dl3y/johnston/commit/324a9bdf79b3664915d1049250ac0dbbe996cf88))
+* **ui:** update fallback MCP tool name to call_mcp in UI header extractor ([b795d9f](https://github.com/p4ulbr4dl3y/johnston/commit/b795d9f62430b691bd719f5082eb74ea444e4f08))
+
+
+### Performance Improvements
+
+* **ui:** make clipboard access asynchronous to prevent freezes ([6d48dd6](https://github.com/p4ulbr4dl3y/johnston/commit/6d48dd6d277f7e0a3e340b001062c3f67f732cda))
+
+
+### Reverts
+
+* **core:** remove experimental interactive prompt auto-detection ([a4ddc9d](https://github.com/p4ulbr4dl3y/johnston/commit/a4ddc9d1b072a3cf8b2ed27a7567e432c538037f))
+
 ## [0.13.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.12.0...johnston-v0.13.0) (2026-08-01)
 
 
