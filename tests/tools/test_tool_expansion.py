@@ -8,7 +8,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual._context import active_app
 
-from widgets.chat_view import ToolCallWidget
+from widgets.chat_view import ToolCallWidget, DiffRenderable
 
 
 class TestToolExpansion(unittest.TestCase):
@@ -70,7 +70,7 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Text)
+        self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
         self.assertNotIn("@@ -7,1 +9,2 @@", rendered_plain)
         self.assertIn("7 - def multiply(a, b):", rendered_plain)
@@ -163,7 +163,7 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Text)
+        self.assertIsInstance(content, (Text, DiffRenderable))
         # Check that tokens inside function handleFormSubmit have styles applied (not style=None)
         has_styled_spans = any(span.style is not None for span in content._spans)
         self.assertTrue(has_styled_spans)
@@ -187,7 +187,7 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Text)
+        self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
         self.assertIn("274 +  </button>", rendered_plain)
         self.assertIn("277 +  Talk to Sales instead", rendered_plain)
@@ -207,7 +207,7 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Text)
+        self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
         self.assertIn("330 + // CTA form handler", rendered_plain)
         self.assertIn("331   const form = document.getElementById('cta-form');", rendered_plain)
@@ -236,7 +236,7 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Text)
+        self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
         self.assertIn("15 - x = 1", rendered_plain)
         self.assertIn("15 + x = 10", rendered_plain)

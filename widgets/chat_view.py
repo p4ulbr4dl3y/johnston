@@ -531,7 +531,26 @@ class ThinkingWidget(Vertical):
             self.content_widget.display = True
         else:
             self.content_widget.display = False
+class DiffRenderable:
+    """Custom Rich renderable for diff views to prevent console line wrapping"""
+    def __init__(self, formatted_lines: list[Text]):
+        self.formatted_lines = formatted_lines
+        self._text = Text("\n").join(formatted_lines)
+        self._text.overflow = "crop"
+        self._text.no_wrap = True
 
+    def __rich_console__(self, console, options):
+        from rich.segment import Segment
+        new_opts = options.update(no_wrap=True, overflow="crop")
+        for line in self.formatted_lines:
+            yield from console.render(line, new_opts)
+            yield Segment.line()
+
+    def __rich_measure__(self, console, options):
+        return self._text.__rich_measure__(console, options)
+
+    def __getattr__(self, name):
+        return getattr(self._text, name)
 
 
 class ToolCallWidget(Vertical):
@@ -991,7 +1010,7 @@ class ToolCallWidget(Vertical):
 
         return t + Text("\n").join(plan_lines)
 
-    def _format_edit_diff(self, diff_text: str, file_path: str) -> Text:
+    def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         if "[Linter Feedback]:" in diff_text:
             diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
 
@@ -1061,19 +1080,26 @@ class ToolCallWidget(Vertical):
         new_line = 0
         old_idx = 0
         new_idx = 0
-        in_hunk = False
 
-        max_num_digits = 3
+        max_num = 1
+        temp_old = 0
+        temp_new = 0
         for line in lines:
-            h_match = hunk_regex.match(line)
-            if h_match:
-                o_val = int(h_match.group(1))
-                n_val = int(h_match.group(2))
-                max_num_digits = max(max_num_digits, len(str(o_val + 200)), len(str(n_val + 200)))
-
-        from rich.console import Console as RichConsole
-        console = self.app.console if (self.app and hasattr(self.app, "console") and self.app.console) else RichConsole(width=120)
-        width = max(console.width - 6, 60)
+            hunk_match = hunk_regex.match(line)
+            if hunk_match:
+                temp_old = int(hunk_match.group(1))
+                temp_new = int(hunk_match.group(2))
+            elif line.startswith("-"):
+                max_num = max(max_num, temp_old)
+                temp_old += 1
+            elif line.startswith("+"):
+                max_num = max(max_num, temp_new)
+                temp_new += 1
+            elif line.startswith(" "):
+                max_num = max(max_num, temp_old, temp_new)
+                temp_old += 1
+                temp_new += 1
+        max_num_digits = len(str(max_num))
 
         def append_diff_line(num_str: str, symbol: str, code_text: Text, style_bg: str = None, style_fg: str = None):
             full_line = Text()
@@ -1134,9 +1160,7 @@ class ToolCallWidget(Vertical):
                 formatted_lines.append(Text(line, style="dim", overflow="crop"))
                 in_hunk = False
 
-        res = Text("\n").join(formatted_lines)
-        res.overflow = "crop"
-        return res
+        return DiffRenderable(formatted_lines)
 
     def _format_read_content(self, text: str, default_file_path: str) -> tuple[str, int, str]:
         lines = text.splitlines()
