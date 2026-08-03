@@ -99,6 +99,8 @@ class CustomMarkdownFence(MarkdownFence):
     def allow_horizontal_scroll(self) -> bool:
         return False
 
+
+
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "code"
         copy_btn = Button("copy", classes="fence-copy-btn")
@@ -109,12 +111,17 @@ class CustomMarkdownFence(MarkdownFence):
         code_content = self._highlighted_code
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
-        yield Label(code_content, id="code-content", expand=True)
+        if hasattr(code_content, "word_wrap"):
+            code_content.word_wrap = False
+        with Vertical(classes="fence-scroll-box"):
+            yield Label(code_content, id="code-content", expand=True)
 
     def set_content(self, content: Any) -> None:
         self._content = content
         if hasattr(content, "code") and isinstance(getattr(content, "code", None), str):
             content.code = content.code.rstrip("\r\n")
+        if hasattr(content, "word_wrap"):
+            content.word_wrap = False
         try:
             self.query_one("#code-content", Label).update(content)
         except Exception:
@@ -552,12 +559,8 @@ class DiffRenderable:
 
 
 class ToolScrollBox(Vertical):
-    """Horizontal scroll box for tool code/diff view that absorbs vertical scroll events to prevent chat jumping"""
-    def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
-        event.stop()
-
-    def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
-        event.stop()
+    """Horizontal scroll box for tool code/diff view"""
+    pass
 
 
 class ToolCallWidget(Vertical):
