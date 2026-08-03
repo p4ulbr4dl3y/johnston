@@ -105,6 +105,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.BackgroundTask") as mock_bg_cls,
         ):
             mock_task = MagicMock()
+            mock_task.background_event = asyncio.Event()
             mock_task.read_task = dummy_task
             mock_task.get_formatted_output.return_value = "normal_timeout_output"
             mock_bg_cls.return_value = mock_task
@@ -126,23 +127,15 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p = MagicMock()
 
         def _mock_wait():
-            fut = asyncio.Future()
-            fut.set_result(0)
-            return fut
+            return asyncio.Future()
 
         mock_p.wait = _mock_wait
 
-        async def custom_wait_for(fut, timeout):
-            if timeout == 120.0:
-                raise asyncio.TimeoutError()
-            return await fut
-
         with (
             patch("asyncio.create_subprocess_shell", return_value=mock_p),
-            patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "echo timeout_test"}, app=mock_app)
+            res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, app=mock_app)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Command is running in background", res)
             mock_ctx.add_background_task.assert_called_once()
@@ -256,6 +249,32 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Error: Background tasks are not supported in subagents.", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
+
+    async def test_move_to_background_during_execution(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        fut = asyncio.Future()
+        mock_p.wait.return_value = fut
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}, app=mock_app))
+            await asyncio.sleep(0.01)
+
+            # Trigger backgrounding via move_to_background on registered task
+            self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
+            registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
+            registered_bg_task.move_to_background()
+
+            res = await exec_task
+            self.assertIn("[Background Task ID:", res)
+            self.assertIn("Command is running in background", res)
 
 
 if __name__ == "__main__":
