@@ -600,7 +600,7 @@ class ToolCallWidget(Vertical):
             or args.get("ToolName")
             or args.get("name")
             or args.get("Name")
-            or "call_mcp_tool"
+            or "call_mcp"
         )
         server = (
             args.get("server")
