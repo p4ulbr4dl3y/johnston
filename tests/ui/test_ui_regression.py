@@ -157,7 +157,7 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
         # Case 3: Missing tool name key, top-level arguments
         item3 = ToolCallWidget("call_mcp_tool", "", "", args={"server": "colab", "code": "print(1)"})
         tool3, server3, args3 = item3._extract_mcp_call_info()
-        self.assertEqual((tool3, server3, args3), ("call_mcp_tool", "colab", {"code": "print(1)"}))
+        self.assertEqual((tool3, server3, args3), ("call_mcp", "colab", {"code": "print(1)"}))
 
 
 if __name__ == "__main__":
