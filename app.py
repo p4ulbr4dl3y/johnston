@@ -486,11 +486,27 @@ class JohnstonApp(App):
                     self.notify("Unknown command", severity="warning")
                 else:
                     if self.is_generating:
-                        self.message_queue.append((user_text, True))
+                        self._queue_message_ui(user_text, show_in_ui=True)
                     else:
                         self.trigger_ai_response(user_text, show_in_ui=True)
         except Exception as e:
             self.notify(f"Error executing command: {e}", severity="error")
+
+    def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
+        """Render queued message in UI immediately with 'Queued Messages' divider if needed, and queue item."""
+        item = (prompt, False, attachments) if attachments else (prompt, False)
+        self.message_queue.append(item)
+        if show_in_ui:
+            async def _render():
+                try:
+                    chat_view = self.query_one(ChatView)
+                    if not getattr(self, "_has_rendered_queue_divider", False):
+                        await chat_view.add_compaction_divider("Queued Messages")
+                        self._has_rendered_queue_divider = True
+                    await chat_view.add_user_message(prompt, attachments=attachments)
+                except Exception:
+                    pass
+            asyncio.create_task(_render())
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -511,8 +527,7 @@ class JohnstonApp(App):
 
         kwargs = {"attachments": attachments} if attachments else {}
         if self.is_generating:
-            item = (user_text, True, attachments) if attachments else (user_text, True)
-            self.message_queue.append(item)
+            self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
@@ -531,9 +546,8 @@ class JohnstonApp(App):
 
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
-        item = (prompt, show_in_ui, attachments) if attachments else (prompt, show_in_ui)
         if getattr(self, "is_generating", False):
-            self.message_queue.append(item)
+            self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments)
         else:
             self.is_generating = True
             kwargs = {"attachments": attachments} if attachments else {}
@@ -660,6 +674,7 @@ class JohnstonApp(App):
                         pass
         except (asyncio.CancelledError, RuntimeError):
             self.message_queue.clear()
+            self._has_rendered_queue_divider = False
             if thinking_widget:
                 try:
                     duration = time.time() - start_time
@@ -715,6 +730,7 @@ class JohnstonApp(App):
                 self.generate_ai_response(queued_next[0], show_in_ui=queued_next[1])
             else:
                 self.is_generating = False
+                self._has_rendered_queue_divider = False
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background shell command finishes"""
