@@ -218,6 +218,13 @@ class IsolatedJohnstonUITest(unittest.IsolatedAsyncioTestCase):
         tool3, server3, args3 = item3._extract_mcp_call_info()
         self.assertEqual((tool3, server3, args3), ("call_mcp", "colab", {"code": "print(1)"}))
 
+    def test_to_snake_case(self):
+        from widgets.chat_view import to_snake_case
+        self.assertEqual(to_snake_case("CallMCPTool"), "call_mcp_tool")
+        self.assertEqual(to_snake_case("openColabBrowser"), "open_colab_browser")
+        self.assertEqual(to_snake_case("OpenColabBrowser"), "open_colab_browser")
+        self.assertEqual(to_snake_case("search_issues"), "search_issues")
+
 
 if __name__ == "__main__":
     unittest.main()
