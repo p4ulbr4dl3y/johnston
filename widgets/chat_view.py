@@ -1085,12 +1085,9 @@ class ToolCallWidget(Vertical):
                 full_line.append("  ")
             full_line.append(code_text)
 
-            wrapped = full_line.wrap(console, width, tab_size=4, overflow="fold")
-            for wl in wrapped:
-                if style_bg:
-                    wl.pad_right(width)
-                    wl.stylize(style_bg)
-                formatted_lines.append(wl)
+            if style_bg:
+                full_line.stylize(style_bg)
+            formatted_lines.append(full_line)
 
         for line in lines:
             if line.startswith("--- ") or line.startswith("+++ "):
@@ -1132,13 +1129,13 @@ class ToolCallWidget(Vertical):
                 old_line += 1
                 new_line += 1
             elif line.startswith("\\"):
-                formatted_lines.append(Text(line, style="dim", overflow="fold"))
+                formatted_lines.append(Text(line, style="dim", overflow="crop"))
             else:
-                formatted_lines.append(Text(line, style="dim", overflow="fold"))
+                formatted_lines.append(Text(line, style="dim", overflow="crop"))
                 in_hunk = False
 
         res = Text("\n").join(formatted_lines)
-        res.overflow = "fold"
+        res.overflow = "crop"
         return res
 
     def _format_read_content(self, text: str, default_file_path: str) -> tuple[str, int, str]:
