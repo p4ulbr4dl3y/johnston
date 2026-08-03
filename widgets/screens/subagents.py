@@ -6,7 +6,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList
 
-from core.config import THEME_MUTED, THEME_PRIMARY
+from core.config import THEME_MUTED
 from core.subagent_tracker import SubagentSessionData, SubagentTracker
 from widgets.screens.subagent_screen import SubagentViewScreen
 
