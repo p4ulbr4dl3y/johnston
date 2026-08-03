@@ -68,6 +68,7 @@ class JohnstonApp(App):
     BINDINGS = [
         ("ctrl+c", "quit", "Exit"),
         ("ctrl+q", "quit", "Exit"),
+        ("ctrl+b", "background_all", "Background All"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("shift+tab", "toggle_mode", "Toggle Mode"),
         ("backtab", "toggle_mode", "Toggle Mode"),
@@ -131,6 +132,22 @@ class JohnstonApp(App):
             chat_view.toggle_expand("all")
         except Exception:
             pass
+
+    def action_background_all(self) -> None:
+        """Background all running foreground shell tasks"""
+        count = 0
+        for t in list(getattr(self, "background_tasks", [])):
+            if getattr(t, "is_running", False) and not getattr(t, "is_background", False):
+                if hasattr(t, "move_to_background"):
+                    t.move_to_background()
+                    count += 1
+                else:
+                    t.is_background = True
+                    count += 1
+        if count > 0:
+            self.notify(f"Moved {count} task(s) to background")
+        else:
+            self.notify("No active foreground tasks to move to background")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):

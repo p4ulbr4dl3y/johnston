@@ -48,6 +48,11 @@ class BackgroundTask:
         self.master_fd = master_fd
         self.reader = reader
         self.transport = transport
+        self.background_event = asyncio.Event()
+
+    def move_to_background(self):
+        self.is_background = True
+        self.background_event.set()
 
     def close_pty(self):
         if self.transport is not None:

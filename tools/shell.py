@@ -160,10 +160,43 @@ class ShellTool(BaseTool):
                 "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
             )
 
+        ctx.add_background_task(task)
         task.start_reading(ctx.app, callback)
 
         try:
-            await asyncio.wait_for(p.wait(), timeout=float(timeout))
+            wait_proc_task = asyncio.ensure_future(p.wait())
+            wait_bg_task = asyncio.ensure_future(task.background_event.wait())
+            done, pending = await asyncio.wait(
+                [wait_proc_task, wait_bg_task],
+                timeout=float(timeout),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t_pending in pending:
+                t_pending.cancel()
+
+            if not done:
+                raise asyncio.TimeoutError()
+
+            if task.background_event.is_set() or task.is_background:
+                task.is_background = True
+                if ctx.app:
+                    ctx.notify(f"Command sent to background (TID: {task_id})")
+                raw_out = task.get_formatted_output()
+                if raw_out.strip():
+                    if len(raw_out) > 2000:
+                        out_tail = "... [Output truncated, showing last 2000 chars]\n" + raw_out[-2000:]
+                    else:
+                        out_tail = raw_out
+                    recent_output_str = f"\n\nRecent Output:\n{out_tail}"
+                else:
+                    recent_output_str = "\n\nRecent Output: (No output yet)"
+                return (
+                    f"[Background Task ID: {task_id}] Command is running in background.{recent_output_str}\n\n"
+                    "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
+                    f"you may call manage_task(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{task_id}') to abort. "
+                    "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
+                )
+
             if task.read_task:
                 try:
                     await asyncio.wait_for(task.read_task, timeout=2.0)
@@ -176,7 +209,6 @@ class ShellTool(BaseTool):
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
         except asyncio.TimeoutError:
             task.is_background = True
-            ctx.add_background_task(task)
             if ctx.app:
                 ctx.notify(f"Command sent to background (TID: {task_id})")
             raw_out = task.get_formatted_output()
