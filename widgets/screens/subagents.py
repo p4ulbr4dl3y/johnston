@@ -58,7 +58,7 @@ class SubagentsScreen(ModalScreen[None]):
         else:
             for sess in self.sessions:
                 st = sess.status.lower()
-                status_style = THEME_PRIMARY if st == "running" else THEME_MUTED
+                status_style = "bold" if st == "running" else THEME_MUTED
 
                 desc = sess.description or sess.prompt or sess.task_id
                 if len(desc) > 75:

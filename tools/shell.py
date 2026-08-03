@@ -122,7 +122,7 @@ class ShellTool(BaseTool):
                 res = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 if not res.strip():
                     return "Command executed with no output."
-                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
+                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
             except asyncio.TimeoutError:
                 await terminate_process(p)
                 if read_task:
@@ -206,7 +206,7 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             if not res.strip():
                 return "Command executed with no output."
-            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell")
+            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
         except asyncio.TimeoutError:
             task.is_background = True
             if ctx.app:

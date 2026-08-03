@@ -41,3 +41,11 @@ class TestTruncateOutput(unittest.TestCase):
         with open(path2, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), text2)
 
+    def test_truncate_output_from_end(self):
+        text = "HEAD_" + ("X" * 1000) + "_TAIL"
+        res = truncate_output(text, max_chars=100, from_end=True, save_log=False)
+        self.assertTrue(res.startswith("[Output truncated. Showing last 100 chars."))
+        self.assertTrue(res.endswith("_TAIL"))
+        self.assertNotIn("HEAD_", res)
+
+
