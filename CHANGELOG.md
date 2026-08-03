@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.15.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.14.0...johnston-v0.15.0) (2026-08-03)
+
+
+### Features
+
+* **subagent:** update completion hint to include send_message action and log file path ([2f46a06](https://github.com/p4ulbr4dl3y/johnston/commit/2f46a069b63055ff51f28612aebf3c691acf2398))
+* **tools:** add run_in_background parameter to shell tool ([4ee3d18](https://github.com/p4ulbr4dl3y/johnston/commit/4ee3d18e8dfb84291e21f53d465a3fcda496454c))
+* **tools:** update default shell timeout to 120s and max timeout to 600s ([44067c6](https://github.com/p4ulbr4dl3y/johnston/commit/44067c6ae240557e071f429d550404a0c682097f))
+* **ui:** add ctrl+b keybinding to move all active foreground shell tasks to background ([784c618](https://github.com/p4ulbr4dl3y/johnston/commit/784c618ef131f72cec6e48eb6a7ff57917acb562))
+* **ui:** render queued messages immediately with divider ([a773c54](https://github.com/p4ulbr4dl3y/johnston/commit/a773c54d27a83624ef77e98c1e025a56a75e9e34))
+
+
+### Bug Fixes
+
+* **ci:** fix ruff lint errors ([8414cd5](https://github.com/p4ulbr4dl3y/johnston/commit/8414cd56a0c6666e3227a72c85103db45bc1a0c1))
+* **core:** remove queued messages divider ([bfb0926](https://github.com/p4ulbr4dl3y/johnston/commit/bfb09265d13f8155491a36d2b7e182ed532d350f))
+* **test:** fix Windows process mocking and increase UI test pause delays ([7b9ee88](https://github.com/p4ulbr4dl3y/johnston/commit/7b9ee883724568f5c04b09a88a4bfe88cf9f9364))
+* **test:** mock GitCheckpointManager in test_esc_key_cancellation_real_flow to avoid git delays on Windows ([9fc14f7](https://github.com/p4ulbr4dl3y/johnston/commit/9fc14f7a51f54a2c65fd2193b3c37acbe701f21e))
+* **test:** mock GitCheckpointManager in test_generate_ai_response_queue_draining_and_attachments ([9d2412b](https://github.com/p4ulbr4dl3y/johnston/commit/9d2412b81872383a42c5f1ee49386d50b58f1ef1))
+* **tools:** truncate shell output from tail and fix option highlight styling ([764155e](https://github.com/p4ulbr4dl3y/johnston/commit/764155e0cf301ada39a945a6b4f39b0c588043a1))
+* **ui:** absorb vertical scroll events in ToolScrollBox to prevent chat from scrolling vertically ([e1d2946](https://github.com/p4ulbr4dl3y/johnston/commit/e1d294632f06a9068eacdc37cc80afbc53f9b5d3))
+* **ui:** add text-wrap: nowrap; to tool content widgets to prevent Textual line wrapping ([5bfc49f](https://github.com/p4ulbr4dl3y/johnston/commit/5bfc49f151e52afe69e86e95f4f0cb7ed8ac60fc))
+* **ui:** allow child width auto and min-width 100% with parent overflow-x auto to enable horizontal scroll ([6d8cd58](https://github.com/p4ulbr4dl3y/johnston/commit/6d8cd58a63b720b487348907ef16358fad3a35f0))
+* **ui:** disable expand capability for read and web_fetch tools ([9a8365b](https://github.com/p4ulbr4dl3y/johnston/commit/9a8365b6d53775a44e0ce06a0ac1375ef8aefc87))
+* **ui:** remove manual line wrapping in diff view to enable true horizontal scrolling ([bbe8329](https://github.com/p4ulbr4dl3y/johnston/commit/bbe832908757a6b57cc8426fd51962c3bf445f9e))
+* **ui:** remove redundant newline in DiffRenderable to fix blank line gaps ([7485672](https://github.com/p4ulbr4dl3y/johnston/commit/74856728177fd301acf916ff4c08d820030c8d65))
+* **ui:** restore normal vertical scrolling over code blocks ([95bbe92](https://github.com/p4ulbr4dl3y/johnston/commit/95bbe92a46b112368a7352264c24570b2cebc703))
+* **ui:** use custom DiffRenderable to prevent Rich Text paragraph line wrapping ([64e11af](https://github.com/p4ulbr4dl3y/johnston/commit/64e11af21f60b6938e017b180c86bc4b8ec20067))
+* **ui:** wrap tool content in inner scroll box so header stays fixed while content scrolls horizontally ([b59ea9f](https://github.com/p4ulbr4dl3y/johnston/commit/b59ea9fb46d88eed66eebe975b5cd7895505484d))
+
+
+### Performance Improvements
+
+* **ui:** use word_wrap=False and overflow-x auto for invisible horizontal scrolling ([a72bfd3](https://github.com/p4ulbr4dl3y/johnston/commit/a72bfd35d73882b6ac7304e7545001224bb51f31))
+
+
+### Documentation
+
+* **help:** add ctrl+b to keybindings list in help modal ([5a5e78f](https://github.com/p4ulbr4dl3y/johnston/commit/5a5e78f16c2baa9c2c76c36d885664ef9f7e86ba))
+
 ## [0.14.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.13.0...johnston-v0.14.0) (2026-08-03)
 
 
