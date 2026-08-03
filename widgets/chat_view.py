@@ -656,7 +656,7 @@ class ToolCallWidget(Vertical):
                 pretty_json,
                 "json",
                 theme="one-dark",
-                word_wrap=True,
+                word_wrap=False,
                 background_color="#18181b"
             )
             if footer:
@@ -1225,7 +1225,7 @@ class ToolCallWidget(Vertical):
                                 lexer,
                                 theme="one-dark",
                                 line_numbers=True,
-                                word_wrap=True,
+                                word_wrap=False,
                                 background_color="#18181b"
                             )
                             self.content_widget.update(syntax)
@@ -1325,7 +1325,7 @@ class ToolCallWidget(Vertical):
                                     theme="one-dark",
                                     line_numbers=True,
                                     start_line=start_line,
-                                    word_wrap=True,
+                                    word_wrap=False,
                                     background_color="#18181b"
                                 )
                                 self.content_widget.update(syntax)
@@ -1376,7 +1376,7 @@ class ToolCallWidget(Vertical):
                                     theme="one-dark",
                                     line_numbers=True,
                                     start_line=start_line,
-                                    word_wrap=True,
+                                    word_wrap=False,
                                     background_color="#18181b"
                                 )
                                 self.content_widget.update(syntax)
@@ -1416,7 +1416,7 @@ class ToolCallWidget(Vertical):
                         full_display,
                         "json",
                         theme="one-dark",
-                        word_wrap=True,
+                        word_wrap=False,
                         background_color="#18181b"
                     )
                     self.content_widget.update(syntax)
