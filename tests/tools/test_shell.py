@@ -223,6 +223,40 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
 
+    async def test_explicit_run_in_background(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True}, app=mock_app)
+            self.assertIn("[Background Task ID:", res)
+            self.assertIn("Command is running in background", res)
+            mock_ctx.add_background_task.assert_called_once()
+            mock_ctx.notify.assert_called_once()
+
+    async def test_subagent_explicit_run_in_background_rejected(self):
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True})
+            self.assertIn("Error: Background tasks are not supported in subagents.", res)
+            mock_term.assert_called_once()
+            mock_ctx.add_background_task.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

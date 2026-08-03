@@ -35,6 +35,7 @@ class ShellTool(BaseTool):
                 "properties": {
                     "command": {"type": "string", "description": "Terminal command to run"},
                     "timeout": {"type": "integer", "description": "Optional timeout in seconds (default: 60, max: 300)"},
+                    "run_in_background": {"type": "boolean", "description": "Set to true to run this command in the background immediately."},
                 },
                 "required": ["command"],
             },
@@ -88,8 +89,14 @@ class ShellTool(BaseTool):
         env = shell_env()
         p = await self._create_std_process(cmd, env)
 
+        run_in_bg = bool(args.get("run_in_background", False))
+
         # Synchronous execution mode for subagents (no background task)
         if ctx.is_subagent:
+            if run_in_bg:
+                await terminate_process(p)
+                return "Error: Background tasks are not supported in subagents."
+
             output_chunks = []
 
             async def _read_stream(stream):
@@ -139,6 +146,20 @@ class ShellTool(BaseTool):
             widget=target_widget,
         )
         callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
+
+        if run_in_bg:
+            task.is_background = True
+            ctx.add_background_task(task)
+            task.start_reading(ctx.app, callback)
+            if ctx.app:
+                ctx.notify(f"Command sent to background (TID: {task_id})")
+            return (
+                f"[Background Task ID: {task_id}] Command is running in background.\n\nRecent Output: (No output yet)\n\n"
+                "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
+                f"you may call manage_task(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{task_id}') to abort. "
+                "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
+            )
+
         task.start_reading(ctx.app, callback)
 
         try:
