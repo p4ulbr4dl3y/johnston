@@ -138,7 +138,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash {
+.tool-create, .tool-read, .tool-edit, .tool-multi_edit, .tool-shell, .tool-bash, .tool-invoke_subagent, .tool-call_mcp {
     color: #d4d4d8;
 }
 
