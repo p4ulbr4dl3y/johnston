@@ -416,29 +416,30 @@ class InitCommand(BaseCommand):
         app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
 
 
-HANDOFF_PROMPT_TEMPLATE = """## Task: Session Continuation Note
+HANDOFF_PROMPT_TEMPLATE = """## Task: Generate Session Continuation Handoff Note
 
 ### Goal
-Create or update `HANDOFF.md` for this repository to enable another agent to continue work seamlessly.
+Create or update `HANDOFF.md` in the repository working directory to enable another AI agent to continue work seamlessly.
 
-### Execution Constraints
-1. Do not output the handoff note in chat. Write or overwrite `HANDOFF.md` in the working directory using file tools.
+### Execution Constraints & Security
+1. Do not output the full handoff note in chat. Write or overwrite `HANDOFF.md` using file tools.
 2. Output only a brief 1-2 sentence confirmation linking to `HANDOFF.md` in chat.
+3. REDACT all sensitive information, including API keys, tokens, passwords, and personally identifiable information (PII).
+4. DO NOT infer or hallucinate completed work, decisions, inspected files, or test results not present in the conversation context.
 
-### Core Rules
-Include information required to continue correctly:
-1. Current goal and user intent
-2. Relevant decisions and constraints
-3. Files, modules, or commands already inspected
-4. Work completed so far
-5. Remaining tasks or next steps
-6. Verification status, including tests or checks run
-7. Known risks, blockers, or assumptions
+### Required Document Structure (`HANDOFF.md`)
+1. **Goal & User Intent**: High-level goal, current objective, and explicit user requirements.
+2. **Current State & Modified Files**: Work completed so far. Reference key modified/created files using exact paths (e.g. `path/file.ext#L10-L30`).
+3. **Decisions Made (Do Not Re-litigate)**: Architectural/technical choices agreed upon and the rationale behind them.
+4. **Verification & Test Status**: Explicit commands run (e.g. `uv run pytest`) and their exact results (PASS/FAIL).
+5. **Remaining Tasks & Open Questions**: Actionable next steps, unresolved questions, or blockers.
+6. **Active / Recommended Skills & Tools**: Skills or tools used in this session or recommended for the next session.
 
 ### Writing Rules
 1. If there is little or no prior session context, state that explicitly in the file.
-2. Do not infer completed work, inspected files, decisions, or verification not present in the conversation.
-3. Prefer short sections and bullets. Be specific enough that another agent can resume without rereading the whole conversation."""
+2. Prefer concise sections and bullet points.
+3. Do not dump entire source files or raw conversation logs into `HANDOFF.md`. Use file links for existing code. You MAY write detailed Markdown explanations, architectural specs, or essential code snippets if crucial for continuation."""
+
 
 
 class HandoffCommand(BaseCommand):
