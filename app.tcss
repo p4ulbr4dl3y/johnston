@@ -138,6 +138,7 @@ WelcomeWidget {
     height: auto;
     margin-top: 1;
     color: #d4d4d8;
+    overflow-x: auto;
 }
 
 .tool-sequential {
@@ -159,14 +160,14 @@ WelcomeWidget {
 }
 
 .tool-content, .tool-content-md {
-    width: 100%;
+    width: auto;
+    min-width: 100%;
     height: auto;
     margin: 1 1 0 0;
     padding: 0 1;
     background: #18181b;
     color: #e4e4e7;
     border-left: solid #3f3f46;
-    overflow-x: auto;
     text-wrap: nowrap;
 }
 
@@ -176,13 +177,13 @@ WelcomeWidget {
 }
 
 .tool-diff-view {
-    width: 100%;
+    width: auto;
+    min-width: 100%;
     height: auto;
     margin-top: 1;
     padding: 0 1;
     background: #09090b;
     color: #e4e4e7;
-    overflow-x: auto;
     text-wrap: nowrap;
 }
 
