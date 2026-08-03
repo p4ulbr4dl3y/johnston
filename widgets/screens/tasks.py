@@ -95,7 +95,7 @@ class TasksListScreen(ModalScreen[None]):
             if len(cmd) > 38:
                 cmd = cmd[:35] + "..."
             status_str = "running" if t.is_running else "finished"
-            status_style = THEME_PRIMARY if t.is_running else THEME_MUTED
+            status_style = "bold" if t.is_running else THEME_MUTED
 
             opt_text = Text()
             opt_text.append(cmd)

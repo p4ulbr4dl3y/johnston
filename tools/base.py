@@ -48,6 +48,7 @@ def truncate_output(
     save_log: bool = True,
     tool_name: str = "",
     tool_id: str = "",
+    from_end: bool = False,
 ) -> str:
     """Truncates text safely if it exceeds max_chars, saving full output to a unique log file."""
     if len(text) <= max_chars:
@@ -72,14 +73,24 @@ def truncate_output(
     else:
         log_path = LAST_TOOL_LOG_FILE
 
-    truncated = text[:max_chars]
-    footer = f"\n... [Output truncated at {max_chars} chars."
-    if save_log:
-        footer += f" Full output saved to {log_path}. Use read tool or shell (grep/head/tail) to inspect or filter full log."
-    if hint:
-        footer += f" {hint}"
-    footer += "]"
-    return truncated + footer
+    if from_end:
+        truncated = text[-max_chars:]
+        header = f"[Output truncated. Showing last {max_chars} chars."
+        if save_log:
+            header += f" Full output saved to {log_path}. Use read tool or shell (grep/head/tail) to inspect or filter full log."
+        if hint:
+            header += f" {hint}"
+        header += "]\n...\n"
+        return header + truncated
+    else:
+        truncated = text[:max_chars]
+        footer = f"\n... [Output truncated at {max_chars} chars."
+        if save_log:
+            footer += f" Full output saved to {log_path}. Use read tool or shell (grep/head/tail) to inspect or filter full log."
+        if hint:
+            footer += f" {hint}"
+        footer += "]"
+        return truncated + footer
 
 
 class BaseTool:
