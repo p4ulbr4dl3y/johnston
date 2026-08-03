@@ -101,11 +101,6 @@ class CommandSuggestions(OptionList):
 
     def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
         """Updates matches list formatted for /commands and @files"""
-        self.clear_options()
-        self.mode = None
-        self.current_matched = []
-        self.at_start_idx = -1
-
         check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
 
         # 1. Check for slash command at any position (/command or /skill)
@@ -114,6 +109,7 @@ class CommandSuggestions(OptionList):
             if slash_idx == 0 or check_text[slash_idx - 1] in " \t\n":
                 query_part = check_text[slash_idx:]
                 if " " not in query_part and "\n" not in query_part:
+                    self.clear_options()
                     self.mode = "command"
                     self.at_start_idx = slash_idx
                     query_lower = query_part.lower()
@@ -144,6 +140,7 @@ class CommandSuggestions(OptionList):
             if at_idx == 0 or check_text[at_idx - 1] in " \t\n":
                 query_part = check_text[at_idx + 1:]
                 if " " not in query_part and "\n" not in query_part:
+                    self.clear_options()
                     self.mode = "file"
                     self.at_start_idx = at_idx
                     query_lower = query_part.lower()
@@ -165,7 +162,12 @@ class CommandSuggestions(OptionList):
                         self.display = False
                     return matched_files
 
-        self.display = False
+        if self.mode is not None or self.display or self.option_count:
+            self.clear_options()
+            self.display = False
+        self.mode = None
+        self.current_matched = []
+        self.at_start_idx = -1
         return []
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -187,4 +189,3 @@ class CommandSuggestions(OptionList):
                 chat_input.focus()
             except Exception:
                 pass
-

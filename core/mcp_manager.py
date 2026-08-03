@@ -180,7 +180,8 @@ class MCPProcessClient:
 
         self.last_error = None
         try:
-            self.process = subprocess.Popen(
+            self.process = await asyncio.to_thread(
+                subprocess.Popen,
                 self.cmd,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
@@ -188,7 +189,7 @@ class MCPProcessClient:
                 cwd=self.cwd or os.getcwd(),
                 env=run_env,
                 text=True,
-                bufsize=1
+                bufsize=1,
             )
             self._start_async_reader()
             init_ok = await self._initialize_async()
@@ -517,6 +518,8 @@ class MCPManager:
         self.global_file = GLOBAL_MCP_FILE
         self.project_file = os.path.join(self.project_dir, PROJECT_MCP_FILE)
         self.clients: Dict[str, MCPProcessClient] = {}
+        self._tools_refresh_time = 0.0
+        self._tools_refresh_task: Optional[asyncio.Task] = None
         self.ensure_default_configs()
         atexit.register(self.stop_all)
 
@@ -805,6 +808,66 @@ class MCPManager:
 
         return tools
 
+    def get_cached_tools(self, mode: Optional[str] = "eager") -> List[Dict[str, Any]]:
+        """Return already discovered tools without starting processes or performing I/O."""
+        tools: List[Dict[str, Any]] = []
+        seen_names: Dict[str, str] = {}
+
+        for server in self.load_servers():
+            if server.get("disabled", False):
+                continue
+            server_mode = server.get("mode", "eager")
+            if mode and mode != "all" and server_mode != mode:
+                continue
+
+            server_name = server.get("name", "")
+            client = self.clients.get(server_name)
+            if client is None:
+                continue
+
+            for tool in client.tools:
+                tool_name = tool.get("name")
+                if not tool_name:
+                    continue
+                exposed_name = tool_name
+                if tool_name in seen_names and seen_names[tool_name] != server_name:
+                    exposed_name = f"{server_name}__{tool_name}"
+                else:
+                    seen_names[tool_name] = server_name
+
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": exposed_name,
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("inputSchema", {"type": "object", "properties": {}}),
+                    },
+                    "_mcp_server": server_name,
+                    "_mcp_tool_name": tool_name,
+                    "_mcp_mode": server_mode,
+                })
+
+        return tools
+
+    async def ensure_tools_ready_async(self, max_age: float = 30.0) -> List[Dict[str, Any]]:
+        """Refresh MCP schemas asynchronously, coalescing concurrent callers."""
+        now = time.monotonic()
+        if now - self._tools_refresh_time < max_age:
+            return self.get_cached_tools(mode="all")
+
+        task = self._tools_refresh_task
+        if task is None or task.done():
+            task = asyncio.create_task(self.get_active_tools_async(mode="all"))
+            self._tools_refresh_task = task
+
+        try:
+            tools = await task
+            self._tools_refresh_time = time.monotonic()
+            return tools
+        finally:
+            if self._tools_refresh_task is task and task.done():
+                self._tools_refresh_task = None
+
     def get_tool_capabilities(self, server_name: str, tool_name: str) -> List[str]:
         """Returns configured capabilities for an MCP tool.
 
@@ -914,8 +977,8 @@ class MCPManager:
         Returns a prompt snippet summarizing currently enabled MCP servers.
         Formats lazy MCP servers under <mcp_servers> block and eager tools if present.
         """
-        eager_tools = self.get_active_tools(mode="eager")
-        lazy_tools = self.get_active_tools(mode="lazy")
+        eager_tools = self.get_cached_tools(mode="eager")
+        lazy_tools = self.get_cached_tools(mode="lazy")
 
         if not eager_tools and not lazy_tools:
             return ""

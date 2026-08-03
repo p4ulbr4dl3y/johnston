@@ -272,7 +272,6 @@ class ChatInput(TextArea):
         pasted_text = self.format_pasted_file_path(event.text)
         if pasted_text.startswith("@"):
             self.insert(pasted_text)
-            self._on_input_change()
             return
 
         text_strip = event.text.strip().strip("'\"")
@@ -297,10 +296,8 @@ class ChatInput(TextArea):
             tag = f"[Pasted text #{idx} +{len(lines)} lines]"
             self.pasted_texts[tag] = pasted_text
             self.insert(tag)
-            self._on_input_change()
         else:
             self.insert(pasted_text)
-            self._on_input_change()
 
     def add_to_history(self, text: str) -> None:
         """Save submitted message to query history"""
@@ -523,7 +520,3 @@ class ChatInput(TextArea):
             event.prevent_default()
             event.stop()
             self.insert("\n")
-            self._on_input_change()
-        else:
-            # On ANY keypress invoke recalculation after refresh
-            self.call_after_refresh(self._on_input_change)
