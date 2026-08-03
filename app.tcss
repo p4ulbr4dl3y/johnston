@@ -167,6 +167,7 @@ WelcomeWidget {
     color: #e4e4e7;
     border-left: solid #3f3f46;
     overflow-x: auto;
+    text-wrap: nowrap;
 }
 
 .tool-call Markdown {
@@ -182,6 +183,7 @@ WelcomeWidget {
     background: #09090b;
     color: #e4e4e7;
     overflow-x: auto;
+    text-wrap: nowrap;
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
