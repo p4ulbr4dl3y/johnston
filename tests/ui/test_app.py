@@ -131,6 +131,114 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.message_queue), 1)
             self.assertEqual(app.message_queue[0], ("Queued message", False))
 
+    async def test_message_queue_rendering_and_compaction_divider(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            app.is_generating = True
+            chat_view = app.query_one(ChatView)
+
+            class FakeEvent1:
+                value = "First queued message"
+
+            await app.on_chat_input_submitted(FakeEvent1())
+            await pilot.pause(0.1)
+
+            dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Queued Messages"]
+            self.assertEqual(len(dividers), 1)
+
+            user_msgs = [c.raw_text for c in chat_view.children if getattr(c, "raw_text", None)]
+            self.assertIn("First queued message", user_msgs)
+
+            class FakeEvent2:
+                value = "Second queued message"
+
+            await app.on_chat_input_submitted(FakeEvent2())
+            await pilot.pause(0.1)
+
+            dividers2 = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Queued Messages"]
+            self.assertEqual(len(dividers2), 1)
+
+            user_msgs2 = [c.raw_text for c in chat_view.children if getattr(c, "raw_text", None)]
+            self.assertIn("Second queued message", user_msgs2)
+            self.assertEqual(len(app.message_queue), 2)
+
+    async def test_generate_ai_response_queue_draining_and_attachments(self):
+        from unittest.mock import MagicMock
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+
+        ran_prompts = []
+        ran_attachments = []
+
+        async def fake_stream_steps(prompt, attachments=None):
+            ran_prompts.append(prompt)
+            ran_attachments.append(attachments)
+            if False:
+                yield
+
+        fake_att = MagicMock()
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.1)
+            app.pm.is_provider_connected = MagicMock(return_value=True)
+            app.pm.get_active_provider_key = MagicMock(return_value="openai")
+            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+            agent.stream_steps = fake_stream_steps
+            app.agent = agent
+            app.pm.create_active_agent = MagicMock(return_value=agent)
+
+            app.message_queue.append(("Queued with att", False, [fake_att]))
+            app.generate_ai_response("Initial prompt")
+            await pilot.pause(0.2)
+
+            self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
+            self.assertEqual(ran_attachments[1], [fake_att])
+            self.assertFalse(app.is_generating)
+            self.assertEqual(len(app.message_queue), 0)
+
+    async def test_esc_key_cancellation_real_flow(self):
+        import asyncio
+        from unittest.mock import MagicMock
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+
+        ran_prompts = []
+
+        async def hanging_stream(prompt, attachments=None):
+            ran_prompts.append(prompt)
+            yield ("thinking_start", "Thinking...", "")
+            await asyncio.sleep(5.0)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.1)
+            app.pm.is_provider_connected = MagicMock(return_value=True)
+            app.pm.get_active_provider_key = MagicMock(return_value="openai")
+            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+            agent.stream_steps = hanging_stream
+            app.agent = agent
+            app.pm.create_active_agent = MagicMock(return_value=agent)
+
+            app.trigger_ai_response("Prompt 1", show_in_ui=True)
+            await pilot.pause(0.3)
+            self.assertTrue(app.is_generating)
+
+            app._queue_message_ui("Prompt 2", show_in_ui=True)
+            self.assertEqual(len(app.message_queue), 1)
+
+            chat_input = app.query_one("#message-input", ChatInput)
+            chat_input.focus()
+            await pilot.press("escape")
+
+            await pilot.pause(0.3)
+
+            self.assertIn("Prompt 1", ran_prompts)
+            self.assertIn("Prompt 2", ran_prompts)
+            chat_view = app.query_one(ChatView)
+            dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
+            self.assertEqual(len(dividers), 1)
+
     def test_resume_tip_on_exit(self):
         from io import StringIO
         from unittest.mock import patch
