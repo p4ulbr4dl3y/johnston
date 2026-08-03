@@ -9,6 +9,7 @@ import json
 import os
 import select
 import subprocess
+import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional
@@ -292,26 +293,35 @@ class MCPProcessClient:
                     return None
                 wait_time = min(1.0, max(0.05, remaining))
 
-            try:
-                rlist, _, _ = select.select([self.process.stdout], [], [], wait_time)
-            except Exception:
-                return None
-
-            if self._stopped:
-                return None
-
-            if not rlist:
-                continue
-
-            try:
-                raw_chunk = os.read(self.process.stdout.fileno(), 8192)
-                if not raw_chunk:
+            if sys.platform == "win32":
+                try:
+                    line_str = self.process.stdout.readline()
+                    if not line_str:
+                        return None
+                    self._buffer += line_str
+                except Exception:
                     return None
-                self._buffer += raw_chunk.decode("utf-8", errors="replace")
-            except (OSError, BlockingIOError):
-                continue
-            except Exception:
-                return None
+            else:
+                try:
+                    rlist, _, _ = select.select([self.process.stdout], [], [], wait_time)
+                except Exception:
+                    return None
+
+                if self._stopped:
+                    return None
+
+                if not rlist:
+                    continue
+
+                try:
+                    raw_chunk = os.read(self.process.stdout.fileno(), 8192)
+                    if not raw_chunk:
+                        return None
+                    self._buffer += raw_chunk.decode("utf-8", errors="replace")
+                except (OSError, BlockingIOError):
+                    continue
+                except Exception:
+                    return None
 
         return None
 
