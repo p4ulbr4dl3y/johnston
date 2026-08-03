@@ -4,25 +4,25 @@ from tools.ask_user import AskUserTool
 from tools.base import BaseTool
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
-from tools.edit import MultiReplaceFileContentTool, ReplaceFileContentTool
+from tools.edit import EditTool, MultiEditTool
+from tools.invoke_subagent import InvokeSubagentTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
-from tools.subagent import SubagentTool
 from tools.update_plan import UpdatePlanTool
 from tools.web_fetch import WebFetchTool
 
 TOOL_CLASSES = [
     ReadTool,
     CreateTool,
-    ReplaceFileContentTool,
-    MultiReplaceFileContentTool,
+    EditTool,
+    MultiEditTool,
     ShellTool,
     AskUserTool,
     CallMCPTool,
     ManageTaskTool,
-    SubagentTool,
+    InvokeSubagentTool,
     ManageSubagentTool,
     UpdatePlanTool,
     WebFetchTool,
@@ -38,19 +38,21 @@ ALIAS_MAP: Dict[str, str] = {
     "read_file": "read",
     "view_file": "read",
     "cat": "read",
-    "edit": "replace_file_content",
-    "update_file": "replace_file_content",
-    "modify_file": "replace_file_content",
-    "str_replace_editor": "replace_file_content",
-    "replace": "replace_file_content",
-    "multi_replace": "multi_replace_file_content",
+    "replace_file_content": "edit",
+    "multi_replace_file_content": "multi_edit",
+    "subagent": "invoke_subagent",
+    "call_mcp_tool": "call_mcp",
+    "update_file": "edit",
+    "modify_file": "edit",
+    "str_replace_editor": "edit",
+    "replace": "edit",
+    "multi_replace": "multi_edit",
     "terminal": "shell",
     "exec": "shell",
     "run_command": "shell",
     "ask": "ask_user",
     "plan": "update_plan",
     "set_plan": "update_plan",
-    "call_mcp": "call_mcp_tool",
 }
 
 

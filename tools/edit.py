@@ -190,13 +190,13 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     return diff_output + linter_output
 
 
-class ReplaceFileContentTool(BaseTool):
-    name = "replace_file_content"
+class EditTool(BaseTool):
+    name = "edit"
     description = "Replace a single contiguous code block in a file."
     schema = {
         "type": "function",
         "function": {
-            "name": "replace_file_content",
+            "name": "edit",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -226,13 +226,13 @@ class ReplaceFileContentTool(BaseTool):
         return await _execute_edit_helper(path, [chunk])
 
 
-class MultiReplaceFileContentTool(BaseTool):
-    name = "multi_replace_file_content"
+class MultiEditTool(BaseTool):
+    name = "multi_edit"
     description = "Replace multiple non-contiguous code blocks in a single file."
     schema = {
         "type": "function",
         "function": {
-            "name": "multi_replace_file_content",
+            "name": "multi_edit",
             "parameters": {
                 "type": "object",
                 "properties": {

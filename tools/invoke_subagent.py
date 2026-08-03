@@ -25,13 +25,13 @@ def _truncate_subagent_result(text: str) -> str:
     )
 
 
-class SubagentTool(BaseTool):
-    name = "subagent"
+class InvokeSubagentTool(BaseTool):
+    name = "invoke_subagent"
     description = "Launch an autonomous subagent for a task."
     schema = {
         "type": "function",
         "function": {
-            "name": "subagent",
+            "name": "invoke_subagent",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -116,7 +116,7 @@ class SubagentTool(BaseTool):
                 numeric_limit(parent_agent, "max_wall_seconds", 30 * 60),
             )
         original_tools = getattr(subagent, "tools", []) or []
-        excluded_tools = {"subagent", "Subagent", "Task", "task", "manage_task", "ManageTask"}
+        excluded_tools = {"subagent", "Subagent", "invoke_subagent", "InvokeSubagent", "Task", "task", "manage_task", "ManageTask"}
         subagent.tools = [
             t for t in original_tools
             if t.get("function", {}).get("name") not in excluded_tools

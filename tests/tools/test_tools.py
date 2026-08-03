@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from tools.create import CreateTool
-from tools.edit import ReplaceFileContentTool
+from tools.edit import EditTool, MultiEditTool
 from tools.linter import run_linter
 from tools.read import ReadTool
 from tools.shell import ShellTool
@@ -119,7 +119,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("is a directory", res_dir_err)
 
     async def test_edit_tool(self):
-        tool = ReplaceFileContentTool()
+        tool = EditTool()
         file_path = os.path.join(self.test_dir, "code.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    return 42\n")
@@ -267,12 +267,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Error: Invalid or missing 'questions' list.", res)
 
     async def test_replace_file_content_line_range(self):
-        from tools.edit import ReplaceFileContentTool
+        from tools.edit import EditTool
         file_path = os.path.join(self.test_dir, "range_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("val = 1\nval = 1\nval = 1\n")
 
-        tool = ReplaceFileContentTool()
+        tool = EditTool()
         # Replace val = 1 only on line 2 (start_line=2, end_line=2)
         res = await tool.execute({
             "target_file": file_path,
@@ -289,12 +289,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines, ["val = 1\n", "val = 42\n", "val = 1\n"])
 
     async def test_replace_file_content_out_of_range_error(self):
-        from tools.edit import ReplaceFileContentTool
+        from tools.edit import EditTool
         file_path = os.path.join(self.test_dir, "range_err.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("first_line = 1\nsecond_line = 2\ntarget_line = 3\n")
 
-        tool = ReplaceFileContentTool()
+        tool = EditTool()
         # Search for target_line = 3 in lines 1-2 (must fail with line hint error)
         res = await tool.execute({
             "target_file": file_path,
@@ -307,12 +307,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Target content was found elsewhere around line 3", res)
 
     async def test_multi_replace_file_content(self):
-        from tools.edit import MultiReplaceFileContentTool
         file_path = os.path.join(self.test_dir, "multi_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def fn_one():\n    return 1\n\ndef fn_two():\n    return 2\n")
 
-        tool = MultiReplaceFileContentTool()
+        tool = MultiEditTool()
         res = await tool.execute({
             "target_file": file_path,
             "replacement_chunks": [

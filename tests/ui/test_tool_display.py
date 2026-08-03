@@ -17,6 +17,8 @@ class TestToolDisplay(unittest.TestCase):
     def test_subagent_description(self):
         res = extract_tool_display("subagent", {"description": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, '"find bugs"')
+        res2 = extract_tool_display("invoke_subagent", {"description": "find bugs", "prompt": "long prompt"})
+        self.assertEqual(res2, '"find bugs"')
 
     def test_manage_task_action_and_id(self):
         res = extract_tool_display("manage_task", {"action": "status", "task_id": "shell_123"})

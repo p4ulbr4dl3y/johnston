@@ -5,12 +5,12 @@ from tools.base import BaseTool, truncate_output
 
 
 class CallMCPTool(BaseTool):
-    name = "call_mcp_tool"
+    name = "call_mcp"
     description = "Execute a lazy-loaded MCP tool by server name, tool name, and arguments."
     schema = {
         "type": "function",
         "function": {
-            "name": "call_mcp_tool",
+            "name": "call_mcp",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -37,7 +37,7 @@ class CallMCPTool(BaseTool):
         mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
         mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
         disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
-        if "call_mcp_tool" in disallowed or tool.lower() in disallowed or f"{server}.{tool}".lower() in disallowed:
+        if "call_mcp" in disallowed or "call_mcp_tool" in disallowed or tool.lower() in disallowed or f"{server}.{tool}".lower() in disallowed:
             return f"Error: MCP tool '{server}.{tool}' is disabled in {mode_def.name} mode."
 
         from core.mcp_manager import get_mcp_manager

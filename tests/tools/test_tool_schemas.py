@@ -40,8 +40,8 @@ class TestToolSchemas(unittest.TestCase):
         self.assertIn("action", params["required"])
 
     def test_subagent_schema_has_task_id(self):
-        from tools.subagent import SubagentTool
-        props = SubagentTool.schema["function"]["parameters"]["properties"]
+        from tools.invoke_subagent import InvokeSubagentTool
+        props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("task_id", props)
 
 

@@ -47,7 +47,7 @@ Each MCP server operates in one of two tool loading modes:
 2. **`lazy`:**
    - Tools are **not** loaded as full JSON schemas into context.
    - Johnston injects a lightweight summary block (`<mcp_servers>`) listing available servers and tools.
-   - The LLM invokes tools on demand using the universal `call_mcp_tool` wrapper.
+   - The LLM invokes tools on demand using the universal `call_mcp` wrapper.
    - Ideal for large MCP servers (e.g. documentation, search toolkits) to minimize token consumption.
 
 ### File Format Example
@@ -227,7 +227,7 @@ key: architect
 name: Architect
 description: High-level design & architecture planning mode
 read_only: true
-disallowed_tools: [create, edit, replace_file_content]
+disallowed_tools: [create, edit, multi_edit]
 ---
 
 ## Execution Mode: ARCHITECT

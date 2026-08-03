@@ -7,7 +7,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 from core.skill_manager import SkillManager
-from tools.subagent import SubagentTool
+from tools.invoke_subagent import InvokeSubagentTool
 
 _GIT_INFO_CACHE: Dict[str, Any] = {"ts": 0.0, "val": ""}
 _GIT_INFO_CACHE_TTL = 30.0
@@ -270,8 +270,8 @@ class PromptBuilder:
         filtered_tools = [t for t in all_tools if _tool_allowed(t)]
 
         if self.allow_task and not any(
-            t.get("function", {}).get("name") in ("subagent", "Subagent") for t in filtered_tools
+            t.get("function", {}).get("name") in ("invoke_subagent", "subagent", "Subagent") for t in filtered_tools
         ):
-            filtered_tools.append(SubagentTool.schema)
+            filtered_tools.append(InvokeSubagentTool.schema)
 
         return [t for t in filtered_tools if _tool_allowed(t)]

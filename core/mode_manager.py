@@ -55,7 +55,7 @@ BUILTIN_MODES = {
             "### Overview\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
             "### Action Rules\n"
-            "1. Precision Edits: Use replace_file_content for single edits and multi_replace_file_content for multiple non-adjacent edits.\n"
+            "1. Precision Edits: Use edit for single edits and multi_edit for multiple non-adjacent edits.\n"
             "2. Verification: Run tests or linters after editing to verify code changes.\n"
             "3. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
             "4. No Unsolicited Commits: Never execute git commits unless explicitly asked."
@@ -83,7 +83,7 @@ BUILTIN_MODES = {
             "### Overview\n"
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n\n"
             "### Critical Constraints\n"
-            "1. Code modification tools (create, edit) are DISABLED.\n"
+            "1. Code modification tools (create, edit, multi_edit) are DISABLED.\n"
             "2. You are STRICTLY PROHIBITED from running state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
             "3. Use shell ONLY for read-only inspection (ls/find/dir, grep/rg/select-string, git status, git log, git diff, cat/type).\n"
             "4. NEVER call the ask_user tool to ask the user if they want to switch to Action mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to press Shift+Tab or type /action when ready.\n"
@@ -94,7 +94,7 @@ BUILTIN_MODES = {
             "3. Edit / Implementation Request: State clearly that you are in Explore mode and tell the user to press Shift+Tab or type /action to switch to Action mode."
         ),
         disallowed_tools=[
-            "create", "edit", "Create", "Edit",
+            "create", "edit", "multi_edit", "Create", "Edit", "MultiEdit",
             "replace_file_content", "multi_replace_file_content",
             "replace", "multi_replace", "write_file", "save_file"
         ],
