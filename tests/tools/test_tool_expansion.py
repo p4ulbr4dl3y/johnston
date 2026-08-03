@@ -258,26 +258,13 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, "line 1\nline 2")
 
-    def test_read_tool_clean_rendering(self):
-        raw_read_output = (
-            "=== Lines 5-7 of 59 in test.py ===\n"
-            " 5 | def foo():\n"
-            " 6 |     return 'bar'\n"
-            " 7 | \n"
-        )
+    def test_read_tool_not_expandable(self):
         widget = ToolCallWidget(
             tool_type="read",
             target="test.py",
-            result_text=raw_read_output,
             args={"path": "test.py"}
         )
-        widget.toggle_expanded()
-        self.assertTrue(widget.is_expanded)
-
-        content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
-        self.assertEqual(content.start_line, 5)
-        self.assertEqual(content.code, "def foo():\n    return 'bar'")
+        self.assertFalse(widget.is_expandable())
 
     def test_create_tool_content_strips_trailing_newline(self):
         widget = ToolCallWidget(
@@ -397,46 +384,14 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(widget._guess_lexer("https://example.com/style.css?query=abc"), "css")
         self.assertEqual(widget._guess_lexer("https://example.com/data.json"), "json")
 
-    def test_web_fetch_python_code_uses_syntax_widget(self):
-        raw_output = (
-            "=== Lines 1-2 of 2 in https://huggingface.co/org/repo/raw/main/modeling.py?token=123 ===\n"
-            "    1 | target_aspect_ratio = 1\n"
-            "    2 | print(target_aspect_ratio)\n"
-        )
-        url = "https://huggingface.co/org/repo/raw/main/modeling.py?token=123"
-        widget = ToolCallWidget(
-            tool_type="web_fetch",
-            target=url,
-            result_text=raw_output,
-            args={"url": url}
-        )
-        widget.toggle_expanded()
-        self.assertTrue(widget.is_expanded)
-        self.assertTrue(widget.content_widget.display)
-        self.assertFalse(widget.md_widget.display)
-
-        content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
-        self.assertEqual(content.lexer.name, "Python")
-        self.assertEqual(content.code, "target_aspect_ratio = 1\nprint(target_aspect_ratio)")
-
-    def test_web_fetch_html_document_uses_md_widget(self):
-        raw_output = (
-            "=== Lines 1-2 of 2 in https://example.com/doc.html ===\n"
-            "    1 | # Documentation\n"
-            "    2 | This is converted markdown.\n"
-        )
+    def test_web_fetch_tool_not_expandable(self):
         url = "https://example.com/doc.html"
         widget = ToolCallWidget(
             tool_type="web_fetch",
             target=url,
-            result_text=raw_output,
             args={"url": url}
         )
-        widget.toggle_expanded()
-        self.assertTrue(widget.is_expanded)
-        self.assertTrue(widget.md_widget.display)
-        self.assertFalse(widget.content_widget.display)
+        self.assertFalse(widget.is_expandable())
 
 
 if __name__ == "__main__":

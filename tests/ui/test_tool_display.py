@@ -62,7 +62,7 @@ class TestToolDisplay(unittest.TestCase):
 
         # Text file target
         w2 = ToolCallWidget("read", "/path/to/main.py", args={"path": "/path/to/main.py"})
-        self.assertTrue(w2.is_expandable())
+        self.assertFalse(w2.is_expandable())
 
         # Image result text
         w3 = ToolCallWidget("read", "file", result_text="[Image file: '123.png' (100x100 px, format: JPEG)]")
