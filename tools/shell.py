@@ -24,7 +24,7 @@ def _new_task_id() -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command. Commands running longer than timeout (default 60s) are automatically moved to the background. Destructive commands require user confirmation."
+    description = "Run a terminal command. Commands running longer than timeout (default 120s) are automatically moved to the background. Destructive commands require user confirmation."
 
     schema = {
         "type": "function",
@@ -34,7 +34,7 @@ class ShellTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Terminal command to run"},
-                    "timeout": {"type": "integer", "description": "Optional timeout in seconds (default: 60, max: 300)"},
+                    "timeout": {"type": "integer", "description": "Optional timeout in seconds (default: 120, max: 600)"},
                     "run_in_background": {"type": "boolean", "description": "Set to true to run this command in the background immediately."},
                 },
                 "required": ["command"],
@@ -46,11 +46,11 @@ class ShellTool(BaseTool):
         ctx = self._ensure_context(app)
         cmd = args.get("command", "").strip()
 
-        raw_timeout = args.get("timeout", 60)
+        raw_timeout = args.get("timeout", 120)
         try:
-            timeout = max(1, min(int(raw_timeout), 300))
+            timeout = max(1, min(int(raw_timeout), 600))
         except (ValueError, TypeError):
-            timeout = 60
+            timeout = 120
 
         m = SLEEP_CHAIN_REGEX.match(cmd)
         if m:
