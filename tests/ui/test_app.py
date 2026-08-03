@@ -200,7 +200,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from core.base_provider import BaseAgent
 
@@ -213,33 +213,34 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             await asyncio.sleep(5.0)
 
-        async with app.run_test() as pilot:
-            await pilot.pause(0.1)
-            app.pm.is_provider_connected = MagicMock(return_value=True)
-            app.pm.get_active_provider_key = MagicMock(return_value="openai")
-            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
-            agent.stream_steps = hanging_stream
-            app.agent = agent
-            app.pm.create_active_agent = MagicMock(return_value=agent)
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                app.pm.is_provider_connected = MagicMock(return_value=True)
+                app.pm.get_active_provider_key = MagicMock(return_value="openai")
+                agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+                agent.stream_steps = hanging_stream
+                app.agent = agent
+                app.pm.create_active_agent = MagicMock(return_value=agent)
 
-            app.trigger_ai_response("Prompt 1", show_in_ui=True)
-            await pilot.pause(0.5)
-            self.assertTrue(app.is_generating)
+                app.trigger_ai_response("Prompt 1", show_in_ui=True)
+                await pilot.pause(0.5)
+                self.assertTrue(app.is_generating)
 
-            app._queue_message_ui("Prompt 2", show_in_ui=True)
-            self.assertEqual(len(app.message_queue), 1)
+                app._queue_message_ui("Prompt 2", show_in_ui=True)
+                self.assertEqual(len(app.message_queue), 1)
 
-            chat_input = app.query_one("#message-input", ChatInput)
-            chat_input.focus()
-            await pilot.press("escape")
+                chat_input = app.query_one("#message-input", ChatInput)
+                chat_input.focus()
+                await pilot.press("escape")
 
-            await pilot.pause(0.5)
+                await pilot.pause(0.5)
 
-            self.assertIn("Prompt 1", ran_prompts)
-            self.assertIn("Prompt 2", ran_prompts)
-            chat_view = app.query_one(ChatView)
-            dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
-            self.assertEqual(len(dividers), 1)
+                self.assertIn("Prompt 1", ran_prompts)
+                self.assertIn("Prompt 2", ran_prompts)
+                chat_view = app.query_one(ChatView)
+                dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
+                self.assertEqual(len(dividers), 1)
 
     def test_resume_tip_on_exit(self):
         from io import StringIO
