@@ -203,11 +203,12 @@ class InvokeSubagentTool(BaseTool):
                     ctx.notify(f"Background subagent completed (ID: {task_id})")
                     ctx.refresh_status()
 
+                    log_file = os.path.join(tracker.storage_dir, f"{task_id}.json")
                     result_text = _truncate_subagent_result(acc[0]) or "Completed with no text output."
                     msg = (
                         f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
                         f"<task_result>\n{result_text}\n</task_result>\n"
-                        f"(Note: Full session log stored in storage file; inspect via `manage_subagent(action='status', task_id='{task_id}')`)"
+                        f"(Note: If output is truncated or details are missing, send a follow-up via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`. Full log: {log_file})"
                     )
                     ctx.trigger_ai_response(msg)
 
