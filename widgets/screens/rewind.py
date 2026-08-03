@@ -26,7 +26,7 @@ class RewindScreen(BaseSelectionScreen[int]):
                 opt = opt_text
             options.append(opt)
 
-        title = "### **Select message to rollback to**"
+        title = "### **Select Message to Rollback To**"
 
         items = [msg[0] for msg in user_messages]
         default_val = items[-1] if items else -1

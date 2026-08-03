@@ -75,7 +75,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("# Available Skills", classes="modal-markdown")
+            yield Markdown("### **Available Skills**", classes="modal-markdown")
             yield OptionList(id="skills-option-list")
             yield Label("enter: activate • h/tab/m: toggle status • esc: cancel", id="modal-hint")
 
