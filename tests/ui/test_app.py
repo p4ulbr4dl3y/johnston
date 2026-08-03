@@ -163,7 +163,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.message_queue), 2)
 
     async def test_generate_ai_response_queue_draining_and_attachments(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from core.base_provider import BaseAgent
 
@@ -180,23 +180,24 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
         fake_att = MagicMock()
 
-        async with app.run_test() as pilot:
-            await pilot.pause(0.1)
-            app.pm.is_provider_connected = MagicMock(return_value=True)
-            app.pm.get_active_provider_key = MagicMock(return_value="openai")
-            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
-            agent.stream_steps = fake_stream_steps
-            app.agent = agent
-            app.pm.create_active_agent = MagicMock(return_value=agent)
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                app.pm.is_provider_connected = MagicMock(return_value=True)
+                app.pm.get_active_provider_key = MagicMock(return_value="openai")
+                agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+                agent.stream_steps = fake_stream_steps
+                app.agent = agent
+                app.pm.create_active_agent = MagicMock(return_value=agent)
 
-            app.message_queue.append(("Queued with att", False, [fake_att]))
-            app.generate_ai_response("Initial prompt")
-            await pilot.pause(0.5)
+                app.message_queue.append(("Queued with att", False, [fake_att]))
+                app.generate_ai_response("Initial prompt")
+                await pilot.pause(0.5)
 
-            self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
-            self.assertEqual(ran_attachments[1], [fake_att])
-            self.assertFalse(app.is_generating)
-            self.assertEqual(len(app.message_queue), 0)
+                self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
+                self.assertEqual(ran_attachments[1], [fake_att])
+                self.assertFalse(app.is_generating)
+                self.assertEqual(len(app.message_queue), 0)
 
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
