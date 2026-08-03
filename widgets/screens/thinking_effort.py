@@ -17,7 +17,7 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
             prefix = r"\[ACTIVE] " if item == current else ""
             options.append(f"{prefix}{item} - {descriptions[item]}")
         super().__init__(
-            "### Thinking Effort",
+            "### **Select Thinking Effort**",
             options,
             items,
             current,

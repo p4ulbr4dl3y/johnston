@@ -256,7 +256,7 @@ class ConfirmScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Confirm your answers**\n\n" + self.summary, classes="modal-markdown")
+            yield Markdown("### **Confirm Your Answers**\n\n" + self.summary, classes="modal-markdown")
             yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
@@ -392,7 +392,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                 ans_display = ans_val if ans_val else "(No response)"
                 summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_display}\n\n"
 
-            title_md.update("### **Confirm your answers**\n\n" + summary)
+            title_md.update("### **Confirm Your Answers**\n\n" + summary)
             opt_list.display = False
             input_field.display = False
             hint.update("enter: confirm • ←: back • esc: cancel")
