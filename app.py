@@ -497,12 +497,15 @@ class JohnstonApp(App):
         item = (prompt, False, attachments) if attachments else (prompt, False)
         self.message_queue.append(item)
         if show_in_ui:
+            need_divider = not getattr(self, "_has_rendered_queue_divider", False)
+            if need_divider:
+                self._has_rendered_queue_divider = True
+
             async def _render():
                 try:
                     chat_view = self.query_one(ChatView)
-                    if not getattr(self, "_has_rendered_queue_divider", False):
+                    if need_divider:
                         await chat_view.add_compaction_divider("Queued Messages")
-                        self._has_rendered_queue_divider = True
                     await chat_view.add_user_message(prompt, attachments=attachments)
                 except Exception:
                     pass
@@ -531,19 +534,6 @@ class JohnstonApp(App):
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
-    async def _check_initial_setup(self) -> None:
-        """Auto-prompt for provider/model selection on first launch if unconfigured"""
-        if getattr(self, "resume_session_id", None) or os.environ.get("PYTEST_CURRENT_TEST"):
-            return
-        act_k = self.pm.get_active_provider_key()
-        connected = self.pm.is_provider_connected(act_k) if act_k else False
-        if not connected:
-            from core.commands import ProvidersCommand
-            await ProvidersCommand().execute(self)
-        elif not getattr(getattr(self, "agent", None), "model", ""):
-            from core.commands import ModelsCommand
-            await ModelsCommand().execute(self)
-
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
         if getattr(self, "is_generating", False):
@@ -556,6 +546,7 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
+        self._has_rendered_queue_divider = False
         act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
         is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
         if not is_connected or not getattr(self.agent, "model", ""):
@@ -673,7 +664,6 @@ class JohnstonApp(App):
                     except Exception:
                         pass
         except (asyncio.CancelledError, RuntimeError):
-            self.message_queue.clear()
             self._has_rendered_queue_divider = False
             if thinking_widget:
                 try:
@@ -727,7 +717,10 @@ class JohnstonApp(App):
             if self.message_queue and getattr(self, "is_app_active", True):
                 queued_next = self.message_queue.pop(0)
             if queued_next is not None:
-                self.generate_ai_response(queued_next[0], show_in_ui=queued_next[1])
+                q_prompt = queued_next[0]
+                q_show = queued_next[1] if len(queued_next) > 1 else False
+                q_atts = queued_next[2] if len(queued_next) > 2 else None
+                self.generate_ai_response(q_prompt, show_in_ui=q_show, attachments=q_atts)
             else:
                 self.is_generating = False
                 self._has_rendered_queue_divider = False
