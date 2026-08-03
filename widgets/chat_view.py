@@ -606,6 +606,7 @@ class ToolCallWidget(Vertical):
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
+        self.scroll_box = Vertical(self.content_widget, self.md_widget, classes="tool-scroll-box")
 
     def _clean_markup_text(self, text: str) -> str:
         if not text:
@@ -775,8 +776,7 @@ class ToolCallWidget(Vertical):
 
     def compose(self) -> ComposeResult:
         yield self.header_label
-        yield self.content_widget
-        yield self.md_widget
+        yield self.scroll_box
 
     def on_mount(self) -> None:
         self.content_widget.display = False
