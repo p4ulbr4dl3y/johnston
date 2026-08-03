@@ -26,7 +26,7 @@ class TaskConsoleScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Console Output: {self.bg_task.command}**", classes="modal-markdown")
+            yield Markdown("### **Console Output**", classes="modal-markdown")
             yield RichLog(id="console-log", highlight=False, markup=False)
             yield Label("esc: back to tasks", id="modal-hint")
 
@@ -94,14 +94,8 @@ class TasksListScreen(ModalScreen[None]):
             cmd = t.command
             if len(cmd) > 38:
                 cmd = cmd[:35] + "..."
-            status_str = "running" if t.is_running else "finished"
-            status_style = "bold" if t.is_running else THEME_MUTED
-
-            opt_text = Text()
-            opt_text.append(cmd)
-            opt_text.append(" | ")
-            opt_text.append(status_str, style=status_style)
-            opt_list.add_option(opt_text)
+            status_tag = r"\[RUNNING]" if t.is_running else r"\[FINISHED]"
+            opt_list.add_option(f"{status_tag} {cmd}")
 
         if current_highlighted is not None and current_highlighted < len(tasks):
             opt_list.highlighted = current_highlighted
