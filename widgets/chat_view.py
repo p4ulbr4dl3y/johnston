@@ -540,10 +540,10 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "multi_edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
-        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file", "view_file",
+        "create", "edit", "multi_edit", "shell", "bash", "update_plan", "plan",
+        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file",
         "call_mcp_tool", "call_mcp",
-        "Create", "Edit", "MultiEdit", "Shell", "Bash", "Read", "WebFetch", "Plan", "CallMCPTool", "CallMCP"
+        "Create", "Edit", "MultiEdit", "Shell", "Bash", "Plan", "CallMCPTool", "CallMCP"
     }
 
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
@@ -554,14 +554,8 @@ class ToolCallWidget(Vertical):
                 return False
         except Exception:
             pass
-        if self.tool_type.lower() in ("read", "view_file"):
-            target_path = (self.args.get("path") if isinstance(self.args, dict) else None) or self.target or ""
-            if any(target_path.lower().endswith(ext) for ext in self.IMAGE_EXTENSIONS):
-                return False
-            if self.result_text:
-                rt = self.result_text.strip()
-                if rt.startswith("[Image file:") or rt.startswith('{"type": "image"') or "format: " in rt.lower() or "px," in rt.lower():
-                    return False
+        if self.tool_type.lower() in ("read", "view_file", "web_fetch", "webfetch"):
+            return False
         if self.tool_type.lower() in ("ask_user", "manage_task", "manage_subagent", "subagent", "invoke_subagent", "task"):
             return False
         if self.tool_type in self.EXPANDABLE_TOOLS or self.tool_type.lower() in ("call_mcp_tool", "call_mcp"):
