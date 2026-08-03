@@ -26,7 +26,7 @@ class TestPromptBuilder(unittest.TestCase):
         names = [t["function"]["name"] for t in tools]
         self.assertNotIn("create", names)
         self.assertNotIn("edit", names)
-        self.assertIn("subagent", names)
+        self.assertIn("invoke_subagent", names)
 
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], mode="action")

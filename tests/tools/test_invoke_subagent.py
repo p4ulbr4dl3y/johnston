@@ -3,10 +3,10 @@ import unittest
 
 from core.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
-from tools.subagent import SubagentTool
+from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool, _truncate_subagent_result
 
 
-class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
+class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         self.old_dir = SUBAGENTS_DIR
@@ -25,7 +25,7 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
 
     async def test_max_concurrent_subagents_limit(self):
-        tool = SubagentTool()
+        tool = InvokeSubagentTool()
 
         # Populate tracker with MAX_CONCURRENT_SUBAGENTS running sessions
         for i in range(MAX_CONCURRENT_SUBAGENTS):
@@ -37,7 +37,7 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Maximum concurrent subagents limit", res)
     async def test_explore_subagent_tool_filtering(self):
         from unittest.mock import MagicMock
-        tool = SubagentTool()
+        tool = InvokeSubagentTool()
 
         # Mock app context and agent
         mock_app = MagicMock()
@@ -69,14 +69,14 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_subagent_tool_exclusion_of_manage_task_and_recursion_guards(self):
         from unittest.mock import MagicMock
-        tool = SubagentTool()
+        tool = InvokeSubagentTool()
 
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [
             {"function": {"name": "read"}},
             {"function": {"name": "shell"}},
-            {"function": {"name": "subagent"}},
+            {"function": {"name": "invoke_subagent"}},
             {"function": {"name": "manage_task"}},
         ]
         mock_agent.system_prompt = "Base prompt"
@@ -95,17 +95,15 @@ class TestSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)
-        self.assertNotIn("subagent", tool_names)
+        self.assertNotIn("invoke_subagent", tool_names)
         self.assertNotIn("manage_task", tool_names)
 
     def test_truncate_subagent_result_short(self):
-        from tools.subagent import _truncate_subagent_result
         self.assertEqual(_truncate_subagent_result("short result"), "short result")
         self.assertEqual(_truncate_subagent_result(""), "")
         self.assertEqual(_truncate_subagent_result(None), "")
 
     def test_truncate_subagent_result_long(self):
-        from tools.subagent import MAX_SUBAGENT_RESULT_CHARS, _truncate_subagent_result
         long_text = "x" * (MAX_SUBAGENT_RESULT_CHARS + 500)
         result = _truncate_subagent_result(long_text)
         # Clipped and annotated with a pointer to the full session log

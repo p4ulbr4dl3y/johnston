@@ -441,10 +441,10 @@ class ToolCallWidget(Vertical):
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
+        "create", "edit", "multi_edit", "shell", "bash", "read", "web_fetch", "update_plan", "plan",
         "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file", "view_file",
         "call_mcp_tool", "call_mcp",
-        "Create", "Edit", "Shell", "Bash", "Read", "WebFetch", "Plan", "CallMCPTool", "CallMCP"
+        "Create", "Edit", "MultiEdit", "Shell", "Bash", "Read", "WebFetch", "Plan", "CallMCPTool", "CallMCP"
     }
 
     IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
@@ -463,7 +463,7 @@ class ToolCallWidget(Vertical):
                 rt = self.result_text.strip()
                 if rt.startswith("[Image file:") or rt.startswith('{"type": "image"') or "format: " in rt.lower() or "px," in rt.lower():
                     return False
-        if self.tool_type.lower() in ("ask_user", "manage_task", "manage_subagent", "subagent", "task"):
+        if self.tool_type.lower() in ("ask_user", "manage_task", "manage_subagent", "subagent", "invoke_subagent", "task"):
             return False
         if self.tool_type in self.EXPANDABLE_TOOLS or self.tool_type.lower() in ("call_mcp_tool", "call_mcp"):
             return True
@@ -702,6 +702,7 @@ class ToolCallWidget(Vertical):
         "read": "Read",
         "create": "Create",
         "edit": "Edit",
+        "multi_edit": "Edit",
         "replace_file_content": "Edit",
         "multi_replace_file_content": "Edit",
         "replace": "Edit",
@@ -718,8 +719,10 @@ class ToolCallWidget(Vertical):
         "skill": "Skill",
         "manage_task": "ManageTask",
         "subagent": "Subagent",
+        "invoke_subagent": "InvokeSubagent",
         "manage_subagent": "ManageSubagent",
         "task": "Task",
+        "call_mcp": "CallMCP",
         "call_mcp_tool": "CallMCPTool",
         "get_mcp_schema": "GetMCPSchema",
         "web_fetch": "WebFetch",
@@ -728,14 +731,14 @@ class ToolCallWidget(Vertical):
     }
 
     SYSTEM_TOOLS = {
-        "read", "create", "edit", "shell", "bash", "glob", "grep", "list_dir",
+        "read", "create", "edit", "multi_edit", "shell", "bash", "glob", "grep", "list_dir",
         "ask_user", "skill", "manage_task", "manage_subagent",
-        "subagent", "task", "web_fetch", "get_mcp_schema",
+        "subagent", "invoke_subagent", "task", "web_fetch", "get_mcp_schema",
         "replace_file_content", "multi_replace_file_content", "replace", "multi_replace",
-        "write_to_file", "view_file", "run_command",
-        "Read", "Create", "Edit", "Shell", "Bash", "Glob", "Grep", "ListDir",
+        "write_to_file", "view_file", "run_command", "call_mcp",
+        "Read", "Create", "Edit", "MultiEdit", "Shell", "Bash", "Glob", "Grep", "ListDir",
         "AskUser", "Skill", "ManageTask", "ManageSubagent",
-        "Subagent", "Task", "WebFetch", "GetMCPSchema"
+        "Subagent", "InvokeSubagent", "Task", "WebFetch", "GetMCPSchema", "CallMCP"
     }
 
     def render_header(self) -> None:
@@ -756,12 +759,12 @@ class ToolCallWidget(Vertical):
         elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
             tool_name = self.args.get("tool") or self.target
             self.header_label.update(f"[{c}]⚙ [bold]GetMCPSchema[/bold][/{c}]({escape(str(tool_name))})")
-        elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "task"):
+        elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "invoke_subagent", "task"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
             from core.tool_display import extract_tool_display
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
             self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
-        elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
+        elif self.tool_type in ("call_mcp", "call_mcp_tool", "CallMCPTool", "CallMCP"):
             tool_name, server, mcp_args = self._extract_mcp_call_info()
             compact = self._format_compact_dict(mcp_args)
             if not compact:
@@ -780,7 +783,7 @@ class ToolCallWidget(Vertical):
                 self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
 
     def on_click(self, event) -> None:
-        if self.tool_type.lower() in ("subagent", "task"):
+        if self.tool_type.lower() in ("subagent", "invoke_subagent", "task"):
             args = self.args if isinstance(self.args, dict) else {}
             task_id = args.get("task_id") or getattr(self, "subagent_task_id", None)
             identifier = task_id or args.get("description") or args.get("prompt") or self.target
@@ -1138,7 +1141,7 @@ class ToolCallWidget(Vertical):
                             self.content_widget.update(rendered)
                     else:
                         self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
-            elif self.tool_type in ("edit", "Edit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
+            elif self.tool_type in ("edit", "Edit", "multi_edit", "MultiEdit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._check_is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
@@ -1326,7 +1329,7 @@ class ToolCallWidget(Vertical):
                     self.content_widget.update(syntax)
                 except Exception:
                     self.content_widget.update(self._clean_markup_text(full_display))
-            elif self.tool_type in ("call_mcp_tool", "CallMCPTool"):
+            elif self.tool_type in ("call_mcp", "CallMCP", "call_mcp_tool", "CallMCPTool"):
                 clean_res = (self.result_text or "(No result)").strip()
                 syntax = self._format_json_result(clean_res)
                 if syntax:

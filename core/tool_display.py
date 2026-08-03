@@ -43,7 +43,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
         t = args.get("tool") or args.get("server") or tool_name
         return _truncate(str(t))
 
-    if name == "subagent":
+    if name in ("subagent", "invoke_subagent"):
         desc = args.get("description") or args.get("prompt") or ""
         return _truncate(f'"{desc}"') if desc else tool_name
 
