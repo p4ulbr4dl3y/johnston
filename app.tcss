@@ -138,7 +138,13 @@ WelcomeWidget {
     height: auto;
     margin-top: 1;
     color: #d4d4d8;
+}
+
+.tool-scroll-box {
+    width: 100%;
+    height: auto;
     overflow-x: auto;
+    scrollbar-size: 0 0 !important;
 }
 
 .tool-sequential {
