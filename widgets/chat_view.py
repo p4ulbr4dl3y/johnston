@@ -540,11 +540,9 @@ class DiffRenderable:
         self._text.no_wrap = True
 
     def __rich_console__(self, console, options):
-        from rich.segment import Segment
         new_opts = options.update(no_wrap=True, overflow="crop")
         for line in self.formatted_lines:
             yield from console.render(line, new_opts)
-            yield Segment.line()
 
     def __rich_measure__(self, console, options):
         return self._text.__rich_measure__(console, options)
