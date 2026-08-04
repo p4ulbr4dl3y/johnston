@@ -47,7 +47,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 - Verification: Run `johnston --mcp` via shell tool to verify server registration.
 
 ### 2. Custom Subagent Definitions (`johnston --subagents`)
-- Location: `~/.johnston/subagents/definitions/<name>.md` or `.json` (global) or `.johnston/subagents/<name>.md` or `.json` (project).
+- Location: `~/.johnston/subagents/definitions/<name>.md` (global) or `.johnston/subagents/<name>.md` (project).
 - Format: Markdown with YAML frontmatter:
   ```markdown
   ---
@@ -94,17 +94,16 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 - Verification: Run `johnston --skills` via shell tool.
 
 ### 6. Custom Execution Modes (`johnston --modes`)
-- Location: `~/.johnston/modes/<name>.json` or `.md` (global) or `.johnston/modes/<name>.json` or `.md` (project).
-- Format: JSON object or Markdown with YAML frontmatter:
-  ```json
-  {
-    "key": "architect",
-    "name": "Architect",
-    "description": "High-level design mode",
-    "read_only": true,
-    "prompt": "Custom system prompt...",
-    "disallowed_tools": ["create", "edit"]
-  }
+- Location: `~/.johnston/modes/<name>.md` (global) or `.johnston/modes/<name>.md` (project).
+- Format: Markdown with YAML frontmatter:
+  ```markdown
+  ---
+  name: Architect
+  description: High-level design mode
+  read_only: true
+  disallowed_tools: create, edit
+  ---
+  Custom system prompt here...
   ```
 - Verification: Run `johnston --modes` via shell tool.
 """

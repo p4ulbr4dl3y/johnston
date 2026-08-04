@@ -78,8 +78,8 @@ Each MCP server operates in one of two tool loading modes:
 
 Subagents run autonomous sub-tasks in isolated conversation contexts.
 
-- **Global location:** `~/.johnston/subagents/definitions/<name>.md` (or `.json`)
-- **Project location:** `.johnston/subagents/<name>.md` (or `.json`)
+- **Global location:** `~/.johnston/subagents/definitions/<name>.md`
+- **Project location:** `.johnston/subagents/<name>.md`
 - **CLI Management:** `johnston --subagents`
 
 ### Built-in Subagents
@@ -212,8 +212,8 @@ Detailed step-by-step guidance...
 
 Define isolated execution modes to restrict or customize agent behavior (e.g. read-only exploration, architect planning mode).
 
-- **Global location:** `~/.johnston/modes/<name>.json` or `<name>.md`
-- **Project location:** `.johnston/modes/<name>.json` or `<name>.md`
+- **Global location:** `~/.johnston/modes/<name>.md`
+- **Project location:** `.johnston/modes/<name>.md`
 - **CLI Management:** `johnston --modes`
 
 ### Built-in Modes
