@@ -17,7 +17,7 @@ from rich.markdown import Markdown as RichMarkdown
 from rich.markup import escape
 from rich.rule import Rule
 from rich.syntax import Syntax
-from rich.text import Text
+from rich.text import Span, Text
 from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
@@ -557,8 +557,20 @@ class DiffRenderable:
 
     def __rich_console__(self, console, options):
         new_opts = options.update(no_wrap=True, overflow="crop")
+        max_line_len = max((line.cell_len for line in self.formatted_lines), default=0)
+        target_width = max(options.max_width, max_line_len)
         for line in self.formatted_lines:
-            yield from console.render(line, new_opts)
+            line_copy = line.copy()
+            pad_count = max(0, target_width - line_copy.cell_len)
+            if pad_count > 0:
+                old_len = len(line_copy.plain)
+                line_copy.pad_right(pad_count)
+                new_len = len(line_copy.plain)
+                line_copy._spans = [
+                    Span(s.start, new_len, s.style) if s.end == old_len else s
+                    for s in line_copy._spans
+                ]
+            yield from console.render(line_copy, new_opts)
 
     def __rich_measure__(self, console, options):
         return self._text.__rich_measure__(console, options)
