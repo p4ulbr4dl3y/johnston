@@ -24,9 +24,13 @@ def format_line_pagination(
             start_line_int = int(start_line)
             if start_line_int > total_lines:
                 path_str = f" in '{path}'" if path else ""
+                if total_lines == 1:
+                    hint_str = "File has only 1 total line (e.g. minified JSON/log). Re-run read tool with start_line=1 and content_offset, or use shell tools (jq/grep)."
+                else:
+                    hint_str = f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
                 return (
                     f"Error: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
-                    f"[Hint: File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}]"
+                    f"[Hint: {hint_str}]"
                 )
             start_line = start_line_int
         except (ValueError, TypeError):

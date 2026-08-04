@@ -48,4 +48,29 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertTrue(res.endswith("_TAIL"))
         self.assertNotIn("HEAD_", res)
 
+    def test_truncate_output_json_pretty_formatting(self):
+        import json
+        large_json_dict = {"status": "success", "data": ["item_" + str(i) for i in range(500)]}
+        single_line_json = json.dumps(large_json_dict)
+        self.assertNotIn("\n", single_line_json)
+
+        res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test", tool_id="json_1")
+        self.assertIn("Format: JSON.", res)
+        self.assertIn("inspect formatted JSON log", res)
+
+        log_path = [line for line in res.split() if "mcp_test_json_1.log" in line][0].rstrip(".")
+        with open(log_path, "r", encoding="utf-8") as f:
+            log_content = f.read()
+
+        # Verify saved log was pretty-printed into multiple lines
+        self.assertIn("\n", log_content)
+        self.assertEqual(json.loads(log_content), large_json_dict)
+
+    def test_format_line_pagination_single_line_error_hint(self):
+        from tools.utils import format_line_pagination
+        res = format_line_pagination(["single line content"], start_line=140, path="test.log")
+        self.assertIn("Error: start_line (140) exceeds total file line count (1)", res)
+        self.assertIn("File has only 1 total line", res)
+        self.assertIn("content_offset", res)
+
 
