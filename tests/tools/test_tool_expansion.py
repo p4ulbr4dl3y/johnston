@@ -132,6 +132,24 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, error_text)
 
+    def test_hints_stripped_from_ui_display_but_retained_in_result_text(self):
+        full_text = "Error: target_content not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
+        widget = ToolCallWidget(
+            tool_type="edit",
+            target="test.py",
+            result_text=full_text,
+            args={"path": "test.py"}
+        )
+        widget.set_result(full_text, is_error=True)
+        widget.toggle_expanded()
+
+        # result_text must keep [Hint:] for agent
+        self.assertEqual(widget.result_text, full_text)
+        # UI content widget must strip [Hint:] block
+        content = getattr(widget.content_widget, "_Static__content")
+        self.assertNotIn("[Hint:", content)
+        self.assertIn("Error: target_content not found.", content)
+
     def test_create_tool_error_display(self):
         error_text = "Error: '/some/dir' is a directory, cannot overwrite with file."
         widget = ToolCallWidget(
