@@ -137,9 +137,7 @@ class ModeManager:
                 if not os.path.isfile(fpath):
                     continue
                 mode_def = None
-                if fname.endswith(".json"):
-                    mode_def = self._parse_json_mode(fpath, source)
-                elif fname.endswith(".md") or fname.endswith(".markdown"):
+                if fname.endswith(".md") or fname.endswith(".markdown"):
                     mode_def = self._parse_md_mode(fpath, source)
 
                 if mode_def:
@@ -155,28 +153,6 @@ class ModeManager:
             return self.modes[key_lower]
         # Fallback to action if not found
         return self.modes.get("action", BUILTIN_MODES["action"])
-
-    def _parse_json_mode(self, fpath: str, source: str) -> Optional[ModeDefinition]:
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            key = data.get("key") or os.path.splitext(os.path.basename(fpath))[0]
-            name = data.get("name") or key.capitalize()
-            return ModeDefinition(
-                key=key,
-                name=name,
-                description=data.get("description", ""),
-                read_only=bool(data.get("read_only", False)),
-                prompt=data.get("prompt", ""),
-                disallowed_tools=data.get("disallowed_tools", []),
-                allowed_capabilities=data.get("allowed_capabilities", []),
-                denied_capabilities=data.get("denied_capabilities", []),
-                allowed_shell_commands=data.get("allowed_shell_commands", []),
-                workspace_allowlist=data.get("workspace_allowlist", []),
-                source=source,
-            )
-        except Exception:
-            return None
 
     def _parse_md_mode(self, fpath: str, source: str) -> Optional[ModeDefinition]:
         try:

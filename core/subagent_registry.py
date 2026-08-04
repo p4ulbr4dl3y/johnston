@@ -73,25 +73,8 @@ class SubagentRegistry:
             if not os.path.isfile(fpath):
                 continue
 
-            if fname.endswith(".json"):
-                self._load_json(fpath, source)
-            elif fname.endswith(".md") or fname.endswith(".markdown"):
+            if fname.endswith(".md") or fname.endswith(".markdown"):
                 self._load_markdown(fpath, source)
-
-    def _load_json(self, fpath: str, source: str) -> None:
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            name = data.get("name") or data.get("subagent_type") or os.path.splitext(os.path.basename(fpath))[0]
-            desc = data.get("description", "Custom subagent")
-            prompt = data.get("system_prompt") or data.get("prompt", "")
-            tools = data.get("tools", [])
-            model = data.get("model", "")
-            self.definitions[name.lower()] = SubagentDefinition(
-                name=name, description=desc, system_prompt=prompt, tools=tools, model=model, source=source
-            )
-        except Exception:
-            pass
 
     def _load_markdown(self, fpath: str, source: str) -> None:
         try:

@@ -16,12 +16,12 @@ class TestSubagentRegistry(unittest.TestCase):
         self.assertEqual(explore_def.name, "explore")
         self.assertIn("## Subagent Mode: EXPLORE", explore_def.system_prompt)
 
-    def test_load_markdown_and_json_subagents(self):
+    def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             proj_subagents = os.path.join(tmpdir, ".johnston", "subagents")
             os.makedirs(proj_subagents, exist_ok=True)
 
-            # 1. Create a markdown subagent definition
+            # 1. Create reviewer subagent definition
             md_file = os.path.join(proj_subagents, "reviewer.md")
             with open(md_file, "w", encoding="utf-8") as f:
                 f.write("""---
@@ -32,16 +32,16 @@ model: deepseek-v4-flash
 ---
 You are a senior code reviewer subagent. Analyze diffs carefully.""")
 
-            # 2. Create a JSON subagent definition
-            json_file = os.path.join(proj_subagents, "tester.json")
-            with open(json_file, "w", encoding="utf-8") as f:
-                f.write("""{
-  "name": "tester",
-  "description": "Automated testing subagent",
-  "system_prompt": "You run tests and report coverage.",
-  "tools": ["shell"],
-  "model": "gpt-4o"
-}""")
+            # 2. Create tester subagent definition
+            md_file2 = os.path.join(proj_subagents, "tester.md")
+            with open(md_file2, "w", encoding="utf-8") as f:
+                f.write("""---
+name: tester
+description: Automated testing subagent
+tools: shell
+model: gpt-4o
+---
+You run tests and report coverage.""")
 
             registry = SubagentRegistry()
             registry.reload(project_dir=tmpdir)
@@ -60,7 +60,8 @@ You are a senior code reviewer subagent. Analyze diffs carefully.""")
             self.assertEqual(tester_def.description, "Automated testing subagent")
             self.assertEqual(tester_def.tools, ["shell"])
             self.assertEqual(tester_def.model, "gpt-4o")
-
+            self.assertIn("run tests and report coverage", tester_def.system_prompt)
 
 if __name__ == "__main__":
     unittest.main()
+
