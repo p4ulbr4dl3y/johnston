@@ -67,7 +67,7 @@ class TestBackgroundTaskSendInput(unittest.IsolatedAsyncioTestCase):
         mock_proc.stdin = None
         t.process = mock_proc
         res = await t.send_input("hello")
-        self.assertIn("stdin is not writable", res)
+        self.assertIn("stdin not writable", res)
 
     async def test_send_input_via_master_fd(self):
         t = BackgroundTask("t5", "cmd", None)
@@ -79,7 +79,7 @@ class TestBackgroundTaskSendInput(unittest.IsolatedAsyncioTestCase):
         try:
             t.master_fd = w_fd
             res = await t.send_input("test input")
-            self.assertIn("Input sent to task t5", res)
+            self.assertIn("OK: input sent to t5", res)
             # Verify the data was written
             data = os.read(r_fd, 1024)
             self.assertEqual(data, b"test input\n")

@@ -121,9 +121,6 @@ class BaseAgent:
         thinking_effort: str = None,
         chunk_timeout: float = 30.0,
         max_tokens: int = 8192,
-        max_steps: int = None,
-        max_tool_calls: int = 200,
-        max_wall_seconds: float = 30 * 60,
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
@@ -145,9 +142,6 @@ class BaseAgent:
         self.thinking_effort = normalize_thinking_effort(thinking_effort or reasoning_effort)
         self.chunk_timeout = chunk_timeout
         self.max_tokens = max_tokens
-        self.max_steps = max_steps
-        self.max_tool_calls = max_tool_calls
-        self.max_wall_seconds = max_wall_seconds
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.retry_backoff = retry_backoff
@@ -290,7 +284,7 @@ class BaseAgent:
                 if is_img:
                     msg_copy = dict(msg)
                     msg_copy["content"] = (
-                        f"Error reading image '{img_path}': [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]"
+                        f"ERR: cannot read image '{img_path}' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]"
                     )
                     sanitized.append(msg_copy)
                     continue
@@ -414,7 +408,7 @@ class BaseAgent:
         disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
         clean_name = self._canonical_tool_name(tool_name).lower()
         if tool_name.lower() in disallowed or clean_name in disallowed:
-            return f"Error: Tool '{clean_name}' is disabled in {mode_def.name} mode."
+            return f"ERR: tool '{clean_name}' disabled in {mode_def.name} mode"
         return None
 
     async def _compact_messages_if_needed(
@@ -781,7 +775,7 @@ class BaseAgent:
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception as json_err:
-                        tool_result = f"Error: Tool '{t_name}' received invalid JSON arguments: {json_err}. Raw arguments: {raw_args}"
+                        tool_result = f"ERR: tool '{t_name}' received invalid JSON arguments: {json_err}. Raw arguments: {raw_args}"
                         yield ("tool", t_name, t_name, {})
                         yield ("tool_result", tool_result, "")
                         messages.append({
@@ -809,7 +803,7 @@ class BaseAgent:
                         try:
                             tool_result = await execute_tool(t_name, args, app=tool_app)
                         except Exception as e:
-                            tool_result = f"Error executing tool '{t_name}': {e}"
+                            tool_result = f"ERR: execute '{t_name}': {e}"
 
                     display_result = tool_result
                     if isinstance(tool_result, str) and (tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]):

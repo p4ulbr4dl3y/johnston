@@ -172,7 +172,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         tool = ReadTool()
         with patch("os.listdir", side_effect=PermissionError("Permission denied")):
             res = await tool.execute({"path": self.test_dir})
-            self.assertIn("Error listing directory", res)
+            self.assertIn("ERR: listing", res)
 
     async def test_read_file_getsize_oserror(self):
         tool = ReadTool()
@@ -182,7 +182,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         with patch("os.path.getsize", side_effect=OSError("Disk read error")):
             res = await tool.execute({"path": file_path})
-            self.assertIn("Error checking file", res)
+            self.assertIn("ERR: check", res)
 
     async def test_read_doc_conversion_error(self):
         tool = ReadTool()
@@ -192,7 +192,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         with patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("Doc convert fail")):
             res = await tool.execute({"path": doc_path})
-            self.assertIn("Error converting document", res)
+            self.assertIn("ERR: doc", res)
 
     async def test_read_content_offset_parsing_and_error(self):
         tool = ReadTool()
@@ -211,7 +211,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         # File read exception inside _read_file_lines
         with patch("builtins.open", side_effect=IOError("Read error")):
             res_err = await tool.execute({"path": file_path})
-            self.assertIn("Error reading file", res_err)
+            self.assertIn("ERR: file", res_err)
 
     @patch("tools.web_fetch.WebFetchTool.execute")
     async def test_read_http_url_delegates_to_web_fetch(self, mock_web_execute):

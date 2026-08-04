@@ -98,7 +98,7 @@ def apply_chunk_replacements(
     path: str
 ) -> Tuple[str, str]:
     if not raw_chunks:
-        raise ValueError("Error: No replacement chunks provided.")
+        raise ValueError("ERR: no replacement chunks provided")
 
     parsed_chunks = []
     for idx, c in enumerate(raw_chunks, start=1):
@@ -106,16 +106,16 @@ def apply_chunk_replacements(
         if target is None:
             target = c.get("old_string")
         if target is None:
-            raise ValueError(f"Error: Chunk {idx} missing 'target_content' or 'old_string'.")
+            raise ValueError(f"ERR: chunk {idx} missing 'target_content' or 'old_string'")
 
         if target == "":
-            raise ValueError(f"Error: Chunk {idx} target_content (old_string) cannot be empty.")
+            raise ValueError(f"ERR: chunk {idx} target_content (old_string) cannot be empty")
 
         replacement = c.get("replacement_content")
         if replacement is None:
             replacement = c.get("new_string")
         if replacement is None:
-            raise ValueError(f"Error: Chunk {idx} missing 'replacement_content' or 'new_string'.")
+            raise ValueError(f"ERR: chunk {idx} missing 'replacement_content' or 'new_string'")
 
         s_line = c.get("start_line")
         e_line = c.get("end_line")
@@ -156,7 +156,7 @@ def apply_chunk_replacements(
         if s_line is not None or e_line is not None:
             if s_line is not None and s_line > len(lines):
                 raise ValueError(
-                    f"Error: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
+                    f"ERR: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
                     f"[Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]"
                 )
             start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
@@ -178,12 +178,12 @@ def apply_chunk_replacements(
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
                 loc_msg = f" Target content was found elsewhere around line {found_line}." if found_line else ""
                 raise ValueError(
-                    f"Error: target_content not found between lines {s_line} and {e_line} in '{path}'.{loc_msg}{hint}"
+                    f"ERR: target not found in '{path}' ({s_line}-{e_line}).{loc_msg}{hint}"
                 )
 
             if count > 1 and not allow_mult:
                 raise ValueError(
-                    f"Error: target_content matches {count} occurrences in lines {s_line}-{e_line} of '{path}'. "
+                    f"ERR: target matches {count} occurrences in lines {s_line}-{e_line} of '{path}'. "
                     f"Narrow start_line/end_line range or include more lines to make target unique."
                 )
 
@@ -200,11 +200,11 @@ def apply_chunk_replacements(
             if count == 0:
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
                 raise ValueError(
-                    f"Error: exact block of text not found in '{path}'.{hint}"
+                    f"ERR: exact block not found in '{path}'.{hint}"
                 )
             if count > 1 and not allow_mult:
                 raise ValueError(
-                    f"Error: target_content matches {count} occurrences in '{path}'. "
+                    f"ERR: target matches {count} occurrences in '{path}'. "
                     f"Specify start_line and end_line or include more surrounding lines to make target unique."
                 )
 
@@ -226,9 +226,9 @@ def apply_chunk_replacements(
 async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) -> str:
     path = resolve_path(path_arg)
     if not path or not os.path.exists(path):
-        return f"Error: file '{path}' not found."
+        return f"ERR: file '{path}' not found"
     if os.path.isdir(path):
-        return f"Error: '{path}' is a directory, not a file."
+        return f"ERR: '{path}' is a directory"
 
     def _do_edit():
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -243,7 +243,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     except ValueError as ve:
         return str(ve)
     except Exception as e:
-        return f"Error modifying file '{path}': {e}"
+        return f"ERR: file '{path}': {e}"
 
     linter_output = await run_linter(path)
     return diff_output + linter_output

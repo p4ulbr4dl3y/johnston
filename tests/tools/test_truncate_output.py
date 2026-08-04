@@ -69,7 +69,7 @@ class TestTruncateOutput(unittest.TestCase):
     def test_format_line_pagination_single_line_error_hint(self):
         from tools.utils import format_line_pagination
         res = format_line_pagination(["single line content"], start_line=140, path="test.log")
-        self.assertIn("Error: start_line (140) exceeds total file line count (1)", res)
+        self.assertIn("ERR: start_line (140) exceeds total file line count (1)", res)
         self.assertIn("File has only 1 total line", res)
         self.assertIn("content_offset", res)
 

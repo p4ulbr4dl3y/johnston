@@ -55,10 +55,10 @@ class WebFetchTool(BaseTool):
         self._ensure_context(app)
         url = args.get("url", "").strip()
         if not url:
-            return "Error: parameter 'url' is required."
+            return "ERR: 'url' required"
 
         if not (url.startswith("http://") or url.startswith("https://")):
-            return f"Error: invalid URL scheme for '{url}'. Must start with http:// or https://."
+            return f"ERR: invalid scheme '{url}'"
 
         raw_mode = bool(args.get("raw", False))
 
@@ -78,7 +78,7 @@ class WebFetchTool(BaseTool):
                     if cl:
                         try:
                             if int(cl) > MAX_RESPONSE_SIZE:
-                                return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
+                                return f"ERR: '{url}' exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB"
                         except ValueError:
                             pass
                     # Stream the body with a hard cap so an oversized or chunked
@@ -88,15 +88,15 @@ class WebFetchTool(BaseTool):
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > MAX_RESPONSE_SIZE:
-                            return f"Error: response body for '{url}' exceeds max allowed size of {MAX_RESPONSE_SIZE // (1024*1024)}MB."
+                            return f"ERR: '{url}' exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB"
                         chunks.append(chunk)
                     content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
-            return f"Error fetching '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
+            return f"ERR: '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
         except httpx.TimeoutException:
-            return f"Error fetching '{url}': Request timed out after 20 seconds."
+            return f"ERR: '{url}' timed out"
         except Exception as e:
-            return f"Error fetching '{url}': {e}"
+            return f"ERR: '{url}': {e}"
 
         if raw_mode:
             text_content = content_bytes.decode("utf-8", errors="replace")

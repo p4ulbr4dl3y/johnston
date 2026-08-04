@@ -26,7 +26,7 @@ class TestManageTaskInput(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ctx
 
         res = await tool.execute({"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, app=mock_app)
-        self.assertIn("Input sent to task task_interactive", res)
+        self.assertIn("OK: input sent to task_interactive", res)
         mock_stdin.write.assert_called_once_with(b"John Doe\n")
 
     async def test_manage_task_send_input_not_running(self):
@@ -41,4 +41,4 @@ class TestManageTaskInput(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ctx
 
         res = await tool.execute({"action": "send_input", "task_id": "task_finished", "input": "test"}, app=mock_app)
-        self.assertIn("Task task_finished is not running", res)
+        self.assertIn("ERR: task 'task_finished' not running", res)

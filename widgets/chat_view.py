@@ -731,7 +731,7 @@ class ToolCallWidget(Vertical):
         if not text:
             return False
         cleaned = text.strip().lower()
-        if cleaned.startswith(("error:", "[error]", "exception:", "failed:", "failure:", "fatal:", "permission denied", "command failed")):
+        if cleaned.startswith(("err:", "error:", "[error]", "exception:", "failed:", "failure:", "fatal:", "permission denied", "command failed")):
             return True
         if "traceback (most recent call last):" in cleaned or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
             return True

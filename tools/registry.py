@@ -93,7 +93,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             ctx = tool_inst._ensure_context(context or app)
             return await tool_inst.execute(args, ctx)
         except Exception as e:
-            return f"Error executing tool {name}: {e}"
+            return f"ERR: execute '{name}': {e}"
 
     from core.mcp_manager import get_mcp_manager
     mcp_mgr = get_mcp_manager()
@@ -115,7 +115,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             resolved_target = ALIAS_MAP.get(matches[0], matches[0])
             desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
-        return f"Unknown tool: {name}{hint}"
+        return f"ERR: unknown tool '{name}'{hint}"
 
     from core.mode_manager import ModeManager
 
@@ -125,7 +125,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
     disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
     if clean_name in disallowed or resolved_name in disallowed:
-        return f"Error: Tool '{name}' is disabled in {mode_def.name} mode."
+        return f"ERR: tool '{name}' disabled in {mode_def.name} mode"
 
     try:
         if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
@@ -136,6 +136,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         if mcp_res is not None:
             return mcp_res
     except Exception as e:
-        return f"Error executing MCP tool '{name}': {e}"
+        return f"ERR: mcp '{name}': {e}"
 
-    return f"Unknown tool: {name}"
+    return f"ERR: unknown tool '{name}'"

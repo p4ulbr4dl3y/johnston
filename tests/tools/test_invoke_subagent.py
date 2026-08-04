@@ -34,7 +34,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         # Attempt to spawn one more
         res = await tool.execute({"prompt": "another task", "description": "Over limit"})
-        self.assertIn("Maximum concurrent subagents limit", res)
+        self.assertIn("maximum concurrent subagents limit", res)
     async def test_explore_subagent_tool_filtering(self):
         from unittest.mock import MagicMock
         tool = InvokeSubagentTool()

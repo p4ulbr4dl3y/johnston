@@ -60,7 +60,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Non-existent file
         res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
-        self.assertIn("Error:", res_err)
+        self.assertIn("ERR:", res_err)
 
         # Directory read (should auto-list directory contents with hint)
         dir_res = await tool.execute({"path": self.test_dir})
@@ -112,12 +112,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Create file in non-existent directory
         res = await tool.execute({"path": file_path, "content": "Hello World"})
-        self.assertIn("created", res)
+        self.assertIn("OK: file", res)
         self.assertTrue(os.path.exists(file_path))
 
         # Update existing file (should return diff and updated status)
         res_update = await tool.execute({"path": file_path, "content": "Hello Universe"})
-        self.assertIn("updated", res_update)
+        self.assertIn("OK: file", res_update)
         self.assertIn("-Hello World", res_update)
         self.assertIn("+Hello Universe", res_update)
 
@@ -174,7 +174,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             "old_string": "non_existent_text",
             "new_string": "abc"
         })
-        self.assertIn("Error:", res_not_found)
+        self.assertIn("ERR:", res_not_found)
         self.assertIn("not found", res_not_found)
 
         # Multiple occurrences error
@@ -203,7 +203,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write("def broken(:\n    pass\n")
 
         syntax_res = await run_linter(syntax_path)
-        self.assertIn("[Linter Feedback]", syntax_res)
+        self.assertIn("ERR:", syntax_res)
         self.assertIn("invalid-syntax", syntax_res)
 
         undefined_path = os.path.join(self.test_dir, "undefined.py")
@@ -211,7 +211,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write("print(missing_name)\n")
 
         undefined_res = await run_linter(undefined_path)
-        self.assertIn("[Linter Feedback]", undefined_res)
+        self.assertIn("ERR:", undefined_res)
         self.assertIn("F821", undefined_res)
 
         long_line_path = os.path.join(self.test_dir, "long_line.py")
@@ -235,13 +235,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Alias Content"})
-        self.assertIn("Success: file", res_create)
+        self.assertIn("OK: file", res_create)
         self.assertTrue(os.path.exists(file_path))
 
         # Test alias "write" -> "create"
         file_path2 = os.path.join(self.test_dir, "write_test.txt")
         res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
-        self.assertIn("Success: file", res_write)
+        self.assertIn("OK: file", res_write)
 
         # Test alias "cat" -> "read"
         res_cat = await execute_tool("cat", {"path": file_path2})
@@ -259,7 +259,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
         with patch("os.path.getsize", return_value=20 * 1024 * 1024):
             res = await tool.execute({"path": file_path})
-            self.assertIn("exceeds maximum readable size", res)
+            self.assertIn("exceeds 10MB", res)
 
     async def test_format_line_pagination_string_args(self):
         from tools.utils import format_line_pagination
@@ -293,7 +293,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         # Invalid questions structure
         res = await tool.execute({"questions": [{"invalid_key": "foo"}]})
-        self.assertIn("Error: Invalid or missing 'questions' list.", res)
+        self.assertIn("ERR: invalid or missing 'questions' list", res)
 
     async def test_replace_file_content_line_range(self):
         from tools.edit import EditTool
@@ -332,7 +332,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             "start_line": 1,
             "end_line": 2
         })
-        self.assertIn("Error: target_content not found between lines 1 and 2", res)
+        self.assertIn("ERR: target not found", res)
         self.assertIn("Target content was found elsewhere around line 3", res)
 
     async def test_multi_replace_file_content(self):
@@ -444,7 +444,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = ReadTool()
         res = await tool.execute({"path": corrupt_path})
-        self.assertIn("Error reading image file", res)
+        self.assertIn("ERR: image", res)
 
 
 if __name__ == "__main__":

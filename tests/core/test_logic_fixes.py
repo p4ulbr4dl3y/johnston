@@ -96,7 +96,7 @@ class TestAskUserUnknownStatus(unittest.IsolatedAsyncioTestCase):
 
         mock_app.push_screen.side_effect = fake_push
         res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, app=mock_app)
-        self.assertIn("Cancelled by user", res)
+        self.assertIn("OK: cancelled by user", res)
 
 
 class TestSessionManagerPureReader(unittest.TestCase):

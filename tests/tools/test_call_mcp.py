@@ -9,19 +9,19 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
     async def test_missing_server_param(self):
         tool = CallMCPTool()
         res = await tool.execute({"tool": "some_tool"})
-        self.assertIn("Error", res)
+        self.assertIn("ERR", res)
         self.assertIn("required", res)
 
     async def test_missing_tool_param(self):
         tool = CallMCPTool()
         res = await tool.execute({"server": "my_server"})
-        self.assertIn("Error", res)
+        self.assertIn("ERR", res)
         self.assertIn("required", res)
 
     async def test_missing_both_params(self):
         tool = CallMCPTool()
         res = await tool.execute({})
-        self.assertIn("Error", res)
+        self.assertIn("ERR", res)
         self.assertIn("required", res)
 
     async def test_successful_call(self):
@@ -45,8 +45,8 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr):
             res = await tool.execute({"server": "fs", "tool": "missing_tool"})
 
-        self.assertIn("Error", res)
-        self.assertIn("Failed to execute", res)
+        self.assertIn("ERR", res)
+        self.assertIn("not found", res)
         self.assertIn("missing_tool", res)
 
     async def test_arguments_default_empty(self):

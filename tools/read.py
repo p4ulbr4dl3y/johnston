@@ -185,7 +185,6 @@ class ReadTool(BaseTool):
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
             from tools.web_fetch import WebFetchTool
             return await WebFetchTool().execute({"url": raw_path, "raw": bool(args.get("raw", False))}, app=app)
-
         path = resolve_path(raw_path)
         if not os.path.exists(path):
             parent_dir = os.path.dirname(path) or "."
@@ -200,7 +199,7 @@ class ReadTool(BaseTool):
                 elif entries:
                     sample = sorted(entries)[:5]
                     hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
-            return f"Error: file '{path}' not found.{hint}"
+            return f"ERR: file '{path}' not found{hint}"
 
         if os.path.isdir(path):
             try:
@@ -227,14 +226,14 @@ class ReadTool(BaseTool):
                     f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
                 )
             except Exception as e:
-                return f"Error listing directory '{path}': {e}"
+                return f"ERR: listing '{path}': {e}"
 
         try:
             file_size = os.path.getsize(path)
             if file_size > MAX_FILE_SIZE:
-                return f"Error: file '{path}' exceeds maximum readable size of {MAX_FILE_SIZE // (1024*1024)}MB."
+                return f"ERR: '{path}' exceeds {MAX_FILE_SIZE // (1024*1024)}MB"
         except OSError as e:
-            return f"Error checking file '{path}': {e}"
+            return f"ERR: check '{path}': {e}"
 
         ext = os.path.splitext(path)[1].lower()
 
@@ -245,7 +244,7 @@ class ReadTool(BaseTool):
                 image_json = await asyncio.to_thread(process_image_file_sync, path, detail_arg)
                 return image_json
             except Exception as e:
-                return f"Error reading image file '{path}': {e}"
+                return f"ERR: image '{path}': {e}"
 
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
@@ -253,7 +252,7 @@ class ReadTool(BaseTool):
                 md_text = await asyncio.to_thread(convert_doc_to_markdown_sync, path)
                 lines = md_text.splitlines(keepends=True)
             except Exception as e:
-                return f"Error converting document '{path}' to Markdown: {e}"
+                return f"ERR: doc '{path}': {e}"
         else:
             try:
                 content_offset = args.get("content_offset")
@@ -273,7 +272,7 @@ class ReadTool(BaseTool):
 
                 lines = await asyncio.to_thread(_read_file_lines, path, content_offset)
             except Exception as e:
-                return f"Error reading file '{path}': {e}"
+                return f"ERR: file '{path}': {e}"
 
         from tools.utils import format_line_pagination
 

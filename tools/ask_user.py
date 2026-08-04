@@ -42,7 +42,7 @@ class AskUserTool(BaseTool):
         questions_list = args.get("questions")
 
         if not questions_list or not isinstance(questions_list, list):
-            return "Error: Invalid or missing 'questions' list."
+            return "ERR: invalid or missing 'questions' list"
 
         validated_questions = []
         for q in questions_list:
@@ -58,7 +58,7 @@ class AskUserTool(BaseTool):
             })
 
         if not validated_questions:
-            return "Error: Invalid or missing 'questions' list."
+            return "ERR: invalid or missing 'questions' list"
 
         if ctx.app and hasattr(ctx.app, "push_screen"):
             try:
@@ -83,12 +83,12 @@ class AskUserTool(BaseTool):
 
                 if isinstance(res, str) and res.strip() and res != "cancelled":
                     return res
-                return "Cancelled by user."
+                return "OK: cancelled by user"
             except asyncio.CancelledError:
-                return "Cancelled by user."
+                return "OK: cancelled by user"
             except Exception as e:
-                return f"Error prompting user: {e}"
-        return "Error: App instance not available."
+                return f"ERR: prompt failed: {e}"
+        return "ERR: app instance not available"
 
 
 

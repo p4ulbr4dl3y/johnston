@@ -55,7 +55,7 @@ class InvokeSubagentTool(BaseTool):
         run_in_background = True
 
         if not prompt:
-            return "Error: 'prompt' argument is required for subagent tool."
+            return "ERR: 'prompt' required"
 
         task_id = args.get("task_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args["task_id"] = task_id
@@ -71,13 +71,13 @@ class InvokeSubagentTool(BaseTool):
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
             return (
-                f"Error: Maximum concurrent subagents limit ({MAX_CONCURRENT_SUBAGENTS}) reached. "
+                f"ERR: maximum concurrent subagents limit ({MAX_CONCURRENT_SUBAGENTS}) reached. "
                 "Wait for running subagents to finish or terminate them using `manage_subagent` action='kill'."
             )
 
         subagent = ctx.create_agent()
         if not subagent:
-            return "Error: No application context available to spawn subagent."
+            return "ERR: no app context"
         subagent.app = ctx.app
         subagent.is_subagent = True
 
@@ -100,21 +100,6 @@ class InvokeSubagentTool(BaseTool):
 
         # Disable nested Task tool calls (recursion guard) and background task management
         subagent.allow_task = False
-        parent_agent = getattr(ctx.app, "agent", None)
-        if parent_agent is not None:
-            def numeric_limit(obj, name: str, default: int | float) -> int | float:
-                value = getattr(obj, name, default)
-                return value if isinstance(value, (int, float)) else default
-
-            subagent.max_steps = min(numeric_limit(subagent, "max_steps", 50), numeric_limit(parent_agent, "max_steps", 50))
-            subagent.max_tool_calls = min(
-                numeric_limit(subagent, "max_tool_calls", 200),
-                numeric_limit(parent_agent, "max_tool_calls", 200),
-            )
-            subagent.max_wall_seconds = min(
-                numeric_limit(subagent, "max_wall_seconds", 30 * 60),
-                numeric_limit(parent_agent, "max_wall_seconds", 30 * 60),
-            )
         original_tools = getattr(subagent, "tools", []) or []
         excluded_tools = {"subagent", "Subagent", "invoke_subagent", "InvokeSubagent", "Task", "task", "manage_task", "ManageTask"}
         subagent.tools = [
@@ -219,7 +204,7 @@ class InvokeSubagentTool(BaseTool):
             ctx.add_background_task(bg_sub)
             ctx.notify(f"Subagent launched in background (ID: {task_id})")
 
-            return f"Subagent '{description}' launched in background (Task ID: {task_id})."
+            return f"OK: subagent '{description}' launched ({task_id})"
         else:
             # Foreground execution
             acc = [""]
@@ -234,8 +219,8 @@ class InvokeSubagentTool(BaseTool):
                 session.finish("error", str(err))
                 partial = _truncate_subagent_result(acc[0]).strip()
                 if partial:
-                    return f"Subagent execution error: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
-                return f"Subagent execution error: {err}"
+                    return f"ERR: subagent: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
+                return f"ERR: subagent: {err}"
             finally:
                 _cleanup_worktree_and_append_diff(acc)
                 _merge_metrics()
