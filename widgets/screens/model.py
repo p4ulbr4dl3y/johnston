@@ -118,10 +118,4 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
         return options, items, default_val
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Select Model**", id="model-title", classes="modal-markdown")
-            if self.show_search:
-                yield Input(placeholder=self.search_placeholder, id="modal-search-input")
-            yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
+

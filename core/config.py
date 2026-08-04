@@ -45,3 +45,7 @@ DEFAULT_IGNORE_DIRS = {
     ".nuxt",
 }
 
+# Image Extensions for UI
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
+
+
