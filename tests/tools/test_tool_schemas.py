@@ -59,8 +59,8 @@ class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
                 os.unlink(path)
 
     async def test_execute_tool_unknown_tool_is_reported(self):
-        res = await execute_tool("definitely_not_a_tool", {})
-        self.assertEqual(res, "Unknown tool: definitely_not_a_tool")
+        res = await execute_tool("xyz_unknown_tool_123", {})
+        self.assertEqual(res, "Unknown tool: xyz_unknown_tool_123")
 
 
 if __name__ == "__main__":
