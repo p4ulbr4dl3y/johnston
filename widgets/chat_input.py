@@ -353,8 +353,8 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Global Exit shortcut: Ctrl+C / Ctrl+Q (including Russian layout)
-        if event.key in ("ctrl+c", "ctrl+q", "ctrl+с", "ctrl+С", "ctrl+й", "ctrl+Й"):
+        # Global Exit shortcut: Ctrl+C / Ctrl+Q
+        if event.key in ("ctrl+c", "ctrl+q"):
             event.prevent_default()
             event.stop()
             self.app.exit()
