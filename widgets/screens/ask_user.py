@@ -359,10 +359,13 @@ class AskUserWizardScreen(ModalScreen[str]):
                 if prev_answer:
                     if prev_answer in self.raw_options:
                         highlight_idx = self.raw_options.index(prev_answer)
+                        input_field.value = ""
                     else:
                         highlight_idx = len(self.options) - 1
                         input_field.value = prev_answer
                         input_field.display = True
+                else:
+                    input_field.value = ""
 
 
 
