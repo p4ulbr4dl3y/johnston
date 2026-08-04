@@ -53,6 +53,9 @@ class SubagentsScreen(ModalScreen[None]):
         if not self.sessions and curr_session_id:
             self.sessions = self.st.get_sessions_for_session(None)
 
+        if self.sessions:
+            self.sessions = sorted(self.sessions, key=lambda s: getattr(s, "status", "") != "running")
+
         if not self.sessions:
             opt_list.add_option(Text("No subagents registered for this session.", style=THEME_MUTED))
         else:

@@ -139,11 +139,13 @@ class ShellTool(BaseTool):
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
+        curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
         task = BackgroundTask(
             task_id,
             cmd,
             p,
             widget=target_widget,
+            session_id=curr_sid,
         )
         callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
 

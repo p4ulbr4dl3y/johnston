@@ -407,6 +407,25 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("`HANDOFF.md`", prompt)
 
 
+    async def test_new_command_clears_background_tasks(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from core.background_task import BackgroundTask
+        from core.commands import NewCommand
+        app = MockApp()
+        app.message_queue = MagicMock()
+        app.sm = MagicMock()
+        app.sm.generate_session_id.return_value = "new-id"
+        mock_chat = MagicMock()
+        mock_chat.remove_children = AsyncMock()
+        app.query_one = MagicMock(return_value=mock_chat)
+        t1 = BackgroundTask("t1", "echo 1", None, session_id="old-session")
+        app.background_tasks = [t1]
+        cmd = NewCommand()
+        await cmd.execute(app)
+        self.assertEqual(len(app.background_tasks), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
 

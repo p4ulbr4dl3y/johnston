@@ -214,8 +214,9 @@ class InvokeSubagentTool(BaseTool):
 
             bg_task = asyncio.create_task(_run_bg())
             session.async_task = bg_task
-            bg_obj = BackgroundSubagent(task_id, description, bg_task)
-            ctx.add_background_task(bg_obj)
+            curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+            bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)
+            ctx.add_background_task(bg_sub)
             ctx.notify(f"Subagent launched in background (ID: {task_id})")
 
             return f"Subagent '{description}' launched in background (Task ID: {task_id})."

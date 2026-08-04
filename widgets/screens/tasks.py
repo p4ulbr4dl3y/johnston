@@ -37,11 +37,13 @@ class TaskConsoleScreen(ModalScreen[None]):
         self.set_interval(0.1, self.update_log)
 
     def update_log(self) -> None:
+        from core.background_task import process_carriage_returns, strip_ansi
         lines = self.bg_task.output
         if len(lines) > self.printed_count:
             for i in range(self.printed_count, len(lines)):
                 raw_line = lines[i].rstrip("\r\n")
-                self.log_widget.write(raw_line)
+                clean_line = process_carriage_returns(strip_ansi(raw_line))
+                self.log_widget.write(clean_line)
             self.printed_count = len(lines)
 
     def action_back(self) -> None:
@@ -61,6 +63,15 @@ class TasksListScreen(ModalScreen[None]):
     def action_quit_app(self) -> None:
         self.app.exit()
 
+    def _get_filtered_tasks(self) -> list:
+        all_tasks = getattr(self.app, "background_tasks", [])
+        curr_sid = getattr(self.app, "current_session_id", None)
+        if curr_sid:
+            filtered = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+        else:
+            filtered = list(all_tasks)
+        return sorted(filtered, key=lambda t: not getattr(t, "is_running", False))
+
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Background Tasks Manager**", classes="modal-markdown")
@@ -76,7 +87,7 @@ class TasksListScreen(ModalScreen[None]):
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
             return
-        tasks = getattr(self.app, "background_tasks", [])
+        tasks = self._get_filtered_tasks()
         new_signatures = [(getattr(t, "task_id", ""), getattr(t, "is_running", False), getattr(t, "command", "")) for t in tasks]
         if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
             return
@@ -103,8 +114,9 @@ class TasksListScreen(ModalScreen[None]):
             opt_list.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option_index is not None and event.option_index < len(self.app.background_tasks):
-            task = self.app.background_tasks[event.option_index]
+        tasks = self._get_filtered_tasks()
+        if event.option_index is not None and event.option_index < len(tasks):
+            task = tasks[event.option_index]
             if hasattr(task, "async_task"):
                 from widgets.screens.subagent_screen import SubagentViewScreen
                 self.app.push_screen(SubagentViewScreen(task.task_id))
@@ -114,8 +126,9 @@ class TasksListScreen(ModalScreen[None]):
     async def action_kill_task(self) -> None:
         opt_list = self.query_one("#tasks-option-list", OptionList)
         idx = opt_list.highlighted
-        if idx is not None and idx < len(self.app.background_tasks):
-            task = self.app.background_tasks[idx]
+        tasks = self._get_filtered_tasks()
+        if idx is not None and idx < len(tasks):
+            task = tasks[idx]
             if task.is_running:
                 import inspect
 
