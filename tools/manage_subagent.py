@@ -69,11 +69,11 @@ class ManageSubagentTool(BaseTool):
             return "\n".join(lines)
 
         if not task_id:
-            return "Error: 'task_id' parameter is required for action '" + action + "'."
+            return "ERR: 'task_id' required for '" + action + "'"
 
         session = tracker.find_session_by_description_or_id(task_id, session_id=curr_session_id)
         if not session:
-            return f"Error: Subagent session '{task_id}' not found."
+            return f"ERR: session '{task_id}' not found"
 
         if action == "status":
             import os
@@ -108,7 +108,7 @@ class ManageSubagentTool(BaseTool):
 
         elif action == "kill":
             if session.status != "running":
-                return f"Subagent {session.task_id} is already in state '{session.status}'."
+                return f"OK: {session.task_id} already in '{session.status}'"
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -118,11 +118,11 @@ class ManageSubagentTool(BaseTool):
 
             session.finish("cancelled", "Cancelled via manage_subagent tool")
             ctx.notify(f"Subagent {session.task_id} terminated.")
-            return f"Subagent {session.task_id} has been terminated."
+            return f"OK: {session.task_id} terminated"
 
         elif action == "send_message":
             if not message:
-                return "Error: 'message' parameter is required for action 'send_message'."
+                return "ERR: 'message' required for 'send_message'"
 
             subagent = session.agent
             if not subagent:
@@ -135,7 +135,7 @@ class ManageSubagentTool(BaseTool):
                     session.agent = subagent
 
             if not subagent:
-                return f"Error: No active agent instance available for subagent {session.task_id}."
+                return f"ERR: no active agent for {session.task_id}"
 
             session.add_event({"type": "user", "text": message})
 
@@ -168,18 +168,18 @@ class ManageSubagentTool(BaseTool):
                 bg_task = asyncio.create_task(_run_msg_bg())
                 session.async_task = bg_task
                 ctx.notify(f"Message sent to background subagent {session.task_id}")
-                return f"Message sent to background subagent {session.task_id}."
+                return f"OK: message sent to {session.task_id}"
             else:
                 acc = [""]
                 try:
                     async for step in subagent.stream_steps(message):
                         _record_step(step, acc)
                 except Exception as err:
-                    return f"Error executing subagent message: {err}"
+                    return f"ERR: subagent message: {err}"
                 finally:
                     _merge_metrics()
 
                 return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"
 
         else:
-            return f"Error: Unknown action '{action}'. Valid actions are: list, status, kill, send_message."
+            return f"ERR: unknown action '{action}'. Valid actions are: list, status, kill, send_message."

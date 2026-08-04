@@ -44,12 +44,12 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_url_scheme(self):
         tool = WebFetchTool()
         res = await tool.execute({"url": "ftp://example.com"})
-        self.assertIn("Error: invalid URL scheme", res)
+        self.assertIn("ERR: invalid scheme 'ftp://example.com'", res)
 
     async def test_missing_url(self):
         tool = WebFetchTool()
         res = await tool.execute({"url": ""})
-        self.assertIn("Error: parameter 'url' is required", res)
+        self.assertIn("ERR: 'url' required", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_html_converted(self, mock_client_cls):
@@ -88,7 +88,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
             tool = WebFetchTool()
             res = await tool.execute({"url": "https://example.com/404"})
 
-        self.assertIn("Error fetching 'https://example.com/404': HTTP 404", res)
+        self.assertIn("ERR: 'https://example.com/404': HTTP 404", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_oversize_content_length_rejected(self, mock_client_cls):
@@ -113,7 +113,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/big"})
-        self.assertIn("exceeds max allowed size", res)
+        self.assertIn("ERR: 'https://example.com/big' exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
     async def test_truncation_behavior(self, mock_client_cls):

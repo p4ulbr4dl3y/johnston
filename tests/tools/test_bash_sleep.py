@@ -21,7 +21,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ToolContext(mock_app)
 
         res = await tool.execute({"command": "sleep 0.05"}, app=mock_app)
-        self.assertIn("Slept for 0.05 seconds", res)
+        self.assertIn("OK: slept 0.05s", res)
 
     async def test_sleep_chain(self):
         tool = ShellTool()
@@ -37,7 +37,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ToolContext(mock_app)
 
         res = await tool.execute({"command": "true"}, app=mock_app)
-        self.assertIn("Command executed with no output", res)
+        self.assertIn("OK: executed (no output)", res)
 
 if __name__ == "__main__":
     unittest.main()

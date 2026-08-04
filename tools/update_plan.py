@@ -52,7 +52,7 @@ class UpdatePlanTool(BaseTool):
         explanation = str(args.get("explanation") or "").strip()
 
         if not raw_plan or not isinstance(raw_plan, list):
-            return "Error: 'plan' parameter must be a non-empty list of items."
+            return "ERR: 'plan' must be non-empty"
 
         validated_plan: List[Dict[str, str]] = []
         for idx, item in enumerate(raw_plan, start=1):
@@ -76,7 +76,7 @@ class UpdatePlanTool(BaseTool):
             })
 
         if not validated_plan:
-            return "Error: Valid 'plan' items with 'step' and 'status' are required."
+            return "ERR: items need 'step'/'status'"
 
         # Store active plan in app state if app exists
         if ctx.app:
@@ -91,7 +91,7 @@ class UpdatePlanTool(BaseTool):
 
         completed_count = sum(1 for p in validated_plan if p["status"] == "completed")
         total_count = len(validated_plan)
-        summary = f"Plan updated ({completed_count}/{total_count} completed)."
+        summary = f"OK: plan updated ({completed_count}/{total_count} completed)"
         if explanation:
             summary += f" {explanation}"
 

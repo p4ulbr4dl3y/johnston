@@ -52,7 +52,7 @@ async def run_linter(path: str) -> str:
     if len(lines) > 10:
         combined = "\n".join(lines[:10]) + f"\n... ({len(lines) - 10} more lines)"
 
-    return f"\n\n[Linter Feedback]:\n{combined}"
+    return f"\n\nERR: {combined}"
 
 
 async def _exec_cmd(cmd: list[str]) -> Optional[str]:

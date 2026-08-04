@@ -119,7 +119,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertTrue(any(s.end == 80 and s.style == "on #12261e" for s in padded_line._spans))
 
     def test_edit_tool_error_display(self):
-        error_text = "Error: target_content not found between lines 10 and 20 in 'test.py'."
+        error_text = "ERR: target not found in 'test.py' (10-20)."
         widget = ToolCallWidget(
             tool_type="edit",
             target="test.py",
@@ -133,7 +133,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(content, error_text)
 
     def test_hints_stripped_from_ui_display_but_retained_in_result_text(self):
-        full_text = "Error: target_content not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
+        full_text = "ERR: target not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
         widget = ToolCallWidget(
             tool_type="edit",
             target="test.py",
@@ -148,10 +148,10 @@ class TestToolExpansion(unittest.TestCase):
         # UI content widget must strip [Hint:] block
         content = getattr(widget.content_widget, "_Static__content")
         self.assertNotIn("[Hint:", content)
-        self.assertIn("Error: target_content not found.", content)
+        self.assertIn("ERR: target not found.", content)
 
     def test_create_tool_error_display(self):
-        error_text = "Error: '/some/dir' is a directory, cannot overwrite with file."
+        error_text = "ERR: '/some/dir' is a directory"
         widget = ToolCallWidget(
             tool_type="create",
             target="/some/dir",
@@ -165,7 +165,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(content, error_text)
 
     def test_update_plan_error_display(self):
-        error_text = "Error: 'plan' parameter must be a non-empty list of items."
+        error_text = "ERR: 'plan' must be non-empty"
         widget = ToolCallWidget(
             tool_type="update_plan",
             target="plan",

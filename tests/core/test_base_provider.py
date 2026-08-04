@@ -23,7 +23,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("Success", res_create)
+        self.assertIn("OK: file", res_create)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
@@ -33,7 +33,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_read_missing_file(self):
         file_path = os.path.join(self.test_dir, "missing.txt")
         res_read = await execute_tool("read", {"path": file_path})
-        self.assertIn("Error", res_read)
+        self.assertIn("ERR: file", res_read)
 
     async def test_edit_tool(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
@@ -72,7 +72,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             "old_string": "missing_line",
             "new_string": "replacement"
         })
-        self.assertIn("Error", res_edit)
+        self.assertIn("ERR: exact block not found", res_edit)
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
@@ -173,7 +173,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_task", {"action": "list"}, app=app)
-        self.assertIn("No background tasks currently active", res_list)
+        self.assertIn("OK: no tasks active", res_list)
 
     async def test_task_tool_foreground(self):
         class DummySubAgent:
@@ -191,7 +191,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "do research", "description": "research task"}, app=app)
-        self.assertIn("launched in background", res)
+        self.assertIn("OK: subagent 'research task' launched", res)
 
     async def test_task_tool_background(self):
         class DummySubAgent:
@@ -220,7 +220,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
-        self.assertIn("launched in background", res)
+        self.assertIn("OK: subagent 'bg job' launched", res)
         self.assertEqual(len(app.background_tasks), 1)
         self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
 

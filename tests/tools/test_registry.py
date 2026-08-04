@@ -16,11 +16,11 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_success_and_alias(self):
         # Execute tool via canonical name
         res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"})
-        self.assertIn("Error:", res)
+        self.assertIn("ERR:", res)
 
         # Execute tool via alias
         res_alias = await execute_tool("cat", {"path": "nonexistent_abc_123.txt"})
-        self.assertIn("Error:", res_alias)
+        self.assertIn("ERR:", res_alias)
 
         # Test additional aliases resolution
         from tools.registry import ALIAS_MAP
@@ -32,24 +32,24 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_execution_exception(self):
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
             res = await execute_tool("read", {"path": "foo.txt"})
-            self.assertIn("Error executing tool read: Execute failed", res)
+            self.assertIn("ERR: execute 'read': Execute failed", res)
 
     async def test_execute_tool_unknown_with_alias_hint(self):
         # Match that resolves to an alias target
         res = await execute_tool("catx", None)
-        self.assertIn("Unknown tool: catx", res)
+        self.assertIn("ERR: unknown tool 'catx'", res)
         self.assertIn("Did you mean 'cat' (target: read)?", res)
 
     async def test_execute_tool_unknown_with_direct_hint(self):
         # Match that maps directly to a registry tool name
         res = await execute_tool("creats", None)
-        self.assertIn("Unknown tool: creats", res)
+        self.assertIn("ERR: unknown tool 'creats'", res)
         self.assertIn("Did you mean 'create'?", res)
         self.assertNotIn("target:", res)
 
     async def test_execute_tool_unknown_no_hint(self):
         res = await execute_tool("zzzzzzzzz_unknown", None)
-        self.assertEqual(res, "Unknown tool: zzzzzzzzz_unknown")
+        self.assertEqual(res, "ERR: unknown tool 'zzzzzzzzz_unknown'")
 
     async def test_execute_tool_mcp_disallowed_in_mode(self):
         mock_mcp_mgr = MagicMock()
@@ -68,7 +68,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             mock_app = MagicMock()
             mock_app.mode = "plan"
             res = await execute_tool("mcp_tool_test", {"arg": "val"}, app=mock_app)
-            self.assertIn("Error: Tool 'mcp_tool_test' is disabled in plan mode.", res)
+            self.assertIn("ERR: tool 'mcp_tool_test' disabled in plan mode", res)
 
     async def test_execute_tool_mcp_success(self):
         mock_mcp_mgr = MagicMock()
@@ -105,7 +105,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
              patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("faulty_mcp", {})
-            self.assertIn("Error executing MCP tool 'faulty_mcp': MCP connection failed", res)
+            self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res)
 
     async def test_execute_tool_mcp_returns_none(self):
         mock_mcp_mgr = MagicMock()
@@ -123,7 +123,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
              patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("none_mcp", {})
-            self.assertEqual(res, "Unknown tool: none_mcp")
+            self.assertEqual(res, "ERR: unknown tool 'none_mcp'")
 
 
 if __name__ == "__main__":

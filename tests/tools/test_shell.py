@@ -17,7 +17,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_sleep_chain_no_remainder(self):
         res = await self.tool.execute({"command": "sleep 0.001"})
-        self.assertEqual(res, "Slept for 0.001 seconds.")
+        self.assertEqual(res, "OK: slept 0.001s")
 
     async def test_sleep_chain_with_remainder(self):
         res = await self.tool.execute({"command": "sleep 0.001 && echo after_sleep"})
@@ -33,7 +33,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, app=mock_app)
-            self.assertEqual(res, "Command execution rejected by user.")
+            self.assertEqual(res, "ERR: rejected by user")
 
     async def test_shell_safety_check_confirmed(self):
         mock_app = MagicMock()
@@ -53,7 +53,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, app=mock_app)
-            self.assertIn("Error prompting for command permission: Screen push failed", res)
+            self.assertIn("ERR: permission prompt: Screen push failed", res)
 
     async def test_standard_pipe_execution(self):
         res = await self.tool.execute({"command": "echo std_pipe_test"})
@@ -116,7 +116,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_normal_execution_empty_output(self):
         res = await self.tool.execute({"command": "true"})
-        self.assertEqual(res, "Command executed with no output.")
+        self.assertEqual(res, "OK: executed (no output)")
 
     async def test_command_timeout_moved_to_background(self):
         mock_app = MagicMock()
@@ -213,7 +213,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
-            self.assertIn("Error: Command timed out after 5 seconds and was terminated.", res)
+            self.assertIn("ERR: timed out after 5s", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
 
@@ -248,7 +248,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True})
-            self.assertIn("Error: Background tasks are not supported in subagents.", res)
+            self.assertIn("ERR: no background in subagent", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
 

@@ -30,7 +30,7 @@ class CallMCPTool(BaseTool):
         arguments = args.get("arguments") or {}
 
         if not server or not tool:
-            return "Error: Both 'server' and 'tool' parameters are required."
+            return "ERR: 'server' and 'tool' params required"
 
         from core.mode_manager import ModeManager
 
@@ -39,7 +39,7 @@ class CallMCPTool(BaseTool):
         mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
         disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
         if "call_mcp" in disallowed or "call_mcp_tool" in disallowed or tool.lower() in disallowed or f"{server}.{tool}".lower() in disallowed:
-            return f"Error: MCP tool '{server}.{tool}' is disabled in {mode_def.name} mode."
+            return f"ERR: tool '{server}.{tool}' disabled in {mode_def.name} mode"
 
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()
@@ -70,6 +70,6 @@ class CallMCPTool(BaseTool):
                     tool_name=f"mcp_{tool}",
                 )
         except Exception as e:
-            return f"Error: Failed to execute MCP tool '{tool}' on server '{server}': {e}" + _get_schema_hint()
+            return f"ERR: failed '{server}.{tool}': {e}" + _get_schema_hint()
 
-        return f"Error: Failed to execute MCP tool '{tool}' on server '{server}'. Server or tool not found." + _get_schema_hint()
+        return f"ERR: server/tool '{server}.{tool}' not found" + _get_schema_hint()

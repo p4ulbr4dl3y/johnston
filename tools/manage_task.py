@@ -29,18 +29,18 @@ class ManageTaskTool(BaseTool):
 
         tasks = ctx.background_tasks
         if not tasks and not ctx.app:
-            return "No background task manager available."
+            return "ERR: no task manager"
 
         def _task_not_found_msg(tid: str) -> str:
             active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
             if active_ids:
                 ids_str = ", ".join(f"'{i}'" for i in active_ids)
-                return f"No task found with ID: {tid}. [Hint: Active background task IDs: {ids_str}]"
-            return f"No task found with ID: {tid}. [Hint: No active background tasks running.]"
+                return f"ERR: task '{tid}' not found [Hint: Active background task IDs: {ids_str}]"
+            return f"ERR: task '{tid}' not found [Hint: No active background tasks running.]"
 
         if action == "list":
             if not tasks:
-                return "No background tasks currently active."
+                return "OK: no tasks active"
             lines = ["Active Background Tasks:"]
             for t in tasks:
                 status = "RUNNING" if t.is_running else "FINISHED"
@@ -49,7 +49,7 @@ class ManageTaskTool(BaseTool):
 
         elif action == "status":
             if not task_id:
-                return "Error: task_id parameter required for 'status' action."
+                return "ERR: 'task_id' required for 'status'"
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
                 return _task_not_found_msg(task_id)
@@ -64,11 +64,11 @@ class ManageTaskTool(BaseTool):
                     f"you may call manage_task(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{t.task_id}') to abort. "
                     "Otherwise, STOP calling manage_task(status) in a loop and end your turn now."
                 )
-            return f"Task ID: {t.task_id}\nStatus: FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
+            return f"OK: {t.task_id} FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 
         elif action in ("send_input", "input"):
             if not task_id:
-                return "Error: task_id parameter required for 'send_input' action."
+                return "ERR: 'task_id' required for 'send_input'"
             input_text = args.get("input", "")
             if input_text is None:
                 input_text = ""
@@ -77,15 +77,15 @@ class ManageTaskTool(BaseTool):
                 return _task_not_found_msg(task_id)
             t = matching[0]
             if not getattr(t, "is_running", False):
-                return f"Task {task_id} is not running."
+                return f"ERR: task '{task_id}' not running"
 
             if hasattr(t, "send_input"):
                 return await t.send_input(input_text)
-            return f"Task {task_id} does not support stdin input."
+            return f"ERR: task '{task_id}' stdin not writable"
 
         elif action == "kill":
             if not task_id:
-                return "Error: task_id parameter required for 'kill' action."
+                return "ERR: 'task_id' required for 'kill'"
             matching = [t for t in tasks if t.task_id == task_id]
             if not matching:
                 return _task_not_found_msg(task_id)
@@ -98,9 +98,9 @@ class ManageTaskTool(BaseTool):
                         t.process.kill()
                     t.is_running = False
                     ctx.refresh_status()
-                    return f"Task {task_id} successfully killed."
+                    return f"OK: {task_id} killed"
                 except Exception as e:
-                    return f"Failed to kill task {task_id}: {e}"
-            return f"Task {task_id} is not running."
+                    return f"ERR: kill {task_id}: {e}"
+            return f"ERR: task '{task_id}' not running"
 
-        return f"Unknown action: {action}. Use 'list', 'status', 'kill', or 'send_input'."
+        return f"ERR: unknown action '{action}'. Use 'list', 'status', 'kill', or 'send_input'."

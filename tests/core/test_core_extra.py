@@ -59,7 +59,7 @@ class TestBackgroundTask(unittest.IsolatedAsyncioTestCase):
 
         bg_task = BackgroundTask("task_3", "interactive_cmd", mock_proc)
         res = await bg_task.send_input("hello stdin")
-        self.assertIn("Input sent to task task_3", res)
+        self.assertIn("OK: input sent to task_3", res)
         mock_stdin.write.assert_called_once_with(b"hello stdin\n")
 
     def test_process_carriage_returns(self):

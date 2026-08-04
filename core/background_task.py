@@ -130,7 +130,7 @@ class BackgroundTask:
                         out_res = self.get_formatted_output()
                         if len(out_res) > 3000:
                             out_res = out_res[:3000] + "\n... [output truncated]"
-                        out_res = out_res if out_res.strip() else "Command executed with no output."
+                        out_res = out_res if out_res.strip() else "OK: executed (no output)"
                         on_completed_cb(self.task_id, self.command, out_res)
                     except Exception:
                         pass
@@ -140,20 +140,20 @@ class BackgroundTask:
 
     async def send_input(self, text: str) -> str:
         if not self.is_running:
-            return f"Task {self.task_id} is not running."
+            return f"ERR: task '{self.task_id}' not running"
         data = (text + "\n").encode("utf-8")
         try:
             if self.master_fd is not None:
                 os.write(self.master_fd, data)
-                return f"Input sent to task {self.task_id}."
+                return f"OK: input sent to {self.task_id}"
             elif self.process and self.process.stdin:
                 self.process.stdin.write(data)
                 await self.process.stdin.drain()
-                return f"Input sent to task {self.task_id}."
+                return f"OK: input sent to {self.task_id}"
             else:
-                return f"Task {self.task_id} stdin is not writable."
+                return f"ERR: task '{self.task_id}' stdin not writable"
         except Exception as e:
-            return f"Failed to send input to task {self.task_id}: {e}"
+            return f"ERR: send input to {self.task_id}: {e}"
 
     def kill_sync(self):
         self.was_killed = True

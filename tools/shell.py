@@ -57,10 +57,10 @@ class ShellTool(BaseTool):
             sec = float(m.group(1))
             remainder = (m.group(2) or "").strip()
             if sec > timeout:
-                return f"Error: sleep duration ({sec}s) exceeds timeout ({timeout}s)."
+                return f"ERR: sleep duration ({sec}s) exceeds timeout ({timeout}s)"
             await asyncio.sleep(sec)
             if not remainder:
-                return f"Slept for {sec} seconds."
+                return f"OK: slept {sec}s"
             cmd = remainder
 
         skip_confirm = bool(args.get("skip_confirm", False))
@@ -82,9 +82,9 @@ class ShellTool(BaseTool):
                 ctx.app.push_screen(screen, callback=on_dismiss)
                 confirmed = await future
                 if not confirmed:
-                    return "Command execution rejected by user."
+                    return "ERR: rejected by user"
             except Exception as e:
-                return f"Error prompting for command permission: {e}"
+                return f"ERR: permission prompt: {e}"
 
         env = shell_env()
         p = await self._create_std_process(cmd, env)
@@ -95,7 +95,7 @@ class ShellTool(BaseTool):
         if ctx.is_subagent:
             if run_in_bg:
                 await terminate_process(p)
-                return "Error: Background tasks are not supported in subagents."
+                return "ERR: no background in subagent"
 
             output_chunks = []
 
@@ -121,7 +121,7 @@ class ShellTool(BaseTool):
                         pass
                 res = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 if not res.strip():
-                    return "Command executed with no output."
+                    return "OK: executed (no output)"
                 return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
             except asyncio.TimeoutError:
                 await terminate_process(p)
@@ -132,7 +132,7 @@ class ShellTool(BaseTool):
                         pass
                 raw_out = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-                return f"Error: Command timed out after {timeout} seconds and was terminated.{partial_str}"
+                return f"ERR: timed out after {timeout}s{partial_str}"
             except asyncio.CancelledError:
                 await terminate_process(p)
                 raise
@@ -207,7 +207,7 @@ class ShellTool(BaseTool):
             task.close_pty()
             res = task.get_formatted_output()
             if not res.strip():
-                return "Command executed with no output."
+                return "OK: executed (no output)"
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
         except asyncio.TimeoutError:
             task.is_background = True

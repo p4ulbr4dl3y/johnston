@@ -29,7 +29,7 @@ def format_line_pagination(
                 else:
                     hint_str = f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
                 return (
-                    f"Error: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
+                    f"ERR: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
                     f"[Hint: {hint_str}]"
                 )
             start_line = start_line_int

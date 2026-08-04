@@ -15,16 +15,16 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("Plan updated (1/3 completed).", res)
+        self.assertIn("OK: plan updated (1/3 completed)", res)
         self.assertIn("Refactoring module for safety", res)
 
     async def test_update_plan_tool_invalid_payload(self):
         tool = UpdatePlanTool()
         res_empty = await tool.execute({"plan": []})
-        self.assertIn("Error:", res_empty)
+        self.assertIn("ERR:", res_empty)
 
         res_malformed = await tool.execute({"plan": "not a list"})
-        self.assertIn("Error:", res_malformed)
+        self.assertIn("ERR:", res_malformed)
 
     async def test_update_plan_normalization_and_skipping(self):
         tool = UpdatePlanTool()
@@ -38,12 +38,12 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("Plan updated (1/3 completed).", res)
+        self.assertIn("OK: plan updated (1/3 completed)", res)
 
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
         res = await tool.execute({"plan": ["invalid", {"step": ""}]})
-        self.assertIn("Error: Valid 'plan' items", res)
+        self.assertIn("ERR: items need", res)
 
     async def test_update_plan_app_integration(self):
         class MockApp:
@@ -64,7 +64,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             },
             app=app,
         )
-        self.assertIn("Plan updated", res)
+        self.assertIn("OK: plan updated (0/1 completed)", res)
         self.assertTrue(app.updated)
         self.assertEqual(app.current_plan_explanation, "App update test")
         self.assertEqual(app.current_plan, [{"step": "Step 1", "status": "in_progress"}])
@@ -80,7 +80,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             {"plan": [{"step": "Step 1", "status": "completed"}]},
             app=app,
         )
-        self.assertIn("Plan updated (1/1 completed).", res)
+        self.assertIn("OK: plan updated (1/1 completed)", res)
 
 
 if __name__ == "__main__":
