@@ -53,8 +53,6 @@ class CallMCPTool(BaseTool):
                 pass
             return ""
 
-        import inspect
-        import unittest.mock
         try:
             if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
                 res_or_coro = mcp_mgr.call_tool_async(tool, arguments, target_server=server)

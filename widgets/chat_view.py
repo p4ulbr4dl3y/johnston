@@ -5,8 +5,6 @@ import json
 import os
 import re
 import warnings
-
-from core.config import IMAGE_EXTENSIONS
 from typing import Any
 from urllib.parse import urlparse
 
@@ -35,6 +33,8 @@ from textual.widgets._markdown import (
     MarkdownTableCellContents,
     MarkdownTableContent,
 )
+
+from core.config import IMAGE_EXTENSIONS
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
 

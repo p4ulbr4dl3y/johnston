@@ -1,8 +1,5 @@
 from typing import Any, Dict, List, Tuple, Union
 
-from textual.app import ComposeResult
-from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.models_catalog import catalog

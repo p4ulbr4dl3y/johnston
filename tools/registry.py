@@ -127,7 +127,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if clean_name in disallowed or resolved_name in disallowed:
         return f"Error: Tool '{name}' is disabled in {mode_def.name} mode."
 
-    import unittest.mock
     try:
         if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
             res_or_coro = mcp_mgr.call_tool_async(name, args)
