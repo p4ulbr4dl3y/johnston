@@ -101,6 +101,23 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("330 +  // new comment", rendered_plain)
         self.assertIn("331   </script>", rendered_plain)
 
+    def test_diff_renderable_pads_background_lines(self):
+        line = Text("85 + matched = 0")
+        line.stylize("on #12261e")
+        diff = DiffRenderable([line])
+
+        mock_console = MagicMock()
+        mock_console.render.side_effect = lambda line, opts: [line]
+        options = MagicMock()
+        options.max_width = 80
+        options.update.return_value = options
+
+        results = list(diff.__rich_console__(mock_console, options))
+        self.assertEqual(len(results), 1)
+        padded_line = results[0]
+        self.assertEqual(len(padded_line.plain), 80)
+        self.assertTrue(any(s.end == 80 and s.style == "on #12261e" for s in padded_line._spans))
+
     def test_edit_tool_error_display(self):
         error_text = "Error: target_content not found between lines 10 and 20 in 'test.py'."
         widget = ToolCallWidget(
