@@ -6,6 +6,61 @@ from typing import Any, Dict, List, Tuple
 from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.linter import run_linter
 
+LEFT_SINGLE_CURLY_QUOTE = "‘"
+RIGHT_SINGLE_CURLY_QUOTE = "’"
+LEFT_DOUBLE_CURLY_QUOTE = "“"
+RIGHT_DOUBLE_CURLY_QUOTE = "”"
+
+
+def normalize_quotes(s: str) -> str:
+    return (
+        s.replace(LEFT_SINGLE_CURLY_QUOTE, "'")
+        .replace(RIGHT_SINGLE_CURLY_QUOTE, "'")
+        .replace(LEFT_DOUBLE_CURLY_QUOTE, '"')
+        .replace(RIGHT_DOUBLE_CURLY_QUOTE, '"')
+    )
+
+
+def _preserve_quote_style(old_str: str, actual_old_str: str, new_str: str) -> str:
+    if old_str == actual_old_str:
+        return new_str
+
+    has_double = LEFT_DOUBLE_CURLY_QUOTE in actual_old_str or RIGHT_DOUBLE_CURLY_QUOTE in actual_old_str
+    has_single = LEFT_SINGLE_CURLY_QUOTE in actual_old_str or RIGHT_SINGLE_CURLY_QUOTE in actual_old_str
+
+    if not has_double and not has_single:
+        return new_str
+
+    res = new_str
+    if has_double:
+        res = res.replace('"', RIGHT_DOUBLE_CURLY_QUOTE)
+    if has_single:
+        res = res.replace("'", RIGHT_SINGLE_CURLY_QUOTE)
+    return res
+
+
+def find_actual_target_and_replacement(
+    text: str, target: str, replacement: str
+) -> Tuple[str, str]:
+    actual_target = target
+    actual_replacement = replacement
+
+    if target not in text:
+        norm_text = normalize_quotes(text)
+        norm_target = normalize_quotes(target)
+        idx = norm_text.find(norm_target)
+        if idx != -1:
+            actual_target = text[idx : idx + len(target)]
+            actual_replacement = _preserve_quote_style(target, actual_target, replacement)
+
+    if actual_replacement == "" and not actual_target.endswith(("\n", "\r")):
+        if actual_target + "\r\n" in text:
+            actual_target += "\r\n"
+        elif actual_target + "\n" in text:
+            actual_target += "\n"
+
+    return actual_target, actual_replacement
+
 
 def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str:
     target_lines = [line_item.strip() for line_item in target.splitlines() if line_item.strip()]
@@ -110,7 +165,9 @@ def apply_chunk_replacements(
             sub_lines = lines[start_idx:end_idx]
             sub_text = "".join(sub_lines)
 
-            count = sub_text.count(target)
+            actual_target, actual_replacement = find_actual_target_and_replacement(sub_text, target, replacement)
+
+            count = sub_text.count(actual_target)
             if count == 0:
                 target_first_line = target.splitlines()[0] if target.splitlines() else target
                 found_line = None
@@ -130,14 +187,16 @@ def apply_chunk_replacements(
                     f"Narrow start_line/end_line range or include more lines to make target unique."
                 )
 
-            new_sub_text = sub_text.replace(target, replacement, 1 if not allow_mult else -1)
+            new_sub_text = sub_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
             sub_replacement_lines = new_sub_text.splitlines(keepends=True)
             if sub_text.endswith(("\n", "\r")) and sub_replacement_lines and not sub_replacement_lines[-1].endswith(("\n", "\r")):
                 sub_replacement_lines[-1] += "\n"
             lines[start_idx:end_idx] = sub_replacement_lines
 
         else:
-            count = current_text.count(target)
+            actual_target, actual_replacement = find_actual_target_and_replacement(current_text, target, replacement)
+
+            count = current_text.count(actual_target)
             if count == 0:
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
                 raise ValueError(
@@ -149,7 +208,7 @@ def apply_chunk_replacements(
                     f"Specify start_line and end_line or include more surrounding lines to make target unique."
                 )
 
-            new_text = current_text.replace(target, replacement, 1 if not allow_mult else -1)
+            new_text = current_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
             lines = new_text.splitlines(keepends=True)
 
     new_content = "".join(lines)

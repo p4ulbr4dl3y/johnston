@@ -55,6 +55,7 @@ class MCPScreen(ModalScreen[None]):
     def refresh_list(self) -> None:
         self.servers = self.mm.load_servers()
         opt_list = self.query_one("#mcp-option-list", OptionList)
+        prev_highlighted = opt_list.highlighted
         opt_list.clear_options()
 
         if not self.servers:
@@ -106,9 +107,13 @@ class MCPScreen(ModalScreen[None]):
                     opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Error")
                 else:
                     status_tag = r"\[ERR]" if (not cmd and not url) else r"\[ON]"
-                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — 0 tools")
+                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name}")
 
         opt_list.focus()
+        if prev_highlighted is not None and 0 <= prev_highlighted < len(self.servers):
+            opt_list.highlighted = prev_highlighted
+        elif self.servers and opt_list.highlighted is None:
+            opt_list.highlighted = 0
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):

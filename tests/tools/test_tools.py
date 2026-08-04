@@ -112,8 +112,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Create file in non-existent directory
         res = await tool.execute({"path": file_path, "content": "Hello World"})
-        self.assertIn("Success: file", res)
+        self.assertIn("created", res)
         self.assertTrue(os.path.exists(file_path))
+
+        # Update existing file (should return diff and updated status)
+        res_update = await tool.execute({"path": file_path, "content": "Hello Universe"})
+        self.assertIn("updated", res_update)
+        self.assertIn("-Hello World", res_update)
+        self.assertIn("+Hello Universe", res_update)
+
         # Create file over existing directory error
         res_dir_err = await tool.execute({"path": self.test_dir, "content": "Hello World"})
         self.assertIn("is a directory", res_dir_err)
@@ -138,6 +145,28 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("+    return 100", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "def foo():\n    return 100\n")
+
+        # Edit with curly quote normalization
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("msg = “hello”\n")
+        await tool.execute({
+            "target_file": file_path,
+            "target_content": 'msg = "hello"',
+            "replacement_content": 'msg = "world"'
+        })
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "msg = ”world”\n")
+
+        # Edit with deletion stripping trailing newline
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("line1\nline2\nline3\n")
+        await tool.execute({
+            "target_file": file_path,
+            "target_content": "line2",
+            "replacement_content": ""
+        })
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "line1\nline3\n")
 
         # Old string not found error
         res_not_found = await tool.execute({

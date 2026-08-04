@@ -1,4 +1,5 @@
 import asyncio
+import difflib
 import os
 from typing import Any, Dict
 
@@ -13,7 +14,7 @@ def _write_file(path: str, content: str) -> None:
 
 class CreateTool(BaseTool):
     name = "create"
-    description = "Create a new file with specified content. Creates parent directories automatically."
+    description = "Create a new file or update an existing file with specified content. Creates parent directories automatically."
     schema = {
         "type": "function",
         "function": {
@@ -34,9 +35,36 @@ class CreateTool(BaseTool):
         if os.path.isdir(path):
             return f"Error: '{path}' is a directory, cannot overwrite with file."
         content = (args.get("content") or "").rstrip("\r\n")
+
+        file_existed = os.path.isfile(path)
+        old_content = ""
+        if file_existed:
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    old_content = f.read()
+            except Exception:
+                old_content = ""
+
         try:
             await asyncio.to_thread(_write_file, path, content)
             linter_output = await run_linter(path)
-            return f"Success: file '{path}' saved ({len(content)} bytes).{linter_output}"
+
+            if file_existed:
+                old_lines = old_content.splitlines(keepends=True)
+                new_lines = content.splitlines(keepends=True)
+                diff_lines = list(
+                    difflib.unified_diff(
+                        old_lines,
+                        new_lines,
+                        fromfile=f"a/{path}",
+                        tofile=f"b/{path}",
+                    )
+                )
+                diff_text = "".join(diff_lines).strip()
+                diff_part = f"\n\n{diff_text}" if diff_text else ""
+                return f"Success: file '{path}' updated ({len(content)} bytes).{linter_output}{diff_part}"
+            else:
+                return f"Success: file '{path}' created ({len(content)} bytes).{linter_output}"
         except Exception as e:
             return f"Error creating file '{path}': {e}"
+
