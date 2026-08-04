@@ -71,9 +71,9 @@ class CreateTool(BaseTool):
 
                 diff_text = "\n".join(diff_lines).strip()
                 diff_part = f"\n\n{diff_text}" if diff_text else ""
-                return f"Success: file '{path}' updated ({len(content)} bytes).{linter_output}{diff_part}"
+                return f"Success: file '{path}' updated.{linter_output}{diff_part}"
             else:
-                return f"Success: file '{path}' created ({len(content)} bytes).{linter_output}"
+                return f"Success: file '{path}' created.{linter_output}"
         except Exception as e:
             return f"Error creating file '{path}': {e}"
 

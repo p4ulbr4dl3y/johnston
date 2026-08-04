@@ -72,7 +72,7 @@ class TestToolDisplay(unittest.TestCase):
             "create",
             "foo.py",
             args={"path": "foo.py", "content": "def bar(): pass"},
-            result_text="Success: file 'foo.py' updated (16 bytes).\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass"
+            result_text="Success: file 'foo.py' updated.\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass"
         )
         w_diff.is_expanded = True
         w_diff.render_content()
@@ -82,7 +82,7 @@ class TestToolDisplay(unittest.TestCase):
             "create",
             "foo.py",
             args={"path": "foo.py", "content": "print('hello')"},
-            result_text="Success: file 'foo.py' created (14 bytes)."
+            result_text="Success: file 'foo.py' created."
         )
         w_new.is_expanded = True
         w_new.render_content()
