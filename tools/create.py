@@ -71,7 +71,7 @@ class CreateTool(BaseTool):
 
                 diff_text = "\n".join(diff_lines).strip()
                 diff_part = f"\n\n{diff_text}" if diff_text else ""
-                return f"Success: file '{path}' updated.{linter_output}{diff_part}"
+                return f"Success: file '{path}' updated.{diff_part}{linter_output}"
             else:
                 return f"Success: file '{path}' created.{linter_output}"
         except Exception as e:
