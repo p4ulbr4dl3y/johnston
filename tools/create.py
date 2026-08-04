@@ -50,17 +50,26 @@ class CreateTool(BaseTool):
             linter_output = await run_linter(path)
 
             if file_existed:
-                old_lines = old_content.splitlines(keepends=True)
-                new_lines = content.splitlines(keepends=True)
+                old_lines = old_content.splitlines()
+                new_lines = content.splitlines()
                 diff_lines = list(
                     difflib.unified_diff(
                         old_lines,
                         new_lines,
                         fromfile=f"a/{path}",
                         tofile=f"b/{path}",
+                        lineterm="",
                     )
                 )
-                diff_text = "".join(diff_lines).strip()
+                if not diff_lines:
+                    cnt = len(new_lines) or 1
+                    diff_lines = [
+                        f"--- a/{path}",
+                        f"+++ b/{path}",
+                        f"@@ -1,{cnt} +1,{cnt} @@",
+                    ] + [" " + line for line in new_lines]
+
+                diff_text = "\n".join(diff_lines).strip()
                 diff_part = f"\n\n{diff_text}" if diff_text else ""
                 return f"Success: file '{path}' updated ({len(content)} bytes).{linter_output}{diff_part}"
             else:
