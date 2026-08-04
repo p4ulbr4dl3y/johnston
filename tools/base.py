@@ -52,6 +52,18 @@ def truncate_output(
 
     from core.config import LAST_TOOL_LOG_FILE, LOGS_DIR
 
+    log_content = text
+    is_json = False
+    stripped = text.strip()
+    if (stripped.startswith("{") and stripped.endswith("}")) or (stripped.startswith("[") and stripped.endswith("]")):
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, (dict, list)):
+                is_json = True
+                log_content = json.dumps(parsed, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
     if save_log:
         import uuid
         name_prefix = f"{tool_name}_" if tool_name else "tool_"
@@ -61,19 +73,29 @@ def truncate_output(
         try:
             os.makedirs(LOGS_DIR, exist_ok=True)
             with open(log_path, "w", encoding="utf-8") as f:
-                f.write(text)
+                f.write(log_content)
             with open(LAST_TOOL_LOG_FILE, "w", encoding="utf-8") as f:
-                f.write(text)
+                f.write(log_content)
         except Exception:
             pass
     else:
         log_path = LAST_TOOL_LOG_FILE
 
+    format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
+
     if from_end:
         truncated = text[-max_chars:]
         header = f"[Output truncated. Showing last {max_chars} chars."
         if save_log:
-            header += f" Full output saved to {log_path}. Use read tool or shell (grep/head/tail) to inspect or filter full log."
+            header += f" Full output saved to {log_path}."
+            if format_desc:
+                header += f" {format_desc}"
+            if is_json:
+                header += " Use read tool or shell (jq/grep) to inspect formatted JSON log."
+            elif "\n" not in text:
+                header += " Log is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full log."
+            else:
+                header += " Use read tool or shell (grep/head/tail) to inspect or filter full log."
         if hint:
             header += f" {hint}"
         header += "]\n...\n"
@@ -82,7 +104,15 @@ def truncate_output(
         truncated = text[:max_chars]
         footer = f"\n... [Output truncated at {max_chars} chars."
         if save_log:
-            footer += f" Full output saved to {log_path}. Use read tool or shell (grep/head/tail) to inspect or filter full log."
+            footer += f" Full output saved to {log_path}."
+            if format_desc:
+                footer += f" {format_desc}"
+            if is_json:
+                footer += " Use read tool or shell (jq/grep) to inspect formatted JSON log."
+            elif "\n" not in text:
+                footer += " Log is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full log."
+            else:
+                footer += " Use read tool or shell (grep/head/tail) to inspect or filter full log."
         if hint:
             footer += f" {hint}"
         footer += "]"
