@@ -8,7 +8,6 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.budgets import BudgetLimits, BudgetState
 from core.models_catalog import catalog, get_context_window
 from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
@@ -500,27 +499,7 @@ class BaseAgent:
             messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
 
         try:
-            def _resolve_limit(agent_val: Any, conf_val: Any) -> Any:
-                if agent_val is None:
-                    return conf_val
-                if conf_val is None:
-                    return agent_val
-                return min(agent_val, conf_val)
-
-            configured_budget = BudgetLimits()
-            budget = BudgetState(
-                BudgetLimits(
-                    max_steps=_resolve_limit(getattr(self, "max_steps", None), configured_budget.max_steps),
-                    max_tool_calls=_resolve_limit(getattr(self, "max_tool_calls", None), configured_budget.max_tool_calls),
-                    max_wall_seconds=_resolve_limit(getattr(self, "max_wall_seconds", None), configured_budget.max_wall_seconds),
-                    max_writes=_resolve_limit(getattr(self, "max_writes", None), configured_budget.max_writes),
-                )
-            )
             while True:
-                budget_decision = budget.before_step()
-                if not budget_decision.allowed:
-                    yield ("thinking", f"{budget_decision.reason} Stopping to prevent runaway tool execution.", "")
-                    break
                 current_mode = getattr(self, "mode", "action")
                 builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name)
                 sys_prompt = builder.build_system_prompt()
@@ -820,10 +799,7 @@ class BaseAgent:
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
 
                     policy_err = self._tool_policy_error(t_name, args, mode_def)
-                    tool_budget_decision = budget.before_tool_call()
-                    if not tool_budget_decision.allowed:
-                        tool_result = f"Error: Tool '{t_name}' blocked by budget: {tool_budget_decision.reason}"
-                    elif policy_err:
+                    if policy_err:
                         tool_result = policy_err
                     else:
                         tool_result = None
