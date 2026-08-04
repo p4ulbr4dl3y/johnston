@@ -1060,6 +1060,8 @@ class ToolCallWidget(Vertical):
         if "[Linter Feedback]:" in diff_text:
             diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
 
+        diff_text = re.sub(r"^Success:\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE).strip()
+
         lexer_name = self._guess_lexer(file_path)
         try:
             lexer = get_lexer_by_name(lexer_name)
@@ -1174,6 +1176,8 @@ class ToolCallWidget(Vertical):
 
             if not in_hunk:
                 if line.strip():
+                    if line.startswith("Success:") or " updated (" in line or " created (" in line or " saved (" in line:
+                        continue
                     formatted_lines.append(Text(line, style="dim"))
                 continue
 
