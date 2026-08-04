@@ -849,48 +849,58 @@ class ToolCallWidget(Vertical):
         if self.is_expanded:
             self.render_content()
 
-    DISPLAY_NAMES = {
-        "read": "Read",
-        "create": "Create",
-        "edit": "Edit",
-        "multi_edit": "Edit",
-        "replace_file_content": "Edit",
-        "multi_replace_file_content": "Edit",
-        "replace": "Edit",
-        "multi_replace": "Edit",
-        "write_to_file": "Create",
-        "view_file": "Read",
-        "run_command": "Shell",
-        "shell": "Shell",
-        "bash": "Bash",
-        "glob": "Glob",
-        "grep": "Grep",
-        "list_dir": "ListDir",
-        "ask_user": "AskUser",
-        "skill": "Skill",
-        "manage_task": "ManageTask",
-        "subagent": "Subagent",
-        "invoke_subagent": "InvokeSubagent",
-        "manage_subagent": "ManageSubagent",
-        "task": "Task",
-        "call_mcp": "CallMCP",
-        "call_mcp_tool": "CallMCPTool",
-        "get_mcp_schema": "GetMCPSchema",
-        "web_fetch": "WebFetch",
-        "update_plan": "Plan",
-        "plan": "Plan",
-    }
+    class _DisplayNamesDict(dict):
+        CANONICAL_NAMES = {
+            "read": "Read",
+            "create": "Create",
+            "edit": "Edit",
+            "multi_edit": "Edit",
+            "shell": "Shell",
+            "ask_user": "AskUser",
+            "manage_task": "ManageTask",
+            "invoke_subagent": "InvokeSubagent",
+            "manage_subagent": "ManageSubagent",
+            "web_fetch": "WebFetch",
+            "update_plan": "Plan",
+            "call_mcp": "CallMCP",
+            "get_mcp_schema": "GetMCPSchema",
+        }
 
-    SYSTEM_TOOLS = {
-        "read", "create", "edit", "multi_edit", "shell", "bash", "glob", "grep", "list_dir",
-        "ask_user", "skill", "manage_task", "manage_subagent",
-        "subagent", "invoke_subagent", "task", "web_fetch", "get_mcp_schema",
-        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace",
-        "write_to_file", "view_file", "run_command", "call_mcp",
-        "Read", "Create", "Edit", "MultiEdit", "Shell", "Bash", "Glob", "Grep", "ListDir",
-        "AskUser", "Skill", "ManageTask", "ManageSubagent",
-        "Subagent", "InvokeSubagent", "Task", "WebFetch", "GetMCPSchema", "CallMCP"
-    }
+        def get(self, key, default=None):
+            if not key or not isinstance(key, str):
+                return default
+            from tools.registry import ALIAS_MAP
+            lower = key.lower()
+            canonical = ALIAS_MAP.get(lower, lower)
+            if canonical in self.CANONICAL_NAMES:
+                return self.CANONICAL_NAMES[canonical]
+            if lower in self.CANONICAL_NAMES:
+                return self.CANONICAL_NAMES[lower]
+            parts = canonical.split("_")
+            return "".join(p.capitalize() for p in parts)
+
+        def __getitem__(self, key):
+            res = self.get(key, None)
+            if res is None:
+                raise KeyError(key)
+            return res
+
+        def __contains__(self, key):
+            return True
+
+    class _SystemToolsSet(set):
+        def __contains__(self, item):
+            if not isinstance(item, str):
+                return False
+            from tools.registry import ALIAS_MAP, REGISTRY
+            lower = item.lower()
+            canonical = ALIAS_MAP.get(lower, lower)
+            if canonical in REGISTRY or canonical in ("get_mcp_schema", "call_mcp", "update_plan"):
+                return True
+            return super().__contains__(item) or super().__contains__(lower)
+
+    DISPLAY_NAMES = _DisplayNamesDict()
+    SYSTEM_TOOLS = _SystemToolsSet()
 
     def render_header(self) -> None:
         c = self._get_status_color()
