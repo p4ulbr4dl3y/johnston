@@ -47,7 +47,7 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
 - Verification: Run `johnston --mcp` via shell tool to verify server registration.
 
 ### 2. Custom Subagent Definitions (`johnston --subagents`)
-- Location: `~/.johnston/subagents/definitions/<name>.md` (global) or `.johnston/subagents/<name>.md` (project).
+- Location: `~/.johnston/subagents/definitions/<name>.md` or `.json` (global) or `.johnston/subagents/<name>.md` or `.json` (project).
 - Format: Markdown with YAML frontmatter:
   ```markdown
   ---
