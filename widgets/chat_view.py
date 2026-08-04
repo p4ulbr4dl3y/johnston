@@ -861,7 +861,7 @@ class ToolCallWidget(Vertical):
             "invoke_subagent": "InvokeSubagent",
             "manage_subagent": "ManageSubagent",
             "web_fetch": "WebFetch",
-            "update_plan": "Plan",
+            "update_plan": "UpdatePlan",
             "call_mcp": "CallMCP",
             "get_mcp_schema": "GetMCPSchema",
         }
@@ -916,7 +916,7 @@ class ToolCallWidget(Vertical):
                     target_str = f"[{completed}/{total} completed]"
             else:
                 target_str = "Plan"
-            self.header_label.update(f"[{c}]⚙ [bold]Plan[/bold][/{c}]({escape(target_str)})")
+            self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
         elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
             tool_name = self.args.get("tool") or self.target
             tool_name_snake = to_snake_case(str(tool_name))
