@@ -104,7 +104,7 @@ class StatusFooter(Static):
             if curr_sid:
                 bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
             bash_tasks = [t for t in bg_tasks if not getattr(t, "task_id", "").startswith("subagent-")]
-            active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False)])
+            active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)])
 
             subagents = [t for t in bg_tasks if getattr(t, "task_id", "").startswith("subagent-")]
             subagents_active = len([t for t in subagents if getattr(t, "is_running", False)])
