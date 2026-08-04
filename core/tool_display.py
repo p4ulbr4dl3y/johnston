@@ -20,7 +20,10 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
     concerns. Tool names are matched case-insensitively against the canonical
     lowercase registry names.
     """
-    name = (tool_name or "").lower()
+    from tools.registry import ALIAS_MAP
+
+    raw_name = (tool_name or "").lower()
+    name = ALIAS_MAP.get(raw_name, raw_name)
     args = args or {}
 
     if name == "ask_user":
