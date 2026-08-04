@@ -1273,6 +1273,9 @@ class ToolCallWidget(Vertical):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._check_is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
+                elif raw_text and ("@@" in raw_text or "--- a/" in raw_text or "+++ b/" in raw_text):
+                    formatted_diff = self._format_edit_diff(raw_text, file_path)
+                    self.content_widget.update(formatted_diff)
                 else:
                     content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
                     if content is None:
