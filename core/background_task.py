@@ -35,7 +35,7 @@ def process_carriage_returns(text: str) -> str:
 
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
-    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None):
+    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None, session_id: str = None):
         self.task_id = task_id
         self.command = command
         self.process = process
@@ -48,6 +48,7 @@ class BackgroundTask:
         self.master_fd = master_fd
         self.reader = reader
         self.transport = transport
+        self.session_id = session_id
         self.background_event = asyncio.Event()
 
     def move_to_background(self):
@@ -190,7 +191,7 @@ class BackgroundTask:
 
 class BackgroundSubagent:
     """Manages background subagent"""
-    def __init__(self, task_id: str, description: str, task: asyncio.Task):
+    def __init__(self, task_id: str, description: str, task: asyncio.Task, session_id: str = None):
         self.task_id = task_id
         self.command = f"Subagent: {description}"
         self.process = None
@@ -198,6 +199,7 @@ class BackgroundSubagent:
         self.is_running = True
         self.is_background = True
         self.async_task = task
+        self.session_id = session_id
 
     def kill_sync(self):
         if self.async_task and not self.async_task.done():

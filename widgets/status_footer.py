@@ -100,6 +100,9 @@ class StatusFooter(Static):
                     continue
                 mcp_active += 1
             bg_tasks = getattr(self.app, "background_tasks", [])
+            curr_sid = getattr(self.app, "current_session_id", None)
+            if curr_sid:
+                bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
             bash_tasks = [t for t in bg_tasks if not getattr(t, "task_id", "").startswith("subagent-")]
             active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False)])
 

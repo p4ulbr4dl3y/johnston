@@ -42,8 +42,16 @@ class NewCommand(BaseCommand):
     description = "Start a new chat session"
 
     async def execute(self, app) -> None:
-        for w in [w for w in app.workers if w.is_running]:
+        import asyncio
+        for w in [w for w in getattr(app, "workers", []) if w.is_running]:
             w.cancel()
+        for task in getattr(app, "background_tasks", []):
+            if hasattr(task, "kill_sync"):
+                task.kill_sync()
+            elif hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
+                asyncio.create_task(task.kill())
+        if hasattr(app, "background_tasks"):
+            app.background_tasks.clear()
         # Reset generation state synchronously: cancelled workers clear is_generating
         # in their own finally, but that runs asynchronously, so /new could leave the
         # app stuck "generating" and swallow subsequent input into the queue.
@@ -327,7 +335,13 @@ class TasksCommand(BaseCommand):
     description = "Manage background tasks"
 
     async def execute(self, app) -> None:
-        if not app.background_tasks:
+        all_tasks = getattr(app, "background_tasks", [])
+        curr_sid = getattr(app, "current_session_id", None)
+        if curr_sid:
+            tasks = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+        else:
+            tasks = all_tasks
+        if not tasks:
             app.notify("No active background tasks", severity="warning")
             return
         app.push_screen(TasksListScreen())

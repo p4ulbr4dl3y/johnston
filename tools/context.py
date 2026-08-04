@@ -24,6 +24,11 @@ class ToolContext:
 
     def add_background_task(self, task: Any) -> None:
         if self.app and hasattr(self.app, "background_tasks"):
+            if getattr(task, "session_id", None) is None and hasattr(task, "__dict__"):
+                try:
+                    setattr(task, "session_id", getattr(self.app, "current_session_id", None))
+                except AttributeError:
+                    pass
             self.app.background_tasks.append(task)
         self.refresh_status()
 
