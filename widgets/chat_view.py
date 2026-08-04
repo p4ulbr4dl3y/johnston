@@ -5,6 +5,8 @@ import json
 import os
 import re
 import warnings
+
+from core.config import IMAGE_EXTENSIONS
 from typing import Any
 from urllib.parse import urlparse
 
@@ -596,7 +598,7 @@ class ToolCallWidget(Vertical):
         "Create", "Edit", "MultiEdit", "Shell", "Bash", "Plan", "CallMCPTool", "CallMCP"
     }
 
-    IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".svg"}
+    IMAGE_EXTENSIONS = IMAGE_EXTENSIONS
 
     def is_expandable(self) -> bool:
         try:

@@ -4,6 +4,8 @@ from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
+from core.config import IMAGE_EXTENSIONS
+
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
 
@@ -128,7 +130,7 @@ class ChatInput(TextArea):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
 
-    IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
+    IMAGE_EXTENSIONS = IMAGE_EXTENSIONS
 
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
@@ -283,7 +285,7 @@ class ChatInput(TextArea):
         exists = await asyncio.to_thread(os.path.exists, expanded)
         is_existing_image_path = (
             exists
-            and any(expanded.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff"))
+            and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
         )
 
         if not is_existing_image_path and not event.text.strip():

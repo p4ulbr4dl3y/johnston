@@ -1,3 +1,4 @@
+import inspect
 from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
@@ -85,7 +86,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     clean_name = raw_name.lower()
     resolved_name = ALIAS_MAP.get(clean_name, clean_name)
 
-    tool_cls = REGISTRY.get(resolved_name) or REGISTRY.get(clean_name)
+    tool_cls = REGISTRY.get(resolved_name)
     if tool_cls:
         try:
             tool_inst = tool_cls()
@@ -99,7 +100,8 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     # Check if the tool is an active MCP tool
     if hasattr(mcp_mgr, "get_active_tools_async") and not type(mcp_mgr).__name__.endswith("Mock"):
-        active_mcp_tools = await mcp_mgr.get_active_tools_async(mode=None)
+        res_or_coro = mcp_mgr.get_active_tools_async(mode=None)
+        active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
     else:
         active_mcp_tools = mcp_mgr.get_active_tools(mode=None) or []
     is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(mcp_mgr.get_capabilities_for_exposed_tool(name))
@@ -125,13 +127,12 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if clean_name in disallowed or resolved_name in disallowed:
         return f"Error: Tool '{name}' is disabled in {mode_def.name} mode."
 
-    import inspect
     import unittest.mock
     try:
-        if isinstance(mcp_mgr, unittest.mock.Mock) or not hasattr(mcp_mgr, "call_tool_async"):
-            res_or_coro = mcp_mgr.call_tool(name, args)
-        else:
+        if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
             res_or_coro = mcp_mgr.call_tool_async(name, args)
+        else:
+            res_or_coro = mcp_mgr.call_tool(name, args)
         mcp_res = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
         if mcp_res is not None:
             return mcp_res

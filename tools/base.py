@@ -6,15 +6,11 @@ from typing import Any, Dict
 from tools.context import ToolContext
 
 
-def resolve_workspace_path(path_str: str | None = None, *, root: str | None = None) -> str:
-    if not path_str:
-        return os.path.realpath(root or os.getcwd())
-    return os.path.abspath(os.path.expanduser(path_str))
-
-
 def resolve_path(path_str: str | None = None) -> str:
     """Resolves a path to an absolute path."""
-    return resolve_workspace_path(path_str)
+    if not path_str:
+        return os.path.realpath(os.getcwd())
+    return os.path.abspath(os.path.expanduser(path_str))
 
 
 def atomic_write_text(path: str, content: str) -> None:
