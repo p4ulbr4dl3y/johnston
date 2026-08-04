@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -378,7 +379,7 @@ def main():
         except Exception:
             pass
 
-    sys.exit(0)
+    os._exit(0)
 
 
 if __name__ == "__main__":
