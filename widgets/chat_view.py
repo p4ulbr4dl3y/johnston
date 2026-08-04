@@ -72,6 +72,7 @@ class CustomMarkdownTableContent(MarkdownTableContent):
                 new_cells.append(
                     Static(
                         cell,
+                        markup=False,
                         classes=f"row{row_index} cell",
                     )
                 )
@@ -332,9 +333,9 @@ class UserMessage(Horizontal):
     """User message"""
     can_focus = False
 
-    def __init__(self, content: str):
+    def __init__(self, content: str, markup: bool = False):
         self.raw_text = content
-        super().__init__(Static(content, classes="user-msg-bubble"), classes="user-msg")
+        super().__init__(Static(content, markup=markup, classes="user-msg-bubble"), classes="user-msg")
 
 
 class BotMessage(Vertical):
@@ -346,7 +347,7 @@ class BotMessage(Vertical):
 
     def __init__(self):
         super().__init__(classes="bot-msg")
-        self.stream_widget = Static("", classes="bot-msg-stream")
+        self.stream_widget = Static("", markup=False, classes="bot-msg-stream")
         self.md_widget = Markdown("")
         self._streaming = False
         self._stream_update_scheduled = False
@@ -495,7 +496,7 @@ class ThinkingWidget(Vertical):
         self.is_expanded = False
 
         self.header_label = Label("Thinking...", classes="thinking-header")
-        self.content_widget = Static("", classes="thinking-content")
+        self.content_widget = Static("", markup=False, classes="thinking-content")
 
     @property
     def md_widget(self) -> Static:
@@ -1645,11 +1646,11 @@ class ChatView(VerticalScroll):
         if attachments:
             att_count = len(attachments)
             img_s = "s" if att_count > 1 else ""
-            display_text = f"{text}\n[not bold dim #a1a1aa]└─ {att_count} image{img_s} attached[/not bold dim #a1a1aa]"
+            display_text = f"{text}\n└─ {att_count} image{img_s} attached"
         else:
             display_text = text
 
-        msg = UserMessage(display_text)
+        msg = UserMessage(display_text, markup=False)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(msg)
