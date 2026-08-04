@@ -359,9 +359,40 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(screen.q_idx, 0)
             self.assertEqual(input_field.value, "abc")
 
+    async def test_write_in_input_cleared_between_questions(self):
+        from textual.widgets import Input
+
+        from widgets.screens.ask_user import AskUserWizardScreen
+
+        questions = [
+            {"question_text": "Q1", "options": ["Opt1"]},
+            {"question_text": "Q2", "options": ["Opt2"]}
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            # Highlight Write-in on Q1 and type text
+            await pilot.press("down")  # Write-in...
+            await pilot.pause()
+            screen.focus_write_in_input()
+            await pilot.pause()
+            await pilot.press("f", "o", "o")
+            await pilot.pause()
+            screen._mount_time = 0
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Q2 now active
+            self.assertEqual(screen.q_idx, 1)
+            input_field = screen.query_one("#write-in-input", Input)
+            self.assertEqual(input_field.value, "")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
