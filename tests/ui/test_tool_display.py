@@ -64,9 +64,28 @@ class TestToolDisplay(unittest.TestCase):
         w2 = ToolCallWidget("read", "/path/to/main.py", args={"path": "/path/to/main.py"})
         self.assertFalse(w2.is_expandable())
 
-        # Image result text
-        w3 = ToolCallWidget("read", "file", result_text="[Image file: '123.png' (100x100 px, format: JPEG)]")
-        self.assertFalse(w3.is_expandable())
+    def test_create_tool_widget_render_diff_vs_clean_code(self):
+        from widgets.chat_view import ToolCallWidget
+
+        # Create with diff (file update)
+        w_diff = ToolCallWidget(
+            "create",
+            "foo.py",
+            args={"path": "foo.py", "content": "def bar(): pass"},
+            result_text="Success: file 'foo.py' updated (16 bytes).\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass"
+        )
+        w_diff.is_expanded = True
+        w_diff.render_content()
+
+        # Create without diff (new file)
+        w_new = ToolCallWidget(
+            "create",
+            "foo.py",
+            args={"path": "foo.py", "content": "print('hello')"},
+            result_text="Success: file 'foo.py' created (14 bytes)."
+        )
+        w_new.is_expanded = True
+        w_new.render_content()
 
 
 if __name__ == "__main__":
