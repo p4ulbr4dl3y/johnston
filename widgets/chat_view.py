@@ -639,10 +639,18 @@ class ToolCallWidget(Vertical):
         self.md_widget = Markdown("", classes="tool-content-md")
         self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes="tool-scroll-box")
 
+    def _clean_hints_for_ui(self, text: str) -> str:
+        if not text:
+            return ""
+        cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
+        cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
+        return cleaned.strip()
+
     def _clean_markup_text(self, text: str) -> str:
         if not text:
             return ""
-        clean = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', text)
+        clean = self._clean_hints_for_ui(text)
+        clean = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
         return escape(clean)
 
     def _try_parse_json(self, text: str) -> Any:
@@ -1048,6 +1056,7 @@ class ToolCallWidget(Vertical):
         return t + Text("\n").join(plan_lines)
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
+        diff_text = self._clean_hints_for_ui(diff_text)
         if "[Linter Feedback]:" in diff_text:
             diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
 
@@ -1481,14 +1490,14 @@ class ToolCallWidget(Vertical):
                 except Exception:
                     self.content_widget.update(self._clean_markup_text(full_display))
             elif self.tool_type in ("call_mcp", "CallMCP", "call_mcp_tool", "CallMCPTool"):
-                clean_res = (self.result_text or "(No result)").strip()
+                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
                 syntax = self._format_json_result(clean_res)
                 if syntax:
                     self.content_widget.update(syntax)
                 else:
                     self.content_widget.update(self._clean_markup_text(clean_res))
             else:
-                clean_res = (self.result_text or "(No result)").strip()
+                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
                 syntax = self._format_json_result(clean_res)
                 if syntax:
                     self.content_widget.update(syntax)
