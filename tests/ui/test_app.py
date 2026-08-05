@@ -353,6 +353,35 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(queued_item), 4)
             self.assertEqual(queued_item[3], "sess_bg_123")
 
+    async def test_queued_system_notification_does_not_show_in_ui(self):
+        from unittest.mock import MagicMock
+
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+
+        async def dummy_stream(prompt, attachments=None):
+            yield ("text", "OK response", "")
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.1)
+            app.pm.is_provider_connected = MagicMock(return_value=True)
+            app.pm.get_active_provider_key = MagicMock(return_value="openai")
+            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+            agent.stream_steps = dummy_stream
+            app.agent = agent
+            app.pm.create_active_agent = MagicMock(return_value=agent)
+
+            app.is_generating = True
+            app.on_background_shell_completed("task_1", "ls", "file.txt")
+            app.is_generating = False
+
+            app.message_queue.append((app.message_queue.pop(0)))
+            # Draining queue should execute generate_ai_response with show_in_ui=False
+            queued = [app.message_queue.pop(0)]
+            should_show = any(item[1] for item in queued if len(item) > 1 and item[1] is not None)
+            self.assertFalse(should_show)
+
     async def test_exception_clears_queue(self):
         from unittest.mock import MagicMock
 

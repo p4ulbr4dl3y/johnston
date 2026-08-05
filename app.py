@@ -739,8 +739,9 @@ class JohnstonApp(App):
                     if atts:
                         all_atts.extend(atts)
                 combined_atts = all_atts if all_atts else None
-                self._rendering_queued_item = True
-                self.generate_ai_response(combined_prompt, show_in_ui=True, attachments=combined_atts)
+                should_show = any(item[1] for item in queued_items if len(item) > 1 and item[1] is not None)
+                self._rendering_queued_item = should_show
+                self.generate_ai_response(combined_prompt, show_in_ui=should_show, attachments=combined_atts)
             else:
                 self.is_generating = False
                 self._has_rendered_queue_divider = False
