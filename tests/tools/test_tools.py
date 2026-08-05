@@ -335,6 +335,27 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: target not found", res)
         self.assertIn("Target content was found elsewhere around line 3", res)
 
+    async def test_edit_tool_end_line_auto_expansion(self):
+        from tools.edit import EditTool
+        file_path = os.path.join(self.test_dir, "auto_expand.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("def sample():\n    a = 1\n    b = 2\n    c = 3\n    return a + b + c\n")
+
+        tool = EditTool()
+        # target_content is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
+        res = await tool.execute({
+            "target_file": file_path,
+            "target_content": "    a = 1\n    b = 2\n    c = 3",
+            "replacement_content": "    a = 10\n    b = 20\n    c = 30",
+            "start_line": 2,
+            "end_line": 3
+        })
+        self.assertNotIn("ERR:", res)
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("a = 10", content)
+        self.assertIn("b = 20", content)
+
     async def test_multi_replace_file_content(self):
         file_path = os.path.join(self.test_dir, "multi_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
