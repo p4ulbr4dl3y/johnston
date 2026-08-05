@@ -32,12 +32,16 @@ def print_models():
     pm = ProviderManager()
     providers = pm.load_providers()
     active_key = pm.get_active_provider_key()
-    print("Available Johnston Providers & Models:\n")
+    print("Available Johnston Providers & Models:")
+    items = []
     for key, info in providers.items():
         api_key = pm.get_api_key(key) or info.get("api_key", "")
         models = info.get("models") or ([info["model"]] if info.get("model") else [])
         if not api_key and not models:
             continue
+        items.append((key, info, api_key, models))
+
+    for idx, (key, info, api_key, models) in enumerate(items):
         is_active = "*" if key == active_key else " "
         name = info.get("name") or key
         model = info.get("model") or (models[0] if models else "not configured")
@@ -51,7 +55,8 @@ def print_models():
             print(f"    Models: {', '.join(models[:5])}{' ...' if len(models) > 5 else ''}")
         if base_url:
             print(f"    Base URL: {base_url}")
-        print()
+        if idx < len(items) - 1:
+            print()
 
 
 def print_skills():
@@ -59,18 +64,19 @@ def print_skills():
     from core.skill_manager import SkillManager
 
     skills = SkillManager().list_skills()
-    print("Available Johnston Skills:\n")
+    print("Available Johnston Skills:")
     if not skills:
         print("  No skills found (~/.johnston/skills/ or .johnston/skills/)")
         return
-    for s in skills:
+    for idx, s in enumerate(skills):
         scope = f"[{s.get('scope', 'global')}]"
         hidden = " [hidden]" if s.get("hidden") else ""
         name = s.get("name", "unnamed")
         print(f"  * {name} {scope}{hidden}")
         if s.get("path"):
             print(f"    Path: {s.get('path')}")
-        print()
+            if idx < len(skills) - 1:
+                print()
 
 
 def print_mcp():
@@ -79,7 +85,7 @@ def print_mcp():
 
     mgr = get_mcp_manager()
     servers = mgr.load_servers()
-    print("Configured MCP Servers:\n")
+    print("Configured MCP Servers:")
     if not servers:
         print("  No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)")
         return
@@ -95,7 +101,7 @@ def print_mcp():
     except Exception:
         pass
 
-    for s in servers:
+    for idx, s in enumerate(servers):
         disabled = s.get("disabled", False)
         status = "[disabled]" if disabled else "[active]"
         scope = f"[{s.get('scope', 'global')}]"
@@ -116,7 +122,8 @@ def print_mcp():
         print(f"    {cmd_str}")
 
         if disabled:
-            print()
+            if idx < len(servers) - 1:
+                print()
             continue
 
         tools = tools_by_server.get(name, [])
@@ -133,43 +140,52 @@ def print_mcp():
                 print("    Error: Server configuration missing 'command' or 'url'")
             else:
                 print("    Error: No tools reported or server failed to respond")
-        print()
+
+        if idx < len(servers) - 1:
+            print()
 
 
 def print_rules():
     """Print active project instructions and rules summary to stdout"""
     from core.rules_manager import RulesManager
 
-    print("Active Rules & Project Instructions:\n")
+    print("Active Rules & Project Instructions:")
     cwd = Path.cwd()
     instruction_files = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
-    found_any = False
 
+    items = []
     for name in instruction_files:
         filepath = cwd / name
         if filepath.is_file():
             try:
                 size = filepath.stat().st_size
-                print(f"  * {name} [project instruction]")
-                print(f"    Path: {filepath} ({size} bytes)")
-                print()
-                found_any = True
+                items.append(("file", name, filepath, size))
             except Exception:
                 pass
 
     rules = RulesManager.get_instance().load_rules()
     for r in rules:
-        scope = f"[{r.source}]"
-        print(f"  * {r.name} [rule] {scope}")
-        if r.modes:
-            print(f"    Modes: {', '.join(r.modes)}")
-        if r.globs:
-            print(f"    Globs: {', '.join(r.globs)}")
-        print()
-        found_any = True
+        items.append(("rule", r.name, r.source, r.modes, r.globs))
 
-    if not found_any:
+    if not items:
         print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .johnston/rules/).")
+        return
+
+    for idx, item in enumerate(items):
+        if item[0] == "file":
+            _, name, filepath, size = item
+            print(f"  * {name} [project instruction]")
+            print(f"    Path: {filepath} ({size} bytes)")
+        else:
+            _, r_name, r_source, r_modes, r_globs = item
+            scope = f"[{r_source}]"
+            print(f"  * {r_name} [rule] {scope}")
+            if r_modes:
+                print(f"    Modes: {', '.join(r_modes)}")
+            if r_globs:
+                print(f"    Globs: {', '.join(r_globs)}")
+        if idx < len(items) - 1:
+            print()
 
 
 def print_modes():
@@ -177,37 +193,31 @@ def print_modes():
     from core.mode_manager import ModeManager
 
     modes = ModeManager.get_instance().load_modes()
-    print("Available Agent Execution Modes:\n")
-    for key, m in modes.items():
+    print("Available Agent Execution Modes:")
+    mode_list = list(modes.items())
+    for idx, (key, m) in enumerate(mode_list):
         ro_str = " (read-only)" if m.read_only else ""
-        print(f"  • {m.name} ({m.key}){ro_str} [{m.source}]")
+        print(f"  * {m.name} ({m.key}){ro_str} [{m.source}]")
         if m.disallowed_tools:
             print(f"    Disallowed tools: {', '.join(m.disallowed_tools)}")
-        print()
+        if idx < len(mode_list) - 1 and m.disallowed_tools:
+            print()
 
 
 def print_subagents():
-    """Print available subagent definitions and sessions to stdout"""
+    """Print available subagent definitions to stdout"""
     from core.subagent_registry import SubagentRegistry
-    from core.subagent_tracker import SubagentTracker
 
     registry = SubagentRegistry.get_instance()
     defs = registry.list_definitions()
     print("Available Subagent Definitions:")
+    if not defs:
+        print("  No subagent definitions found.")
+        return
     for dname, dval in defs.items():
         tools_str = f" | Tools: {', '.join(dval.tools)}" if dval.tools else ""
         model_str = f" | Model: {dval.model}" if dval.model else ""
-        print(f"  • {dname} [{dval.source}]{tools_str}{model_str}")
-
-    tracker = SubagentTracker.get_instance()
-    sessions = list(tracker.sessions.values())
-    if sessions:
-        print("\nRegistered Subagent Sessions (last 10):")
-        for sess in sessions[-10:]:
-            print(
-                f"  • ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
-            )
-    print()
+        print(f"  * {dname} [{dval.source}]{tools_str}{model_str}")
 
 
 def run_headless_prompt(
