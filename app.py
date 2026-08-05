@@ -553,6 +553,9 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
+            if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
+                self._has_rendered_queue_divider = True
+                await chat_view.add_compaction_divider("Queued Messages")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
         await self.save_current_session_async()
@@ -735,10 +738,12 @@ class JohnstonApp(App):
                 q_prompt = queued_next[0]
                 q_show = queued_next[1] if len(queued_next) > 1 else False
                 q_atts = queued_next[2] if len(queued_next) > 2 else None
+                self._rendering_queued_item = True
                 self.generate_ai_response(q_prompt, show_in_ui=q_show, attachments=q_atts)
             else:
                 self.is_generating = False
                 self._has_rendered_queue_divider = False
+                self._rendering_queued_item = False
                 try:
                     chat_view.remove_queued_divider()
                 except Exception:
