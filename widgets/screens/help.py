@@ -11,8 +11,6 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 * `/thinking` — Set reasoning effort / thinking budget
 * `/new` — Start a new chat session
 * `/compact` — Compact session conversation history
-* `/handoff` — Generate session handoff summary
-* `/init` — Guided `AGENTS.md` project setup
 * `/subagents` — View and manage active subagents
 * `/tasks` — View and manage background tasks
 * `/skills` — Browse and activate available skills

@@ -90,9 +90,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
         self.assertEqual(res_shell.strip(), "hello shell")
 
-    def test_init_and_compact_commands_registered(self):
+    def test_compact_command_registered(self):
         from core.commands import COMMAND_REGISTRY
-        self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/compact", COMMAND_REGISTRY)
 
 
