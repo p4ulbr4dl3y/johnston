@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.17.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.16.0...johnston-v0.17.0) (2026-08-05)
+
+
+### Features
+
+* **skills:** convert /init and /handoff commands to global skills ([f5f6fcf](https://github.com/p4ulbr4dl3y/johnston/commit/f5f6fcfd8b47afdb5d2d69d3d8c389598bb748ca))
+* **tools:** enforce file read verification before create and edit ([872b3b5](https://github.com/p4ulbr4dl3y/johnston/commit/872b3b516bab214410812bd4663f686805dd8090))
+* **ui:** persist global prompt history across sessions ([0067319](https://github.com/p4ulbr4dl3y/johnston/commit/006731958e2db21be25bb3f5ce8c2a3a88563bc0))
+
+
+### Bug Fixes
+
+* **cli:** prevent headless hang on shutdown and non-tty stdin ([296425b](https://github.com/p4ulbr4dl3y/johnston/commit/296425b034a0d350c2f75b86f1c0507b58e373b5))
+* **providers:** handle data-wrapped responses from clinepass ([4583a7c](https://github.com/p4ulbr4dl3y/johnston/commit/4583a7ce645d887bb5ac4ebdce6dbc3c80f17a45))
+* **skills:** support multiline YAML block scalars in frontmatter parsing ([27f0eb0](https://github.com/p4ulbr4dl3y/johnston/commit/27f0eb02b492f03de11341caa040ee16e478c50b))
+* **tools:** auto-expand end_line for multi-line targets in edit tool ([1c034bd](https://github.com/p4ulbr4dl3y/johnston/commit/1c034bda15e308af330756ee624b293fb27b897b))
+* **ui:** display only background tasks in task manager ([fdded33](https://github.com/p4ulbr4dl3y/johnston/commit/fdded33be14ecaf6e46263f5314a4231469cb94a))
+* **ui:** filter non-background tasks before opening tasks screen ([3aaabf4](https://github.com/p4ulbr4dl3y/johnston/commit/3aaabf4660945d9175851214050c313da0107fc8))
+* **ui:** strip OK status headers and system noise from tool diff views ([8fc8fcc](https://github.com/p4ulbr4dl3y/johnston/commit/8fc8fccdd476a8d8fc3c713813dbacb404b597cd))
+
 ## [0.16.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.15.0...johnston-v0.16.0) (2026-08-05)
 
 
