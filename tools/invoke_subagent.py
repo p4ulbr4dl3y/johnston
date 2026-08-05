@@ -185,7 +185,7 @@ class InvokeSubagentTool(BaseTool):
                     for t in ctx.background_tasks:
                         if getattr(t, "task_id", "") == task_id:
                             t.is_running = False
-                    ctx.notify(f"Background subagent completed (ID: {task_id})")
+
                     ctx.refresh_status()
 
                     log_file = os.path.join(tracker.storage_dir, f"{task_id}.json")
@@ -202,7 +202,7 @@ class InvokeSubagentTool(BaseTool):
             curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
             bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)
             ctx.add_background_task(bg_sub)
-            ctx.notify(f"Subagent launched in background (ID: {task_id})")
+
 
             return f"OK: subagent '{description}' launched ({task_id})"
         else:
