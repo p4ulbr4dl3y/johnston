@@ -338,6 +338,33 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sanitized[3]["role"], "user")
         self.assertIn("orphan content", sanitized[3]["content"])
 
+    async def test_sanitize_history_interrupted_tool_calls(self):
+        agent = BaseAgent(api_key="test", model="non-vision-model", base_url="http://test", provider_key="opencode")
+        self.addAsyncCleanup(agent.close)
+
+        history = [
+            {"role": "user", "content": "Run tools"},
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "call_1", "function": {"name": "read"}},
+                {"id": "call_2", "function": {"name": "shell"}}
+            ]},
+            {"role": "user", "content": "Next question"}
+        ]
+
+        sanitized = agent.sanitize_history_for_model(history)
+        # Should inject 2 synthetic tool responses for call_1 and call_2 before the User message
+        self.assertEqual(len(sanitized), 5)
+        self.assertEqual(sanitized[0]["role"], "user")
+        self.assertEqual(sanitized[1]["role"], "assistant")
+        self.assertEqual(sanitized[2]["role"], "tool")
+        self.assertEqual(sanitized[2]["tool_call_id"], "call_1")
+        self.assertIn("interrupted or cancelled", sanitized[2]["content"])
+        self.assertEqual(sanitized[3]["role"], "tool")
+        self.assertEqual(sanitized[3]["tool_call_id"], "call_2")
+        self.assertIn("interrupted or cancelled", sanitized[3]["content"])
+        self.assertEqual(sanitized[4]["role"], "user")
+        self.assertEqual(sanitized[4]["content"], "Next question")
+
     def test_default_max_tokens_is_8192(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", system_prompt="t", provider_key="p")
         self.addAsyncCleanup(agent.close)
