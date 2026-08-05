@@ -554,7 +554,7 @@ class JohnstonApp(App):
         if show_in_ui:
             if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
                 self._has_rendered_queue_divider = True
-                await chat_view.add_compaction_divider("Queued Messages")
+                await chat_view.add_compaction_divider("Queued Message")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
         bot_msg = None
