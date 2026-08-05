@@ -112,3 +112,37 @@ class SubagentRegistry:
 
     def list_definitions(self) -> Dict[str, SubagentDefinition]:
         return self.definitions
+
+    def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
+        self.reload(project_dir=project_dir)
+        if not self.definitions:
+            return ""
+
+        builtins = []
+        globals_list = []
+        project_list = []
+
+        for defn in self.definitions.values():
+            tools_str = f" (Tools: {', '.join(defn.tools)})" if defn.tools else ""
+            desc = f": {defn.description}" if defn.description else ""
+            line = f"- `{defn.name}`{desc}{tools_str}"
+            if defn.source == "builtin":
+                builtins.append(line)
+            elif defn.source == "global":
+                globals_list.append(line)
+            elif defn.source == "project":
+                project_list.append(line)
+
+        lines = ["## Subagents (use as `subagent_type` in `invoke_subagent`)"]
+        if builtins:
+            lines.append("\n### Builtin")
+            lines.extend(builtins)
+        if globals_list:
+            lines.append("\n### Global (`~/.johnston/subagents/definitions/<name>.md`)")
+            lines.extend(globals_list)
+        if project_list:
+            lines.append("\n### Project (`.johnston/subagents/<name>.md`)")
+            lines.extend(project_list)
+
+        return "\n".join(lines)
+
