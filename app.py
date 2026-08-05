@@ -491,26 +491,15 @@ class JohnstonApp(App):
             self.notify(f"Error executing command: {e}", severity="error")
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Render queued message in UI immediately under 'Queued Messages' divider."""
+        """Queue message to be executed after current turn finishes."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
+        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
-            need_divider = not getattr(self, "_has_rendered_queue_divider", False)
-            if need_divider:
-                self._has_rendered_queue_divider = True
-
-            async def _render():
-                try:
-                    chat_view = self.query_one(ChatView)
-                    if need_divider:
-                        await chat_view.add_compaction_divider("Queued Messages")
-                    await chat_view.add_user_message(prompt, attachments=attachments)
-                    self.notify("Message queued", severity="info")
-                except Exception as e:
-                    print(f"Error rendering queued message in UI: {e}")
-
-            asyncio.create_task(_render())
+            try:
+                self.notify("Message queued", severity="info")
+            except Exception:
+                pass
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -547,7 +536,6 @@ class JohnstonApp(App):
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
-        self._has_rendered_queue_divider = False
         act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
         is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
         if not is_connected or not getattr(self.agent, "model", ""):
@@ -564,9 +552,12 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
+            if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
+                self._has_rendered_queue_divider = True
+                await chat_view.add_compaction_divider("Queued Messages")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
-        bot_msg = await chat_view.add_bot_message()
+        bot_msg = None
 
         await self.save_current_session_async()
         curr_sid = getattr(self, "current_session_id", None)
