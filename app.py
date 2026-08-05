@@ -491,24 +491,15 @@ class JohnstonApp(App):
             self.notify(f"Error executing command: {e}", severity="error")
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Render queued message in UI immediately with 'Queued Messages' divider if needed, and queue item."""
+        """Queue message to be executed sequentially after current generation finishes."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
+        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
-            need_divider = not getattr(self, "_has_rendered_queue_divider", False)
-            if need_divider:
-                self._has_rendered_queue_divider = True
-
-            async def _render():
-                try:
-                    chat_view = self.query_one(ChatView)
-                    if need_divider:
-                        await chat_view.add_compaction_divider("Queued Messages")
-                    await chat_view.add_user_message(prompt, attachments=attachments)
-                except Exception as e:
-                    print(f"Error rendering queued message in UI: {e}")
-            asyncio.create_task(_render())
+            try:
+                self.notify("Message queued", severity="info")
+            except Exception:
+                pass
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""

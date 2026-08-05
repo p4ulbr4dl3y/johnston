@@ -129,13 +129,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             await app.on_chat_input_submitted(FakeEvent())
             self.assertEqual(len(app.message_queue), 1)
-            self.assertEqual(app.message_queue[0][:2], ("Queued message", False))
+            self.assertEqual(app.message_queue[0][:2], ("Queued message", True))
 
-    async def test_message_queue_rendering_and_compaction_divider(self):
+    async def test_message_queue_rendering_sequence(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
             app.is_generating = True
-            chat_view = app.query_one(ChatView)
 
             class FakeEvent1:
                 value = "First queued message"
@@ -143,24 +142,15 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await app.on_chat_input_submitted(FakeEvent1())
             await pilot.pause(0.1)
 
-            dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Queued Messages"]
-            self.assertEqual(len(dividers), 1)
-
-            user_msgs = [c.raw_text for c in chat_view.children if getattr(c, "raw_text", None)]
-            self.assertIn("First queued message", user_msgs)
-
             class FakeEvent2:
                 value = "Second queued message"
 
             await app.on_chat_input_submitted(FakeEvent2())
             await pilot.pause(0.1)
 
-            dividers2 = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Queued Messages"]
-            self.assertEqual(len(dividers2), 1)
-
-            user_msgs2 = [c.raw_text for c in chat_view.children if getattr(c, "raw_text", None)]
-            self.assertIn("Second queued message", user_msgs2)
             self.assertEqual(len(app.message_queue), 2)
+            self.assertEqual(app.message_queue[0][0], "First queued message")
+            self.assertEqual(app.message_queue[1][0], "Second queued message")
 
     async def test_generate_ai_response_queue_draining_and_attachments(self):
         from unittest.mock import MagicMock, patch
