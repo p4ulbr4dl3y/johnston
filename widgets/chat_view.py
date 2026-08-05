@@ -1723,6 +1723,31 @@ class ChatView(VerticalScroll):
             if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
                 child.remove()
 
+    def update_queued_divider_position(self, first_queued_text: str | None) -> None:
+        """Ensure 'Queued Messages' divider sits right before the first unstarted queued user message."""
+        queued_divider = None
+        for child in list(self.children):
+            if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
+                queued_divider = child
+                break
+
+        if first_queued_text is None:
+            if queued_divider:
+                queued_divider.remove()
+            return
+
+        target_user_msg = None
+        for child in self.children:
+            if isinstance(child, UserMessage) and getattr(child, "raw_text", "") == first_queued_text:
+                target_user_msg = child
+                break
+
+        if target_user_msg is not None:
+            if queued_divider is None:
+                queued_divider = CompactionDivider("Queued Messages")
+
+            self.mount(queued_divider, before=target_user_msg)
+
     def get_user_messages(self) -> list[tuple[int, str]]:
         result = []
         for idx, child in enumerate(self.children):

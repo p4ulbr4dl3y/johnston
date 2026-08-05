@@ -749,6 +749,13 @@ class JohnstonApp(App):
                 q_show = queued_next[1] if len(queued_next) > 1 else False
                 q_atts = queued_next[2] if len(queued_next) > 2 else None
                 self._rendering_queued_item = True
+
+                next_queued_prompt = self.message_queue[0][0] if self.message_queue else None
+                try:
+                    chat_view.update_queued_divider_position(next_queued_prompt)
+                except Exception:
+                    pass
+
                 self.generate_ai_response(q_prompt, show_in_ui=q_show, attachments=q_atts)
             else:
                 self.is_generating = False
