@@ -162,14 +162,19 @@ def apply_chunk_replacements(
             start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
             end_idx = e_line if (e_line and e_line <= len(lines)) else len(lines)
 
-            sub_lines = lines[start_idx:end_idx]
+            target_line_count = len(target.splitlines()) if target.splitlines() else 1
+            effective_end_idx = max(end_idx, start_idx + target_line_count)
+
+            sub_lines = lines[start_idx:effective_end_idx]
             sub_text = "".join(sub_lines)
 
             actual_target, actual_replacement = find_actual_target_and_replacement(sub_text, target, replacement)
 
             count = sub_text.count(actual_target)
             if count == 0:
-                target_first_line = target.splitlines()[0] if target.splitlines() else target
+                current_text = "".join(lines)
+                actual_target_full, _ = find_actual_target_and_replacement(current_text, target, replacement)
+                target_first_line = actual_target_full.splitlines()[0] if actual_target_full.splitlines() else actual_target_full
                 found_line = None
                 for l_no, line_str in enumerate(lines, start=1):
                     if target_first_line in line_str:
@@ -191,9 +196,10 @@ def apply_chunk_replacements(
             sub_replacement_lines = new_sub_text.splitlines(keepends=True)
             if sub_text.endswith(("\n", "\r")) and sub_replacement_lines and not sub_replacement_lines[-1].endswith(("\n", "\r")):
                 sub_replacement_lines[-1] += "\n"
-            lines[start_idx:end_idx] = sub_replacement_lines
+            lines[start_idx:effective_end_idx] = sub_replacement_lines
 
         else:
+            current_text = "".join(lines)
             actual_target, actual_replacement = find_actual_target_and_replacement(current_text, target, replacement)
 
             count = current_text.count(actual_target)
