@@ -142,7 +142,7 @@ class ModelsCommand(BaseCommand):
             if not connected:
                 await ProvidersCommand().execute(app)
                 return
-            app.notify("Could not fetch models for connected provider: check API key or network connection", severity="warning")
+            app.notify("Failed to fetch models: check API key or network connection", severity="warning")
             return
 
         curr_provider = app.pm.get_active_provider_key()
