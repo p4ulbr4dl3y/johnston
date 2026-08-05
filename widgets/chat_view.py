@@ -132,7 +132,8 @@ class CustomMarkdownFence(MarkdownFence):
             except Exception:
                 target_lexer = "text"
 
-        code_content = Syntax(self.code, lexer=target_lexer, theme=self.theme, word_wrap=False)
+        theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or "monokai"
+        code_content = Syntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False)
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
         with Vertical(classes="fence-scroll-box"):

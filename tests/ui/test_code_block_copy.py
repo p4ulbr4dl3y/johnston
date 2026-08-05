@@ -28,6 +28,20 @@ class TestCodeBlockCopy(unittest.TestCase):
         fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
         self.assertFalse(fence.allow_horizontal_scroll)
 
+    def test_custom_markdown_fence_compose_without_theme(self):
+        from textual._context import active_app
+        mock_app = MagicMock()
+        mock_app._compose_stacks = [[]]
+        token = active_app.set(mock_app)
+        try:
+            fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
+            fence.lexer = "python"
+            fence.code = "print(1)"
+            res = list(fence.compose())
+            self.assertTrue(len(res) > 0)
+        finally:
+            active_app.reset(token)
+
 
 if __name__ == "__main__":
     unittest.main()
