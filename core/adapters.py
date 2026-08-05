@@ -141,9 +141,16 @@ class OpenAIAdapter(BaseApiAdapter):
                     "total_tokens": getattr(u, "total_tokens", 0) or 0,
                     "cache_read_tokens": cache_read,
                 })
-            if not chunk.choices:
+            choices = getattr(chunk, "choices", None)
+            if not choices and hasattr(chunk, "data"):
+                d = getattr(chunk, "data")
+                choices = d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
+            if not choices:
                 continue
-            delta = chunk.choices[0].delta
+            choice_0 = choices[0]
+            delta = getattr(choice_0, "delta", None) if not isinstance(choice_0, dict) else choice_0.get("delta")
+            if not delta:
+                continue
             if getattr(delta, "content", None):
                 yield ("adapter_text", delta.content)
             if getattr(delta, "tool_calls", None):
