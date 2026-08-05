@@ -145,7 +145,7 @@ class JohnstonApp(App):
                     t.is_background = True
                     count += 1
         if count == 0:
-            self.notify("No active foreground tasks to move to background")
+            self.notify("No active foreground tasks to move to background", severity="warning")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="app-container"):
@@ -268,7 +268,7 @@ class JohnstonApp(App):
                         print(f"Warning: error restoring UI message item: {err}")
             except Exception as err:
                 try:
-                    self.notify(f"UI restoration warning: {err}", severity="warning")
+                    self.notify(f"UI restoration failed: {err}", severity="warning")
                 except Exception:
                     pass
 
@@ -488,7 +488,7 @@ class JohnstonApp(App):
                     else:
                         self.trigger_ai_response(user_text, show_in_ui=True)
         except Exception as e:
-            self.notify(f"Error executing command: {e}", severity="error")
+            self.notify(f"Command execution failed: {e}", severity="error")
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Queue message to be executed after current generation finishes."""
@@ -702,7 +702,7 @@ class JohnstonApp(App):
             else:
                 if getattr(self, "is_app_active", True):
                     try:
-                        self.notify(f"Error during generation: {e}", severity="error")
+                        self.notify(f"Generation failed: {e}", severity="error")
                     except Exception:
                         pass
         finally:
