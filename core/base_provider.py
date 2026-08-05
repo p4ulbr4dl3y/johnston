@@ -358,18 +358,37 @@ class BaseAgent:
     def sanitize_history_for_model(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Adapts and normalizes session history for the active provider & model.
         Ensures seamless model switching across different providers and capabilities.
+        Guarantees strict LLM wire contract compliance:
+        - Filters invalid message objects and roles
+        - Ensures every assistant tool_call has matching tool response messages before subsequent user/assistant messages
+        - Injects synthetic tool cancellation results for missing/interrupted tool calls
+        - Normalizes orphaned tool responses without prior assistant tool calls to user role
         """
         if not history:
             return []
 
+        # Pass 1: Map all valid tool_call_ids that have tool responses in history
+        tool_responses_by_id = set()
+        for msg in history:
+            if isinstance(msg, dict) and msg.get("role") == "tool":
+                tc_id = msg.get("tool_call_id")
+                if tc_id:
+                    tool_responses_by_id.add(tc_id)
+
         sanitized = []
         known_tool_call_ids = set()
 
-        for msg in history:
+        i = 0
+        n = len(history)
+
+        while i < n:
+            msg = history[i]
             if not isinstance(msg, dict):
+                i += 1
                 continue
             role = msg.get("role")
             if role not in ("user", "assistant", "tool", "system"):
+                i += 1
                 continue
 
             item = dict(msg)
@@ -378,13 +397,45 @@ class BaseAgent:
                 tool_calls = item.get("tool_calls")
                 if tool_calls and isinstance(tool_calls, list):
                     valid_calls = []
+                    valid_tc_ids = set()
+                    missing_tool_call_ids = []
                     for tc in tool_calls:
                         if isinstance(tc, dict):
                             tc_id = tc.get("id")
                             if tc_id:
                                 known_tool_call_ids.add(tc_id)
-                            valid_calls.append(tc)
+                                valid_tc_ids.add(tc_id)
+                                valid_calls.append(tc)
+                                if tc_id not in tool_responses_by_id:
+                                    fn_obj = tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
+                                    fn_name = fn_obj.get("name") or tc.get("name") or "tool"
+                                    missing_tool_call_ids.append((tc_id, fn_name))
+
                     item["tool_calls"] = valid_calls
+                    sanitized.append(item)
+                    i += 1
+
+                    # Collect contiguous tool responses that belong to THIS assistant message
+                    while i < n and isinstance(history[i], dict) and history[i].get("role") == "tool":
+                        t_item = dict(history[i])
+                        tc_id = t_item.get("tool_call_id")
+                        if tc_id and tc_id in valid_tc_ids:
+                            sanitized.append(t_item)
+                            i += 1
+                        else:
+                            break
+
+                    # Inject synthetic tool responses for any missing tool_call_ids in this assistant message
+                    for missing_id, fn_name in missing_tool_call_ids:
+                        sanitized.append({
+                            "role": "tool",
+                            "tool_call_id": missing_id,
+                            "name": fn_name,
+                            "content": f"[Tool call '{fn_name}' execution was interrupted or cancelled]"
+                        })
+                        known_tool_call_ids.add(missing_id)
+
+                    continue
 
             elif role == "tool":
                 tc_id = item.get("tool_call_id")
@@ -395,6 +446,7 @@ class BaseAgent:
                     }
 
             sanitized.append(item)
+            i += 1
 
         return sanitized
 
@@ -889,7 +941,7 @@ class BaseAgent:
             yield ("compaction_divider", clean_msg, "")
         finally:
             if len(messages) > 1:
-                self.history = messages[1:]
+                self.history = self.sanitize_history_for_model(messages[1:])
 
     async def compact_history(self) -> Tuple[bool, str]:
         """
