@@ -142,7 +142,7 @@ class ModelsCommand(BaseCommand):
             if not connected:
                 await ProvidersCommand().execute(app)
                 return
-            app.notify("Could not fetch models for connected provider. Please check API key or network connection.", severity="warning")
+            app.notify("Could not fetch models for connected provider: check API key or network connection", severity="warning")
             return
 
         curr_provider = app.pm.get_active_provider_key()
@@ -236,10 +236,23 @@ class RewindCommand(BaseCommand):
 
         try:
             from core.git_checkpoint import GitCheckpointManager
-            checkpoints_enabled = GitCheckpointManager.is_valid_checkpoint_target(proj_path)
+            checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, proj_path)
             if curr_sid and checkpoints_enabled:
+                seq_indices = list(range(len(user_msgs)))
+                try:
+                    stats_map = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            GitCheckpointManager.get_diff_stats_batch,
+                            curr_sid,
+                            seq_indices,
+                            project_path=proj_path,
+                        ),
+                        timeout=2.0,
+                    )
+                except (asyncio.TimeoutError, Exception):
+                    stats_map = {}
                 for seq_idx, (child_idx, text) in enumerate(user_msgs):
-                    stat = GitCheckpointManager.get_diff_stats(curr_sid, seq_idx, project_path=proj_path) or ""
+                    stat = stats_map.get(seq_idx) or ""
                     msgs_with_stats.append((child_idx, text, stat))
             else:
                 msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
@@ -375,7 +388,7 @@ class SkillsCommand(BaseCommand):
         sm = SkillManager()
         skills = sm.list_skills()
         if not skills:
-            app.notify("No available skills found (~/.johnston/skills/ or .johnston/skills/)", severity="warning")
+            app.notify("No available skills found", severity="warning")
             return
 
         def on_skill_selected(selected_skill: dict | None) -> None:

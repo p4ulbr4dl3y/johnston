@@ -144,9 +144,7 @@ class JohnstonApp(App):
                 else:
                     t.is_background = True
                     count += 1
-        if count > 0:
-            self.notify(f"Moved {count} task(s) to background")
-        else:
+        if count == 0:
             self.notify("No active foreground tasks to move to background")
 
     def compose(self) -> ComposeResult:

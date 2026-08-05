@@ -369,7 +369,10 @@ def main():
         model=args.model,
         resume_session_id=args.resume,
     )
-    app.run()
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        pass
 
     if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
         try:

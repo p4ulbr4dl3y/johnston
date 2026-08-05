@@ -1,3 +1,5 @@
+from rich.markup import escape
+
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -18,12 +20,13 @@ class RewindScreen(BaseSelectionScreen[int]):
             max_text_len = 28
             opt_text = f"{clean[:max_text_len]}..." if len(clean) > max_text_len else clean
             opt_text = opt_text or "(empty message)"
+            escaped_text = escape(opt_text)
 
             if checkpoints_enabled:
                 stat_label = diff_stat or "no checkpoint"
-                opt = f"{opt_text} \\[{stat_label}]"
+                opt = f"{escaped_text} [dim]{escape(f'[{stat_label}]')}[/dim]"
             else:
-                opt = opt_text
+                opt = escaped_text
             options.append(opt)
 
         title = "### **Select Message to Rollback To**"

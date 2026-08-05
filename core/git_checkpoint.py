@@ -47,11 +47,118 @@ class GitCheckpointManager:
         ".cache/\n"
         "bower_components/\n"
         ".DS_Store\n"
-        "Thumbs.db\n"
         "*.log\n"
         "*.tmp\n"
         "*.temp\n"
         "tmp/\n"
+        "temp/\n"
+        ".tmp/\n"
+        ".temp/\n"
+        ".pixi/\n"
+        ".conda/\n"
+        "conda-env/\n"
+        "envs/\n"
+        ".envs/\n"
+        "target/\n"
+        "vendor/\n"
+        ".pnpm-store/\n"
+        ".yarn/\n"
+        ".gradle/\n"
+        ".m2/\n"
+        ".ivy2/\n"
+        ".hypothesis/\n"
+        ".parcel-cache/\n"
+        ".turbo/\n"
+        ".astro/\n"
+        "out/\n"
+        "wandb/\n"
+        ".wandb/\n"
+        "mlruns/\n"
+        "*.gguf\n"
+        "*.bin\n"
+        "*.safetensors\n"
+        "*.pth\n"
+        "*.pt\n"
+        "*.onnx\n"
+        "*.onnx_data\n"
+        "*.tflite\n"
+        "*.h5\n"
+        "*.hdf5\n"
+        "*.ckpt\n"
+        "*.model\n"
+        "*.weights\n"
+        "*.pb\n"
+        "*.ptl\n"
+        "*.pkl\n"
+        "*.pickle\n"
+        "*.feather\n"
+        "*.ort\n"
+        "*.tensor\n"
+        "*.tensors\n"
+        "*.msgpack\n"
+        "*.parquet\n"
+        "*.arrow\n"
+        "*.npz\n"
+        "*.npy\n"
+        "*.zip\n"
+        "*.tar\n"
+        "*.tar.gz\n"
+        "*.tgz\n"
+        "*.gz\n"
+        "*.bz2\n"
+        "*.xz\n"
+        "*.zst\n"
+        "*.lz4\n"
+        "*.7z\n"
+        "*.rar\n"
+        "*.iso\n"
+        "*.dmg\n"
+        "*.pkg\n"
+        "*.deb\n"
+        "*.rpm\n"
+        "*.so\n"
+        "*.dylib\n"
+        "*.dll\n"
+        "*.exe\n"
+        "*.a\n"
+        "*.o\n"
+        "*.obj\n"
+        "*.class\n"
+        "*.jar\n"
+        "*.war\n"
+        "*.ear\n"
+        "*.wasm\n"
+        "*.lib\n"
+        "*.sqlite\n"
+        "*.sqlite3\n"
+        "*.db\n"
+        "*.mdb\n"
+        "*.ldb\n"
+        "*.leveldb\n"
+        "*.mp4\n"
+        "*.mkv\n"
+        "*.avi\n"
+        "*.mov\n"
+        "*.webm\n"
+        "*.flv\n"
+        "*.wmv\n"
+        "*.m4v\n"
+        "*.mp3\n"
+        "*.wav\n"
+        "*.flac\n"
+        "*.aac\n"
+        "*.ogg\n"
+        "*.m4a\n"
+        "*.psd\n"
+        "*.ai\n"
+        "*.tiff\n"
+        "*.tif\n"
+        "*.raw\n"
+        "*.dmp\n"
+        "*.dump\n"
+        "*.stackdump\n"
+        "core.*\n"
+        "desktop.ini\n"
     )
 
     @classmethod
@@ -80,14 +187,23 @@ class GitCheckpointManager:
             pass
 
     @staticmethod
-    def _run_git(args: List[str], cwd: str, env: Optional[dict] = None) -> subprocess.CompletedProcess:
-        return subprocess.run(
-            ["git"] + args,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+    def _run_git(
+        args: List[str],
+        cwd: str,
+        env: Optional[dict] = None,
+        timeout: Optional[float] = None,
+    ) -> subprocess.CompletedProcess:
+        try:
+            return subprocess.run(
+                ["git"] + args,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return subprocess.CompletedProcess(args=["git"] + args, returncode=124, stdout="", stderr="timeout")
 
     @classmethod
     def _get_shadow_dir(cls, project_path: Optional[str] = None) -> tuple[str, str]:
@@ -346,6 +462,72 @@ class GitCheckpointManager:
                     os.remove(tmp_index)
                 except Exception:
                     pass
+
+    @classmethod
+    def get_diff_stats_batch(
+        cls,
+        session_id: str,
+        message_indices: List[int],
+        project_path: Optional[str] = None,
+    ) -> dict[int, Optional[str]]:
+        """Calculates line changes between each saved checkpoint in message_indices and current workspace.
+
+        Stages current workspace ONCE to calculate all diff stats efficiently.
+        Returns dict mapping message_index -> stat string (e.g. '+12 / -4', 'no changes', or None).
+        """
+        results: dict[int, Optional[str]] = {idx: None for idx in message_indices}
+        if not message_indices:
+            return results
+
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        if not cls.is_git_repo(cwd):
+            return results
+
+        cls._ensure_shadow_exclude(shadow_dir)
+
+        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
+        env = os.environ.copy()
+        env["GIT_DIR"] = shadow_dir
+        env["GIT_WORK_TREE"] = cwd
+        env["GIT_INDEX_FILE"] = tmp_index
+
+        try:
+            add_res = cls._run_git(["add", "-A"], cwd=cwd, env=env, timeout=1.5)
+            if add_res.returncode != 0:
+                return results
+
+            for msg_idx in message_indices:
+                ref_name = cls.get_ref_name(session_id, msg_idx)
+                rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.2)
+                if rev_res.returncode != 0:
+                    continue
+                commit_sha = rev_res.stdout.strip()
+
+                diff_res = cls._run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env, timeout=0.3)
+                if diff_res.returncode != 0:
+                    continue
+
+                added, deleted = 0, 0
+                for line in diff_res.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
+                        added += int(parts[0])
+                        deleted += int(parts[1])
+
+                if added == 0 and deleted == 0:
+                    results[msg_idx] = "no changes"
+                else:
+                    results[msg_idx] = f"+{added} / -{deleted}"
+        except Exception:
+            pass
+        finally:
+            if os.path.exists(tmp_index):
+                try:
+                    os.remove(tmp_index)
+                except Exception:
+                    pass
+
+        return results
 
     @classmethod
     def delete_session_checkpoints(

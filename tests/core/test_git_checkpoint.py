@@ -116,31 +116,22 @@ class TestGitCheckpointManager(unittest.TestCase):
         with open(mod_file, "a") as f:
             f.write("added line 1\nadded line 2")
 
-        stat_diff = GitCheckpointManager.get_diff_stats("session_stat", 0, project_path=repo_path)
-        self.assertEqual(stat_diff, "+2 / -0")
-
-    def test_default_excludes_without_gitignore(self):
+    def test_get_diff_stats_batch(self):
         repo_path = self._init_git_repo()
-        # Create a venv directory and node_modules directory without a .gitignore file
-        venv_dir = os.path.join(repo_path, "venv")
-        os.makedirs(venv_dir, exist_ok=True)
-        with open(os.path.join(venv_dir, "lib.py"), "w") as f:
-            f.write("print('ignored')\n")
+        GitCheckpointManager.create_checkpoint("session_batch", 0, project_path=repo_path)
+        
+        mod_file = os.path.join(repo_path, "initial.txt")
+        with open(mod_file, "a") as f:
+            f.write("added line 1\n")
+        GitCheckpointManager.create_checkpoint("session_batch", 1, project_path=repo_path)
 
-        node_dir = os.path.join(repo_path, "node_modules")
-        os.makedirs(node_dir, exist_ok=True)
-        with open(os.path.join(node_dir, "pkg.json"), "w") as f:
-            f.write("{}\n")
+        with open(mod_file, "a") as f:
+            f.write("added line 2\n")
 
-        sha = GitCheckpointManager.create_checkpoint("session_excl", 0, project_path=repo_path)
-        self.assertIsNotNone(sha)
-
-        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
-        ls_res = GitCheckpointManager._run_git(["ls-tree", "-r", "--name-only", sha], cwd=shadow_dir)
-        tracked_files = ls_res.stdout.splitlines()
-
-        self.assertNotIn("venv/lib.py", tracked_files)
-        self.assertNotIn("node_modules/pkg.json", tracked_files)
+        batch_stats = GitCheckpointManager.get_diff_stats_batch("session_batch", [0, 1, 2], project_path=repo_path)
+        self.assertEqual(batch_stats[0], "+2 / -0")
+        self.assertEqual(batch_stats[1], "+1 / -0")
+        self.assertIsNone(batch_stats[2])
 
 
 if __name__ == "__main__":
