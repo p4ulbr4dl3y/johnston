@@ -39,6 +39,8 @@ from core.config import IMAGE_EXTENSIONS
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
 
+CODE_THEME = "one-dark"
+
 
 def to_snake_case(name: str) -> str:
     if not name:
@@ -132,7 +134,7 @@ class CustomMarkdownFence(MarkdownFence):
             except Exception:
                 target_lexer = "text"
 
-        theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or "monokai"
+        theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
         code_content = Syntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False)
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
@@ -728,7 +730,7 @@ class ToolCallWidget(Vertical):
             syntax = Syntax(
                 pretty_json,
                 "json",
-                theme="one-dark",
+                theme=CODE_THEME,
                 word_wrap=False,
                 background_color="#18181b"
             )
@@ -1333,7 +1335,7 @@ class ToolCallWidget(Vertical):
                             syntax = Syntax(
                                 content,
                                 lexer,
-                                theme="one-dark",
+                                theme=CODE_THEME,
                                 line_numbers=True,
                                 word_wrap=False,
                                 background_color="#18181b"
@@ -1432,7 +1434,7 @@ class ToolCallWidget(Vertical):
                                 syntax = Syntax(
                                     clean_code,
                                     lexer if lexer != "html" else "html",
-                                    theme="one-dark",
+                                    theme=CODE_THEME,
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
@@ -1483,7 +1485,7 @@ class ToolCallWidget(Vertical):
                                 syntax = Syntax(
                                     clean_code,
                                     lexer,
-                                    theme="one-dark",
+                                    theme=CODE_THEME,
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
@@ -1525,7 +1527,7 @@ class ToolCallWidget(Vertical):
                     syntax = Syntax(
                         full_display,
                         "json",
-                        theme="one-dark",
+                        theme=CODE_THEME,
                         word_wrap=False,
                         background_color="#18181b"
                     )
