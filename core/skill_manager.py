@@ -14,6 +14,7 @@ PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
 def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     """
     Parses YAML frontmatter delimited by `---`.
+    Supports single-line and multi-line scalar values (including > and | block scalars).
     Returns (frontmatter_dict, body_content).
     """
     if content.startswith("---"):
@@ -21,12 +22,39 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
         if len(parts) >= 3:
             fm_text = parts[1]
             body = parts[2]
-            fm = {}
+            fm: Dict[str, Any] = {}
+            current_key = None
+            current_val_lines = []
+
+            def _flush():
+                nonlocal current_key, current_val_lines
+                if current_key:
+                    joined = " ".join(line_item.strip() for line_item in current_val_lines if line_item.strip()).strip()
+                    if joined in (">", "|"):
+                        joined = ""
+                    elif joined.startswith("> ") or joined.startswith("| "):
+                        joined = joined[2:].strip()
+                    elif (joined.startswith(">") or joined.startswith("|")) and len(joined) > 1:
+                        joined = joined[1:].strip()
+                    fm[current_key] = joined.strip('"').strip("'")
+                current_key = None
+                current_val_lines = []
+
             for line in fm_text.splitlines():
-                line = line.strip()
-                if line and ":" in line and not line.startswith("#"):
-                    k, v = line.split(":", 1)
-                    fm[k.strip().lower()] = v.strip().strip('"').strip("'")
+                sline = line.strip()
+                if not sline or sline.startswith("#"):
+                    continue
+
+                if ":" in sline and not line.startswith(" ") and not line.startswith("\t"):
+                    _flush()
+                    k, v = sline.split(":", 1)
+                    current_key = k.strip().lower()
+                    v_str = v.strip().strip('"').strip("'")
+                    current_val_lines = [v_str] if v_str else []
+                elif current_key and (line.startswith(" ") or line.startswith("\t")):
+                    current_val_lines.append(sline)
+
+            _flush()
             return fm, body
     return {}, content
 
