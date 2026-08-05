@@ -11,7 +11,6 @@ from app import (
     print_rules,
     print_skills,
     print_subagents,
-    print_system_prompt,
 )
 
 
@@ -92,15 +91,6 @@ class TestCLI(unittest.TestCase):
             print_subagents()
         output = f.getvalue()
         self.assertIn("Available Subagent Definitions:", output)
-
-    def test_print_system_prompt(self):
-        f = io.StringIO()
-        with redirect_stdout(f):
-            print_system_prompt()
-        output = f.getvalue()
-        self.assertIn("Primary Goal", output)
-        self.assertIn("## Skills", output)
-        self.assertIn("## Subagents", output)
 
 
 if __name__ == "__main__":

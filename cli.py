@@ -210,14 +210,6 @@ def print_subagents():
     print()
 
 
-def print_system_prompt(mode: str = "action"):
-    """Print fully rendered system prompt to stdout"""
-    from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
-    builder = PromptBuilder(base_system_prompt=DEFAULT_SYSTEM_PROMPT, base_tools=[], mode=mode)
-    print(builder.build_system_prompt())
-
-
-
 def run_headless_prompt(
     prompt: str,
     mode: str | None = None,
@@ -301,7 +293,6 @@ def main():
     parser.add_argument("--modes", action="store_true", help="List available agent execution modes")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
-    parser.add_argument("--system-prompt", action="store_true", help="Print fully rendered system prompt to stdout")
     parser.add_argument("--init", action="store_true", help="Initialize or update AGENTS.md guide for repo")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
@@ -309,10 +300,6 @@ def main():
 
     if args.version:
         print(f"johnston {get_version()}")
-        sys.exit(0)
-
-    if args.system_prompt:
-        print_system_prompt(mode=args.mode or "action")
         sys.exit(0)
 
     if args.modes:
