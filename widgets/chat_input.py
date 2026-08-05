@@ -1,9 +1,12 @@
+import json
+import os
 import re
 
 from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
+from core import config
 from core.config import IMAGE_EXTENSIONS
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
@@ -33,14 +36,38 @@ class ChatInput(TextArea):
 
     PASTE_LINE_THRESHOLD = 10
 
+    MAX_PROMPT_HISTORY = 500
+
     def __init__(self, **kwargs):
         kwargs.setdefault("soft_wrap", True)
         super().__init__(**kwargs)
-        self.prompt_history: list[str] = []
-        self.prompt_history_index: int = 0
-        self.prompt_draft: str = ""
         self.pasted_texts: dict[str, str] = {}
         self.clipboard_attachments: list = []
+        self.prompt_history: list[str] = self.load_prompt_history()
+        self.prompt_history_index: int = len(self.prompt_history)
+        self.prompt_draft: str = ""
+
+    def load_prompt_history(self) -> list[str]:
+        """Load global prompt history from disk"""
+        if not os.path.exists(config.PROMPT_HISTORY_FILE):
+            return []
+        try:
+            with open(config.PROMPT_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return [str(item) for item in data][-self.MAX_PROMPT_HISTORY:]
+        except Exception:
+            pass
+        return []
+
+    def save_prompt_history(self) -> None:
+        """Save global prompt history to disk"""
+        try:
+            os.makedirs(config.CONFIG_DIR, exist_ok=True)
+            with open(config.PROMPT_HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(self.prompt_history[-self.MAX_PROMPT_HISTORY:], f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
     def on_mount(self) -> None:
         self.focus()
@@ -305,6 +332,9 @@ class ChatInput(TextArea):
         """Save submitted message to query history"""
         if text and (not self.prompt_history or self.prompt_history[-1] != text):
             self.prompt_history.append(text)
+            if len(self.prompt_history) > self.MAX_PROMPT_HISTORY:
+                self.prompt_history = self.prompt_history[-self.MAX_PROMPT_HISTORY:]
+            self.save_prompt_history()
         self.prompt_history_index = len(self.prompt_history)
         self.prompt_draft = ""
 

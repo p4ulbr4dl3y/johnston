@@ -14,6 +14,7 @@ SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 LAST_TOOL_LOG_FILE = os.path.join(LOGS_DIR, "last_tool.log")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
+PROMPT_HISTORY_FILE = os.path.join(CONFIG_DIR, "prompt_history.json")
 
 # Agent Execution Limits & Timeouts
 DEFAULT_CONTEXT_LIMIT = 128000
