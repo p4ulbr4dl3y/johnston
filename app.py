@@ -496,15 +496,11 @@ class JohnstonApp(App):
         item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
-            need_divider = not getattr(self, "_has_rendered_queue_divider", False)
-            if need_divider:
-                self._has_rendered_queue_divider = True
-
             try:
                 chat_view = self.query_one(ChatView)
-                if need_divider:
-                    await chat_view.add_compaction_divider("Queued Messages")
                 await chat_view.add_user_message(prompt, attachments=attachments)
+                first_queued = self.message_queue[0][0] if self.message_queue else None
+                chat_view.update_queued_divider_position(first_queued)
                 self.notify("Message queued", severity="info")
             except Exception as e:
                 print(f"Error rendering queued message in UI: {e}")
