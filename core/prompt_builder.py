@@ -109,7 +109,7 @@ def get_rules_snippet(mode: str = "action") -> str:
     return RulesManager.get_instance().get_formatted_rules(mode=mode)
 
 
-DEFAULT_SYSTEM_PROMPT = """You are {model_name}, an expert AI software engineer operating inside Johnston CLI, pair programming with the user.
+DEFAULT_SYSTEM_PROMPT = """You are {model_name} operating inside Johnston CLI, pair programming with the user.
 
 ## Primary Goal
 Assist the user with software engineering tasks through safe, high-quality, and precise code modifications and analysis.
