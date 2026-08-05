@@ -70,6 +70,7 @@ class TasksListScreen(ModalScreen[None]):
             filtered = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
         else:
             filtered = list(all_tasks)
+        filtered = [t for t in filtered if getattr(t, "is_background", False)]
         return sorted(filtered, key=lambda t: not getattr(t, "is_running", False))
 
     def compose(self) -> ComposeResult:

@@ -276,6 +276,21 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Command is running in background", res)
 
+    async def test_sync_task_cleaned_up_from_background_tasks(self):
+        mock_app = MagicMock()
+        mock_app.background_tasks = []
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+        mock_ctx.add_background_task.side_effect = lambda t: mock_app.background_tasks.append(t)
+
+        with patch.object(ShellTool, "_ensure_context", return_value=mock_ctx):
+            res = await self.tool.execute({"command": "echo test_sync_cleanup"}, app=mock_app)
+            self.assertIn("test_sync_cleanup", res)
+            # Sync task should be removed from app.background_tasks after finishing
+            self.assertEqual(len(mock_app.background_tasks), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+
