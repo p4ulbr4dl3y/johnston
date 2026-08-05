@@ -698,11 +698,7 @@ class JohnstonApp(App):
                     await chat_view.add_compaction_divider("Response Interrupted")
                 except Exception:
                     pass
-                if getattr(self, "is_app_active", True):
-                    try:
-                        self.notify("Agent response interrupted (Esc)", severity="warning")
-                    except Exception:
-                        pass
+
             else:
                 if getattr(self, "is_app_active", True):
                     try:
@@ -759,7 +755,6 @@ class JohnstonApp(App):
         if not getattr(self, "is_app_active", True):
             return
         try:
-            self.notify(f"Background command completed (TID: {task_id})")
             msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:

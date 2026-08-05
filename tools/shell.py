@@ -153,8 +153,7 @@ class ShellTool(BaseTool):
             task.is_background = True
             ctx.add_background_task(task)
             task.start_reading(ctx.app, callback)
-            if ctx.app:
-                ctx.notify(f"Command sent to background (TID: {task_id})")
+
             return (
                 f"[Background Task ID: {task_id}] Command is running in background.\n\nRecent Output: (No output yet)\n\n"
                 "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
@@ -181,8 +180,7 @@ class ShellTool(BaseTool):
 
             if task.background_event.is_set() or task.is_background:
                 task.is_background = True
-                if ctx.app:
-                    ctx.notify(f"Command sent to background (TID: {task_id})")
+
                 raw_out = task.get_formatted_output()
                 if raw_out.strip():
                     if len(raw_out) > 2000:
@@ -211,8 +209,7 @@ class ShellTool(BaseTool):
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
         except asyncio.TimeoutError:
             task.is_background = True
-            if ctx.app:
-                ctx.notify(f"Command sent to background (TID: {task_id})")
+
             raw_out = task.get_formatted_output()
             if raw_out.strip():
                 if len(raw_out) > 2000:

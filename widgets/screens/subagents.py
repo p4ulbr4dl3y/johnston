@@ -89,9 +89,8 @@ class SubagentsScreen(ModalScreen[None]):
                         except Exception:
                             pass
                     sess.finish("cancelled", "Terminated from /subagents menu")
-                    if self.app:
-                        self.app.notify(f"Subagent {sess.task_id} terminated.")
                     self.refresh_list()
+
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.sessions):

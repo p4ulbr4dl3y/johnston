@@ -117,7 +117,7 @@ class ManageSubagentTool(BaseTool):
                     pass
 
             session.finish("cancelled", "Cancelled via manage_subagent tool")
-            ctx.notify(f"Subagent {session.task_id} terminated.")
+
             return f"OK: {session.task_id} terminated"
 
         elif action == "send_message":
@@ -167,7 +167,7 @@ class ManageSubagentTool(BaseTool):
 
                 bg_task = asyncio.create_task(_run_msg_bg())
                 session.async_task = bg_task
-                ctx.notify(f"Message sent to background subagent {session.task_id}")
+
                 return f"OK: message sent to {session.task_id}"
             else:
                 acc = [""]
