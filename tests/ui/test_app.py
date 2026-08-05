@@ -129,7 +129,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             await app.on_chat_input_submitted(FakeEvent())
             self.assertEqual(len(app.message_queue), 1)
-            self.assertEqual(app.message_queue[0], ("Queued message", False))
+            self.assertEqual(app.message_queue[0][:2], ("Queued message", False))
 
     async def test_message_queue_rendering_and_compaction_divider(self):
         app = JohnstonApp()
@@ -238,7 +238,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
 
                 self.assertIn("Prompt 1", ran_prompts)
-                self.assertIn("Prompt 2", ran_prompts)
+                self.assertNotIn("Prompt 2", ran_prompts)
+                self.assertEqual(len(app.message_queue), 0)
                 chat_view = app.query_one(ChatView)
                 dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
                 self.assertEqual(len(dividers), 1)
@@ -315,6 +316,106 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             click_evt = events.Click(0, 0, 0, 0, 0, 1, False, False, False)
             app.on_click(click_evt)
+
+    async def test_session_drift_prevention(self):
+        from unittest.mock import MagicMock, patch
+
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+        ran_prompts = []
+
+        async def fake_stream_steps(prompt, attachments=None):
+            ran_prompts.append(prompt)
+            if False:
+                yield
+
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                app.pm.is_provider_connected = MagicMock(return_value=True)
+                app.pm.get_active_provider_key = MagicMock(return_value="openai")
+                agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+                agent.stream_steps = fake_stream_steps
+                app.agent = agent
+                app.pm.create_active_agent = MagicMock(return_value=agent)
+
+                app.current_session_id = "sess_1"
+                app.message_queue.append(("Old session prompt", False, None, "sess_old"))
+
+                app.generate_ai_response("Current session prompt")
+                await pilot.pause(0.5)
+
+                self.assertEqual(ran_prompts, ["Current session prompt"])
+                self.assertEqual(len(app.message_queue), 0)
+
+    async def test_background_command_session_binding(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = True
+            app.current_session_id = "sess_bg_123"
+            app.on_background_shell_completed("task_1", "ls", "file.txt")
+
+            self.assertEqual(len(app.message_queue), 1)
+            queued_item = app.message_queue[0]
+            self.assertEqual(len(queued_item), 4)
+            self.assertEqual(queued_item[3], "sess_bg_123")
+
+    async def test_exception_clears_queue(self):
+        from unittest.mock import MagicMock
+
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+
+        async def error_stream(prompt, attachments=None):
+            yield ("thinking_start", "Thinking...", "")
+            raise ValueError("API call failed")
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.1)
+            app.pm.is_provider_connected = MagicMock(return_value=True)
+            app.pm.get_active_provider_key = MagicMock(return_value="openai")
+            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+            agent.stream_steps = error_stream
+            app.agent = agent
+            app.pm.create_active_agent = MagicMock(return_value=agent)
+
+            app.message_queue.append(("Should not run", False, None, app.current_session_id))
+            app.generate_ai_response("Failing prompt")
+            await pilot.pause(0.5)
+
+            self.assertEqual(len(app.message_queue), 0)
+            self.assertFalse(app.is_generating)
+
+    async def test_queued_user_message_checkpoint(self):
+        from unittest.mock import MagicMock, patch
+
+        from core.base_provider import BaseAgent
+
+        app = JohnstonApp()
+        checkpoint_calls = []
+
+        def mock_checkpoint(sid, idx, project_path=None):
+            checkpoint_calls.append((sid, idx))
+
+        async def queued_event_stream(prompt, attachments=None):
+            yield ("queued_user_message", "Mid-turn queued message", None, True)
+
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=mock_checkpoint):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                app.pm.is_provider_connected = MagicMock(return_value=True)
+                app.pm.get_active_provider_key = MagicMock(return_value="openai")
+                agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+                agent.stream_steps = queued_event_stream
+                app.agent = agent
+                app.pm.create_active_agent = MagicMock(return_value=agent)
+
+                app.generate_ai_response("Start prompt")
+                await pilot.pause(0.5)
+
+                self.assertTrue(len(checkpoint_calls) >= 2)
 
 
 if __name__ == "__main__":
