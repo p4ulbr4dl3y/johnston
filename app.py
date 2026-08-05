@@ -552,9 +552,6 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
-            if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
-                self._has_rendered_queue_divider = True
-                await chat_view.add_compaction_divider("Queued Message")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
         bot_msg = None
@@ -667,7 +664,6 @@ class JohnstonApp(App):
                     except Exception:
                         pass
         except (asyncio.CancelledError, RuntimeError, Exception) as e:
-            self._has_rendered_queue_divider = False
             self.message_queue.clear()
             if thinking_widget:
                 try:
@@ -740,16 +736,9 @@ class JohnstonApp(App):
                         all_atts.extend(atts)
                 combined_atts = all_atts if all_atts else None
                 should_show = any(item[1] for item in queued_items if len(item) > 1 and item[1] is not None)
-                self._rendering_queued_item = should_show
                 self.generate_ai_response(combined_prompt, show_in_ui=should_show, attachments=combined_atts)
             else:
                 self.is_generating = False
-                self._has_rendered_queue_divider = False
-                self._rendering_queued_item = False
-                try:
-                    chat_view.remove_queued_divider()
-                except Exception:
-                    pass
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background shell command finishes"""
