@@ -27,6 +27,7 @@ from cli import (
     print_rules,
     print_skills,
     print_subagents,
+    print_system_prompt,
     run_headless_prompt,
 )
 
@@ -40,6 +41,7 @@ __all__ = [
     "print_rules",
     "print_modes",
     "print_subagents",
+    "print_system_prompt",
     "run_headless_prompt",
 ]
 from core.commands import handle_slash_command
