@@ -585,7 +585,6 @@ class JohnstonApp(App):
 
         thinking_widget = None
         current_tool_widget = None
-        bot_msg = None
 
         start_time = time.time()
         try:
