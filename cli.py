@@ -1,5 +1,4 @@
 import asyncio
-import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -213,24 +212,14 @@ def print_subagents():
 
 def run_headless_prompt(
     prompt: str,
-    mode: str | None = None,
-    provider: str | None = None,
-    model: str | None = None,
-    quiet: bool = False,
     verbose: bool = False,
 ):
     """Execute a single prompt headless via CLI with clean stdout piping and stderr tool logging"""
     pm = ProviderManager()
-    if provider:
-        pm.set_active_provider_key(provider)
     agent = pm.create_active_agent()
     if not agent:
         sys.stderr.write("Error: Could not initialize AI agent provider.\n")
         sys.exit(1)
-    if model and agent:
-        agent.model = model
-    if mode and agent:
-        agent.mode = mode
 
     async def _runner():
         last_printed_len = 0
@@ -248,7 +237,7 @@ def run_headless_prompt(
                         sys.stdout.write(new_text)
                         sys.stdout.flush()
                         last_printed_len = len(val1)
-                elif not quiet:
+                else:
                     if chunk_type == "thinking_start":
                         sys.stderr.write("[Thinking...]\r")
                         sys.stderr.flush()
@@ -294,25 +283,13 @@ def main():
         prog="johnston",
         description="Johnston Coding Agent",
     )
-    parser.add_argument("-p", "--prompt", help="Run a single prompt in CLI headless mode")
-    parser.add_argument(
-        "-m",
-        "--mode",
-        choices=["action", "explore"],
-        help="Agent execution mode ('action' or 'explore')",
-    )
-    parser.add_argument("--provider", help="Set active provider key (e.g. openai)")
-    parser.add_argument("--model", help="Set active model ID")
     parser.add_argument("--resume", help="Resume specific session ID")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress tool execution logs on stderr")
-    parser.add_argument("--verbose", action="store_true", help="Show detailed thinking and tool output logs on stderr")
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
     parser.add_argument("--modes", action="store_true", help="List available agent execution modes")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
-    parser.add_argument("--init", action="store_true", help="Initialize or update AGENTS.md guide for repo")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
     args = parser.parse_args()
@@ -345,63 +322,7 @@ def main():
         print_subagents()
         sys.exit(0)
 
-    # Check for stdin piped input (e.g. cat file | johnston -p "...")
-    # Never block on a non-tty stdin that has no pending data (e.g. launched
-    # from another tool where the pipe stays open without input).
-    stdin_input = ""
-    if args.prompt and not sys.stdin.isatty():
-        try:
-            if sys.platform == "win32":
-                data = sys.stdin.read()
-            else:
-                import fcntl
-
-                fd = sys.stdin.fileno()
-                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                try:
-                    data = sys.stdin.read()
-                except BlockingIOError:
-                    data = ""
-                finally:
-                    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-            if data:
-                stdin_input = data.strip()
-        except Exception:
-            pass
-
-    target_prompt = args.prompt or ""
-    if stdin_input:
-        target_prompt = f"Piped Stdin Content:\n{stdin_input}\n\nTask: {target_prompt}".strip()
-
-    if args.init:
-        from core.commands import INIT_PROMPT_TEMPLATE
-
-        run_headless_prompt(
-            prompt=INIT_PROMPT_TEMPLATE,
-            mode=args.mode,
-            provider=args.provider,
-            model=args.model,
-            quiet=args.quiet,
-            verbose=args.verbose,
-        )
-        sys.exit(0)
-
-    if target_prompt:
-        run_headless_prompt(
-            prompt=target_prompt,
-            mode=args.mode,
-            provider=args.provider,
-            model=args.model,
-            quiet=args.quiet,
-            verbose=args.verbose,
-        )
-        sys.exit(0)
-
     app = JohnstonApp(
-        mode=args.mode,
-        provider=args.provider,
-        model=args.model,
         resume_session_id=args.resume,
     )
     try:

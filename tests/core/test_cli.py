@@ -99,32 +99,7 @@ class TestCLI(unittest.TestCase):
             main()
         self.assertEqual(cm.exception.code, 0)
 
-    @patch("sys.argv", ["johnston", "-p", "test prompt", "-m", "explore", "-q", "--verbose"])
-    @patch("cli.run_headless_prompt")
-    def test_main_prompt(self, mock_headless):
-        with self.assertRaises(SystemExit) as cm:
-            from cli import main
-            main()
-        self.assertEqual(cm.exception.code, 0)
-        mock_headless.assert_called_once_with(
-            prompt="test prompt",
-            mode="explore",
-            provider=None,
-            model=None,
-            quiet=True,
-            verbose=True,
-        )
-
-    @patch("sys.argv", ["johnston", "--init"])
-    @patch("cli.run_headless_prompt")
-    def test_main_init(self, mock_headless):
-        with self.assertRaises(SystemExit) as cm:
-            from cli import main
-            main()
-        self.assertEqual(cm.exception.code, 0)
-        self.assertTrue(mock_headless.called)
-
-    @patch("sys.argv", ["johnston", "-m", "action", "--provider", "openai", "--model", "gpt-4", "--resume", "sess123"])
+    @patch("sys.argv", ["johnston", "--resume", "sess123"])
     @patch("app.JohnstonApp.run")
     def test_main_app_start(self, mock_app_run):
         with self.assertRaises(SystemExit) as cm:
