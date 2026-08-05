@@ -492,7 +492,8 @@ class JohnstonApp(App):
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Render queued message in UI immediately with 'Queued Messages' divider if needed, and queue item."""
-        item = (prompt, False, attachments) if attachments else (prompt, False)
+        curr_sid = getattr(self, "current_session_id", None)
+        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
             need_divider = not getattr(self, "_has_rendered_queue_divider", False)
@@ -505,8 +506,8 @@ class JohnstonApp(App):
                     if need_divider:
                         await chat_view.add_compaction_divider("Queued Messages")
                     await chat_view.add_user_message(prompt, attachments=attachments)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error rendering queued message in UI: {e}")
             asyncio.create_task(_render())
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
@@ -562,11 +563,13 @@ class JohnstonApp(App):
 
         if show_in_ui:
             await chat_view.add_user_message(user_text, attachments=attachments)
-            await self.save_current_session_async()
-            curr_sid = getattr(self, "current_session_id", None)
-            if curr_sid:
-                user_msgs = chat_view.get_user_messages()
-                msg_idx = len(user_msgs) - 1
+
+        await self.save_current_session_async()
+        curr_sid = getattr(self, "current_session_id", None)
+        if curr_sid:
+            user_msgs = chat_view.get_user_messages()
+            msg_idx = len(user_msgs) - 1
+            if msg_idx >= 0:
                 try:
                     proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
                     from core.git_checkpoint import GitCheckpointManager
@@ -632,10 +635,18 @@ class JohnstonApp(App):
                     q_show = val3 if val3 is not None else True
                     if q_show:
                         await chat_view.add_user_message(q_msg, attachments=q_atts)
-                        try:
-                            await self.save_current_session_async()
-                        except Exception:
-                            pass
+                    try:
+                        await self.save_current_session_async()
+                        curr_sid = getattr(self, "current_session_id", None)
+                        if curr_sid:
+                            user_msgs = chat_view.get_user_messages()
+                            msg_idx = len(user_msgs) - 1
+                            if msg_idx >= 0:
+                                proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
+                                from core.git_checkpoint import GitCheckpointManager
+                                await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
+                    except Exception as e:
+                        print(f"Error handling queued_user_message checkpoint: {e}")
                 elif event_type in ("bot_chunk", "bot_delta"):
                     if val1.strip():
                         if bot_msg is None:
@@ -661,8 +672,9 @@ class JohnstonApp(App):
                         await self.save_current_session_async()
                     except Exception:
                         pass
-        except (asyncio.CancelledError, RuntimeError):
+        except (asyncio.CancelledError, RuntimeError, Exception) as e:
             self._has_rendered_queue_divider = False
+            self.message_queue.clear()
             if thinking_widget:
                 try:
                     duration = time.time() - start_time
@@ -674,28 +686,35 @@ class JohnstonApp(App):
                     await bot_msg.finalize_stream()
                 except Exception:
                     pass
-            if hasattr(self, "agent") and hasattr(self.agent, "history"):
-                partial = (bot_msg.content if bot_msg else "").strip()
-                if partial:
-                    self.agent.history.append({"role": "assistant", "content": partial})
-                self.agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+            if isinstance(e, (asyncio.CancelledError, RuntimeError)):
+                if hasattr(self, "agent") and hasattr(self.agent, "history"):
+                    partial = (bot_msg.content if bot_msg else "").strip()
+                    if partial:
+                        self.agent.history.append({"role": "assistant", "content": partial})
+                    self.agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+                    try:
+                        from core.token_util import estimate_tokens
+                        sys_tok = getattr(self.agent, "_last_sys_tokens", 0)
+                        hist_tok = estimate_tokens(self.agent.history)
+                        self.agent.last_context_tokens = sys_tok + hist_tok
+                        self.refresh_status_footer()
+                    except Exception:
+                        pass
                 try:
-                    from core.token_util import estimate_tokens
-                    sys_tok = getattr(self.agent, "_last_sys_tokens", 0)
-                    hist_tok = estimate_tokens(self.agent.history)
-                    self.agent.last_context_tokens = sys_tok + hist_tok
-                    self.refresh_status_footer()
+                    await chat_view.add_compaction_divider("Response Interrupted")
                 except Exception:
                     pass
-            try:
-                await chat_view.add_compaction_divider("Response Interrupted")
-            except Exception:
-                pass
-            if getattr(self, "is_app_active", True):
-                try:
-                    self.notify("Agent response interrupted (Esc)", severity="warning")
-                except Exception:
-                    pass
+                if getattr(self, "is_app_active", True):
+                    try:
+                        self.notify("Agent response interrupted (Esc)", severity="warning")
+                    except Exception:
+                        pass
+            else:
+                if getattr(self, "is_app_active", True):
+                    try:
+                        self.notify(f"Error during generation: {e}", severity="error")
+                    except Exception:
+                        pass
         finally:
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
@@ -712,8 +731,15 @@ class JohnstonApp(App):
             # concurrent user input bypasses the queue and cancels this queued item via
             # the exclusive worker. Only return to idle when the queue is empty.
             queued_next = None
-            if self.message_queue and getattr(self, "is_app_active", True):
-                queued_next = self.message_queue.pop(0)
+            curr_sid = getattr(self, "current_session_id", None)
+            while self.message_queue and getattr(self, "is_app_active", True):
+                candidate = self.message_queue.pop(0)
+                q_sid = candidate[3] if len(candidate) > 3 else None
+                if q_sid is not None and curr_sid is not None and q_sid != curr_sid:
+                    continue
+                queued_next = candidate
+                break
+
             if queued_next is not None:
                 q_prompt = queued_next[0]
                 q_show = queued_next[1] if len(queued_next) > 1 else False
@@ -730,8 +756,9 @@ class JohnstonApp(App):
         try:
             self.notify(f"Background command completed (TID: {task_id})")
             msg = f"[System Notification] Background command '{command_str}' (TID: {task_id}) completed.\nOutput:\n{result}"
+            curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:
-                self.message_queue.append((msg, False))
+                self.message_queue.append((msg, False, None, curr_sid))
             else:
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception:

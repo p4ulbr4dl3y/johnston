@@ -119,7 +119,7 @@ class TestGitCheckpointManager(unittest.TestCase):
     def test_get_diff_stats_batch(self):
         repo_path = self._init_git_repo()
         GitCheckpointManager.create_checkpoint("session_batch", 0, project_path=repo_path)
-        
+
         mod_file = os.path.join(repo_path, "initial.txt")
         with open(mod_file, "a") as f:
             f.write("added line 1\n")
