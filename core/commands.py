@@ -353,7 +353,8 @@ class TasksCommand(BaseCommand):
         if curr_sid:
             tasks = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
         else:
-            tasks = all_tasks
+            tasks = list(all_tasks)
+        tasks = [t for t in tasks if getattr(t, "is_background", False)]
         if not tasks:
             app.notify("No active background tasks", severity="warning")
             return

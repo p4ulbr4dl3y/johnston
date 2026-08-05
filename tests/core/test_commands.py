@@ -421,7 +421,39 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
         self.assertEqual(len(app.background_tasks), 0)
 
+    async def test_tasks_command_filters_non_background_tasks(self):
+        from unittest.mock import MagicMock
+        from core.background_task import BackgroundTask
+        from core.commands import TasksCommand
+
+        app = MockApp()
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+
+        # Task with is_background=False
+        t_sync = BackgroundTask("t-sync", "echo 1", None)
+        t_sync.is_background = False
+        app.background_tasks = [t_sync]
+
+        cmd = TasksCommand()
+        await cmd.execute(app)
+
+        # Since only sync task exists, toast should show and screen should not be pushed
+        app.notify.assert_called_once_with("No active background tasks", severity="warning")
+        app.push_screen.assert_not_called()
+
+        # Task with is_background=True
+        t_bg = BackgroundTask("t-bg", "sleep 100", None)
+        t_bg.is_background = True
+        app.background_tasks = [t_bg]
+        app.notify.reset_mock()
+
+        await cmd.execute(app)
+        app.notify.assert_not_called()
+        app.push_screen.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
