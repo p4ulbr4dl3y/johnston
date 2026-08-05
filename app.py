@@ -490,20 +490,16 @@ class JohnstonApp(App):
         except Exception as e:
             self.notify(f"Error executing command: {e}", severity="error")
 
-    async def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Queue message and render Queued Messages divider and user bubble immediately."""
+    def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
+        """Queue message to be executed after current generation finishes."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
+        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
             try:
-                chat_view = self.query_one(ChatView)
-                await chat_view.add_user_message(prompt, attachments=attachments)
-                first_queued = self.message_queue[0][0] if self.message_queue else None
-                chat_view.update_queued_divider_position(first_queued)
                 self.notify("Message queued", severity="info")
-            except Exception as e:
-                print(f"Error rendering queued message in UI: {e}")
+            except Exception:
+                pass
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -524,14 +520,14 @@ class JohnstonApp(App):
 
         kwargs = {"attachments": attachments} if attachments else {}
         if self.is_generating:
-            await self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
+            self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
         if getattr(self, "is_generating", False):
-            asyncio.create_task(self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments))
+            self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments)
         else:
             self.is_generating = True
             kwargs = {"attachments": attachments} if attachments else {}
@@ -556,6 +552,9 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
+            if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
+                self._has_rendered_queue_divider = True
+                await chat_view.add_compaction_divider("Queued Messages")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
         bot_msg = None
@@ -726,33 +725,26 @@ class JohnstonApp(App):
                     await self.save_current_session_async(force=True)
             except Exception:
                 pass
-            # Drain the queue atomically: if a queued message exists, dispatch it WITHOUT
-            # clearing is_generating first. Clearing it early opens a window where a
-            # concurrent user input bypasses the queue and cancels this queued item via
-            # the exclusive worker. Only return to idle when the queue is empty.
-            queued_next = None
+            queued_items = []
             curr_sid = getattr(self, "current_session_id", None)
             while self.message_queue and getattr(self, "is_app_active", True):
                 candidate = self.message_queue.pop(0)
                 q_sid = candidate[3] if len(candidate) > 3 else None
                 if q_sid is not None and curr_sid is not None and q_sid != curr_sid:
                     continue
-                queued_next = candidate
-                break
+                queued_items.append(candidate)
 
-            if queued_next is not None:
-                q_prompt = queued_next[0]
-                q_show = queued_next[1] if len(queued_next) > 1 else False
-                q_atts = queued_next[2] if len(queued_next) > 2 else None
+            if queued_items:
+                prompts = [item[0] for item in queued_items if item[0]]
+                combined_prompt = "\n".join(prompts)
+                all_atts = []
+                for item in queued_items:
+                    atts = item[2] if len(item) > 2 and item[2] else None
+                    if atts:
+                        all_atts.extend(atts)
+                combined_atts = all_atts if all_atts else None
                 self._rendering_queued_item = True
-
-                next_queued_prompt = self.message_queue[0][0] if self.message_queue else None
-                try:
-                    chat_view.update_queued_divider_position(next_queued_prompt)
-                except Exception:
-                    pass
-
-                self.generate_ai_response(q_prompt, show_in_ui=q_show, attachments=q_atts)
+                self.generate_ai_response(combined_prompt, show_in_ui=True, attachments=combined_atts)
             else:
                 self.is_generating = False
                 self._has_rendered_queue_divider = False

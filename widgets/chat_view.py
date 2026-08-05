@@ -1651,19 +1651,6 @@ class ChatView(VerticalScroll):
         else:
             display_text = text
 
-    async def _mount_smart(self, widget: Widget) -> None:
-        if not self.is_attached:
-            await self._wait_until_attached()
-        queued_divider = None
-        for child in self.children:
-            if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
-                queued_divider = child
-                break
-        if queued_divider is not None:
-            await self.mount(widget, before=queued_divider)
-        else:
-            await self.mount(widget)
-
     async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
         self.clear_welcome()
         if attachments:
@@ -1684,7 +1671,9 @@ class ChatView(VerticalScroll):
     async def add_bot_message(self, animate: bool = True) -> BotMessage:
         self.clear_welcome()
         msg = BotMessage()
-        await self._mount_smart(msg)
+        if not self.is_attached:
+            await self._wait_until_attached()
+        await self.mount(msg)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
@@ -1692,7 +1681,9 @@ class ChatView(VerticalScroll):
     async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
         self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
-        await self._mount_smart(widget)
+        if not self.is_attached:
+            await self._wait_until_attached()
+        await self.mount(widget)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
@@ -1702,7 +1693,9 @@ class ChatView(VerticalScroll):
 
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
-        await self._mount_smart(widget)
+        if not self.is_attached:
+            await self._wait_until_attached()
+        await self.mount(widget)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
@@ -1722,31 +1715,6 @@ class ChatView(VerticalScroll):
         for child in list(self.children):
             if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
                 child.remove()
-
-    def update_queued_divider_position(self, first_queued_text: str | None) -> None:
-        """Ensure 'Queued Messages' divider sits right before the first unstarted queued user message."""
-        queued_divider = None
-        for child in list(self.children):
-            if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
-                queued_divider = child
-                break
-
-        if not first_queued_text:
-            if queued_divider:
-                queued_divider.remove()
-            return
-
-        target_user_msg = None
-        for child in self.children:
-            if isinstance(child, UserMessage) and getattr(child, "raw_text", "") == first_queued_text:
-                target_user_msg = child
-                break
-
-        if target_user_msg is not None:
-            if queued_divider is None:
-                queued_divider = CompactionDivider("Queued Messages")
-
-            self.mount(queued_divider, before=target_user_msg)
 
     def get_user_messages(self) -> list[tuple[int, str]]:
         result = []
