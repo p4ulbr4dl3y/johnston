@@ -491,9 +491,9 @@ class JohnstonApp(App):
             self.notify(f"Error executing command: {e}", severity="error")
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Queue message and render 'Queued Messages' divider in ChatView immediately."""
+        """Render queued message in UI immediately under 'Queued Messages' divider."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
+        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
             need_divider = not getattr(self, "_has_rendered_queue_divider", False)
@@ -505,9 +505,10 @@ class JohnstonApp(App):
                     chat_view = self.query_one(ChatView)
                     if need_divider:
                         await chat_view.add_compaction_divider("Queued Messages")
+                    await chat_view.add_user_message(prompt, attachments=attachments)
                     self.notify("Message queued", severity="info")
                 except Exception as e:
-                    print(f"Error rendering queued divider in UI: {e}")
+                    print(f"Error rendering queued message in UI: {e}")
 
             asyncio.create_task(_render())
 
@@ -564,6 +565,8 @@ class JohnstonApp(App):
 
         if show_in_ui:
             await chat_view.add_user_message(user_text, attachments=attachments)
+
+        bot_msg = await chat_view.add_bot_message()
 
         await self.save_current_session_async()
         curr_sid = getattr(self, "current_session_id", None)
@@ -717,6 +720,11 @@ class JohnstonApp(App):
                     except Exception:
                         pass
         finally:
+            if bot_msg and not getattr(bot_msg, "content", "").strip():
+                try:
+                    bot_msg.remove()
+                except Exception:
+                    pass
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
                 footer.set_generating(False)
