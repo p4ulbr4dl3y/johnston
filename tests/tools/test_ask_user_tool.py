@@ -64,6 +64,18 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(res, "OK: cancelled by user")
 
+    async def test_unknown_status_cancels(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        def fake_push(screen, callback=None):
+            if callback:
+                callback({"status": "unknown_garbage"})
+
+        mock_app.push_screen.side_effect = fake_push
+        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, app=mock_app)
+        self.assertIn("OK: cancelled by user", res)
+
 
 if __name__ == "__main__":
     unittest.main()

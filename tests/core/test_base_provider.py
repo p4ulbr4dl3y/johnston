@@ -5,6 +5,7 @@ import unittest
 import unittest.mock
 
 from core.base_provider import BaseAgent
+from core.mode_manager import ModeDefinition
 from tools.registry import execute_tool
 
 
@@ -647,6 +648,65 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         self.assertGreater(agent.tokens_input, 0)
         self.assertGreaterEqual(agent.total_tokens, agent.tokens_input)
+
+
+class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
+    """The compaction threshold must count system prompt + tool schema overhead, not
+    history alone — otherwise a large system prompt can overflow the context window
+    before history ever reaches the 75% threshold."""
+
+    async def test_compaction_triggers_when_sys_overhead_exceeds_threshold(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.history = [
+            {"role": "user", "content": "a"},
+            {"role": "assistant", "content": "b"},
+            {"role": "user", "content": "c"},
+            {"role": "assistant", "content": "d"},
+            {"role": "user", "content": "e"},
+        ]
+
+        def fake_estimate(val):
+            if isinstance(val, str):
+                return 100  # system prompt
+            if isinstance(val, list):
+                first = val[0] if val else None
+                if isinstance(first, dict) and first.get("type") == "function":
+                    return 0  # tools schema
+                return 10  # history
+            return 0
+
+        with unittest.mock.patch("core.base_provider.estimate_tokens", side_effect=fake_estimate):
+            with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
+                mock_limit.return_value = 100  # threshold = 75
+                with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
+                    mock_comp.return_value = (True, "compacted")
+                    with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                        mock_create.side_effect = Exception("Stop stream")
+                        try:
+                            async for _ in agent.stream_steps("trigger"):
+                                pass
+                        except Exception:
+                            pass
+                        mock_comp.assert_called_once()
+
+
+class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
+    async def test_read_only_blocks_write_aliases(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
+        self.addAsyncCleanup(agent.close)
+        mode_def = ModeDefinition("explore", "Explore", read_only=True, disallowed_tools=["write_file", "create", "edit"])
+        err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, mode_def)
+        self.assertIsNotNone(err)
+        self.assertIn("disabled in Explore mode", err)
+
+    async def test_disallowed_tools_blocks_aliases(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
+        self.addAsyncCleanup(agent.close)
+        mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["shell"])
+        err = agent._tool_policy_error("shell", {"command": "pwd"}, mode_def)
+        self.assertIsNotNone(err)
+        self.assertIn("disabled in Locked mode", err)
 
 
 if __name__ == "__main__":
