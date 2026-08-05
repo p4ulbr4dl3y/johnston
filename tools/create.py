@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict
 
 from tools.base import BaseTool, atomic_write_text, resolve_path
+from tools.file_state import record_file_write, verify_file_read
 from tools.linter import run_linter
 
 
@@ -34,6 +35,11 @@ class CreateTool(BaseTool):
         path = resolve_path(args.get("path"))
         if os.path.isdir(path):
             return f"ERR: '{path}' is a directory"
+
+        ok, err_msg = verify_file_read(path)
+        if not ok:
+            return err_msg
+
         content = (args.get("content") or "").rstrip("\r\n")
 
         file_existed = os.path.isfile(path)
@@ -47,6 +53,7 @@ class CreateTool(BaseTool):
 
         try:
             await asyncio.to_thread(_write_file, path, content)
+            record_file_write(path)
             linter_output = await run_linter(path)
 
             if file_existed:
