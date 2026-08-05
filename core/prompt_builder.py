@@ -193,9 +193,11 @@ class PromptBuilder:
     def _build_system_prompt_uncached(self) -> str:
         cwd = os.getcwd()
         from core.mcp_manager import get_mcp_manager
+        from core.subagent_registry import SubagentRegistry
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
+        subagents_snippet = SubagentRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %z")
         os_info = f"{platform.system()} {platform.release()}"
@@ -227,6 +229,8 @@ class PromptBuilder:
             sys_prompt = f"{sys_prompt}\n\n## User Rules\n{rules_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
+        if subagents_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{subagents_snippet}"
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 

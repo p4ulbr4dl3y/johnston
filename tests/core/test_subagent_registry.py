@@ -62,6 +62,14 @@ You run tests and report coverage.""")
             self.assertEqual(tester_def.model, "gpt-4o")
             self.assertIn("run tests and report coverage", tester_def.system_prompt)
 
+            snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
+            self.assertIn("## Subagents (use as `subagent_type` in `invoke_subagent`)", snippet)
+            self.assertIn("### Builtin", snippet)
+            self.assertIn("- `explore`: Fast code exploration subagent", snippet)
+            self.assertIn("### Project (`.johnston/subagents/<name>.md`)", snippet)
+            self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
+
 if __name__ == "__main__":
     unittest.main()
+
 
