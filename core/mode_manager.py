@@ -13,8 +13,6 @@ class ModeDefinition:
         read_only: bool = False,
         prompt: str = "",
         disallowed_tools: Optional[List[str]] = None,
-        allowed_capabilities: Optional[List[str]] = None,
-        denied_capabilities: Optional[List[str]] = None,
         allowed_shell_commands: Optional[List[str]] = None,
         workspace_allowlist: Optional[List[str]] = None,
         source: str = "builtin",
@@ -25,8 +23,6 @@ class ModeDefinition:
         self.read_only = read_only
         self.prompt = prompt
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
-        self.allowed_capabilities = [c.strip() for c in (allowed_capabilities or [])]
-        self.denied_capabilities = [c.strip() for c in (denied_capabilities or [])]
         self.allowed_shell_commands = [c.strip() for c in (allowed_shell_commands or [])]
         self.workspace_allowlist = [p.strip() for p in (workspace_allowlist or [])]
         self.source = source
@@ -38,17 +34,6 @@ BUILTIN_MODES = {
         name="Action",
         description="Execution and implementation mode. Full editing, shell, and task permissions.",
         read_only=False,
-        allowed_capabilities=[
-            "agent.delegate",
-            "fs.read",
-            "fs.write",
-            "mcp.call",
-            "network.fetch",
-            "shell.exec",
-            "skill.read",
-            "task.manage",
-            "user.prompt",
-        ],
         prompt=(
             "## Execution Mode: ACTION\n\n"
             "### Overview\n"
@@ -67,16 +52,6 @@ BUILTIN_MODES = {
         name="Explore",
         description="Read-only mode for Q&A, research, code explanation, architecture review, and planning.",
         read_only=True,
-        allowed_capabilities=[
-            "agent.delegate",
-            "fs.read",
-            "network.fetch",
-            "shell.exec",
-            "skill.read",
-            "task.manage",
-            "user.prompt",
-        ],
-        denied_capabilities=["fs.write", "mcp.call"],
         prompt=(
             "## Execution Mode: EXPLORE\n\n"
             "### Overview\n"
@@ -93,9 +68,8 @@ BUILTIN_MODES = {
             "3. Edit / Implementation Request: State clearly that you are in Explore mode and tell the user to press Shift+Tab or type /action to switch to Action mode."
         ),
         disallowed_tools=[
-            "create", "edit", "multi_edit", "Create", "Edit", "MultiEdit",
-            "replace_file_content", "multi_replace_file_content",
-            "replace", "multi_replace", "write_file", "save_file"
+            "create", "edit", "multi_edit",
+            "write_to_file", "replace_file_content", "multi_replace_file_content"
         ],
         source="builtin",
     ),
@@ -198,8 +172,6 @@ class ModeManager:
                 read_only=read_only_val,
                 prompt=prompt,
                 disallowed_tools=disallowed_tools,
-                allowed_capabilities=_parse_list("allowed_capabilities"),
-                denied_capabilities=_parse_list("denied_capabilities"),
                 allowed_shell_commands=_parse_list("allowed_shell_commands"),
                 workspace_allowlist=_parse_list("workspace_allowlist"),
                 source=source,

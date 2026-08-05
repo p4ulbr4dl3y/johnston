@@ -240,4 +240,3 @@ You are in high-level architecture planning mode. Analyze code structure, propos
 - `name`: Display name.
 - `read_only`: Boolean flag blocking state-changing operations.
 - `disallowed_tools`: List of specific tool names disabled in this mode.
-- `allowed_capabilities` / `denied_capabilities`: Fine-grained capability toggles (`fs.read`, `fs.write`, `shell.exec`, `mcp.call`, `skill.read`, etc.).
