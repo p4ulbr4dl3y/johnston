@@ -22,6 +22,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.widget import Widget
 from textual.highlight import HighlightTheme
 from textual.reactive import reactive
 from textual.style import Style
@@ -1650,6 +1651,28 @@ class ChatView(VerticalScroll):
         else:
             display_text = text
 
+    async def _mount_smart(self, widget: Widget) -> None:
+        if not self.is_attached:
+            await self._wait_until_attached()
+        queued_divider = None
+        for child in self.children:
+            if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
+                queued_divider = child
+                break
+        if queued_divider is not None:
+            await self.mount(widget, before=queued_divider)
+        else:
+            await self.mount(widget)
+
+    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
+        self.clear_welcome()
+        if attachments:
+            att_count = len(attachments)
+            img_s = "s" if att_count > 1 else ""
+            display_text = f"{text}\n└─ {att_count} image{img_s} attached"
+        else:
+            display_text = text
+
         msg = UserMessage(display_text, markup=False)
         if not self.is_attached:
             await self._wait_until_attached()
@@ -1661,9 +1684,7 @@ class ChatView(VerticalScroll):
     async def add_bot_message(self, animate: bool = True) -> BotMessage:
         self.clear_welcome()
         msg = BotMessage()
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(msg)
+        await self._mount_smart(msg)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return msg
@@ -1671,9 +1692,7 @@ class ChatView(VerticalScroll):
     async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
         self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(widget)
+        await self._mount_smart(widget)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
@@ -1683,9 +1702,7 @@ class ChatView(VerticalScroll):
 
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(widget)
+        await self._mount_smart(widget)
         if not self._is_loading_session and (not animate or self.is_at_bottom()):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget

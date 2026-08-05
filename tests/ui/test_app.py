@@ -129,7 +129,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             await app.on_chat_input_submitted(FakeEvent())
             self.assertEqual(len(app.message_queue), 1)
-            self.assertEqual(app.message_queue[0][:2], ("Queued message", True))
+            self.assertEqual(app.message_queue[0][:2], ("Queued message", False))
 
     async def test_message_queue_rendering_sequence(self):
         app = JohnstonApp()

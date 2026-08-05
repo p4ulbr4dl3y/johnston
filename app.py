@@ -491,15 +491,26 @@ class JohnstonApp(App):
             self.notify(f"Error executing command: {e}", severity="error")
 
     def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Queue message to be executed after current turn finishes."""
+        """Queue message and render Queued Messages divider and user bubble immediately."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
+        item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
-            try:
-                self.notify("Message queued", severity="info")
-            except Exception:
-                pass
+            need_divider = not getattr(self, "_has_rendered_queue_divider", False)
+            if need_divider:
+                self._has_rendered_queue_divider = True
+
+            async def _render():
+                try:
+                    chat_view = self.query_one(ChatView)
+                    if need_divider:
+                        await chat_view.add_compaction_divider("Queued Messages")
+                    await chat_view.add_user_message(prompt, attachments=attachments)
+                    self.notify("Message queued", severity="info")
+                except Exception as e:
+                    print(f"Error rendering queued message in UI: {e}")
+
+            asyncio.create_task(_render())
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -552,9 +563,6 @@ class JohnstonApp(App):
         chat_view = self.query_one(ChatView)
 
         if show_in_ui:
-            if getattr(self, "_rendering_queued_item", False) and not getattr(self, "_has_rendered_queue_divider", False):
-                self._has_rendered_queue_divider = True
-                await chat_view.add_compaction_divider("Queued Messages")
             await chat_view.add_user_message(user_text, attachments=attachments)
 
         bot_msg = None
