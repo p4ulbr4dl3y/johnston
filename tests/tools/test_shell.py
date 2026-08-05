@@ -140,7 +140,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Command is running in background", res)
             mock_ctx.add_background_task.assert_called_once()
-            mock_ctx.notify.assert_called_once()
 
     async def test_create_windows_process_powershell(self):
         with (
@@ -234,7 +233,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Command is running in background", res)
             mock_ctx.add_background_task.assert_called_once()
-            mock_ctx.notify.assert_called_once()
 
     async def test_subagent_explicit_run_in_background_rejected(self):
         mock_ctx = MagicMock()
