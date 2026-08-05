@@ -375,7 +375,10 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             app.message_queue.append(("Should not run", False, None, app.current_session_id))
             app.generate_ai_response("Failing prompt")
-            await pilot.pause(0.5)
+            for _ in range(20):
+                await pilot.pause(0.1)
+                if len(app.message_queue) == 0:
+                    break
 
             self.assertEqual(len(app.message_queue), 0)
             self.assertFalse(app.is_generating)
