@@ -22,7 +22,6 @@ from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widget import Widget
 from textual.highlight import HighlightTheme
 from textual.reactive import reactive
 from textual.style import Style
@@ -1653,15 +1652,6 @@ class ChatView(VerticalScroll):
                 await asyncio.sleep(0.005)
         except Exception:
             pass
-
-    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
-        self.clear_welcome()
-        if attachments:
-            att_count = len(attachments)
-            img_s = "s" if att_count > 1 else ""
-            display_text = f"{text}\n└─ {att_count} image{img_s} attached"
-        else:
-            display_text = text
 
     async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
         self.clear_welcome()

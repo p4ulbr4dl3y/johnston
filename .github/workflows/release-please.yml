@@ -40,7 +40,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         run: |
           uv run ruff check .
-          uv run python -m unittest discover -s tests
+          uv run pytest
 
       - name: Build package
         if: ${{ steps.release.outputs.release_created }}
