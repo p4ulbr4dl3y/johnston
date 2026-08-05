@@ -38,7 +38,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
     async def test_concurrent_async_refreshes_are_coalesced(self):
         manager = self._manager_without_init()
 
-        async def slow_refresh(mode="all"):
+        async def slow_refresh(mode="eager"):
             await asyncio.sleep(0.02)
             return [{"type": "function", "function": {"name": "search"}}]
 
@@ -49,7 +49,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(results[0], results[1])
-        manager.get_active_tools_async.assert_awaited_once_with(mode="all")
+        manager.get_active_tools_async.assert_awaited_once_with(mode="eager")
 
     async def test_recent_refresh_uses_memory_cache(self):
         manager = self._manager_without_init()
