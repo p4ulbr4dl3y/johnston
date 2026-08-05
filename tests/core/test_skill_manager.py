@@ -25,6 +25,11 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fm["description"], "A cool skill")
         self.assertIn("# Title", body)
 
+        content_multiline = "---\nname: caveman\ndescription: >\n  Ultra-compressed mode.\n  Cuts tokens.\n---\nBody"
+        fm2, _ = parse_frontmatter(content_multiline)
+        self.assertEqual(fm2["name"], "caveman")
+        self.assertEqual(fm2["description"], "Ultra-compressed mode. Cuts tokens.")
+
     def test_global_and_project_skills(self):
         sm = SkillManager(project_dir=self.test_dir)
         global_tmp = tempfile.mkdtemp()
