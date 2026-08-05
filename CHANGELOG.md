@@ -1,5 +1,67 @@
 # Changelog
 
+## [0.16.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.15.0...johnston-v0.16.0) (2026-08-05)
+
+
+### Features
+
+* **cli:** add --system-prompt flag to print rendered system prompt ([a9c56e6](https://github.com/p4ulbr4dl3y/johnston/commit/a9c56e6aba853e029b63faf2135027bde4d6eee8))
+* **prompt:** group skills and subagents by path templates in system prompt ([09e18f7](https://github.com/p4ulbr4dl3y/johnston/commit/09e18f75140f9db52d656fda9f66e882592abff6))
+* **prompt:** increase project instructions truncation limit to 20000 chars ([5df8cc1](https://github.com/p4ulbr4dl3y/johnston/commit/5df8cc12147aa576c9ef3f30c5f3cac49a4a6549))
+* **skills:** add session-debugger project skill ([3652e8a](https://github.com/p4ulbr4dl3y/johnston/commit/3652e8a2cd32a3fa7527f38c9d1fc281fa287f09))
+* **tools:** add diff on create update, quote normalization and trailing newline deletion in edit ([70ceae7](https://github.com/p4ulbr4dl3y/johnston/commit/70ceae75dd5f0f957560817c48ca74b587655997))
+* **tools:** expand tool aliases in ALIAS_MAP ([ffbb1f5](https://github.com/p4ulbr4dl3y/johnston/commit/ffbb1f5ce70b89f5fe86a854b3790589a8b3cb87))
+* **tools:** pretty print JSON dumps and improve truncation hints ([09b6841](https://github.com/p4ulbr4dl3y/johnston/commit/09b6841a0867316035a449e3675d677f4654996e))
+* **ui:** dynamic Queued Messages divider tracking exact unstarted queue boundary ([0f960f2](https://github.com/p4ulbr4dl3y/johnston/commit/0f960f28ce58b2cdc00848ad9bf58cee422b803f))
+* **ui:** implement sticky Queued Messages divider with smart widget insertion above divider ([4279389](https://github.com/p4ulbr4dl3y/johnston/commit/42793896ef39f43ea1c5235dfa438f0c982e69c5))
+* **ui:** make message queue production-grade with session drift protection and checkpointing ([0e3d8a9](https://github.com/p4ulbr4dl3y/johnston/commit/0e3d8a9db18856d1f7ff9987814564f5b5cdf805))
+* **ui:** render Queued Messages divider above queued message execution block ([21f1c50](https://github.com/p4ulbr4dl3y/johnston/commit/21f1c5098cf898e8930911b0ccf4c6f10a982730))
+* **ui:** simplify message queue to batch-process all queued inputs in a single clean turn ([8d2f6b4](https://github.com/p4ulbr4dl3y/johnston/commit/8d2f6b4fdda1f958230f10a120dee7cf1cdcb7c7))
+* **ui:** unify code block syntax theme to one-dark ([31acbb8](https://github.com/p4ulbr4dl3y/johnston/commit/31acbb82af6c736f675b8d89f1d83c3815fdab9f))
+
+
+### Bug Fixes
+
+* **app:** respect show_in_ui flag when processing queued messages ([1171282](https://github.com/p4ulbr4dl3y/johnston/commit/1171282444f8c767019fd1b68b13dff387b1ef59))
+* **ask_user:** clear write-in input value between wizard questions ([d0053d3](https://github.com/p4ulbr4dl3y/johnston/commit/d0053d319977308c74d1449fcbc272948038af4a))
+* **ci:** fix ruff lint error and pytest test runner in release-please ([dde209b](https://github.com/p4ulbr4dl3y/johnston/commit/dde209b77f4d1190c480a06caece405955b8af4b))
+* **cli:** exit process cleanly after TUI shutdown ([61fc366](https://github.com/p4ulbr4dl3y/johnston/commit/61fc366a3c087c000f9ac86b124e6c1a6c10f020))
+* **cli:** exit process cleanly on exit and support RU hotkeys ([79fcc47](https://github.com/p4ulbr4dl3y/johnston/commit/79fcc47379e243a14cea7622e3304a3c5d1f7431))
+* **cli:** use clean sys.exit instead of os._exit to restore terminal TTY state ([658db2c](https://github.com/p4ulbr4dl3y/johnston/commit/658db2c97465158de309c0c750002c3d41c53c1e))
+* **prompt:** fix duplicate wording in DEFAULT_SYSTEM_PROMPT ([90c9ef9](https://github.com/p4ulbr4dl3y/johnston/commit/90c9ef9fc855204ed74f6064f29282508717a319))
+* **provider:** sanitize interrupted tool calls with synthetic responses to prevent API 400 errors ([120b2ad](https://github.com/p4ulbr4dl3y/johnston/commit/120b2ad6b48f2b020470437f647a63c941516975))
+* **tests:** resolve Windows CI race condition in test_exception_clears_queue ([4bb801a](https://github.com/p4ulbr4dl3y/johnston/commit/4bb801a41f6c03dc90cecf4c2ab5d8dc3b4471fc))
+* **tests:** wait for is_generating reset in test_exception_clears_queue ([9b5a983](https://github.com/p4ulbr4dl3y/johnston/commit/9b5a983147856ebc909a9f374609ef8932e4a72d))
+* **ui:** change divider title to Queued Message ([4e6bbba](https://github.com/p4ulbr4dl3y/johnston/commit/4e6bbba233ae946058ece01989bc2111c10f8768))
+* **ui:** defer queued user message rendering to guarantee strict chronological chat order ([0fbc7ba](https://github.com/p4ulbr4dl3y/johnston/commit/0fbc7ba4e2208039e30f762fb3b5180378a78128))
+* **ui:** defer rendering queued messages to guarantee strict chronological chat order ([dd3fbc4](https://github.com/p4ulbr4dl3y/johnston/commit/dd3fbc4f2cdc184d1ead0738a2bebbb8c2100025))
+* **ui:** disable Rich markup parsing in Static widgets to prevent text formatting glitches ([c268368](https://github.com/p4ulbr4dl3y/johnston/commit/c2683682b3f895bfb9bb748024dbf60994fd237f))
+* **ui:** eliminate async queue rendering race condition by awaiting _queue_message_ui directly ([159b549](https://github.com/p4ulbr4dl3y/johnston/commit/159b5492fe784be5d7dd8addaca029b2536d24ec))
+* **ui:** extend diff line background colors to full widget width ([86e10d0](https://github.com/p4ulbr4dl3y/johnston/commit/86e10d002bdeeb0b7c06c9e098fd1f3772ff8637))
+* **ui:** guarantee diff widget rendering when Create tool updates existing file ([da1ac4f](https://github.com/p4ulbr4dl3y/johnston/commit/da1ac4f0e92a44c429fc10b898e1a5983842a9ec))
+* **ui:** handle missing theme attribute on CustomMarkdownFence ([0165f15](https://github.com/p4ulbr4dl3y/johnston/commit/0165f1546757bbbe3471a000139d417dee56e166))
+* **ui:** keep only standard ctrl+c and ctrl+q bindings in chat_input ([defc6b9](https://github.com/p4ulbr4dl3y/johnston/commit/defc6b981d3aeb6c785ae37d6ec9a5f466d1be47))
+* **ui:** match background color of CustomMarkdownFence Syntax to [#18181](https://github.com/p4ulbr4dl3y/johnston/issues/18181)b ([d1973a3](https://github.com/p4ulbr4dl3y/johnston/commit/d1973a389f2a3b6c640c8bc18af5801389ea56fa))
+* **ui:** mount Queued Messages divider immediately when user queues input ([0496e28](https://github.com/p4ulbr4dl3y/johnston/commit/0496e2808e2a8edf1a7534e9b81364303ded1305))
+* **ui:** position Queued Messages divider before first unstarted queued message ([d255044](https://github.com/p4ulbr4dl3y/johnston/commit/d255044c5595e7b6065429d17bef4a66d567c412))
+* **ui:** preserve pre-mounted bot_msg reference during thinking stream ([027b070](https://github.com/p4ulbr4dl3y/johnston/commit/027b0701641ada4d3aac1bbe85f2492397674d14))
+* **ui:** remove Queued Messages divider when queue is empty ([9a48c2f](https://github.com/p4ulbr4dl3y/johnston/commit/9a48c2f6b4a940b18a2ffa40166e096f86e14dfa))
+* **ui:** render queued user message bubble immediately under Queued Messages divider ([05d0395](https://github.com/p4ulbr4dl3y/johnston/commit/05d03953cd631b6464baae1c421213f626689d08))
+* **ui:** scope background tasks by session and sort running items first ([14a9e87](https://github.com/p4ulbr4dl3y/johnston/commit/14a9e878b0b5995151f3f63ff9d89be0d4cec012))
+* **ui:** strip Success status text from diff view display ([7355d7c](https://github.com/p4ulbr4dl3y/johnston/commit/7355d7ce27e92a3365f0e25d1681eb19810b22f0))
+* **ui:** strip system hints from UI tool expansion blocks ([33d2a75](https://github.com/p4ulbr4dl3y/johnston/commit/33d2a754afc24a82b8b6dddb165ea8a15074a59d))
+* **ui:** use plain text lexer for non-code fence blocks to prevent false syntax highlighting ([483954d](https://github.com/p4ulbr4dl3y/johnston/commit/483954dfc38d6404e6c635014a371319119a3c96))
+
+
+### Reverts
+
+* **cli:** remove temporary --system-prompt debug flag ([209c18b](https://github.com/p4ulbr4dl3y/johnston/commit/209c18b05fcd52a50f6f0c5d828f0e36b969df58))
+
+
+### Documentation
+
+* **architect:** document .json format support for subagents in johnston-architect skill ([f072ceb](https://github.com/p4ulbr4dl3y/johnston/commit/f072ceb491048200719cdfd206ea6f6fc6dd1050))
+
 ## [0.15.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.14.0...johnston-v0.15.0) (2026-08-03)
 
 
