@@ -274,6 +274,9 @@ class ReadTool(BaseTool):
             except Exception as e:
                 return f"ERR: file '{path}': {e}"
 
+        from tools.file_state import record_file_read
+        record_file_read(path)
+
         from tools.utils import format_line_pagination
 
         start_line = args.get("start_line")

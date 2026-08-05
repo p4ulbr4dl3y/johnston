@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from tools.base import BaseTool, atomic_write_text, resolve_path
+from tools.file_state import record_file_write, verify_file_read
 from tools.linter import run_linter
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
@@ -236,6 +237,10 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     if os.path.isdir(path):
         return f"ERR: '{path}' is a directory"
 
+    ok, err_msg = verify_file_read(path)
+    if not ok:
+        return err_msg
+
     def _do_edit():
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
@@ -246,6 +251,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
 
     try:
         diff_output = await asyncio.to_thread(_do_edit)
+        record_file_write(path)
     except ValueError as ve:
         return str(ve)
     except Exception as e:

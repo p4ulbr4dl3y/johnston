@@ -127,9 +127,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_edit_tool(self):
         tool = EditTool()
+        read_tool = ReadTool()
         file_path = os.path.join(self.test_dir, "code.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    return 42\n")
+        await read_tool.execute({"path": file_path})
 
         # Edit on directory error
         res_edit_dir = await tool.execute({"target_file": self.test_dir, "target_content": "a", "replacement_content": "b"})
@@ -149,6 +151,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Edit with curly quote normalization
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("msg = “hello”\n")
+        await read_tool.execute({"path": file_path})
         await tool.execute({
             "target_file": file_path,
             "target_content": 'msg = "hello"',
@@ -160,6 +163,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Edit with deletion stripping trailing newline
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("line1\nline2\nline3\n")
+        await read_tool.execute({"path": file_path})
         await tool.execute({
             "target_file": file_path,
             "target_content": "line2",
@@ -180,6 +184,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Multiple occurrences error
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("dup\ndup\n")
+        await read_tool.execute({"path": file_path})
         res_dup = await tool.execute({
             "path": file_path,
             "old_string": "dup",
@@ -300,6 +305,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "range_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("val = 1\nval = 1\nval = 1\n")
+        await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
         # Replace val = 1 only on line 2 (start_line=2, end_line=2)
@@ -322,6 +328,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "range_err.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("first_line = 1\nsecond_line = 2\ntarget_line = 3\n")
+        await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
         # Search for target_line = 3 in lines 1-2 (must fail with line hint error)
@@ -340,6 +347,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "auto_expand.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def sample():\n    a = 1\n    b = 2\n    c = 3\n    return a + b + c\n")
+        await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
         # target_content is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
@@ -360,6 +368,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "multi_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def fn_one():\n    return 1\n\ndef fn_two():\n    return 2\n")
+        await ReadTool().execute({"path": file_path})
 
         tool = MultiEditTool()
         res = await tool.execute({
