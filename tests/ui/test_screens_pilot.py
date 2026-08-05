@@ -148,11 +148,13 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         task_sub = MagicMock()
         task_sub.task_id = "task-sub"
         task_sub.command = "sub task"
+        task_sub.is_background = True
         task_sub.async_task = MagicMock()
 
         task_normal = MagicMock()
         task_normal.task_id = "task-norm"
         task_normal.command = "norm task"
+        task_normal.is_background = True
         del task_normal.async_task
 
         screen = TasksListScreen()
@@ -194,7 +196,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         task_normal.task_id = "task-norm"
         task_normal.command = "short cmd"
         task_normal.is_running = True
-        task_normal.is_background = False
+        task_normal.is_background = True
         task_normal.kill = MagicMock(return_value=None)
         task_normal.get_formatted_output.return_value = "killed output"
 

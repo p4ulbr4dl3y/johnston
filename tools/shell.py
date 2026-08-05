@@ -235,6 +235,10 @@ class ShellTool(BaseTool):
                 except Exception:
                     pass
             raise
+        finally:
+            if 'task' in locals() and task and not getattr(task, "is_background", False):
+                if ctx.app and hasattr(ctx.app, "background_tasks") and task in ctx.app.background_tasks:
+                    ctx.app.background_tasks.remove(task)
 
     async def _create_std_process(self, command: str, env: dict[str, str]):
         if is_windows():
