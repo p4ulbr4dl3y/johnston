@@ -748,6 +748,10 @@ class JohnstonApp(App):
             else:
                 self.is_generating = False
                 self._has_rendered_queue_divider = False
+                try:
+                    chat_view.remove_queued_divider()
+                except Exception:
+                    pass
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background shell command finishes"""

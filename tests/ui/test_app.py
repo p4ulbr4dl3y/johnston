@@ -198,6 +198,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ran_attachments[1], [fake_att])
                 self.assertFalse(app.is_generating)
                 self.assertEqual(len(app.message_queue), 0)
+                dividers = [c for c in app.query_one(ChatView).children if getattr(c, "divider_title", None) == "Queued Messages"]
+                self.assertEqual(len(dividers), 0)
 
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
