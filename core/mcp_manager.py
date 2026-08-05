@@ -867,7 +867,10 @@ class MCPManager:
 
         task = self._tools_refresh_task
         if task is None or task.done():
-            task = asyncio.create_task(self.get_active_tools_async(mode="all"))
+            # Only warm up eager servers here. Lazy servers stay unstarted
+            # until an explicit call_mcp; auto-starting them spawns subprocess
+            # reader threads that block interpreter shutdown in headless mode.
+            task = asyncio.create_task(self.get_active_tools_async(mode="eager"))
             self._tools_refresh_task = task
 
         try:

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -233,35 +234,53 @@ def run_headless_prompt(
 
     async def _runner():
         last_printed_len = 0
-        async for step in agent.stream_steps(prompt):
-            chunk_type = step[0]
-            val1 = step[1] if len(step) > 1 else ""
-            val2 = step[2] if len(step) > 2 else ""
+        try:
+            async for step in agent.stream_steps(prompt):
+                chunk_type = step[0]
+                val1 = step[1] if len(step) > 1 else ""
+                val2 = step[2] if len(step) > 2 else ""
 
-            if chunk_type in ("bot_delta", "bot_text", "text"):
-                if len(val1) < last_printed_len:
-                    last_printed_len = 0
-                new_text = val1[last_printed_len:]
-                if new_text:
-                    sys.stdout.write(new_text)
-                    sys.stdout.flush()
-                    last_printed_len = len(val1)
-            elif not quiet:
-                if chunk_type in ("thinking_start", "thinking_delta") and verbose:
-                    sys.stderr.write(f"\r[Thinking: {val1[:80]}...]\x1b[K")
-                    sys.stderr.flush()
-                elif chunk_type == "thinking_end" and verbose:
-                    sys.stderr.write(f"\n[Thought for {val1}s]\n")
-                    sys.stderr.flush()
-                elif chunk_type == "tool":
-                    last_printed_len = 0
-                    sys.stderr.write(f"\n[Executing Tool: {val1} ({val2})]\n")
-                    sys.stderr.flush()
-                elif chunk_type == "tool_result" and verbose:
-                    sys.stderr.write(f"[Tool Result: {str(val1)[:150]}...]\n")
-                    sys.stderr.flush()
-        sys.stdout.write("\n")
-        sys.stdout.flush()
+                if chunk_type in ("bot_delta", "bot_text", "text"):
+                    if len(val1) < last_printed_len:
+                        last_printed_len = 0
+                    new_text = val1[last_printed_len:]
+                    if new_text:
+                        sys.stdout.write(new_text)
+                        sys.stdout.flush()
+                        last_printed_len = len(val1)
+                elif not quiet:
+                    if chunk_type == "thinking_start":
+                        sys.stderr.write("[Thinking...]\r")
+                        sys.stderr.flush()
+                    elif chunk_type == "thinking_delta" and verbose:
+                        sys.stderr.write(f"\r[Thinking: {val1[:80]}...]\x1b[K")
+                        sys.stderr.flush()
+                    elif chunk_type == "thinking_end":
+                        if verbose:
+                            sys.stderr.write(f"\n[Thought for {val1}s]\n")
+                        else:
+                            sys.stderr.write("\x1b[K\r")
+                        sys.stderr.flush()
+                    elif chunk_type == "tool":
+                        last_printed_len = 0
+                        sys.stderr.write(f"\n[Executing Tool: {val1} ({val2})]\n")
+                        sys.stderr.flush()
+                    elif chunk_type == "tool_result" and verbose:
+                        sys.stderr.write(f"[Tool Result: {str(val1)[:150]}...]\n")
+                        sys.stderr.flush()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        finally:
+            try:
+                from core.mcp_manager import get_mcp_manager
+                get_mcp_manager().stop_all()
+            except Exception:
+                pass
+            if hasattr(agent, "client") and hasattr(agent.client, "close"):
+                try:
+                    await asyncio.wait_for(agent.client.close(), timeout=3)
+                except Exception:
+                    pass
 
     asyncio.run(_runner())
 
@@ -327,10 +346,27 @@ def main():
         sys.exit(0)
 
     # Check for stdin piped input (e.g. cat file | johnston -p "...")
+    # Never block on a non-tty stdin that has no pending data (e.g. launched
+    # from another tool where the pipe stays open without input).
     stdin_input = ""
-    if not sys.stdin.isatty():
+    if args.prompt and not sys.stdin.isatty():
         try:
-            stdin_input = sys.stdin.read().strip()
+            if sys.platform == "win32":
+                data = sys.stdin.read()
+            else:
+                import fcntl
+
+                fd = sys.stdin.fileno()
+                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                try:
+                    data = sys.stdin.read()
+                except BlockingIOError:
+                    data = ""
+                finally:
+                    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+            if data:
+                stdin_input = data.strip()
         except Exception:
             pass
 
