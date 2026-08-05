@@ -94,8 +94,8 @@ def get_project_instructions_snippet() -> str:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
                 if content:
-                    if len(content) > 2500:
-                        content = content[:2500] + "\n... [Project instructions truncated at 2500 chars]"
+                    if len(content) > 20000:
+                        content = content[:20000] + "\n... [Project instructions truncated at 20000 chars]"
                     found_snippets.append(f"## Project Instructions ({name})\n{content}")
             except Exception:
                 pass
