@@ -220,7 +220,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
                 self.assertTrue(app.is_generating)
 
-                app._queue_message_ui("Prompt 2", show_in_ui=True)
+                await app._queue_message_ui("Prompt 2", show_in_ui=True)
                 self.assertEqual(len(app.message_queue), 1)
 
                 chat_input = app.query_one("#message-input", ChatInput)
