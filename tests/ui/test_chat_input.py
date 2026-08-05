@@ -422,6 +422,35 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             ci.load_text("Hello M<65;1272;815M World [<65;1272;815M")
             self.assertEqual(ci.text, "Hello  World ")
 
+    async def test_file_suggestion_replaces_current_at_token_and_preserves_cursor(self):
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        async with app.run_test():
+            ci.load_text("attach @REA")
+            ci.move_cursor((0, len("attach @REA")))
+            ci.apply_file_suggestion("README.md", 7)
+
+            self.assertEqual(ci.text, "attach @README.md ")
+            self.assertEqual(ci.cursor_location, (0, len("attach @README.md ")))
+
+    async def test_typing_runs_one_input_change_per_key(self):
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        async with app.run_test() as pilot:
+            change_count = 0
+            original = ci._on_input_change
+
+            def count_change():
+                nonlocal change_count
+                change_count += 1
+                return original()
+
+            ci._on_input_change = count_change
+            await pilot.press(*list("abcdefghij"))
+            await pilot.pause(0.1)
+
+            self.assertEqual(change_count, 10)
+
 
 if __name__ == "__main__":
     unittest.main()

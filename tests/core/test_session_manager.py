@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import tempfile
@@ -151,6 +152,49 @@ class TestSessionManagerRegression(unittest.TestCase):
         # Ensure no leftover .tmp files
         tmp_files = [f for f in os.listdir(self.sm.sessions_dir) if ".tmp." in f]
         self.assertEqual(tmp_files, [])
+
+
+class TestSessionManagerPureReader(unittest.TestCase):
+    """list_sessions must be a pure reader (no destructive side effects); empty-file
+    cleanup is a separate explicit purge_empty_sessions operation."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.p1 = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
+        self.p2 = patch("core.session_manager.CONFIG_DIR", self.test_dir)
+        self.p1.start()
+        self.p2.start()
+        self.project_path = os.path.join(self.test_dir, "proj")
+        os.makedirs(self.project_path, exist_ok=True)
+        from core.session_manager import SessionManager
+        self.sm = SessionManager(project_path=self.project_path)
+
+    def tearDown(self):
+        self.p1.stop()
+        self.p2.stop()
+        shutil.rmtree(self.test_dir)
+
+    def test_list_sessions_does_not_delete_empty_files(self):
+        empty_path = os.path.join(self.sm.sessions_dir, "empty.json")
+        with open(empty_path, "w") as f:
+            json.dump({"id": "empty", "ui_messages": [], "agent_history": []}, f)
+
+        sid = self.sm.generate_session_id()
+        self.sm.save_session(sid, {"id": sid, "ui_messages": [{"type": "user", "text": "real"}]})
+
+        sessions = self.sm.list_sessions()
+        self.assertTrue(os.path.exists(empty_path))
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0]["id"], sid)
+
+    def test_purge_empty_sessions_removes_files(self):
+        empty_path = os.path.join(self.sm.sessions_dir, "empty.json")
+        with open(empty_path, "w") as f:
+            json.dump({"id": "empty", "ui_messages": [], "agent_history": []}, f)
+
+        removed = self.sm.purge_empty_sessions()
+        self.assertEqual(removed, 1)
+        self.assertFalse(os.path.exists(empty_path))
 
 
 if __name__ == "__main__":

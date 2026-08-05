@@ -1,8 +1,10 @@
 import unittest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView, UserMessage
+from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import (
     HelpScreen,
     ModelScreen,
@@ -440,6 +442,51 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
 
                 self.assertTrue(len(checkpoint_calls) >= 2)
+
+    async def test_plain_submit_routes_to_ai_and_clears_input(self):
+        app = JohnstonApp()
+        app.trigger_ai_response = MagicMock()
+
+        async with app.run_test() as pilot:
+            chat_input = app.query_one("#message-input", ChatInput)
+            chat_input.load_text("hello ui")
+            await pilot.press("enter")
+            await pilot.pause()
+
+            app.trigger_ai_response.assert_called_once_with("hello ui", show_in_ui=True)
+            self.assertEqual(chat_input.text, "")
+            self.assertTrue(chat_input.has_focus)
+
+    async def test_slash_submit_uses_command_handler_not_ai_route(self):
+        app = JohnstonApp()
+        app.trigger_ai_response = MagicMock()
+
+        with patch("app.handle_slash_command", new_callable=AsyncMock) as mock_handle:
+            mock_handle.return_value = True
+
+            async with app.run_test() as pilot:
+                chat_input = app.query_one("#message-input", ChatInput)
+                chat_input.load_text("/help ")
+                await pilot.press("enter")
+                await pilot.pause()
+
+        mock_handle.assert_awaited_once_with(app, "/help")
+        app.trigger_ai_response.assert_not_called()
+
+    async def test_command_suggestions_open_for_slash_and_hide_after_space(self):
+        app = JohnstonApp()
+
+        async with app.run_test():
+            suggestions = app.query_one("#command-suggestions", CommandSuggestions)
+
+            matches = suggestions.update_query("/he", "/he", 3)
+            self.assertEqual(suggestions.mode, "command")
+            self.assertTrue(suggestions.display)
+            self.assertIn("/help", matches)
+
+            matches = suggestions.update_query("/help now", "/help now", 9)
+            self.assertEqual(matches, [])
+            self.assertFalse(suggestions.display)
 
 
 if __name__ == "__main__":
