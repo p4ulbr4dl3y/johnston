@@ -490,7 +490,7 @@ class JohnstonApp(App):
         except Exception as e:
             self.notify(f"Error executing command: {e}", severity="error")
 
-    def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
+    async def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Queue message and render Queued Messages divider and user bubble immediately."""
         curr_sid = getattr(self, "current_session_id", None)
         item = (prompt, False, attachments, curr_sid) if attachments else (prompt, False, None, curr_sid)
@@ -500,17 +500,14 @@ class JohnstonApp(App):
             if need_divider:
                 self._has_rendered_queue_divider = True
 
-            async def _render():
-                try:
-                    chat_view = self.query_one(ChatView)
-                    if need_divider:
-                        await chat_view.add_compaction_divider("Queued Messages")
-                    await chat_view.add_user_message(prompt, attachments=attachments)
-                    self.notify("Message queued", severity="info")
-                except Exception as e:
-                    print(f"Error rendering queued message in UI: {e}")
-
-            asyncio.create_task(_render())
+            try:
+                chat_view = self.query_one(ChatView)
+                if need_divider:
+                    await chat_view.add_compaction_divider("Queued Messages")
+                await chat_view.add_user_message(prompt, attachments=attachments)
+                self.notify("Message queued", severity="info")
+            except Exception as e:
+                print(f"Error rendering queued message in UI: {e}")
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -531,14 +528,14 @@ class JohnstonApp(App):
 
         kwargs = {"attachments": attachments} if attachments else {}
         if self.is_generating:
-            self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
+            await self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
     def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
         if getattr(self, "is_generating", False):
-            self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments)
+            asyncio.create_task(self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments))
         else:
             self.is_generating = True
             kwargs = {"attachments": attachments} if attachments else {}
