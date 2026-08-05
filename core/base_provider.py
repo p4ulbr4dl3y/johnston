@@ -493,7 +493,10 @@ class BaseAgent:
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             from core.mcp_manager import get_mcp_manager
 
-            await get_mcp_manager().ensure_tools_ready_async()
+            try:
+                await asyncio.wait_for(get_mcp_manager().ensure_tools_ready_async(max_age=60.0), timeout=0.5)
+            except Exception:
+                pass
         builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name)
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
@@ -656,9 +659,13 @@ class BaseAgent:
                                 if getattr(chunk, "usage", None):
                                     step_usage = parse_usage(chunk.usage)
 
-                                if not chunk.choices:
+                                choices = getattr(chunk, "choices", None) if not isinstance(chunk, dict) else chunk.get("choices")
+                                if not choices and (hasattr(chunk, "data") or (isinstance(chunk, dict) and "data" in chunk)):
+                                    d = getattr(chunk, "data", None) if not isinstance(chunk, dict) else chunk.get("data")
+                                    choices = d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
+                                if not choices:
                                     continue
-                                choice = chunk.choices[0]
+                                choice = choices[0]
                                 delta = choice.delta
                                 reasoning = (
                                     getattr(delta, "reasoning_content", None)
@@ -1133,6 +1140,12 @@ class BaseAgent:
                     )
                     if res:
                         choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
+                        if not choices:
+                            d = res.get("data") if isinstance(res, dict) else getattr(res, "data", None)
+                            if isinstance(d, dict):
+                                choices = d.get("choices")
+                            elif d and hasattr(d, "choices"):
+                                choices = getattr(d, "choices")
                         if choices and choices[0]:
                             first_choice = choices[0]
                             if isinstance(first_choice, dict):
