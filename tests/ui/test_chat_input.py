@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
@@ -38,6 +39,16 @@ class TestClipboardAttachment(unittest.TestCase):
 
 
 class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.tmp_file = os.path.join(self.tmp_dir.name, "prompt_history.json")
+        self.patcher = patch("core.config.PROMPT_HISTORY_FILE", self.tmp_file)
+        self.patcher.start()
+
+    async def asyncTearDown(self):
+        self.patcher.stop()
+        self.tmp_dir.cleanup()
+
     async def test_on_mount_and_update_height(self):
         ci = ChatInput()
         app = DummyChatApp(ci)
@@ -240,6 +251,23 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
             await ci._on_key(event_down)
             self.assertEqual(ci.text, "Draft text")
+
+    async def test_prompt_history_persistence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_history_file = os.path.join(tmpdir, "prompt_history.json")
+            with patch("core.config.PROMPT_HISTORY_FILE", tmp_history_file), \
+                 patch("core.config.CONFIG_DIR", tmpdir):
+                ci = ChatInput()
+                self.assertEqual(ci.prompt_history, [])
+
+                ci.add_to_history("Global prompt 1")
+                ci.add_to_history("Global prompt 2")
+                self.assertTrue(os.path.exists(tmp_history_file))
+
+                # New ChatInput instance loads persisted history
+                ci2 = ChatInput()
+                self.assertEqual(ci2.prompt_history, ["Global prompt 1", "Global prompt 2"])
+                self.assertEqual(ci2.prompt_history_index, 2)
 
     async def test_key_shortcuts(self):
         ci = ChatInput()
