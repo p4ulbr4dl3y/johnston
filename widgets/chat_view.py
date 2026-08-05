@@ -1731,7 +1731,7 @@ class ChatView(VerticalScroll):
                 queued_divider = child
                 break
 
-        if first_queued_text is None:
+        if not first_queued_text:
             if queued_divider:
                 queued_divider.remove()
             return
