@@ -1700,6 +1700,12 @@ class ChatView(VerticalScroll):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
+    def remove_queued_divider(self) -> None:
+        """Remove any 'Queued Messages' compaction divider from the chat view."""
+        for child in list(self.children):
+            if isinstance(child, CompactionDivider) and getattr(child, "divider_title", None) == "Queued Messages":
+                child.remove()
+
     def get_user_messages(self) -> list[tuple[int, str]]:
         result = []
         for idx, child in enumerate(self.children):
