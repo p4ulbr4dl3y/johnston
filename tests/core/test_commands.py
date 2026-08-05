@@ -248,12 +248,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.chat_view.dividers), 1)
         self.assertEqual(app.chat_view.dividers[0].divider_title, "Compaction Cancelled")
 
-    async def test_init_command(self):
+    async def test_init_skill_command(self):
         app = MockApp()
         handled = await handle_slash_command(app, "/init")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("AGENTS.md", app.ai_prompts[0][0])
+        self.assertIn("init", app.ai_prompts[0][0])
 
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
@@ -380,7 +380,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)
-        self.assertIn("/init", COMMAND_REGISTRY)
         self.assertIn("/help", COMMAND_REGISTRY)
         self.assertIn("/connect", COMMAND_REGISTRY)
 
@@ -396,15 +395,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(commands_dict["/model"], "Alias for /models")
         self.assertIn("Manage AI providers", commands_dict["/providers"])
 
-    async def test_handoff_command(self):
-        from core.commands import HandoffCommand
+    async def test_handoff_skill_command(self):
         app = MockApp()
-        cmd = HandoffCommand()
-        await cmd.execute(app)
+        handled = await handle_slash_command(app, "/handoff")
+        self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        prompt, show_in_ui = app.ai_prompts[0]
-        self.assertTrue(show_in_ui)
-        self.assertIn("`HANDOFF.md`", prompt)
+        self.assertIn("handoff", app.ai_prompts[0][0])
 
 
     async def test_new_command_clears_background_tasks(self):

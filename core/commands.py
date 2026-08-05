@@ -412,71 +412,6 @@ class MCPCommand(BaseCommand):
         app.push_screen(MCPScreen())
 
 
-INIT_PROMPT_TEMPLATE = """## Task: Repository Initialization
-
-### Goal
-Create or update `AGENTS.md` for this repository to help future AI sessions avoid mistakes and ramp up quickly.
-
-### Investigation Protocol
-Read high-value sources first:
-1. `README*`, root manifests, workspace config, lockfiles
-2. Build, test, lint, formatter, typecheck, and codegen config
-3. CI workflows and pre-commit / task runner config
-4. Existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`)
-
-If architecture is still unclear, inspect representative code files to find entrypoints and boundaries.
-
-### Writing Rules
-Include high-signal, repo-specific guidance:
-1. Exact commands and shortcuts the agent would otherwise guess wrong
-2. Architecture notes not obvious from filenames
-3. Conventions that differ from language or framework defaults
-
-When in doubt, omit. Prefer short sections and bullets.
-If `AGENTS.md` already exists, improve it in place rather than rewriting blindly."""
-
-class InitCommand(BaseCommand):
-    name = "/init"
-    description = "Start guided `AGENTS.md` setup"
-
-    async def execute(self, app) -> None:
-        app.trigger_ai_response(INIT_PROMPT_TEMPLATE, show_in_ui=True)
-
-
-HANDOFF_PROMPT_TEMPLATE = """## Task: Generate Session Continuation Handoff Note
-
-### Goal
-Create or update `HANDOFF.md` in the repository working directory to enable another AI agent to continue work seamlessly.
-
-### Execution Constraints & Security
-1. Do not output the full handoff note in chat. Write or overwrite `HANDOFF.md` using file tools.
-2. Output only a brief 1-2 sentence confirmation linking to `HANDOFF.md` in chat.
-3. REDACT all sensitive information, including API keys, tokens, passwords, and personally identifiable information (PII).
-4. DO NOT infer or hallucinate completed work, decisions, inspected files, or test results not present in the conversation context.
-
-### Required Document Structure (`HANDOFF.md`)
-1. **Goal & User Intent**: High-level goal, current objective, and explicit user requirements.
-2. **Current State & Modified Files**: Work completed so far. Reference key modified/created files using exact paths (e.g. `path/file.ext#L10-L30`).
-3. **Decisions Made (Do Not Re-litigate)**: Architectural/technical choices agreed upon and the rationale behind them.
-4. **Verification & Test Status**: Explicit commands run (e.g. `uv run pytest`) and their exact results (PASS/FAIL).
-5. **Remaining Tasks & Open Questions**: Actionable next steps, unresolved questions, or blockers.
-6. **Active / Recommended Skills & Tools**: Skills or tools used in this session or recommended for the next session.
-
-### Writing Rules
-1. If there is little or no prior session context, state that explicitly in the file.
-2. Prefer concise sections and bullet points.
-3. Do not dump entire source files or raw conversation logs into `HANDOFF.md`. Use file links for existing code. You MAY write detailed Markdown explanations, architectural specs, or essential code snippets if crucial for continuation."""
-
-
-
-class HandoffCommand(BaseCommand):
-    name = "/handoff"
-    description = "Prepare a continuation note for the next AI session"
-
-    async def execute(self, app) -> None:
-        app.trigger_ai_response(HANDOFF_PROMPT_TEMPLATE, show_in_ui=True)
-
-
 class CompactCommand(BaseCommand):
     name = "/compact"
     aliases = ["/compress"]
@@ -559,8 +494,6 @@ COMMAND_CLASSES = [
     SubagentsCommand,
     SkillsCommand,
     MCPCommand,
-    InitCommand,
-    HandoffCommand,
     CompactCommand,
 ]
 
