@@ -511,6 +511,13 @@ SubagentsScreen #modal-dialog {
     scrollbar-size: 0 0;
 }
 
+SubagentViewScreen MarkdownFence,
+SubagentViewScreen CustomMarkdownFence,
+SubagentViewScreen MarkdownFence #code-content,
+SubagentViewScreen CustomMarkdownFence #code-content {
+    background: #18181b;
+}
+
 #modal-dialog MarkdownFence * {
     background: transparent;
 }
