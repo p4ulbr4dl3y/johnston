@@ -163,7 +163,7 @@ class InvokeSubagentTool(BaseTool):
                 if has_changes and diff_text:
                     acc[0] += (
                         f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply these changes to the current working tree.\n\n"
+                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n\n"
                         f"{diff_text}"
                     )
                 SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
