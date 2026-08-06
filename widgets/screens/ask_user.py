@@ -155,7 +155,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                 except Exception:
                     pass
 
-    def update_step(self) -> None:
+    def update_step(self, target_highlight: int | None = None) -> None:
         title_md = self.query_one("#wizard-title", Markdown)
         opt_list = self.query_one("#options-list", OptionList)
         input_field = self.query_one("#write-in-input", Input)
@@ -176,7 +176,13 @@ class AskUserWizardScreen(ModalScreen[str]):
                 opt_list.display = True
                 opt_list.clear_options()
 
-                if prev_answer:
+                if target_highlight is not None and target_highlight < len(self.options):
+                    highlight_idx = target_highlight
+                    if highlight_idx == len(self.options) - 1 and prev_answer and prev_answer not in self.raw_options:
+                        input_field.value = prev_answer
+                    elif highlight_idx < len(self.raw_options):
+                        input_field.value = ""
+                elif prev_answer:
                     if prev_answer in self.raw_options:
                         highlight_idx = self.raw_options.index(prev_answer)
                         input_field.value = ""
@@ -185,14 +191,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                         input_field.value = prev_answer
                         input_field.display = True
                 else:
-                    try:
-                        curr_hl = opt_list.highlighted
-                    except Exception:
-                        curr_hl = None
-                    if curr_hl is not None and curr_hl < len(self.options):
-                        highlight_idx = curr_hl
-                    else:
-                        highlight_idx = 0
+                    highlight_idx = 0
                     input_field.value = ""
 
                 for idx, opt in enumerate(self.options):
@@ -320,7 +319,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                     self.answers[self.q_idx] = {"answer": ""}
                 else:
                     self.answers[self.q_idx] = {"answer": chosen}
-                self.update_step()
+                self.update_step(target_highlight=idx)
         except Exception:
             pass
 
