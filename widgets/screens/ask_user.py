@@ -212,7 +212,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
-                blocks.append(f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_display}")
+                blocks.append(f"**{q_clean}**\n\n{ans_display}")
             summary = "\n\n&nbsp;\n\n".join(blocks)
 
             title_md.add_class("confirm-summary")
@@ -326,7 +326,10 @@ class AskUserWizardScreen(ModalScreen[str]):
             self.update_step()
 
     def action_go_next(self) -> None:
-        self.submit_current_step()
+        """Right arrow: navigate to the next question; on the last one show the summary."""
+        if self.q_idx < len(self.questions):
+            self.q_idx += 1
+            self.update_step()
 
     def action_quit(self) -> None:
         self.app.exit()
