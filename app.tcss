@@ -593,7 +593,7 @@ SubagentViewScreen {
 #write-in-input,
 #modal-search-input,
 #api-key-input {
-    margin-top: 1;
+    margin: 0 0 1 0;
     background: #09090b;
     border: solid #27272a;
     color: #f4f4f5;
