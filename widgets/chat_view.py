@@ -619,11 +619,11 @@ class ToolCallWidget(Vertical):
                 return False
         except Exception:
             pass
-        if self.tool_type.lower() in ("read", "view_file", "web_fetch", "webfetch"):
+        from tools.registry import normalize_tool_name
+        canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
+        if canonical in ("read", "web_fetch", "ask_user", "manage_task", "manage_subagent", "invoke_subagent"):
             return False
-        if self.tool_type.lower() in ("ask_user", "manage_task", "manage_subagent", "subagent", "invoke_subagent", "task"):
-            return False
-        if self.tool_type in self.EXPANDABLE_TOOLS or self.tool_type.lower() in ("call_mcp_tool", "call_mcp"):
+        if canonical in self.EXPANDABLE_TOOLS or canonical in ("call_mcp", "create", "edit", "multi_edit", "shell", "update_plan"):
             return True
         if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
             return True
@@ -634,7 +634,9 @@ class ToolCallWidget(Vertical):
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
+        from tools.registry import normalize_tool_name
         self.tool_type = tool_type
+        self.canonical_tool = normalize_tool_name(tool_type)
         if isinstance(target, str):
             import re
             target = re.sub(r'\s+', ' ', target.replace("\n", " ").replace("\r", " ")).strip()
@@ -647,7 +649,7 @@ class ToolCallWidget(Vertical):
         if result_text:
             self.status = "error" if self._check_is_error(result_text) else "done"
 
-        is_clickable = self.is_expandable() or self.tool_type.lower() in ("subagent", "task")
+        is_clickable = self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_task")
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
@@ -854,7 +856,7 @@ class ToolCallWidget(Vertical):
         else:
             self.status = "done"
 
-        if not self.is_expandable() and self.tool_type.lower() not in ("subagent", "invoke_subagent", "task"):
+        if not self.is_expandable() and self.canonical_tool not in ("invoke_subagent", "manage_task"):
             self.is_expanded = False
             self.header_label.remove_class("tool-header-expandable")
             self.header_label.add_class("tool-header")
@@ -878,21 +880,14 @@ class ToolCallWidget(Vertical):
             "web_fetch": "WebFetch",
             "update_plan": "UpdatePlan",
             "call_mcp": "CallMCP",
-            "get_mcp_schema": "GetMCPSchema",
         }
 
         def get(self, key, default=None):
-            if not key or not isinstance(key, str):
-                return default
-            from tools.registry import ALIAS_MAP
-            lower = key.lower()
-            canonical = ALIAS_MAP.get(lower, lower)
+            from tools.registry import normalize_tool_name
+            canonical = normalize_tool_name(key)
             if canonical in self.CANONICAL_NAMES:
                 return self.CANONICAL_NAMES[canonical]
-            if lower in self.CANONICAL_NAMES:
-                return self.CANONICAL_NAMES[lower]
-            parts = canonical.split("_")
-            return "".join(p.capitalize() for p in parts)
+            return super().get(key, default)
 
         def __getitem__(self, key):
             res = self.get(key, None)
@@ -919,26 +914,27 @@ class ToolCallWidget(Vertical):
 
     def render_header(self) -> None:
         c = self._get_status_color()
-        if self.tool_type.lower() in ("update_plan", "plan"):
-            plan_items = self.args.get("plan") or []
-            if isinstance(plan_items, list) and plan_items:
-                total = len(plan_items)
-                completed = sum(1 for item in plan_items if isinstance(item, dict) and item.get("status") in ("completed", "done"))
-                curr_step = next((item.get("step") for item in plan_items if isinstance(item, dict) and item.get("status") == "in_progress"), None)
-                if curr_step:
-                    target_str = f"[{completed}/{total}] {curr_step[:40]}"
-                else:
+        if self.canonical_tool == "update_plan":
+            target_str = "Plan"
+            if self.args and isinstance(self.args, dict):
+                plan_data = self.args.get("plan")
+                if isinstance(plan_data, dict):
+                    entries = plan_data.get("entries", [])
+                    total = len(entries)
+                    completed = sum(1 for e in entries if isinstance(e, dict) and e.get("status") == "completed")
                     target_str = f"[{completed}/{total} completed]"
-            else:
-                target_str = "Plan"
+                elif isinstance(plan_data, list):
+                    total = len(plan_data)
+                    completed = sum(1 for item in plan_data if isinstance(item, dict) and item.get("status") in ("completed", "done"))
+                    target_str = f"[{completed}/{total} completed]"
             self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
-        elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
+        elif self.canonical_tool == "call_mcp" and self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
             tool_name = self.args.get("tool") or self.target
             tool_name_snake = to_snake_case(str(tool_name))
             compact = self._format_compact_dict(self.args if isinstance(self.args, dict) else {})
             escaped_compact = escape(compact) if compact else "{}"
             self.header_label.update(f"[{c}]⚙ [bold]get_mcp_schema[/bold][/{c}]({escaped_compact})")
-        elif self.tool_type.lower() in ("call_mcp", "call_mcp_tool", "callmcp", "callmcptool"):
+        elif self.canonical_tool == "call_mcp":
             tool_name, server, mcp_args = self._extract_mcp_call_info()
             tool_name_snake = to_snake_case(str(tool_name))
             compact = self._format_compact_dict(mcp_args)
@@ -946,8 +942,8 @@ class ToolCallWidget(Vertical):
                 compact = f'{{server: "{server}"}}' if server else "{}"
             escaped_compact = escape(compact)
             self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
-        elif self.tool_type in self.SYSTEM_TOOLS or self.tool_type.lower() in ("subagent", "invoke_subagent", "task"):
-            display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
+        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in ("invoke_subagent", "manage_task", "manage_subagent", "ask_user"):
+            display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
             from core.tool_display import extract_tool_display
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
             self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
@@ -961,11 +957,11 @@ class ToolCallWidget(Vertical):
                 escaped_compact = escape(compact)
                 self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
             else:
-                display_name = self.DISPLAY_NAMES.get(self.tool_type.lower(), self.tool_type)
+                display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
                 self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
 
     def on_click(self, event) -> None:
-        if self.tool_type.lower() in ("subagent", "invoke_subagent", "task"):
+        if self.canonical_tool in ("invoke_subagent", "manage_task"):
             args = self.args if isinstance(self.args, dict) else {}
             task_id = args.get("task_id") or getattr(self, "subagent_task_id", None)
             identifier = task_id or args.get("description") or args.get("prompt") or self.target

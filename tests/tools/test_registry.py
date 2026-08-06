@@ -1,10 +1,17 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_args
+from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_args, normalize_tool_name
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
+    def test_normalize_tool_name(self):
+        self.assertEqual(normalize_tool_name("subagent"), "invoke_subagent")
+        self.assertEqual(normalize_tool_name("view_file"), "read")
+        self.assertEqual(normalize_tool_name("write_to_file"), "create")
+        self.assertEqual(normalize_tool_name("unknown_tool"), "unknown_tool")
+        self.assertEqual(normalize_tool_name(""), "")
+
     def test_normalize_tool_args(self):
         # Test shell argument aliases
         norm_shell = normalize_tool_args("shell", {"cmd": "ls -l", "time_limit": 30, "async": True})
