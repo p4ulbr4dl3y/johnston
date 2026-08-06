@@ -102,7 +102,9 @@ def truncate_output(
         return header + truncated
     else:
         truncated = text[:max_chars]
-        footer = f"\n... [Output truncated at {max_chars} chars."
+        shown_lines = truncated.count("\n") + (1 if truncated else 0)
+        next_line = shown_lines + 1
+        footer = f"\n... [Output truncated at {max_chars} chars (lines 1-{shown_lines} shown)."
         if save_log:
             footer += f" Full output saved to {log_path}."
             if format_desc:
@@ -112,7 +114,7 @@ def truncate_output(
             elif "\n" not in text:
                 footer += " Log is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full log."
             else:
-                footer += " Use read tool or shell (grep/head/tail) to inspect or filter full log."
+                footer += f" Use read tool (start_line={next_line}) or shell (grep/head/tail) to inspect remaining log."
         if hint:
             footer += f" {hint}"
         footer += "]"

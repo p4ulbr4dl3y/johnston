@@ -19,6 +19,12 @@ class TestTruncateOutput(unittest.TestCase):
             content = f.read()
         self.assertEqual(content, large_text)
 
+    def test_truncate_output_start_line_hint(self):
+        multi_line_text = "\n".join([f"Line {i}" for i in range(1, 200)])
+        res = truncate_output(multi_line_text, max_chars=100)
+        self.assertIn("lines 1-", res)
+        self.assertIn("Use read tool (start_line=", res)
+
     def test_truncate_output_unique_log_per_tool(self):
         text1 = "TOOL_1_" + ("A" * 2000)
         text2 = "TOOL_2_" + ("B" * 2000)
