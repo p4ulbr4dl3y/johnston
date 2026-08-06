@@ -286,10 +286,10 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         lines = [long_line for _ in range(500)]
         # max_chars=300 -> each line formatted is ~109 chars ("    1 | x...x")
         # 2 complete lines ~219 chars fit, 3 lines exceed 300
-        res = format_line_pagination(lines, start_line=1, max_chars=300)
+        res = format_line_pagination(lines, start_line=1, end_line=500, max_chars=300)
         self.assertIn("Lines 1-2 of 500", res)
         self.assertIn("Use start_line=3", res)
-        self.assertNotIn("Output truncated at", res)
+        self.assertIn("Warning: Output truncated at line 2 before target line 500 due to character limit (300 chars)", res)
 
 
 
