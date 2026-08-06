@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.app import App, ComposeResult
 from textual.events import Focus, Key
+from textual.widgets import OptionList
 
 from widgets.screens.ask_user import (
     AskUserWizardScreen,
@@ -267,6 +268,52 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.assertEqual(app.dismiss_result, "Cancelled by user.")
+
+    async def test_wizard_new_question_highlights_first_option(self):
+        questions = [
+            {"question_text": "Q1", "options": ["A", "B", "C"]},
+            {"question_text": "Q2", "options": ["X", "Y", "Z"]},
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            opt_list = screen.query_one("#options-list", OptionList)
+            opt_list.highlighted = 2  # move away from first in Q1
+            await pilot.press("enter")
+            await pilot.pause()
+
+            self.assertEqual(screen.q_idx, 1)
+            # no state for Q2 -> highlight resets to first option
+            self.assertEqual(opt_list.highlighted, 0)
+
+    async def test_wizard_go_back_restores_previous_highlight(self):
+        questions = [
+            {"question_text": "Q1", "options": ["A", "B", "C"]},
+            {"question_text": "Q2", "options": ["X", "Y", "Z"]},
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            opt_list = screen.query_one("#options-list", OptionList)
+            opt_list.highlighted = 2  # pick "C" in Q1
+            await pilot.press("enter")
+            await pilot.pause()
+            self.assertEqual(screen.q_idx, 1)
+
+            await pilot.press("left")  # back to Q1
+            await pilot.pause()
+
+            self.assertEqual(screen.q_idx, 0)
+            # state exists -> highlight restored to the chosen option
+            self.assertEqual(opt_list.highlighted, 2)
 
 
 if __name__ == "__main__":
