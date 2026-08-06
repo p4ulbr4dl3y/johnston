@@ -159,10 +159,14 @@ class InvokeSubagentTool(BaseTool):
             nonlocal wt_path, wt_branch
             if wt_path and wt_branch:
                 from core.subagent_worktree import SubagentWorktreeManager
-                diff_text = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
-                if diff_text:
-                    acc[0] += f"\n\n[Worktree Changes in {wt_branch}]:\n{diff_text}"
-                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch)
+                diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
+                if has_changes and diff_text:
+                    acc[0] += (
+                        f"\n\n[Worktree Branch '{wt_branch}']\n"
+                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply these changes to the current working tree.\n\n"
+                        f"{diff_text}"
+                    )
+                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
                 wt_path = None
                 wt_branch = None
 
