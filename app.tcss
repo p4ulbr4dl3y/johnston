@@ -473,13 +473,18 @@ SubagentsScreen #modal-dialog {
     max-width: 100;
 }
 
-.modal-title,
-#wizard-title {
+.modal-title {
     dock: top;
     width: 100%;
     text-align: center;
     color: #ffffff;
     text-style: bold;
+    margin-bottom: 0;
+}
+
+#wizard-title {
+    width: 100%;
+    height: auto;
     margin-bottom: 0;
 }
 
