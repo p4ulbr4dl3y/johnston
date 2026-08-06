@@ -78,7 +78,10 @@ def format_line_pagination(
     if actual_end < total_lines:
         next_start = actual_end + 1
         next_end = min(total_lines, next_start + DEFAULT_LINE_WINDOW - 1)
-        header += f"\n[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]"
+        hint_text = f"\n[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]"
+        if actual_end < end:
+            hint_text += f" [Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]"
+        header += hint_text
 
     return f"{header}\n{result_body}"
 

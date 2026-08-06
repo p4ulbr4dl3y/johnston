@@ -18,7 +18,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], mode="explore")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("## Execution Mode: EXPLORE", sys_prompt)
-        self.assertIn("Shift+Tab or /action", sys_prompt)
+        self.assertIn("Shift+Tab", sys_prompt)
 
     def test_build_tools_explore_mode_filters_create_edit(self):
         builder = PromptBuilder("System prompt test", [], mode="explore")

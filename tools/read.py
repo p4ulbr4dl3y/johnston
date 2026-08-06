@@ -287,6 +287,6 @@ class ReadTool(BaseTool):
             raw_lines,
             start_line=start_line,
             end_line=end_line,
-            max_chars=14000,
+            max_chars=100000,
             path=path,
         )
