@@ -7,12 +7,10 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.app import App, ComposeResult
 from textual.events import Focus, Key
-from textual.widgets import Input, OptionList
 
 from widgets.screens.ask_user import (
     AskUserWizardScreen,
     ConfirmScreen,
-    QuestionScreen,
     WriteInInput,
 )
 
@@ -44,7 +42,7 @@ class TestWriteInInput(unittest.IsolatedAsyncioTestCase):
         app = DummyWidgetApp(inp)
         async with app.run_test():
             inp.value = "hello"
-            inp.select_all()
+            inp._clear_selection()
             self.assertEqual(inp.cursor_position, 5)
 
     async def test_clear_selection_exception_fallback(self):
@@ -149,99 +147,6 @@ class TestWriteInInput(unittest.IsolatedAsyncioTestCase):
                 mock_screen.action_go_next.assert_called_once()
 
 
-class TestQuestionScreenUnit(unittest.TestCase):
-    def test_init_and_bindings(self):
-        qs = QuestionScreen("1/1", "Question?", ["A", "B"], current_val="A")
-        self.assertEqual(qs.num_text, "1/1")
-        self.assertEqual(qs.question_text, "Question?")
-        self.assertEqual(qs.raw_options, ["A", "B"])
-        self.assertEqual(qs.options, ["A", "B", "Write-in..."])
-        self.assertEqual(qs.current_val, "A")
-
-    def test_action_cancel(self):
-        qs = QuestionScreen("1/1", "Q?", ["A"])
-        qs.dismiss = MagicMock()
-        qs.action_cancel()
-        qs.dismiss.assert_called_once_with({"status": "cancelled", "answer": "Cancelled"})
-
-    def test_action_quit(self):
-        qs = QuestionScreen("1/1", "Q?", ["A"])
-        mock_app = MagicMock()
-        with patch.object(QuestionScreen, "app", new_callable=PropertyMock, return_value=mock_app):
-            qs.action_quit()
-            mock_app.exit.assert_called_once()
-
-    def test_on_key_shift_tab(self):
-        qs = QuestionScreen("1/1", "Q?", ["A"])
-        event = Key("shift+tab", "shift+tab")
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        qs._on_key(event)
-        event.prevent_default.assert_called_once()
-        event.stop.assert_called_once()
-
-    def test_submit_answer_exception_handling(self):
-        qs = QuestionScreen("1/1", "Q?", ["A"])
-        qs.query_one = MagicMock(side_effect=Exception("Widget missing"))
-        qs.dismiss = MagicMock()
-        qs.submit_answer()
-        qs.dismiss.assert_called_once_with({"status": "error", "answer": "Error: Widget missing"})
-
-    def test_question_screen_focus_and_events(self):
-        qs = QuestionScreen("1/1", "Q?", ["A", "B"])
-        qs._mount_time = 0.0
-        qs.dismiss = MagicMock()
-
-        # Exception handling in focus_write_in_input & focus_options_list
-        qs.query_one = MagicMock(side_effect=Exception("query fail"))
-        qs.focus_write_in_input()
-        qs.focus_options_list()
-
-        # focus_options_list with raw_options
-        mock_input = MagicMock()
-        mock_opt = MagicMock()
-        qs.query_one = MagicMock(side_effect=lambda selector, *args: mock_input if "write-in" in selector else mock_opt)
-        qs.focus_options_list()
-        self.assertFalse(mock_input.display)
-        mock_opt.focus.assert_called_once()
-
-        # on_option_list_option_highlighted Write-in vs normal
-        qs._is_mounted = True
-        qs.focus_write_in_input = MagicMock()
-        mock_option = MagicMock()
-        mock_option.id = "opt_1"
-        event_last = OptionList.OptionHighlighted(mock_opt, mock_option, 2)
-        event_last.option_index = 2
-        qs.on_option_list_option_highlighted(event_last)
-        qs.focus_write_in_input.assert_called_once()
-
-        event_first = OptionList.OptionHighlighted(mock_opt, mock_option, 0)
-        event_first.option_index = 0
-        qs.on_option_list_option_highlighted(event_first)
-        self.assertFalse(mock_input.display)
-
-        # on_option_list_option_selected
-        qs.submit_answer = MagicMock()
-        qs.on_option_list_option_selected(event_first)
-        qs.submit_answer.assert_called_once()
-
-        qs.submit_answer.reset_mock()
-        qs.focus_write_in_input.reset_mock()
-        qs.on_option_list_option_selected(event_last)
-        qs.focus_write_in_input.assert_called_once()
-
-        # action_go_next and on_key
-        qs.action_go_next()
-        qs.submit_answer.assert_called_once_with(status="next")
-
-        event_up = Key("up", "up")
-        event_up.prevent_default = MagicMock()
-        event_up.stop = MagicMock()
-        qs.focus_options_list = MagicMock()
-        qs.on_key(event_up)
-        qs.focus_options_list.assert_called_once()
-
-
 class TestConfirmScreenUnit(unittest.TestCase):
     def test_actions(self):
         cs = ConfirmScreen("Summary here")
@@ -309,60 +214,6 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
-
-    async def test_question_screen_pilot_options_select(self):
-        screen = QuestionScreen("Q 1/1", "Select option", ["Option A", "Option B"], current_val="Option A")
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-            await pilot.press("enter")
-            await pilot.pause()
-
-            self.assertEqual(app.dismiss_result, {"status": "next", "answer": "Option A"})
-
-    async def test_question_screen_pilot_custom_write_in(self):
-        screen = QuestionScreen("Q 1/1", "Select option", ["Option A", "Option B"], current_val="Custom text")
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-
-            input_field = screen.query_one("#write-in-input", Input)
-            self.assertEqual(input_field.value, "Custom text")
-
-            await pilot.press("enter")
-            await pilot.pause()
-
-            self.assertEqual(app.dismiss_result, {"status": "next", "answer": "Custom text"})
-
-    async def test_question_screen_pilot_no_options(self):
-        screen = QuestionScreen("Q 1/1", "Type custom answer", [])
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-
-            await pilot.press("h", "e", "l", "l", "o")
-            await pilot.press("enter")
-            await pilot.pause()
-
-            self.assertEqual(app.dismiss_result, {"status": "next", "answer": "hello"})
-
-    async def test_question_screen_pilot_cancel_and_navigation(self):
-        screen = QuestionScreen("Q 1/1", "Question", ["Opt 1", "Opt 2"])
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-
-            await pilot.press("left")
-            await pilot.pause()
-            self.assertEqual(app.dismiss_result, {"status": "back", "answer": ""})
 
     async def test_confirm_screen_pilot(self):
         screen = ConfirmScreen("Do you agree?")

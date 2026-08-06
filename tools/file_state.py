@@ -48,7 +48,3 @@ def verify_file_read(path: str) -> Tuple[bool, str]:
         )
 
     return True, ""
-
-
-def clear_file_state() -> None:
-    _FILE_READ_STATE.clear()

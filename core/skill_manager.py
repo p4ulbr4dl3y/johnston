@@ -373,44 +373,6 @@ class SkillManager:
         except Exception:
             return skill.get("hidden", False)
 
-    def load_skill_payload(self, name: str, file_limit: int = 10) -> str:
-        skill = self.get_skill(name)
-        if not skill:
-            return f"Error: Unable to load skill '{name}'"
-
-        skill_dir = skill["directory"]
-        is_skill_md = os.path.basename(skill["location"]) == "SKILL.md"
-
-        sampled_files = []
-        if is_skill_md and os.path.exists(skill_dir):
-            for root, dirs, files in os.walk(skill_dir):
-                dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
-                for f in sorted(files):
-                    if f == "SKILL.md" or f.startswith("."):
-                        continue
-                    full_p = os.path.join(root, f)
-                    rel_p = os.path.relpath(full_p, skill_dir)
-                    sampled_files.append(rel_p)
-                    if len(sampled_files) >= file_limit:
-                        break
-                if len(sampled_files) >= file_limit:
-                    break
-
-        files_xml = ""
-        if sampled_files:
-            files_list_str = "\n".join(f"  <file>{f}</file>" for f in sampled_files)
-            files_xml = f"\n<skill_files>\n{files_list_str}\n</skill_files>"
-
-        return (
-            f'<skill_content name="{skill["name"]}">\n'
-            f'# Skill: {skill["name"]}\n\n'
-            f'{skill["content"]}\n\n'
-            f'Base directory for this skill: {skill_dir}\n'
-            f'Relative paths in this skill are relative to this base directory.'
-            f'{files_xml}\n'
-            f'</skill_content>'
-        )
-
     def get_system_prompt_snippet(self) -> str:
         skills = self.list_skills(include_hidden=False, for_system_prompt=True)
         if not skills:

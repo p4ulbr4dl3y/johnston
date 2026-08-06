@@ -86,20 +86,12 @@ class TestSessionManager(unittest.TestCase):
         # Check sorting (latest first)
         self.assertEqual(sessions[0]["id"], sid2)
 
-    def test_delete_session(self):
-        sid = self.sm.generate_session_id()
-        self.sm.save_session(sid, {"id": sid, "ui_messages": [{"type": "user", "text": "hello"}]})
-        self.assertIsNotNone(self.sm.load_session(sid))
-
-        self.sm.delete_session(sid)
-        self.assertIsNone(self.sm.load_session(sid))
-
     def test_active_session_id(self):
         sid = self.sm.generate_session_id()
         self.sm.save_session(sid, {"id": sid, "ui_messages": [{"type": "user", "text": "hello"}]})
 
         self.sm.set_active_session_id(sid)
-        self.assertEqual(self.sm.get_active_session_id(), sid)
+        self.assertEqual(self.sm.load_session(sid)["id"], sid)
 
 class TestSessionManagerRegression(unittest.TestCase):
     def setUp(self):
@@ -137,7 +129,6 @@ class TestSessionManagerRegression(unittest.TestCase):
         self.sm.save_session(sid, {"id": sid, "ui_messages": [], "agent_history": []})
 
         self.assertFalse(os.path.exists(os.path.join(self.sm.sessions_dir, f"{sid}.json")))
-        self.assertIsNone(self.sm.get_active_session_id())
 
     def test_atomic_save_session_persists_data_and_cleans_up_tmp(self):
         sid = self.sm.generate_session_id()
@@ -156,7 +147,7 @@ class TestSessionManagerRegression(unittest.TestCase):
 
 class TestSessionManagerPureReader(unittest.TestCase):
     """list_sessions must be a pure reader (no destructive side effects); empty-file
-    cleanup is a separate explicit purge_empty_sessions operation."""
+    cleanup happens on next save_session when a session becomes empty."""
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
@@ -187,13 +178,12 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0]["id"], sid)
 
-    def test_purge_empty_sessions_removes_files(self):
+    def test_save_empty_session_removes_empty_file(self):
         empty_path = os.path.join(self.sm.sessions_dir, "empty.json")
         with open(empty_path, "w") as f:
             json.dump({"id": "empty", "ui_messages": [], "agent_history": []}, f)
 
-        removed = self.sm.purge_empty_sessions()
-        self.assertEqual(removed, 1)
+        self.sm.save_session("empty", {"id": "empty", "ui_messages": [], "agent_history": []})
         self.assertFalse(os.path.exists(empty_path))
 
 

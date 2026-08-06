@@ -8,10 +8,14 @@ from core.circuit_breaker import CircuitBreaker, circuit_breaker
 class TestCircuitBreaker(unittest.TestCase):
 
     def setUp(self):
-        circuit_breaker.reset()
+        circuit_breaker._failures.clear()
+        circuit_breaker._state.clear()
+        circuit_breaker._opened_at.clear()
 
     def tearDown(self):
-        circuit_breaker.reset()
+        circuit_breaker._failures.clear()
+        circuit_breaker._state.clear()
+        circuit_breaker._opened_at.clear()
 
     def test_state_transitions(self):
         cb = CircuitBreaker(failure_threshold=3, cooldown_seconds=0.01)
@@ -54,7 +58,7 @@ class TestCircuitBreaker(unittest.TestCase):
         cb.record_failure(provider)
         self.assertEqual(cb.get_state(provider), "OPEN")
 
-    def test_reset_specific_or_all(self):
+    def test_failures_tracked_per_provider(self):
         cb = CircuitBreaker(failure_threshold=1)
         cb.record_failure("prov1")
         cb.record_failure("prov2")
@@ -62,21 +66,18 @@ class TestCircuitBreaker(unittest.TestCase):
         self.assertEqual(cb.get_state("prov1"), "OPEN")
         self.assertEqual(cb.get_state("prov2"), "OPEN")
 
-        cb.reset("prov1")
-        self.assertEqual(cb.get_state("prov1"), "CLOSED")
-        self.assertEqual(cb.get_state("prov2"), "OPEN")
-
-        cb.reset()
-        self.assertEqual(cb.get_state("prov2"), "CLOSED")
-
 
 class TestAgentCircuitBreakerIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
-        circuit_breaker.reset()
+        circuit_breaker._failures.clear()
+        circuit_breaker._state.clear()
+        circuit_breaker._opened_at.clear()
 
     async def asyncTearDown(self):
-        circuit_breaker.reset()
+        circuit_breaker._failures.clear()
+        circuit_breaker._state.clear()
+        circuit_breaker._opened_at.clear()
 
     async def test_agent_yields_circuit_breaker_open_error(self):
         cb = circuit_breaker

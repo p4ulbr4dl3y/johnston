@@ -21,10 +21,6 @@ MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
 
 
-def clear_doc_cache() -> None:
-    _DOC_CACHE.clear()
-
-
 def get_cached_doc_markdown(path: str) -> str | None:
     try:
         mtime = os.path.getmtime(path)

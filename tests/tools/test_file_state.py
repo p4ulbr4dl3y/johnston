@@ -5,18 +5,18 @@ import unittest
 
 from tools.create import CreateTool
 from tools.edit import EditTool
-from tools.file_state import clear_file_state
+from tools.file_state import _FILE_READ_STATE
 from tools.read import ReadTool
 
 
 class TestFileState(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        clear_file_state()
+        _FILE_READ_STATE.clear()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
 
     def tearDown(self):
-        clear_file_state()
+        _FILE_READ_STATE.clear()
         self.temp_dir.cleanup()
 
     async def test_file_state_flow(self):

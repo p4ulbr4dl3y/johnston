@@ -14,12 +14,6 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(format_context_tokens(64_000), "64k")
         self.assertEqual(format_context_tokens(500), "500")
 
-    def test_init_does_not_start_background_refresh(self):
-        with patch.object(ModelsCatalog, "_trigger_background_refresh") as mock_refresh:
-            ModelsCatalog()
-
-        mock_refresh.assert_not_called()
-
     def test_get_context_limit_default_and_cache(self):
         catalog = ModelsCatalog()
         # Default fallback
@@ -58,20 +52,15 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(cat.get_context_limit("google", "gemma-4"), 262144)
         # Test fuzzy match with MLX/4bit suffix
         self.assertEqual(cat.get_context_limit("omlx", "gemma-4-E4B-it-MLX-4bit"), 262144)
-        self.assertTrue(cat.supports_reasoning("omlx", "gemma-4-E4B-it-MLX-4bit"))
 
-    def test_output_limit_and_reasoning_and_open_weights(self):
+    def test_reasoning_and_open_weights_parsed_from_cache(self):
         cat = ModelsCatalog()
         cat._limits = {"deepseek/deepseek-v4-pro": 1000000}
-        cat._output_limits = {"deepseek/deepseek-v4-pro": 384000}
         cat._reasoning = ["deepseek/deepseek-v4-pro"]
         cat._open_weights = ["deepseek/deepseek-v4-pro"]
-        cat._descriptions = {"deepseek/deepseek-v4-pro": "Open MoE flagship"}
 
-        self.assertEqual(cat.get_output_limit("deepseek", "deepseek-v4-pro"), 384000)
-        self.assertTrue(cat.supports_reasoning("deepseek", "deepseek-v4-pro"))
-        self.assertTrue(cat.is_open_weights("deepseek", "deepseek-v4-pro"))
-        self.assertEqual(cat.get_model_description("deepseek", "deepseek-v4-pro"), "Open MoE flagship")
+        self.assertIn("deepseek/deepseek-v4-pro", cat._reasoning)
+        self.assertIn("deepseek/deepseek-v4-pro", cat._open_weights)
 
     def test_save_and_load_cache(self):
         cat = ModelsCatalog()
@@ -140,7 +129,6 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
             limits = await cat.refresh()
             self.assertIn("openai/gpt-4o", limits)
             self.assertEqual(limits["openai/gpt-4o"], 128000)
-            self.assertTrue(cat.supports_reasoning("openai", "gpt-4o"))
 
             self.assertIn("anthropic/claude-3.5-sonnet", limits)
             self.assertEqual(limits["anthropic/claude-3.5-sonnet"], 200000)

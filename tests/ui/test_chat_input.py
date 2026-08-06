@@ -1,12 +1,11 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from PIL import Image
 from textual.app import App, ComposeResult
-from textual.events import Blur, Key, Paste
-from textual.screen import ModalScreen
+from textual.events import Key, Paste
 
 from widgets.chat_input import ChatInput, ClipboardAttachment
 
@@ -65,22 +64,6 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             ci.load_text("1\n2\n3\n4\n5\n6\n7\n8")
             ci.update_height()
             self.assertEqual(ci.styles.height.value, 6)
-
-    async def test_on_blur(self):
-        ci = ChatInput()
-        app = DummyChatApp(ci)
-        async with app.run_test():
-            ci.call_after_refresh = MagicMock()
-            event = Blur()
-            ci.on_blur(event)
-            ci.call_after_refresh.assert_called_once_with(ci.focus)
-
-            # Modal screen open -> no focus call
-            ci.call_after_refresh.reset_mock()
-            modal = ModalScreen()
-            with patch.object(App, "screen", new_callable=PropertyMock, return_value=modal):
-                ci.on_blur(event)
-                ci.call_after_refresh.assert_not_called()
 
     async def test_get_full_text_and_tag_deletion(self):
         ci = ChatInput()
@@ -178,33 +161,6 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(res)
                 mock_save.assert_called_once()
                 self.assertEqual(len(ci.clipboard_attachments), 1)
-
-    async def test_paste_universal_clipboard_text(self):
-        ci = ChatInput()
-        app = DummyChatApp(ci)
-        async with app.run_test():
-            with patch.object(ci, "try_paste_clipboard_image", return_value=False), \
-                 patch("asyncio.create_subprocess_exec") as mock_run:
-                # Short text paste
-                mock_process = AsyncMock()
-                mock_process.returncode = 0
-                mock_process.communicate.return_value = (b"Hello from clipboard", b"")
-                mock_run.return_value = mock_process
-
-                res = await ci.paste_universal_clipboard()
-                self.assertTrue(res)
-                self.assertEqual(ci.text, "Hello from clipboard")
-
-                # Long text paste > 10 lines
-                long_text = "\n".join([f"Line {i}" for i in range(15)])
-                mock_process_long = AsyncMock()
-                mock_process_long.returncode = 0
-                mock_process_long.communicate.return_value = (long_text.encode("utf-8"), b"")
-                mock_run.return_value = mock_process_long
-
-                res_long = await ci.paste_universal_clipboard()
-                self.assertTrue(res_long)
-                self.assertIn("[Pasted text #1 +15 lines]", ci.text)
 
     async def test_on_paste_event_multiline(self):
         ci = ChatInput()

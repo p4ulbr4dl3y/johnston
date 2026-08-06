@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Optional
+from typing import Dict
 
 
 class CircuitBreakerOpenError(Exception):
@@ -62,16 +62,6 @@ class CircuitBreaker:
         if failures >= self.failure_threshold:
             self._state[provider_key] = "OPEN"
             self._opened_at[provider_key] = time.time()
-
-    def reset(self, provider_key: Optional[str] = None):
-        if provider_key:
-            self._failures.pop(provider_key, None)
-            self._state.pop(provider_key, None)
-            self._opened_at.pop(provider_key, None)
-        else:
-            self._failures.clear()
-            self._state.clear()
-            self._opened_at.clear()
 
 
 # Shared singleton instance

@@ -11,10 +11,6 @@ def is_windows() -> bool:
     return os.name == "nt"
 
 
-def supports_pty() -> bool:
-    return False
-
-
 def johnston_config_dir() -> Path:
     if is_windows():
         base = os.environ.get("APPDATA")
