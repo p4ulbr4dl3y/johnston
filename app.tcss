@@ -499,6 +499,10 @@ SubagentsScreen #modal-dialog {
     margin-bottom: 1;
 }
 
+SubagentViewScreen {
+    background: #09090b;
+}
+
 #modal-dialog MarkdownFence {
     background: #27272a;
     border-left: solid #ffffff;
@@ -511,11 +515,24 @@ SubagentsScreen #modal-dialog {
     scrollbar-size: 0 0;
 }
 
-SubagentViewScreen MarkdownFence,
 SubagentViewScreen CustomMarkdownFence,
-SubagentViewScreen MarkdownFence #code-content,
-SubagentViewScreen CustomMarkdownFence #code-content {
+SubagentViewScreen MarkdownFence {
     background: #18181b;
+    border-left: none;
+    padding: 0;
+    margin: 1 0;
+}
+
+SubagentViewScreen CustomMarkdownFence .fence-header,
+SubagentViewScreen MarkdownFence .fence-header {
+    display: block;
+    background: #27272a;
+}
+
+SubagentViewScreen CustomMarkdownFence #code-content,
+SubagentViewScreen MarkdownFence #code-content {
+    background: #18181b;
+    padding: 0 1;
 }
 
 #modal-dialog MarkdownFence * {
