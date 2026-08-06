@@ -520,6 +520,10 @@ class ThinkingWidget(Vertical):
 
     def on_mount(self) -> None:
         self.content_widget.display = False
+        if self.is_expandable():
+            self.header_label.add_class("thinking-header-expandable")
+        else:
+            self.header_label.remove_class("thinking-header-expandable")
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
@@ -543,6 +547,8 @@ class ThinkingWidget(Vertical):
             self.content_widget.display = False
 
     def on_click(self, event) -> None:
+        if not self.is_expandable():
+            return
         self.toggle_expanded()
         event.stop()
 
@@ -555,6 +561,8 @@ class ThinkingWidget(Vertical):
         return True
 
     def toggle_expanded(self) -> None:
+        if not self.is_expandable():
+            return
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
             if self.thinking_text:
