@@ -156,6 +156,7 @@ class ChatInput(TextArea):
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
         import os
+        import urllib.parse
         lines = pasted_text.strip().splitlines()
         if not lines:
             return pasted_text
@@ -177,7 +178,10 @@ class ChatInput(TextArea):
             else:
                 clean = stripped.strip("'\"")
                 if clean.startswith("file://"):
-                    clean = clean[7:]
+                    clean = urllib.parse.unquote(clean[7:])
+                else:
+                    clean = urllib.parse.unquote(clean)
+
                 clean = clean.replace("\\ ", " ")
                 expanded = os.path.expanduser(clean)
                 ext = os.path.splitext(clean)[1].lower()
@@ -247,17 +251,22 @@ class ChatInput(TextArea):
 
     async def on_paste(self, event: events.Paste) -> None:
         import os
+        import urllib.parse
         event.prevent_default()
         event.stop()
 
         pasted_text = self.format_pasted_file_path(event.text)
-        if pasted_text.startswith("@"):
+        if pasted_text.startswith("@") or (pasted_text != event.text and any(line_item.strip().startswith("@") for line_item in pasted_text.splitlines())):
             self.insert(pasted_text)
+            self._on_input_change()
             return
 
         text_strip = event.text.strip().strip("'\"")
         if text_strip.startswith("file://"):
-            text_strip = text_strip[7:]
+            text_strip = urllib.parse.unquote(text_strip[7:])
+        else:
+            text_strip = urllib.parse.unquote(text_strip)
+
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
 
         import asyncio
@@ -279,6 +288,7 @@ class ChatInput(TextArea):
             self.insert(tag)
         else:
             self.insert(pasted_text)
+        self._on_input_change()
 
     def add_to_history(self, text: str) -> None:
         """Save submitted message to query history"""

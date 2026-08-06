@@ -19,4 +19,6 @@ build/
 # Local folders
 .serena/
 .johnston/
+scripts/
+
 

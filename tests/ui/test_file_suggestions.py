@@ -50,6 +50,9 @@ class TestFileSuggestions(unittest.TestCase):
         # Test escaped spaces
         self.assertEqual(chat_input.format_pasted_file_path("/tmp/my\\ folder/script.py"), "@/tmp/my folder/script.py ")
 
+        # Test URL-encoded file scheme drag and drop
+        self.assertEqual(chat_input.format_pasted_file_path("file:///tmp/my%20folder/script.py"), "@/tmp/my folder/script.py ")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -176,6 +176,19 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 event.stop.assert_called_once()
                 self.assertIn("[Pasted text #1 +12 lines]", ci.text)
 
+    async def test_on_paste_event_drag_drop_file(self):
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        async with app.run_test():
+            event = Paste("file:///tmp/my%20test%20folder/app.py")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+
+            await ci.on_paste(event)
+            event.prevent_default.assert_called_once()
+            event.stop.assert_called_once()
+            self.assertEqual(ci.text, "@/tmp/my test folder/app.py ")
+
     async def test_history_navigation_up_down(self):
         ci = ChatInput()
         app = DummyChatApp(ci)

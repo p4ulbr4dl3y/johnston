@@ -476,6 +476,15 @@ class JohnstonApp(App):
                     self.agent.history = sess.get("agent_history", [])
             self.refresh_status_footer()
 
+    async def on_paste(self, event: events.Paste) -> None:
+        """Forward application-level paste/drag-and-drop events to ChatInput"""
+        try:
+            chat_input = self.query_one("#message-input", ChatInput)
+            chat_input.focus()
+            await chat_input.on_paste(event)
+        except Exception:
+            pass
+
     async def _exec_slash_command(self, user_text: str) -> None:
         try:
             processed = await handle_slash_command(self, user_text)
