@@ -4,6 +4,7 @@ Handles global (~/.johnston/linters.json) and project (.johnston/linters.json) l
 Provides a preset registry of syntax-only linters for popular languages, with
 enable/disable and availability scanning.
 """
+import asyncio
 import functools
 import json
 import os
@@ -15,7 +16,6 @@ from core.config import CONFIG_DIR
 from core.platform_utils import is_windows
 
 GLOBAL_LINTERS_FILE = os.path.join(CONFIG_DIR, "linters.json")
-PROJECT_LINTERS_FILE = os.path.join(".johnston", "linters.json")
 
 
 # Preset linters: syntax-only checks per language. cmd placeholders:
@@ -57,15 +57,6 @@ PRESET_LINTERS: Dict[str, Dict[str, Any]] = {
         "install": "npx",
         "package": "@biomejs/biome",
         "check": ["biome", "--version"],
-    },
-    "go": {
-        "name": "go",
-        "label": "Go",
-        "extensions": [".go"],
-        "cmd": ["gofmt", "-e", "{file}"],
-        "install": "system",
-        "package": "Go toolchain (gofmt)",
-        "check": ["gofmt", "-h"],
     },
     "rust": {
         "name": "rust",
@@ -112,15 +103,6 @@ PRESET_LINTERS: Dict[str, Dict[str, Any]] = {
         "package": "php",
         "check": ["php", "--version"],
     },
-    "bash": {
-        "name": "bash",
-        "label": "Bash/Shell",
-        "extensions": [".sh", ".bash"],
-        "cmd": ["bash", "-n", "{file}"],
-        "install": "system",
-        "package": "Bash",
-        "check": ["bash", "--version"],
-    },
     "json": {
         "name": "json",
         "label": "JSON",
@@ -129,15 +111,6 @@ PRESET_LINTERS: Dict[str, Dict[str, Any]] = {
         "install": "system",
         "package": "jq",
         "check": ["jq", "--version"],
-    },
-    "html": {
-        "name": "html",
-        "label": "HTML",
-        "extensions": [".html", ".htm"],
-        "cmd": ["tidy", "-q", "-e", "{file}"],
-        "install": "system",
-        "package": "tidy",
-        "check": ["tidy", "-v"],
     },
     "yaml": {
         "name": "yaml",
@@ -168,60 +141,47 @@ NOISE_PREFIXES = (
 _linters_manager_instance: Optional["LintersManager"] = None
 
 
-def get_linters_manager(project_dir: Optional[str] = None) -> "LintersManager":
+def get_linters_manager() -> "LintersManager":
     global _linters_manager_instance
     if _linters_manager_instance is None:
-        _linters_manager_instance = LintersManager(project_dir=project_dir)
-    elif project_dir:
-        real_p = os.path.realpath(project_dir)
-        if _linters_manager_instance.project_dir != real_p:
-            _linters_manager_instance.project_dir = real_p
-            _linters_manager_instance.project_file = os.path.join(real_p, PROJECT_LINTERS_FILE)
+        _linters_manager_instance = LintersManager()
     return _linters_manager_instance
 
 
 class LintersManager:
     """Manages linter presets, enabled state, install/uninstall, and availability."""
 
-    def __init__(self, project_dir: Optional[str] = None):
-        self.project_dir = os.path.realpath(project_dir or os.getcwd())
-        self.global_file = GLOBAL_LINTERS_FILE
-        self.project_file = os.path.join(self.project_dir, PROJECT_LINTERS_FILE)
+    def __init__(self, config_file: Optional[str] = None):
+        self.config_file = os.path.realpath(config_file or GLOBAL_LINTERS_FILE)
         self._availability: Dict[str, bool] = {}
         self.ensure_default_configs()
 
     def ensure_default_configs(self):
-        os.makedirs(os.path.dirname(self.global_file), exist_ok=True)
-        if not os.path.exists(self.global_file):
+        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+        if not os.path.exists(self.config_file):
             from tools.base import atomic_write_json
-            atomic_write_json(self.global_file, {"linters": {}}, indent=2)
+            atomic_write_json(self.config_file, {"linters": {}}, indent=2)
 
     # ------------------------------------------------------------------ load
 
     def load_linters(self) -> List[Dict[str, Any]]:
         """
-        Loads global + project linter configs; project overrides global by key.
-        Every preset appears with its effective enabled state; custom linters
-        (defined in config) are appended.
+        Loads the linter config; every preset appears with its effective enabled
+        state; custom linters (defined in config) are appended.
         """
-        curr_proj_dir = os.path.realpath(self.project_dir or os.getcwd())
-        self.project_file = os.path.join(curr_proj_dir, PROJECT_LINTERS_FILE)
-
         merged: Dict[str, Dict[str, Any]] = {}
-        for scope, path in (("global", self.global_file), ("project", self.project_file)):
-            try:
-                if os.path.exists(path):
-                    with open(path, "r", encoding="utf-8") as f:
-                        cfg = json.load(f)
-                    section = cfg.get("linters", {})
-                    if isinstance(section, dict):
-                        for name, entry in section.items():
-                            base = dict(entry or {})
-                            base["name"] = name
-                            base["scope"] = scope
-                            merged[name] = base
-            except Exception:
-                continue
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                section = cfg.get("linters", {})
+                if isinstance(section, dict):
+                    for name, entry in section.items():
+                        base = dict(entry or {})
+                        base["name"] = name
+                        merged[name] = base
+        except Exception:
+            pass
 
         result: List[Dict[str, Any]] = []
         for p_name, preset in PRESET_LINTERS.items():
@@ -286,11 +246,7 @@ class LintersManager:
         if target is None:
             return False
 
-        file_to_update = (
-            self.project_file
-            if target.get("scope") == "project" and os.path.exists(self.project_file)
-            else self.global_file
-        )
+        file_to_update = self.config_file
         try:
             cfg: Dict[str, Any] = {"linters": {}}
             if os.path.exists(file_to_update):
@@ -335,6 +291,47 @@ class LintersManager:
         tmp_dir = tmp_dir or os.path.join(tempfile.gettempdir(), "johnston-lints")
         os.makedirs(tmp_dir, exist_ok=True)
         return [c.replace("{file}", path).replace("{tmp}", tmp_dir) for c in lint.get("cmd", [])]
+
+    # ---------------------------------------------------------------- execution
+
+    async def run_for(self, path: str) -> str:
+        """Runs enabled & available linters for the file extension; returns warning string if errors found."""
+        if not os.path.exists(path):
+            return ""
+
+        lint_list = self.get_for_extension(os.path.splitext(path)[1].lower())
+        if not lint_list:
+            return ""
+
+        errors = []
+        for lint in lint_list:
+            output = await self._run_one(lint, path)
+            if output:
+                errors.append(output)
+
+        if not errors:
+            return ""
+
+        combined = "\n".join(errors).strip()
+        combined = _clean_output(combined)
+        if not combined:
+            return ""
+
+        lines = combined.splitlines()
+        if len(lines) > 10:
+            combined = "\n".join(lines[:10]) + f"\n... ({len(lines) - 10} more lines)"
+
+        return f"\n\nERR: {combined}"
+
+    async def _run_one(self, lint, path: str) -> Optional[str]:
+        """Runs a single linter entry; returns captured output on non-zero exit."""
+        try:
+            cmd = self.render_cmd(lint, path)
+            if not cmd or not cmd[0]:
+                return None
+            return await _exec_cmd(cmd)
+        except Exception:
+            return None
 
 
 # --------------------------------------------------------------------- utils
@@ -391,4 +388,39 @@ def _cache_has_tool(manager: str, package: str) -> bool:
                 return True
         return False
     return False
+
+
+async def _exec_cmd(cmd: List[str]) -> Optional[str]:
+    """Runs a command; returns captured output on non-zero exit, None otherwise."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT
+        )
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3.0)
+            if proc.returncode != 0 and stdout:
+                return stdout.decode("utf-8", errors="replace").strip()
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return None
+        except asyncio.CancelledError:
+            proc.kill()
+            await proc.wait()
+            raise
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        return None
+    return None
+
+
+def _clean_output(text: str) -> str:
+    clean_lines = [
+        line for line in text.splitlines()
+        if not any(line.strip().startswith(prefix) for prefix in NOISE_PREFIXES)
+    ]
+    return "\n".join(clean_lines).strip()
 

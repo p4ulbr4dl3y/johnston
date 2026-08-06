@@ -3,9 +3,9 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
+from core.linters_manager import get_linters_manager
 from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.file_state import record_file_write, verify_file_read
-from tools.linter import run_linter
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -279,7 +279,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) 
     except Exception as e:
         return f"ERR: file '{path}': {e}"
 
-    linter_output = await run_linter(path)
+    linter_output = await get_linters_manager().run_for(path)
     return diff_output + linter_output
 
 

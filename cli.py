@@ -154,7 +154,7 @@ def print_linters():
     availability = mgr.scan_available()
     print("Configured Linters:")
     if not linters:
-        print("  No linters configured (~/.johnston/linters.json or .johnston/linters.json)")
+        print("  No linters configured (~/.johnston/linters.json)")
         return
 
     for idx, lint in enumerate(linters):

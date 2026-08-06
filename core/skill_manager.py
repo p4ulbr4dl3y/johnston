@@ -134,6 +134,16 @@ You are the Johnston System Configurator & Architect. Your goal is to configure,
   Custom system prompt here...
   ```
 - Verification: Run `johnston --modes` via shell tool.
+
+### 7. Linters Configuration (`johnston --linters`)
+- Location: `~/.johnston/linters.json` (global only).
+- Model: presets in `core/linters_manager.py::PRESET_LINTERS` are syntax-only checks, keyed by language, with `cmd` placeholders `{file}` -> checked file and `{tmp}` -> scratch dir.
+  Presets (extensions in parens): python `.py` (ruff `E9,F`), js/ts (eslint@9), js_biome (Biome), rust (rustc --emit=metadata), c/cpp (gcc -fsyntax-only), ruby (ruby -c), php (php -l), json (jq empty), yaml (yamllint), toml (taplo check).
+- Format: `{"linters": {<name>: {"cmd": [...], "extensions": [...], "enabled": true|false}}}`; custom linters append to presets.
+- Availability: `scan_available` resolves via `which()` for system binaries, else offline-safe cache probe for uvx (`~/.cache/uv` or `UV_CACHE_DIR`) and npx (`~/.npm/_npx`); no network probing.
+- Enable/disable: persisted via `set_enabled` to the single config file.
+- Output handling: `LintersManager.run_for` filters noise lines (`Building `, `Downloading `, `Audited `, etc.); linter errors truncate to 10 lines, prefixed `ERR:`, and surface in-tool after edits (`create`/`edit` call `get_linters_manager().run_for(path)`).
+- Verification: Run `johnston --linters` via shell tool.
 """
 
 DEFAULT_INIT_SKILL_CONTENT = """---
