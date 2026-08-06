@@ -10,6 +10,7 @@ PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")
 SUBAGENTS_DIR = os.path.join(CONFIG_DIR, "subagents")
 SUBAGENT_DEFS_DIR = os.path.join(SUBAGENTS_DIR, "definitions")
 SUBAGENT_SESSIONS_DIR = os.path.join(SUBAGENTS_DIR, "sessions")
+SUBAGENT_LOGS_DIR = os.path.join(SUBAGENTS_DIR, "logs")
 
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 LAST_TOOL_LOG_FILE = os.path.join(LOGS_DIR, "last_tool.log")

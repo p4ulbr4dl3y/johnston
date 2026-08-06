@@ -126,10 +126,24 @@ class SubagentTracker:
 
     def save_session(self, sess: SubagentSessionData) -> None:
         try:
+            from core.config import SUBAGENT_LOGS_DIR
             from tools.base import atomic_write_json
             os.makedirs(self.storage_dir, exist_ok=True)
+            os.makedirs(SUBAGENT_LOGS_DIR, exist_ok=True)
             fpath = os.path.join(self.storage_dir, f"{sess.task_id}.json")
             atomic_write_json(fpath, sess.to_dict(), indent=2)
+
+            # Extract final bot text and save to log markdown file
+            last_text = ""
+            for evt in reversed(sess.events):
+                if evt.get("type") in ("bot_text", "bot_delta") and evt.get("text", "").strip():
+                    last_text = evt.get("text", "").strip()
+                    break
+
+            if last_text:
+                md_path = os.path.join(SUBAGENT_LOGS_DIR, f"{sess.task_id}.md")
+                with open(md_path, "w", encoding="utf-8") as f:
+                    f.write(f"# Subagent Task: {sess.description}\n\n**Task ID:** `{sess.task_id}`\n**Status:** `{sess.status}`\n\n## Final Response\n\n{last_text}\n")
         except Exception:
             pass
 
