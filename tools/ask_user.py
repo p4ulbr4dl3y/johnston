@@ -4,6 +4,26 @@ from typing import Any, Dict
 from tools.base import BaseTool
 
 
+def _is_recommended_option(opt: str) -> bool:
+    """Detect a '(Recommended)' marker at the start or end of an option label."""
+    s = opt.strip().lower()
+    return (
+        s.startswith("(recommended)")
+        or s.startswith("[recommended]")
+        or s.startswith("recommended")
+        or s.endswith("(recommended)")
+        or s.endswith("[recommended]")
+        or s.endswith("recommended)")
+        or s.endswith("recommended]")
+        or s.endswith("recommended")
+    )
+
+
+def _sort_recommended_first(options: list[str]) -> list[str]:
+    """Stable sort: recommended options float to the top, the rest keep order."""
+    return sorted(options, key=lambda o: not _is_recommended_option(o))
+
+
 class AskUserTool(BaseTool):
     name = "ask_user"
     description = "Ask the user questions with pre-defined options and write-in answers. Use when user intent or requirements are ambiguous."
@@ -24,7 +44,7 @@ class AskUserTool(BaseTool):
                                 "options": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "List of selectable options. If recommending an option, list it first and prefix with '(Recommended)'."
+                                    "description": "List of selectable options. If recommending an option, mark it with '(Recommended)'."
                                 }
 
                             },
@@ -54,7 +74,7 @@ class AskUserTool(BaseTool):
                 continue
             validated_questions.append({
                 "question_text": q_text,
-                "options": [str(opt) for opt in options]
+                "options": _sort_recommended_first([str(opt) for opt in options])
             })
 
         if not validated_questions:
