@@ -54,11 +54,6 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             names = [s["name"] for s in skills]
             self.assertIn("code-reviewer", names)
             self.assertIn("custom-test", names)
-
-            # Test loading payload
-            payload = sm.load_skill_payload("code-reviewer")
-            self.assertIn('<skill_content name="code-reviewer">', payload)
-            self.assertIn("<file>script.py</file>", payload)
         finally:
             shutil.rmtree(global_tmp)
 
@@ -104,20 +99,6 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         # Toggle back to hidden
         re_hidden_state = sm.toggle_hidden("secret-skill")
         self.assertTrue(re_hidden_state)
-
-    def test_skill_payload_loading(self):
-        sm = SkillManager(project_dir=self.test_dir)
-        p_skill_dir = os.path.join(sm.project_dir_skills, "linter")
-        os.makedirs(p_skill_dir, exist_ok=True)
-        with open(os.path.join(p_skill_dir, "SKILL.md"), "w") as f:
-            f.write("---\nname: linter\ndescription: Project linter\n---\nLint instructions.")
-
-        res = sm.load_skill_payload("linter")
-        self.assertIn('<skill_content name="linter">', res)
-        self.assertIn("Lint instructions.", res)
-
-        res_missing = sm.load_skill_payload("nonexistent")
-        self.assertIn("Error: Unable to load skill", res_missing)
 
     def test_skills_command_registered(self):
         from core.commands import COMMAND_REGISTRY

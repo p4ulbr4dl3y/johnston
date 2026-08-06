@@ -52,20 +52,6 @@ class ModelsCatalog:
         self._updated_at: float = 0.0
         self.load_cache()
 
-    def _trigger_background_refresh(self):
-        try:
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                task = loop.create_task(self.refresh())
-                def _log_exc(t):
-                    try:
-                        t.result()
-                    except Exception as e:
-                        print(f"ModelsCatalog background refresh error: {e}")
-                task.add_done_callback(_log_exc)
-        except RuntimeError:
-            pass
-
     def load_cache(self) -> bool:
         loaded = False
         target_file = CACHE_FILE if os.path.exists(CACHE_FILE) else None
@@ -248,7 +234,6 @@ class ModelsCatalog:
     def _get_all_catalog_keys(self) -> Set[str]:
         return set().union(
             self._limits,
-            self._output_limits,
             self._names,
             self._descriptions,
             self._pricing,
@@ -379,38 +364,6 @@ class ModelsCatalog:
 
         return DEFAULT_CONTEXT_LIMIT
 
-    def get_output_limit(self, provider_id: str, model_id: str) -> int:
-        if not self._output_limits and not self._limits:
-            self.load_cache()
-
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._output_limits, tag="output_limits")
-        if resolved and resolved in self._output_limits:
-            return self._output_limits[resolved]
-
-        return 4096
-
-    def supports_reasoning(self, provider_id: str, model_id: str) -> bool:
-        if not model_id:
-            return False
-        if not self._reasoning and not self._limits:
-            self.load_cache()
-
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._reasoning, tag="reasoning")
-        if resolved and resolved in self._reasoning:
-            return True
-
-        return False
-
-    def is_open_weights(self, provider_id: str, model_id: str) -> bool:
-        if not model_id:
-            return False
-        if not self._open_weights and not self._limits:
-            self.load_cache()
-
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._open_weights, tag="open_weights")
-        if resolved and resolved in self._open_weights:
-            return True
-
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:
             return ""
@@ -449,16 +402,6 @@ class ModelsCatalog:
         if suffix_tag and f"({suffix_tag})" not in res:
             res += f" ({suffix_tag})"
         return res
-
-    def get_model_description(self, provider_id: str, model_id: str) -> str:
-        if not model_id:
-            return ""
-
-        resolved = self._resolve_catalog_key(provider_id, model_id, self._descriptions, tag="descriptions")
-        if resolved and resolved in self._descriptions:
-            return self._descriptions[resolved]
-
-        return ""
 
     def get_model_pricing(self, provider_id: str, model_id: str) -> Dict[str, float]:
         if not self._pricing and not self._limits:

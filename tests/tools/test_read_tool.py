@@ -10,7 +10,6 @@ from tools.read import (
     _DOC_CACHE,
     MAX_DOC_CACHE,
     ReadTool,
-    clear_doc_cache,
     convert_doc_to_markdown_sync,
     get_cached_doc_markdown,
     process_image_file_sync,
@@ -22,10 +21,10 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
-        clear_doc_cache()
+        _DOC_CACHE.clear()
 
     def tearDown(self):
-        clear_doc_cache()
+        _DOC_CACHE.clear()
         self.temp_dir.cleanup()
 
     # --- Cache Function Tests ---

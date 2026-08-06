@@ -1,4 +1,4 @@
-from widgets.screens.ask_user import AskUserWizardScreen, ConfirmScreen, QuestionScreen
+from widgets.screens.ask_user import AskUserWizardScreen, ConfirmScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
@@ -14,7 +14,6 @@ from widgets.screens.thinking_effort import ThinkingEffortScreen
 
 __all__ = [
     "AskUserWizardScreen",
-    "QuestionScreen",
     "ConfirmScreen",
     "ShellConfirmScreen",
     "BaseSelectionScreen",

@@ -73,12 +73,6 @@ class ChatInput(TextArea):
         self.focus()
         self.update_height()
 
-    def on_blur(self, event: events.Blur) -> None:
-        from textual.screen import ModalScreen
-        if self.app and isinstance(self.app.screen, ModalScreen):
-            return
-        self.call_after_refresh(self.focus)
-
     def load_text(self, text: str) -> None:
         if not text:
             self.pasted_texts.clear()
@@ -248,48 +242,6 @@ class ChatInput(TextArea):
             self.clipboard_attachments.append(att)
             self.update_attachment_bar()
             return True
-
-        return False
-
-    async def paste_universal_clipboard(self) -> bool:
-        """Universal clipboard paste (image or text)"""
-        import asyncio
-
-        # 1. Try pasting image from clipboard
-        if await self.try_paste_clipboard_image():
-            return True
-
-        # 2. If no image, read text from clipboard
-        try:
-            process = await asyncio.create_subprocess_exec(
-                "pbpaste",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout, _ = await asyncio.wait_for(process.communicate(), timeout=2.0)
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.wait()
-                return False
-
-            if process.returncode == 0 and stdout:
-                text_content = stdout.decode("utf-8")
-                pasted_text = self.format_pasted_file_path(text_content)
-                lines = pasted_text.splitlines()
-
-                if len(lines) > self.PASTE_LINE_THRESHOLD:
-                    idx = len(self.pasted_texts) + 1
-                    tag = f"[Pasted text #{idx} +{len(lines)} lines]"
-                    self.pasted_texts[tag] = pasted_text
-                    self.insert(tag)
-                else:
-                    self.insert(pasted_text)
-
-                self._on_input_change()
-                return True
-        except Exception:
-            pass
 
         return False
 

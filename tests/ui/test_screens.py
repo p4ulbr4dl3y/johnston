@@ -2,32 +2,12 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from widgets.screens.ask_user import ConfirmScreen, QuestionScreen
+from widgets.screens.ask_user import ConfirmScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
-
-
-class TestQuestionScreen(unittest.TestCase):
-    def test_init_with_options(self):
-        s = QuestionScreen("### **Q 1/2**", "Pick a color", ["red", "blue"], "red")
-        self.assertEqual(s.num_text, "### **Q 1/2**")
-        self.assertEqual(s.question_text, "Pick a color")
-        self.assertEqual(s.raw_options, ["red", "blue"])
-        self.assertIn("Write-in...", s.options)
-        self.assertEqual(s.current_val, "red")
-
-    def test_init_without_options(self):
-        s = QuestionScreen("### **Q 1/1**", "Type answer", [])
-        self.assertEqual(s.raw_options, [])
-        self.assertEqual(s.options, [])
-
-    def test_bindings(self):
-        keys = [b[0] for b in QuestionScreen("n", "q", ["a"]).BINDINGS]
-        self.assertIn("escape", keys)
-        self.assertIn("left", keys)
 
 
 class TestConfirmScreen(unittest.TestCase):

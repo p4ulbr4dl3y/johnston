@@ -33,10 +33,10 @@ class SessionManager:
     def list_sessions(self) -> List[Dict[str, Any]]:
         """Returns list of NON-EMPTY sessions for current project, sorted by updated time.
 
-        Pure reader: does NOT delete empty session files. Empty files are purged
-        explicitly via purge_empty_sessions() (called from save_session when a session
-        becomes empty). A read-only getter must not mutate the filesystem as a side
-        effect — that makes list_sessions unsafe to call from UI/status code.
+        Pure reader: does NOT delete empty session files. Empty files are removed
+        on next save_session() when a session becomes empty. A read-only getter
+        must not mutate the filesystem as a side effect — that makes list_sessions
+        unsafe to call from UI/status code.
         """
         sessions = []
         if not os.path.exists(self.sessions_dir):
@@ -66,31 +66,6 @@ class SessionManager:
 
         sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
         return sessions
-
-    def purge_empty_sessions(self) -> int:
-        """Removes session files that contain no messages. Returns count removed.
-
-        Explicit cleanup operation kept separate from the read-only list_sessions so
-        that reading the session list never has destructive filesystem side effects.
-        """
-        removed = 0
-        if not os.path.exists(self.sessions_dir):
-            return removed
-        for filename in os.listdir(self.sessions_dir):
-            if not filename.endswith(".json"):
-                continue
-            filepath = os.path.join(self.sessions_dir, filename)
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                ui_msgs = data.get("ui_messages") or data.get("messages") or []
-                agent_history = data.get("agent_history") or []
-                if not ui_msgs and not agent_history:
-                    os.remove(filepath)
-                    removed += 1
-            except Exception:
-                pass
-        return removed
 
     def load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         if not session_id:
@@ -139,36 +114,6 @@ class SessionManager:
             raise
 
         self.set_active_session_id(session_id)
-
-    def delete_session(self, session_id: str):
-        filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        try:
-            from core.git_checkpoint import GitCheckpointManager
-            GitCheckpointManager.delete_session_checkpoints(session_id, project_path=self.project_path)
-        except Exception:
-            pass
-
-    def get_active_session_id(self) -> Optional[str]:
-        """Returns ID of last active session or None if none exist"""
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    sid = cfg.get("active_session_id")
-                    if sid and os.path.exists(os.path.join(self.sessions_dir, f"{sid}.json")):
-                        return sid
-            except Exception:
-                pass
-
-        sessions = self.list_sessions()
-        if sessions:
-            sid = sessions[0]["id"]
-            self.set_active_session_id(sid)
-            return sid
-
-        return None
 
     def set_active_session_id(self, session_id: str):
         cfg = {}

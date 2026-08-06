@@ -10,7 +10,6 @@ from core.platform_utils import (
     is_image_file,
     johnston_config_dir,
     shell_env,
-    supports_pty,
 )
 
 
@@ -20,9 +19,6 @@ class TestPlatformUtils(unittest.TestCase):
             os.environ, {"APPDATA": r"C:\Users\me\AppData\Roaming"}
         ):
             self.assertEqual(johnston_config_dir(), Path(r"C:\Users\me\AppData\Roaming") / "johnston")
-
-    def test_supports_pty_returns_false(self):
-        self.assertFalse(supports_pty())
 
     def test_shell_env_contains_noninteractive_variables(self):
         env = shell_env()
