@@ -745,6 +745,7 @@ class JohnstonApp(App):
                         all_atts.extend(atts)
                 combined_atts = all_atts if all_atts else None
                 should_show = any(item[1] for item in queued_items if len(item) > 1 and item[1] is not None)
+                self.is_generating = False
                 asyncio.create_task(self._process_queued_message(combined_prompt, should_show, combined_atts))
             else:
                 self.is_generating = False
