@@ -4,6 +4,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
 
 
+from core.platform_utils import is_windows
+
+
 class ShellConfirmScreen(ModalScreen[bool]):
     """Modal screen for requesting permission to run a potentially dangerous shell command across Windows, macOS, and Linux."""
 
@@ -21,9 +24,10 @@ class ShellConfirmScreen(ModalScreen[bool]):
         self.reason = reason
 
     def compose(self) -> ComposeResult:
+        lang = "powershell" if is_windows() else "bash"
         content = (
             "### **Confirm Shell Command**\n"
-            "```bash\n"
+            f"```{lang}\n"
             f"{self.command}\n"
             "```"
         )
