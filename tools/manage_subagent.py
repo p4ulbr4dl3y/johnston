@@ -80,7 +80,7 @@ class ManageSubagentTool(BaseTool):
 
             from core.config import SUBAGENT_LOGS_DIR
             log_file = os.path.join(tracker.storage_dir, f"{session.task_id}.json")
-            result_md_file = os.path.join(SUBAGENT_LOGS_DIR, f"{session.task_id}.md")
+            result_log_file = os.path.join(SUBAGENT_LOGS_DIR, f"{session.task_id}.log")
 
             lines = [
                 f"Subagent Status ({session.task_id}):",
@@ -90,15 +90,15 @@ class ManageSubagentTool(BaseTool):
                 f"• Mode: {'Background' if session.background else 'Foreground'}",
                 f"• Total Events: {len(session.events)}",
                 f"• Full Log File: {log_file}",
-                f"• Markdown Result File: {result_md_file}",
+                f"• Result Log File: {result_log_file}",
             ]
 
-            if os.path.exists(result_md_file):
+            if os.path.exists(result_log_file):
                 try:
-                    with open(result_md_file, "r", encoding="utf-8") as f:
-                        md_content = f.read().strip()
-                    if md_content:
-                        lines.append(f"\nFinal Response Snippet:\n{md_content[:2000]}")
+                    with open(result_log_file, "r", encoding="utf-8") as f:
+                        log_content = f.read().strip()
+                    if log_content:
+                        lines.append(f"\nFinal Response Snippet:\n{log_content[:2000]}")
                 except Exception:
                     pass
 
