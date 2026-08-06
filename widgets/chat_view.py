@@ -854,7 +854,7 @@ class ToolCallWidget(Vertical):
         else:
             self.status = "done"
 
-        if not self.is_expandable():
+        if not self.is_expandable() and self.tool_type.lower() not in ("subagent", "invoke_subagent", "task"):
             self.is_expanded = False
             self.header_label.remove_class("tool-header-expandable")
             self.header_label.add_class("tool-header")
