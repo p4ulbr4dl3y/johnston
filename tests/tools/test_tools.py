@@ -327,11 +327,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from tools.edit import EditTool
         file_path = os.path.join(self.test_dir, "range_err.py")
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("first_line = 1\nsecond_line = 2\ntarget_line = 3\n")
+            f.write("first_line = 1\nsecond_line = 2\ntarget_line = 3\ntarget_line = 3\n")
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # Search for target_line = 3 in lines 1-2 (must fail with line hint error)
+        # Search for target_line = 3 in lines 1-2 when multiple exist in file
         res = await tool.execute({
             "target_file": file_path,
             "target_content": "target_line = 3",
@@ -339,8 +339,40 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             "start_line": 1,
             "end_line": 2
         })
-        self.assertIn("ERR: target not found", res)
-        self.assertIn("Target content was found elsewhere around line 3", res)
+        self.assertIn("ERR: target not found in specified range", res)
+        self.assertIn("matches multiple occurrences (2)", res)
+
+    async def test_edit_tool_line_range_miss_fallback(self):
+        from tools.edit import EditTool
+        file_path = os.path.join(self.test_dir, "fallback_test.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("val_a = 1\nval_b = 2\nunique_target = 42\nval_c = 4\n")
+        await ReadTool().execute({"path": file_path})
+
+        tool = EditTool()
+        # Range 1-2 does not include unique_target = 42 (line 3), but fallback succeeds because it is unique!
+        res = await tool.execute({
+            "target_file": file_path,
+            "target_content": "unique_target = 42",
+            "replacement_content": "unique_target = 100",
+            "start_line": 1,
+            "end_line": 2
+        })
+        self.assertNotIn("ERR:", res)
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertIn("unique_target = 100", f.read())
+
+        # Start line out of bounds, but target unique in file -> fallback succeeds!
+        res_oob = await tool.execute({
+            "target_file": file_path,
+            "target_content": "unique_target = 100",
+            "replacement_content": "unique_target = 200",
+            "start_line": 50,
+            "end_line": 60
+        })
+        self.assertNotIn("ERR:", res_oob)
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertIn("unique_target = 200", f.read())
 
     async def test_edit_tool_end_line_auto_expansion(self):
         from tools.edit import EditTool

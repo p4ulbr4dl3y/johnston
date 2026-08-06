@@ -48,6 +48,10 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
     _DOC_CACHE[path] = (mtime, time.monotonic(), text)
 
 
+def clear_doc_cache() -> None:
+    _DOC_CACHE.clear()
+
+
 def convert_doc_to_markdown_sync(path: str) -> str:
     """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
     cached = get_cached_doc_markdown(path)
