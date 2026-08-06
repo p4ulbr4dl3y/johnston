@@ -185,7 +185,14 @@ class AskUserWizardScreen(ModalScreen[str]):
                         input_field.value = prev_answer
                         input_field.display = True
                 else:
-                    highlight_idx = 0
+                    try:
+                        curr_hl = opt_list.highlighted
+                    except Exception:
+                        curr_hl = None
+                    if curr_hl is not None and curr_hl < len(self.options):
+                        highlight_idx = curr_hl
+                    else:
+                        highlight_idx = 0
                     input_field.value = ""
 
                 for idx, opt in enumerate(self.options):
@@ -326,10 +333,12 @@ class AskUserWizardScreen(ModalScreen[str]):
             self.update_step()
 
     def action_go_next(self) -> None:
-        """Right arrow: navigate to the next question; on the last one show the summary."""
+        """Right arrow: navigate to the next question; on the last one show/confirm summary."""
         if self.q_idx < len(self.questions):
             self.q_idx += 1
             self.update_step()
+        else:
+            self.submit_current_step()
 
     def action_quit(self) -> None:
         self.app.exit()
