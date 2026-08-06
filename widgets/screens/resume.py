@@ -21,6 +21,8 @@ class ResumeScreen(BaseSelectionScreen[str]):
             title="### **Select Session to Resume**",
             options=options,
             items=items,
-            default_value=default_val
+            default_value=default_val,
+            show_search=True,
+            search_placeholder="Search sessions..."
         )
 

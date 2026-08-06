@@ -78,7 +78,7 @@ class TestTaskScreens(unittest.TestCase):
     def test_list_bindings(self):
         keys = [b[0] for b in TasksListScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("k", keys)
+        self.assertIn("tab", keys)
 
 
 class TestMCPScreen(unittest.TestCase):
@@ -95,7 +95,7 @@ class TestMCPScreen(unittest.TestCase):
         from widgets.screens.mcp import MCPScreen
         keys = [b[0] for b in MCPScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("m", keys)
+        self.assertIn("tab", keys)
 
 
 class TestProvidersScreen(unittest.TestCase):
@@ -237,7 +237,7 @@ class TestSubagentsScreen(unittest.TestCase):
         from widgets.screens.subagents import SubagentsScreen
         keys = [b[0] for b in SubagentsScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("k", keys)
+        self.assertIn("tab", keys)
 
 
 if __name__ == "__main__":

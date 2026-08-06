@@ -1,8 +1,9 @@
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Label, Markdown, OptionList, RichLog
+from textual.widgets import Input, Label, Markdown, OptionList, RichLog
 
 from core.config import THEME_MUTED
 
@@ -55,13 +56,18 @@ class TasksListScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Manager"),
-        ("k", "kill_task", "Kill Task"),
+        ("tab", "kill_task", "Kill Task"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ]
 
     def action_quit_app(self) -> None:
         self.app.exit()
+
+    def __init__(self):
+        super().__init__()
+        self.search_query = ""
+        self.filtered_tasks = []
 
     def _get_filtered_tasks(self) -> list:
         all_tasks = getattr(self.app, "background_tasks", [])
@@ -71,19 +77,68 @@ class TasksListScreen(ModalScreen[None]):
         else:
             filtered = list(all_tasks)
         filtered = [t for t in filtered if getattr(t, "is_background", False)]
+        q = self.search_query.strip().lower()
+        if q:
+            filtered = [
+                t for t in filtered
+                if q in getattr(t, "command", "").lower()
+                or q in getattr(t, "task_id", "").lower()
+            ]
         return sorted(filtered, key=lambda t: not getattr(t, "is_running", False))
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Background Tasks Manager**", classes="modal-markdown")
+            yield Input(placeholder="Search tasks...", id="modal-search-input")
             yield OptionList(id="tasks-option-list")
-            yield Label("enter: view output • k: kill task • esc: cancel", id="modal-hint")
+            yield Label("enter: view output • tab: kill task • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self._last_signatures = None
         self.update_tasks_list()
-        self.query_one("#tasks-option-list", OptionList).focus()
+        try:
+            self.query_one("#modal-search-input", Input).focus()
+        except Exception:
+            pass
         self.set_interval(0.5, self.update_tasks_list)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "modal-search-input":
+            self.search_query = event.value
+            self._last_signatures = None
+            self.update_tasks_list()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "modal-search-input":
+            tasks = self._get_filtered_tasks()
+            opt_list = self.query_one("#tasks-option-list", OptionList)
+            idx = opt_list.highlighted
+            if idx is not None and idx < len(tasks):
+                task = tasks[idx]
+                if hasattr(task, "async_task"):
+                    from widgets.screens.subagent_screen import SubagentViewScreen
+                    self.app.push_screen(SubagentViewScreen(task.task_id))
+                else:
+                    self.app.push_screen(TaskConsoleScreen(task))
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("down", "up"):
+            try:
+                search_input = self.query_one("#modal-search-input", Input)
+                if search_input.has_focus:
+                    tasks = self._get_filtered_tasks()
+                    opt_list = self.query_one("#tasks-option-list", OptionList)
+                    if opt_list.highlighted is None and tasks:
+                        opt_list.highlighted = 0
+                    elif opt_list.highlighted is not None:
+                        if event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
+                    event.prevent_default()
+                    event.stop()
+            except Exception:
+                pass
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
@@ -140,3 +195,4 @@ class TasksListScreen(ModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
+

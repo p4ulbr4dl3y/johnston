@@ -30,6 +30,7 @@ def apply_textual_patches() -> None:
 
     try:
         from textual.widgets import Markdown
+
         from widgets.chat_view import CustomMarkdownFence
         Markdown.BLOCKS["fence"] = CustomMarkdownFence
         Markdown.BLOCKS["code_block"] = CustomMarkdownFence

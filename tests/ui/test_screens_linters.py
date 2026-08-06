@@ -80,16 +80,14 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 mock_mgr.set_enabled.assert_called_with("php", True)
 
-                # Details
-                await pilot.press("x")
-                await pilot.pause()
+                # Close screen
                 await pilot.press("escape")
                 await pilot.pause()
 
     async def test_linters_screen_bindings_include_keys(self):
         screen = LintersScreen()
         keys = [b[0] for b in screen.BINDINGS]
-        self.assertIn("x", keys)
+        self.assertNotIn("x", keys)
         self.assertIn("escape", keys)
         self.assertNotIn("i", keys)
         self.assertNotIn("u", keys)

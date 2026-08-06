@@ -3,7 +3,6 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
 
-
 from core.platform_utils import is_windows
 
 
