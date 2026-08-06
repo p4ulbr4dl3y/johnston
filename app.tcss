@@ -529,12 +529,10 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence,
 #modal-dialog.bash-confirm-dialog MarkdownFence {
-    background: #18181b;
-    border-left: solid #3f3f46;
-    border-top: none;
-    border-right: none;
-    border-bottom: none;
-    padding: 0 1;
+    background: #27272a;
+    border: none;
+    color: #f4f4f5;
+    padding: 0;
     margin: 1 0;
 }
 
@@ -545,10 +543,14 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence #code-content,
 #modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
-    background: #18181b;
-    color: #e4e4e7;
-    padding: 0;
+    background: #27272a;
+    color: #f4f4f5;
+    padding: 0 1;
 }
+
+
+
+
 
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus {
