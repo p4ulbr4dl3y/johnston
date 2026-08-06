@@ -134,7 +134,7 @@ class CustomMarkdownFence(MarkdownFence):
                 target_lexer = "text"
 
         theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
-        code_content = Syntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="#18181b")
+        code_content = Syntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default")
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
         with Vertical(classes="fence-scroll-box"):
@@ -741,7 +741,7 @@ class ToolCallWidget(Vertical):
                 "json",
                 theme=CODE_THEME,
                 word_wrap=False,
-                background_color="#18181b"
+                background_color="default"
             )
             if footer:
                 return Group(syntax, Text("\n" + footer.strip()))
@@ -1341,7 +1341,7 @@ class ToolCallWidget(Vertical):
                                 theme=CODE_THEME,
                                 line_numbers=True,
                                 word_wrap=False,
-                                background_color="#18181b"
+                                background_color="default"
                             )
                             self.content_widget.update(syntax)
                         except Exception:
@@ -1441,7 +1441,7 @@ class ToolCallWidget(Vertical):
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
-                                    background_color="#18181b"
+                                    background_color="default"
                                 )
                                 self.content_widget.update(syntax)
                             except Exception:
@@ -1492,7 +1492,7 @@ class ToolCallWidget(Vertical):
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
-                                    background_color="#18181b"
+                                    background_color="default"
                                 )
                                 self.content_widget.update(syntax)
                             except Exception:
@@ -1532,7 +1532,7 @@ class ToolCallWidget(Vertical):
                         "json",
                         theme=CODE_THEME,
                         word_wrap=False,
-                        background_color="#18181b"
+                        background_color="default"
                     )
                     self.content_widget.update(syntax)
                 except Exception:
