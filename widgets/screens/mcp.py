@@ -1,10 +1,11 @@
 import asyncio
 from typing import Any, Dict
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Label, Markdown, OptionList
+from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.mcp_manager import get_mcp_manager
 
@@ -15,7 +16,6 @@ class MCPScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
-        ("m", "toggle_mode", "Toggle Eager/Lazy"),
         ("tab", "toggle_mode", "Toggle Eager/Lazy"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
@@ -28,18 +28,25 @@ class MCPScreen(ModalScreen[None]):
         super().__init__()
         self.mm = get_mcp_manager()
         self.servers: list[Dict[str, Any]] = []
+        self.filtered_servers: list[Dict[str, Any]] = []
+        self.search_query = ""
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Manage MCP Servers**", classes="modal-markdown")
+            yield Input(placeholder="Search MCP servers...", id="modal-search-input")
             yield OptionList(id="mcp-option-list")
-            yield Label("enter: toggle • tab / m: mode • esc: cancel", id="modal-hint")
+            yield Label("enter: toggle • tab: mode • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()
         opt_list = self.query_one("#mcp-option-list", OptionList)
-        if self.servers:
+        if self.filtered_servers:
             opt_list.highlighted = 0
+        try:
+            self.query_one("#modal-search-input", Input).focus()
+        except Exception:
+            pass
 
         # Non-blocking background warmup for unstarted MCP servers
         asyncio.create_task(self._warmup_tools())
@@ -60,6 +67,23 @@ class MCPScreen(ModalScreen[None]):
 
         if not self.servers:
             opt_list.add_option("*No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)*")
+            self.filtered_servers = []
+            return
+
+        q = self.search_query.strip().lower()
+        if not q:
+            self.filtered_servers = list(self.servers)
+        else:
+            self.filtered_servers = [
+                s for s in self.servers
+                if q in s.get("name", "").lower()
+                or q in s.get("scope", "").lower()
+                or q in s.get("command", "").lower()
+                or q in s.get("url", "").lower()
+            ]
+
+        if not self.filtered_servers:
+            opt_list.add_option("*No matching MCP servers found*")
             return
 
         tools_per_server: Dict[str, int] = {}
@@ -71,7 +95,7 @@ class MCPScreen(ModalScreen[None]):
         except Exception:
             pass
 
-        for s in self.servers:
+        for s in self.filtered_servers:
             disabled = s.get("disabled", False)
             scope_tag = rf"\[{s['scope'].upper()}]"
             mode_tag = rf"\[{s.get('mode', 'eager').upper()}]"
@@ -109,11 +133,45 @@ class MCPScreen(ModalScreen[None]):
                     status_tag = r"\[ERR]" if (not cmd and not url) else r"\[ON]"
                     opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name}")
 
-        opt_list.focus()
-        if prev_highlighted is not None and 0 <= prev_highlighted < len(self.servers):
+        if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
             opt_list.highlighted = prev_highlighted
-        elif self.servers and opt_list.highlighted is None:
+        elif self.filtered_servers and opt_list.highlighted is None:
             opt_list.highlighted = 0
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "modal-search-input":
+            self.search_query = event.value
+            self.refresh_list()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "modal-search-input":
+            opt_list = self.query_one("#mcp-option-list", OptionList)
+            idx = opt_list.highlighted
+            if idx is not None and 0 <= idx < len(self.filtered_servers):
+                target = self.filtered_servers[idx]
+                s_name = target["name"]
+                self.mm.toggle_server(s_name)
+                self.refresh_list()
+                if hasattr(self.app, "refresh_status_footer"):
+                    self.app.refresh_status_footer()
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("down", "up"):
+            try:
+                search_input = self.query_one("#modal-search-input", Input)
+                if search_input.has_focus:
+                    opt_list = self.query_one("#mcp-option-list", OptionList)
+                    if opt_list.highlighted is None and self.filtered_servers:
+                        opt_list.highlighted = 0
+                    elif opt_list.highlighted is not None:
+                        if event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
+                    event.prevent_default()
+                    event.stop()
+            except Exception:
+                pass
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):
@@ -123,8 +181,8 @@ class MCPScreen(ModalScreen[None]):
     def action_toggle_mode(self) -> None:
         opt_list = self.query_one("#mcp-option-list", OptionList)
         highlighted = opt_list.highlighted
-        if highlighted is not None and 0 <= highlighted < len(self.servers):
-            target = self.servers[highlighted]
+        if highlighted is not None and 0 <= highlighted < len(self.filtered_servers):
+            target = self.filtered_servers[highlighted]
             s_name = target["name"]
             self.mm.toggle_mode(s_name)
             if hasattr(self.app, "refresh_status_footer"):
@@ -133,8 +191,8 @@ class MCPScreen(ModalScreen[None]):
             opt_list.highlighted = highlighted
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.servers):
-            target = self.servers[event.option_index]
+        if 0 <= event.option_index < len(self.filtered_servers):
+            target = self.filtered_servers[event.option_index]
             s_name = target["name"]
             self.mm.toggle_server(s_name)
             self.refresh_list()
@@ -143,4 +201,5 @@ class MCPScreen(ModalScreen[None]):
 
             if hasattr(self.app, "refresh_status_footer"):
                 self.app.refresh_status_footer()
+
 

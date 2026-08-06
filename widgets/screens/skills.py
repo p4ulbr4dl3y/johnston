@@ -1,9 +1,10 @@
 from typing import Any, Dict, Optional
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Label, Markdown, OptionList
+from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.skill_manager import SkillManager
 
@@ -48,9 +49,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
-        ("h", "toggle_hidden", "Toggle Hidden"),
         ("tab", "toggle_hidden", "Toggle Hidden"),
-        ("m", "toggle_hidden", "Toggle Hidden"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ]
@@ -63,6 +62,9 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.sm = SkillManager()
         self.skills: list[Dict[str, Any]] = []
         self.options: list[str] = []
+        self.filtered_skills: list[Dict[str, Any]] = []
+        self.filtered_options: list[str] = []
+        self.search_query = ""
         self.load_skills()
 
     def load_skills(self) -> None:
@@ -72,39 +74,101 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
             scope_tag = rf"\[{s['scope'].upper()}]"
             status_tag = r"\[HIDDEN]" if s.get("hidden") else r"\[VISIBLE]"
             self.options.append(f"{scope_tag} {status_tag} {s['name']}")
+        self.filtered_skills = list(self.skills)
+        self.filtered_options = list(self.options)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Available Skills**", classes="modal-markdown")
+            yield Input(placeholder="Search skills...", id="modal-search-input")
             yield OptionList(id="skills-option-list")
-            yield Label("enter: activate • tab / m: toggle status • esc: cancel", id="modal-hint")
+            yield Label("enter: activate • tab: toggle status • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
+        try:
+            self.query_one("#modal-search-input", Input).focus()
+        except Exception:
+            pass
 
     def refresh_list(self, force_load: bool = True) -> None:
         if force_load:
             self.load_skills()
+        self._apply_filter()
+
+    def _apply_filter(self) -> None:
+        q = self.search_query.strip().lower()
+        if not q:
+            self.filtered_skills = list(self.skills)
+            self.filtered_options = list(self.options)
+        else:
+            self.filtered_skills = []
+            self.filtered_options = []
+            for s, opt in zip(self.skills, self.options):
+                name = s.get("name", "").lower()
+                desc = s.get("description", "").lower()
+                scope = s.get("scope", "").lower()
+                if q in name or q in desc or q in scope:
+                    self.filtered_skills.append(s)
+                    self.filtered_options.append(opt)
+
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()
-            if not self.skills:
-                opt_list.add_option("*No skills found in ~/.johnston/skills/ or .johnston/skills/*")
+            if not self.filtered_skills:
+                if not self.skills:
+                    opt_list.add_option("*No skills found in ~/.johnston/skills/ or .johnston/skills/*")
+                else:
+                    opt_list.add_option("*No matching skills found*")
                 return
-            for opt in self.options:
+            for opt in self.filtered_options:
                 opt_list.add_option(opt)
-            opt_list.focus()
-            if self.skills:
+            if self.filtered_skills:
                 opt_list.highlighted = 0
         except Exception:
             pass
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "modal-search-input":
+            self.search_query = event.value
+            self._apply_filter()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "modal-search-input":
+            try:
+                opt_list = self.query_one("#skills-option-list", OptionList)
+                idx = opt_list.highlighted
+                if idx is not None and 0 <= idx < len(self.filtered_skills):
+                    self.dismiss(self.filtered_skills[idx])
+                    return
+            except Exception:
+                pass
+            self.dismiss(None)
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in ("down", "up"):
+            try:
+                search_input = self.query_one("#modal-search-input", Input)
+                if search_input.has_focus:
+                    opt_list = self.query_one("#skills-option-list", OptionList)
+                    if opt_list.highlighted is None and self.filtered_skills:
+                        opt_list.highlighted = 0
+                    elif opt_list.highlighted is not None:
+                        if event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
+                    event.prevent_default()
+                    event.stop()
+            except Exception:
+                pass
 
     def action_toggle_hidden(self) -> None:
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             highlighted = opt_list.highlighted
-            if highlighted is not None and 0 <= highlighted < len(self.skills):
-                target = self.skills[highlighted]
+            if highlighted is not None and 0 <= highlighted < len(self.filtered_skills):
+                target = self.filtered_skills[highlighted]
                 s_name = target["name"]
                 self.sm.toggle_hidden(s_name)
                 self.refresh_list()
@@ -116,7 +180,8 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.dismiss(None)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.skills):
-            self.dismiss(self.skills[event.option_index])
+        if 0 <= event.option_index < len(self.filtered_skills):
+            self.dismiss(self.filtered_skills[event.option_index])
         else:
             self.dismiss(None)
+
