@@ -74,6 +74,43 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         res = subprocess.run(["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
         self.assertNotIn(branch_name, res.stdout)
 
+    def test_worktree_branch_git_merge_integration(self):
+        """Full end-to-end verification: create worktree, write files, remove worktree, git merge branch."""
+        task_id = "e2e-merge-task"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+
+        # Subagent creates new file and edits existing file inside worktree
+        new_file = os.path.join(wt_path, "feature.py")
+        with open(new_file, "w", encoding="utf-8") as f:
+            f.write("def feature(): return 'ok'\n")
+
+        readme_file = os.path.join(wt_path, "README.md")
+        with open(readme_file, "a", encoding="utf-8") as f:
+            f.write("Updated README\n")
+
+        # Auto-commit and get diff
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        self.assertTrue(has_changes)
+        self.assertIn("feature.py", diff_summary)
+        self.assertIn("Updated README", diff_summary)
+
+        # Cleanup worktree directory, preserving branch
+        SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=has_changes)
+        self.assertFalse(os.path.exists(wt_path))
+
+        # Parent repo performs git merge branch_name
+        merge_res = subprocess.run(["git", "merge", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
+        self.assertEqual(merge_res.returncode, 0)
+
+        # Verify merged files exist in parent repo
+        merged_feature = os.path.join(self.repo_dir, "feature.py")
+        self.assertTrue(os.path.exists(merged_feature))
+        with open(merged_feature, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "def feature(): return 'ok'\n")
+
+        with open(os.path.join(self.repo_dir, "README.md"), "r", encoding="utf-8") as f:
+            self.assertIn("Updated README", f.read())
+
 
 if __name__ == "__main__":
     unittest.main()
