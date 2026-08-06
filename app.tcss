@@ -489,7 +489,8 @@ SubagentsScreen #modal-dialog {
 }
 
 #modal-search-input {
-    dock: top;
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
 .modal-body {
