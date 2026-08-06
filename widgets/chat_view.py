@@ -19,19 +19,6 @@ from rich.rule import Rule
 from rich.segment import Segment
 from rich.syntax import Syntax
 from rich.text import Span, Text
-
-
-class TransparentSyntax(Syntax):
-    """Rich Syntax renderable with transparent token background to allow TCSS styling."""
-
-    def _get_syntax(self, console: Any, options: Any):
-        for segment in super()._get_syntax(console, options):
-            if segment.style and segment.style.bgcolor:
-                style = segment.style.copy()
-                style._bgcolor = None
-                yield Segment(segment.text, style, segment.control)
-            else:
-                yield segment
 from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
@@ -51,6 +38,19 @@ from textual.widgets._markdown import (
 from core.config import IMAGE_EXTENSIONS
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
+
+
+class TransparentSyntax(Syntax):
+    """Rich Syntax renderable with transparent token background to allow TCSS styling."""
+
+    def _get_syntax(self, console: Any, options: Any):
+        for segment in super()._get_syntax(console, options):
+            if segment.style and segment.style.bgcolor:
+                style = segment.style.copy()
+                style._bgcolor = None
+                yield Segment(segment.text, style, segment.control)
+            else:
+                yield segment
 
 CODE_THEME = "one-dark"
 
