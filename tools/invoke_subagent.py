@@ -194,7 +194,6 @@ class InvokeSubagentTool(BaseTool):
                         f"<task_result>\n{result_text}\n</task_result>\n"
                         f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
                     )
-                    ctx.notify(f"Subagent '{description}' completed.")
                     ctx.trigger_ai_response(msg)
 
             bg_task = asyncio.create_task(_run_bg())

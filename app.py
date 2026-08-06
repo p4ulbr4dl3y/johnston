@@ -745,9 +745,14 @@ class JohnstonApp(App):
                         all_atts.extend(atts)
                 combined_atts = all_atts if all_atts else None
                 should_show = any(item[1] for item in queued_items if len(item) > 1 and item[1] is not None)
-                self.generate_ai_response(combined_prompt, show_in_ui=should_show, attachments=combined_atts)
+                asyncio.create_task(self._process_queued_message(combined_prompt, should_show, combined_atts))
             else:
                 self.is_generating = False
+
+    async def _process_queued_message(self, prompt: str, show_in_ui: bool, attachments: list = None) -> None:
+        """Helper to trigger queued AI response on next event loop iteration after previous @work task finishes."""
+        await asyncio.sleep(0.01)
+        self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background shell command finishes"""
