@@ -98,6 +98,36 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
     return formatted
 
 
+def sort_keys_recursive(obj: Any) -> Any:
+    """Recursively sorts dictionary keys to guarantee deterministic JSON serialization (stableStringify)."""
+    if isinstance(obj, dict):
+        return {k: sort_keys_recursive(v) for k, v in sorted(obj.items())}
+    elif isinstance(obj, list):
+        return [sort_keys_recursive(elem) for elem in obj]
+    return obj
+
+
+def apply_anthropic_rolling_cache(anthropic_msgs: List[Dict[str, Any]]) -> None:
+    """Places a rolling Anthropic cache_control breakpoint on the 2nd-to-last user message in history."""
+    user_indices = [i for i, m in enumerate(anthropic_msgs) if m.get("role") == "user"]
+    if len(user_indices) < 2:
+        return
+
+    target_idx = user_indices[-2]
+    msg = anthropic_msgs[target_idx]
+    content = msg.get("content")
+
+    if isinstance(content, str):
+        if content:
+            msg["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
+    elif isinstance(content, list) and content:
+        last_block = content[-1]
+        if isinstance(last_block, dict) and "cache_control" not in last_block:
+            cloned_block = dict(last_block)
+            cloned_block["cache_control"] = {"type": "ephemeral"}
+            msg["content"] = content[:-1] + [cloned_block]
+
+
 class OpenAIAdapter(BaseApiAdapter):
     """Adapter for OpenAI-compatible Chat Completions API.
 
@@ -295,6 +325,7 @@ class AnthropicAdapter(BaseApiAdapter):
         thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_prompt, anthropic_msgs = self._to_anthropic_messages(messages)
+        apply_anthropic_rolling_cache(anthropic_msgs)
         endpoint_url = f"{(base_url or 'https://api.anthropic.com/v1').rstrip('/')}/messages"
         headers = {
             "x-api-key": api_key,
@@ -323,7 +354,7 @@ class AnthropicAdapter(BaseApiAdapter):
                 {
                     "name": (t.get("function", {}) or {}).get("name"),
                     "description": (t.get("function", {}) or {}).get("description", ""),
-                    "input_schema": (t.get("function", {}) or {}).get("parameters", {}),
+                    "input_schema": sort_keys_recursive((t.get("function", {}) or {}).get("parameters", {})),
                 }
                 for t in tools
             ]

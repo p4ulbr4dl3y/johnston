@@ -77,14 +77,195 @@ ALIAS_MAP: Dict[str, str] = {
 }
 
 
+PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
+    "shell": {
+        "cmd": "command",
+        "script": "command",
+        "command_line": "command",
+        "exec": "command",
+        "time_limit": "timeout",
+        "max_seconds": "timeout",
+        "background": "run_in_background",
+        "async": "run_in_background",
+        "is_async": "run_in_background",
+    },
+    "read": {
+        "file_path": "path",
+        "filepath": "path",
+        "file": "path",
+        "filename": "path",
+        "target_file": "path",
+        "uri": "path",
+        "url": "path",
+        "start": "start_line",
+        "startLine": "start_line",
+        "from_line": "start_line",
+        "line_start": "start_line",
+        "end": "end_line",
+        "endLine": "end_line",
+        "to_line": "end_line",
+        "line_end": "end_line",
+        "offset": "content_offset",
+        "contentOffset": "content_offset",
+    },
+    "create": {
+        "path": "target_file",
+        "file_path": "target_file",
+        "filepath": "target_file",
+        "file": "target_file",
+        "filename": "target_file",
+        "destination": "target_file",
+        "content": "code",
+        "text": "code",
+        "contents": "code",
+        "file_content": "code",
+        "body": "code",
+        "summary": "description",
+        "desc": "description",
+        "reason": "description",
+    },
+    "edit": {
+        "path": "target_file",
+        "file_path": "target_file",
+        "filepath": "target_file",
+        "file": "target_file",
+        "filename": "target_file",
+        "target_content": "old_str",
+        "old_content": "old_str",
+        "search": "old_str",
+        "oldStr": "old_str",
+        "old": "old_str",
+        "replacement_content": "new_str",
+        "new_content": "new_str",
+        "replace": "new_str",
+        "newStr": "new_str",
+        "new": "new_str",
+        "desc": "description",
+        "prompt": "instruction",
+    },
+    "multi_edit": {
+        "path": "target_file",
+        "file_path": "target_file",
+        "filepath": "target_file",
+        "file": "target_file",
+        "replacement_chunks": "edits",
+        "chunks": "edits",
+        "changes": "edits",
+    },
+    "web_fetch": {
+        "uri": "url",
+        "link": "url",
+        "path": "url",
+        "address": "url",
+    },
+    "ask_user": {
+        "question": "prompt",
+        "message": "prompt",
+        "text": "prompt",
+        "choices": "options",
+        "answers": "options",
+    },
+    "update_plan": {
+        "steps": "plan",
+        "tasks": "plan",
+        "items": "plan",
+        "todo": "plan",
+    },
+    "invoke_subagent": {
+        "type": "subagent_type",
+        "subagent": "subagent_type",
+        "name": "subagent_type",
+        "agent_type": "subagent_type",
+        "agent": "subagent_type",
+        "instructions": "prompt",
+        "task": "prompt",
+        "goal": "prompt",
+        "message": "prompt",
+        "mode": "workspace",
+    },
+    "manage_subagent": {
+        "cmd": "action",
+        "command": "action",
+        "ids": "conversation_ids",
+        "subagent_ids": "conversation_ids",
+        "id": "conversation_ids",
+    },
+    "manage_task": {
+        "cmd": "action",
+        "command": "action",
+        "id": "task_id",
+        "taskId": "task_id",
+        "text": "input",
+        "stdin": "input",
+        "data": "input",
+    },
+    "call_mcp": {
+        "server": "server_name",
+        "mcp_server": "server_name",
+        "tool": "tool_name",
+        "mcp_tool": "tool_name",
+        "args": "arguments",
+        "params": "arguments",
+        "parameters": "arguments",
+        "input": "arguments",
+    },
+}
+
+
+def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
+    """Normalizes tool argument names to canonical names using PARAM_ALIAS_MAP."""
+    if not args or not isinstance(args, dict):
+        return {}
+
+    clean_name = (tool_name or "").strip().lower()
+    resolved_name = ALIAS_MAP.get(clean_name, clean_name)
+    param_aliases = PARAM_ALIAS_MAP.get(resolved_name, {})
+
+    normalized = dict(args)
+    for k, v in list(args.items()):
+        if k in param_aliases:
+            canonical = param_aliases[k]
+            if canonical not in normalized or normalized[canonical] is None:
+                normalized[canonical] = v
+
+    if resolved_name == "multi_edit" and isinstance(normalized.get("edits"), list):
+        chunk_aliases = {
+            "target_content": "old_str",
+            "old_content": "old_str",
+            "search": "old_str",
+            "oldStr": "old_str",
+            "old": "old_str",
+            "replacement_content": "new_str",
+            "new_content": "new_str",
+            "replace": "new_str",
+            "newStr": "new_str",
+            "new": "new_str",
+        }
+        normalized_edits = []
+        for chunk in normalized["edits"]:
+            if isinstance(chunk, dict):
+                c_norm = dict(chunk)
+                for ck, cv in list(chunk.items()):
+                    if ck in chunk_aliases:
+                        canon_c = chunk_aliases[ck]
+                        if canon_c not in c_norm or c_norm[canon_c] is None:
+                            c_norm[canon_c] = cv
+                normalized_edits.append(c_norm)
+            else:
+                normalized_edits.append(chunk)
+        normalized["edits"] = normalized_edits
+
+    return normalized
+
+
 def get_default_tools() -> list[Dict[str, Any]]:
     return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
 
 async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> str:
-    args = args or {}
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
     resolved_name = ALIAS_MAP.get(clean_name, clean_name)
+    args = normalize_tool_args(resolved_name, args)
 
     tool_cls = REGISTRY.get(resolved_name)
     if tool_cls:

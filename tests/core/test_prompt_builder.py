@@ -10,7 +10,7 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("System prompt test", sys_prompt)
         self.assertIn("## Environment Metadata", sys_prompt)
         self.assertIn("- Working Directory:", sys_prompt)
-        self.assertIn("- Local Time:", sys_prompt)
+        self.assertIn("- Current Date:", sys_prompt)
         self.assertIn("- Operating System:", sys_prompt)
         self.assertIn("## Execution Mode: ACTION", sys_prompt)
 
@@ -27,6 +27,17 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertNotIn("create", names)
         self.assertNotIn("edit", names)
         self.assertIn("invoke_subagent", names)
+
+    def test_build_tools_sorted_alphabetically(self):
+        base_tools = [
+            {"function": {"name": "z_tool"}},
+            {"function": {"name": "a_tool"}},
+            {"function": {"name": "m_tool"}},
+        ]
+        builder = PromptBuilder("Test", base_tools, mode="action", allow_task=False)
+        tools = builder.build_tools()
+        names = [t.get("function", {}).get("name") for t in tools]
+        self.assertEqual(names, sorted(names))
 
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], mode="action")

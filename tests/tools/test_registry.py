@@ -1,10 +1,43 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from tools.registry import REGISTRY, execute_tool, get_default_tools
+from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_args
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
+    def test_normalize_tool_args(self):
+        # Test shell argument aliases
+        norm_shell = normalize_tool_args("shell", {"cmd": "ls -l", "time_limit": 30, "async": True})
+        self.assertEqual(norm_shell["command"], "ls -l")
+        self.assertEqual(norm_shell["timeout"], 30)
+        self.assertEqual(norm_shell["run_in_background"], True)
+
+        # Test read argument aliases
+        norm_read = normalize_tool_args("read", {"file_path": "foo.py", "start": 10, "end": 20})
+        self.assertEqual(norm_read["path"], "foo.py")
+        self.assertEqual(norm_read["start_line"], 10)
+        self.assertEqual(norm_read["end_line"], 20)
+
+        # Test create argument aliases
+        norm_create = normalize_tool_args("create", {"filepath": "bar.py", "content": "print(1)"})
+        self.assertEqual(norm_create["target_file"], "bar.py")
+        self.assertEqual(norm_create["code"], "print(1)")
+
+        # Test edit argument aliases
+        norm_edit = normalize_tool_args("edit", {"file": "baz.py", "target_content": "a", "replacement_content": "b"})
+        self.assertEqual(norm_edit["target_file"], "baz.py")
+        self.assertEqual(norm_edit["old_str"], "a")
+        self.assertEqual(norm_edit["new_str"], "b")
+
+        # Test multi_edit chunk aliases
+        norm_multi = normalize_tool_args("multi_edit", {
+            "file": "baz.py",
+            "chunks": [{"search": "a", "replace": "b"}]
+        })
+        self.assertEqual(norm_multi["target_file"], "baz.py")
+        self.assertEqual(norm_multi["edits"][0]["old_str"], "a")
+        self.assertEqual(norm_multi["edits"][0]["new_str"], "b")
+
     def test_get_default_tools(self):
         tools = get_default_tools()
         self.assertIsInstance(tools, list)
