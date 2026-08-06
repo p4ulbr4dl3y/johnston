@@ -162,6 +162,7 @@ class AskUserWizardScreen(ModalScreen[str]):
         hint = self.query_one("#modal-hint", Label)
 
         if self.q_idx < len(self.questions):
+            title_md.remove_class("confirm-summary")
             q = self.questions[self.q_idx]
             q_text = q.get("question_text", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n\n{q_text}")
@@ -205,14 +206,16 @@ class AskUserWizardScreen(ModalScreen[str]):
                 input_field.value = prev_answer
                 input_field.focus()
         else:
-            summary = ""
+            blocks = []
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question_text", "")
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
-                summary += f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_display}\n\n"
+                blocks.append(f"**Question {idx+1}:** {q_clean}\n\n**Answer:** {ans_display}")
+            summary = "\n\n&nbsp;\n\n".join(blocks)
 
+            title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**\n\n" + summary)
             opt_list.display = False
             input_field.display = False

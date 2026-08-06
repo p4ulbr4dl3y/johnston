@@ -499,6 +499,10 @@ SubagentsScreen #modal-dialog {
     margin-bottom: 1;
 }
 
+.modal-markdown.confirm-summary MarkdownParagraph {
+    margin: 0;
+}
+
 SubagentViewScreen {
     background: #09090b;
 }

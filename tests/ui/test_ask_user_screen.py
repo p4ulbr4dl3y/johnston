@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.app import App, ComposeResult
 from textual.events import Focus, Key
-from textual.widgets import OptionList
+from textual.widgets import Markdown, OptionList
 
 from widgets.screens.ask_user import (
     AskUserWizardScreen,
@@ -314,6 +314,33 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(screen.q_idx, 0)
             # state exists -> highlight restored to the chosen option
             self.assertEqual(opt_list.highlighted, 2)
+
+    async def test_wizard_confirm_summary_class_applied_and_removed(self):
+        questions = [
+            {"question_text": "Q1", "options": ["A", "B"]},
+            {"question_text": "Q2", "options": ["X", "Y"]},
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            md = screen.query_one("#wizard-title", Markdown)
+            self.assertFalse(md.has_class("confirm-summary"))
+
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # on the confirm step the class is set
+            self.assertTrue(md.has_class("confirm-summary"))
+
+            await pilot.press("left")  # back to Q2
+            await pilot.pause()
+            self.assertFalse(md.has_class("confirm-summary"))
 
 
 if __name__ == "__main__":
