@@ -308,6 +308,11 @@ class BaseAgent:
         self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
+        # Drop the cached system prompt + tool schema token count from the last
+        # stream. get_metrics() falls back to this when last_context_tokens is
+        # zero, so keeping a stale value here makes a fresh session (after /new)
+        # show the previous session's sys+tools overhead (e.g. ~3k tokens).
+        self._last_sys_tokens = 0
 
     def truncate_history_to_user_message(self, user_msg_index: int) -> None:
         """Truncates conversation history to immediately before the specified user message index (0-indexed)."""
