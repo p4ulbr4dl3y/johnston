@@ -212,6 +212,14 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
 }
 
 
+def normalize_tool_name(name: str) -> str:
+    """Normalizes a tool name or alias to its canonical name using ALIAS_MAP."""
+    if not name:
+        return ""
+    clean = name.strip().lower()
+    return ALIAS_MAP.get(clean, clean)
+
+
 def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
     """Normalizes tool argument names to canonical names using PARAM_ALIAS_MAP."""
     if not args or not isinstance(args, dict):
