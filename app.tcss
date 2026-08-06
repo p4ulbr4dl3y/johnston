@@ -554,16 +554,50 @@ SubagentViewScreen {
     margin-bottom: 0;
 }
 
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence,
 #modal-dialog.bash-confirm-dialog MarkdownFence {
-    background: #27272a;
-    border-left: solid #ffffff;
-    padding: 0 1;
-    margin: 1 0 0 0;
+    background: #09090b;
+    border: solid #27272a;
+    padding: 0;
+    margin: 1 0;
 }
 
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-header,
+#modal-dialog.bash-confirm-dialog MarkdownFence .fence-header {
+    display: flex;
+    height: 1;
+    width: 100%;
+    background: #27272a;
+    padding: 0 0 0 1;
+}
+
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-lang,
+#modal-dialog.bash-confirm-dialog MarkdownFence .fence-lang {
+    display: block;
+    color: #a1a1aa;
+    text-style: bold;
+    height: 1;
+    width: 1fr;
+}
+
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-copy-btn,
+#modal-dialog.bash-confirm-dialog MarkdownFence .fence-copy-btn {
+    display: block;
+    height: 1;
+    min-height: 1;
+    min-width: 6;
+    border: none;
+    background: #3f3f46;
+    color: #ffffff;
+    padding: 0 1;
+    margin: 0;
+}
+
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence #code-content,
 #modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
-    padding: 0;
-    background: transparent;
+    background: #09090b;
+    color: #f4f4f5;
+    padding: 0 1;
 }
 
 #modal-dialog OptionList,
