@@ -503,43 +503,28 @@ SubagentViewScreen {
     background: #09090b;
 }
 
+#modal-dialog CustomMarkdownFence,
 #modal-dialog MarkdownFence {
     background: #27272a;
-    border-left: solid #ffffff;
-    border-top: none;
-    border-right: none;
-    border-bottom: none;
+    border: none;
     color: #f4f4f5;
-    padding: 0 1;
+    padding: 0;
     margin: 1 0;
     scrollbar-size: 0 0;
 }
 
-SubagentViewScreen #modal-dialog CustomMarkdownFence,
-SubagentViewScreen #modal-dialog MarkdownFence {
-    background: #18181b;
-    border-left: none;
-    border: none;
-    padding: 0;
-    margin: 1 0;
-}
-
-SubagentViewScreen #modal-dialog CustomMarkdownFence .fence-header,
-SubagentViewScreen #modal-dialog MarkdownFence .fence-header {
-    display: block;
+#modal-dialog CustomMarkdownFence #code-content,
+#modal-dialog MarkdownFence #code-content {
     background: #27272a;
-}
-
-SubagentViewScreen #modal-dialog CustomMarkdownFence #code-content,
-SubagentViewScreen #modal-dialog MarkdownFence #code-content {
-    background: #18181b;
     padding: 0 1;
 }
 
+#modal-dialog CustomMarkdownFence *,
 #modal-dialog MarkdownFence * {
     background: transparent;
 }
 
+#modal-dialog CustomMarkdownFence .fence-header,
 #modal-dialog MarkdownFence .fence-header,
 .modal-markdown MarkdownFence .fence-header {
     display: none;
