@@ -1,6 +1,7 @@
 from widgets.screens.ask_user import AskUserWizardScreen, ConfirmScreen
 from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
+from widgets.screens.linters import LintersScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
@@ -20,6 +21,7 @@ __all__ = [
     "ProvidersScreen",
     "ApiKeyInputScreen",
     "HelpScreen",
+    "LintersScreen",
     "MCPScreen",
     "ModelScreen",
     "ResumeScreen",

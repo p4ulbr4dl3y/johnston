@@ -4,6 +4,14 @@ import os
 import shutil
 from typing import Optional
 
+from core.linters_manager import get_linters_manager
+
+# Output noise prefixes that should never reach the chat (progress lines etc.)
+_NOISE_PREFIXES = (
+    "Building ", "Downloading ", "× Failed", "└─>", "Call to ",
+    "[stderr]", "Audited ", "Checked ", "No fixes applied",
+)
+
 
 @functools.lru_cache(maxsize=16)
 def _cached_which(cmd: str) -> Optional[str]:
@@ -11,40 +19,27 @@ def _cached_which(cmd: str) -> Optional[str]:
 
 
 async def run_linter(path: str) -> str:
-    """Run fast CLI linter on saved file and return warning string if errors found."""
+    """Run enabled & available linters for the file extension; return warning string if errors found."""
     if not os.path.exists(path):
         return ""
 
     ext = os.path.splitext(path)[1].lower()
-    errors = []
+    linter_mgr = get_linters_manager()
+    lint_list = linter_mgr.get_for_extension(ext)
+    if not lint_list:
+        return ""
 
-    if ext == ".py":
-        if _cached_which("ruff"):
-            output = await _exec_cmd(["ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
-        elif _cached_which("uv"):
-            output = await _exec_cmd(["uv", "run", "--no-sync", "ruff", "check", "--select", "E9,F", "--no-fix", "--output-format=concise", path])
-        else:
-            output = None
+    errors = []
+    for lint in lint_list:
+        output = await _run_one(lint, path)
         if output:
             errors.append(output)
-
-    elif ext in (".ts", ".tsx", ".js", ".jsx", ".json"):
-        if _cached_which("biome"):
-            output = await _exec_cmd(["biome", "lint", "--only=correctness", path])
-            if output:
-                errors.append(output)
 
     if not errors:
         return ""
 
     combined = "\n".join(errors).strip()
-    clean_lines = [
-        line for line in combined.splitlines()
-        if not any(line.strip().startswith(prefix) for prefix in (
-            "Building ", "Downloading ", "× Failed", "└─>", "Call to ", "[stderr]", "Audited "
-        ))
-    ]
-    combined = "\n".join(clean_lines).strip()
+    combined = _clean_output(combined)
     if not combined:
         return ""
 
@@ -53,6 +48,29 @@ async def run_linter(path: str) -> str:
         combined = "\n".join(lines[:10]) + f"\n... ({len(lines) - 10} more lines)"
 
     return f"\n\nERR: {combined}"
+
+
+async def _run_one(lint, path: str) -> Optional[str]:
+    """Runs a single linter entry; returns captured stderr/stdout on non-zero exit."""
+    try:
+        cmd = linter_mgr_render_cmd(lint, path)
+        if not cmd or not cmd[0]:
+            return None
+        output = await _exec_cmd(cmd)
+        return output
+    except Exception:
+        return None
+
+
+_linter_mgr_cache = None
+
+
+def linter_mgr_render_cmd(lint, path: str) -> list[str]:
+    """Expands {file}/{tmp} placeholders using the linter manager's renderer."""
+    global _linter_mgr_cache
+    if _linter_mgr_cache is None:
+        _linter_mgr_cache = get_linters_manager()
+    return _linter_mgr_cache.render_cmd(lint, path)
 
 
 async def _exec_cmd(cmd: list[str]) -> Optional[str]:
@@ -79,3 +97,11 @@ async def _exec_cmd(cmd: list[str]) -> Optional[str]:
     except Exception:
         return None
     return None
+
+
+def _clean_output(text: str) -> str:
+    clean_lines = [
+        line for line in text.splitlines()
+        if not any(line.strip().startswith(prefix) for prefix in _NOISE_PREFIXES)
+    ]
+    return "\n".join(clean_lines).strip()

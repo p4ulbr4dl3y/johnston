@@ -11,6 +11,7 @@ Johnston is configured via global settings in `~/.johnston/` and project-level o
 ├── config.json                     # Active provider, default model, settings
 ├── providers.json                  # Custom and configured LLM provider definitions
 ├── mcp.json                        # Global MCP server configurations
+├── linters.json                    # Linter presets & enabled state
 ├── subagents/definitions/*.md      # Custom subagent definitions
 ├── rules/*.md                      # Global system prompt rules
 ├── skills/<skill_name>/SKILL.md    # Global skills
@@ -19,6 +20,7 @@ Johnston is configured via global settings in `~/.johnston/` and project-level o
 <project_root>/
 ├── .johnston/                      # Project-specific overrides
 │   ├── mcp.json
+│   ├── linters.json
 │   ├── subagents/*.md
 │   ├── rules/*.md
 │   ├── skills/<skill_name>/SKILL.md
@@ -74,7 +76,55 @@ Each MCP server operates in one of two tool loading modes:
 
 ---
 
-## 3. Custom Subagent Definitions (`subagents/`)
+## 3. Linter Configuration (`linters.json`)
+
+Johnston runs fast, **syntax-only** linters after `create`/`edit` tool writes to catch broken code early. Linters are managed interactively with the `/linters` modal (or `/lint`) and stored in config.
+
+- **Global location:** `~/.johnston/linters.json`
+- **Project location:** `.johnston/linters.json` (overrides global by name)
+
+### Presets
+
+| Linter | Languages / extensions | Install | Command |
+|---|---|---|---|
+| `python` | `.py` | uvx | `uvx ruff check -q --select E9,F` |
+| `js` / `ts` | `.js .mjs .cjs .jsx` / `.ts .tsx` | npx | `npx --yes eslint@9 --no-config-lookup` |
+| `js_biome` | JS/TS/JSX + `.css` | npx/global | `biome lint --only=correctness` |
+| `go` | `.go` | system (gofmt) | `gofmt -e` |
+| `rust` | `.rs` | system (rustc) | `rustc --edition 2021 --emit=metadata` |
+| `c` / `cpp` | `.c .h` / `.cc .cpp .hpp` | system (gcc) | `gcc -fsyntax-only` |
+| `ruby` | `.rb` | system | `ruby -c` |
+| `php` | `.php` | brew (heavy) | `php -l` |
+| `bash` | `.sh .bash` | system | `bash -n` |
+| `json` | `.json` | system (jq) | `jq empty` |
+| `html` | `.html .htm` | system (tidy) | `tidy -q -e` |
+| `yaml` | `.yaml .yml` | uvx | `uvx yamllint --no-warnings` |
+| `toml` | `.toml` | uvx | `uvx taplo check` |
+
+Presets are **syntax-only**: they detect parse errors and fatal issues, not style. System tools (gofmt, rustc, gcc, ruby, bash, jq, tidy) are detected via `which`; uvx/npx-managed tools are detected from the local tool cache. Only available linters run automatically — missing ones are skipped silently. uvx/npx fetch the tool on first run, no manual install step needed.
+
+### File Format Example
+
+```json
+{
+  "linters": {
+    "python": { "enabled": false },
+    "custom-checker": {
+      "cmd": ["my-lint", "--syntax", "{file}"],
+      "extensions": [".myext"],
+      "enabled": true
+    }
+  }
+}
+```
+
+- `enabled: false` disables that linter.
+- Custom entries accept `cmd` (with `{file}` / `{tmp}` placeholders, `{tmp}` expands to a writable scratch dir) and `extensions`. They are appended to the preset list.
+- `{tmp}` — e.g. Rust's `--emit=metadata -o {tmp}/check.rmeta` needs a writable output path.
+
+---
+
+## 4. Custom Subagent Definitions (`subagents/`)
 
 Subagents run autonomous sub-tasks in isolated conversation contexts.
 
@@ -108,7 +158,7 @@ Inspect git diffs and code changes. Focus on potential bugs, security issues, an
 
 ---
 
-## 4. Rules & System Instructions (`rules/`)
+## 5. Rules & System Instructions (`rules/`)
 
 Inject system prompt rules globally or per-project. Rules can be conditionally triggered by current execution mode or modified file globs.
 
@@ -136,7 +186,7 @@ description: Python PEP 8 & Ruff guidelines
 
 ---
 
-## 5. LLM Provider Setup (`providers.json`)
+## 6. LLM Provider Setup (`providers.json`)
 
 Configure endpoints for LLM providers (OpenAI, Anthropic, Gemini, Ollama, OpenRouter, Groq, xAI, Mistral, Together AI, DeepInfra, Fireworks, Cerebras, Nvidia, GitHub Copilot, or custom OpenAI-compatible endpoints).
 
@@ -173,7 +223,7 @@ Configure endpoints for LLM providers (OpenAI, Anthropic, Gemini, Ollama, OpenRo
 
 ---
 
-## 6. Skills Management (`skills/`)
+## 7. Skills Management (`skills/`)
 
 Skills bundle instruction sets and prompt templates into reusable markdown packages.
 
@@ -208,7 +258,7 @@ Detailed step-by-step guidance...
 
 ---
 
-## 7. Custom Execution Modes (`modes/`)
+## 8. Custom Execution Modes (`modes/`)
 
 Define isolated execution modes to restrict or customize agent behavior (e.g. read-only exploration, architect planning mode).
 

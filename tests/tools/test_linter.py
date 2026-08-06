@@ -7,10 +7,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from tools.linter import _cached_which, _exec_cmd, run_linter
 
 
+def fake_linter(name="ruff", exts=None, cmd=None, enabled=True, available=True):
+    return {
+        "name": name,
+        "label": name,
+        "extensions": exts or [".py"],
+        "cmd": cmd or ["ruff", "check", "--select", "E9,F", "{file}"],
+        "enabled": enabled,
+        "install": "system",
+    }
+
+
 class TestLinter(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
+        import tools.linter as linter_mod
+        linter_mod._linter_mgr_cache = None
 
     def test_cached_which(self):
         _cached_which.cache_clear()
@@ -23,83 +36,92 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         result = await run_linter(os.path.join(self.temp_dir.name, "non_existent.py"))
         self.assertEqual(result, "")
 
-    @patch("tools.linter._cached_which")
     @patch("tools.linter._exec_cmd")
-    async def test_ruff_fallback_to_uv(self, mock_exec_cmd, mock_which):
-        def which_side_effect(cmd):
-            if cmd == "ruff":
-                return None
-            if cmd == "uv":
-                return "/usr/bin/uv"
-            return None
-
-        mock_which.side_effect = which_side_effect
+    async def test_python_linter_error_reported(self, mock_exec_cmd):
         mock_exec_cmd.return_value = "file.py:1:1: F401 'os' imported but unused"
+        fake = fake_linter("python")
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = [fake]
+        mgr.render_cmd.side_effect = lambda lint, path: [c.replace("{file}", path) for c in lint["cmd"]]
 
-        py_file = os.path.join(self.temp_dir.name, "test.py")
-        with open(py_file, "w") as f:
-            f.write("import os\n")
-
-        result = await run_linter(py_file)
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("import os\n")
+            result = await run_linter(py_file)
         mock_exec_cmd.assert_called_once()
         cmd_arg = mock_exec_cmd.call_args[0][0]
-        self.assertEqual(cmd_arg[:3], ["uv", "run", "--no-sync"])
+        self.assertEqual(cmd_arg[:3], ["ruff", "check", "--select"])
+        self.assertEqual(cmd_arg[3], "E9,F")
         self.assertIn("F401", result)
 
-    @patch("tools.linter._cached_which", return_value=None)
-    async def test_no_linter_available(self, mock_which):
-        py_file = os.path.join(self.temp_dir.name, "test.py")
-        with open(py_file, "w") as f:
-            f.write("import os\n")
+    @patch("tools.linter._exec_cmd")
+    async def test_no_matching_linter(self, mock_exec_cmd):
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = []
 
-        result = await run_linter(py_file)
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("x = 1\n")
+            result = await run_linter(py_file)
+        self.assertEqual(result, "")
+        mock_exec_cmd.assert_not_called()
+
+    async def test_linter_not_available_skipped(self):
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = []
+
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("x = 1\n")
+            result = await run_linter(py_file)
         self.assertEqual(result, "")
 
-    @patch("tools.linter._cached_which")
     @patch("tools.linter._exec_cmd")
-    async def test_biome_linter_supported_extensions(self, mock_exec_cmd, mock_which):
-        mock_which.side_effect = lambda cmd: "/usr/bin/biome" if cmd == "biome" else None
-        mock_exec_cmd.return_value = "test.ts:1:1 error linting error"
+    async def test_multiple_matching_linters_aggregate(self, mock_exec_cmd):
+        mock_exec_cmd.side_effect = ["one error", "two error"]
+        fake1 = fake_linter("ruff", exts=[".py"])
+        fake2 = fake_linter("mypy", exts=[".py"])
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = [fake1, fake2]
 
-        for ext in (".ts", ".tsx", ".js", ".jsx", ".json"):
-            file_path = os.path.join(self.temp_dir.name, f"test{ext}")
-            with open(file_path, "w") as f:
-                f.write("{}\n")
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("x = 1\n")
+            result = await run_linter(py_file)
+        self.assertIn("one error", result)
+        self.assertIn("two error", result)
 
-            result = await run_linter(file_path)
-            self.assertIn("linting error", result)
-
-    @patch("tools.linter._cached_which", return_value=None)
-    async def test_ts_file_without_biome(self, mock_which):
-        ts_file = os.path.join(self.temp_dir.name, "test.ts")
-        with open(ts_file, "w") as f:
-            f.write("const x = 1;\n")
-
-        result = await run_linter(ts_file)
-        self.assertEqual(result, "")
-
-    @patch("tools.linter._cached_which", return_value="/usr/bin/ruff")
     @patch("tools.linter._exec_cmd")
-    async def test_clean_lines_filtering_all_filtered(self, mock_exec_cmd, mock_which):
+    async def test_clean_lines_filtering_all_filtered(self, mock_exec_cmd):
         mock_exec_cmd.return_value = "Downloading dependency...\nBuilding wheel...\nAudited 5 packages"
-        py_file = os.path.join(self.temp_dir.name, "test.py")
-        with open(py_file, "w") as f:
-            f.write("x = 1\n")
+        fake = fake_linter("ruff")
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = [fake]
 
-        result = await run_linter(py_file)
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("x = 1\n")
+            result = await run_linter(py_file)
         self.assertEqual(result, "")
 
-    @patch("tools.linter._cached_which", return_value="/usr/bin/ruff")
     @patch("tools.linter._exec_cmd")
-    async def test_line_truncation_over_10_lines(self, mock_exec_cmd, mock_which):
+    async def test_line_truncation_over_10_lines(self, mock_exec_cmd):
         many_errors = "\n".join([f"file.py:{i}:1: E101 error {i}" for i in range(15)])
         mock_exec_cmd.return_value = many_errors
+        fake = fake_linter("ruff")
+        mgr = MagicMock()
+        mgr.get_for_extension.return_value = [fake]
 
-        py_file = os.path.join(self.temp_dir.name, "test.py")
-        with open(py_file, "w") as f:
-            f.write("x = 1\n")
-
-        result = await run_linter(py_file)
+        with patch("tools.linter.get_linters_manager", return_value=mgr):
+            py_file = os.path.join(self.temp_dir.name, "test.py")
+            with open(py_file, "w") as f:
+                f.write("x = 1\n")
+            result = await run_linter(py_file)
         self.assertIn("... (5 more lines)", result)
 
     async def test_exec_cmd_nonzero_exit(self):
