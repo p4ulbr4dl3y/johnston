@@ -39,7 +39,7 @@ class SubagentWorktreeManager:
         branch_name = f"subagent-{task_id}"
 
         # Clean up any leftover worktree or branch with same task_id
-        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
+        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name)
 
         try:
             res = subprocess.run(
@@ -57,13 +57,12 @@ class SubagentWorktreeManager:
         return None, None
 
     @staticmethod
-    def get_worktree_diff_summary(project_dir: str, wt_path: str, branch_name: str) -> Tuple[str, bool]:
-        """Auto-commits changes in worktree and returns (diff_summary, has_changes)."""
+    def get_worktree_diff_summary(project_dir: str, wt_path: str, branch_name: str) -> str:
+        """Returns git diff summary between worktree branch and project_dir HEAD."""
         if not wt_path or not os.path.exists(wt_path):
-            return "", False
+            return ""
 
         try:
-            # Check if there are uncommitted worktree changes
             status_res = subprocess.run(
                 ["git", "status", "--short"],
                 cwd=wt_path,
@@ -72,53 +71,26 @@ class SubagentWorktreeManager:
                 timeout=10,
             )
             changes = status_res.stdout.strip()
-            if changes:
-                # Stage & commit uncommitted worktree changes to the branch
-                subprocess.run(["git", "add", "-A"], cwd=wt_path, capture_output=True, text=True, timeout=10)
-                subprocess.run(
-                    ["git", "commit", "-m", f"subagent: automatic save for {branch_name}"],
-                    cwd=wt_path,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
+            if not changes:
+                return ""
 
-            # Get base commit SHA of main project_dir
-            base_sha = "HEAD"
-            if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
-                base_res = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=project_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if base_res.returncode == 0 and base_res.stdout.strip():
-                    base_sha = base_res.stdout.strip()
-
-            # Diff worktree against parent project_dir base commit
             diff_res = subprocess.run(
-                ["git", "diff", base_sha],
+                ["git", "diff", "HEAD"],
                 cwd=wt_path,
                 capture_output=True,
                 text=True,
                 timeout=10,
             )
             diff_text = diff_res.stdout.strip()
-            if not diff_text:
-                return "", False
-
             if len(diff_text) > 4000:
                 diff_text = diff_text[:4000] + "\n... [diff truncated]"
-
-            status_block = f"Status:\n{changes}\n\n" if changes else ""
-            return f"{status_block}Diff:\n{diff_text}", True
+            return f"Status:\n{changes}\n\nDiff:\n{diff_text}"
         except Exception:
-            return "", False
+            return ""
 
     @staticmethod
-    def cleanup_worktree(project_dir: str, wt_path: str, branch_name: str, keep_branch: bool = False) -> None:
-        """Safely removes git worktree and optionally deletes the branch if empty."""
+    def cleanup_worktree(project_dir: str, wt_path: str, branch_name: str) -> None:
+        """Safely removes git worktree and temporary branch."""
         if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
             if wt_path:
                 try:
@@ -132,7 +104,7 @@ class SubagentWorktreeManager:
                 except Exception:
                     pass
 
-            if branch_name and not keep_branch:
+            if branch_name:
                 try:
                     subprocess.run(
                         ["git", "branch", "-D", branch_name],
