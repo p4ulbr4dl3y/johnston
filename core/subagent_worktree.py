@@ -36,7 +36,7 @@ class SubagentWorktreeManager:
         os.makedirs(base_worktree_dir, exist_ok=True)
 
         wt_path = os.path.join(base_worktree_dir, task_id)
-        branch_name = f"subagent-{task_id}"
+        branch_name = task_id if task_id.startswith("subagent-") else f"subagent-{task_id}"
 
         # Clean up any leftover worktree or branch with same task_id
         SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
