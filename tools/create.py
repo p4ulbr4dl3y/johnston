@@ -5,7 +5,6 @@ from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
 from tools.base import BaseTool, atomic_write_text, resolve_path
-from tools.file_state import record_file_write, verify_file_read
 
 
 def _write_file(path: str, content: str) -> None:
@@ -36,10 +35,6 @@ class CreateTool(BaseTool):
         if os.path.isdir(path):
             return f"ERR: '{path}' is a directory"
 
-        ok, err_msg = verify_file_read(path)
-        if not ok:
-            return err_msg
-
         content = (args.get("content") or "").rstrip("\r\n")
 
         file_existed = os.path.isfile(path)
@@ -53,7 +48,6 @@ class CreateTool(BaseTool):
 
         try:
             await asyncio.to_thread(_write_file, path, content)
-            record_file_write(path)
             linter_output = await get_linters_manager().run_for(path)
 
             if file_existed:
