@@ -165,7 +165,7 @@ class AskUserWizardScreen(ModalScreen[str]):
             title_md.remove_class("confirm-summary")
             q = self.questions[self.q_idx]
             q_text = q.get("question_text", "")
-            title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n\n{q_text}")
+            title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
             hint.update("enter: confirm • space: toggle • ←: back • →: next • esc: cancel")
 
             self.raw_options = q.get("options") or []

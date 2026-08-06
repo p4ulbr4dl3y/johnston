@@ -47,7 +47,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: select • esc: cancel • ↑/↓: navigate", id="modal-hint")
+            yield Label("enter: select • ↑/↓: navigate • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         opt_list = self.query_one("#modal-option-list", OptionList)

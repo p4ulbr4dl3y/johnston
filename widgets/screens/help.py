@@ -55,7 +55,7 @@ class HelpScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
             yield Markdown(COMMANDS_MD, id="help-markdown", classes="modal-markdown")
-            yield Label("←/→ or tab: switch • esc: close", id="modal-hint")
+            yield Label("tab / ←/→: switch • esc: cancel", id="modal-hint")
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):

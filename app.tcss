@@ -473,12 +473,18 @@ SubagentsScreen #modal-dialog {
     max-width: 100;
 }
 
-.modal-title {
+.modal-title,
+#wizard-title {
+    dock: top;
     width: 100%;
     text-align: center;
     color: #ffffff;
     text-style: bold;
-    margin-bottom: 1;
+    margin-bottom: 0;
+}
+
+#modal-search-input {
+    dock: top;
 }
 
 .modal-body {
@@ -491,12 +497,17 @@ SubagentsScreen #modal-dialog {
     width: 100%;
     height: auto;
     color: #e4e4e7;
+    margin-bottom: 0;
 }
 
 .modal-markdown MarkdownHeader {
     text-align: center;
     color: #ffffff;
-    margin-bottom: 1;
+    margin: 0 0 1 0;
+}
+
+.modal-markdown MarkdownParagraph {
+    margin: 0;
 }
 
 .modal-markdown.confirm-summary MarkdownParagraph {
@@ -591,6 +602,7 @@ SubagentViewScreen {
 }
 
 .modal-buttons {
+    dock: bottom;
     width: 100%;
     height: auto;
     align: center middle;
@@ -614,6 +626,7 @@ SubagentViewScreen {
 }
 
 #modal-hint {
+    dock: bottom;
     width: 100%;
     text-align: center;
     color: #71717a;

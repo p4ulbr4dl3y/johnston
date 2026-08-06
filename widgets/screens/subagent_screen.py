@@ -36,7 +36,7 @@ class SubagentViewScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Subagent Details**", classes="modal-markdown")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield Label("esc: close window", id="modal-hint")
+            yield Label("esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
