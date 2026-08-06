@@ -74,6 +74,33 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         res = subprocess.run(["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
         self.assertNotIn(branch_name, res.stdout)
 
+    def test_worktree_manual_commits_by_subagent_detected(self):
+        """Verify that if subagent manually runs git commit (leaving git status empty), get_worktree_diff_summary still detects changes against base commit."""
+        task_id = "manual-commit-task"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+
+        # Subagent manually creates file and commits
+        manual_file = os.path.join(wt_path, "manual.txt")
+        with open(manual_file, "w", encoding="utf-8") as f:
+            f.write("Manual commit contents\n")
+
+        subprocess.run(["git", "add", "."], cwd=wt_path, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", "Subagent manual commit"], cwd=wt_path, capture_output=True, text=True)
+
+        # Git status --short is now empty, but branch has commits relative to parent repo base_sha
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        self.assertTrue(has_changes)
+        self.assertIn("manual.txt", diff_summary)
+        self.assertIn("Manual commit contents", diff_summary)
+
+        # Cleanup preserving branch
+        SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=has_changes)
+
+        # Merge branch into parent repo
+        merge_res = subprocess.run(["git", "merge", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
+        self.assertEqual(merge_res.returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(self.repo_dir, "manual.txt")))
+
     def test_worktree_branch_git_merge_integration(self):
         """Full end-to-end verification: create worktree, write files, remove worktree, git merge branch."""
         task_id = "e2e-merge-task"

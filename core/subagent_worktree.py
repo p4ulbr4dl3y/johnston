@@ -63,6 +63,7 @@ class SubagentWorktreeManager:
             return "", False
 
         try:
+            # Check if there are uncommitted worktree changes
             status_res = subprocess.run(
                 ["git", "status", "--short"],
                 cwd=wt_path,
@@ -71,30 +72,47 @@ class SubagentWorktreeManager:
                 timeout=10,
             )
             changes = status_res.stdout.strip()
-            if not changes:
-                return "", False
+            if changes:
+                # Stage & commit uncommitted worktree changes to the branch
+                subprocess.run(["git", "add", "-A"], cwd=wt_path, capture_output=True, text=True, timeout=10)
+                subprocess.run(
+                    ["git", "commit", "-m", f"subagent: automatic save for {branch_name}"],
+                    cwd=wt_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
 
-            # Stage & commit uncommitted worktree changes to the branch
-            subprocess.run(["git", "add", "-A"], cwd=wt_path, capture_output=True, text=True, timeout=10)
-            subprocess.run(
-                ["git", "commit", "-m", f"subagent: automatic save for {branch_name}"],
-                cwd=wt_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            # Get base commit SHA of main project_dir
+            base_sha = "HEAD"
+            if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
+                base_res = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=project_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if base_res.returncode == 0 and base_res.stdout.strip():
+                    base_sha = base_res.stdout.strip()
 
+            # Diff worktree against parent project_dir base commit
             diff_res = subprocess.run(
-                ["git", "diff", "HEAD~1"],
+                ["git", "diff", base_sha],
                 cwd=wt_path,
                 capture_output=True,
                 text=True,
                 timeout=10,
             )
             diff_text = diff_res.stdout.strip()
+            if not diff_text:
+                return "", False
+
             if len(diff_text) > 4000:
                 diff_text = diff_text[:4000] + "\n... [diff truncated]"
-            return f"Status:\n{changes}\n\nDiff:\n{diff_text}", True
+
+            status_block = f"Status:\n{changes}\n\n" if changes else ""
+            return f"{status_block}Diff:\n{diff_text}", True
         except Exception:
             return "", False
 
