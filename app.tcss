@@ -468,11 +468,6 @@ SubagentViewScreen #modal-dialog {
     max-height: 90%;
 }
 
-SubagentsScreen #modal-dialog {
-    width: 90%;
-    max-width: 100;
-}
-
 .modal-title {
     dock: top;
     width: 100%;
