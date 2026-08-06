@@ -1,5 +1,6 @@
 
 import asyncio
+import os
 from typing import Any
 
 from core.models_catalog import catalog
@@ -551,16 +552,26 @@ async def handle_slash_command(app, command_text: str) -> bool:
             other_words.append(w)
 
     if loaded_skills:
-        if len(loaded_skills) == 1:
-            s = loaded_skills[0]
-            skill_str = f"skill '{s['name']}' from '{s['location']}'"
-        else:
-            skill_str = "skills: " + ", ".join(f"'{s['name']}' from '{s['location']}'" for s in loaded_skills)
+        skill_blocks = []
+        for s in loaded_skills:
+            content = s.get("content", "").strip()
+            if not content and s.get("location") and os.path.exists(s["location"]):
+                try:
+                    with open(s["location"], "r", encoding="utf-8") as f:
+                        raw_c = f.read()
+                    from core.skill_manager import parse_frontmatter
+                    _, body = parse_frontmatter(raw_c)
+                    content = body.strip()
+                except Exception:
+                    content = ""
+            skill_blocks.append(f'<SKILL name="{s["name"]}">\n{content}\n</SKILL>')
+
+        skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()
         if user_request:
-            prompt = f"Read and follow instructions for {skill_str}.\n\nUser request: {user_request}"
+            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}\n\nUser request: {user_request}"
         else:
-            prompt = f"Read and follow instructions for {skill_str}."
+            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}"
 
         try:
             from widgets.chat_view import ChatView
