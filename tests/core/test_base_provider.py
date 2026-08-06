@@ -247,6 +247,22 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent.clear_history()
         self.assertEqual(agent.cost_usd, 0.0)
 
+    def test_clear_history_resets_sys_tokens_for_new_session(self):
+        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        # Simulate a prior session having streamed once, caching sys+tools tokens.
+        agent._last_sys_tokens = 3100
+        agent.history = [{"role": "user", "content": "old session"}]
+        agent.last_context_tokens = 0
+
+        # Before /new, metrics reflect the stale sys+tools overhead (non-zero).
+        self.assertGreater(agent.get_metrics()["context_used"], 0)
+
+        # /new clears history but must not leak the previous session's overhead.
+        agent.clear_history()
+        metrics = agent.get_metrics()
+        self.assertEqual(metrics["context_used"], 0)
+        self.assertEqual(agent._last_sys_tokens, 0)
+
     def test_truncate_history_to_user_message(self):
         agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
         agent.history = [
