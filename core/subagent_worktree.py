@@ -39,7 +39,7 @@ class SubagentWorktreeManager:
         branch_name = f"subagent-{task_id}"
 
         # Clean up any leftover worktree or branch with same task_id
-        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name)
+        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
 
         try:
             res = subprocess.run(
@@ -57,10 +57,10 @@ class SubagentWorktreeManager:
         return None, None
 
     @staticmethod
-    def get_worktree_diff_summary(project_dir: str, wt_path: str, branch_name: str) -> str:
-        """Returns git diff summary between worktree branch and project_dir HEAD."""
+    def get_worktree_diff_summary(project_dir: str, wt_path: str, branch_name: str) -> Tuple[str, bool]:
+        """Auto-commits changes in worktree and returns (diff_summary, has_changes)."""
         if not wt_path or not os.path.exists(wt_path):
-            return ""
+            return "", False
 
         try:
             status_res = subprocess.run(
@@ -72,10 +72,20 @@ class SubagentWorktreeManager:
             )
             changes = status_res.stdout.strip()
             if not changes:
-                return ""
+                return "", False
+
+            # Stage & commit uncommitted worktree changes to the branch
+            subprocess.run(["git", "add", "-A"], cwd=wt_path, capture_output=True, text=True, timeout=10)
+            subprocess.run(
+                ["git", "commit", "-m", f"subagent: automatic save for {branch_name}"],
+                cwd=wt_path,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
 
             diff_res = subprocess.run(
-                ["git", "diff", "HEAD"],
+                ["git", "diff", "HEAD~1"],
                 cwd=wt_path,
                 capture_output=True,
                 text=True,
@@ -84,13 +94,13 @@ class SubagentWorktreeManager:
             diff_text = diff_res.stdout.strip()
             if len(diff_text) > 4000:
                 diff_text = diff_text[:4000] + "\n... [diff truncated]"
-            return f"Status:\n{changes}\n\nDiff:\n{diff_text}"
+            return f"Status:\n{changes}\n\nDiff:\n{diff_text}", True
         except Exception:
-            return ""
+            return "", False
 
     @staticmethod
-    def cleanup_worktree(project_dir: str, wt_path: str, branch_name: str) -> None:
-        """Safely removes git worktree and temporary branch."""
+    def cleanup_worktree(project_dir: str, wt_path: str, branch_name: str, keep_branch: bool = False) -> None:
+        """Safely removes git worktree and optionally deletes the branch if empty."""
         if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
             if wt_path:
                 try:
@@ -104,7 +114,7 @@ class SubagentWorktreeManager:
                 except Exception:
                     pass
 
-            if branch_name:
+            if branch_name and not keep_branch:
                 try:
                     subprocess.run(
                         ["git", "branch", "-D", branch_name],
