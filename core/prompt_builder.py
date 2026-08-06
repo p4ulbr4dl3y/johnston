@@ -64,18 +64,16 @@ def _compute_git_info() -> str:
             text=True,
             timeout=1
         ).strip()
-        status = subprocess.check_output(
-            ["git", "status", "-s"],
+        if branch:
+            return f"branch '{branch}'"
+        rev = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=1
         ).strip()
-        lines = [line for line in status.splitlines() if line.strip()]
-        dirty_summary = f"{len(lines)} modified/untracked file(s)" if lines else "clean working tree"
-        if branch:
-            return f"branch '{branch}' ({dirty_summary})"
-        elif lines:
-            return f"detached HEAD ({dirty_summary})"
+        if rev:
+            return f"detached HEAD ({rev})"
     except Exception:
         pass
     return ""
@@ -199,14 +197,14 @@ class PromptBuilder:
         skills_snippet = SkillManager().get_system_prompt_snippet()
         subagents_snippet = SubagentRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
 
-        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %z")
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
         os_info = f"{platform.system()} {platform.release()}"
         git_info = get_git_info()
 
         env_lines = [
             "## Environment Metadata",
             f"- Working Directory: {cwd}",
-            f"- Local Time: {now_str}",
+            f"- Current Date: {now_str}",
             f"- Operating System: {os_info}"
         ]
         if git_info:
@@ -278,4 +276,6 @@ class PromptBuilder:
         ):
             filtered_tools.append(InvokeSubagentTool.schema)
 
-        return [t for t in filtered_tools if _tool_allowed(t)]
+        allowed_tools = [t for t in filtered_tools if _tool_allowed(t)]
+        allowed_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
+        return allowed_tools

@@ -1,7 +1,15 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.adapters import AnthropicAdapter, GeminiAdapter, OllamaAdapter, OpenAIAdapter, get_adapter
+from core.adapters import (
+    AnthropicAdapter,
+    GeminiAdapter,
+    OllamaAdapter,
+    OpenAIAdapter,
+    apply_anthropic_rolling_cache,
+    get_adapter,
+    sort_keys_recursive,
+)
 
 
 class TestAdapters(unittest.TestCase):
@@ -11,6 +19,29 @@ class TestAdapters(unittest.TestCase):
         self.assertIsInstance(get_adapter("gemini"), GeminiAdapter)
         self.assertIsInstance(get_adapter("ollama"), OllamaAdapter)
         self.assertIsInstance(get_adapter("unknown"), OpenAIAdapter)
+
+    def test_sort_keys_recursive(self):
+        unsorted = {"z": 1, "a": {"c": 2, "b": 3}, "m": [3, 2, {"y": 4, "x": 5}]}
+        sorted_res = sort_keys_recursive(unsorted)
+        self.assertEqual(list(sorted_res.keys()), ["a", "m", "z"])
+        self.assertEqual(list(sorted_res["a"].keys()), ["b", "c"])
+        self.assertEqual(list(sorted_res["m"][2].keys()), ["x", "y"])
+
+    def test_apply_anthropic_rolling_cache(self):
+        msgs = [
+            {"role": "user", "content": "Hello 1"},
+            {"role": "assistant", "content": "Hi 1"},
+            {"role": "user", "content": "Hello 2"},
+            {"role": "assistant", "content": "Hi 2"},
+            {"role": "user", "content": "Hello 3"},
+        ]
+        apply_anthropic_rolling_cache(msgs)
+        # user turn 2 (index 2) should have cache_control breakpoint
+        self.assertEqual(
+            msgs[2]["content"],
+            [{"type": "text", "text": "Hello 2", "cache_control": {"type": "ephemeral"}}],
+        )
+        self.assertEqual(msgs[4]["content"], "Hello 3")
 
 
 class TestAdapterMessageNormalization(unittest.TestCase):
