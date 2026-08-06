@@ -16,8 +16,22 @@ from rich.console import Group
 from rich.markdown import Markdown as RichMarkdown
 from rich.markup import escape
 from rich.rule import Rule
+from rich.segment import Segment
 from rich.syntax import Syntax
 from rich.text import Span, Text
+
+
+class TransparentSyntax(Syntax):
+    """Rich Syntax renderable with transparent token background to allow TCSS styling."""
+
+    def _get_syntax(self, console: Any, options: Any):
+        for segment in super()._get_syntax(console, options):
+            if segment.style and segment.style.bgcolor:
+                style = segment.style.copy()
+                style._bgcolor = None
+                yield Segment(segment.text, style, segment.control)
+            else:
+                yield segment
 from textual import events
 from textual.app import ComposeResult
 from textual.color import Color
@@ -134,7 +148,7 @@ class CustomMarkdownFence(MarkdownFence):
                 target_lexer = "text"
 
         theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
-        code_content = Syntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default")
+        code_content = TransparentSyntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default")
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
         with Vertical(classes="fence-scroll-box"):
@@ -736,7 +750,7 @@ class ToolCallWidget(Vertical):
         parsed = self._try_parse_json(text_to_parse)
         if parsed is not None:
             pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
-            syntax = Syntax(
+            syntax = TransparentSyntax(
                 pretty_json,
                 "json",
                 theme=CODE_THEME,
@@ -1335,7 +1349,7 @@ class ToolCallWidget(Vertical):
                         content = content.rstrip("\r\n")
                         lexer = self._guess_lexer(file_path)
                         try:
-                            syntax = Syntax(
+                            syntax = TransparentSyntax(
                                 content,
                                 lexer,
                                 theme=CODE_THEME,
@@ -1434,7 +1448,7 @@ class ToolCallWidget(Vertical):
                         if clean_code:
                             clean_code = clean_code.rstrip("\r\n")
                             try:
-                                syntax = Syntax(
+                                syntax = TransparentSyntax(
                                     clean_code,
                                     lexer if lexer != "html" else "html",
                                     theme=CODE_THEME,
@@ -1485,7 +1499,7 @@ class ToolCallWidget(Vertical):
                         if clean_code:
                             clean_code = clean_code.rstrip("\r\n")
                             try:
-                                syntax = Syntax(
+                                syntax = TransparentSyntax(
                                     clean_code,
                                     lexer,
                                     theme=CODE_THEME,
@@ -1527,7 +1541,7 @@ class ToolCallWidget(Vertical):
                     display_parts.append(f"\nSchema:\n{self.result_text.strip()}")
                 full_display = "\n".join(display_parts)
                 try:
-                    syntax = Syntax(
+                    syntax = TransparentSyntax(
                         full_display,
                         "json",
                         theme=CODE_THEME,
