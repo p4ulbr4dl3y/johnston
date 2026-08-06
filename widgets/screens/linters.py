@@ -50,15 +50,14 @@ class LintersScreen(ModalScreen[None]):
             label = lint.get("label", name)
             enabled = bool(lint.get("enabled"))
             available = avail.get(name, False)
-            install_hint = lint.get("install", "system")
 
             if available:
-                status = r"[ON]" if enabled else r"[OFF]"
+                status = r"\[ON]" if enabled else r"\[OFF]"
                 extra = " — enabled" if enabled else " — disabled"
             else:
-                status = r"[N/A]"
-                extra = f" — not installed ({install_hint})"
-            opt_list.add_option(f"{status} {label} · {install_hint}{extra}")
+                status = r"\[N/A]"
+                extra = " — not installed"
+            opt_list.add_option(f"{status} {label}{extra}")
 
         opt_list.focus()
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.linters):
@@ -96,11 +95,10 @@ class LintersScreen(ModalScreen[None]):
             return
         name = target.get("name", "?")
         label = target.get("label", name)
-        install = target.get("install", "?")
         exts = ", ".join(target.get("extensions", [])) or "none"
         cmd = " ".join(target.get("cmd", []))
         self.app.notify(
-            f"{label} [{install}] · files: {exts}\ncmd: {cmd}",
+            f"{label} · files: {exts}\ncmd: {cmd}",
             title="Linter Details",
             severity="information",
             timeout=8,
