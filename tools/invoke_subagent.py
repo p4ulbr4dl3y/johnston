@@ -91,8 +91,6 @@ class InvokeSubagentTool(BaseTool):
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
-            else:
-                subagent.system_prompt += "\n\n[Note: workspace='branch' requested, but project directory is not a git repository. Executing subagent in standard directory.]"
 
         session = tracker.create_session(
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
@@ -161,14 +159,10 @@ class InvokeSubagentTool(BaseTool):
             nonlocal wt_path, wt_branch
             if wt_path and wt_branch:
                 from core.subagent_worktree import SubagentWorktreeManager
-                diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
-                if has_changes and diff_text:
-                    acc[0] += (
-                        f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n\n"
-                        f"{diff_text}"
-                    )
-                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
+                diff_text = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
+                if diff_text:
+                    acc[0] += f"\n\n[Worktree Changes in {wt_branch}]:\n{diff_text}"
+                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch)
                 wt_path = None
                 wt_branch = None
 
@@ -183,7 +177,7 @@ class InvokeSubagentTool(BaseTool):
                     acc[0] = "[Subagent cancelled]"
                     session.finish("cancelled", "Cancelled by user")
                 except Exception as err:
-                    acc[0] += f"\n[Subagent error: {err}]"
+                    acc[0] = f"[Subagent error: {err}]"
                     session.finish("error", str(err))
                 finally:
                     _cleanup_worktree_and_append_diff(acc)
@@ -200,6 +194,7 @@ class InvokeSubagentTool(BaseTool):
                         f"<task_result>\n{result_text}\n</task_result>\n"
                         f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
                     )
+                    ctx.notify(f"Subagent '{description}' completed.")
                     ctx.trigger_ai_response(msg)
 
             bg_task = asyncio.create_task(_run_bg())
@@ -222,7 +217,10 @@ class InvokeSubagentTool(BaseTool):
                 raise
             except Exception as err:
                 session.finish("error", str(err))
-                acc[0] += f"\n[Subagent error: {err}]"
+                partial = _truncate_subagent_result(acc[0]).strip()
+                if partial:
+                    return f"ERR: subagent: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
+                return f"ERR: subagent: {err}"
             finally:
                 _cleanup_worktree_and_append_diff(acc)
                 _merge_metrics()
