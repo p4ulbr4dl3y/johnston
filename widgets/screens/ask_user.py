@@ -172,11 +172,9 @@ class AskUserWizardScreen(ModalScreen[str]):
             prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
 
             if self.raw_options:
-                current_highlight = opt_list.highlighted
                 opt_list.display = True
                 opt_list.clear_options()
 
-                highlight_idx = current_highlight if current_highlight is not None else 0
                 if prev_answer:
                     if prev_answer in self.raw_options:
                         highlight_idx = self.raw_options.index(prev_answer)
@@ -186,6 +184,7 @@ class AskUserWizardScreen(ModalScreen[str]):
                         input_field.value = prev_answer
                         input_field.display = True
                 else:
+                    highlight_idx = 0
                     input_field.value = ""
 
                 for idx, opt in enumerate(self.options):
