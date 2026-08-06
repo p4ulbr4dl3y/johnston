@@ -9,6 +9,7 @@ from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 from widgets.modal_screens import (
     HelpScreen,
+    LintersScreen,
     MCPScreen,
     ModelScreen,
     ResumeScreen,
@@ -414,6 +415,15 @@ class MCPCommand(BaseCommand):
         app.push_screen(MCPScreen())
 
 
+class LintersCommand(BaseCommand):
+    name = "/linters"
+    aliases = ["/lint"]
+    description = "Manage linters (toggle enabled/disabled, install/uninstall)"
+
+    async def execute(self, app) -> None:
+        app.push_screen(LintersScreen())
+
+
 class CompactCommand(BaseCommand):
     name = "/compact"
     aliases = ["/compress"]
@@ -496,6 +506,7 @@ COMMAND_CLASSES = [
     SubagentsCommand,
     SkillsCommand,
     MCPCommand,
+    LintersCommand,
     CompactCommand,
 ]
 
