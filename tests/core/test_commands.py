@@ -37,6 +37,10 @@ class MockChatView:
     def __init__(self, children=None):
         self.children = children or []
         self.dividers = []
+        self.user_messages = []
+
+    async def add_user_message(self, text=""):
+        self.user_messages.append(text)
 
     async def add_bot_message(self):
         msg = MockBotMessage("")
@@ -253,7 +257,20 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/init")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("init", app.ai_prompts[0][0])
+        prompt, show_in_ui = app.ai_prompts[0]
+        self.assertFalse(show_in_ui)
+        self.assertIn('<SKILL name="init">', prompt)
+
+    async def test_multiple_skills_command(self):
+        app = MockApp()
+        handled = await handle_slash_command(app, "/init /handoff analyze project")
+        self.assertTrue(handled)
+        self.assertEqual(len(app.ai_prompts), 1)
+        prompt, show_in_ui = app.ai_prompts[0]
+        self.assertFalse(show_in_ui)
+        self.assertIn('<SKILL name="init">', prompt)
+        self.assertIn('<SKILL name="handoff">', prompt)
+        self.assertIn("User request: analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
         from core.commands import ModelsCommand
