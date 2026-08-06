@@ -3,9 +3,9 @@ import difflib
 import os
 from typing import Any, Dict
 
+from core.linters_manager import get_linters_manager
 from tools.base import BaseTool, atomic_write_text, resolve_path
 from tools.file_state import record_file_write, verify_file_read
-from tools.linter import run_linter
 
 
 def _write_file(path: str, content: str) -> None:
@@ -54,7 +54,7 @@ class CreateTool(BaseTool):
         try:
             await asyncio.to_thread(_write_file, path, content)
             record_file_write(path)
-            linter_output = await run_linter(path)
+            linter_output = await get_linters_manager().run_for(path)
 
             if file_existed:
                 old_lines = old_content.splitlines()

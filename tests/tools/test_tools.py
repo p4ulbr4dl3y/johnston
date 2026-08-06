@@ -2,9 +2,9 @@ import os
 import tempfile
 import unittest
 
+from core.linters_manager import get_linters_manager
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
-from tools.linter import run_linter
 from tools.read import ReadTool
 from tools.shell import ShellTool
 
@@ -207,7 +207,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(syntax_path, "w", encoding="utf-8") as f:
             f.write("def broken(:\n    pass\n")
 
-        syntax_res = await run_linter(syntax_path)
+        syntax_res = await get_linters_manager().run_for(syntax_path)
         self.assertIn("ERR:", syntax_res)
         self.assertIn("invalid-syntax", syntax_res)
 
@@ -215,7 +215,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(undefined_path, "w", encoding="utf-8") as f:
             f.write("print(missing_name)\n")
 
-        undefined_res = await run_linter(undefined_path)
+        undefined_res = await get_linters_manager().run_for(undefined_path)
         self.assertIn("ERR:", undefined_res)
         self.assertIn("F821", undefined_res)
 
@@ -224,14 +224,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(long_line_path, "w", encoding="utf-8") as f:
             f.write(f"value = '{long_value}'\nprint(value)\n")
 
-        long_line_res = await run_linter(long_line_path)
+        long_line_res = await get_linters_manager().run_for(long_line_path)
         self.assertEqual("", long_line_res)
 
         import_order_path = os.path.join(self.test_dir, "import_order.py")
         with open(import_order_path, "w", encoding="utf-8") as f:
             f.write("import sys\nimport os\n\nprint(os.name, sys.version)\n")
 
-        import_order_res = await run_linter(import_order_path)
+        import_order_res = await get_linters_manager().run_for(import_order_path)
         self.assertEqual("", import_order_res)
 
     async def test_tool_aliases_and_case(self):
