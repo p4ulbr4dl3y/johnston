@@ -34,7 +34,7 @@ class SubagentsScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Active Subagent Tasks**", id="subagents-title", classes="modal-markdown")
             yield OptionList(id="subagents-option-list")
-            yield Label("enter: view details • k: kill • esc: close", id="modal-hint")
+            yield Label("enter: view details • k: kill • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()

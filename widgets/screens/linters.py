@@ -29,7 +29,7 @@ class LintersScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Manage Linters**", classes="modal-markdown")
             yield OptionList(id="linters-option-list")
-            yield Label("enter: toggle • x: details • esc: close", id="modal-hint")
+            yield Label("enter: toggle • x: details • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()

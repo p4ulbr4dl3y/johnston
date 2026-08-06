@@ -33,7 +33,7 @@ class SkillDetailScreen(ModalScreen[bool]):
 
         with Vertical(id="modal-dialog"):
             yield Markdown(body_md, classes="modal-markdown")
-            yield Label("enter: activate • esc: back", id="modal-hint")
+            yield Label("enter: activate • esc: cancel", id="modal-hint")
 
     def action_cancel(self) -> None:
         self.dismiss(False)
@@ -77,7 +77,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Available Skills**", classes="modal-markdown")
             yield OptionList(id="skills-option-list")
-            yield Label("enter: activate • h/tab/m: toggle status • esc: cancel", id="modal-hint")
+            yield Label("enter: activate • tab / m: toggle status • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)

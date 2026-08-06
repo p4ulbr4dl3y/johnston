@@ -33,7 +33,7 @@ class MCPScreen(ModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown("### **Manage MCP Servers**", classes="modal-markdown")
             yield OptionList(id="mcp-option-list")
-            yield Label("enter: toggle • m/tab: mode • esc: close", id="modal-hint")
+            yield Label("enter: toggle • tab / m: mode • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()
