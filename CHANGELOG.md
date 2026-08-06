@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.17.0...johnston-v0.18.0) (2026-08-06)
+
+
+### Features
+
+* **commands:** inject full skill content into prompt for slash commands ([16a6bb6](https://github.com/p4ulbr4dl3y/johnston/commit/16a6bb65bc58b2c32c13a3491f1a1fd5dd6716cd))
+* **tools:** include line count and start_line hint in truncate_output footer ([a3a6af1](https://github.com/p4ulbr4dl3y/johnston/commit/a3a6af1e89817c288105415ef1b1134f929cf3c4))
+* **tools:** optimize prompt caching and add tool parameter normalization ([7b0eb5f](https://github.com/p4ulbr4dl3y/johnston/commit/7b0eb5fdad86922943d398b9ecf46af1cd476cc6))
+
 ## [0.17.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.16.0...johnston-v0.17.0) (2026-08-05)
 
 
