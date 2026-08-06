@@ -141,8 +141,8 @@ class SubagentTracker:
                     break
 
             if last_text:
-                md_path = os.path.join(SUBAGENT_LOGS_DIR, f"{sess.task_id}.md")
-                with open(md_path, "w", encoding="utf-8") as f:
+                log_path = os.path.join(SUBAGENT_LOGS_DIR, f"{sess.task_id}.log")
+                with open(log_path, "w", encoding="utf-8") as f:
                     f.write(f"# Subagent Task: {sess.description}\n\n**Task ID:** `{sess.task_id}`\n**Status:** `{sess.status}`\n\n## Final Response\n\n{last_text}\n")
         except Exception:
             pass
