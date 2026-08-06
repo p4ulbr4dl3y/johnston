@@ -28,3 +28,11 @@ def apply_textual_patches() -> None:
 
     Screen._forward_event = _safe_forward_event
 
+    try:
+        from textual.widgets import Markdown
+        from widgets.chat_view import CustomMarkdownFence
+        Markdown.BLOCKS["fence"] = CustomMarkdownFence
+        Markdown.BLOCKS["code_block"] = CustomMarkdownFence
+    except Exception:
+        pass
+
