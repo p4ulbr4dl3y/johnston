@@ -155,26 +155,42 @@ def apply_chunk_replacements(
         current_text = "".join(lines)
 
         if s_line is not None or e_line is not None:
+            in_bounds = True
             if s_line is not None and s_line > len(lines):
-                raise ValueError(
-                    f"ERR: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
-                    f"[Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]"
-                )
-            start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
-            end_idx = e_line if (e_line and e_line <= len(lines)) else len(lines)
+                in_bounds = False
 
-            target_line_count = len(target.splitlines()) if target.splitlines() else 1
-            effective_end_idx = max(end_idx, start_idx + target_line_count)
+            if in_bounds:
+                start_idx = (s_line - 1) if (s_line and s_line > 0) else 0
+                end_idx = e_line if (e_line and e_line <= len(lines)) else len(lines)
 
-            sub_lines = lines[start_idx:effective_end_idx]
-            sub_text = "".join(sub_lines)
+                target_line_count = len(target.splitlines()) if target.splitlines() else 1
+                effective_end_idx = max(end_idx, start_idx + target_line_count)
 
-            actual_target, actual_replacement = find_actual_target_and_replacement(sub_text, target, replacement)
+                sub_lines = lines[start_idx:effective_end_idx]
+                sub_text = "".join(sub_lines)
 
-            count = sub_text.count(actual_target)
+                actual_target, actual_replacement = find_actual_target_and_replacement(sub_text, target, replacement)
+                count = sub_text.count(actual_target)
+            else:
+                count = 0
+                actual_target = target
+                actual_replacement = replacement
+
             if count == 0:
-                current_text = "".join(lines)
-                actual_target_full, _ = find_actual_target_and_replacement(current_text, target, replacement)
+                actual_target_full, actual_replacement_full = find_actual_target_and_replacement(current_text, target, replacement)
+                full_count = current_text.count(actual_target_full)
+
+                if full_count == 1:
+                    new_text = current_text.replace(actual_target_full, actual_replacement_full, 1)
+                    lines = new_text.splitlines(keepends=True)
+                    continue
+
+                if not in_bounds:
+                    raise ValueError(
+                        f"ERR: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
+                        f"[Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]"
+                    )
+
                 target_first_line = actual_target_full.splitlines()[0] if actual_target_full.splitlines() else actual_target_full
                 found_line = None
                 for l_no, line_str in enumerate(lines, start=1):
@@ -182,10 +198,16 @@ def apply_chunk_replacements(
                         found_line = l_no
                         break
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
-                loc_msg = f" Target content was found elsewhere around line {found_line}." if found_line else ""
-                raise ValueError(
-                    f"ERR: target not found in '{path}' ({s_line}-{e_line}).{loc_msg}{hint}"
-                )
+                if full_count > 1 and not allow_mult:
+                    loc_msg = f" Target content matches {full_count} occurrences in full file (around line {found_line})." if found_line else ""
+                    raise ValueError(
+                        f"ERR: target not found in specified range ({s_line}-{e_line}) and matches multiple occurrences ({full_count}) in '{path}'.{loc_msg}{hint}"
+                    )
+                else:
+                    loc_msg = f" Target content was found elsewhere around line {found_line}." if found_line else ""
+                    raise ValueError(
+                        f"ERR: target not found in '{path}' ({s_line}-{e_line}).{loc_msg}{hint}"
+                    )
 
             if count > 1 and not allow_mult:
                 raise ValueError(
