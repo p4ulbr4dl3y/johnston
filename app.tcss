@@ -564,7 +564,7 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-header,
 #modal-dialog.bash-confirm-dialog MarkdownFence .fence-header {
-    display: flex;
+    display: block;
     height: 1;
     width: 100%;
     background: #27272a;
