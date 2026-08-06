@@ -121,6 +121,11 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(chat_input.text, "")
             self.assertEqual(chat_input.pasted_texts, {})
 
+            # 13. Test app-level on_paste forwarding for drag-and-drop
+            await app.on_paste(events.Paste("file:///tmp/dropped_script.py"))
+            await pilot.pause(0.1)
+            self.assertEqual(chat_input.text, "@/tmp/dropped_script.py ")
+
     async def test_message_queue(self):
         app = JohnstonApp()
         async with app.run_test():
