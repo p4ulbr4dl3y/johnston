@@ -520,26 +520,6 @@ SubagentsScreen #modal-dialog {
     display: none;
 }
 
-SubagentViewScreen CustomMarkdownFence,
-SubagentViewScreen MarkdownFence {
-    background: #18181b;
-    border-left: none;
-    padding: 0;
-    margin: 1 0;
-}
-
-SubagentViewScreen CustomMarkdownFence .fence-header,
-SubagentViewScreen MarkdownFence .fence-header {
-    display: block;
-    background: #27272a;
-}
-
-SubagentViewScreen CustomMarkdownFence #code-content,
-SubagentViewScreen MarkdownFence #code-content {
-    background: #18181b;
-    padding: 0 1;
-}
-
 #modal-dialog.bash-confirm-dialog .modal-markdown {
     margin-bottom: 0;
 }
