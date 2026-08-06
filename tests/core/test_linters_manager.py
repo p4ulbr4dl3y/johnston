@@ -21,6 +21,9 @@ class TestLintersManager(unittest.TestCase):
 
     def _mgr(self, **kw):
         m = LintersManager(project_dir=self.test_dir, **kw)
+        # Isolate global config from the real CONFIG_DIR so tests never depend
+        # on the user's ~/.johnston/linters.json state.
+        m.global_file = os.path.join(self.test_dir, "global_linters.json")
         return m
 
     def test_presets_loaded_with_defaults(self):

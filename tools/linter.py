@@ -4,13 +4,7 @@ import os
 import shutil
 from typing import Optional
 
-from core.linters_manager import get_linters_manager
-
-# Output noise prefixes that should never reach the chat (progress lines etc.)
-_NOISE_PREFIXES = (
-    "Building ", "Downloading ", "× Failed", "└─>", "Call to ",
-    "[stderr]", "Audited ", "Checked ", "No fixes applied",
-)
+from core.linters_manager import NOISE_PREFIXES, get_linters_manager
 
 
 @functools.lru_cache(maxsize=16)
@@ -102,6 +96,6 @@ async def _exec_cmd(cmd: list[str]) -> Optional[str]:
 def _clean_output(text: str) -> str:
     clean_lines = [
         line for line in text.splitlines()
-        if not any(line.strip().startswith(prefix) for prefix in _NOISE_PREFIXES)
+        if not any(line.strip().startswith(prefix) for prefix in NOISE_PREFIXES)
     ]
     return "\n".join(clean_lines).strip()

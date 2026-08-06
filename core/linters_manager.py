@@ -12,6 +12,7 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
+from core.platform_utils import is_windows
 
 GLOBAL_LINTERS_FILE = os.path.join(CONFIG_DIR, "linters.json")
 PROJECT_LINTERS_FILE = os.path.join(".johnston", "linters.json")
@@ -159,7 +160,7 @@ PRESET_LINTERS: Dict[str, Dict[str, Any]] = {
 }
 
 # Output noise prefixes that should never reach the chat (progress lines etc.)
-_NOISE_PREFIXES = (
+NOISE_PREFIXES = (
     "Building ", "Downloading ", "× Failed", "└─>", "Call to ",
     "[stderr]", "Audited ", "Checked ", "No fixes applied",
 )
@@ -344,14 +345,20 @@ def _cached_which(cmd: str) -> Optional[str]:
     return shutil.which(cmd)
 
 
-@functools.lru_cache(maxsize=64)
 def _cache_has_tool(manager: str, package: str) -> bool:
     """
     Checks local caches for uvx/npx-managed tools without hitting the network.
-    uvx: ~/.cache/uv (tools/ or archive-v0); npx: ~/.npm/_npx/*/node_modules.
+    Cache roots are platform-aware and respect common env overrides:
+      uvx: UV_CACHE_DIR else ~/.cache/uv (posix) / %LOCALAPPDATA%\\uv (windows)
+      npx: npm_config_cache else ~/.npm/_npx (posix) / %LOCALAPPDATA%\\npm-cache\\_npx (windows)
     """
     if manager == "uvx":
-        cache = os.path.join(os.path.expanduser("~"), ".cache", "uv")
+        cache = os.environ.get("UV_CACHE_DIR")
+        if not cache:
+            cache = os.path.join(
+                os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+                "uv",
+            ) if is_windows() else os.path.join(os.path.expanduser("~"), ".cache", "uv")
         if not os.path.isdir(cache):
             return False
         # ruff/yamllint/taplo install via uvx tool or ephemeral env; look for
@@ -363,13 +370,25 @@ def _cache_has_tool(manager: str, package: str) -> bool:
                 return True
         return False
     elif manager == "npx":
-        cache = os.path.join(os.path.expanduser("~"), ".npm", "_npx")
-        if not os.path.isdir(cache):
+        cache = os.environ.get("npm_config_cache")
+        if cache:
+            npx_dir = os.path.join(cache, "_npx")
+        elif is_windows():
+            npx_dir = os.path.join(
+                os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+                "npm-cache",
+                "_npx",
+            )
+        else:
+            npx_dir = os.path.join(os.path.expanduser("~"), ".npm", "_npx")
+        if not os.path.isdir(npx_dir):
             return False
-        for root, dirs, files in os.walk(cache):
-            for d in dirs:
-                if package.replace("@", "").split("/")[-1] in d:
-                    return True
+        pkg_key = package.replace("@", "").split("/")[-1]
+        for root, dirs, files in os.walk(npx_dir):
+            if any(pkg_key in d for d in dirs):
+                return True
+            if any(pkg_key in f for f in files):
+                return True
         return False
     return False
 
