@@ -479,18 +479,17 @@ SubagentsScreen #modal-dialog {
     text-align: center;
     color: #ffffff;
     text-style: bold;
-    margin-bottom: 0;
+    margin-bottom: 1;
 }
 
 #wizard-title {
     width: 100%;
     height: auto;
-    margin-bottom: 0;
+    margin-bottom: 1;
 }
 
 #modal-search-input {
-    margin-top: 1;
-    margin-bottom: 1;
+    margin: 0 0 1 0;
 }
 
 .modal-body {
@@ -571,7 +570,7 @@ SubagentViewScreen {
 #modal-dialog OptionList:focus {
     height: auto;
     max-height: 10;
-    margin-top: 1;
+    margin: 0;
     border: none;
     background: #27272a;
     scrollbar-size: 0 0;
