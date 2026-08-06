@@ -91,6 +91,8 @@ class InvokeSubagentTool(BaseTool):
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
+            else:
+                subagent.system_prompt += "\n\n[Note: workspace='branch' requested, but project directory is not a git repository. Executing subagent in standard directory.]"
 
         session = tracker.create_session(
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
@@ -181,7 +183,7 @@ class InvokeSubagentTool(BaseTool):
                     acc[0] = "[Subagent cancelled]"
                     session.finish("cancelled", "Cancelled by user")
                 except Exception as err:
-                    acc[0] = f"[Subagent error: {err}]"
+                    acc[0] += f"\n[Subagent error: {err}]"
                     session.finish("error", str(err))
                 finally:
                     _cleanup_worktree_and_append_diff(acc)
@@ -220,10 +222,7 @@ class InvokeSubagentTool(BaseTool):
                 raise
             except Exception as err:
                 session.finish("error", str(err))
-                partial = _truncate_subagent_result(acc[0]).strip()
-                if partial:
-                    return f"ERR: subagent: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
-                return f"ERR: subagent: {err}"
+                acc[0] += f"\n[Subagent error: {err}]"
             finally:
                 _cleanup_worktree_and_append_diff(acc)
                 _merge_metrics()

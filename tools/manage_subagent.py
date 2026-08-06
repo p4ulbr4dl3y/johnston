@@ -58,14 +58,12 @@ class ManageSubagentTool(BaseTool):
             for dname, dval in defs.items():
                 lines.append(f"• Type: '{dname}' [{dval.source}] — {dval.description}")
 
-            show_all = bool(args.get("all", False))
-            target_sessions = list(tracker.sessions.values()) if show_all else tracker.get_sessions_for_session(curr_session_id)
-            if target_sessions:
-                lines.append("\nActive/Past Subagent Sessions:")
-                for sess in target_sessions:
-                    lines.append(
-                        f"• ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
-                    )
+            active_sessions = tracker.get_sessions_for_session(curr_session_id)
+            if active_sessions:
+                lines.append("\nTracked Subagent Sessions:")
+                for sess in active_sessions:
+                    lines.append(f"• ID: '{sess.task_id}' [{sess.status}] — {sess.description}")
+
             return "\n".join(lines)
 
         if not task_id:
@@ -139,7 +137,21 @@ class ManageSubagentTool(BaseTool):
 
             session.add_event({"type": "user", "text": message})
 
+            # Check if subagent was running in a worktree branch and re-attach worktree
+            import os
+
             from core.subagent_tracker import merge_subagent_metrics, record_subagent_step
+            from core.subagent_worktree import SubagentWorktreeManager
+
+            project_dir = getattr(ctx.app, "project_dir", None) or os.getcwd()
+            branch_name = f"subagent-{session.task_id}"
+            wt_path = SubagentWorktreeManager.attach_worktree(project_dir, session.task_id, branch_name)
+            if wt_path:
+                subagent.project_dir = wt_path
+                subagent.cwd = wt_path
+            else:
+                subagent.project_dir = project_dir
+                subagent.cwd = project_dir
 
             def _record_step(step, acc):
                 record_subagent_step(step, session, acc)
@@ -147,6 +159,17 @@ class ManageSubagentTool(BaseTool):
             def _merge_metrics():
                 merge_subagent_metrics(subagent, ctx)
                 ctx.refresh_status()
+
+            def _cleanup_worktree_if_needed(acc):
+                if wt_path:
+                    diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, branch_name)
+                    if has_changes and diff_text:
+                        acc[0] += (
+                            f"\n\n[Worktree Branch '{branch_name}']\n"
+                            f"Changes saved to git branch '{branch_name}'. Run `git merge {branch_name}` to apply, or `git diff {branch_name}` for full diff.\n\n"
+                            f"{diff_text}"
+                        )
+                    SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=has_changes)
 
             run_bg = bool(args["background"]) if "background" in args else session.background
             if run_bg:
@@ -158,6 +181,7 @@ class ManageSubagentTool(BaseTool):
                     except Exception as err:
                         acc[0] = f"[Subagent message error: {err}]"
                     finally:
+                        _cleanup_worktree_if_needed(acc)
                         _merge_metrics()
                         msg = (
                             f"[System Notification] Follow-up to background subagent '{session.description}' (ID: {session.task_id}) completed.\n"
@@ -175,8 +199,9 @@ class ManageSubagentTool(BaseTool):
                     async for step in subagent.stream_steps(message):
                         _record_step(step, acc)
                 except Exception as err:
-                    return f"ERR: subagent message: {err}"
+                    acc[0] = f"ERR: subagent message: {err}"
                 finally:
+                    _cleanup_worktree_if_needed(acc)
                     _merge_metrics()
 
                 return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"
