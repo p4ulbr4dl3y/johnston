@@ -527,6 +527,29 @@ SubagentViewScreen {
     margin-bottom: 0;
 }
 
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence,
+#modal-dialog.bash-confirm-dialog MarkdownFence {
+    background: #18181b;
+    border-left: solid #3f3f46;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 0 1;
+    margin: 1 0;
+}
+
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-header,
+#modal-dialog.bash-confirm-dialog MarkdownFence .fence-header {
+    display: none;
+}
+
+#modal-dialog.bash-confirm-dialog CustomMarkdownFence #code-content,
+#modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
+    background: #18181b;
+    color: #e4e4e7;
+    padding: 0;
+}
+
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus {
     height: auto;
