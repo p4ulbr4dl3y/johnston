@@ -8,7 +8,7 @@ from core.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_tracker import SubagentTracker
 from tools.base import BaseTool
 
-MAX_SUBAGENT_RESULT_CHARS = 12000
+MAX_SUBAGENT_RESULT_CHARS = 15000
 
 
 def _truncate_subagent_result(text: str) -> str:
