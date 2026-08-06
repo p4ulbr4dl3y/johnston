@@ -342,6 +342,38 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertFalse(md.has_class("confirm-summary"))
 
+    async def test_wizard_right_arrow_navigates_without_selecting(self):
+        questions = [
+            {"question_text": "Q1", "options": ["A", "B"]},
+            {"question_text": "Q2", "options": ["X", "Y"]},
+            {"question_text": "Q3", "options": ["M", "N"]},
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            await pilot.press("right")
+            await pilot.pause()
+            self.assertEqual(screen.q_idx, 1)
+            self.assertEqual(screen.answers, {})  # no answer recorded
+
+            await pilot.press("right")
+            await pilot.pause()
+            self.assertEqual(screen.q_idx, 2)
+
+            # on the last question right shows the summary
+            await pilot.press("right")
+            await pilot.pause()
+            self.assertEqual(screen.q_idx, 3)
+
+            # enter still selects and moves on (to confirm)
+            await pilot.press("enter")
+            await pilot.pause()
+            self.assertEqual(screen.q_idx, 3)
+
 
 if __name__ == "__main__":
     unittest.main()
