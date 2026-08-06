@@ -232,7 +232,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         long_text = "a" * 100
         truncated = truncate_output(long_text, max_chars=10, hint="Use line ranges.", save_log=False)
         self.assertTrue(truncated.startswith("aaaaaaaaaa"))
-        self.assertIn("Output truncated at 10 chars. Use line ranges.", truncated)
+        self.assertIn("Output truncated at 10 chars", truncated)
+        self.assertIn("Use line ranges.", truncated)
 
     def test_agent_cost_usd_calculation(self):
         agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
