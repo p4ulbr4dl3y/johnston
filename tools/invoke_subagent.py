@@ -59,7 +59,6 @@ class InvokeSubagentTool(BaseTool):
         description = args.get("description", prompt[:30] or "subagent task").strip()
         subagent_type = args.get("subagent_type", "general").strip().lower()
         workspace_mode = args.get("workspace", "inherit").strip().lower()
-        run_in_background = True
 
         if not prompt:
             return "ERR: 'prompt' required"
@@ -100,7 +99,7 @@ class InvokeSubagentTool(BaseTool):
                 subagent.cwd = wt_path
 
         session = tracker.create_session(
-            task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
+            task_id, description, prompt, subagent_type, background=True, session_id=session_id
         )
         session.agent = subagent
         session.project_dir = wt_path or ""
@@ -180,63 +179,39 @@ class InvokeSubagentTool(BaseTool):
                 wt_path = None
                 wt_branch = None
 
-        if run_in_background:
-            async def _run_bg():
-                acc = [""]
-                try:
-                    async for step in subagent.stream_steps(prompt):
-                        _record_step(step, acc)
-                    session.finish("completed")
-                except asyncio.CancelledError:
-                    acc[0] = "[Subagent cancelled]"
-                    session.finish("cancelled", "Cancelled by user")
-                except Exception as err:
-                    acc[0] = f"[Subagent error: {err}]"
-                    session.finish("error", str(err))
-                finally:
-                    _cleanup_worktree_and_append_diff(acc)
-                    _merge_metrics()
-                    for t in ctx.background_tasks:
-                        if getattr(t, "task_id", "") == task_id:
-                            t.is_running = False
-
-                    ctx.refresh_status()
-
-                    result_text = _truncate_subagent_result(acc[0]) or "Completed with no text output."
-                    msg = (
-                        f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
-                        f"<task_result>\n{result_text}\n</task_result>\n"
-                        f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
-                    )
-                    ctx.trigger_ai_response(msg)
-
-            bg_task = asyncio.create_task(_run_bg())
-            session.async_task = bg_task
-            curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
-            bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)
-            ctx.add_background_task(bg_sub)
-
-
-            return f"OK: subagent '{description}' launched ({task_id})"
-        else:
-            # Foreground execution
+        async def _run_bg():
             acc = [""]
             try:
                 async for step in subagent.stream_steps(prompt):
                     _record_step(step, acc)
                 session.finish("completed")
             except asyncio.CancelledError:
+                acc[0] = "[Subagent cancelled]"
                 session.finish("cancelled", "Cancelled by user")
-                raise
             except Exception as err:
+                acc[0] = f"[Subagent error: {err}]"
                 session.finish("error", str(err))
-                partial = _truncate_subagent_result(acc[0]).strip()
-                if partial:
-                    return f"ERR: subagent: {err}\n\n<partial_result>\n{partial}\n</partial_result>"
-                return f"ERR: subagent: {err}"
             finally:
                 _cleanup_worktree_and_append_diff(acc)
                 _merge_metrics()
+                for t in ctx.background_tasks:
+                    if getattr(t, "task_id", "") == task_id:
+                        t.is_running = False
 
-            result_text = _truncate_subagent_result(acc[0]) or "Subagent finished with no text output."
-            return f"<task_result>\n{result_text}\n</task_result>"
+                ctx.refresh_status()
+
+                result_text = _truncate_subagent_result(acc[0]) or "Completed with no text output."
+                msg = (
+                    f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
+                    f"<task_result>\n{result_text}\n</task_result>\n"
+                    f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
+                )
+                ctx.trigger_ai_response(msg)
+
+        bg_task = asyncio.create_task(_run_bg())
+        session.async_task = bg_task
+        curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)
+        ctx.add_background_task(bg_sub)
+
+        return f"OK: subagent '{description}' launched ({task_id})"
