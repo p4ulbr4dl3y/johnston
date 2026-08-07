@@ -21,14 +21,14 @@ def mock_app(temp_workspace):
     app = MagicMock()
     app.project_dir = temp_workspace
     app.current_session_id = "pytest-session-id"
-    app.mode = "action"
+    app.mode = "act"
     app.is_app_active = True
     app.tool_context = ToolContext(app)
     app.notify = MagicMock()
     app.refresh_status_footer = MagicMock()
 
     agent = MagicMock()
-    agent.mode = "action"
+    agent.mode = "act"
     agent.model = "deepseek-v4-flash"
     agent.provider_key = "openai"
     agent.stream_steps = AsyncMock()

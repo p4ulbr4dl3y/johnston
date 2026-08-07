@@ -246,7 +246,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         tracker = SubagentTracker.get_instance()
         tracker.storage_dir = self.test_dir
         tracker.sessions.clear()
-        tracker.create_session("sub-p1", "Pilot subagent", "do work", "general", False)
+        tracker.create_session("sub-p1", "Pilot subagent", "do work", "worker", False)
 
         try:
             screen = SubagentsScreen()

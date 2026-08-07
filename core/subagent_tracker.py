@@ -88,7 +88,7 @@ class SubagentSessionData:
             task_id=data.get("task_id", ""),
             description=data.get("description", ""),
             prompt=data.get("prompt", ""),
-            subagent_type=data.get("subagent_type", "general"),
+            subagent_type=data.get("subagent_type", "worker"),
             background=bool(data.get("background", False)),
             session_id=data.get("session_id"),
         )

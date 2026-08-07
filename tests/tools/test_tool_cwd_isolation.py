@@ -165,7 +165,7 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
     def test_session_persists_project_dir_and_branch(self):
         from core.subagent_tracker import SubagentSessionData
 
-        sess = SubagentSessionData("sub-abc", "desc", "prompt", "general", True)
+        sess = SubagentSessionData("sub-abc", "desc", "prompt", "worker", True)
         sess.project_dir = "/tmp/wt/sub-abc"
         sess.branch_name = "subagent-sub-abc"
         data = sess.to_dict()

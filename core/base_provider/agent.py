@@ -71,7 +71,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
-        self.mode = "action"
+        self.mode = "act"
 
     async def close(self):
         if hasattr(self, "client") and self.client:
@@ -112,7 +112,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         }
 
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
-        agent_mode = getattr(self, "mode", "action")
+        agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
         m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
         if not os.environ.get("PYTEST_CURRENT_TEST"):
@@ -174,7 +174,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         try:
             while True:
-                current_mode = getattr(self, "mode", "action")
+                current_mode = getattr(self, "mode", "act")
                 builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name, cwd=getattr(self, "cwd", None))
                 sys_prompt = builder.build_system_prompt()
                 all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
@@ -473,7 +473,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     yield ("tool", t_name, target, args)
 
                     from core.mode_manager import ModeManager
-                    current_mode = getattr(self, "mode", "action").lower()
+                    current_mode = getattr(self, "mode", "act").lower()
                     mode_def = ModeManager.get_instance().get_mode(current_mode)
 
                     policy_err = self._tool_policy_error(t_name, args, mode_def)

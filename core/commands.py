@@ -100,7 +100,7 @@ class ProvidersCommand(BaseCommand):
                             app.pm.set_provider_api_key(selected_key, entered_key)
                             app.pm.set_provider_disabled(selected_key, False)
                         old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
-                        current_mode = getattr(app, "mode", getattr(app.agent, "mode", "action"))
+                        current_mode = getattr(app, "mode", getattr(app.agent, "mode", "act"))
                         app.pm.set_active_provider_key(selected_key)
                         app.agent = app.pm.create_active_agent()
                         if app.agent and old_history:
@@ -164,7 +164,7 @@ class ModelsCommand(BaseCommand):
 
                 if selected_prov != app.pm.get_active_provider_key():
                     old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
-                    current_mode = getattr(app, "mode", getattr(app.agent, "mode", "action"))
+                    current_mode = getattr(app, "mode", getattr(app.agent, "mode", "act"))
                     app.pm.set_active_provider_key(selected_prov)
                     app.agent = app.pm.create_active_agent()
                     if app.agent and old_history:
@@ -204,7 +204,7 @@ class ThinkingEffortCommand(BaseCommand):
                 app.query_one("#message-input", ChatInput).focus()
                 return
 
-            current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "action"))
+            current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "act"))
             old_history = getattr(getattr(app, "agent", None), "history", [])
             if hasattr(app.pm, "set_provider_thinking_effort"):
                 app.pm.set_provider_thinking_effort(provider_key, model_name, effort)

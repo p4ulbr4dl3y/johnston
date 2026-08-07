@@ -38,7 +38,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_status_action(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-2", "Refactor module", "clean up code", "general", True)
+        sess = self.tracker.create_session("sub-2", "Refactor module", "clean up code", "worker", True)
         sess.add_event({"type": "user", "text": "clean up code"})
         sess.add_event({"type": "bot_text", "text": "Done cleaning."})
 
@@ -51,7 +51,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-3", "Long running task", "do heavy work", "general", True)
+        sess = self.tracker.create_session("sub-3", "Long running task", "do heavy work", "worker", True)
 
         res_kill = await tool.execute({"action": "kill", "task_id": "sub-3"})
         self.assertIn("OK: sub-3 terminated", res_kill)
@@ -67,7 +67,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             "task_id": "sub-test",
             "description": "test desc",
             "prompt": "test prompt",
-            "subagent_type": "general",
+            "subagent_type": "worker",
             "background": False,
             "status": "completed",
             "agent_history": [{"role": "user", "content": "Prior prompt"}, {"role": "assistant", "content": "Prior response"}]
@@ -99,7 +99,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_no_message(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-sm1", "Task", "prompt", "general", False)
+        self.tracker.create_session("sub-sm1", "Task", "prompt", "worker", False)
         res = await tool.execute({"action": "send_message", "task_id": "sub-sm1"}, app=MagicMock())
         self.assertIn("ERR: 'message' required", res)
 
@@ -115,7 +115,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_no_agent_available(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-sm2", "Task", "prompt", "general", False)
+        self.tracker.create_session("sub-sm2", "Task", "prompt", "worker", False)
         mock_app = MagicMock()
         mock_app.current_session_id = None
         mock_app.pm = MagicMock()
@@ -125,7 +125,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_sync_success(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-sm3", "Task", "prompt", "general", False)
+        sess = self.tracker.create_session("sub-sm3", "Task", "prompt", "worker", False)
 
         class MockSubagent:
             def __init__(self):
@@ -158,14 +158,14 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-unk", "Task", "prompt", "general", False)
+        self.tracker.create_session("sub-unk", "Task", "prompt", "worker", False)
         res = await tool.execute({"action": "bogus", "task_id": "sub-unk"})
         self.assertIn("ERR: unknown action 'bogus'", res)
         self.assertIn("bogus", res)
 
     async def test_send_message_background(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-bg", "Task", "prompt", "general", True)
+        self.tracker.create_session("sub-bg", "Task", "prompt", "worker", True)
 
         class MockSubagent:
             def __init__(self):

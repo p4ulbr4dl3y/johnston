@@ -25,7 +25,7 @@ class BaseTestCase(unittest.TestCase):
         mock_app = MagicMock()
         mock_app.project_dir = p_dir
         mock_app.current_session_id = "test-session-id"
-        mock_app.mode = "action"
+        mock_app.mode = "act"
         mock_app.is_app_active = True
         mock_app.tool_context = ToolContext(mock_app)
         mock_app.notify = MagicMock()
@@ -34,7 +34,7 @@ class BaseTestCase(unittest.TestCase):
 
         # Mock ProviderManager & Agent
         mock_agent = MagicMock()
-        mock_agent.mode = "action"
+        mock_agent.mode = "act"
         mock_agent.model = "deepseek-v4-flash"
         mock_agent.provider_key = "openai"
         mock_agent.tokens_input = 0

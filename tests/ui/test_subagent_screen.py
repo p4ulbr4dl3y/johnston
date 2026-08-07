@@ -44,7 +44,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.tracker.storage_dir = self.old_dir
 
     def test_tracker_create_and_find(self):
-        sess = self.tracker.create_session("task-123", "test subagent", "test prompt", "general", False)
+        sess = self.tracker.create_session("task-123", "test subagent", "test prompt", "worker", False)
         self.assertEqual(sess.task_id, "task-123")
         self.assertEqual(sess.description, "test subagent")
         self.assertEqual(sess.status, "running")
@@ -78,7 +78,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(sess.events[0]["text"], "Hello world")
 
     def test_subagent_view_screen_initialization(self):
-        sess = self.tracker.create_session("task-789", "my subagent", "do something", "general", False)
+        sess = self.tracker.create_session("task-789", "my subagent", "do something", "worker", False)
         screen = SubagentViewScreen("task-789")
         self.assertEqual(screen.session, sess)
         self.assertEqual(screen.task_id_or_desc, "task-789")
@@ -103,7 +103,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(found, sess)
 
     def test_find_session_substring_description(self):
-        sess = self.tracker.create_session("task-sub", "Test subagent check env for py", "Test subagent check env for python environment", "general", False)
+        sess = self.tracker.create_session("task-sub", "Test subagent check env for py", "Test subagent check env for python environment", "worker", False)
         found = self.tracker.find_session_by_description_or_id("Test subagent check env")
         self.assertEqual(found, sess)
 
@@ -126,7 +126,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.tracker.storage_dir = self.old_dir
 
     async def test_render_all_event_types_pilot(self):
-        sess = self.tracker.create_session("task-events", "Event Agent", "prompt", "general", False)
+        sess = self.tracker.create_session("task-events", "Event Agent", "prompt", "worker", False)
         sess.add_event({"type": "user", "text": "hello subagent"})
         sess.add_event({"type": "thinking_start", "val1": "thinking..."})
         sess.add_event({"type": "thinking_delta", "val1": " delta"})
@@ -156,7 +156,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_session_found_via_current_session_id(self):
-        sess = self.tracker.create_session("task-curr-sess", "Curr Sess Agent", "prompt", "general", False, session_id="sess-xyz")
+        sess = self.tracker.create_session("task-curr-sess", "Curr Sess Agent", "prompt", "worker", False, session_id="sess-xyz")
         screen = SubagentViewScreen("Curr Sess Agent")
         screen.session = None  # Force fallback in on_mount
 
@@ -179,7 +179,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_render_event_edge_cases(self):
-        self.tracker.create_session("task-edges", "Edge Agent", "prompt", "general", False)
+        self.tracker.create_session("task-edges", "Edge Agent", "prompt", "worker", False)
         screen = SubagentViewScreen("task-edges")
         app = DummyHostApp(screen)
 
@@ -207,7 +207,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_subagent_screen_widgets_not_expandable(self):
-        sess = self.tracker.create_session("task-select", "Select Agent", "prompt", "general", False)
+        sess = self.tracker.create_session("task-select", "Select Agent", "prompt", "worker", False)
         sess.add_event({"type": "thinking_start", "val1": "thinking..."})
         sess.add_event({"type": "thinking_end", "duration": 1.0, "content": "thought done"})
         sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py"})

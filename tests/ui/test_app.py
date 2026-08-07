@@ -91,16 +91,16 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(isinstance(app.screen, TasksListScreen))
 
             # 9. Test mode toggle via Shift+Tab
-            self.assertEqual(getattr(app.agent, "mode", "action"), "action")
+            self.assertEqual(getattr(app.agent, "mode", "act"), "act")
             await pilot.press("shift+tab")
             await pilot.pause(0.2)
-            self.assertEqual(getattr(app.agent, "mode", "action"), "explore")
+            self.assertEqual(getattr(app.agent, "mode", "act"), "explore")
             await pilot.press("shift+tab")
             await pilot.pause(0.2)
-            self.assertEqual(getattr(app.agent, "mode", "action"), "orchestrator")
+            self.assertEqual(getattr(app.agent, "mode", "act"), "orchestrate")
             await pilot.press("shift+tab")
             await pilot.pause(0.2)
-            self.assertEqual(getattr(app.agent, "mode", "action"), "action")
+            self.assertEqual(getattr(app.agent, "mode", "act"), "act")
 
             # 10. Test input height auto-expansion on multiline text insert
             chat_input.load_text("")

@@ -26,11 +26,12 @@ class SubagentDefinition:
 
 
 DEFAULT_DEFINITIONS: Dict[str, SubagentDefinition] = {
-    "explore": SubagentDefinition(
-        name="explore",
+    "explorer": SubagentDefinition(
+        name="explorer",
+        subagent_type="explorer",
         description="Fast code exploration subagent",
         system_prompt=(
-            "## Subagent Mode: EXPLORE\n\n"
+            "## Subagent Mode: EXPLORER\n\n"
             "You are a read-only exploration subagent operating inside Johnston CLI.\n\n"
             "## Primary Goal\n"
             "Search codebase, analyze files, and report findings concisely without altering system state.\n\n"
@@ -42,11 +43,12 @@ DEFAULT_DEFINITIONS: Dict[str, SubagentDefinition] = {
         ),
         source="builtin",
     ),
-    "general": SubagentDefinition(
-        name="general",
+    "worker": SubagentDefinition(
+        name="worker",
+        subagent_type="worker",
         description="General multi-step execution subagent",
         system_prompt=(
-            "## Subagent Mode: GENERAL\n\n"
+            "## Subagent Mode: WORKER\n\n"
             "You are a task execution subagent operating inside Johnston CLI.\n\n"
             "## Primary Goal\n"
             "Perform multi-step engineering tasks safely and return concise, actionable results.\n\n"
@@ -128,7 +130,7 @@ class SubagentRegistry:
         key = subagent_type.lower().strip()
         if key in self.definitions:
             return self.definitions[key]
-        return DEFAULT_DEFINITIONS["general"]
+        return DEFAULT_DEFINITIONS["worker"]
 
     def list_definitions(self) -> Dict[str, SubagentDefinition]:
         return self.definitions

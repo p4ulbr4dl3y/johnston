@@ -17,7 +17,7 @@ class ActionsMixin:
         from core.mode_manager import ModeManager
 
         available_modes = list(ModeManager.get_instance().load_modes().keys())
-        curr = getattr(self.agent, "mode", "action").lower()
+        curr = getattr(self.agent, "mode", "act").lower()
         next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
         new_mode = available_modes[next_idx]
         self.agent.mode = new_mode
@@ -134,7 +134,7 @@ class ActionsMixin:
     def on_select_changed(self, event: Select.Changed) -> None:
         """Switch agent provider from ~/.johnston config"""
         if event.value and isinstance(event.value, str) and event.value != "none":
-            current_mode = getattr(self, "mode", getattr(self.agent, "mode", "action"))
+            current_mode = getattr(self, "mode", getattr(self.agent, "mode", "act"))
             self.pm.set_active_provider_key(event.value)
             self.agent = self.pm.create_active_agent()
             self.agent.mode = current_mode

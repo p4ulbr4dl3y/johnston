@@ -5,14 +5,14 @@ from core.prompt_builder import PromptBuilder
 
 class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_default(self):
-        builder = PromptBuilder("System prompt test", [], mode="action")
+        builder = PromptBuilder("System prompt test", [], mode="act")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("System prompt test", sys_prompt)
         self.assertIn("## Environment Metadata", sys_prompt)
         self.assertIn("- Working Directory:", sys_prompt)
         self.assertIn("- Current Date:", sys_prompt)
         self.assertIn("- Operating System:", sys_prompt)
-        self.assertIn("## Execution Mode: ACTION", sys_prompt)
+        self.assertIn("## Execution Mode: ACT", sys_prompt)
 
     def test_build_system_prompt_explore_mode(self):
         builder = PromptBuilder("System prompt test", [], mode="explore")
@@ -34,13 +34,13 @@ class TestPromptBuilder(unittest.TestCase):
             {"function": {"name": "a_tool"}},
             {"function": {"name": "m_tool"}},
         ]
-        builder = PromptBuilder("Test", base_tools, mode="action", allow_task=False)
+        builder = PromptBuilder("Test", base_tools, mode="act", allow_task=False)
         tools = builder.build_tools()
         names = [t.get("function", {}).get("name") for t in tools]
         self.assertEqual(names, sorted(names))
 
     def test_build_system_prompt_includes_project_instructions(self):
-        builder = PromptBuilder("System prompt test", [], mode="action")
+        builder = PromptBuilder("System prompt test", [], mode="act")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("## Project Instructions", sys_prompt)
 
@@ -70,7 +70,7 @@ class TestPromptBuilder(unittest.TestCase):
                 f.write("Always use pytest")
 
             with patch("os.getcwd", return_value=tmpdir):
-                builder = PromptBuilder("Test", [], mode="action")
+                builder = PromptBuilder("Test", [], mode="act")
                 prompt = builder.build_system_prompt()
                 self.assertIn("## User Rules", prompt)
                 self.assertIn("### Rule: custom_rule", prompt)
@@ -79,10 +79,10 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_env_metadata_last(self):
         # Volatile env metadata must come AFTER the stable base + mode block so
         # the stable prefix is prompt-cacheable across turns.
-        builder = PromptBuilder("Base instructions marker", [], mode="action")
+        builder = PromptBuilder("Base instructions marker", [], mode="act")
         prompt = builder.build_system_prompt()
         self.assertLess(prompt.index("Base instructions marker"), prompt.index("## Environment Metadata"))
-        self.assertLess(prompt.index("## Execution Mode: ACTION"), prompt.index("## Environment Metadata"))
+        self.assertLess(prompt.index("## Execution Mode: ACT"), prompt.index("## Environment Metadata"))
 
     def test_build_system_prompt_cached_within_ttl(self):
         import time as _time
@@ -90,7 +90,7 @@ class TestPromptBuilder(unittest.TestCase):
 
         import core.prompt_builder as pb
         pb._SYSTEM_PROMPT_CACHE.clear()
-        builder = PromptBuilder("Cache stability marker", [], mode="action")
+        builder = PromptBuilder("Cache stability marker", [], mode="act")
         first = builder.build_system_prompt()
         # Rebuild "later" but still inside the TTL window: must return the exact
         # same cached string (env time frozen) instead of recomputing.
@@ -103,18 +103,18 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_cache_invalidates_on_mode_change(self):
         import core.prompt_builder as pb
         pb._SYSTEM_PROMPT_CACHE.clear()
-        action_prompt = PromptBuilder("Mode invalidate marker", [], mode="action").build_system_prompt()
+        action_prompt = PromptBuilder("Mode invalidate marker", [], mode="act").build_system_prompt()
         explore_prompt = PromptBuilder("Mode invalidate marker", [], mode="explore").build_system_prompt()
         # Different mode -> different cache key -> rebuilt with the explore block
-        self.assertIn("## Execution Mode: ACTION", action_prompt)
+        self.assertIn("## Execution Mode: ACT", action_prompt)
         self.assertIn("## Execution Mode: EXPLORE", explore_prompt)
     def test_build_system_prompt_substitutes_model_name(self):
-        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="action", model_name="Gemini 3.6 Flash")
+        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="act", model_name="Gemini 3.6 Flash")
         prompt = builder.build_system_prompt()
         self.assertIn("You are Gemini 3.6 Flash operating inside Johnston CLI", prompt)
 
     def test_build_system_prompt_fallback_model_name(self):
-        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="action", model_name="")
+        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="act", model_name="")
         prompt = builder.build_system_prompt()
         self.assertIn("You are an expert AI software engineer operating inside Johnston CLI", prompt)
 
