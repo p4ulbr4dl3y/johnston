@@ -67,7 +67,14 @@ class ShellTool(BaseTool):
         from core.shell_guard import analyze_shell_command
         is_safe, reason = analyze_shell_command(cmd)
 
-        if not is_safe and not skip_confirm and ctx.app:
+        from core.permission_manager import PermissionManager
+        pm = PermissionManager.get_instance()
+        project_dir = getattr(ctx, "cwd", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
+        effective_perms = pm.get_effective_permissions(project_dir)
+        sg_enabled = effective_perms.get("shell_guard", {}).get("enabled", True)
+        session_override = pm.session_overrides.get("shell") or pm.session_overrides.get("shell_guard")
+
+        if sg_enabled and not is_safe and not skip_confirm and session_override != "allow" and ctx.app:
             try:
                 from widgets.screens.permission_confirm import PermissionConfirmScreen
 
@@ -81,7 +88,12 @@ class ShellTool(BaseTool):
 
                 def on_dismiss(result: Any) -> None:
                     if not future.done():
-                        future.set_result(result in ("allow", "always_allow"))
+                        if result == "always_allow":
+                            pm.set_session_override("shell", "allow")
+                            pm.set_session_override("shell_guard", "allow")
+                            future.set_result(True)
+                        else:
+                            future.set_result(result == "allow")
 
                 ctx.app.push_screen(screen, callback=on_dismiss)
                 confirmed = await future

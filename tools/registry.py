@@ -301,6 +301,8 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                     res = await app_obj.push_screen_wait(screen)
                     if res == "always_allow":
                         pm.set_session_override(resolved_name, "allow")
+                        if resolved_name == "shell":
+                            pm.set_session_override("shell_guard", "allow")
                     elif res != "allow":
                         return f"ERR: tool '{name}' execution denied by user"
                 else:
