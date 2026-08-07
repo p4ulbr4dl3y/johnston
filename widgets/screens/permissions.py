@@ -7,7 +7,6 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
-from core.config import PROJECT_PERMISSIONS_FILE
 from core.permission_manager import PermissionManager
 
 
@@ -72,7 +71,7 @@ class PermissionsScreen(ModalScreen[None]):
                 items.append({
                     "type": "group",
                     "name": grp,
-                    "label": grp.upper(),
+                    "label": grp.capitalize(),
                     "desc": group_descriptions.get(grp, ""),
                     "action": act,
                 })
@@ -118,14 +117,11 @@ class PermissionsScreen(ModalScreen[None]):
                 "action": "active" if not self.use_project_scope else "on",
             })
             if self.project_dir:
-                proj_perm_path = os.path.join(self.project_dir, PROJECT_PERMISSIONS_FILE)
-                exists = os.path.exists(proj_perm_path)
-                desc = ".johnston/permissions.json" if exists else ".johnston/permissions.json (inherits global, created on edit)"
                 items.append({
                     "type": "scope",
                     "name": "project",
                     "label": "Project Configuration",
-                    "desc": desc,
+                    "desc": ".johnston/permissions.json",
                     "action": "active" if self.use_project_scope else "on",
                 })
             else:
