@@ -189,7 +189,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
-            self.assertEqual(res, "ERR: tool 'read' denied by permission policy (Policy blocks it)")
+            self.assertEqual(res, "ERR: tool 'read' denied by permission policy")
 
     async def test_execute_tool_permission_ask_confirmed(self):
         mock_app = MagicMock()
@@ -238,7 +238,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
              self._mock_mode(), \
              patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("mcp_deny", {})
-        self.assertEqual(res, "ERR: tool 'mcp_deny' denied by permission policy (MCP policy blocks it)")
+        self.assertEqual(res, "ERR: tool 'mcp_deny' denied by permission policy")
 
     async def test_execute_tool_mcp_permission_ask_no_app(self):
         mock_mcp_mgr = MagicMock()
