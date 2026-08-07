@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.19.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.18.0...johnston-v0.19.0) (2026-08-07)
+
+
+### Features
+
+* **permissions:** add tool permission manager and confirmation UI ([47adbd6](https://github.com/p4ulbr4dl3y/johnston/commit/47adbd6e7a1481dae8179a538e980a599dac7bc1))
+* **permissions:** support session overrides for shell guard aliases ([33be325](https://github.com/p4ulbr4dl3y/johnston/commit/33be32563acbf6999dfabb2e2e1a11b74716a75b))
+* **scripts:** add dump_system_prompt.py to inspect main agent prompt ([ad653ed](https://github.com/p4ulbr4dl3y/johnston/commit/ad653ed0b6fceca72c3bdbb9654bd700618dffc4))
+* **scripts:** add mock visual inspection scripts for subagents, tasks, and shell_confirm modals ([3a39c23](https://github.com/p4ulbr4dl3y/johnston/commit/3a39c238a6775b365858f4fa93abda6f33d3f47c))
+* **scripts:** update dump_system_prompt.py to dynamic live execution ([fcd2a68](https://github.com/p4ulbr4dl3y/johnston/commit/fcd2a68749fb993ca48f29916929323f973fa3b5))
+* **subagents:** ask user about branch deletion after merge ([6390def](https://github.com/p4ulbr4dl3y/johnston/commit/6390def451819c6421b9236fce8027062c0aa45b))
+* **subagents:** save final subagent Markdown response to ~/.johnston/subagents/logs/&lt;task_id&gt;.md and include in manage_subagent status ([e429adf](https://github.com/p4ulbr4dl3y/johnston/commit/e429adf94957e479aa782647f7b9c16d03c5f689))
+* **subagents:** update explore and general system prompts ([e4484c5](https://github.com/p4ulbr4dl3y/johnston/commit/e4484c58198630a4d2a79337150b7bb73d6c71fe))
+* **ui:** add /permissions command and interactive modal screen ([c2a69f9](https://github.com/p4ulbr4dl3y/johnston/commit/c2a69f98b0facb3a3cb99d8453b2b5e64a839ff1))
+* **ui:** add PermissionConfirmScreen with human-friendly action descriptions and diff view ([8dc64a2](https://github.com/p4ulbr4dl3y/johnston/commit/8dc64a2c03f96008c157fa5286320bcf31649698))
+* **ui:** add search and normalize keybindings in modal screens ([fca3063](https://github.com/p4ulbr4dl3y/johnston/commit/fca30633f9efd0e68d090626d7539990f3b672da))
+* **ui:** dynamically set shell syntax language (powershell vs bash) based on OS ([e28d525](https://github.com/p4ulbr4dl3y/johnston/commit/e28d525dfac0ce2583e550f18eec7a6c4385a095))
+* **ui:** support lazy creation of project permissions and clean up header title ([fde24c3](https://github.com/p4ulbr4dl3y/johnston/commit/fde24c312ec982e206b2f9f09729c65508b950a4))
+* **worktree:** preserve git branch when subagent makes changes in worktree ([c048c74](https://github.com/p4ulbr4dl3y/johnston/commit/c048c74ee8810d40cb9e35beb36177a560e0dd92))
+
+
+### Bug Fixes
+
+* **app:** defer queued message execution to prevent Textual exclusive worker collision ([f4acbd7](https://github.com/p4ulbr4dl3y/johnston/commit/f4acbd7b8bed5e061e52bba0adbd4840bad09ee4))
+* **app:** reset is_generating flag before scheduling queued message processing ([2df4dd9](https://github.com/p4ulbr4dl3y/johnston/commit/2df4dd90a08482bc3d9e2ca28228d0195ee5bb32))
+* **permissions:** harden permission system against bypasses and fail-open paths ([35efd71](https://github.com/p4ulbr4dl3y/johnston/commit/35efd71f86c5e114d85bea006d6c262b472ebeb8))
+* **subagents:** clean up subagent worktree management and background queue processing ([d0c1e5a](https://github.com/p4ulbr4dl3y/johnston/commit/d0c1e5a90c03eb2cc56a5ef86893e588b39333e2))
+* **subagents:** cleanup follow-up worktree and commit changes to branch ([7f484b1](https://github.com/p4ulbr4dl3y/johnston/commit/7f484b1ac71c9ad3b415d7e50c6ed119a17296fc))
+* **subagents:** dynamic is_running calculation for BackgroundSubagent and completion toast notify ([89e3e53](https://github.com/p4ulbr4dl3y/johnston/commit/89e3e5304a0eda2dbf7d95ebace4b0874857ae55))
+* **subagents:** isolate project rules and persist follow-up worktree context ([3191ed0](https://github.com/p4ulbr4dl3y/johnston/commit/3191ed042829d83a4b8fbfe46804b1e87c8e5a6e))
+* **subagents:** propagate cwd for isolated subagent worktrees ([142ce5e](https://github.com/p4ulbr4dl3y/johnston/commit/142ce5e94f8e98048df80a3a14b35cfe35d4ea77))
+* **subagents:** unify subagent result output log extension to .log ([9a5a318](https://github.com/p4ulbr4dl3y/johnston/commit/9a5a3187e2c900a6b0886756053ca52e60e9776c))
+* **tcss:** replace invalid display flex with display block ([b168fad](https://github.com/p4ulbr4dl3y/johnston/commit/b168fad982edd03f863600563145fa8a5a781a81))
+* **tools:** increase MAX_SUBAGENT_RESULT_CHARS limit to 15000 ([401e6fc](https://github.com/p4ulbr4dl3y/johnston/commit/401e6fcde706ec62cd0324d853b8ff478a77e4e4))
+* **tools:** resolve send_message cwd fallback and background error accumulation ([b0ae62c](https://github.com/p4ulbr4dl3y/johnston/commit/b0ae62c7e472dfe178657306ed6e9c4d2843e34c))
+* **ui:** apply CustomMarkdownFence globally so modal code blocks use dark background ([b278070](https://github.com/p4ulbr4dl3y/johnston/commit/b27807080368e1bcd3f7fe20b0f372f3e65d0b59))
+* **ui:** fix import order in chat_view.py ([2015d39](https://github.com/p4ulbr4dl3y/johnston/commit/2015d396d468d2ad1beb30f6064c13bf58e91166))
+* **ui:** fix project scope resolution and activation in /permissions modal ([b3128a4](https://github.com/p4ulbr4dl3y/johnston/commit/b3128a45594f5af7ccb96a2d1af0e3a5a6beaec5))
+* **ui:** highlight first item in Groups/Tools tabs and active scope item in Scope tab ([9dc25f0](https://github.com/p4ulbr4dl3y/johnston/commit/9dc25f0c2b4889d73541523bc073ae4211a47417))
+* **ui:** move format_edit_diff helper before ToolCallWidget class ([e48c177](https://github.com/p4ulbr4dl3y/johnston/commit/e48c177a05692594b2f746b0973ed940d21916eb))
+* **ui:** pass target_highlight to update_step when toggling selection ([d326bdb](https://github.com/p4ulbr4dl3y/johnston/commit/d326bdbfa9ee42d393fd39db712b3a434347fd11))
+* **ui:** preserve highlight on deselect and submit summary on enter in ask_user wizard ([0c2d54f](https://github.com/p4ulbr4dl3y/johnston/commit/0c2d54fad036c9b48135faace24ecbf9b542d96a))
+* **ui:** remove dock top from search input so it stays below title ([24307dd](https://github.com/p4ulbr4dl3y/johnston/commit/24307dd3e05f07fbeab2aac4da182bd623b3c250))
+* **ui:** remove redundant top margin on modal inputs to match help screen spacing ([26372fd](https://github.com/p4ulbr4dl3y/johnston/commit/26372fdd9ca989ffca544bcc5b7cdc4574a5d717))
+* **ui:** remove trailing dash from scope items in permissions modal ([3c165f9](https://github.com/p4ulbr4dl3y/johnston/commit/3c165f95c68a7d20dc12236af715828e92cb0db5))
+* **worktree:** detect manual subagent commits when diffing against parent base commit ([860fa80](https://github.com/p4ulbr4dl3y/johnston/commit/860fa80e508e4d64a0b975e5ccdc4acd1b082183))
+* **worktree:** ensure keep_branch preserves subagent branch on changes ([d58daef](https://github.com/p4ulbr4dl3y/johnston/commit/d58daef85fc253961bb91c0ffd9877d8ad74ad84))
+* **worktree:** prevent duplicate subagent- prefix in branch names ([3c02d0e](https://github.com/p4ulbr4dl3y/johnston/commit/3c02d0ee0c67ce692fa41fa0172c2a604d1548ce))
+
 ## [0.18.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.17.0...johnston-v0.18.0) (2026-08-06)
 
 
