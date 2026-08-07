@@ -166,7 +166,9 @@ class ManageSubagentTool(BaseTool):
             if not subagent:
                 return f"ERR: no active agent for {session.task_id}"
 
+            session.status = "running"
             session.add_event({"type": "user", "text": message})
+            session.add_event({"type": "status_change", "status": "running"})
 
             from core.subagent_tracker import merge_subagent_metrics, record_subagent_step
 
@@ -204,8 +206,13 @@ class ManageSubagentTool(BaseTool):
                     try:
                         async for step in subagent.stream_steps(message):
                             _record_step(step, acc)
+                        session.finish("completed")
+                    except asyncio.CancelledError:
+                        acc[0] = "[Subagent cancelled]"
+                        session.finish("cancelled", "Cancelled by user")
                     except Exception as err:
                         acc[0] = f"[Subagent message error: {err}]"
+                        session.finish("error", str(err))
                     finally:
                         _cleanup_followup(acc)
                         _merge_metrics()
@@ -224,7 +231,12 @@ class ManageSubagentTool(BaseTool):
                 try:
                     async for step in subagent.stream_steps(message):
                         _record_step(step, acc)
+                    session.finish("completed")
+                except asyncio.CancelledError:
+                    session.finish("cancelled", "Cancelled by user")
+                    return "ERR: subagent message cancelled"
                 except Exception as err:
+                    session.finish("error", str(err))
                     return f"ERR: subagent message: {err}"
                 finally:
                     _cleanup_followup(acc)

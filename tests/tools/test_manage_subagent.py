@@ -154,6 +154,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<task_result>", res)
         self.assertIn("Subagent reply text", res)
         self.assertIsNotNone(sess.agent)
+        self.assertEqual(sess.status, "completed")
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()
