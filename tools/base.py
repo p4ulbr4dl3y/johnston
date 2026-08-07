@@ -16,11 +16,6 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
     return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
 
 
-def is_protected_config_path(path: str) -> bool:
-    """Config paths are not protected; agents can modify project configuration."""
-    return False
-
-
 def atomic_write_text(path: str, content: str) -> None:
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
