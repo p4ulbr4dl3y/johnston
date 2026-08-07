@@ -280,9 +280,33 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         try:
             tool_inst = tool_cls()
             ctx = tool_inst._ensure_context(context or app)
+
+            # Check Tool Permissions
+            from core.permission_manager import PermissionManager
+            pm = PermissionManager.get_instance()
+            project_dir = getattr(ctx, "project_dir", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
+            action, reason = pm.check_permission(resolved_name, args, project_dir=project_dir)
+
+            if action == "deny":
+                return f"ERR: tool '{name}' denied by permission policy ({reason})"
+            elif action == "ask":
+                app_obj = getattr(ctx, "app", None) or app
+                if app_obj and hasattr(app_obj, "push_screen_wait"):
+                    from widgets.screens.confirm_tool import ConfirmToolScreen
+                    screen = ConfirmToolScreen(tool_name=resolved_name, args=args, reason=reason)
+                    res = await app_obj.push_screen_wait(screen)
+                    if res == "always_allow":
+                        pm.set_session_override(resolved_name, "allow")
+                    elif res != "allow":
+                        return f"ERR: tool '{name}' execution denied by user"
+                else:
+                    # Non-interactive / headless fallback for 'ask' action
+                    return f"ERR: tool '{name}' requires user confirmation ({reason})"
+
             return await tool_inst.execute(args, ctx)
         except Exception as e:
             return f"ERR: execute '{name}': {e}"
+
 
     from core.mcp_manager import get_mcp_manager
     mcp_mgr = get_mcp_manager()
@@ -316,7 +340,27 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if clean_name in disallowed or resolved_name in disallowed:
         return f"ERR: tool '{name}' disabled in {mode_def.name} mode"
 
+    from core.permission_manager import PermissionManager
+    pm = PermissionManager.get_instance()
+    project_dir = getattr(ctx_or_app, "project_dir", None) or getattr(app_obj, "project_dir", None)
+    action, reason = pm.check_permission("call_mcp", args, project_dir=project_dir)
+
+    if action == "deny":
+        return f"ERR: tool '{name}' denied by permission policy ({reason})"
+    elif action == "ask":
+        if app_obj and hasattr(app_obj, "push_screen_wait"):
+            from widgets.screens.confirm_tool import ConfirmToolScreen
+            screen = ConfirmToolScreen(tool_name=f"mcp:{name}", args=args, reason=reason)
+            res = await app_obj.push_screen_wait(screen)
+            if res == "always_allow":
+                pm.set_session_override("call_mcp", "allow")
+            elif res != "allow":
+                return f"ERR: tool '{name}' execution denied by user"
+        else:
+            return f"ERR: tool '{name}' requires user confirmation ({reason})"
+
     try:
+
         if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
             res_or_coro = mcp_mgr.call_tool_async(name, args)
         else:

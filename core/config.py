@@ -50,4 +50,23 @@ DEFAULT_IGNORE_DIRS = {
 # Image Extensions for UI
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
 
+# Permissions Defaults
+PROJECT_PERMISSIONS_FILE = ".johnston/permissions.json"
+
+DEFAULT_PERMISSIONS = {
+    "default": "ask",
+    "groups": {
+        "read": "allow",
+        "write": "allow",
+        "net": "ask",
+        "exec": "ask",
+    },
+    "tools": {},
+    "shell_guard": {
+        "enabled": True,
+        "destructive_action": "deny",
+    },
+}
+
+
 

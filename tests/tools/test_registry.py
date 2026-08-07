@@ -5,6 +5,10 @@ from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from core.permission_manager import PermissionManager
+        PermissionManager.get_instance().set_session_override("call_mcp", "allow")
+
     def test_normalize_tool_name(self):
         self.assertEqual(normalize_tool_name("subagent"), "invoke_subagent")
         self.assertEqual(normalize_tool_name("view_file"), "read")
