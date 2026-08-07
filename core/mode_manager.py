@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 
@@ -74,6 +74,26 @@ BUILTIN_MODES = {
         source="builtin",
     ),
 }
+
+
+WRITE_TOOLS = {
+    "create", "edit", "multi_edit",
+    "write", "write_file", "create_file", "save_file", "write_to_file", "touch",
+    "edit_file", "replace_file_content", "multi_replace_file_content", "update_file", "modify_file",
+}
+
+
+def mode_tool_error(mode_def: Any, tool_name: str) -> Optional[str]:
+    """Returns an error string if mode_def blocks tool_name, else None."""
+    if not mode_def:
+        return None
+    disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
+    clean = (tool_name or "").strip().lower()
+    if clean in disallowed:
+        return f"ERR: tool '{clean}' disabled in {mode_def.name} mode"
+    if getattr(mode_def, "read_only", False) and clean in WRITE_TOOLS:
+        return f"ERR: tool '{clean}' disabled in read-only {mode_def.name} mode"
+    return None
 
 
 class ModeManager:

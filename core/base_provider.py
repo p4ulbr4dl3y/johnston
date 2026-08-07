@@ -460,13 +460,10 @@ class BaseAgent:
         return ALIAS_MAP.get(clean_name.lower(), clean_name)
 
     def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
-        if not mode_def:
-            return None
-        disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
+        from core.mode_manager import mode_tool_error
+
         clean_name = self._canonical_tool_name(tool_name).lower()
-        if tool_name.lower() in disallowed or clean_name in disallowed:
-            return f"ERR: tool '{clean_name}' disabled in {mode_def.name} mode"
-        return None
+        return mode_tool_error(mode_def, clean_name)
 
     async def _compact_messages_if_needed(
         self,

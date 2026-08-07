@@ -81,6 +81,35 @@ Custom prompt''')
                 self.assertIn("custom", modes)
                 self.assertEqual(modes["custom"].source, "global")
 
+    def test_mode_tool_error_read_only_enforced(self):
+        from core.mode_manager import mode_tool_error
+
+        mm = ModeManager.get_instance()
+        explore = mm.get_mode("explore")
+
+        # disallowed_tools still enforced
+        self.assertIsNotNone(mode_tool_error(explore, "create"))
+        self.assertIsNotNone(mode_tool_error(explore, "write_to_file"))
+        # read_only blocks write tools even without explicit disallow
+        self.assertIsNotNone(mode_tool_error(explore, "edit"))
+        self.assertIsNotNone(mode_tool_error(explore, "multi_edit"))
+        # aliases resolved by caller, but plain names covered too
+        self.assertIsNotNone(mode_tool_error(explore, "create_file"))
+        # read tools allowed in read-only mode
+        self.assertIsNone(mode_tool_error(explore, "read"))
+        self.assertIsNone(mode_tool_error(explore, "shell"))
+        # action mode allows everything
+        action = mm.get_mode("action")
+        self.assertIsNone(mode_tool_error(action, "create"))
+
+    def test_mode_tool_error_custom_read_only_without_disallowed(self):
+        from core.mode_manager import ModeDefinition, mode_tool_error
+
+        # Custom read_only mode WITHOUT disallowed_tools must still block writes
+        ro_mode = ModeDefinition(key="ro", name="RO", read_only=True)
+        self.assertIsNotNone(mode_tool_error(ro_mode, "create"))
+        self.assertIsNone(mode_tool_error(ro_mode, "read"))
+
 
 if __name__ == "__main__":
     unittest.main()

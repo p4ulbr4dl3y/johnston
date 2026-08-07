@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, atomic_write_text, resolve_path
+from tools.base import BaseTool, atomic_write_text, is_protected_config_path, resolve_path
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -255,6 +255,8 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
     path = resolve_path(path_arg, cwd=cwd)
     if not path or not os.path.exists(path):
         return f"ERR: file '{path}' not found"
+    if is_protected_config_path(path):
+        return f"ERR: '{path}' is Johnston configuration (.johnston/**) and cannot be modified by the agent"
     if os.path.isdir(path):
         return f"ERR: '{path}' is a directory"
 

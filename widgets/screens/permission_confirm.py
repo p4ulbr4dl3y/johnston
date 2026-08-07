@@ -67,13 +67,13 @@ class PermissionConfirmScreen(ModalScreen[str]):
 
         # Generate diff for Edit tools
         if self.tool_name in ("edit", "replace_file_content", "multi_replace_file_content", "multi_edit"):
-            chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks")
+            chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks") or self.args.get("edits")
             diff_parts = []
             if chunks and isinstance(chunks, list):
                 for chunk in chunks:
                     if isinstance(chunk, dict):
-                        old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or ""
-                        new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or ""
+                        old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or chunk.get("old_str") or ""
+                        new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or chunk.get("new_str") or ""
                         start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
                         if old_c or new_c:
                             d_lines = list(difflib.unified_diff(
@@ -91,8 +91,8 @@ class PermissionConfirmScreen(ModalScreen[str]):
                                     d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
                             diff_parts.extend(d_lines)
             else:
-                old_s = self.args.get("old_string") or self.args.get("target_content") or self.args.get("TargetContent") or ""
-                new_s = self.args.get("new_string") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
+                old_s = self.args.get("old_string") or self.args.get("old_str") or self.args.get("target_content") or self.args.get("TargetContent") or ""
+                new_s = self.args.get("new_string") or self.args.get("new_str") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
                 start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
                 if old_s or new_s:
                     d_lines = list(difflib.unified_diff(
