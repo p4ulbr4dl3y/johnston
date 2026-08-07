@@ -27,12 +27,18 @@ def _truncate_subagent_result(text: str) -> str:
 
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
-    description = "Launch an autonomous subagent for a bounded, non-blocking subtask. Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
+    description = (
+        f"Launch an autonomous subagent for a bounded, non-blocking subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+        "Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
+    )
     schema = {
         "type": "function",
         "function": {
             "name": "invoke_subagent",
-            "description": "Launch an autonomous subagent for a bounded, non-blocking subtask. Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge.",
+            "description": (
+                f"Launch an autonomous subagent for a bounded, non-blocking subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+                "Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {

@@ -50,7 +50,10 @@ class PermissionManager:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
         normalized = self.normalize_action(action)
         if normalized in self.VALID_ACTIONS:
-            self.session_overrides[tool_name.lower()] = normalized
+            from tools.registry import ALIAS_MAP
+            clean = (tool_name or "").strip().lower()
+            canonical = ALIAS_MAP.get(clean, clean)
+            self.session_overrides[canonical] = normalized
 
     def clear_session_overrides(self) -> None:
         self.session_overrides.clear()
@@ -82,7 +85,11 @@ class PermissionManager:
         if target_type not in ("group", "tool", "shell_guard"):
             raise ValueError(f"Invalid target_type: '{target_type}'")
 
-        target_name = target_name.lower()
+        target_name = (target_name or "").strip().lower()
+        if target_type == "tool":
+            from tools.registry import ALIAS_MAP
+            target_name = ALIAS_MAP.get(target_name, target_name)
+
         if target_type == "shell_guard":
             if action.lower() not in ("allow", "deny", "true", "false", "enabled", "disabled"):
                 raise ValueError(f"Invalid shell_guard action: '{action}'")
@@ -181,16 +188,24 @@ class PermissionManager:
         Returns (action, reason) where action is 'allow', 'ask', or 'deny'.
         """
         raw_tool = (tool_name or "").strip().lower()
-        from tools.registry import ALIAS_MAP
+        from tools.registry import ALIAS_MAP, normalize_tool_args
         canonical_name = ALIAS_MAP.get(raw_tool, raw_tool)
+        norm_args = normalize_tool_args(canonical_name, args or {})
 
         effective_perms = self.get_effective_permissions(project_dir)
 
         # 1. Check shell_guard for 'shell' commands FIRST (security firewall)
         if canonical_name == "shell":
-            command = (args or {}).get("command") or (args or {}).get("command_line") or ""
+            command = (
+                norm_args.get("command")
+                or (args or {}).get("command")
+                or (args or {}).get("cmd")
+                or (args or {}).get("command_line")
+                or (args or {}).get("CommandLine")
+                or ""
+            )
             sg_cfg = effective_perms.get("shell_guard", {})
-            if sg_cfg.get("enabled", True):
+            if sg_cfg.get("enabled", True) and self.session_overrides.get("shell_guard") != "allow":
                 is_safe, reason = analyze_shell_command(command)
                 if not is_safe:
                     return "deny", f"Shell Guard flagged unsafe command: {reason}"
