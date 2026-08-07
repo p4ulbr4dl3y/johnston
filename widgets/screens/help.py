@@ -51,7 +51,7 @@ class HelpScreen(ModalScreen[None]):
     def _get_header_md(self) -> str:
         t0 = "**[ Commands ]**" if self.active_tab == 0 else "**Commands**"
         t1 = "**[ Keybindings ]**" if self.active_tab == 1 else "**Keybindings**"
-        return f"### **Johnston Help**\n\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1}"
+        return f"### **Johnston Help**\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1}"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
