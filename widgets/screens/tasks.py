@@ -27,9 +27,10 @@ class TaskConsoleScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Console Output**", classes="modal-markdown")
+            yield Markdown("### **Console Output**", classes="modal-markdown modal-markdown-centered")
             yield RichLog(id="console-log", highlight=False, markup=False)
             yield Label("esc: cancel", id="modal-hint")
+
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -88,7 +89,7 @@ class TasksListScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Background Tasks Manager**", classes="modal-markdown")
+            yield Markdown("### **Background Tasks Manager**", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search tasks...", id="modal-search-input")
             yield OptionList(id="tasks-option-list")
             yield Label("enter: view output • tab: kill task • esc: cancel", id="modal-hint")

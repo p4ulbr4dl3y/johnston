@@ -54,8 +54,7 @@ class TestSkillDetailScreen(unittest.IsolatedAsyncioTestCase):
         app = DummyHostApp(screen)
         async with app.run_test() as pilot:
             await pilot.pause()
-            md = screen.query_one(".modal-markdown", Markdown)
-            text = str(md._markdown)
+            text = " ".join(str(m._markdown) for m in screen.query(Markdown))
             self.assertIn("[GLOBAL]", text)
             self.assertIn("alpha", text)
             self.assertIn("No description provided.", text)
@@ -65,10 +64,10 @@ class TestSkillDetailScreen(unittest.IsolatedAsyncioTestCase):
         app = DummyHostApp(screen)
         async with app.run_test() as pilot:
             await pilot.pause()
-            md = screen.query_one(".modal-markdown", Markdown)
-            text = str(md._markdown)
+            text = " ".join(str(m._markdown) for m in screen.query(Markdown))
             self.assertIn("[PROJECT]", text)
             self.assertIn("A useful skill", text)
+
 
     async def test_action_cancel_dismisses_false(self):
         screen = SkillDetailScreen({"name": "alpha"})

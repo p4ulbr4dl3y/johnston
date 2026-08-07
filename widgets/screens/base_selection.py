@@ -43,7 +43,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self.title, classes="modal-markdown")
+            yield Markdown(self.title, classes="modal-markdown modal-markdown-centered")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")

@@ -52,7 +52,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self.title, classes="modal-markdown")
+            yield Markdown(self.title, classes="modal-markdown modal-markdown-centered")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
             yield OptionList(*self.filtered_options, id="modal-option-list")
@@ -122,13 +122,12 @@ class ApiKeyInputScreen(ModalScreen[str | None]):
             masked = self.current_key if self.current_key else "not set"
 
         with Vertical(id="modal-dialog"):
-            yield Markdown(
-                f"### **Connect {self.provider_name}**\n\n"
-                f"Current API Key: `{masked}`",
-                classes="modal-markdown"
-            )
+            yield Markdown(f"### **Connect {self.provider_name}**", classes="modal-markdown modal-markdown-centered")
+            yield Markdown(f"Current API Key: `{masked}`", classes="modal-markdown")
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
             yield Label("enter: save • esc: cancel", id="modal-hint")
+
+
 
     def on_mount(self) -> None:
         self.query_one("#api-key-input", Input).focus()

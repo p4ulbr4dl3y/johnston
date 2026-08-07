@@ -34,7 +34,7 @@ class SubagentViewScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Subagent Details**", classes="modal-markdown")
+            yield Markdown("### **Subagent Details**", classes="modal-markdown modal-markdown-centered")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield Label("esc: cancel", id="modal-hint")
 

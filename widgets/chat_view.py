@@ -1297,6 +1297,13 @@ class ToolCallWidget(Vertical):
                 line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
             plan_lines.append(line)
 
+        for i, pl in enumerate(plan_lines):
+            t.append(pl)
+            if i < len(plan_lines) - 1:
+                t.append("\n")
+
+        return t
+
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         diff_text = self._clean_hints_for_ui(diff_text)
         return format_edit_diff(diff_text, file_path)

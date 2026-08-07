@@ -483,6 +483,23 @@ SubagentViewScreen #modal-dialog {
     margin-bottom: 1;
 }
 
+#wizard-title MarkdownHeader {
+    text-align: center;
+    color: #ffffff;
+    margin: 0 0 1 0;
+}
+
+#wizard-title MarkdownParagraph {
+    text-align: left;
+    color: #e4e4e7;
+    margin: 0;
+}
+
+
+
+
+
+
 #modal-search-input {
     margin: 0 0 1 0;
 }
@@ -519,6 +536,13 @@ SubagentViewScreen #modal-dialog {
 .modal-markdown.confirm-summary MarkdownParagraph {
     margin: 0;
 }
+
+#wizard-title.confirm-summary {
+    margin-bottom: 0;
+}
+
+
+
 
 SubagentViewScreen {
     background: #09090b;

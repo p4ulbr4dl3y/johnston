@@ -33,7 +33,7 @@ class MCPScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Manage MCP Servers**", classes="modal-markdown")
+            yield Markdown("### **Manage MCP Servers**", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search MCP servers...", id="modal-search-input")
             yield OptionList(id="mcp-option-list")
             yield Label("enter: toggle • tab: mode • esc: cancel", id="modal-hint")
