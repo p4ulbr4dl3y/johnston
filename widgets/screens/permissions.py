@@ -112,23 +112,23 @@ class PermissionsScreen(ModalScreen[None]):
             items.append({
                 "type": "scope",
                 "name": "global",
-                "label": "Global Configuration",
-                "desc": "~/.johnston/config.json",
+                "label": "Global",
+                "desc": "",
                 "action": "active" if not self.use_project_scope else "on",
             })
             if self.project_dir:
                 items.append({
                     "type": "scope",
                     "name": "project",
-                    "label": "Project Configuration",
-                    "desc": ".johnston/permissions.json",
+                    "label": "Project",
+                    "desc": "",
                     "action": "active" if self.use_project_scope else "on",
                 })
             else:
                 items.append({
                     "type": "scope",
                     "name": "project",
-                    "label": "Project Configuration",
+                    "label": "Project",
                     "desc": "No active project directory",
                     "action": "off",
                 })
