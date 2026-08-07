@@ -9,7 +9,6 @@ class ModeDefinition:
         self,
         key: str,
         name: str,
-        description: str = "",
         read_only: bool = False,
         prompt: str = "",
         disallowed_tools: Optional[List[str]] = None,
@@ -19,7 +18,6 @@ class ModeDefinition:
     ):
         self.key = key.lower().strip()
         self.name = name
-        self.description = description
         self.read_only = read_only
         self.prompt = prompt
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
@@ -32,7 +30,6 @@ BUILTIN_MODES = {
     "action": ModeDefinition(
         key="action",
         name="Action",
-        description="Execution and implementation mode. Full editing, shell, and task permissions.",
         read_only=False,
         prompt=(
             "## Execution Mode: ACTION\n\n"
@@ -50,7 +47,6 @@ BUILTIN_MODES = {
     "explore": ModeDefinition(
         key="explore",
         name="Explore",
-        description="Read-only mode for Q&A, research, code explanation, architecture review, and planning.",
         read_only=True,
         prompt=(
             "## Execution Mode: EXPLORE\n\n"
@@ -188,7 +184,6 @@ class ModeManager:
             return ModeDefinition(
                 key=key,
                 name=name,
-                description=meta.get("description", ""),
                 read_only=read_only_val,
                 prompt=prompt,
                 disallowed_tools=disallowed_tools,

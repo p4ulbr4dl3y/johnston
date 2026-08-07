@@ -10,14 +10,12 @@ class RuleDefinition:
         self,
         name: str,
         content: str,
-        description: str = "",
         modes: Optional[List[str]] = None,
         globs: Optional[List[str]] = None,
         source: str = "global"
     ):
         self.name = name
         self.content = content
-        self.description = description
         self.modes = [m.lower().strip() for m in (modes or [])]
         self.globs = [g.strip() for g in (globs or [])]
         self.source = source
@@ -100,7 +98,6 @@ class RulesManager:
                             meta[k.strip().lower()] = v.strip().strip("\"'")
 
             name = meta.get("name") or base_name
-            desc = meta.get("description", "")
             modes_raw = meta.get("mode") or meta.get("modes") or ""
             globs_raw = meta.get("globs") or meta.get("glob") or ""
 
@@ -117,7 +114,6 @@ class RulesManager:
             return RuleDefinition(
                 name=name,
                 content=content,
-                description=desc,
                 modes=modes,
                 globs=globs,
                 source=source
