@@ -71,7 +71,7 @@ class PermissionsScreen(ModalScreen[None]):
                 items.append({
                     "type": "group",
                     "name": grp,
-                    "label": f"GROUP: {grp.upper()}",
+                    "label": grp.upper(),
                     "desc": group_descriptions.get(grp, ""),
                     "action": act,
                 })
@@ -101,7 +101,7 @@ class PermissionsScreen(ModalScreen[None]):
                         "type": "tool",
                         "name": t,
                         "group": grp,
-                        "label": f"{t:<16}",
+                        "label": t,
                         "desc": tool_descriptions.get(t, ""),
                         "action": act,
                         "is_override": is_override,
