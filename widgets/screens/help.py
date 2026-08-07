@@ -4,7 +4,9 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
 
-COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
+COMMANDS_MD = """### **Johnston Help**
+
+**[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; **Keybindings**
 
 * `/connect` — Connect AI provider & set API key
 * `/models` — Switch active model across providers
@@ -19,7 +21,9 @@ COMMANDS_MD = """### **[ Commands ]** &nbsp;&nbsp;&nbsp;&nbsp; Keybindings
 * `/resume` — Switch and resume saved session dialogs
 * `/help` — Open this help screen"""
 
-KEYBINDINGS_MD = """### &nbsp;&nbsp; Commands &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybindings ]**
+KEYBINDINGS_MD = """### **Johnston Help**
+
+**Commands** &nbsp;&nbsp;&nbsp;&nbsp; **[ Keybindings ]**
 
 * `Shift+Tab` — Toggle Action / Explore mode
 * `Ctrl+B` — Move active shell tasks to background
