@@ -177,6 +177,25 @@ class ManageSubagentTool(BaseTool):
                 merge_subagent_metrics(subagent, ctx)
                 ctx.refresh_status()
 
+            def _cleanup_followup(acc):
+                # Commit any follow-up changes to the subagent's branch and remove
+                # the (possibly re-attached) worktree, mirroring invoke_subagent.
+                wt_path = session.project_dir
+                wt_branch = session.branch_name
+                if wt_path and wt_branch and os.path.isdir(wt_path):
+                    from core.subagent_worktree import SubagentWorktreeManager
+                    parent_dir = getattr(ctx.app, "project_dir", None) or os.getcwd()
+                    diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
+                        parent_dir, wt_path, wt_branch
+                    )
+                    if has_changes and diff_text:
+                        acc[0] = acc[0].rstrip() + (
+                            f"\n\n[Worktree Branch '{wt_branch}']\n"
+                            f"Changes updated on branch '{wt_branch}'. Run `git merge {wt_branch}` to apply.\n\n"
+                            f"{diff_text}"
+                        )
+                    SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=True)
+
             run_bg = bool(args["background"]) if "background" in args else session.background
             if run_bg:
                 async def _run_msg_bg():
@@ -187,6 +206,7 @@ class ManageSubagentTool(BaseTool):
                     except Exception as err:
                         acc[0] = f"[Subagent message error: {err}]"
                     finally:
+                        _cleanup_followup(acc)
                         _merge_metrics()
                         msg = (
                             f"[System Notification] Follow-up to background subagent '{session.description}' (ID: {session.task_id}) completed.\n"
@@ -206,6 +226,7 @@ class ManageSubagentTool(BaseTool):
                 except Exception as err:
                     return f"ERR: subagent message: {err}"
                 finally:
+                    _cleanup_followup(acc)
                     _merge_metrics()
 
                 return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"
