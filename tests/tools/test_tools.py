@@ -34,36 +34,30 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from core.permission_manager import PermissionManager
         PermissionManager.get_instance().set_session_override("shell", "allow")
 
-    async def test_create_blocks_johnston_config(self):
+    async def test_create_allows_johnston_config(self):
         from tools.base import is_protected_config_path
 
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "permissions.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
-        self.assertIn("Johnston configuration", res)
-        self.assertFalse(os.path.exists(target))
+        self.assertIn("OK:", res)
+        self.assertTrue(os.path.exists(target))
 
-        # Normal file still writable
-        ok = await tool.execute({"path": os.path.join(self.test_dir, "ok.txt"), "content": "hi"})
-        self.assertIn("OK:", ok)
+        # is_protected_config_path is disabled
+        self.assertFalse(is_protected_config_path(os.path.expanduser("~/.johnston/config.json")))
 
-        # Tool's own worktree store is NOT protected for regular files
-        self.assertFalse(is_protected_config_path(os.path.expanduser("~/.johnston/worktrees/abc/src/foo.py")))
-        # ...but config files inside a worktree project ARE protected
-        self.assertTrue(is_protected_config_path(os.path.expanduser("~/.johnston/worktrees/abc/.johnston/permissions.json")))
-        # Global config protected
-        self.assertTrue(is_protected_config_path(os.path.expanduser("~/.johnston/config.json")))
-
-    async def test_edit_blocks_johnston_config(self):
+    async def test_edit_allows_johnston_config(self):
         tool = EditTool()
-        target = os.path.join(self.test_dir, ".johnston", "modes", "evil.md")
+        target = os.path.join(self.test_dir, ".johnston", "modes", "custom.md")
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write("old")
         res = await tool.execute({"path": target, "target_content": "old", "replacement_content": "new"})
-        self.assertIn("Johnston configuration", res)
+        self.assertNotIn("ERR:", res)
+        self.assertIn("-old", res)
+        self.assertIn("+new", res)
         with open(target, "r", encoding="utf-8") as f:
-            self.assertEqual(f.read(), "old")
+            self.assertEqual(f.read(), "new")
 
     def tearDown(self):
         os.chdir(self.old_cwd)

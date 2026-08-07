@@ -292,7 +292,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             action, reason = pm.check_permission(resolved_name, args, project_dir=project_dir)
 
             if action == "deny":
-                return f"ERR: tool '{name}' denied by permission policy ({reason})"
+                return f"ERR: tool '{name}' denied by permission policy"
             elif action == "ask":
                 app_obj = getattr(ctx, "app", None) or app
                 if app_obj and hasattr(app_obj, "push_screen_wait"):
@@ -351,7 +351,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     action, reason = pm.check_permission("call_mcp", args, project_dir=project_dir)
 
     if action == "deny":
-        return f"ERR: tool '{name}' denied by permission policy ({reason})"
+        return f"ERR: tool '{name}' denied by permission policy"
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             from widgets.screens.permission_confirm import PermissionConfirmScreen
