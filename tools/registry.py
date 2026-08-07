@@ -292,15 +292,14 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             elif action == "ask":
                 app_obj = getattr(ctx, "app", None) or app
                 if app_obj and hasattr(app_obj, "push_screen_wait"):
-                    from widgets.screens.confirm_tool import ConfirmToolScreen
-                    screen = ConfirmToolScreen(tool_name=resolved_name, args=args, reason=reason)
+                    from widgets.screens.permission_confirm import PermissionConfirmScreen
+                    screen = PermissionConfirmScreen(tool_name=resolved_name, args=args, reason=reason)
                     res = await app_obj.push_screen_wait(screen)
                     if res == "always_allow":
                         pm.set_session_override(resolved_name, "allow")
                     elif res != "allow":
                         return f"ERR: tool '{name}' execution denied by user"
                 else:
-                    # Non-interactive / headless fallback for 'ask' action
                     return f"ERR: tool '{name}' requires user confirmation ({reason})"
 
             return await tool_inst.execute(args, ctx)
@@ -349,8 +348,8 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return f"ERR: tool '{name}' denied by permission policy ({reason})"
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
-            from widgets.screens.confirm_tool import ConfirmToolScreen
-            screen = ConfirmToolScreen(tool_name=f"mcp:{name}", args=args, reason=reason)
+            from widgets.screens.permission_confirm import PermissionConfirmScreen
+            screen = PermissionConfirmScreen(tool_name=f"mcp:{name}", args=args, reason=reason)
             res = await app_obj.push_screen_wait(screen)
             if res == "always_allow":
                 pm.set_session_override("call_mcp", "allow")
