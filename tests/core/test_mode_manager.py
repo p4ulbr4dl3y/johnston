@@ -11,8 +11,11 @@ class TestModeManager(unittest.TestCase):
         modes = mm.load_modes(include_global=False)
         self.assertIn("action", modes)
         self.assertIn("explore", modes)
+        self.assertIn("orchestrator", modes)
         self.assertFalse(modes["action"].read_only)
         self.assertTrue(modes["explore"].read_only)
+        self.assertFalse(modes["orchestrator"].read_only)
+        self.assertEqual(modes["orchestrator"].name, "Orchestrator")
 
     def test_custom_md_mode_with_frontmatter(self):
         with tempfile.TemporaryDirectory() as tmpdir:

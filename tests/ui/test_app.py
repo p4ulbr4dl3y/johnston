@@ -97,6 +97,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(getattr(app.agent, "mode", "action"), "explore")
             await pilot.press("shift+tab")
             await pilot.pause(0.2)
+            self.assertEqual(getattr(app.agent, "mode", "action"), "orchestrator")
+            await pilot.press("shift+tab")
+            await pilot.pause(0.2)
             self.assertEqual(getattr(app.agent, "mode", "action"), "action")
 
             # 10. Test input height auto-expansion on multiline text insert
