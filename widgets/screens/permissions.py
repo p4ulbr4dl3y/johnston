@@ -139,10 +139,10 @@ class PermissionsScreen(ModalScreen[None]):
 
         return items
 
-    def refresh_list(self) -> None:
+    def refresh_list(self, reset_highlight: bool = False) -> None:
         raw_items = self._get_items_for_active_tab()
         opt_list = self.query_one("#permissions-option-list", OptionList)
-        prev_highlighted = opt_list.highlighted
+        prev_highlighted = opt_list.highlighted if not reset_highlight else None
         opt_list.clear_options()
 
         q = self.search_query.strip().lower()
@@ -177,9 +177,19 @@ class PermissionsScreen(ModalScreen[None]):
                 desc = f" — {it['desc']}" if it.get("desc") else ""
                 opt_list.add_option(f"{status} {it['label']}{override_tag}{desc}")
 
-        if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_items):
+        if reset_highlight:
+            if self.active_tab == 2:  # Scope tab: highlight active scope
+                active_idx = 0
+                for idx, it in enumerate(self.filtered_items):
+                    if it.get("action") == "active":
+                        active_idx = idx
+                        break
+                opt_list.highlighted = active_idx
+            else:  # Groups or Tools tab: highlight first item
+                opt_list.highlighted = 0
+        elif prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_items):
             opt_list.highlighted = prev_highlighted
-        elif self.filtered_items and opt_list.highlighted is None:
+        elif self.filtered_items:
             opt_list.highlighted = 0
 
     def _cycle_action(self, current: str) -> str:
@@ -200,7 +210,7 @@ class PermissionsScreen(ModalScreen[None]):
                     self.use_project_scope = False
                 header_md = self.query_one("#permissions-header-md", Markdown)
                 header_md.update(self._get_header_md())
-                self.refresh_list()
+                self.refresh_list(reset_highlight=True)
                 return
 
             next_act = self._cycle_action(target["action"])
@@ -229,7 +239,7 @@ class PermissionsScreen(ModalScreen[None]):
         self.active_tab = (self.active_tab + delta) % 3
         header_md = self.query_one("#permissions-header-md", Markdown)
         header_md.update(self._get_header_md())
-        self.refresh_list()
+        self.refresh_list(reset_highlight=True)
 
     def _on_key(self, event: events.Key) -> None:
         key = event.key
