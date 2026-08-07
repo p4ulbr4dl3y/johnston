@@ -594,7 +594,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             return mock_responses.pop(0)
 
         with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
-            with unittest.mock.patch("core.base_provider.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="file content result"):
+            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="file content result"):
                 events = []
                 async for evt in agent.stream_steps("Read file test.txt"):
                     events.append(evt)
@@ -700,7 +700,7 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
                 return 10  # history
             return 0
 
-        with unittest.mock.patch("core.base_provider.estimate_tokens", side_effect=fake_estimate):
+        with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
             with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
                 mock_limit.return_value = 100  # threshold = 75
                 with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
