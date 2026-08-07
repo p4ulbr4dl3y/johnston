@@ -1,7 +1,8 @@
 import ast
+import asyncio
 import json
 import re
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 
 def format_api_error(err: Exception) -> str:
@@ -91,3 +92,134 @@ def format_api_error(err: Exception) -> str:
         header = "**API Error:**"
 
     return f"{header} `{msg}`" if msg else f"{header} `Unknown error`"
+
+
+class ErrorHandlingMixin:
+    """Mixin providing retry-classification and vision-error handling for BaseAgent."""
+
+    def _is_retryable_error(self, err: Exception) -> bool:
+        if err is None:
+            return False
+
+        err_str = str(err).lower()
+
+        # 1. HTTP status code check
+        status_code: Optional[int] = getattr(err, "status_code", None)
+        if status_code is None and hasattr(err, "response") and getattr(err, "response", None) is not None:
+            status_code = getattr(err.response, "status_code", None)
+
+        if status_code in (400, 401, 403, 404, 422):
+            return False
+
+        # 2. Non-retryable error terms
+        non_retryable_terms = [
+            "invalid api key", "unauthorized", "authentication",
+            "invalid_api_key", "context_length_exceeded",
+            "context window", "maximum context length",
+            "invalid request", "model_not_found", "permission_denied",
+            "account_deactivated", "billing_not_active"
+        ]
+        if any(term in err_str for term in non_retryable_terms):
+            return False
+
+        # 3. Known non-retryable OpenAI exception types
+        try:
+            import openai
+            if isinstance(err, (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError, openai.NotFoundError)):
+                return False
+        except ImportError:
+            pass
+
+        # 4. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
+        if status_code in (408, 429, 500, 502, 503, 504, 524, 529):
+            return True
+
+        # 5. Asyncio / Runtime timeout errors
+        if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
+            if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
+                return True
+
+        # 6. HTTPX exception types
+        try:
+            import httpx
+            if isinstance(err, (httpx.TimeoutException, httpx.NetworkError)):
+                return True
+            if isinstance(err, httpx.HTTPStatusError):
+                if err.response.status_code in (401, 400, 403, 404, 422):
+                    return False
+                return True
+        except ImportError:
+            pass
+
+        # 7. OpenAI retryable exception types
+        try:
+            import openai
+            if isinstance(err, (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError)):
+                return True
+        except ImportError:
+            pass
+
+        # 8. Fallback retryable terms
+        retryable_terms = [
+            "timeout", "timed out", "rate limit", "429", "500", "502", "503", "504", "524", "529",
+            "connection", "network", "server error", "reset", "refused", "overloaded",
+            "chunk timeout", "service unavailable", "gateway timeout"
+        ]
+        if any(term in err_str for term in retryable_terms):
+            return True
+
+        return False
+
+    def _is_vision_error(self, err: Exception) -> bool:
+        if err is None:
+            return False
+        err_str = str(err).lower()
+        vision_keywords = [
+            "image input",
+            "does not support image",
+            "image_url",
+            "multimodal",
+            "vision",
+            "unsupported image",
+            "no endpoints found that support image",
+            "image input not supported",
+        ]
+        return any(kw in err_str for kw in vision_keywords)
+
+    def _sanitize_vision_error_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        sanitized: List[Dict[str, Any]] = []
+        for msg in messages:
+            if not isinstance(msg, dict):
+                sanitized.append(msg)
+                continue
+
+            role = msg.get("role")
+            content = msg.get("content")
+
+            if role == "user" and isinstance(content, list):
+                has_image_url = any(isinstance(item, dict) and item.get("type") == "image_url" for item in content)
+                if has_image_url:
+                    continue
+
+            if role == "tool":
+                is_img = False
+                img_path = "image"
+                if isinstance(content, dict) and content.get("type") == "image":
+                    is_img = True
+                    img_path = content.get("path", "image")
+                elif isinstance(content, str) and ('"type": "image"' in content or "[Image file:" in content):
+                    is_img = True
+                    path_match = re.search(r"['\"]path['\"]\s*:\s*['\"]([^'\"]+)['\"]", content)
+                    if path_match:
+                        img_path = path_match.group(1)
+
+                if is_img:
+                    msg_copy = dict(msg)
+                    msg_copy["content"] = (
+                        f"ERR: cannot read image '{img_path}' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]"
+                    )
+                    sanitized.append(msg_copy)
+                    continue
+
+            sanitized.append(msg)
+        return sanitized
