@@ -85,7 +85,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_subprocess_creation_exception_cleanup_no_transport(self):
         with (
             patch("tools.shell.is_windows", return_value=False),
-            patch("asyncio.create_subprocess_shell", side_effect=RuntimeError("Subprocess launch failed")),
+            patch.object(ShellTool, "_create_std_process", side_effect=RuntimeError("Subprocess launch failed")),
         ):
             with self.assertRaises(RuntimeError):
                 await self.tool.execute({"command": "echo fail"})
@@ -108,7 +108,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             return await fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.BackgroundTask") as mock_bg_cls,
         ):
             mock_task = MagicMock()
@@ -140,9 +140,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("tools.shell.shell_executable", return_value="/bin/sh"),
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+
             res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, app=mock_app)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Command is running in background", res)
@@ -214,7 +215,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             return await fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
@@ -234,7 +235,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("tools.shell.shell_executable", return_value="/bin/sh"),
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True}, app=mock_app)
@@ -249,7 +250,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p = MagicMock()
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
@@ -269,9 +270,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait.return_value = fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}, app=mock_app))
             await asyncio.sleep(0.01)
 
@@ -323,7 +325,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait = _mock_wait
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "true"}, app=mock_ctx)
@@ -350,7 +352,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             return await fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
@@ -377,7 +379,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError("drain failed")
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
             patch("tools.shell.terminate_process", new_callable=AsyncMock),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
@@ -398,7 +400,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait = _mock_wait
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
@@ -420,7 +422,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait.return_value = fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x"}))
@@ -445,7 +447,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait.return_value = asyncio.Future()
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
@@ -469,7 +471,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait.return_value = asyncio.Future()
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
@@ -503,7 +505,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             return await fut
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.BackgroundTask") as mock_bg_cls,
         ):
             mock_task = MagicMock()
@@ -527,7 +529,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.wait.return_value = asyncio.Future()
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}))
@@ -549,10 +551,11 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p.kill.side_effect = RuntimeError("kill failed")
 
         with (
-            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch("tools.shell.BackgroundTask") as mock_bg_cls,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+
             mock_bg = MagicMock()
             mock_bg.__bool__ = lambda self: False
             mock_bg.background_event = asyncio.Event()

@@ -24,7 +24,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self):
         os.chdir(self.old_cwd)
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     async def test_create_and_read_tool(self):
         file_path = os.path.join(self.test_dir, "test.txt")
