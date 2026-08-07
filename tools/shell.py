@@ -69,15 +69,19 @@ class ShellTool(BaseTool):
 
         if not is_safe and not skip_confirm and ctx.app:
             try:
-                from widgets.modal_screens import ShellConfirmScreen
+                from widgets.screens.permission_confirm import PermissionConfirmScreen
 
-                screen = ShellConfirmScreen(command=cmd, reason=reason)
+                screen = PermissionConfirmScreen(
+                    tool_name="shell",
+                    args={"command": cmd},
+                    reason=reason,
+                )
                 loop = asyncio.get_running_loop()
                 future = loop.create_future()
 
-                def on_dismiss(result: bool) -> None:
+                def on_dismiss(result: Any) -> None:
                     if not future.done():
-                        future.set_result(bool(result))
+                        future.set_result(result in ("allow", "always_allow"))
 
                 ctx.app.push_screen(screen, callback=on_dismiss)
                 confirmed = await future

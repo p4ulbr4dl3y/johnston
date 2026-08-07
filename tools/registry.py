@@ -44,7 +44,8 @@ ALIAS_MAP: Dict[str, str] = {
     "read_file_content": "read",
     "edit_file": "edit",
     "replace_file_content": "edit",
-    "multi_replace_file_content": "multi_edit",
+    "multi_replace_file_content": "edit",
+    "multi_edit": "edit",
     "subagent": "invoke_subagent",
     "spawn_subagent": "invoke_subagent",
     "run_subagent": "invoke_subagent",
@@ -55,7 +56,7 @@ ALIAS_MAP: Dict[str, str] = {
     "modify_file": "edit",
     "str_replace_editor": "edit",
     "replace": "edit",
-    "multi_replace": "multi_edit",
+    "multi_replace": "edit",
     "terminal": "shell",
     "exec": "shell",
     "run_command": "shell",
@@ -142,6 +143,9 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
         "new": "new_str",
         "desc": "description",
         "prompt": "instruction",
+        "replacement_chunks": "edits",
+        "chunks": "edits",
+        "changes": "edits",
     },
     "multi_edit": {
         "path": "target_file",
@@ -236,7 +240,7 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
             if canonical not in normalized or normalized[canonical] is None:
                 normalized[canonical] = v
 
-    if resolved_name == "multi_edit" and isinstance(normalized.get("edits"), list):
+    if resolved_name in ("multi_edit", "edit") and isinstance(normalized.get("edits"), list):
         chunk_aliases = {
             "target_content": "old_str",
             "old_content": "old_str",

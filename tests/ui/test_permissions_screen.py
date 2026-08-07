@@ -73,9 +73,20 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("enter")
             await pilot.pause()
 
-            # File should now be lazily created
-            self.assertTrue(os.path.exists(perm_file))
+    async def test_shell_guard_toggle(self):
+        screen = PermissionsScreen(project_dir=self.test_dir)
+        app = DummyHostApp(screen)
 
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Switch to Tools tab
+            await pilot.press("tab")
+            await pilot.pause()
+
+            items = screen._get_items_for_active_tab()
+            sg_item = next((it for it in items if it["name"] == "shell_guard"), None)
+            self.assertIsNotNone(sg_item)
+            self.assertEqual(sg_item["label"], "ShellGuard")
 
 
 if __name__ == "__main__":

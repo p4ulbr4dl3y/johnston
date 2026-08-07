@@ -11,7 +11,7 @@ class PermissionManager:
 
     GROUPS = {
         "read": {"read", "ask_user", "update_plan", "manage_task", "manage_subagent"},
-        "write": {"create", "edit", "multi_edit"},
+        "write": {"create", "edit"},
         "net": {"web_fetch", "call_mcp"},
         "exec": {"shell", "invoke_subagent"},
     }
@@ -81,11 +81,16 @@ class PermissionManager:
                 data["permissions"] = {}
             perms = data["permissions"]
 
-        section = "groups" if target_type == "group" else "tools"
-        if section not in perms or not isinstance(perms[section], dict):
-            perms[section] = {}
+        if target_type == "shell_guard":
+            if "shell_guard" not in perms or not isinstance(perms["shell_guard"], dict):
+                perms["shell_guard"] = {}
+            perms["shell_guard"]["enabled"] = action in ("allow", "true", "enabled")
+        else:
+            section = "groups" if target_type == "group" else "tools"
+            if section not in perms or not isinstance(perms[section], dict):
+                perms[section] = {}
+            perms[section][target_name] = action
 
-        perms[section][target_name] = action
         atomic_write_json(file_path, data)
 
 
@@ -162,8 +167,7 @@ class PermissionManager:
             if sg_cfg.get("enabled", True):
                 is_safe, reason = analyze_shell_command(command)
                 if not is_safe:
-                    dest_action = sg_cfg.get("destructive_action", "deny").lower()
-                    return dest_action, f"Shell Guard flagged unsafe command: {reason}"
+                    return "deny", f"Shell Guard flagged unsafe command: {reason}"
 
         # 2. Check runtime session overrides
         if canonical_name in self.session_overrides:
