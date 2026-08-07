@@ -77,20 +77,18 @@ class PermissionsScreen(ModalScreen[None]):
                 })
 
         elif self.active_tab == 1:
-            # Tools Tab
-            tool_descriptions = {
-                "read": "Read files and directories",
-                "create": "Create new files",
-                "edit": "Modify file content",
-                "multi_edit": "Multiple file edits",
-                "shell": "Execute shell commands",
-                "ask_user": "Ask user questions",
-                "call_mcp": "Invoke MCP tools",
-                "manage_task": "Manage background tasks",
-                "invoke_subagent": "Spawn background subagent",
-                "manage_subagent": "Control active subagents",
-                "update_plan": "Update task plan",
-                "web_fetch": "Fetch web page content",
+            tool_labels = {
+                "read": "Read",
+                "create": "Create",
+                "edit": "Edit",
+                "shell": "Shell",
+                "ask_user": "AskUser",
+                "call_mcp": "CallMCP",
+                "manage_task": "ManageTask",
+                "invoke_subagent": "InvokeSubagent",
+                "manage_subagent": "ManageSubagent",
+                "update_plan": "UpdatePlan",
+                "web_fetch": "WebFetch",
             }
             tools_cfg = perms.get("tools", {})
             for grp, tool_set in self.pm.GROUPS.items():
@@ -101,11 +99,23 @@ class PermissionsScreen(ModalScreen[None]):
                         "type": "tool",
                         "name": t,
                         "group": grp,
-                        "label": t,
-                        "desc": tool_descriptions.get(t, ""),
+                        "label": tool_labels.get(t, t.capitalize()),
+                        "desc": "",
                         "action": act,
                         "is_override": is_override,
                     })
+                    if t == "shell":
+                        sg_cfg = perms.get("shell_guard", {})
+                        sg_enabled = sg_cfg.get("enabled", True)
+                        items.append({
+                            "type": "shell_guard",
+                            "name": "shell_guard",
+                            "group": "exec",
+                            "label": "ShellGuard",
+                            "desc": "",
+                            "action": "allow" if sg_enabled else "deny",
+                            "is_override": "enabled" in sg_cfg,
+                        })
 
         else:
             # Scope Tab
@@ -161,6 +171,9 @@ class PermissionsScreen(ModalScreen[None]):
                 status = r"\[ACTIVE]" if it["action"] == "active" else (r"\[ON]" if it["action"] == "on" else r"\[N/A]")
                 desc = f" — {it['desc']}" if it.get("desc") else ""
                 opt_list.add_option(f"{status} {it['label']}{desc}")
+            elif it["type"] == "shell_guard":
+                status = r"\[ON]" if it["action"] == "allow" else r"\[OFF]"
+                opt_list.add_option(f"{status} {it['label']}")
             else:
                 act = it["action"].upper()
                 if act == "ALLOW":
@@ -170,9 +183,8 @@ class PermissionsScreen(ModalScreen[None]):
                 else:
                     status = r"\[ASK]"
 
-                override_tag = r" \[OVERRIDE]" if it.get("is_override") else ""
-                desc = f" — {it['desc']}" if it.get("desc") else ""
-                opt_list.add_option(f"{status} {it['label']}{override_tag}{desc}")
+                desc = f" — {it['desc']}" if (it.get("desc") and it.get("type") == "group") else ""
+                opt_list.add_option(f"{status} {it['label']}{desc}")
 
         if reset_highlight:
             if self.active_tab == 2:  # Scope tab: highlight active scope

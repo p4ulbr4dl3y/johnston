@@ -64,7 +64,6 @@ DEFAULT_PERMISSIONS = {
     "tools": {},
     "shell_guard": {
         "enabled": True,
-        "destructive_action": "deny",
     },
 }
 

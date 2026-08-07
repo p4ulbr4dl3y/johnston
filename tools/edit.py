@@ -302,6 +302,10 @@ class EditTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         path = args.get("target_file") or args.get("path", "")
+        chunks = args.get("replacement_chunks") or args.get("ReplacementChunks")
+        if chunks and isinstance(chunks, list):
+            return await _execute_edit_helper(path, chunks, cwd=ctx.cwd)
+
         target_val = args.get("target_content") if "target_content" in args else args.get("old_string", "")
         repl_val = args.get("replacement_content") if "replacement_content" in args else args.get("new_string", "")
         chunk = {

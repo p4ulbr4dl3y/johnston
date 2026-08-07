@@ -39,7 +39,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
 
         def push_screen_side_effect(screen, callback):
-            callback(True)
+            callback("allow")
 
         mock_app.push_screen.side_effect = push_screen_side_effect
 

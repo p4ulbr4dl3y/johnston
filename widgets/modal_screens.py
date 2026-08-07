@@ -8,7 +8,6 @@ from widgets.screens.permission_confirm import PermissionConfirmScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.rewind import RewindScreen
-from widgets.screens.shell_confirm import ShellConfirmScreen
 from widgets.screens.skills import SkillDetailScreen, SkillsScreen
 from widgets.screens.subagents import SubagentsScreen
 from widgets.screens.tasks import TasksListScreen
@@ -18,7 +17,6 @@ __all__ = [
     "AskUserWizardScreen",
     "ConfirmScreen",
     "PermissionConfirmScreen",
-    "ShellConfirmScreen",
     "BaseSelectionScreen",
     "ProvidersScreen",
     "ApiKeyInputScreen",

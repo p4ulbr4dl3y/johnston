@@ -195,9 +195,11 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name in ("shell", "run_command", "bash"):
-                cmd = self.args.get("command") or self.args.get("cmd") or ""
+                cmd = self.args.get("command") or self.args.get("cmd") or self.args.get("command_line") or ""
+                from core.platform_utils import is_windows
+                lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
-                    yield Markdown(f"```bash\n{cmd.strip()}\n```", classes="modal-diff-view")
+                    yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
             elif self.tool_name in ("manage_task", "task") and (self.args.get("action") or "").lower() == "send_input":
                 inp = self.args.get("input") or self.args.get("Input") or ""
                 with ToolScrollBox(classes="tool-scroll-box"):
