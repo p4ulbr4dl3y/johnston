@@ -27,6 +27,8 @@ class SubagentSessionData:
         self.agent: Any = None
         self.agent_history: List[Dict[str, Any]] = []
         self.async_task: Any = None
+        self.project_dir: str = ""
+        self.branch_name: str = ""
 
     def add_event(self, event: Dict[str, Any]) -> None:
         etype = event.get("type", "")
@@ -75,7 +77,9 @@ class SubagentSessionData:
             "session_id": self.session_id,
             "status": self.status,
             "events": self.events,
-            "agent_history": history
+            "agent_history": history,
+            "project_dir": self.project_dir,
+            "branch_name": self.branch_name,
         }
 
     @classmethod
@@ -91,6 +95,8 @@ class SubagentSessionData:
         sess.status = data.get("status", "completed")
         sess.events = data.get("events", [])
         sess.agent_history = data.get("agent_history", [])
+        sess.project_dir = data.get("project_dir", "")
+        sess.branch_name = data.get("branch_name", "")
         return sess
 
 
