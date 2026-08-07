@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Optional
 
 from textual import events
@@ -6,6 +7,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
+from core.config import PROJECT_PERMISSIONS_FILE
 from core.permission_manager import PermissionManager
 
 
@@ -35,8 +37,7 @@ class PermissionsScreen(ModalScreen[None]):
         t0 = "**[ Groups ]**" if self.active_tab == 0 else "Groups"
         t1 = "**[ Tools ]**" if self.active_tab == 1 else "Tools"
         t2 = "**[ Scope ]**" if self.active_tab == 2 else "Scope"
-        scope_name = "Project" if self.use_project_scope else "Global"
-        return f"### {t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2} &nbsp;&nbsp;&nbsp;&nbsp; `({scope_name})`"
+        return f"### {t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2}"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
@@ -117,11 +118,14 @@ class PermissionsScreen(ModalScreen[None]):
                 "action": "active" if not self.use_project_scope else "on",
             })
             if self.project_dir:
+                proj_perm_path = os.path.join(self.project_dir, PROJECT_PERMISSIONS_FILE)
+                exists = os.path.exists(proj_perm_path)
+                desc = ".johnston/permissions.json" if exists else ".johnston/permissions.json (inherits global, created on edit)"
                 items.append({
                     "type": "scope",
                     "name": "project",
                     "label": "Project Configuration",
-                    "desc": ".johnston/permissions.json",
+                    "desc": desc,
                     "action": "active" if self.use_project_scope else "on",
                 })
             else:

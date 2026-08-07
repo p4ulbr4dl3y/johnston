@@ -59,6 +59,24 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
+    async def test_lazy_project_file_creation(self):
+        perm_file = os.path.join(self.test_dir, ".johnston", "permissions.json")
+        self.assertFalse(os.path.exists(perm_file))
+
+        screen = PermissionsScreen(project_dir=self.test_dir)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+
+            # Press enter to edit highlighted group setting in project scope
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # File should now be lazily created
+            self.assertTrue(os.path.exists(perm_file))
+
+
 
 if __name__ == "__main__":
     unittest.main()
