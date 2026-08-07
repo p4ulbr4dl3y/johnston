@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Any, Dict
 
@@ -12,7 +13,25 @@ def _truncate(target: str, max_len: int = 60) -> str:
     return target
 
 
-def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
+def _format_path_display(val: str, cwd: str | None = None) -> str:
+    """Format file path for UI tool chips: relative if inside project root, absolute if outside."""
+    if not isinstance(val, str) or not val:
+        return ""
+    val_str = val.strip()
+    if os.path.isabs(val_str):
+        root = os.path.realpath(cwd or os.getcwd())
+        try:
+            abs_val = os.path.realpath(val_str)
+            if abs_val == root or abs_val.startswith(root + os.sep):
+                rel = os.path.relpath(abs_val, root)
+                if not rel.startswith(".."):
+                    return rel
+        except Exception:
+            pass
+    return val_str
+
+
+def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
     """Build a short, human-readable label describing what a tool call targets.
 
     This is presentation-only metadata for the chat tool chip and is intentionally
@@ -65,7 +84,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
     for key in ("TargetFile", "target_file", "path", "file", "file_path", "filepath", "filename", "image_path"):
         val = args.get(key)
         if isinstance(val, str) and val:
-            return _truncate(val)
+            return _truncate(_format_path_display(val, cwd=cwd))
 
     # Generic: prefer a query/prompt argument when present (e.g., search, subagent)
     q_val = args.get("query") or args.get("prompt")

@@ -8,7 +8,18 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(extract_tool_display("shell", {"command": "ls -la"}), "ls -la")
 
     def test_read_path(self):
-        self.assertEqual(extract_tool_display("read", {"path": "/tmp/x.py"}), "/tmp/x.py")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py"}), "x.py")
+
+    def test_path_formatting_relative_and_absolute(self):
+        import os
+        root = os.path.realpath("/app/project")
+        # File inside project root -> formatted as relative path
+        in_path = os.path.join(root, "src", "main.py")
+        self.assertEqual(extract_tool_display("create", {"TargetFile": in_path}, cwd=root), "src/main.py")
+
+        # File outside project root -> formatted as absolute path
+        out_path = os.path.realpath("/tmp/other/file.py")
+        self.assertEqual(extract_tool_display("create", {"TargetFile": out_path}, cwd=root), out_path)
 
     def test_ask_user_questions(self):
         res = extract_tool_display("ask_user", {"questions": [{"question_text": "Which framework?"}]})

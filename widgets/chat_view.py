@@ -1168,7 +1168,12 @@ class ToolCallWidget(Vertical):
         elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in ("invoke_subagent", "manage_task", "manage_subagent", "ask_user"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
             from core.tool_display import extract_tool_display
-            target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
+            project_dir = None
+            try:
+                project_dir = getattr(self.app, "project_dir", None)
+            except Exception:
+                pass
+            target_str = extract_tool_display(self.tool_type, self.args, cwd=project_dir) if self.args else self.target
             self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
             # Eager MCP tool or custom external tool
