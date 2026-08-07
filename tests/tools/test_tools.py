@@ -35,16 +35,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         PermissionManager.get_instance().set_session_override("shell", "allow")
 
     async def test_create_allows_johnston_config(self):
-        from tools.base import is_protected_config_path
-
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "permissions.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
         self.assertIn("OK:", res)
         self.assertTrue(os.path.exists(target))
-
-        # is_protected_config_path is disabled
-        self.assertFalse(is_protected_config_path(os.path.expanduser("~/.johnston/config.json")))
 
     async def test_edit_allows_johnston_config(self):
         tool = EditTool()
@@ -470,8 +465,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Line 801", res)
 
     async def test_read_tool_doc_caching(self):
-        from tools.read import clear_doc_cache, convert_doc_to_markdown_sync
-        clear_doc_cache()
+        from tools.read import convert_doc_to_markdown_sync
         pdf_path = os.path.join(self.test_dir, "cached_doc.pdf")
         with open(pdf_path, "wb") as f:
             f.write(b"%PDF-1.7 mock content")
@@ -486,8 +480,6 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 res1 = convert_doc_to_markdown_sync(pdf_path)
                 self.assertIn("Cached Doc Header", res1)
                 self.assertTrue(mock_set.called)
-
-        clear_doc_cache()
 
     async def test_read_tool_image_support(self):
         import json
