@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_args, normalize_tool_name
 
@@ -168,6 +168,139 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
              patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("none_mcp", {})
             self.assertEqual(res, "ERR: unknown tool 'none_mcp'")
+
+    def test_normalize_tool_args_non_dict_chunk(self):
+        # Non-dict entries inside the edits list must pass through untouched.
+        norm = normalize_tool_args("multi_edit", {"edits": ["raw", {"search": "a", "replace": "b"}]})
+        self.assertEqual(norm["edits"][0], "raw")
+        self.assertEqual(norm["edits"][1]["old_str"], "a")
+        self.assertEqual(norm["edits"][1]["new_str"], "b")
+
+    def _mock_mode(self, name="action"):
+        mock_mode_def = MagicMock()
+        mock_mode_def.name = name
+        mock_mode_def.disallowed_tools = []
+        mock_mode_mgr = MagicMock()
+        mock_mode_mgr.get_mode.return_value = mock_mode_def
+        return patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr)
+
+    async def test_execute_tool_permission_denied(self):
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("read", {"path": "foo.txt"})
+            self.assertEqual(res, "ERR: tool 'read' denied by permission policy (Policy blocks it)")
+
+    async def test_execute_tool_permission_ask_confirmed(self):
+        mock_app = MagicMock()
+        mock_app.push_screen_wait = AsyncMock(return_value="allow")
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
+        self.assertIn("ERR:", res)
+        mock_app.push_screen_wait.assert_awaited_once()
+
+    async def test_execute_tool_permission_ask_always_allow(self):
+        mock_app = MagicMock()
+        mock_app.push_screen_wait = AsyncMock(return_value="always_allow")
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
+        self.assertIn("ERR:", res)
+        mock_pm.set_session_override.assert_called_once_with("read", "allow")
+
+    async def test_execute_tool_permission_ask_denied_by_user(self):
+        mock_app = MagicMock()
+        mock_app.push_screen_wait = AsyncMock(return_value="no")
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("read", {"path": "foo.txt"}, app=mock_app)
+        self.assertEqual(res, "ERR: tool 'read' execution denied by user")
+
+    async def test_execute_tool_permission_ask_no_app(self):
+        # No interactive app available -> fall back to a textual denial.
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "No interactive app")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("read", {"path": "foo.txt"})
+        self.assertEqual(res, "ERR: tool 'read' requires user confirmation (No interactive app)")
+
+    async def test_execute_tool_mcp_permission_denied(self):
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_deny"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("deny", "MCP policy blocks it")
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
+             self._mock_mode(), \
+             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("mcp_deny", {})
+        self.assertEqual(res, "ERR: tool 'mcp_deny' denied by permission policy (MCP policy blocks it)")
+
+    async def test_execute_tool_mcp_permission_ask_no_app(self):
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_ask"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
+             self._mock_mode(), \
+             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("mcp_ask", {})
+        self.assertEqual(res, "ERR: tool 'mcp_ask' requires user confirmation (Confirm MCP call)")
+
+    async def test_execute_tool_mcp_permission_ask_always_allow(self):
+        mock_app = MagicMock()
+        mock_app.app = mock_app
+        mock_app.push_screen_wait = AsyncMock(return_value="always_allow")
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_allow"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr.call_tool.return_value = "MCP Executed"
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
+             self._mock_mode(), \
+             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("mcp_allow", {"x": 1}, app=mock_app)
+        self.assertEqual(res, "MCP Executed")
+        mock_pm.set_session_override.assert_called_once_with("call_mcp", "allow")
+
+    async def test_execute_tool_mcp_permission_ask_denied_by_user(self):
+        mock_app = MagicMock()
+        mock_app.app = mock_app
+        mock_app.push_screen_wait = AsyncMock(return_value="no")
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_no"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
+             self._mock_mode(), \
+             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("mcp_no", {}, app=mock_app)
+        self.assertEqual(res, "ERR: tool 'mcp_no' execution denied by user")
+
+    async def test_execute_tool_mcp_async_call(self):
+        # Manager class whose type name does not end with "Mock" and which exposes
+        # call_tool_async -> the async MCP invocation branch must be used.
+        class _FakeMCPManager:
+            def get_active_tools(self, mode=None):
+                return []
+
+            def get_capabilities_for_exposed_tool(self, exposed_name):
+                return ["server1"]
+
+            async def call_tool_async(self, tool_name, arguments, target_server=None, timeout=None):
+                return "async mcp output"
+
+        with patch("core.mcp_manager.get_mcp_manager", return_value=_FakeMCPManager()), \
+             self._mock_mode():
+            res = await execute_tool("async_mcp", {"q": 1})
+        self.assertEqual(res, "async mcp output")
 
 
 if __name__ == "__main__":

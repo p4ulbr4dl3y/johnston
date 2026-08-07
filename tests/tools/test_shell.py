@@ -7,7 +7,14 @@ from tools.shell import ShellTool, _new_task_id
 
 class TestShellTool(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        from core.permission_manager import PermissionManager
+        PermissionManager.get_instance().clear_session_overrides()
+        self.config_patcher = patch("core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json")
+        self.config_patcher.start()
         self.tool = ShellTool()
+
+    def tearDown(self):
+        self.config_patcher.stop()
 
     def test_new_task_id(self):
         tid1 = _new_task_id()
@@ -290,6 +297,290 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("test_sync_cleanup", res)
             # Sync task should be removed from app.background_tasks after finishing
             self.assertEqual(len(mock_app.background_tasks), 0)
+
+    async def test_invalid_timeout_value_falls_back_to_default(self):
+        res = await self.tool.execute({"command": "echo hi", "timeout": "abc"})
+        self.assertIn("hi", res)
+
+    async def test_sleep_chain_exceeds_timeout(self):
+        res = await self.tool.execute({"command": "sleep 5", "timeout": 1})
+        self.assertEqual(res, "ERR: sleep duration (5.0s) exceeds timeout (1s)")
+
+    async def test_subagent_no_stdout_stream(self):
+        # p.stdout is None -> the stream reader exits immediately and empty
+        # output is reported instead of hanging.
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+        mock_p.stdout = None
+
+        def _mock_wait():
+            fut = asyncio.Future()
+            fut.set_result(0)
+            return fut
+
+        mock_p.wait = _mock_wait
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "true"}, app=mock_ctx)
+        self.assertEqual(res, "OK: executed (no output)")
+
+    async def test_subagent_read_task_drain_timeout(self):
+        # Process finishes, but draining the read task times out -> ignored.
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+        mock_p.stdout = None
+
+        def _mock_wait():
+            fut = asyncio.Future()
+            fut.set_result(0)
+            return fut
+
+        mock_p.wait = _mock_wait
+
+        async def custom_wait_for(fut, timeout):
+            if timeout == 2.0:
+                raise asyncio.TimeoutError()
+            return await fut
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "true"}, app=mock_ctx)
+        self.assertEqual(res, "OK: executed (no output)")
+
+    async def test_subagent_timeout_read_task_exception_ignored(self):
+        # Subagent timeout path: draining the read task after kill raises a
+        # non-Timeout exception -> swallowed, partial output still reported.
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+        mock_p.stdout = None
+
+        def _mock_wait():
+            return asyncio.Future()  # never resolves
+
+        mock_p.wait = _mock_wait
+
+        async def custom_wait_for(fut, timeout):
+            if timeout == 5.0:
+                raise asyncio.TimeoutError()
+            raise RuntimeError("drain failed")
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
+            patch("tools.shell.terminate_process", new_callable=AsyncMock),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
+        self.assertIn("ERR: timed out after 5s", res)
+
+    async def test_subagent_shell_execution_cancelled(self):
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+
+        mock_p = MagicMock()
+        mock_p.stdout = None
+
+        def _mock_wait():
+            return asyncio.Future()  # never resolves
+
+        mock_p.wait = _mock_wait
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "run_long_task"}))
+            await asyncio.sleep(0.01)
+            exec_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await exec_task
+            mock_term.assert_called_once()
+
+    async def test_move_to_background_with_large_output_truncated(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        fut = asyncio.Future()
+        mock_p.wait.return_value = fut
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x"}))
+            await asyncio.sleep(0.01)
+
+            self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
+            registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
+            registered_bg_task.output = ["y" * 2500]
+            registered_bg_task.move_to_background()
+
+            res = await exec_task
+            self.assertIn("[Background Task ID:", res)
+            self.assertIn("[Output truncated, showing last 2000 chars]", res)
+
+    async def test_timeout_moved_to_background_with_output(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        mock_p.wait.return_value = asyncio.Future()
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
+            await asyncio.sleep(0.01)
+
+            self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
+            registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
+            registered_bg_task.output = ["short output"]
+
+            res = await exec_task
+            self.assertIn("[Background Task ID:", res)
+            self.assertIn("Recent Output:\nshort output", res)
+
+    async def test_timeout_moved_to_background_with_large_output(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        mock_p.wait.return_value = asyncio.Future()
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
+            await asyncio.sleep(0.01)
+
+            self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
+            registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
+            registered_bg_task.output = ["z" * 2500]
+
+            res = await exec_task
+            self.assertIn("[Background Task ID:", res)
+            self.assertIn("[Output truncated, showing last 2000 chars]", res)
+
+    async def test_normal_execution_read_task_drain_timeout(self):
+        # is_background explicitly False so the sync completion branch (and its
+        # 2s read_task drain timeout) is exercised.
+        mock_p = MagicMock()
+
+        async def _mock_wait():
+            return 0
+
+        mock_p.wait = _mock_wait
+
+        loop = asyncio.get_running_loop()
+        dummy_task = loop.create_future()
+        dummy_task.set_result(None)
+
+        async def custom_wait_for(fut, timeout):
+            if timeout == 2.0:
+                raise asyncio.TimeoutError()
+            return await fut
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.BackgroundTask") as mock_bg_cls,
+        ):
+            mock_task = MagicMock()
+            mock_task.background_event = asyncio.Event()
+            mock_task.is_background = False
+            mock_task.read_task = dummy_task
+            mock_task.get_formatted_output.return_value = "drained_output"
+            mock_bg_cls.return_value = mock_task
+
+            with patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for):
+                res = await self.tool.execute({"command": "echo test"})
+                self.assertIn("drained_output", res)
+
+    async def test_execute_cancelled_cleans_up_task(self):
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        mock_p.wait.return_value = asyncio.Future()
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}))
+            await asyncio.sleep(0.01)
+            exec_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await exec_task
+
+    async def test_execute_cancelled_with_falsy_task_kill_error(self):
+        # Cancellation with a falsy BackgroundTask -> falls back to killing the
+        # raw process, and a failing p.kill() must be swallowed.
+        mock_app = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.is_subagent = False
+
+        mock_p = MagicMock()
+        mock_p.wait.return_value = asyncio.Future()
+        mock_p.kill.side_effect = RuntimeError("kill failed")
+
+        with (
+            patch("asyncio.create_subprocess_shell", return_value=mock_p),
+            patch("tools.shell.BackgroundTask") as mock_bg_cls,
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+        ):
+            mock_bg = MagicMock()
+            mock_bg.__bool__ = lambda self: False
+            mock_bg.background_event = asyncio.Event()
+            mock_bg_cls.return_value = mock_bg
+
+            exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}))
+            await asyncio.sleep(0.01)
+            exec_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await exec_task
+
+    async def test_shell_safety_check_always_allow(self):
+        from core.permission_manager import PermissionManager
+        pm = PermissionManager.get_instance()
+        pm.clear_session_overrides()
+
+        mock_app = MagicMock()
+
+        def push_screen_side_effect(screen, callback):
+            callback("always_allow")
+
+        mock_app.push_screen.side_effect = push_screen_side_effect
+
+        with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
+            res = await self.tool.execute({"command": "echo session_allowed"}, app=mock_app)
+            self.assertIn("session_allowed", res)
+            self.assertEqual(pm.session_overrides.get("shell"), "allow")
+            self.assertEqual(pm.session_overrides.get("shell_guard"), "allow")
 
 
 if __name__ == "__main__":
