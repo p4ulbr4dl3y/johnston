@@ -181,11 +181,12 @@ class ReadTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         raw_path = str(args.get("path") or "").strip()
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
             from tools.web_fetch import WebFetchTool
             return await WebFetchTool().execute({"url": raw_path, "raw": bool(args.get("raw", False))}, app=app)
-        path = resolve_path(raw_path)
+        path = resolve_path(raw_path, cwd=ctx.cwd)
         if not os.path.exists(path):
             parent_dir = os.path.dirname(path) or "."
             hint = ""

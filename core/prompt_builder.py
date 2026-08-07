@@ -9,60 +9,60 @@ from typing import Any, Dict, List, Tuple
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
 
-_GIT_INFO_CACHE: Dict[str, Any] = {"ts": 0.0, "val": ""}
+_GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
 _GIT_INFO_CACHE_TTL = 30.0
 
+def get_git_info(cwd: str = None) -> str:
+    """Returns current git branch for a working directory (defaults to os.getcwd()).
 
-def get_git_info() -> str:
-    """Returns current git branch and dirty working tree status safely.
-
-    The result is cached briefly so the multi-step agent loop does not spawn two
-    git subprocesses on every tool-call step. Freezing the git string within a
-    turn also keeps the system prompt byte-identical across steps, which is what
-    makes provider prompt caching (OpenAI auto-cache / Anthropic cache_control)
-    actually hit on steps 2..N of a turn.
+    Cached briefly per-directory so the multi-step agent loop does not spawn two
+    git subprocesses on every tool-call step, and subagents report their own
+    worktree branch instead of the parent checkout's.
     """
+    key = os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())
     now = time.time()
-    if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
-        return _GIT_INFO_CACHE["val"]
+    cached = _GIT_INFO_CACHE.get(key)
+    if cached is not None and now - cached[0] < _GIT_INFO_CACHE_TTL:
+        return cached[1]
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
 
     if loop and loop.is_running():
-        if _GIT_INFO_CACHE["val"]:
-            return _GIT_INFO_CACHE["val"]
-        # Fast path if no cache yet and loop running: run via to_thread or short return
+        if cached is not None:
+            return cached[1]
         try:
-            loop.create_task(get_git_info_async())
+            loop.create_task(get_git_info_async(cwd=cwd))
         except Exception:
             pass
-        return _GIT_INFO_CACHE.get("val", "")
+        return cached[1] if cached else ""
 
-    val = _compute_git_info()
-    _GIT_INFO_CACHE["ts"] = now
-    _GIT_INFO_CACHE["val"] = val
+    val = _compute_git_info(cwd)
+    _GIT_INFO_CACHE[key] = (now, val)
     return val
 
 
-async def get_git_info_async() -> str:
+async def get_git_info_async(cwd: str = None) -> str:
+    key = os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())
     now = time.time()
-    if now - _GIT_INFO_CACHE["ts"] < _GIT_INFO_CACHE_TTL:
-        return _GIT_INFO_CACHE["val"]
-    val = await asyncio.to_thread(_compute_git_info)
-    _GIT_INFO_CACHE["ts"] = now
-    _GIT_INFO_CACHE["val"] = val
+    cached = _GIT_INFO_CACHE.get(key)
+    if cached is not None and now - cached[0] < _GIT_INFO_CACHE_TTL:
+        return cached[1]
+    val = await asyncio.to_thread(_compute_git_info, cwd)
+    _GIT_INFO_CACHE[key] = (now, val)
     return val
 
 
-def _compute_git_info() -> str:
+def _compute_git_info(cwd: str = None) -> str:
+    kw = {} if not cwd else {"cwd": cwd}
     try:
         branch = subprocess.check_output(
             ["git", "branch", "--show-current"],
             stderr=subprocess.DEVNULL,
             text=True,
-            timeout=1
+            timeout=1,
+            **kw,
         ).strip()
         if branch:
             return f"branch '{branch}'"
@@ -70,7 +70,8 @@ def _compute_git_info() -> str:
             ["git", "rev-parse", "--short", "HEAD"],
             stderr=subprocess.DEVNULL,
             text=True,
-            timeout=1
+            timeout=1,
+            **kw,
         ).strip()
         if rev:
             return f"detached HEAD ({rev})"
@@ -79,9 +80,10 @@ def _compute_git_info() -> str:
     return ""
 
 
-def get_project_instructions_snippet() -> str:
-    """Reads AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules, or CONVENTIONS.md from current working directory."""
-    cwd = os.getcwd()
+
+def get_project_instructions_snippet(cwd: str = None) -> str:
+    """Reads AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules, or CONVENTIONS.md from a working directory."""
+    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
     candidates = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
     found_snippets = []
 
@@ -158,12 +160,14 @@ class PromptBuilder:
         mode: str = "action",
         allow_task: bool = True,
         model_name: str = "",
+        cwd: str = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
         self.mode = mode
         self.allow_task = allow_task
         self.model_name = model_name
+        self.cwd = os.path.realpath(cwd) if cwd else None
 
     def build_system_prompt(self) -> str:
         # Cache the fully-built prompt so that across the many tool-call steps of
@@ -171,7 +175,7 @@ class PromptBuilder:
         # stability is what lets provider prompt caching (OpenAI/OpenRouter
         # automatic prefix cache, Anthropic cache_control) hit on steps 2..N and
         # avoid re-billing the ~2-4k token static overhead every step.
-        cwd = os.getcwd()
+        cwd = self.cwd or os.getcwd()
         cache_key = (
             self.base_system_prompt,
             self.mode,
@@ -189,7 +193,7 @@ class PromptBuilder:
         return sys_prompt
 
     def _build_system_prompt_uncached(self) -> str:
-        cwd = os.getcwd()
+        cwd = self.cwd or os.getcwd()
         from core.mcp_manager import get_mcp_manager
         from core.subagent_registry import SubagentRegistry
         mcp_mgr = get_mcp_manager()
@@ -199,7 +203,7 @@ class PromptBuilder:
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
         os_info = f"{platform.system()} {platform.release()}"
-        git_info = get_git_info()
+        git_info = get_git_info(self.cwd)
 
         env_lines = [
             "## Environment Metadata",
@@ -212,7 +216,7 @@ class PromptBuilder:
 
         env_block = "\n".join(env_lines)
 
-        project_snippet = get_project_instructions_snippet()
+        project_snippet = get_project_instructions_snippet(self.cwd)
         rules_snippet = get_rules_snippet(mode=self.mode)
 
         # Stable prefix first (cacheable across turns); volatile env metadata
