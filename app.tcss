@@ -510,6 +510,11 @@ SubagentViewScreen #modal-dialog {
     margin: 0;
 }
 
+.modal-markdown-centered MarkdownParagraph {
+    text-align: center;
+    margin: 0;
+}
+
 .modal-markdown.confirm-summary MarkdownParagraph {
     margin: 0;
 }

@@ -41,7 +41,7 @@ class PermissionsScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self._get_header_md(), id="permissions-header-md", classes="modal-markdown")
+            yield Markdown(self._get_header_md(), id="permissions-header-md", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search permissions...", id="modal-search-input")
             yield OptionList(id="permissions-option-list")
             yield Label("enter: toggle • tab / ←/→: switch tab • esc: close", id="modal-hint")
