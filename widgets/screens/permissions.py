@@ -34,10 +34,10 @@ class PermissionsScreen(ModalScreen[None]):
         self.filtered_items: List[Dict[str, Any]] = []
 
     def _get_header_md(self) -> str:
-        t0 = "**[ Groups ]**" if self.active_tab == 0 else "Groups"
-        t1 = "**[ Tools ]**" if self.active_tab == 1 else "Tools"
-        t2 = "**[ Scope ]**" if self.active_tab == 2 else "Scope"
-        return f"### {t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2}"
+        t0 = "**[ Groups ]**" if self.active_tab == 0 else "**Groups**"
+        t1 = "**[ Tools ]**" if self.active_tab == 1 else "**Tools**"
+        t2 = "**[ Scope ]**" if self.active_tab == 2 else "**Scope**"
+        return f"### **Manage Tool Permissions**\n\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2}"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
