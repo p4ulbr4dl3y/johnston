@@ -10,6 +10,13 @@ from tools.registry import execute_tool
 
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from core.permission_manager import PermissionManager
+        pm = PermissionManager.get_instance()
+        pm.set_session_override("shell", "allow")
+        pm.set_session_override("manage_task", "allow")
+        pm.set_session_override("invoke_subagent", "allow")
+
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()

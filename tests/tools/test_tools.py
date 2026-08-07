@@ -26,11 +26,13 @@ class MockApp:
 
 
 class TestTools(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
+    async def asyncSetUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.test_dir = self.temp_dir.name
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
+        from core.permission_manager import PermissionManager
+        PermissionManager.get_instance().set_session_override("shell", "allow")
 
     def tearDown(self):
         os.chdir(self.old_cwd)
