@@ -112,7 +112,7 @@ class PermissionsScreen(ModalScreen[None]):
             items.append({
                 "type": "scope",
                 "name": "global",
-                "label": "Global",
+                "label": "Global Configuration",
                 "desc": "",
                 "action": "active" if not self.use_project_scope else "on",
             })
@@ -120,7 +120,7 @@ class PermissionsScreen(ModalScreen[None]):
                 items.append({
                     "type": "scope",
                     "name": "project",
-                    "label": "Project",
+                    "label": "Project Configuration",
                     "desc": "",
                     "action": "active" if self.use_project_scope else "on",
                 })
@@ -128,8 +128,8 @@ class PermissionsScreen(ModalScreen[None]):
                 items.append({
                     "type": "scope",
                     "name": "project",
-                    "label": "Project",
-                    "desc": "No active project directory",
+                    "label": "Project Configuration",
+                    "desc": "",
                     "action": "off",
                 })
 
