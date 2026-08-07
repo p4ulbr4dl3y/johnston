@@ -6,11 +6,14 @@ from typing import Any, Dict
 from tools.context import ToolContext
 
 
-def resolve_path(path_str: str | None = None) -> str:
-    """Resolves a path to an absolute path."""
+def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
+    """Resolves a path to an absolute path, optionally relative to a base cwd."""
+    base = os.path.realpath(os.path.abspath(cwd)) if cwd else os.path.realpath(os.getcwd())
     if not path_str:
-        return os.path.realpath(os.getcwd())
-    return os.path.abspath(os.path.expanduser(path_str))
+        return base
+    if os.path.isabs(path_str):
+        return os.path.abspath(os.path.expanduser(path_str))
+    return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
 
 
 def atomic_write_text(path: str, content: str) -> None:
@@ -144,12 +147,9 @@ class BaseTool:
             return ctx_or_app
         if not ctx_or_app:
             return ToolContext(app=None)
-        if hasattr(ctx_or_app, "app") and not hasattr(ctx_or_app, "push_screen") and getattr(ctx_or_app, "app", None) is not None:
-            app = ctx_or_app.app
-        else:
-            app = ctx_or_app
-        is_sub = getattr(ctx_or_app, "is_subagent", False) or (getattr(app, "is_subagent", False) if app else False)
-        return ToolContext(app=app, is_subagent=is_sub)
+        # Pass the agent through to ToolContext so it can extract the host app,
+        # subagent flag, and working directory (cwd/project_dir) it carries.
+        return ToolContext(app=ctx_or_app)
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         raise NotImplementedError

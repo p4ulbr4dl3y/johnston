@@ -31,7 +31,8 @@ class CreateTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        path = resolve_path(args.get("path"))
+        ctx = self._ensure_context(app)
+        path = resolve_path(args.get("path"), cwd=ctx.cwd)
         if os.path.isdir(path):
             return f"ERR: '{path}' is a directory"
 

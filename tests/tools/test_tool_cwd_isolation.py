@@ -1,0 +1,135 @@
+import os
+import tempfile
+import unittest
+
+from tools.base import resolve_path
+from tools.context import ToolContext
+
+
+class MockTextualApp:
+    """Minimal stand-in for the real Textual app (has push_screen)."""
+
+    def __init__(self):
+        self.background_tasks = []
+        self.current_session_id = None
+
+    def push_screen(self, screen, callback=None):
+        raise NotImplementedError
+
+
+def make_agent(app, cwd=None, is_subagent=False):
+    """Build a real BaseAgent wired like a (sub)agent with an optional worktree cwd."""
+    from core.base_provider import BaseAgent
+
+    agent = BaseAgent(api_key="", base_url="", model="")
+    agent.app = app
+    if cwd is not None:
+        agent.cwd = cwd
+        agent.project_dir = cwd
+    agent.is_subagent = is_subagent
+    return agent
+
+
+class TestToolContextCwdIsolation(unittest.TestCase):
+    def test_agent_unwrap_to_host_app(self):
+        host = MockTextualApp()
+        with tempfile.TemporaryDirectory() as base:
+            agent = make_agent(host, cwd=base, is_subagent=True)
+            ctx = ToolContext(agent)
+            self.assertIs(ctx.app, host)
+            self.assertTrue(ctx.is_subagent)
+            self.assertEqual(ctx.cwd, os.path.realpath(base))
+
+    def test_agent_untrusted_nonexistent_cwd_ignored(self):
+        host = MockTextualApp()
+        agent = make_agent(host, cwd="/definitely/not/a/real/dir", is_subagent=True)
+        ctx = ToolContext(agent)
+        self.assertIs(ctx.app, host)
+        self.assertTrue(ctx.is_subagent)
+        self.assertIsNone(ctx.cwd)
+
+    def test_main_agent_no_isolation(self):
+        host = MockTextualApp()
+        agent = make_agent(host)
+        ctx = ToolContext(agent)
+        self.assertIs(ctx.app, host)
+        self.assertFalse(ctx.is_subagent)
+        self.assertIsNone(ctx.cwd)
+
+    def test_subagent_keeps_cwd(self):
+        with tempfile.TemporaryDirectory() as base:
+            ctx = ToolContext(None, is_subagent=True, cwd=base)
+            self.assertTrue(ctx.is_subagent)
+            self.assertEqual(ctx.cwd, os.path.realpath(base))
+
+
+class TestResolvePathCwd(unittest.TestCase):
+    def test_relative_resolved_against_cwd(self):
+        with tempfile.TemporaryDirectory() as base:
+            resolved = resolve_path("a/b.txt", cwd=base)
+            self.assertTrue(os.path.isabs(resolved))
+            self.assertTrue(resolved.startswith(os.path.realpath(base)))
+
+    def test_absolute_ignores_cwd(self):
+        with tempfile.TemporaryDirectory() as base, tempfile.TemporaryDirectory() as other:
+            resolved = resolve_path(os.path.join(other, "x.txt"), cwd=base)
+            self.assertTrue(os.path.realpath(resolved).startswith(os.path.realpath(other)))
+
+    def test_empty_path_returns_cwd(self):
+        with tempfile.TemporaryDirectory() as base:
+            self.assertEqual(resolve_path("", cwd=base), os.path.realpath(base))
+
+
+class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
+    async def test_shell_uses_ctx_cwd_as_process_cwd(self):
+        from tools.shell import ShellTool
+
+        tool = ShellTool()
+        with tempfile.TemporaryDirectory() as base:
+            ctx = ToolContext(None, is_subagent=True, cwd=base)
+            res = await tool.execute({"command": "pwd"}, ctx)
+            self.assertIn(os.path.realpath(base), res)
+
+    async def test_shell_uses_cwd_from_agent(self):
+        from tools.shell import ShellTool
+
+        tool = ShellTool()
+        with tempfile.TemporaryDirectory() as base:
+            host = MockTextualApp()
+            agent = make_agent(host, cwd=base, is_subagent=True)
+            res = await tool.execute({"command": "pwd"}, agent)
+            self.assertIn(os.path.realpath(base), res)
+
+
+class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
+    async def test_create_writes_to_rel_path_under_agent_cwd(self):
+        from tools.create import CreateTool
+
+        tool = CreateTool()
+        with tempfile.TemporaryDirectory() as base:
+            host = MockTextualApp()
+            agent = make_agent(host, cwd=base, is_subagent=True)
+            res = await tool.execute({"path": "subdir/newfile.txt", "content": "hello"}, agent)
+            self.assertNotIn("ERR:", res, res)
+            target = os.path.join(base, "subdir", "newfile.txt")
+            self.assertTrue(os.path.isfile(target))
+            with open(target, encoding="utf-8") as f:
+                self.assertEqual(f.read().rstrip(), "hello")
+
+
+class TestPromptBuilderCwd(unittest.TestCase):
+    def test_system_prompt_shows_agent_cwd(self):
+        from core.prompt_builder import PromptBuilder
+
+        with tempfile.TemporaryDirectory() as base:
+            with open(os.path.join(base, "AGENTS.md"), "w", encoding="utf-8") as f:
+                f.write("# Worktree rules\nDo work only here.\n")
+            builder = PromptBuilder("You are X.", [], model_name="m", cwd=base)
+            prompt = builder.build_system_prompt()
+            self.assertIn(base, prompt)
+            self.assertIn("Working Directory", prompt)
+            self.assertIn("Worktree rules", prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()

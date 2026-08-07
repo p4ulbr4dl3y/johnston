@@ -87,7 +87,8 @@ class ShellTool(BaseTool):
                 return f"ERR: permission prompt: {e}"
 
         env = shell_env()
-        p = await self._create_std_process(cmd, env)
+        proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
+        p = await self._create_std_process(cmd, env, cwd=proc_cwd)
 
         run_in_bg = bool(args.get("run_in_background", False))
 
@@ -240,20 +241,21 @@ class ShellTool(BaseTool):
                 if ctx.app and hasattr(ctx.app, "background_tasks") and task in ctx.app.background_tasks:
                     ctx.app.background_tasks.remove(task)
 
-    async def _create_std_process(self, command: str, env: dict[str, str]):
+    async def _create_std_process(self, command: str, env: dict[str, str], cwd: str = None):
         if is_windows():
-            return await self._create_windows_process(command, env)
+            return await self._create_windows_process(command, env, cwd=cwd)
         return await asyncio.create_subprocess_shell(
             command,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
+            cwd=cwd,
             executable=shell_executable(),
             **shell_subprocess_kwargs(),
         )
 
-    async def _create_windows_process(self, command: str, env: dict[str, str]):
+    async def _create_windows_process(self, command: str, env: dict[str, str], cwd: str = None):
         shell = shell_executable()
         if shell and shell.lower().endswith(("pwsh.exe", "pwsh", "powershell.exe", "powershell")):
             return await asyncio.create_subprocess_exec(
@@ -268,6 +270,7 @@ class ShellTool(BaseTool):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
+                cwd=cwd,
                 **shell_subprocess_kwargs(),
             )
         if shell and shell.lower().endswith(("cmd.exe", "cmd")):
@@ -281,6 +284,7 @@ class ShellTool(BaseTool):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
+                cwd=cwd,
                 **shell_subprocess_kwargs(),
             )
         return await asyncio.create_subprocess_shell(
@@ -289,5 +293,6 @@ class ShellTool(BaseTool):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
+            cwd=cwd,
             **shell_subprocess_kwargs(),
         )

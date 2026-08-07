@@ -251,8 +251,8 @@ def apply_chunk_replacements(
     return new_content, diff_output
 
 
-async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]]) -> str:
-    path = resolve_path(path_arg)
+async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> str:
+    path = resolve_path(path_arg, cwd=cwd)
     if not path or not os.path.exists(path):
         return f"ERR: file '{path}' not found"
     if os.path.isdir(path):
@@ -300,6 +300,7 @@ class EditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         path = args.get("target_file") or args.get("path", "")
         target_val = args.get("target_content") if "target_content" in args else args.get("old_string", "")
         repl_val = args.get("replacement_content") if "replacement_content" in args else args.get("new_string", "")
@@ -310,7 +311,7 @@ class EditTool(BaseTool):
             "end_line": args.get("end_line"),
             "allow_multiple": args.get("allow_multiple", False),
         }
-        return await _execute_edit_helper(path, [chunk])
+        return await _execute_edit_helper(path, [chunk], cwd=ctx.cwd)
 
 
 class MultiEditTool(BaseTool):
@@ -345,7 +346,8 @@ class MultiEditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        ctx = self._ensure_context(app)
         path = args.get("target_file") or args.get("path", "")
         raw_chunks = args.get("replacement_chunks") or args.get("chunks") or []
-        return await _execute_edit_helper(path, raw_chunks)
+        return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)
 

@@ -176,6 +176,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env={"ENV": "1"},
+                cwd=None,
                 **shell_subprocess_kwargs(),
             )
 
