@@ -1229,12 +1229,12 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget = ToolCallWidget("shell", "cmd")
         multi = widget._lex_block_to_line_texts(["x = 1", "", "y = 2"], None)
         self.assertEqual(len(multi), 3)
-        with patch("widgets.chat_view.pygments.lex", side_effect=Exception("boom")):
+        with patch("widgets.chat_tools.pygments.lex", side_effect=Exception("boom")):
             fallback = widget._lex_block_to_line_texts(["z"], object())
         self.assertEqual(fallback[0].plain, "z")
         from pygments.token import Token
 
-        with patch("widgets.chat_view.pygments.lex", return_value=iter([(Token.Text, "only one line")])):
+        with patch("widgets.chat_tools.pygments.lex", return_value=iter([(Token.Text, "only one line")])):
             padded = widget._lex_block_to_line_texts(["a", "b", "c"], object())
         self.assertEqual(len(padded), 3)
 
@@ -1490,7 +1490,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
     def test_render_content_create_syntax_exception_fallback(self):
         w = self._widget("create", "", args={"content": "print(1)", "path": "f.py"})
-        with patch("widgets.chat_view.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("widgets.chat_tools.TransparentSyntax", side_effect=Exception("boom")):
             w.render_content()
         self.assertTrue(w.content_widget.display)
 
@@ -1556,7 +1556,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w2.render_content()
 
         w3 = self._widget("web_fetch", "def f():\n    pass", args={"url": "http://x/code.py", "raw": True})
-        with patch("widgets.chat_view.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("widgets.chat_tools.TransparentSyntax", side_effect=Exception("boom")):
             w3.render_content()
 
     def test_render_content_read_error_and_fallback(self):
@@ -1571,7 +1571,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w2.render_content()
 
         w3 = self._widget("read", "def f():\n    return 1", args={"path": "f.py"})
-        with patch("widgets.chat_view.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("widgets.chat_tools.TransparentSyntax", side_effect=Exception("boom")):
             w3.render_content()
         self.assertTrue(w3.content_widget.display)
 
@@ -1586,7 +1586,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
     def test_render_content_get_mcp_schema_exception(self):
         w = self._widget("get_mcp_schema", '{"server": "s"}', args={"server": "srv", "tool": "tool"})
-        with patch("widgets.chat_view.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("widgets.chat_tools.TransparentSyntax", side_effect=Exception("boom")):
             w.render_content()
 
     def test_render_content_read_branches(self):

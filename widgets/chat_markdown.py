@@ -1,0 +1,326 @@
+import asyncio
+import inspect
+import re
+import warnings
+from typing import Any
+
+from markdown_it import MarkdownIt
+from pygments.lexers import get_lexer_by_name
+from pygments.token import Token
+from rich.segment import Segment
+from rich.syntax import Syntax
+from textual.app import ComposeResult
+from textual.color import Color
+from textual.containers import Horizontal, Vertical
+from textual.highlight import HighlightTheme
+from textual.style import Style
+from textual.widgets import Button, Label, Markdown, Static
+from textual.widgets._markdown import (
+    MarkdownBlock,
+    MarkdownFence,
+    MarkdownTable,
+    MarkdownTableCellContents,
+    MarkdownTableContent,
+)
+
+warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
+
+
+class TransparentSyntax(Syntax):
+    """Rich Syntax renderable with transparent token background to allow TCSS styling."""
+
+    def _get_syntax(self, console: Any, options: Any):
+        for segment in super()._get_syntax(console, options):
+            if segment.style and segment.style.bgcolor:
+                style = segment.style.copy()
+                style._bgcolor = None
+                yield Segment(segment.text, style, segment.control)
+            else:
+                yield segment
+
+CODE_THEME = "one-dark"
+
+
+def to_snake_case(name: str) -> str:
+    if not name:
+        return ""
+    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", str(name))
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s)
+    s = re.sub(r"[-\s]+", "_", s)
+    return s.lower()
+
+
+class CustomMarkdownTableContent(MarkdownTableContent):
+    """Custom Markdown table content without cell hover tooltips."""
+
+    def compose(self) -> ComposeResult:
+        for header in self.headers:
+            yield MarkdownTableCellContents(header, classes="header")
+        for row_index, row in enumerate(self.rows, 1):
+            for cell_index, cell in enumerate(row, 1):
+                yield MarkdownTableCellContents(
+                    cell,
+                    classes=f"row{row_index} cell",
+                    name=f"cell{row_index}.{cell_index}",
+                )
+            self.last_row = row_index
+
+    async def _update_rows(self, updated_rows: list[Any]) -> None:
+        self.styles.grid_size_columns = len(self.headers)
+        await self.query_children(f".cell.row{self.last_row}").remove()
+        new_cells: list[Static] = []
+        for row_index, row in enumerate(updated_rows, self.last_row):
+            for cell in row:
+                new_cells.append(
+                    Static(
+                        cell,
+                        markup=False,
+                        classes=f"row{row_index} cell",
+                    )
+                )
+        self.last_row = row_index
+        await self.mount_all(new_cells)
+
+    def on_mount(self) -> None:
+        self.styles.grid_size_columns = len(self.headers)
+        for child in self.query("*"):
+            child.tooltip = None
+
+
+class CustomMarkdownTable(MarkdownTable):
+    """Custom Markdown table block using CustomMarkdownTableContent."""
+
+    def compose(self) -> ComposeResult:
+        headers, rows = self._get_headers_and_rows()
+        self._headers = headers
+        self._rows = rows
+        yield CustomMarkdownTableContent(headers, rows)
+
+
+class CustomMarkdownFence(MarkdownFence):
+    """Markdown code block with a header line and Copy button."""
+
+    DEFAULT_CSS = """
+    CustomMarkdownFence {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        overflow: hidden hidden;
+    }
+    """
+
+    @property
+    def allow_horizontal_scroll(self) -> bool:
+        return False
+
+
+
+    def compose(self) -> ComposeResult:
+        lang_str = self.lexer.strip() if self.lexer else "code"
+        copy_btn = Button("copy", classes="fence-copy-btn")
+        copy_btn.can_focus = False
+        with Horizontal(classes="fence-header"):
+            yield Label(lang_str, classes="fence-lang")
+            yield copy_btn
+
+        clean_lang = (self.lexer or "").strip().lower()
+        if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
+            target_lexer = "text"
+        else:
+            try:
+                get_lexer_by_name(clean_lang)
+                target_lexer = clean_lang
+            except Exception:
+                target_lexer = "text"
+
+        theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
+        code_content = TransparentSyntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default")
+        if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
+            code_content.code = code_content.code.rstrip("\r\n")
+        with Vertical(classes="fence-scroll-box"):
+            yield Label(code_content, id="code-content", expand=True)
+
+    def set_content(self, content: Any) -> None:
+        self._content = content
+        if hasattr(content, "code") and isinstance(getattr(content, "code", None), str):
+            content.code = content.code.rstrip("\r\n")
+        if hasattr(content, "word_wrap"):
+            content.word_wrap = False
+        try:
+            self.query_one("#code-content", Label).update(content)
+        except Exception:
+            pass
+
+    def render(self):
+        return ""
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if "fence-copy-btn" in event.button.classes:
+            try:
+                app = self.app
+                if hasattr(app, "copy_to_clipboard"):
+                    app.copy_to_clipboard(self.code)
+            except Exception:
+                pass
+            event.stop()
+
+
+HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
+HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
+HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
+HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
+
+Markdown.BLOCKS["fence"] = CustomMarkdownFence
+Markdown.BLOCKS["code_block"] = CustomMarkdownFence
+Markdown.BLOCKS["table"] = CustomMarkdownTable
+
+def _custom_markdown_parser_factory() -> MarkdownIt:
+    md = MarkdownIt("gfm-like", {"linkify": False})
+    md.validateLink = lambda url: True
+    return md
+
+
+
+_old_markdown_init = Markdown.__init__
+def _new_markdown_init(self, *args, **kwargs):
+    if "parser_factory" not in kwargs or kwargs["parser_factory"] is None:
+        kwargs["parser_factory"] = _custom_markdown_parser_factory
+    self.BLOCKS = dict(self.BLOCKS)
+    self.BLOCKS["fence"] = CustomMarkdownFence
+    self.BLOCKS["code_block"] = CustomMarkdownFence
+    self.BLOCKS["table"] = CustomMarkdownTable
+    _old_markdown_init(self, *args, **kwargs)
+Markdown.__init__ = _new_markdown_init
+
+
+_old_markdown_block_get_style = MarkdownBlock._get_style
+def _new_markdown_block_get_style(self, style):
+    if style == ".code_inline":
+        return Style(
+            background=Color(39, 39, 42),
+            foreground=Color(255, 255, 255),
+        )
+    return _old_markdown_block_get_style(self, style)
+MarkdownBlock._get_style = _new_markdown_block_get_style
+
+
+
+
+def _handle_markdown_task_done(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    try:
+        task.exception()
+    except (asyncio.CancelledError, Exception):
+        pass
+
+
+def clean_markdown_for_rendering(text: str) -> str:
+    """Preprocesses LLM markdown text to fix common rendering glitches in Textual:
+    - Double bullet markers (e.g. '   * * item' or ' - * item')
+    - Blockquote + bullet markers (e.g. ' > * item')
+    - Word-ending italic colon syntax ('*Text:*' -> '**Text:**')
+    - Unpaired single leading asterisks before words ('*Wait, ...' -> 'Wait, ...')
+    - Excessive list indentation capped to 8 spaces
+    - Unclosed code blocks during streaming
+    """
+    if not text:
+        return ""
+
+    text = text.replace("\r\n", "\n").expandtabs(4)
+    lines = text.splitlines()
+
+    in_code = False
+    cleaned = []
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_code = not in_code
+            cleaned.append(line)
+            continue
+
+        if in_code:
+            cleaned.append(line)
+            continue
+
+        line = re.sub(r"(?<!\*)\*([^*:]+):\*(?!\*)", r"**\1:**", line)
+        line = re.sub(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+", r"\1* ", line)
+        line = re.sub(r"^(\s*>\s*)[-*]\s+", r"\1", line)
+
+        m_list = re.match(r"^(\s*(?:[-*]|\d+\.))\s+(.*)", line)
+        if m_list:
+            prefix, body = m_list.groups()
+            if body.count("*") == 1:
+                body = body.replace("*", "")
+            line = f"{prefix} {body}"
+        elif line.count("*") == 1:
+            line = line.replace("*", "")
+
+        m = re.match(r"^(\s+)([-*]|\d+\.)\s+(.*)", line)
+        if m:
+            indent, marker, content = m.groups()
+            new_indent_len = min(len(indent), 8)
+            line = (" " * new_indent_len) + marker + " " + content
+
+        cleaned.append(line)
+
+    if in_code:
+        cleaned.append("```")
+
+    result = "\n".join(cleaned)
+    return re.sub(r"\n{3,}", "\n\n", result)
+
+
+def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) -> None:
+    """Updates Markdown widget safely without creating unawaited coroutines when unattached."""
+    if not getattr(widget, "is_attached", True):
+        return
+    cleaned = clean_markdown_for_rendering(content)
+    try:
+        res = widget.update(cleaned)
+        if inspect.isawaitable(res):
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    task = loop.create_task(res)
+                    def _done_cb(t: asyncio.Task) -> None:
+                        _handle_markdown_task_done(t)
+                        if on_done:
+                            on_done()
+                    task.add_done_callback(_done_cb)
+                    return
+            except RuntimeError:
+                pass
+        if on_done:
+            on_done()
+    except Exception:
+        if on_done:
+            on_done()
+
+
+TOKEN_COLORS = {
+    Token.Keyword: "#c678dd",
+    Token.Keyword.Namespace: "#c678dd",
+    Token.Keyword.Type: "#e5c07b",
+    Token.Keyword.Declaration: "#c678dd",
+    Token.Name.Function: "#61afef",
+    Token.Name.Class: "#e5c07b",
+    Token.Name.Tag: "#e06c75",
+    Token.Name.Attribute: "#d19a66",
+    Token.Name.Property: "#e06c75",
+    Token.Name.Variable: "#e06c75",
+    Token.Name.Constant: "#d19a66",
+    Token.Name.Builtin: "#e5c07b",
+    Token.Name.Label: "#61afef",
+    Token.Name.Entity: "#56b6c2",
+    Token.Name.Decorator: "#61afef",
+    Token.Name.Other: "#e06c75",
+    Token.Name: "#e06c75",
+    Token.String: "#98c379",
+    Token.String.Doc: "#98c379",
+    Token.Number: "#d19a66",
+    Token.Number.Hex: "#d19a66",
+    Token.Literal: "#d19a66",
+    Token.Operator: "#56b6c2",
+    Token.Punctuation: "#abb2bf",
+    Token.Comment: "#7f848e italic",
+}
