@@ -313,7 +313,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         ]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
             adapter = OpenAIAdapter()
             events = [e async for e in adapter.stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
@@ -328,7 +328,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         ]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
             adapter = OpenAIAdapter()
             events = [e async for e in adapter.stream_chat("http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "shell"}}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
@@ -340,7 +340,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         chunks = [_MockChunk(choices=[_MockChoice(_MockDelta(content="x"))])]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
             _ = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [], max_tokens=100)]
         self.assertEqual(mock_client.chat.completions.create.call_args.kwargs["max_tokens"], 100)
 
@@ -355,7 +355,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"message_delta","usage":{"output_tokens":5}}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello")
@@ -371,7 +371,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"content_block_stop","index":0}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
@@ -384,7 +384,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
             'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
         ]
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello")
@@ -393,7 +393,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_function_call(self):
         lines = ['data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"shell","args":{"command":"ls"}}}]}}]}']
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
@@ -407,7 +407,7 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             '{"message":{"content":" world"},"done":false}',
             '{"done":true,"prompt_eval_count":10,"eval_count":5}',
         ]
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello world")
@@ -419,7 +419,7 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             '{"message":{"content":"","tool_calls":[{"function":{"name":"shell","arguments":{"command":"ls"}}}]},"done":false}',
             '{"done":true,"prompt_eval_count":5,"eval_count":0}',
         ]
-        with patch("core.adapters.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
@@ -505,7 +505,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
                             yield ""
                 return _CM()
 
-        with patch("core.adapters.httpx.AsyncClient", return_value=_CaptureClient()):
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
                 "http://x", "k", "m",
                 [{"role": "system", "content": "You are helpful."}, {"role": "user", "content": "hi"}],
@@ -546,7 +546,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
                             yield ""
                 return _CM()
 
-        with patch("core.adapters.httpx.AsyncClient", return_value=_CaptureClient()):
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
                 "http://x", "k", "m", [{"role": "user", "content": "hi"}],
             ):
@@ -567,7 +567,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
         chunks = [_MockChunk(choices=[], usage=_UsageWithCache())]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
             events = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         usage = [e for e in events if e[0] == "adapter_usage"]
         self.assertEqual(usage[0][1]["cache_read_tokens"], 40)

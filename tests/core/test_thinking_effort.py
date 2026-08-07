@@ -156,7 +156,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
                 'data: {"type":"message_stop"}',
             ]
 
-        with unittest.mock.patch("core.adapters.httpx.AsyncClient", Client):
+        with unittest.mock.patch("core.adapters.anthropic.httpx.AsyncClient", Client):
             async for _ in AnthropicAdapter().stream_chat("", "key", "claude-test", [{"role": "user", "content": "hi"}], thinking_effort="medium"):
                 pass
         self.assertEqual(_FakeHttpClient.captured_payload["output_config"], {"effort": "medium"})
@@ -167,7 +167,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
         class Client(_FakeHttpClient):
             lines = ['data: {"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}']
 
-        with unittest.mock.patch("core.adapters.httpx.AsyncClient", Client):
+        with unittest.mock.patch("core.adapters.gemini.httpx.AsyncClient", Client):
             async for _ in GeminiAdapter().stream_chat("", "key", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high"):
                 pass
         self.assertEqual(
@@ -181,7 +181,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
         class Client(_FakeHttpClient):
             lines = ['{"done": true, "prompt_eval_count": 1, "eval_count": 1}']
 
-        with unittest.mock.patch("core.adapters.httpx.AsyncClient", Client):
+        with unittest.mock.patch("core.adapters.ollama.httpx.AsyncClient", Client):
             async for _ in OllamaAdapter().stream_chat("", "", "qwen3", [{"role": "user", "content": "hi"}], thinking_effort="low"):
                 pass
         self.assertEqual(_FakeHttpClient.captured_payload["think"], "low")

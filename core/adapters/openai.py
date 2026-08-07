@@ -1,0 +1,146 @@
+import json
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+
+from openai import AsyncOpenAI
+
+from core.adapters.base import BaseApiAdapter
+from core.thinking_effort import build_openai_thinking_kwargs
+
+
+def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Formates OpenAI tool messages containing image JSON by extracting clean string content for tool role and appending image_url user messages after tool response blocks."""
+    formatted: List[Dict[str, Any]] = []
+    i = 0
+    n = len(messages)
+    while i < n:
+        msg = messages[i]
+        if not isinstance(msg, dict):
+            formatted.append(msg)
+            i += 1
+            continue
+
+        role = msg.get("role")
+        if role == "tool":
+            tool_batch: List[Dict[str, Any]] = []
+            pending_user_images: List[Dict[str, Any]] = []
+
+            while i < n and isinstance(messages[i], dict) and messages[i].get("role") == "tool":
+                curr_msg = messages[i]
+                tcontent = curr_msg.get("content", "")
+                parsed_img = None
+                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+                    parsed_img = tcontent
+                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+                    try:
+                        data = json.loads(tcontent)
+                        if isinstance(data, dict) and data.get("type") == "image":
+                            parsed_img = data
+                    except Exception:
+                        pass
+
+                if parsed_img and parsed_img.get("base64"):
+                    summary_text = parsed_img.get("summary", "[Image content]")
+                    media_type = parsed_img.get("media_type", "image/jpeg")
+                    b64_data = parsed_img.get("base64")
+                    detail_val = parsed_img.get("detail", "high")
+
+                    tool_msg = dict(curr_msg)
+                    tool_msg["content"] = summary_text
+                    tool_batch.append(tool_msg)
+
+                    pending_user_images.append({
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"Image preview ({summary_text}):"},
+                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val}}
+                        ]
+                    })
+                else:
+                    tool_batch.append(curr_msg)
+                i += 1
+
+            formatted.extend(tool_batch)
+            formatted.extend(pending_user_images)
+            continue
+
+        formatted.append(msg)
+        i += 1
+
+    return formatted
+
+
+class OpenAIAdapter(BaseApiAdapter):
+    """Adapter for OpenAI-compatible Chat Completions API.
+
+    The main agent loop talks to AsyncOpenAI directly on the canonical OpenAI
+    path (to access reasoning_content and per-chunk usage). This adapter is used
+    as a uniform fallback for OpenAI-compatible providers reached via the
+    adapter branch, and yields the same normalized event protocol as the other
+    adapters.
+    """
+
+    async def stream_chat(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
+    ) -> AsyncGenerator[Tuple[str, Any], None]:
+        client = AsyncOpenAI(api_key=api_key or "sk-placeholder", base_url=base_url or "https://api.openai.com/v1")
+        formatted_msgs = format_messages_for_openai(messages)
+        kwargs: Dict[str, Any] = {"model": model, "messages": formatted_msgs, "stream": True}
+        if tools:
+            kwargs["tools"] = tools
+        if max_tokens and max_tokens > 0:
+            kwargs["max_tokens"] = max_tokens
+        kwargs.update(build_openai_thinking_kwargs(thinking_effort))
+        response = await client.chat.completions.create(**kwargs)
+        tool_calls: Dict[int, Dict[str, str]] = {}
+        async for chunk in response:
+            if getattr(chunk, "usage", None):
+                u = chunk.usage
+                cache_read = 0
+                prompt_details = getattr(u, "prompt_tokens_details", None)
+                if prompt_details:
+                    cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
+                yield ("adapter_usage", {
+                    "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
+                    "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
+                    "total_tokens": getattr(u, "total_tokens", 0) or 0,
+                    "cache_read_tokens": cache_read,
+                })
+            choices = getattr(chunk, "choices", None)
+            if not choices and hasattr(chunk, "data"):
+                d = getattr(chunk, "data")
+                choices = d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
+            if not choices:
+                continue
+            choice_0 = choices[0]
+            delta = getattr(choice_0, "delta", None) if not isinstance(choice_0, dict) else choice_0.get("delta")
+            if not delta:
+                continue
+            if getattr(delta, "content", None):
+                yield ("adapter_text", delta.content)
+            if getattr(delta, "tool_calls", None):
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_calls:
+                        tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                    if tc.id:
+                        tool_calls[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_calls[idx]["name"] = tc.function.name
+                        if tc.function.arguments:
+                            tool_calls[idx]["arguments"] += tc.function.arguments
+        for idx in sorted(tool_calls):
+            tc = tool_calls[idx]
+            if tc["name"]:
+                yield ("adapter_tool_call", {
+                    "id": tc["id"] or f"call_{idx}",
+                    "name": tc["name"],
+                    "arguments": tc["arguments"] or "{}",
+                })
