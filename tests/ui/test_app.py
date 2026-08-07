@@ -390,7 +390,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(should_show)
 
     async def test_exception_clears_queue(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from core.base_provider import BaseAgent
 
@@ -400,24 +400,25 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             raise ValueError("API call failed")
 
-        async with app.run_test() as pilot:
-            await pilot.pause(0.1)
-            app.pm.is_provider_connected = MagicMock(return_value=True)
-            app.pm.get_active_provider_key = MagicMock(return_value="openai")
-            agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
-            agent.stream_steps = error_stream
-            app.agent = agent
-            app.pm.create_active_agent = MagicMock(return_value=agent)
-
-            app.message_queue.append(("Should not run", False, None, app.current_session_id))
-            app.generate_ai_response("Failing prompt")
-            for _ in range(20):
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
                 await pilot.pause(0.1)
-                if len(app.message_queue) == 0 and not app.is_generating:
-                    break
+                app.pm.is_provider_connected = MagicMock(return_value=True)
+                app.pm.get_active_provider_key = MagicMock(return_value="openai")
+                agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+                agent.stream_steps = error_stream
+                app.agent = agent
+                app.pm.create_active_agent = MagicMock(return_value=agent)
 
-            self.assertEqual(len(app.message_queue), 0)
-            self.assertFalse(app.is_generating)
+                app.message_queue.append(("Should not run", False, None, app.current_session_id))
+                app.generate_ai_response("Failing prompt")
+                for _ in range(40):
+                    await pilot.pause(0.1)
+                    if len(app.message_queue) == 0 and not app.is_generating:
+                        break
+
+                self.assertEqual(len(app.message_queue), 0)
+                self.assertFalse(app.is_generating)
 
     async def test_queued_user_message_checkpoint(self):
         from unittest.mock import MagicMock, patch

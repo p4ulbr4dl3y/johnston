@@ -23,7 +23,7 @@ def _format_path_display(val: str, cwd: str | None = None) -> str:
         try:
             abs_val = os.path.realpath(val_str)
             if abs_val == root or abs_val.startswith(root + os.sep):
-                rel = os.path.relpath(abs_val, root)
+                rel = os.path.relpath(abs_val, root).replace("\\", "/")
                 if not rel.startswith(".."):
                     return rel
         except Exception:
