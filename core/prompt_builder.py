@@ -103,10 +103,14 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     return "\n\n".join(found_snippets)
 
 
-def get_rules_snippet(mode: str = "action") -> str:
-    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager."""
+def get_rules_snippet(mode: str = "action", cwd: str = None) -> str:
+    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager.
+
+    cwd selects the project rules directory so a subagent working in an isolated
+    worktree sees its own `.johnston/rules` instead of the parent checkout's.
+    """
     from core.rules_manager import RulesManager
-    return RulesManager.get_instance().get_formatted_rules(mode=mode)
+    return RulesManager.get_instance().get_formatted_rules(mode=mode, project_dir=cwd)
 
 
 DEFAULT_SYSTEM_PROMPT = """You are {model_name} operating inside Johnston CLI, pair programming with the user.
@@ -217,7 +221,7 @@ class PromptBuilder:
         env_block = "\n".join(env_lines)
 
         project_snippet = get_project_instructions_snippet(self.cwd)
-        rules_snippet = get_rules_snippet(mode=self.mode)
+        rules_snippet = get_rules_snippet(mode=self.mode, cwd=self.cwd)
 
         # Stable prefix first (cacheable across turns); volatile env metadata
         # last so the longest possible stable prefix can be prompt-cached.

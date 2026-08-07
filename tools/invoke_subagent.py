@@ -96,6 +96,8 @@ class InvokeSubagentTool(BaseTool):
             task_id, description, prompt, subagent_type, run_in_background, session_id=session_id
         )
         session.agent = subagent
+        session.project_dir = wt_path or ""
+        session.branch_name = wt_branch or ""
         session.add_event({"type": "user", "text": prompt})
 
         # Disable nested Task tool calls (recursion guard) and background task management

@@ -130,6 +130,59 @@ class TestPromptBuilderCwd(unittest.TestCase):
             self.assertIn("Working Directory", prompt)
             self.assertIn("Worktree rules", prompt)
 
+    def test_system_prompt_loads_project_rules_from_cwd(self):
+        """Project rules (.johnston/rules) are read from the agent cwd, not main checkout."""
+        from core.prompt_builder import PromptBuilder
+
+        with tempfile.TemporaryDirectory() as base:
+            rules_dir = os.path.join(base, ".johnston", "rules")
+            os.makedirs(rules_dir)
+            with open(os.path.join(rules_dir, "pref.md"), "w", encoding="utf-8") as f:
+                f.write("---\nname: subagent-pref\n---\nAlways use this subagent rule.\n")
+            builder = PromptBuilder("You are X.", [], model_name="m", cwd=base)
+            prompt = builder.build_system_prompt()
+            self.assertIn("Always use this subagent rule", prompt)
+            self.assertIn("subagent-pref", prompt)
+
+
+class TestGetRulesSnippetCwd(unittest.TestCase):
+    def test_get_rules_snippet_respects_cwd(self):
+        from core.prompt_builder import get_rules_snippet
+
+        with tempfile.TemporaryDirectory() as main, tempfile.TemporaryDirectory() as wt:
+            proj_rules = os.path.join(wt, ".johnston", "rules")
+            os.makedirs(proj_rules)
+            with open(os.path.join(proj_rules, "r.md"), "w", encoding="utf-8") as f:
+                f.write("---\nname: wt-rule\n---\nWT-specific rule.\n")
+            snippet = get_rules_snippet(mode="action", cwd=wt)
+            self.assertIn("WT-specific rule", snippet)
+            self.assertNotIn("WT-specific rule", get_rules_snippet(mode="action", cwd=main))
+
+
+class TestSubagentBranchContextPersistence(unittest.TestCase):
+    """Follow-up subagents must recover their isolated worktree cwd/branch after reload."""
+
+    def test_session_persists_project_dir_and_branch(self):
+        from core.subagent_tracker import SubagentSessionData
+
+        sess = SubagentSessionData("sub-abc", "desc", "prompt", "general", True)
+        sess.project_dir = "/tmp/wt/sub-abc"
+        sess.branch_name = "subagent-sub-abc"
+        data = sess.to_dict()
+        self.assertEqual(data["project_dir"], "/tmp/wt/sub-abc")
+        self.assertEqual(data["branch_name"], "subagent-sub-abc")
+
+        restored = SubagentSessionData.from_dict(data)
+        self.assertEqual(restored.project_dir, "/tmp/wt/sub-abc")
+        self.assertEqual(restored.branch_name, "subagent-sub-abc")
+
+    def test_from_dict_defaults_empty(self):
+        from core.subagent_tracker import SubagentSessionData
+
+        restored = SubagentSessionData.from_dict({"task_id": "x"})
+        self.assertEqual(restored.project_dir, "")
+        self.assertEqual(restored.branch_name, "")
+
 
 if __name__ == "__main__":
     unittest.main()

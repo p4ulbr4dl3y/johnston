@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import Any, Dict
 
 from core.subagent_tracker import SubagentTracker
@@ -76,8 +77,6 @@ class ManageSubagentTool(BaseTool):
             return f"ERR: session '{task_id}' not found"
 
         if action == "status":
-            import os
-
             from core.config import SUBAGENT_LOGS_DIR
             log_file = os.path.join(tracker.storage_dir, f"{session.task_id}.json")
             result_log_file = os.path.join(SUBAGENT_LOGS_DIR, f"{session.task_id}.log")
@@ -143,10 +142,26 @@ class ManageSubagentTool(BaseTool):
                 subagent = ctx.create_agent()
                 if subagent:
                     subagent.app = ctx.app
+                    subagent.is_subagent = True
                     hist = session.to_dict().get("agent_history", []) if hasattr(session, "to_dict") else []
                     if hist:
                         subagent.history = hist
                     session.agent = subagent
+
+            # Restore the isolated worktree context for follow-up so the subagent
+            # keeps working on its own branch/cwd instead of silently falling back
+            # to the parent checkout (worktree is removed on completion).
+            if subagent and session.project_dir and session.branch_name:
+                project_dir = session.project_dir
+                branch_name = session.branch_name
+                if not os.path.isdir(project_dir):
+                    from core.subagent_worktree import SubagentWorktreeManager
+                    parent_dir = getattr(ctx.app, "project_dir", None) or os.getcwd()
+                    reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.task_id, branch_name)
+                    if reattached:
+                        project_dir = reattached
+                subagent.project_dir = project_dir
+                subagent.cwd = project_dir
 
             if not subagent:
                 return f"ERR: no active agent for {session.task_id}"
