@@ -27,18 +27,19 @@ def _truncate_subagent_result(text: str) -> str:
 
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
-    description = "Launch an autonomous subagent for a task."
+    description = "Launch an autonomous subagent for a bounded, non-blocking subtask. Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
     schema = {
         "type": "function",
         "function": {
             "name": "invoke_subagent",
+            "description": "Launch an autonomous subagent for a bounded, non-blocking subtask. Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Task prompt"},
+                    "prompt": {"type": "string", "description": "Detailed task prompt with clear boundaries and expected output format"},
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
-                    "subagent_type": {"type": "string", "description": "Subagent type: 'general' or 'explore'"},
-                    "workspace": {"type": "string", "description": "Workspace: 'inherit' or 'branch'"},
+                    "subagent_type": {"type": "string", "description": "Subagent type: 'general' (task execution) or 'explore' (read-only analysis)"},
+                    "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},
                     "task_id": {"type": "string", "description": "Optional task ID"}
                 },
                 "required": ["prompt", "description"]
@@ -166,7 +167,7 @@ class InvokeSubagentTool(BaseTool):
                     acc[0] += (
                         f"\n\n[Worktree Branch '{wt_branch}']\n"
                         f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
-                        f"After merging, ask the user via the ask_user tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
+                        f"After merging, clean up the branch with `git branch -d {wt_branch}`.\n\n"
                         f"{diff_text}"
                     )
                 SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
