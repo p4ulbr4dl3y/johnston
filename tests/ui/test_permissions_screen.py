@@ -29,8 +29,11 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
+        self.config_patcher = patch("core.permission_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
+        self.config_patcher.start()
 
     def tearDown(self):
+        self.config_patcher.stop()
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
 
