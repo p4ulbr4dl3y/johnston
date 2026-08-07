@@ -501,7 +501,7 @@ class PermissionsCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         from widgets.screens.permissions import PermissionsScreen
-        project_dir = getattr(app, "project_dir", None)
+        project_dir = getattr(app, "project_dir", None) or getattr(getattr(app, "agent", None), "project_dir", None) or os.getcwd()
         app.push_screen(PermissionsScreen(project_dir=project_dir))
 
 

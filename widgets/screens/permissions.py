@@ -27,7 +27,7 @@ class PermissionsScreen(ModalScreen[None]):
     def __init__(self, project_dir: Optional[str] = None):
         super().__init__()
         self.pm = PermissionManager.get_instance()
-        self.project_dir = project_dir
+        self.project_dir = os.path.realpath(project_dir or os.getcwd())
         self.use_project_scope = bool(project_dir)
         self.active_tab = 0  # 0: Groups, 1: Tools, 2: Scope
         self.search_query = ""
@@ -204,7 +204,7 @@ class PermissionsScreen(ModalScreen[None]):
         if 0 <= idx < len(self.filtered_items):
             target = self.filtered_items[idx]
             if target["type"] == "scope":
-                if target["name"] == "project" and self.project_dir:
+                if target["name"] == "project":
                     self.use_project_scope = True
                 elif target["name"] == "global":
                     self.use_project_scope = False
