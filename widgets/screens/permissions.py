@@ -10,12 +10,11 @@ from core.permission_manager import PermissionManager
 
 
 class PermissionsScreen(ModalScreen[None]):
-    """Modal screen for managing tool permissions (groups and individual tools)."""
+    """Tabbed Modal screen for managing tool permissions (Groups, Tools, Scope)."""
 
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
-        ("tab", "toggle_scope", "Toggle Scope"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ]
@@ -28,22 +27,23 @@ class PermissionsScreen(ModalScreen[None]):
         self.pm = PermissionManager.get_instance()
         self.project_dir = project_dir
         self.use_project_scope = bool(project_dir)
-        self.items: List[Dict[str, Any]] = []
-        self.filtered_items: List[Dict[str, Any]] = []
+        self.active_tab = 0  # 0: Groups, 1: Tools, 2: Scope
         self.search_query = ""
+        self.filtered_items: List[Dict[str, Any]] = []
+
+    def _get_header_md(self) -> str:
+        t0 = "**[ Groups ]**" if self.active_tab == 0 else "Groups"
+        t1 = "**[ Tools ]**" if self.active_tab == 1 else "Tools"
+        t2 = "**[ Scope ]**" if self.active_tab == 2 else "Scope"
+        scope_name = "Project" if self.use_project_scope else "Global"
+        return f"### {t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2} &nbsp;&nbsp;&nbsp;&nbsp; `({scope_name})`"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Manage Tool Permissions**", classes="modal-markdown")
-            yield Label(self._get_scope_label(), id="permissions-scope-label")
+            yield Markdown(self._get_header_md(), id="permissions-header-md", classes="modal-markdown")
             yield Input(placeholder="Search permissions...", id="modal-search-input")
             yield OptionList(id="permissions-option-list")
-            yield Label("enter: cycle action (ALLOW → ASK → DENY) • tab: toggle scope • esc: close", id="modal-hint")
-
-    def _get_scope_label(self) -> str:
-        if self.use_project_scope:
-            return "Scope: Project (.johnston/permissions.json)"
-        return "Scope: Global (~/.johnston/config.json)"
+            yield Label("enter: toggle • tab / ←/→: switch tab • esc: close", id="modal-hint")
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -52,108 +52,131 @@ class PermissionsScreen(ModalScreen[None]):
         except Exception:
             pass
 
-    def _build_items(self) -> List[Dict[str, Any]]:
+    def _get_items_for_active_tab(self) -> List[Dict[str, Any]]:
         target_dir = self.project_dir if self.use_project_scope else None
         perms = self.pm.get_effective_permissions(target_dir)
 
         items = []
 
-        # Groups
-        group_descriptions = {
-            "read": "Read-only & state operations",
-            "write": "Filesystem modifications",
-            "net": "Network & MCP requests",
-            "exec": "Terminal & subagent execution",
-        }
-
-        for grp in ["read", "write", "net", "exec"]:
-            act = perms.get("groups", {}).get(grp, "ask")
-            items.append({
-                "type": "group",
-                "name": grp,
-                "label": f"GROUP: {grp.upper()}",
-                "desc": group_descriptions.get(grp, ""),
-                "action": act,
-            })
-
-        # Individual tools
-        tool_descriptions = {
-            "read": "Read files and directories",
-            "create": "Create new files",
-            "edit": "Modify existing file content",
-            "multi_edit": "Multiple non-contiguous file edits",
-            "shell": "Execute shell commands",
-            "ask_user": "Ask user multiple-choice questions",
-            "call_mcp": "Invoke MCP tools",
-            "manage_task": "Manage background tasks",
-            "invoke_subagent": "Spawn background subagent",
-            "manage_subagent": "Control active subagents",
-            "update_plan": "Update task plan",
-            "web_fetch": "Fetch web page content",
-        }
-
-        tools_cfg = perms.get("tools", {})
-        for grp, tool_set in self.pm.GROUPS.items():
-            for t in sorted(tool_set):
-                act = tools_cfg.get(t) or perms.get("groups", {}).get(grp, "ask")
-                is_override = t in tools_cfg
+        if self.active_tab == 0:
+            # Groups Tab
+            group_descriptions = {
+                "read": "Read-only & state operations",
+                "write": "Filesystem modifications",
+                "net": "Network & MCP requests",
+                "exec": "Terminal & subagent execution",
+            }
+            for grp in ["read", "write", "net", "exec"]:
+                act = perms.get("groups", {}).get(grp, "ask")
                 items.append({
-                    "type": "tool",
-                    "name": t,
-                    "group": grp,
-                    "label": f"  • {t}",
-                    "desc": tool_descriptions.get(t, ""),
+                    "type": "group",
+                    "name": grp,
+                    "label": f"GROUP: {grp.upper()}",
+                    "desc": group_descriptions.get(grp, ""),
                     "action": act,
-                    "is_override": is_override,
+                })
+
+        elif self.active_tab == 1:
+            # Tools Tab
+            tool_descriptions = {
+                "read": "Read files and directories",
+                "create": "Create new files",
+                "edit": "Modify file content",
+                "multi_edit": "Multiple file edits",
+                "shell": "Execute shell commands",
+                "ask_user": "Ask user questions",
+                "call_mcp": "Invoke MCP tools",
+                "manage_task": "Manage background tasks",
+                "invoke_subagent": "Spawn background subagent",
+                "manage_subagent": "Control active subagents",
+                "update_plan": "Update task plan",
+                "web_fetch": "Fetch web page content",
+            }
+            tools_cfg = perms.get("tools", {})
+            for grp, tool_set in self.pm.GROUPS.items():
+                for t in sorted(tool_set):
+                    act = tools_cfg.get(t) or perms.get("groups", {}).get(grp, "ask")
+                    is_override = t in tools_cfg
+                    items.append({
+                        "type": "tool",
+                        "name": t,
+                        "group": grp,
+                        "label": f"{t:<16}",
+                        "desc": tool_descriptions.get(t, ""),
+                        "action": act,
+                        "is_override": is_override,
+                    })
+
+        else:
+            # Scope Tab
+            items.append({
+                "type": "scope",
+                "name": "global",
+                "label": "Global Configuration",
+                "desc": "~/.johnston/config.json",
+                "action": "active" if not self.use_project_scope else "on",
+            })
+            if self.project_dir:
+                items.append({
+                    "type": "scope",
+                    "name": "project",
+                    "label": "Project Configuration",
+                    "desc": ".johnston/permissions.json",
+                    "action": "active" if self.use_project_scope else "on",
+                })
+            else:
+                items.append({
+                    "type": "scope",
+                    "name": "project",
+                    "label": "Project Configuration",
+                    "desc": "No active project directory",
+                    "action": "off",
                 })
 
         return items
 
     def refresh_list(self) -> None:
-        self.items = self._build_items()
+        raw_items = self._get_items_for_active_tab()
         opt_list = self.query_one("#permissions-option-list", OptionList)
         prev_highlighted = opt_list.highlighted
         opt_list.clear_options()
 
         q = self.search_query.strip().lower()
         if not q:
-            self.filtered_items = list(self.items)
+            self.filtered_items = list(raw_items)
         else:
             self.filtered_items = [
-                it for it in self.items
+                it for it in raw_items
                 if q in it["name"].lower()
                 or q in it["label"].lower()
                 or q in it["desc"].lower()
             ]
 
         if not self.filtered_items:
-            opt_list.add_option("*No permissions found*")
+            opt_list.add_option("*No items found*")
             return
 
         for it in self.filtered_items:
-            act = it["action"].upper()
-            if act == "ALLOW":
-                status = r"\[ALLOW]"
-            elif act == "DENY":
-                status = r"\[DENY]"
+            if it["type"] == "scope":
+                status = r"\[ACTIVE]" if it["action"] == "active" else (r"\[ON]" if it["action"] == "on" else r"\[N/A]")
+                opt_list.add_option(f"{status} {it['label']} — {it['desc']}")
             else:
-                status = r"\[ASK]"
+                act = it["action"].upper()
+                if act == "ALLOW":
+                    status = r"\[ALLOW]"
+                elif act == "DENY":
+                    status = r"\[DENY]"
+                else:
+                    status = r"\[ASK]"
 
-            override_tag = r" \[OVERRIDE]" if it.get("is_override") else ""
-            desc = f" — {it['desc']}" if it.get("desc") else ""
-            opt_list.add_option(f"{status} {it['label']}{override_tag}{desc}")
+                override_tag = r" \[OVERRIDE]" if it.get("is_override") else ""
+                desc = f" — {it['desc']}" if it.get("desc") else ""
+                opt_list.add_option(f"{status} {it['label']}{override_tag}{desc}")
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_items):
             opt_list.highlighted = prev_highlighted
         elif self.filtered_items and opt_list.highlighted is None:
             opt_list.highlighted = 0
-
-    def action_toggle_scope(self) -> None:
-        if self.project_dir:
-            self.use_project_scope = not self.use_project_scope
-            scope_label = self.query_one("#permissions-scope-label", Label)
-            scope_label.update(self._get_scope_label())
-            self.refresh_list()
 
     def _cycle_action(self, current: str) -> str:
         cur = current.lower()
@@ -166,6 +189,16 @@ class PermissionsScreen(ModalScreen[None]):
     def toggle_selected_permission(self, idx: int) -> None:
         if 0 <= idx < len(self.filtered_items):
             target = self.filtered_items[idx]
+            if target["type"] == "scope":
+                if target["name"] == "project" and self.project_dir:
+                    self.use_project_scope = True
+                elif target["name"] == "global":
+                    self.use_project_scope = False
+                header_md = self.query_one("#permissions-header-md", Markdown)
+                header_md.update(self._get_header_md())
+                self.refresh_list()
+                return
+
             next_act = self._cycle_action(target["action"])
             target_dir = self.project_dir if self.use_project_scope else None
             self.pm.update_permission(target["type"], target["name"], next_act, project_dir=target_dir)
@@ -188,8 +221,26 @@ class PermissionsScreen(ModalScreen[None]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         self.toggle_selected_permission(event.option_index)
 
+    def switch_tab(self, delta: int = 1) -> None:
+        self.active_tab = (self.active_tab + delta) % 3
+        header_md = self.query_one("#permissions-header-md", Markdown)
+        header_md.update(self._get_header_md())
+        self.refresh_list()
+
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("down", "up"):
+        key = event.key
+        if key in ("right", "tab", "key_right"):
+            self.switch_tab(1)
+            event.prevent_default()
+            event.stop()
+            return
+        elif key in ("left", "shift+tab", "backtab", "key_left"):
+            self.switch_tab(-1)
+            event.prevent_default()
+            event.stop()
+            return
+
+        if key in ("down", "up"):
             try:
                 search_input = self.query_one("#modal-search-input", Input)
                 if search_input.has_focus:
@@ -197,7 +248,7 @@ class PermissionsScreen(ModalScreen[None]):
                     if opt_list.highlighted is None and self.filtered_items:
                         opt_list.highlighted = 0
                     elif opt_list.highlighted is not None:
-                        if event.key == "down":
+                        if key == "down":
                             opt_list.action_cursor_down()
                         else:
                             opt_list.action_cursor_up()
@@ -205,10 +256,6 @@ class PermissionsScreen(ModalScreen[None]):
                     event.stop()
             except Exception:
                 pass
-        elif event.key in ("tab", "shift+tab"):
-            self.action_toggle_scope()
-            event.prevent_default()
-            event.stop()
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):
