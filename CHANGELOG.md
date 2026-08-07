@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.20.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.19.0...johnston-v0.20.0) (2026-08-07)
+
+
+### Features
+
+* **ui:** display relative file paths in tool call cards and clarify shell tool CWD ([e156e70](https://github.com/p4ulbr4dl3y/johnston/commit/e156e707b59cd9800238ed7925b1b95b549f03d3))
+
+
+### Bug Fixes
+
+* **ci:** normalize path display slashes and patch checkpoint in test_app ([dc224f0](https://github.com/p4ulbr4dl3y/johnston/commit/dc224f05e57d2e2b87ac950738c26233c56240a6))
+* **subagents:** track session lifecycle status in message flow ([447bab7](https://github.com/p4ulbr4dl3y/johnston/commit/447bab7a5e5b50f07be76e9f5f9fe2629c630e9f))
+* **tests:** isolate permissions screen test from global user config ([a058fd0](https://github.com/p4ulbr4dl3y/johnston/commit/a058fd01e523c4117b0f146718bdcdb555bc0364))
+
 ## [0.19.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.18.0...johnston-v0.19.0) (2026-08-07)
 
 
