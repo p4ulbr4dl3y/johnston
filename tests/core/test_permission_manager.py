@@ -2,14 +2,20 @@ import json
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from core.permission_manager import PermissionManager
 
 
 class TestPermissionManager(unittest.TestCase):
     def setUp(self):
-        self.pm = PermissionManager()
+        self.pm = PermissionManager.get_instance()
         self.pm.clear_session_overrides()
+        self.config_patcher = patch("core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json")
+        self.config_patcher.start()
+
+    def tearDown(self):
+        self.config_patcher.stop()
 
     def test_default_permissions(self):
         # Read group -> allow by default
