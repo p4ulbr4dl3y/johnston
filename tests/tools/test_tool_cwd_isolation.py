@@ -126,7 +126,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
                 f.write("# Worktree rules\nDo work only here.\n")
             builder = PromptBuilder("You are X.", [], model_name="m", cwd=base)
             prompt = builder.build_system_prompt()
-            self.assertIn(base, prompt)
+            self.assertIn(os.path.realpath(base), prompt)
             self.assertIn("Working Directory", prompt)
             self.assertIn("Worktree rules", prompt)
 
