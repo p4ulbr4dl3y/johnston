@@ -23,11 +23,11 @@ class PermissionsScreen(ModalScreen[None]):
     def action_quit_app(self) -> None:
         self.app.exit()
 
-    def __init__(self, project_dir: Optional[str] = None):
+    def __init__(self, project_dir: Optional[str] = None, use_project_scope: bool = False):
         super().__init__()
         self.pm = PermissionManager.get_instance()
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
-        self.use_project_scope = bool(project_dir)
+        self.use_project_scope = use_project_scope
         self.active_tab = 0  # 0: Groups, 1: Tools, 2: Scope
         self.search_query = ""
         self.filtered_items: List[Dict[str, Any]] = []
@@ -159,7 +159,8 @@ class PermissionsScreen(ModalScreen[None]):
         for it in self.filtered_items:
             if it["type"] == "scope":
                 status = r"\[ACTIVE]" if it["action"] == "active" else (r"\[ON]" if it["action"] == "on" else r"\[N/A]")
-                opt_list.add_option(f"{status} {it['label']} — {it['desc']}")
+                desc = f" — {it['desc']}" if it.get("desc") else ""
+                opt_list.add_option(f"{status} {it['label']}{desc}")
             else:
                 act = it["action"].upper()
                 if act == "ALLOW":

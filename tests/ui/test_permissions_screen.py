@@ -63,7 +63,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         perm_file = os.path.join(self.test_dir, ".johnston", "permissions.json")
         self.assertFalse(os.path.exists(perm_file))
 
-        screen = PermissionsScreen(project_dir=self.test_dir)
+        screen = PermissionsScreen(project_dir=self.test_dir, use_project_scope=True)
         app = DummyHostApp(screen)
 
         async with app.run_test() as pilot:
