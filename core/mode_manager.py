@@ -27,12 +27,12 @@ class ModeDefinition:
 
 
 BUILTIN_MODES = {
-    "action": ModeDefinition(
-        key="action",
-        name="Action",
+    "act": ModeDefinition(
+        key="act",
+        name="Act",
         read_only=False,
         prompt=(
-            "## Execution Mode: ACTION\n\n"
+            "## Execution Mode: ACT\n\n"
             "### Overview\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
             "### Action Rules\n"
@@ -56,12 +56,12 @@ BUILTIN_MODES = {
             "1. Code modification tools (create, edit, multi_edit) are DISABLED.\n"
             "2. You are STRICTLY PROHIBITED from running state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
             "3. Use shell ONLY for read-only inspection (ls/find/dir, grep/rg/select-string, git status, git log, git diff, cat/type).\n"
-            "4. NEVER call the ask_user tool to ask the user if they want to switch to Action mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to press Shift+Tab when ready.\n"
-            "5. If the user asks to modify code, apply changes, or proceed with implementation while in Explore mode, NEVER claim you are applying changes. Immediately inform the user you are in read-only Explore mode and tell them to press Shift+Tab to switch to Action mode.\n\n"
+            "4. NEVER call the ask_user tool to ask the user if they want to switch to Act mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to press Shift+Tab when ready.\n"
+            "5. If the user asks to modify code, apply changes, or proceed with implementation while in Explore mode, NEVER claim you are applying changes. Immediately inform the user you are in read-only Explore mode and tell them to press Shift+Tab to switch to Act mode.\n\n"
             "### Response Guidelines\n"
             "1. Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
-            "2. Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Action mode (via Shift+Tab) when ready to implement.\n"
-            "3. Edit / Implementation Request: State clearly that you are in Explore mode and tell the user to press Shift+Tab to switch to Action mode."
+            "2. Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest switching to Act mode (via Shift+Tab) when ready to implement.\n"
+            "3. Edit / Implementation Request: State clearly that you are in Explore mode and tell the user to press Shift+Tab to switch to Act mode."
         ),
         disallowed_tools=[
             "create", "edit", "multi_edit",
@@ -69,12 +69,12 @@ BUILTIN_MODES = {
         ],
         source="builtin",
     ),
-    "orchestrator": ModeDefinition(
-        key="orchestrator",
-        name="Orchestrator",
+    "orchestrate": ModeDefinition(
+        key="orchestrate",
+        name="Orchestrate",
         read_only=False,
         prompt=(
-            "## Execution Mode: ORCHESTRATOR\n\n"
+            "## Execution Mode: ORCHESTRATE\n\n"
             "### Overview\n"
             "You are an orchestrator: you plan, delegate bounded subtasks to subagents, "
             "coordinate them, and integrate their results. You retain full tool access and "
@@ -84,8 +84,8 @@ BUILTIN_MODES = {
             "single area — spawning a subagent would only add overhead and context cost.\n"
             "2. Delegate to a subagent when a task is clearly bounded and parallelizable: "
             "independent files/modules, independent research, or independent experiments.\n"
-            "3. For analysis or reconnaissance, delegate to subagent_type 'explore'. "
-            "For isolated execution, delegate to subagent_type 'general'. Prefer "
+            "3. For analysis or reconnaissance, delegate to subagent_type 'explorer'. "
+            "For isolated execution, delegate to subagent_type 'worker'. Prefer "
             "workspace='branch' for work that mutates state, then merge the branch.\n\n"
             "### Orchestration Rules\n"
             "1. Decompose first, then delegate: lay out the subtasks and dependencies "
@@ -186,8 +186,8 @@ class ModeManager:
         key_lower = key.lower().strip()
         if key_lower in self.modes:
             return self.modes[key_lower]
-        # Fallback to action if not found
-        return self.modes.get("action", BUILTIN_MODES["action"])
+        # Fallback to act if not found
+        return self.modes.get("act", BUILTIN_MODES["act"])
 
     def _parse_md_mode(self, fpath: str, source: str) -> Optional[ModeDefinition]:
         try:

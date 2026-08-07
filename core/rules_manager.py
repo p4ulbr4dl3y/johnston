@@ -121,7 +121,7 @@ class RulesManager:
         except Exception:
             return None
 
-    def get_formatted_rules(self, mode: str = "action", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None) -> str:
+    def get_formatted_rules(self, mode: str = "act", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None) -> str:
         rules = self.load_rules(project_dir=project_dir)
         matching = []
         for r in rules:

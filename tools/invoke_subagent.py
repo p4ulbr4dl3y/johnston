@@ -44,7 +44,7 @@ class InvokeSubagentTool(BaseTool):
                 "properties": {
                     "prompt": {"type": "string", "description": "Detailed task prompt with clear boundaries and expected output format"},
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
-                    "subagent_type": {"type": "string", "description": "Subagent type: 'general' (task execution) or 'explore' (read-only analysis)"},
+                    "subagent_type": {"type": "string", "description": "Subagent type: 'worker' (task execution) or 'explorer' (read-only analysis)"},
                     "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},
                     "task_id": {"type": "string", "description": "Optional task ID"}
                 },
@@ -57,7 +57,7 @@ class InvokeSubagentTool(BaseTool):
         ctx = self._ensure_context(app)
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
-        subagent_type = args.get("subagent_type", "general").strip().lower()
+        subagent_type = args.get("subagent_type", "worker").strip().lower()
         workspace_mode = args.get("workspace", "inherit").strip().lower()
 
         if not prompt:
@@ -124,7 +124,7 @@ class InvokeSubagentTool(BaseTool):
         if definition.model:
             subagent.model = definition.model
 
-        if subagent_type == "explore":
+        if subagent_type == "explorer":
             edit_tool_names = {
                 "create", "edit", "replace_file_content", "multi_replace_file_content",
                 "Create", "Edit", "Replace_File_Content", "Multi_Replace_File_Content"

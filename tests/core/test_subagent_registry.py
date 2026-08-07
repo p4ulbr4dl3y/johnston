@@ -10,12 +10,12 @@ class TestSubagentRegistry(unittest.TestCase):
     def test_default_definitions(self):
         registry = SubagentRegistry.get_instance()
         defs = registry.list_definitions()
-        self.assertIn("explore", defs)
-        self.assertIn("general", defs)
+        self.assertIn("explorer", defs)
+        self.assertIn("worker", defs)
 
-        explore_def = registry.get_definition("explore")
-        self.assertEqual(explore_def.name, "explore")
-        self.assertIn("## Subagent Mode: EXPLORE", explore_def.system_prompt)
+        explorer_def = registry.get_definition("explorer")
+        self.assertEqual(explorer_def.name, "explorer")
+        self.assertIn("## Subagent Mode: EXPLORER", explorer_def.system_prompt)
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -66,7 +66,7 @@ You run tests and report coverage.""")
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
             self.assertIn("## Subagents (use as `subagent_type` in `invoke_subagent`)", snippet)
             self.assertIn("### Builtin", snippet)
-            self.assertIn("- `explore`: Fast code exploration subagent", snippet)
+            self.assertIn("- `explorer`: Fast code exploration subagent", snippet)
             self.assertIn("### Project (`.johnston/subagents/<name>.md`)", snippet)
             self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
 
@@ -83,8 +83,8 @@ class TestSubagentTrackerStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.tracker.sessions.clear()
 
     async def test_no_loose_fallback_for_unknown_id(self):
-        self.tracker.create_session("task-1", "Important task", "p1", "general", False)
-        self.tracker.create_session("task-2", "Other task", "p2", "general", False)
+        self.tracker.create_session("task-1", "Important task", "p1", "worker", False)
+        self.tracker.create_session("task-2", "Other task", "p2", "worker", False)
 
         # A single letter that previously matched via substring must now return None.
         self.assertIsNone(self.tracker.find_session_by_description_or_id("a"))
@@ -92,7 +92,7 @@ class TestSubagentTrackerStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.tracker.find_session_by_description_or_id("nonexistent-xyz"))
 
     async def test_exact_match_still_works(self):
-        self.tracker.create_session("task-1", "Important task", "p1", "general", False)
+        self.tracker.create_session("task-1", "Important task", "p1", "worker", False)
         res = self.tracker.find_session_by_description_or_id("task-1")
         self.assertIsNotNone(res)
         self.assertEqual(res.task_id, "task-1")

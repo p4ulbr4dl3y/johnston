@@ -9,13 +9,13 @@ class TestModeManager(unittest.TestCase):
     def test_builtin_modes(self):
         mm = ModeManager.get_instance()
         modes = mm.load_modes(include_global=False)
-        self.assertIn("action", modes)
+        self.assertIn("act", modes)
         self.assertIn("explore", modes)
-        self.assertIn("orchestrator", modes)
-        self.assertFalse(modes["action"].read_only)
+        self.assertIn("orchestrate", modes)
+        self.assertFalse(modes["act"].read_only)
         self.assertTrue(modes["explore"].read_only)
-        self.assertFalse(modes["orchestrator"].read_only)
-        self.assertEqual(modes["orchestrator"].name, "Orchestrator")
+        self.assertFalse(modes["orchestrate"].read_only)
+        self.assertEqual(modes["orchestrate"].name, "Orchestrate")
 
     def test_custom_md_mode_with_frontmatter(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,9 +101,9 @@ Custom prompt''')
         # read tools allowed in read-only mode
         self.assertIsNone(mode_tool_error(explore, "read"))
         self.assertIsNone(mode_tool_error(explore, "shell"))
-        # action mode allows everything
-        action = mm.get_mode("action")
-        self.assertIsNone(mode_tool_error(action, "create"))
+        # act mode allows everything
+        act = mm.get_mode("act")
+        self.assertIsNone(mode_tool_error(act, "create"))
 
     def test_mode_tool_error_custom_read_only_without_disallowed(self):
         from core.mode_manager import ModeDefinition, mode_tool_error

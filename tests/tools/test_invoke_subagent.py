@@ -29,7 +29,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         # Populate tracker with MAX_CONCURRENT_SUBAGENTS running sessions
         for i in range(MAX_CONCURRENT_SUBAGENTS):
-            sess = self.tracker.create_session(f"task-{i}", f"Task {i}", "prompt", "general", True)
+            sess = self.tracker.create_session(f"task-{i}", f"Task {i}", "prompt", "worker", True)
             sess.status = "running"
 
         # Attempt to spawn one more
@@ -58,7 +58,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "search codebase", "subagent_type": "explore"})
+        await tool.execute({"prompt": "search codebase", "subagent_type": "explorer"})
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
@@ -89,7 +89,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "run task", "subagent_type": "general"})
+        await tool.execute({"prompt": "run task", "subagent_type": "worker"})
 
         self.assertTrue(mock_agent.is_subagent)
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]

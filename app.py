@@ -76,7 +76,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             self.agent.model = model
         if mode and self.agent:
             self.agent.mode = mode
-        self.mode = getattr(self.agent, "mode", mode or "action") if self.agent else (mode or "action")
+        self.mode = getattr(self.agent, "mode", mode or "act") if self.agent else (mode or "act")
         if self.agent:
             self.agent.app = self
 

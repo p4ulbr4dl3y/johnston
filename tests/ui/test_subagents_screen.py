@@ -54,7 +54,7 @@ def make_sess(
     task_id,
     description="desc",
     prompt="prompt",
-    subagent_type="general",
+    subagent_type="worker",
     status="running",
     session_id=None,
     async_task=None,
@@ -602,9 +602,9 @@ class TestSubagentsScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.tracker.storage_dir = self.temp_dir.name
         self.tracker.sessions.clear()
         self.sess = self.tracker.create_session(
-            "pilot-1", "Pilot task description", "Pilot prompt", "general", False
+            "pilot-1", "Pilot task description", "Pilot prompt", "worker", False
         )
-        self.sess.role = "general"
+        self.sess.role = "worker"
 
     def tearDown(self):
         for sess in list(self.tracker.sessions.values()):
