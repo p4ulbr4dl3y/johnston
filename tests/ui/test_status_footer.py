@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from textual.app import App, ComposeResult
 
@@ -11,6 +11,19 @@ class DummyTask:
         self.task_id = task_id
         self.is_running = is_running
         self.is_background = is_background
+
+
+class StubPM:
+    """Provider manager stub without get_provider_thinking_effort."""
+
+    def get_active_provider_key(self):
+        return "openai"
+
+    def load_providers(self):
+        return {"openai": {"name": "OpenAI"}}
+
+    def is_provider_connected(self, key, info=None):
+        return True
 
 
 class FooterTestApp(App):
@@ -80,3 +93,113 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 subagents_active=1,
                 subagents_total=2,
             )
+
+    def test_spin_without_last_status_args(self):
+        footer = StatusFooter()
+        with patch.object(footer, "refresh_footer") as mock_rf:
+            footer._spin()
+            mock_rf.assert_called_once()
+
+    async def test_set_generating_noop_when_state_unchanged(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            footer.set_generating(True)
+            self.assertTrue(footer.is_generating)
+            footer.set_generating(True)  # no-op
+            footer.set_generating(False)
+            self.assertFalse(footer.is_generating)
+            footer.set_generating(False)  # no-op
+
+    async def test_refresh_footer_exception_falls_back_to_default(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            with patch("core.mcp_manager.get_mcp_manager", side_effect=Exception("boom")):
+                with patch.object(footer, "update_status") as mock_us:
+                    footer.refresh_footer()
+                    mock_us.assert_called_once_with(provider_key="default")
+
+    async def test_refresh_footer_clean_model_placeholder(self):
+        app = FooterTestApp()
+        async with app.run_test() as pilot:
+            footer = app.query_one(StatusFooter)
+            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+                footer.refresh_footer()
+                await pilot.pause()
+            self.assertEqual(footer._last_status_args["clean_model"], "[Select model: /models]")
+
+    async def test_refresh_footer_thinking_effort_fallback(self):
+        app = FooterTestApp()
+        app.pm = StubPM()
+        app.agent.thinking_effort = "medium"
+        async with app.run_test() as pilot:
+            footer = app.query_one(StatusFooter)
+            await pilot.pause()
+            self.assertEqual(footer._last_status_args["thinking_effort"], "medium")
+
+    async def test_refresh_footer_mcp_active_counting(self):
+        app = FooterTestApp()
+        async with app.run_test() as pilot:
+            footer = app.query_one(StatusFooter)
+            mgr = MagicMock()
+            mgr.load_servers.return_value = [
+                {"name": "url-only", "url": "http://x", "command": None, "disabled": False},
+                {"name": "err-client", "command": "python", "disabled": False},
+                {"name": "good", "command": "python", "disabled": False},
+                {"name": "off", "command": "python", "disabled": True},
+            ]
+            mgr.clients = {
+                "err-client": MagicMock(last_error="boom"),
+                "good": MagicMock(last_error=None),
+            }
+            footer._mcp_cache_time = 0  # force reload of cached servers
+            with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+                footer.refresh_footer()
+                await pilot.pause()
+            self.assertEqual(footer._last_status_args["mcp_active"], 1)
+            self.assertEqual(footer._last_status_args["mcp_total"], 4)
+
+    async def test_update_status_fallback_branches(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+                footer.update_status(provider_key="openai", model_name="gpt-4o", is_connected=True)
+            footer.update_status(provider_key="openai", is_connected=True, model_name="")
+            footer.update_status(provider_key="openai", is_connected=False, model_name="")
+
+    async def test_update_status_compact_mode(self):
+        app = FooterTestApp()
+        async with app.run_test(size=(60, 24)):
+            footer = app.query_one(StatusFooter)
+            with patch.object(app, "query_one", return_value=MagicMock(clipboard_attachments=[1, 2])):
+                footer.update_status(
+                    provider_key="openai",
+                    provider_display="OpenAI",
+                    is_connected=True,
+                    model_name="gpt-4o",
+                    active_bg_tasks=1,
+                    subagents_active=1,
+                    subagents_total=2,
+                    context_used=1000,
+                    context_limit=128000,
+                    total_tokens=5000,
+                    mcp_active=1,
+                    mcp_total=2,
+                )
+            footer.update_status(provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="")
+            footer.update_status(provider_key="openai", provider_display="OpenAI", is_connected=False, model_name="")
+
+    async def test_update_status_noncompact_attachments(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            with patch.object(app, "query_one", return_value=MagicMock(clipboard_attachments=[1, 2])):
+                footer.update_status(
+                    provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="gpt-4o"
+                )
+            with patch.object(app, "query_one", return_value=MagicMock(clipboard_attachments=[1])):
+                footer.update_status(
+                    provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="gpt-4o"
+                )
