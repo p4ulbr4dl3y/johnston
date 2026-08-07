@@ -127,6 +127,123 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Output truncated at 8000 chars", res)
         self.assertIn("Full output saved to", res)
 
+    async def test_convert_content_to_md_sync_unlink_oserror(self):
+        # A failing tmp-file cleanup must be swallowed while the converted
+        # markdown is still returned.
+        from tools.web_fetch import _convert_content_to_md_sync
+
+        with (
+            patch("tools.read.convert_doc_to_markdown_sync", return_value="converted md"),
+            patch("os.unlink", side_effect=OSError("file in use")),
+        ):
+            res = _convert_content_to_md_sync(b"<p>hi</p>", ".html")
+        self.assertEqual(res, "converted md")
+
+    @patch("httpx.AsyncClient")
+    async def test_fetch_invalid_content_length_ignored(self, mock_client_cls):
+        # A non-numeric Content-Length must be ignored, not crash the fetch.
+        body = b"plain body"
+        mock_client_cls.return_value = _make_stream_client(
+            body, "text/plain", url="https://example.com/x"
+        )
+        mock_client_cls.return_value.stream.return_value.__aenter__.return_value.headers = {
+            "content-type": "text/plain",
+            "content-length": "garbage",
+        }
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com/x"})
+        self.assertIn("plain body", res)
+
+    @patch("httpx.AsyncClient")
+    async def test_fetch_streamed_oversize_rejected(self, mock_client_cls):
+        # A chunked response without a Content-Length header must still be
+        # capped at MAX_RESPONSE_SIZE while streaming.
+        from tools.web_fetch import MAX_RESPONSE_SIZE
+
+        response = MagicMock()
+        response.status_code = 200
+        response.headers = {"content-type": "text/html"}
+        response.raise_for_status = MagicMock()
+
+        async def _aiter_bytes():
+            yield b"x" * MAX_RESPONSE_SIZE
+            yield b"overflow"
+
+        response.aiter_bytes = _aiter_bytes
+
+        cm = MagicMock()
+        cm.__aenter__ = AsyncMock(return_value=response)
+        cm.__aexit__ = AsyncMock(return_value=False)
+
+        client = MagicMock()
+        client.stream = MagicMock(return_value=cm)
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = client
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com/big"})
+        self.assertIn("ERR: 'https://example.com/big' exceeds 10MB", res)
+
+    @patch("httpx.AsyncClient")
+    async def test_fetch_timeout_exception(self, mock_client_cls):
+        client = MagicMock()
+        client.stream.side_effect = httpx.TimeoutException("timed out")
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = client
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com"})
+        self.assertEqual(res, "ERR: 'https://example.com' timed out")
+
+    @patch("httpx.AsyncClient")
+    async def test_fetch_generic_exception(self, mock_client_cls):
+        client = MagicMock()
+        client.stream.side_effect = httpx.ConnectError("connection refused")
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        mock_client_cls.return_value = client
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com"})
+        self.assertIn("ERR: 'https://example.com':", res)
+
+    @patch("httpx.AsyncClient")
+    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    async def test_fetch_pdf_conversion_fallback(self, mock_convert, mock_client_cls):
+        body = b"%PDF-1.4 fake body"
+        mock_client_cls.return_value = _make_stream_client(body, "application/pdf")
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com/doc.pdf"})
+        self.assertIn("%PDF-1.4 fake body", res)
+
+    @patch("httpx.AsyncClient")
+    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    async def test_fetch_docx_conversion_fallback(self, mock_convert, mock_client_cls):
+        body = b"PK\x03\x04 fake docx"
+        mock_client_cls.return_value = _make_stream_client(
+            body, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com/doc.docx"})
+        self.assertIn("PK\x03\x04 fake docx", res)
+
+    @patch("httpx.AsyncClient")
+    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    async def test_fetch_xlsx_conversion_fallback(self, mock_convert, mock_client_cls):
+        body = b"PK\x03\x04 fake xlsx"
+        mock_client_cls.return_value = _make_stream_client(
+            body, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        tool = WebFetchTool()
+        res = await tool.execute({"url": "https://example.com/data.xlsx"})
+        self.assertIn("PK\x03\x04 fake xlsx", res)
+
 
 if __name__ == "__main__":
     unittest.main()
