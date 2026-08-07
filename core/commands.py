@@ -494,6 +494,17 @@ class CompactCommand(BaseCommand):
 
 
 
+class PermissionsCommand(BaseCommand):
+    name = "/permissions"
+    aliases = ["/permission", "/perms"]
+    description = "Manage tool permissions (allow, ask, deny)"
+
+    async def execute(self, app) -> None:
+        from widgets.screens.permissions import PermissionsScreen
+        project_dir = getattr(app, "project_dir", None)
+        app.push_screen(PermissionsScreen(project_dir=project_dir))
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -508,6 +519,7 @@ COMMAND_CLASSES = [
     MCPCommand,
     LintersCommand,
     CompactCommand,
+    PermissionsCommand,
 ]
 
 

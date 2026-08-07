@@ -52,6 +52,43 @@ class PermissionManager:
         except Exception:
             return {}
 
+    def update_permission(
+        self,
+        target_type: str,
+        target_name: str,
+        action: str,
+        project_dir: Optional[str] = None,
+    ) -> None:
+        """
+        Updates a permission setting (target_type: 'group' or 'tool') to action ('allow', 'ask', 'deny').
+        Saves to project permissions file if project_dir is set, otherwise global config.
+        """
+        from tools.base import atomic_write_json
+
+        target_name = target_name.lower()
+        action = action.lower()
+
+        if project_dir:
+            file_path = os.path.join(project_dir, PROJECT_PERMISSIONS_FILE)
+            data = self._load_json_config(file_path)
+            if "permissions" not in data or not isinstance(data["permissions"], dict):
+                data["permissions"] = {}
+            perms = data["permissions"]
+        else:
+            file_path = CONFIG_FILE
+            data = self._load_json_config(file_path)
+            if "permissions" not in data or not isinstance(data["permissions"], dict):
+                data["permissions"] = {}
+            perms = data["permissions"]
+
+        section = "groups" if target_type == "group" else "tools"
+        if section not in perms or not isinstance(perms[section], dict):
+            perms[section] = {}
+
+        perms[section][target_name] = action
+        atomic_write_json(file_path, data)
+
+
     def get_effective_permissions(self, project_dir: Optional[str] = None) -> Dict[str, Any]:
         """Merges global and project permissions on top of DEFAULT_PERMISSIONS."""
         # 1. Base defaults
