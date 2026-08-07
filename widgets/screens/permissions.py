@@ -222,7 +222,11 @@ class PermissionsScreen(ModalScreen[None]):
                 self.refresh_list(reset_highlight=True)
                 return
 
-            next_act = self._cycle_action(target["action"])
+            if target["type"] == "shell_guard":
+                # ShellGuard is a binary toggle: allow (enabled) <-> deny (disabled). 'ask' has no meaning here.
+                next_act = "deny" if target["action"] == "allow" else "allow"
+            else:
+                next_act = self._cycle_action(target["action"])
             target_dir = self.project_dir if self.use_project_scope else None
             self.pm.update_permission(target["type"], target["name"], next_act, project_dir=target_dir)
             self.refresh_list()

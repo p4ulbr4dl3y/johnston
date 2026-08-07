@@ -16,6 +16,30 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
     return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
 
 
+def is_protected_config_path(path: str) -> bool:
+    """
+    True if the path targets Johnston configuration (.johnston/**): permission files,
+    global config, mode/rule definitions, or any other file inside a project .johnston dir.
+    Agents must not be able to modify these (permission escalation / policy bypass).
+    The tool's own worktree store (~/.johnston/worktrees/<id>/...) is exempt for regular files,
+    but config files inside a worktree project are still protected.
+    """
+    abs_path = os.path.realpath(os.path.abspath(path))
+    parts = abs_path.split(os.sep)
+    for i, part in enumerate(parts):
+        if part != ".johnston":
+            continue
+        rest = parts[i + 1:]
+        if not rest:
+            return True
+        if rest[0] == "worktrees":
+            # Tool-owned worktree store: regular project files inside are fine,
+            # nested .johnston config dirs are caught by the next component scan.
+            continue
+        return True
+    return False
+
+
 def atomic_write_text(path: str, content: str) -> None:
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)

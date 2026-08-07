@@ -32,14 +32,15 @@ class CallMCPTool(BaseTool):
         if not server or not tool:
             return "ERR: 'server' and 'tool' params required"
 
-        from core.mode_manager import ModeManager
+        from core.mode_manager import ModeManager, mode_tool_error
 
         app_obj = getattr(app, "app", app)
         mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
         mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
-        disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
-        if "call_mcp" in disallowed or "call_mcp_tool" in disallowed or tool.lower() in disallowed or f"{server}.{tool}".lower() in disallowed:
-            return f"ERR: tool '{server}.{tool}' disabled in {mode_def.name} mode"
+        for candidate in ("call_mcp", "call_mcp_tool", tool.lower(), f"{server}.{tool}".lower()):
+            policy_err = mode_tool_error(mode_def, candidate)
+            if policy_err:
+                return policy_err
 
         from core.mcp_manager import get_mcp_manager
         mcp_mgr = get_mcp_manager()

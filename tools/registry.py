@@ -288,7 +288,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             # Check Tool Permissions
             from core.permission_manager import PermissionManager
             pm = PermissionManager.get_instance()
-            project_dir = getattr(ctx, "project_dir", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
+            project_dir = getattr(ctx, "cwd", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
             action, reason = pm.check_permission(resolved_name, args, project_dir=project_dir)
 
             if action == "deny":
@@ -333,15 +333,15 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
         return f"ERR: unknown tool '{name}'{hint}"
 
-    from core.mode_manager import ModeManager
+    from core.mode_manager import ModeManager, mode_tool_error
 
     ctx_or_app = context or app
     app_obj = getattr(ctx_or_app, "app", ctx_or_app)
     mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
     mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
-    disallowed = [t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])]
-    if clean_name in disallowed or resolved_name in disallowed:
-        return f"ERR: tool '{name}' disabled in {mode_def.name} mode"
+    policy_err = mode_tool_error(mode_def, clean_name) or mode_tool_error(mode_def, resolved_name)
+    if policy_err:
+        return policy_err
 
     from core.permission_manager import PermissionManager
     pm = PermissionManager.get_instance()

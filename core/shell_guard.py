@@ -35,6 +35,15 @@ WINDOWS_DESTRUCTIVE_COMMANDS = {
 
 IGNORED_COMMAND_PREFIXES = {"rtk", "env", "time", "nohup", "nice", "sudo"}
 
+# Flags that consume a following argument (e.g. 'sudo -u root rm').
+FLAG_WITH_ARG = {"-u", "--user", "-g", "--group", "-p", "--password", "-h", "--host", "-l", "--login", "-c", "--command", "-m", "-n", "-t", "-S", "--setenv", "-C", "--chdir", "-w", "--workdir"}
+
+# Indirection patterns that can smuggle destructive commands past token checks.
+COMMAND_SUBSTITUTION_RE = re.compile(r"\$\(|\$\(\(|`")
+SHELL_WRAPPER_RE = re.compile(r"(?:\bsh\b|\bbash\b|\bzsh\b|\bk\b|\bpython3?\b|\bperl\b|\bnode\b|\bruby\b)\s+-(?:c|e)\b", re.IGNORECASE)
+XARGS_RE = re.compile(r"\bxargs\b", re.IGNORECASE)
+FIND_DELETE_RE = re.compile(r"\bfind\b.*\s-delete\b", re.IGNORECASE)
+
 DANGEROUS_GIT_REGEX = re.compile(r"\bgit\s+(?:push|reset\s+--hard|clean\s+-[a-zA-Z]*f[a-zA-Z]*)\b", re.IGNORECASE)
 
 POSIX_SENSITIVE_PATHS = ("/etc", "/sys", "/proc", "/root", "~/.ssh")
@@ -60,12 +69,15 @@ def _first_token(part: str) -> str:
     if not tokens:
         return ""
 
-    # Unwrap prefixes like rtk, env, time, FOO=bar
+    # Unwrap prefixes like rtk, env, time, FOO=bar and skip flags (and their args)
     idx = 0
     while idx < len(tokens):
         token = tokens[idx]
         if "=" in token and not token.startswith("-"):
             idx += 1
+            continue
+        if token.startswith("-") and token != "-":
+            idx += 2 if token in FLAG_WITH_ARG else 1
             continue
         clean_bin = (ntpath.basename(token) if is_windows() else os.path.basename(token)).lower()
         if clean_bin.endswith((".exe", ".cmd", ".bat", ".ps1")):
@@ -101,6 +113,18 @@ def analyze_shell_command(command: str) -> Tuple[bool, str]:
 
     if DANGEROUS_GIT_REGEX.search(cmd_str):
         return False, "Potentially dangerous Git operation (push, reset --hard, clean -f)"
+
+    if COMMAND_SUBSTITUTION_RE.search(cmd_str):
+        return False, "Command substitution detected ($(...) or backticks)"
+
+    if SHELL_WRAPPER_RE.search(cmd_str):
+        return False, "Shell/interpreter -c/-e wrapper detected (may hide destructive commands)"
+
+    if XARGS_RE.search(cmd_str):
+        return False, "xargs indirection detected (may invoke destructive commands)"
+
+    if FIND_DELETE_RE.search(cmd_str):
+        return False, "find -delete detected (bulk file deletion)"
 
     sensitive_path = _contains_sensitive_path(cmd_str)
     if sensitive_path:

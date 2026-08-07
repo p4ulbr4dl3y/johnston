@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, atomic_write_text, resolve_path
+from tools.base import BaseTool, atomic_write_text, is_protected_config_path, resolve_path
 
 
 def _write_file(path: str, content: str) -> None:
@@ -33,6 +33,8 @@ class CreateTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
+        if is_protected_config_path(path):
+            return f"ERR: '{path}' is Johnston configuration (.johnston/**) and cannot be modified by the agent"
         if os.path.isdir(path):
             return f"ERR: '{path}' is a directory"
 

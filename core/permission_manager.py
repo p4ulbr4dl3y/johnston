@@ -16,6 +16,8 @@ class PermissionManager:
         "exec": {"shell", "invoke_subagent"},
     }
 
+    VALID_ACTIONS = {"allow", "ask", "deny"}
+
     _instance: Optional["PermissionManager"] = None
 
     def __init__(self):
@@ -35,9 +37,20 @@ class PermissionManager:
     def get_group_for_tool(self, tool_name: str) -> Optional[str]:
         return self.tool_to_group.get(tool_name.lower())
 
+    @staticmethod
+    def normalize_action(action: str, default: str = "ask") -> str:
+        """Normalizes an action to 'allow'/'ask'/'deny'. Invalid values fall back to default."""
+        if isinstance(action, str):
+            cleaned = action.strip().lower()
+            if cleaned in PermissionManager.VALID_ACTIONS:
+                return cleaned
+        return default
+
     def set_session_override(self, tool_name: str, action: str) -> None:
-        """Sets a runtime session override for a tool (e.g. 'allow', 'deny')."""
-        self.session_overrides[tool_name.lower()] = action.lower()
+        """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
+        normalized = self.normalize_action(action)
+        if normalized in self.VALID_ACTIONS:
+            self.session_overrides[tool_name.lower()] = normalized
 
     def clear_session_overrides(self) -> None:
         self.session_overrides.clear()
@@ -60,13 +73,26 @@ class PermissionManager:
         project_dir: Optional[str] = None,
     ) -> None:
         """
-        Updates a permission setting (target_type: 'group' or 'tool') to action ('allow', 'ask', 'deny').
+        Updates a permission setting (target_type: 'group', 'tool' or 'shell_guard') to action.
+        Raises ValueError on invalid target_type or action.
         Saves to project permissions file if project_dir is set, otherwise global config.
         """
         from tools.base import atomic_write_json
 
+        if target_type not in ("group", "tool", "shell_guard"):
+            raise ValueError(f"Invalid target_type: '{target_type}'")
+
         target_name = target_name.lower()
-        action = action.lower()
+        if target_type == "shell_guard":
+            if action.lower() not in ("allow", "deny", "true", "false", "enabled", "disabled"):
+                raise ValueError(f"Invalid shell_guard action: '{action}'")
+        else:
+            # Validate the raw value BEFORE normalization: normalize_action() would
+            # turn junk into the valid 'ask' default and mask the error.
+            raw = (action or "").strip().lower()
+            if raw not in self.VALID_ACTIONS:
+                raise ValueError(f"Invalid action '{action}' for {target_type} '{target_name}'")
+            action = raw
 
         if project_dir:
             file_path = os.path.join(project_dir, PROJECT_PERMISSIONS_FILE)
@@ -131,15 +157,15 @@ class PermissionManager:
         if not override:
             return
         if "default" in override and isinstance(override["default"], str):
-            base["default"] = override["default"].lower()
+            base["default"] = self.normalize_action(override["default"])
         if "groups" in override and isinstance(override["groups"], dict):
             for g, act in override["groups"].items():
                 if isinstance(act, str):
-                    base["groups"][g.lower()] = act.lower()
+                    base["groups"][g.lower()] = self.normalize_action(act)
         if "tools" in override and isinstance(override["tools"], dict):
             for t, act in override["tools"].items():
                 if isinstance(act, str):
-                    base["tools"][t.lower()] = act.lower()
+                    base["tools"][t.lower()] = self.normalize_action(act)
         if "shell_guard" in override and isinstance(override["shell_guard"], dict):
             base["shell_guard"].update(override["shell_guard"])
 
@@ -187,4 +213,5 @@ class PermissionManager:
 
         # 5. Fallback to default
         default_action = effective_perms.get("default", "ask")
-        return default_action, f"Default permission fallback for '{canonical_name}'"
+        # Fail-closed: any unexpected value becomes 'ask' (user confirmation), never silent 'allow'.
+        return self.normalize_action(default_action), f"Default permission fallback for '{canonical_name}'"
