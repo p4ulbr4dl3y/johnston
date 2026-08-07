@@ -165,7 +165,8 @@ class InvokeSubagentTool(BaseTool):
                 if has_changes and diff_text:
                     acc[0] += (
                         f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n\n"
+                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
+                        f"After merging, ask the user via the ask_user tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
                         f"{diff_text}"
                     )
                 SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
