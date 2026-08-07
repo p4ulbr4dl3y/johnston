@@ -30,11 +30,13 @@ class SkillDetailScreen(ModalScreen[bool]):
         scope_tag = self.skill.get("scope", "global").upper()
         header_md = f"### **Skill: {self.skill['name']}** (`[{scope_tag}]`)"
         desc = self.skill.get("description", "").strip() or "No description provided."
-        body_md = f"{header_md}\n\n---\n\n{desc}"
 
         with Vertical(id="modal-dialog"):
-            yield Markdown(body_md, classes="modal-markdown")
+            yield Markdown(header_md, classes="modal-markdown modal-markdown-centered")
+            yield Markdown(desc, classes="modal-markdown")
             yield Label("enter: activate • esc: cancel", id="modal-hint")
+
+
 
     def action_cancel(self) -> None:
         self.dismiss(False)
@@ -79,7 +81,7 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Available Skills**", classes="modal-markdown")
+            yield Markdown("### **Available Skills**", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search skills...", id="modal-search-input")
             yield OptionList(id="skills-option-list")
             yield Label("enter: activate • tab: toggle status • esc: cancel", id="modal-hint")

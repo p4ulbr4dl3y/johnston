@@ -168,8 +168,9 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 action_desc = f"Agent wants to execute `{self.tool_name}`"
 
         with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
-            yield Markdown("### **Confirm Tool Action**", classes="modal-markdown-centered")
+            yield Markdown("### **Confirm Tool Action**", classes="modal-markdown modal-markdown-centered")
             yield Markdown(action_desc, classes="modal-markdown")
+
 
             if self.tool_name in ("create", "write", "write_to_file"):
                 file_exists = bool(target_path and os.path.isfile(target_path))

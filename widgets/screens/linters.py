@@ -29,7 +29,7 @@ class LintersScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Manage Linters**", classes="modal-markdown")
+            yield Markdown("### **Manage Linters**", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search linters...", id="modal-search-input")
             yield OptionList(id="linters-option-list")
             yield Label("enter: toggle • esc: cancel", id="modal-hint")

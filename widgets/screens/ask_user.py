@@ -81,8 +81,10 @@ class ConfirmScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Confirm Your Answers**\n\n" + self.summary, classes="modal-markdown")
+            yield Markdown("### **Confirm Your Answers**", classes="modal-markdown modal-markdown-centered")
+            yield Markdown(self.summary, classes="modal-markdown")
             yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
+
 
     def on_mount(self) -> None:
         import time
@@ -219,7 +221,9 @@ class AskUserWizardScreen(ModalScreen[str]):
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
                 blocks.append(f"**{q_clean}**\n\n{ans_display}")
+
             summary = "\n\n&nbsp;\n\n".join(blocks)
+
 
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**\n\n" + summary)

@@ -1522,8 +1522,11 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
     def test_render_content_update_plan(self):
         w = self._widget("update_plan", "Error: nope", args={})
         w.render_content()
-        w2 = self._widget("update_plan", "", args={"plan": [{"step": "s", "status": "in_progress"}]})
+        w2 = self._widget("update_plan", "", args={"plan": [{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}]})
         w2.render_content()
+        plan_text = w2._format_plan_display([{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}], "explanation")
+        self.assertIn("s", plan_text.plain)
+        self.assertIn("done step", plan_text.plain)
 
     def test_render_content_web_fetch(self):
         w = self._widget("web_fetch", "error: failed", args={"url": "http://x"})

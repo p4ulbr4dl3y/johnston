@@ -35,7 +35,7 @@ class SubagentsScreen(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Active Subagent Tasks**", id="subagents-title", classes="modal-markdown")
+            yield Markdown("### **Active Subagent Tasks**", id="subagents-title", classes="modal-markdown modal-markdown-centered")
             yield Input(placeholder="Search subagents...", id="modal-search-input")
             yield OptionList(id="subagents-option-list")
             yield Label("enter: view details • tab: kill • esc: cancel", id="modal-hint")
