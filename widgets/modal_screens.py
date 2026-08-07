@@ -4,6 +4,7 @@ from widgets.screens.help import HelpScreen
 from widgets.screens.linters import LintersScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
+from widgets.screens.permission_confirm import PermissionConfirmScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
 from widgets.screens.rewind import RewindScreen
@@ -16,6 +17,7 @@ from widgets.screens.thinking_effort import ThinkingEffortScreen
 __all__ = [
     "AskUserWizardScreen",
     "ConfirmScreen",
+    "PermissionConfirmScreen",
     "ShellConfirmScreen",
     "BaseSelectionScreen",
     "ProvidersScreen",
