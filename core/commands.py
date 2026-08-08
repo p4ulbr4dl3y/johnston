@@ -505,68 +505,6 @@ class PermissionsCommand(BaseCommand):
         app.push_screen(PermissionsScreen(project_dir=project_dir))
 
 
-DEMO_QUESTIONS = [
-    {
-        "question_text": "Что хочешь сделать с этим багом?",
-        "options": [
-            "(Recommended) Починить сразу",
-            "Сначала написать тест",
-            "Только посмотреть код",
-            "Отложить до завтра",
-        ],
-    },
-    {
-        "question_text": "Какие файлы задействовать?",
-        "options": [
-            "core/session_manager.py",
-            "widgets/chat_input.py",
-            "widgets/status_footer.py",
-            "app.py",
-        ],
-    },
-    {
-        "question_text": "Опиши подробности свободным текстом:",
-        "options": [],
-    },
-]
-
-
-class DemoCommand(BaseCommand):
-    name = "/demo"
-    aliases = ["/askdemo"]
-    description = "Launch interactive questions demo wizard (supports Tab minimize & /questions resume)"
-
-    async def execute(self, app) -> None:
-        from tools.ask_user import AskUserTool
-
-        try:
-            from widgets.chat_view import ChatView
-
-            chat_view = app.query_one("#chat-view", ChatView)
-            await chat_view.add_user_message("/demo")
-            await chat_view.add_tool_call(
-                tool_type="ask_user",
-                target="Ask user clarification questions",
-                args={"questions": DEMO_QUESTIONS},
-            )
-        except Exception:
-            chat_view = None
-
-        tool = AskUserTool()
-
-        async def _run_demo():
-            res = await tool.execute({"questions": DEMO_QUESTIONS}, app=app)
-            if chat_view and isinstance(res, str) and res.strip() and not res.startswith("OK: cancelled"):
-                try:
-                    bot_msg = await chat_view.add_bot_message()
-                    if hasattr(bot_msg, "update_text"):
-                        bot_msg.update_text(f"**Demo Result:**\n\n```\n{res}\n```")
-                except Exception:
-                    pass
-
-        asyncio.create_task(_run_demo())
-
-
 class QuestionsCommand(BaseCommand):
     name = "/questions"
     aliases = ["/q", "/ask"]
@@ -585,7 +523,7 @@ class QuestionsCommand(BaseCommand):
             pending_func()
         else:
             if hasattr(app, "notify"):
-                app.notify("No pending questions: type /demo to test", severity="warning")
+                app.notify("No pending questions", severity="warning")
 
 
 COMMAND_CLASSES = [
@@ -603,7 +541,6 @@ COMMAND_CLASSES = [
     LintersCommand,
     CompactCommand,
     PermissionsCommand,
-    DemoCommand,
     QuestionsCommand,
 ]
 
