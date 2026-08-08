@@ -202,14 +202,16 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
             def mount(self, widget):
                 self.mounted.append(widget)
 
+        import asyncio
         app = MockApp()
-        container = ContainerMock()
-        app.query_one = lambda selector, *args: container if selector == "#app-container" else (app.chat_view if selector == "#chat-view" else MagicMock())
+        app.push_screen = MagicMock()
         handled = await handle_slash_command(app, "/demo")
         self.assertTrue(handled)
-        self.assertEqual(len(container.mounted), 1)
-        from widgets.inline_question import InlineQuestionBar
-        self.assertIsInstance(container.mounted[0], InlineQuestionBar)
+        await asyncio.sleep(0.05)
+        self.assertTrue(app.push_screen.called)
+        from widgets.screens.ask_user import AskUserWizardScreen
+        screen_arg = app.push_screen.call_args[0][0]
+        self.assertIsInstance(screen_arg, AskUserWizardScreen)
 
 
     async def test_compact_command(self):

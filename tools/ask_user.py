@@ -83,30 +83,49 @@ class AskUserTool(BaseTool):
         if ctx.app and hasattr(ctx.app, "push_screen"):
             try:
                 from widgets.screens.ask_user import AskUserWizardScreen
-                screen = AskUserWizardScreen(validated_questions)
+
                 loop = asyncio.get_running_loop()
                 future = loop.create_future()
 
-                def on_dismiss(result):
-                    if not future.done():
-                        future.set_result(result)
+                def _show_wizard(questions, answers=None, q_idx=0):
+                    screen = AskUserWizardScreen(questions, answers=answers, q_idx=q_idx)
 
-                ctx.app.push_screen(screen, callback=on_dismiss)
+                    def on_dismiss(result):
+                        if isinstance(result, dict) and result.get("action") == "minimize":
+                            saved_answers = result.get("answers", {})
+                            saved_q_idx = result.get("q_idx", 0)
+                            setattr(ctx.app, "_pending_ask_user", lambda: _show_wizard(questions, saved_answers, saved_q_idx))
+                            if hasattr(ctx.app, "notify"):
+                                try:
+                                    ctx.app.notify("Questions minimized. Type /questions to resume.", title="Questions")
+                                except Exception:
+                                    pass
+                        else:
+                            if hasattr(ctx.app, "_pending_ask_user"):
+                                setattr(ctx.app, "_pending_ask_user", None)
+                            if not future.done():
+                                future.set_result(result)
+
+                    ctx.app.push_screen(screen, callback=on_dismiss)
+
+                _show_wizard(validated_questions)
+
                 try:
                     res = await future
                 finally:
-                    if getattr(screen, "is_mounted", False):
-                        try:
-                            screen.dismiss("cancelled")
-                        except Exception:
-                            pass
+                    if hasattr(ctx.app, "_pending_ask_user") and future.done():
+                        setattr(ctx.app, "_pending_ask_user", None)
 
                 if isinstance(res, str) and res.strip() and res != "cancelled":
                     return res
                 return "OK: cancelled by user"
             except asyncio.CancelledError:
+                if hasattr(ctx.app, "_pending_ask_user"):
+                    setattr(ctx.app, "_pending_ask_user", None)
                 return "OK: cancelled by user"
             except Exception as e:
+                if hasattr(ctx.app, "_pending_ask_user"):
+                    setattr(ctx.app, "_pending_ask_user", None)
                 return f"ERR: prompt failed: {e}"
         return "ERR: app instance not available"
 

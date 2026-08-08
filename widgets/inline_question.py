@@ -33,6 +33,12 @@ DEMO_QUESTIONS = [
 class WriteInInput(Input):
     """Custom Input widget that handles Up key to return focus to OptionList and prevents select-all"""
 
+    def get_bar(self) -> "InlineQuestionBar | None":
+        try:
+            return self.ancestor(InlineQuestionBar)
+        except Exception:
+            return None
+
     def _clear_selection(self) -> None:
         val_len = len(self.value)
         self.cursor_position = val_len
@@ -52,46 +58,44 @@ class WriteInInput(Input):
         self.call_after_refresh(self._clear_selection)
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if self.parent and hasattr(self.parent, "save_write_in_draft"):
-            getattr(self.parent, "save_write_in_draft")(event.value)
+        bar = self.get_bar()
+        if bar and hasattr(bar, "save_write_in_draft"):
+            bar.save_write_in_draft(event.value)
 
     def _on_input(self, event: Input.Changed) -> None:
         self.on_input_changed(event)
 
-    async def _on_key(self, event: events.Key) -> None:
+    async def on_key(self, event: events.Key) -> None:
         key = event.key
         cursor = self.cursor_position
         val_len = len(self.value)
+        bar = self.get_bar()
 
-        if key in ("up", "key_up"):
-            if self.parent and getattr(self.parent, "raw_options", None):
-                if hasattr(self.parent, "focus_options_list"):
-                    getattr(self.parent, "focus_options_list")()
-                    event.stop()
-                    event.prevent_default()
-                    return
+        if key in ("up", "key_up") and bar:
+            if bar.raw_options:
+                bar.focus_options_list()
+                event.stop()
+                event.prevent_default()
+                return
             else:
-                if self.parent and hasattr(self.parent, "action_go_back"):
-                    getattr(self.parent, "action_go_back")()
-                    event.stop()
-                    event.prevent_default()
-                    return
+                bar.action_go_back()
+                event.stop()
+                event.prevent_default()
+                return
 
-        elif key in ("left", "key_left"):
+        elif key in ("left", "key_left") and bar:
             if cursor == 0:
-                if self.parent and hasattr(self.parent, "action_go_back"):
-                    getattr(self.parent, "action_go_back")()
-                    event.stop()
-                    event.prevent_default()
-                    return
+                bar.action_go_back()
+                event.stop()
+                event.prevent_default()
+                return
 
-        elif key in ("right", "key_right"):
+        elif key in ("right", "key_right") and bar:
             if cursor == val_len:
-                if self.parent and hasattr(self.parent, "action_go_next"):
-                    getattr(self.parent, "action_go_next")()
-                    event.stop()
-                    event.prevent_default()
-                    return
+                bar.action_go_next()
+                event.stop()
+                event.prevent_default()
+                return
 
         await super()._on_key(event)
 
@@ -99,10 +103,17 @@ class WriteInInput(Input):
 class QuestionOptionList(OptionList):
     """Custom OptionList that intercepts Space to toggle selection without advancing."""
 
-    async def _on_key(self, event: events.Key) -> None:
+    def get_bar(self) -> "InlineQuestionBar | None":
+        try:
+            return self.ancestor(InlineQuestionBar)
+        except Exception:
+            return None
+
+    async def on_key(self, event: events.Key) -> None:
         if event.key == "space":
-            if self.parent and hasattr(self.parent, "action_toggle_selection"):
-                getattr(self.parent, "action_toggle_selection")()
+            bar = self.get_bar()
+            if bar:
+                bar.action_toggle_selection()
                 event.stop()
                 event.prevent_default()
                 return
@@ -205,11 +216,26 @@ class InlineQuestionBar(Vertical):
         yield Label("", id="modal-hint")
 
     def on_mount(self) -> None:
+        try:
+            self.app.query_one("#message-input").display = False
+            self.app.query_one("#status-footer").display = False
+        except Exception:
+            pass
+
         self.update_step()
         self.call_after_refresh(self._force_focus)
         self.set_timer(0.05, self._force_focus)
         self.set_timer(0.15, self._force_focus)
         self.set_timer(0.30, self._force_focus)
+
+    def on_unmount(self) -> None:
+        try:
+            msg_input = self.app.query_one("#message-input")
+            msg_input.display = True
+            msg_input.focus()
+            self.app.query_one("#status-footer").display = True
+        except Exception:
+            pass
 
     def on_focus(self, event: events.Focus) -> None:
         self._force_focus()
@@ -349,7 +375,7 @@ class InlineQuestionBar(Vertical):
             opt_list = self.query_one("#options-list", QuestionOptionList)
             input_field.display = False
             opt_list.highlighted = max(0, len(self.options) - 2)
-            self.call_after_refresh(opt_list.focus)
+            opt_list.focus()
         except Exception:
             pass
 
@@ -441,3 +467,4 @@ class InlineQuestionBar(Vertical):
                         res[idx] = str(a or "")
             self.callback(res)
         self.remove()
+

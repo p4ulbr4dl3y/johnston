@@ -112,6 +112,7 @@ class AskUserWizardScreen(ModalScreen[str]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
+        ("tab", "minimize", "Minimize"),
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
         ("enter", "go_next", "Next / Confirm"),
@@ -120,11 +121,11 @@ class AskUserWizardScreen(ModalScreen[str]):
         ("ctrl+q", "quit", "Exit"),
     ]
 
-    def __init__(self, questions: list[dict]):
+    def __init__(self, questions: list[dict], answers: dict | None = None, q_idx: int = 0):
         super().__init__()
         self.questions = questions or []
-        self.answers = {}
-        self.q_idx = 0
+        self.answers = answers or {}
+        self.q_idx = q_idx
         self.raw_options = []
         self.options = []
 
@@ -168,7 +169,7 @@ class AskUserWizardScreen(ModalScreen[str]):
             q = self.questions[self.q_idx]
             q_text = q.get("question_text", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
-            hint.update("enter: confirm • space: toggle • ←: back • →: next • esc: cancel")
+            hint.update("enter: confirm • space: toggle • ←: back • →: next • tab: minimize • esc: cancel")
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
@@ -330,6 +331,9 @@ class AskUserWizardScreen(ModalScreen[str]):
     def action_cancel(self) -> None:
         self.dismiss("Cancelled by user.")
 
+    def action_minimize(self) -> None:
+        self.dismiss({"action": "minimize", "answers": self.answers, "q_idx": self.q_idx})
+
     def action_go_back(self) -> None:
         if self.q_idx > 0:
             self.q_idx -= 1
@@ -347,7 +351,7 @@ class AskUserWizardScreen(ModalScreen[str]):
         self.app.exit()
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("tab", "shift+tab", "backtab", "shift_tab"):
+        if event.key in ("shift+tab", "backtab", "shift_tab"):
             event.prevent_default()
             event.stop()
             return
