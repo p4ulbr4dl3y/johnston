@@ -97,21 +97,20 @@ class ManageSubagentTool(BaseTool):
                 except Exception:
                     pass
 
-            lines.append("\nRecent Events Log:")
-
-            recent = session.events[-15:]
-            for evt in recent:
-                etype = evt.get("type")
-                if etype == "user":
-                    lines.append(f"  [User]: {evt.get('text')}")
-                elif etype == "bot_text":
-                    lines.append(f"  [Bot]: {evt.get('text')[:150]}...")
-                elif etype == "tool":
-                    lines.append(f"  [Tool]: {evt.get('tool_type')} ({evt.get('target')})")
-                elif etype == "status_change":
-                    lines.append(f"  [Status]: {evt.get('status')}")
-
             if session.status == "running":
+                lines.append("\nRecent Events Log:")
+                recent = session.events[-15:]
+                for evt in recent:
+                    etype = evt.get("type")
+                    if etype == "user":
+                        lines.append(f"  [User]: {evt.get('text')}")
+                    elif etype == "bot_text":
+                        lines.append(f"  [Bot]: {evt.get('text')[:150]}...")
+                    elif etype == "tool":
+                        lines.append(f"  [Tool]: {evt.get('tool_type')} ({evt.get('target')})")
+                    elif etype == "status_change":
+                        lines.append(f"  [Status]: {evt.get('status')}")
+
                 lines.append("\nNote: Subagent is still running. STOP calling manage_subagent(status) in a loop and end your turn now.")
             return "\n".join(lines)
 
