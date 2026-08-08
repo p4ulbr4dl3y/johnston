@@ -360,7 +360,7 @@ class TasksCommand(BaseCommand):
         if not tasks:
             app.notify("No active background tasks", severity="warning")
             return
-        app.push_screen(TasksListScreen())
+        app.push_screen(TasksListScreen(default_tab=0))
 
 
 class SubagentsCommand(BaseCommand):
@@ -370,15 +370,25 @@ class SubagentsCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         from core.subagent_tracker import SubagentTracker
-        from widgets.screens.subagents import SubagentsScreen
+        all_tasks = getattr(app, "background_tasks", [])
+        curr_sid = getattr(app, "current_session_id", None)
+        if curr_sid:
+            tasks = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+        else:
+            tasks = list(all_tasks)
+        tasks = [t for t in tasks if getattr(t, "is_background", False)]
 
-        curr_session_id = getattr(app, "current_session_id", None)
-        sessions = SubagentTracker.get_instance().get_sessions_for_session(curr_session_id)
-        if not sessions:
-            app.notify("No subagents registered for this session", severity="warning")
+        st = SubagentTracker.get_instance()
+        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
+        if not sessions and curr_sid:
+            sessions = st.get_sessions_for_session(None)
+
+        if not tasks and not sessions:
+            app.notify("No active background tasks", severity="warning")
             return
 
-        app.push_screen(SubagentsScreen())
+        from widgets.screens.tasks import TasksListScreen
+        app.push_screen(TasksListScreen(default_tab=1))
 
 
 
@@ -526,6 +536,78 @@ class QuestionsCommand(BaseCommand):
                 app.notify("No pending questions", severity="warning")
 
 
+class DemoCommand(BaseCommand):
+    name = "/demo"
+    description = "Spawn fake subagents and shell background tasks for UI testing"
+
+    async def execute(self, app) -> None:
+        from core.background_task import BackgroundTask
+        from core.subagent_tracker import SubagentTracker
+
+        curr_sid = getattr(app, "current_session_id", None)
+
+        # 1. Create 2 fake shell background tasks
+        t1 = BackgroundTask(
+            task_id="demo-shell-1",
+            command="pytest --cov=core --cov-report=term",
+            process=None,
+            session_id=curr_sid
+        )
+        t1.is_running = True
+        t1.is_background = True
+        t1.output = ["Running pytest...\n", "tests/core/test_tasks.py .. [100%]\n"]
+
+        t2 = BackgroundTask(
+            task_id="demo-shell-2",
+            command="npm run build --prefix ./frontend",
+            process=None,
+            session_id=curr_sid
+        )
+        t2.is_running = True
+        t2.is_background = True
+        t2.output = ["Building frontend assets...\n", "Webpack compiled successfully.\n"]
+
+        if not hasattr(app, "background_tasks"):
+            app.background_tasks = []
+        app.background_tasks.extend([t1, t2])
+
+        # 2. Create 2 fake subagent tasks
+        st = SubagentTracker.get_instance()
+        s1 = st.create_session(
+            task_id="subagent-demo-1",
+            description="Refactoring UI Widgets and Tasks Manager",
+            prompt="Refactor TasksListScreen to support tabs and subagent tracking",
+            subagent_type="worker",
+            background=True,
+            session_id=curr_sid
+        )
+        s1.status = "running"
+
+        s2 = st.create_session(
+            task_id="subagent-demo-2",
+            description="Analyzing Codebase Architecture and MCP Tools",
+            prompt="Perform full audit of codebase imports and tool schemas",
+            subagent_type="research",
+            background=True,
+            session_id=curr_sid
+        )
+        s2.status = "running"
+
+        # Refresh UI footer
+        if hasattr(app, "refresh_status_footer"):
+            app.refresh_status_footer()
+        else:
+            try:
+                from widgets.status_footer import StatusFooter
+                footer = app.query_one(StatusFooter)
+                footer.refresh_footer()
+            except Exception:
+                pass
+
+        if hasattr(app, "notify"):
+            app.notify("Spawned 2 agents & 2 shell tasks! Check footer or run /tasks", severity="info")
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -542,6 +624,7 @@ COMMAND_CLASSES = [
     CompactCommand,
     PermissionsCommand,
     QuestionsCommand,
+    DemoCommand,
 ]
 
 

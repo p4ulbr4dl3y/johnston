@@ -106,9 +106,19 @@ class StatusFooter(Static):
             bash_tasks = [t for t in bg_tasks if not getattr(t, "task_id", "").startswith("subagent-")]
             active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)])
 
-            subagents = [t for t in bg_tasks if getattr(t, "task_id", "").startswith("subagent-")]
-            subagents_active = len([t for t in subagents if getattr(t, "is_running", False)])
-            subagents_total = len(subagents)
+            from core.subagent_tracker import SubagentTracker
+            st = SubagentTracker.get_instance()
+            st._load_all_sessions()
+            sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
+            if not sessions and curr_sid:
+                sessions = st.get_sessions_for_session(None)
+            st_running = len([s for s in sessions if getattr(s, "status", "") == "running"])
+
+            subagents_bg = [t for t in bg_tasks if getattr(t, "task_id", "").startswith("subagent-")]
+            bg_running = len([t for t in subagents_bg if getattr(t, "is_running", False)])
+
+            subagents_active = max(st_running, bg_running)
+            subagents_total = max(len(sessions), len(subagents_bg))
 
             agent_mode = getattr(agent, "mode", "action")
 
@@ -218,10 +228,13 @@ class StatusFooter(Static):
             else:
                 row2_left = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
                 row2_right_parts = []
-            if active_bg_tasks > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks}bg[/]")
+            task_parts = []
             if subagents_active > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total}sub[/]")
+                task_parts.append(f"{subagents_active}agent")
+            if active_bg_tasks > 0:
+                task_parts.append(f"{active_bg_tasks}shell")
+            if task_parts:
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
             row2_right = " • ".join(row2_right_parts)
         else:
             row1_left_parts = [
@@ -278,10 +291,13 @@ class StatusFooter(Static):
                 row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
                 row2_right_parts = []
 
-            if active_bg_tasks > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} bg task[/]")
+            task_parts = []
             if subagents_active > 0:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{subagents_active}/{subagents_total} subagent[/]")
+                task_parts.append(f"{subagents_active} agent" if subagents_active == 1 else f"{subagents_active} agents")
+            if active_bg_tasks > 0:
+                task_parts.append(f"{active_bg_tasks} shell")
+            if task_parts:
+                row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
 
             row2_right = "  •  ".join(row2_right_parts)
 

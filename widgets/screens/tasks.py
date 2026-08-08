@@ -3,7 +3,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Input, Label, Markdown, OptionList, RichLog
+from textual.widgets import Label, Markdown, OptionList, RichLog
 
 from core.config import THEME_MUTED
 
@@ -53,11 +53,15 @@ class TaskConsoleScreen(ModalScreen[None]):
 
 
 class TasksListScreen(ModalScreen[None]):
-    """Modal screen with background tasks list"""
+    """Modal screen with background tasks list and tabs for All, Agents, and Shell tasks."""
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Manager"),
-        ("tab", "kill_task", "Kill Task"),
+        ("k", "kill_task", "Kill Task"),
+        ("left", "prev_tab", "Previous Tab"),
+        ("right", "next_tab", "Next Tab"),
+        ("tab", "next_tab", "Next Tab"),
+        ("backtab", "prev_tab", "Previous Tab"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ]
@@ -65,134 +69,203 @@ class TasksListScreen(ModalScreen[None]):
     def action_quit_app(self) -> None:
         self.app.exit()
 
-    def __init__(self):
+    def __init__(self, default_tab: int = 0):
         super().__init__()
+        self.active_tab = default_tab  # 0: All, 1: Agents, 2: Shell
         self.search_query = ""
         self.filtered_tasks = []
 
+    def _get_header_md(self) -> str:
+        t0 = "**[ All ]**" if self.active_tab == 0 else "**All**"
+        t1 = "**[ Agents ]**" if self.active_tab == 1 else "**Agents**"
+        t2 = "**[ Shell ]**" if self.active_tab == 2 else "**Shell**"
+        return f"### **Background Tasks Manager**\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2}"
+
+    def action_prev_tab(self) -> None:
+        self.active_tab = (self.active_tab - 1) % 3
+        self._refresh_header_and_list()
+
+    def action_next_tab(self) -> None:
+        self.active_tab = (self.active_tab + 1) % 3
+        self._refresh_header_and_list()
+
+    def _get_header_widget(self) -> Markdown:
+        try:
+            return self.query_one("#tasks-header-md", Markdown)
+        except Exception:
+            return self.query_one("#subagents-title", Markdown)
+
+    def _get_option_list(self) -> OptionList:
+        try:
+            return self.query_one("#tasks-option-list", OptionList)
+        except Exception:
+            return self.query_one("#subagents-option-list", OptionList)
+
+    def _refresh_header_and_list(self) -> None:
+        try:
+            header_md = self._get_header_widget()
+            header_md.update(self._get_header_md())
+        except Exception:
+            pass
+        self._last_signatures = None
+        self.update_tasks_list()
+
     def _get_filtered_tasks(self) -> list:
-        all_tasks = getattr(self.app, "background_tasks", [])
-        curr_sid = getattr(self.app, "current_session_id", None)
+        items = []
+
+        # 1. Gather shell background tasks
+        all_bg_tasks = getattr(self.app, "background_tasks", []) if hasattr(self, "app") and self.app else []
+        curr_sid = getattr(self.app, "current_session_id", None) if hasattr(self, "app") and self.app else None
         if curr_sid:
-            filtered = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+            bg_tasks = [t for t in all_bg_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
         else:
-            filtered = list(all_tasks)
-        filtered = [t for t in filtered if getattr(t, "is_background", False)]
+            bg_tasks = list(all_bg_tasks)
+
+        for t in bg_tasks:
+            # Exclude subagent tasks stored in background_tasks to avoid duplication with SubagentTracker
+            task_id = getattr(t, "task_id", "")
+            if task_id.startswith("subagent-"):
+                continue
+            if getattr(t, "is_background", False):
+                items.append({
+                    "id": task_id,
+                    "kind": "shell",
+                    "command": getattr(t, "command", ""),
+                    "is_running": getattr(t, "is_running", False),
+                    "status_str": "RUNNING" if getattr(t, "is_running", False) else "FINISHED",
+                    "raw_obj": t
+                })
+
+        # 2. Gather subagent sessions
+        from core.subagent_tracker import SubagentTracker
+        st = SubagentTracker.get_instance()
+        st._load_all_sessions()
+        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
+        if not sessions and curr_sid:
+            sessions = st.get_sessions_for_session(None)
+
+        for s in sessions:
+            st_str = (getattr(s, "status", "") or "unknown").upper()
+            is_run = st_str == "RUNNING"
+            items.append({
+                "id": getattr(s, "task_id", ""),
+                "kind": "agent",
+                "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "task_id", ""),
+                "is_running": is_run,
+                "status_str": st_str,
+                "raw_obj": s
+            })
+
+        # Filter by active tab
+        if self.active_tab == 1:
+            items = [item for item in items if item["kind"] == "agent"]
+        elif self.active_tab == 2:
+            items = [item for item in items if item["kind"] == "shell"]
+
+        # Filter by search query
         q = self.search_query.strip().lower()
         if q:
-            filtered = [
-                t for t in filtered
-                if q in getattr(t, "command", "").lower()
-                or q in getattr(t, "task_id", "").lower()
+            items = [
+                item for item in items
+                if q in item["command"].lower() or q in item["id"].lower() or q in item["kind"].lower()
             ]
-        return sorted(filtered, key=lambda t: not getattr(t, "is_running", False))
+
+        return sorted(items, key=lambda item: not item["is_running"])
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Background Tasks Manager**", classes="modal-markdown modal-markdown-centered")
-            yield Input(placeholder="Search tasks...", id="modal-search-input")
+            yield Markdown(self._get_header_md(), id="tasks-header-md", classes="modal-markdown modal-markdown-centered")
             yield OptionList(id="tasks-option-list")
-            yield Label("enter: view output • tab: kill task • esc: cancel", id="modal-hint")
+            yield Label("enter: view details • tab / ←/→: switch tab • k: kill • esc: cancel", id="modal-hint")
 
     def on_mount(self) -> None:
         self._last_signatures = None
         self.update_tasks_list()
         try:
-            self.query_one("#modal-search-input", Input).focus()
+            self._get_option_list().focus()
         except Exception:
             pass
         self.set_interval(0.5, self.update_tasks_list)
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "modal-search-input":
-            self.search_query = event.value
-            self._last_signatures = None
-            self.update_tasks_list()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "modal-search-input":
-            tasks = self._get_filtered_tasks()
-            opt_list = self.query_one("#tasks-option-list", OptionList)
-            idx = opt_list.highlighted
-            if idx is not None and idx < len(tasks):
-                task = tasks[idx]
-                if hasattr(task, "async_task"):
-                    from widgets.screens.subagent_screen import SubagentViewScreen
-                    self.app.push_screen(SubagentViewScreen(task.task_id))
-                else:
-                    self.app.push_screen(TaskConsoleScreen(task))
-
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("down", "up"):
-            try:
-                search_input = self.query_one("#modal-search-input", Input)
-                if search_input.has_focus:
-                    tasks = self._get_filtered_tasks()
-                    opt_list = self.query_one("#tasks-option-list", OptionList)
-                    if opt_list.highlighted is None and tasks:
-                        opt_list.highlighted = 0
-                    elif opt_list.highlighted is not None:
-                        if event.key == "down":
-                            opt_list.action_cursor_down()
-                        else:
-                            opt_list.action_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-            except Exception:
-                pass
+        if event.key in ("left", "backtab"):
+            self.action_prev_tab()
+            event.prevent_default()
+            event.stop()
+        elif event.key in ("right", "tab"):
+            self.action_next_tab()
+            event.prevent_default()
+            event.stop()
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
             return
         tasks = self._get_filtered_tasks()
-        new_signatures = [(getattr(t, "task_id", ""), getattr(t, "is_running", False), getattr(t, "command", "")) for t in tasks]
+        new_signatures = [(item["id"], item["is_running"], item["command"], item["kind"]) for item in tasks]
         if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
             return
         self._last_signatures = new_signatures
 
-        opt_list = self.query_one("#tasks-option-list", OptionList)
+        opt_list = self._get_option_list()
         current_highlighted = opt_list.highlighted
 
         opt_list.clear_options()
         if not tasks:
-            opt_list.add_option(Text("No active background tasks.", style=THEME_MUTED))
+            opt_list.add_option(Text("No background tasks found.", style=THEME_MUTED))
             return
 
-        for t in tasks:
-            cmd = t.command
-            if len(cmd) > 38:
-                cmd = cmd[:35] + "..."
-            status_tag = r"\[RUNNING]" if t.is_running else r"\[FINISHED]"
-            opt_list.add_option(f"{status_tag} {cmd}")
+        for item in tasks:
+            cmd = item["command"]
+            if len(cmd) > 35:
+                cmd = cmd[:32] + "..."
+            status_tag = f"\\[{item['status_str']}]"
+            kind_tag = f"\\[{item['kind'].capitalize()}]" if self.active_tab == 0 else ""
+            prefix = f"{status_tag} {kind_tag}".strip()
+            opt_list.add_option(f"{prefix} {cmd}")
 
         if current_highlighted is not None and current_highlighted < len(tasks):
             opt_list.highlighted = current_highlighted
         else:
             opt_list.highlighted = 0
 
+    def _open_task_details(self, item: dict) -> None:
+        raw = item["raw_obj"]
+        if item["kind"] == "agent" or hasattr(raw, "async_task"):
+            from widgets.screens.subagent_screen import SubagentViewScreen
+            self.app.push_screen(SubagentViewScreen(item["id"]))
+        else:
+            self.app.push_screen(TaskConsoleScreen(raw))
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         tasks = self._get_filtered_tasks()
         if event.option_index is not None and event.option_index < len(tasks):
-            task = tasks[event.option_index]
-            if hasattr(task, "async_task"):
-                from widgets.screens.subagent_screen import SubagentViewScreen
-                self.app.push_screen(SubagentViewScreen(task.task_id))
-            else:
-                self.app.push_screen(TaskConsoleScreen(task))
+            self._open_task_details(tasks[event.option_index])
 
     async def action_kill_task(self) -> None:
-        opt_list = self.query_one("#tasks-option-list", OptionList)
+        opt_list = self._get_option_list()
         idx = opt_list.highlighted
         tasks = self._get_filtered_tasks()
         if idx is not None and idx < len(tasks):
-            task = tasks[idx]
-            if task.is_running:
-                import inspect
-
-                res = task.kill()
-                if inspect.isawaitable(res):
-                    await res
-                self.update_tasks_list()
+            item = tasks[idx]
+            raw = item["raw_obj"]
+            if item["kind"] == "agent":
+                sess = raw
+                if getattr(sess, "status", "") == "running":
+                    if getattr(sess, "async_task", None) and not sess.async_task.done():
+                        try:
+                            sess.async_task.cancel()
+                        except Exception:
+                            pass
+                    if hasattr(sess, "finish"):
+                        sess.finish("cancelled", "Terminated from tasks menu")
+            else:
+                if getattr(raw, "is_running", False):
+                    import inspect
+                    res = raw.kill()
+                    if inspect.isawaitable(res):
+                        await res
+            self._last_signatures = None
+            self.update_tasks_list()
 
     def action_close(self) -> None:
         self.dismiss()

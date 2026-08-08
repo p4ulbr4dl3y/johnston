@@ -602,6 +602,7 @@ SubagentViewScreen {
     border: none;
     background: #27272a;
     scrollbar-size: 0 0;
+    text-overflow: ellipsis;
 }
 
 #modal-dialog OptionList > .option-list--option-disabled {
