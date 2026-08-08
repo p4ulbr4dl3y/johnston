@@ -15,7 +15,7 @@ class TestSubagentRegistry(unittest.TestCase):
 
         explorer_def = registry.get_definition("explorer")
         self.assertEqual(explorer_def.name, "explorer")
-        self.assertIn("## Subagent Mode: EXPLORER", explorer_def.system_prompt)
+        self.assertIn("## Subagent Type: EXPLORER", explorer_def.system_prompt)
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:

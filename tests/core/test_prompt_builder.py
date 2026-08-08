@@ -118,6 +118,14 @@ class TestPromptBuilder(unittest.TestCase):
         prompt = builder.build_system_prompt()
         self.assertIn("You are an expert AI software engineer operating inside Johnston CLI", prompt)
 
+    def test_build_system_prompt_subagent_mode(self):
+        builder = PromptBuilder("Subagent base prompt", [], mode="orchestrate", is_subagent=True)
+        prompt = builder.build_system_prompt()
+        self.assertIn("Subagent base prompt", prompt)
+        self.assertNotIn("## Execution Mode: ORCHESTRATE", prompt)
+        self.assertNotIn("## Subagents (use as `subagent_type`", prompt)
+        self.assertIn("## Environment Metadata", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

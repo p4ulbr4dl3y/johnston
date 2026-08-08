@@ -46,7 +46,7 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Detailed task prompt with absolute file paths, clear boundaries, and expected output format"},
+                    "prompt": {"type": "string", "description": "Detailed task prompt with relative file paths from project root, clear boundaries, and expected output format"},
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "subagent_type": {"type": "string", "description": "Subagent type: 'worker' (task execution) or 'explorer' (read-only analysis)"},
                     "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},
@@ -119,12 +119,13 @@ class InvokeSubagentTool(BaseTool):
             if t.get("function", {}).get("name") not in excluded_tools
         ]
 
+        from core.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
         from core.subagent_registry import SubagentRegistry
         registry = SubagentRegistry.get_instance()
         registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
         definition = registry.get_definition(subagent_type)
 
-        subagent.system_prompt += f"\n\n{definition.system_prompt}"
+        subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
         if definition.model:
             subagent.model = definition.model
 
