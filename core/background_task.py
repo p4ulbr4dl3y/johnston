@@ -129,7 +129,7 @@ class BackgroundTask:
                     try:
                         out_res = self.get_formatted_output()
                         if len(out_res) > 3000:
-                            out_res = out_res[:3000] + "\n... [output truncated]"
+                            out_res = "... [Output truncated, showing last 3000 chars]\n" + out_res[-3000:]
                         out_res = out_res if out_res.strip() else "OK: executed (no output)"
                         on_completed_cb(self.task_id, self.command, out_res)
                     except Exception:
