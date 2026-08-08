@@ -124,7 +124,7 @@ class TasksListScreen(ModalScreen[None]):
         for t in bg_tasks:
             # Exclude subagent tasks stored in background_tasks to avoid duplication with SubagentTracker
             task_id = getattr(t, "task_id", "")
-            if task_id.startswith("subagent-") or hasattr(t, "async_task"):
+            if task_id.startswith("subagent-") or type(t).__name__ == "BackgroundSubagent":
                 continue
             if getattr(t, "is_background", False):
                 items.append({
@@ -230,9 +230,16 @@ class TasksListScreen(ModalScreen[None]):
 
     def _open_task_details(self, item: dict) -> None:
         raw = item["raw_obj"]
-        if item["kind"] == "agent" or hasattr(raw, "async_task"):
+        is_subagent = (
+            item["kind"] == "agent"
+            or type(raw).__name__ == "BackgroundSubagent"
+            or item["id"].startswith("subagent-")
+            or getattr(raw, "async_task", None) is not None
+        )
+        if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen
-            self.app.push_screen(SubagentViewScreen(item["id"]))
+            task_id = getattr(raw, "task_id", item["id"])
+            self.app.push_screen(SubagentViewScreen(task_id))
         else:
             self.app.push_screen(TaskConsoleScreen(raw))
 
@@ -248,15 +255,16 @@ class TasksListScreen(ModalScreen[None]):
         if idx is not None and idx < len(tasks):
             item = tasks[idx]
             raw = item["raw_obj"]
-            if item["kind"] == "agent":
+            is_subagent = item["kind"] == "agent" or type(raw).__name__ == "BackgroundSubagent"
+            if is_subagent:
                 sess = raw
-                if getattr(sess, "status", "") == "running":
+                if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):
                     if getattr(sess, "async_task", None) and not sess.async_task.done():
                         try:
                             sess.async_task.cancel()
                         except Exception:
                             pass
-                    elif hasattr(sess, "finish"):
+                    if hasattr(sess, "finish"):
                         sess.finish("cancelled", "Terminated from tasks menu")
             else:
                 if getattr(raw, "is_running", False):
