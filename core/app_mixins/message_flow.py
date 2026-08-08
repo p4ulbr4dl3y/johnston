@@ -298,7 +298,7 @@ class MessageFlowMixin:
             return
         try:
             msg = (
-                f"[System Notification] Background shell task '{command_str}' (ID: {task_id}) completed.\n"
+                f"[System Notification] Background shell '{command_str}' (ID: {task_id}) completed.\n"
                 f"<task_result>\n{result}\n</task_result>"
             )
             curr_sid = getattr(self, "current_session_id", None)
