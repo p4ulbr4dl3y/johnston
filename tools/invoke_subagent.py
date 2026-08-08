@@ -25,7 +25,7 @@ def _truncate_subagent_result(text: str, task_id: str = "") -> str:
     next_line = shown_lines + 1
     return (
         truncated
-        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) or `manage_subagent(action='status')` to inspect remaining output.]"
+        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
     )
 
 
