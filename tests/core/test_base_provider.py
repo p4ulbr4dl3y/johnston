@@ -185,6 +185,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: no tasks active", res_list)
 
     async def test_task_tool_foreground(self):
+        from core.subagent_tracker import SubagentTracker
+        SubagentTracker.get_instance().sessions.clear()
         class DummySubAgent:
             system_prompt = "system"
             tools = []
@@ -203,6 +205,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: subagent 'research task' launched", res)
 
     async def test_task_tool_background(self):
+        from core.subagent_tracker import SubagentTracker
+        SubagentTracker.get_instance().sessions.clear()
         class DummySubAgent:
             system_prompt = "system"
             tools = []
