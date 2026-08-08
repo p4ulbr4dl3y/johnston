@@ -32,13 +32,13 @@ class CallMCPTool(BaseTool):
         if not server or not tool:
             return "ERR: 'server' and 'tool' params required"
 
-        from core.mode_manager import ModeManager, mode_tool_error
+        from core.role_registry import RoleRegistry, role_tool_error
 
         app_obj = getattr(app, "app", app)
-        mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
-        mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
-        for candidate in ("call_mcp", "call_mcp_tool", tool.lower(), f"{server}.{tool}".lower()):
-            policy_err = mode_tool_error(mode_def, candidate)
+        mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
+        role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
+        for target in (f"{server}.{tool}", tool, "call_mcp"):
+            policy_err = role_tool_error(role_def, target)
             if policy_err:
                 return policy_err
 

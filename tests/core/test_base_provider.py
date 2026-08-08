@@ -7,7 +7,6 @@ import unittest
 import unittest.mock
 
 from core.base_provider import BaseAgent
-from core.mode_manager import ModeDefinition
 from tools.registry import execute_tool
 
 
@@ -723,20 +722,22 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
 
 class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
     async def test_read_only_blocks_write_aliases(self):
+        from core.role_registry import AgentRole
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
-        mode_def = ModeDefinition("explore", "Explore", read_only=True, disallowed_tools=["write_file", "create", "edit"])
-        err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, mode_def)
+        role_def = AgentRole("explore", "Explore", read_only=True, disallowed_tools=["write_file", "create", "edit"])
+        err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, role_def)
         self.assertIsNotNone(err)
-        self.assertIn("disabled in Explore mode", err)
+        self.assertIn("disabled in Explore role", err)
 
     async def test_disallowed_tools_blocks_aliases(self):
+        from core.role_registry import AgentRole
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
-        mode_def = ModeDefinition("locked", "Locked", disallowed_tools=["shell"])
-        err = agent._tool_policy_error("shell", {"command": "pwd"}, mode_def)
+        role_def = AgentRole("locked", "Locked", disallowed_tools=["shell"])
+        err = agent._tool_policy_error("shell", {"command": "pwd"}, role_def)
         self.assertIsNotNone(err)
-        self.assertIn("disabled in Locked mode", err)
+        self.assertIn("disabled in Locked role", err)
 
 
 class _Chunk:

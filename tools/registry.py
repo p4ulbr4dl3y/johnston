@@ -335,13 +335,13 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
         return f"ERR: unknown tool '{name}'{hint}"
 
-    from core.mode_manager import ModeManager, mode_tool_error
+    from core.role_registry import RoleRegistry, role_tool_error
 
     ctx_or_app = context or app
     app_obj = getattr(ctx_or_app, "app", ctx_or_app)
-    mode = getattr(app_obj, "mode", "action") if app_obj is not None else "action"
-    mode_def = ModeManager.get_instance().get_mode(str(mode).lower())
-    policy_err = mode_tool_error(mode_def, clean_name) or mode_tool_error(mode_def, resolved_name)
+    mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
+    role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
+    policy_err = role_tool_error(role_def, clean_name) or role_tool_error(role_def, resolved_name)
     if policy_err:
         return policy_err
 

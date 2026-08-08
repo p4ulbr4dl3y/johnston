@@ -84,14 +84,14 @@ class TestCLI(unittest.TestCase):
         with redirect_stdout(f):
             print_modes()
         output = f.getvalue()
-        self.assertIn("Available Agent Execution Modes:", output)
+        self.assertIn("Available Agent Roles & Modes:", output)
 
     def test_print_subagents(self):
         f = io.StringIO()
         with redirect_stdout(f):
             print_subagents()
         output = f.getvalue()
-        self.assertIn("Available Subagent Definitions:", output)
+        self.assertIn("Available Subagent Definitions & Roles:", output)
 
     @patch("sys.argv", ["johnston", "-v"])
     def test_main_version(self):
@@ -357,15 +357,15 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_modes_with_disallowed_tools(self):
         f = io.StringIO()
-        with patch("core.mode_manager.ModeManager") as mock_cls:
-            mode_mgr = MagicMock()
-            mode = MagicMock(
-                read_only=False, source="builtin", disallowed_tools=["rm"],
+        with patch("core.role_registry.RoleRegistry") as mock_cls:
+            role_mgr = MagicMock()
+            role = MagicMock(
+                read_only=False, source="builtin", disallowed_tools=["rm"], description="Act mode", allowed_tools=[], scope="any"
             )
-            type(mode).name = "Act"
-            type(mode).key = "act"
-            mode_mgr.load_modes.return_value = {"act": mode}
-            mock_cls.get_instance.return_value = mode_mgr
+            type(role).name = "Act"
+            type(role).key = "act"
+            role_mgr.load_roles.return_value = {"act": role}
+            mock_cls.get_instance.return_value = role_mgr
             with redirect_stdout(f):
                 print_modes()
         out = f.getvalue()
@@ -374,7 +374,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_subagents_empty(self):
         f = io.StringIO()
-        with patch("core.subagent_registry.SubagentRegistry") as mock_cls:
+        with patch("core.role_registry.RoleRegistry") as mock_cls:
             reg = MagicMock()
             reg.list_definitions.return_value = {}
             mock_cls.get_instance.return_value = reg
@@ -384,10 +384,10 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_subagents_with_defs(self):
         f = io.StringIO()
-        with patch("core.subagent_registry.SubagentRegistry") as mock_cls:
+        with patch("core.role_registry.RoleRegistry") as mock_cls:
             reg = MagicMock()
             dval = MagicMock()
-            dval.tools = ["shell"]
+            dval.allowed_tools = ["shell"]
             dval.model = "gpt-4o"
             dval.source = "builtin"
             reg.list_definitions.return_value = {"worker": dval}

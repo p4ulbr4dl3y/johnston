@@ -220,34 +220,45 @@ def print_rules():
             print()
 
 
+def print_roles():
+    """Print available unified agent roles to stdout"""
+    from core.role_registry import RoleRegistry
+
+    registry = RoleRegistry.get_instance()
+    roles = registry.load_roles()
+    print("Available Agent Roles & Modes:")
+    role_list = list(roles.items())
+    for idx, (key, r) in enumerate(role_list):
+        ro_str = " (read-only)" if r.read_only else ""
+        scope_str = f" [scope: {r.scope}]" if r.scope != "any" else ""
+        print(f"  * {r.name} ({r.key}){ro_str}{scope_str} [{r.source}]")
+        if r.description:
+            print(f"    Description: {r.description}")
+        if r.disallowed_tools:
+            print(f"    Disallowed tools: {', '.join(r.disallowed_tools)}")
+        if r.allowed_tools:
+            print(f"    Allowed tools: {', '.join(r.allowed_tools)}")
+        if idx < len(role_list) - 1:
+            print()
+
+
 def print_modes():
     """Print available agent execution modes to stdout"""
-    from core.mode_manager import ModeManager
-
-    modes = ModeManager.get_instance().load_modes()
-    print("Available Agent Execution Modes:")
-    mode_list = list(modes.items())
-    for idx, (key, m) in enumerate(mode_list):
-        ro_str = " (read-only)" if m.read_only else ""
-        print(f"  * {m.name} ({m.key}){ro_str} [{m.source}]")
-        if m.disallowed_tools:
-            print(f"    Disallowed tools: {', '.join(m.disallowed_tools)}")
-        if idx < len(mode_list) - 1 and m.disallowed_tools:
-            print()
+    print_roles()
 
 
 def print_subagents():
     """Print available subagent definitions to stdout"""
-    from core.subagent_registry import SubagentRegistry
+    from core.role_registry import RoleRegistry
 
-    registry = SubagentRegistry.get_instance()
+    registry = RoleRegistry.get_instance()
     defs = registry.list_definitions()
-    print("Available Subagent Definitions:")
+    print("Available Subagent Definitions & Roles:")
     if not defs:
         print("  No subagent definitions found.")
         return
     for dname, dval in defs.items():
-        tools_str = f" | Tools: {', '.join(dval.tools)}" if dval.tools else ""
+        tools_str = f" | Tools: {', '.join(dval.allowed_tools)}" if dval.allowed_tools else ""
         model_str = f" | Model: {dval.model}" if dval.model else ""
         print(f"  * {dname} [{dval.source}]{tools_str}{model_str}")
 
@@ -330,6 +341,7 @@ def main():
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
     parser.add_argument("--modes", action="store_true", help="List available agent execution modes")
+    parser.add_argument("--roles", action="store_true", help="List available unified agent roles")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
     parser.add_argument("--linters", action="store_true", help="List configured linters")
@@ -341,8 +353,8 @@ def main():
         print(f"johnston {get_version()}")
         sys.exit(0)
 
-    if args.modes:
-        print_modes()
+    if args.modes or args.roles:
+        print_roles()
         sys.exit(0)
 
     if args.models:

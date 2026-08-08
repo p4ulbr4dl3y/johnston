@@ -11,12 +11,13 @@ class ActionsMixin:
     """Actions and pointer/selection event handlers for JohnstonApp."""
 
     def action_toggle_mode(self) -> None:
-        """Toggle agent mode across all registered modes (builtin, global, project)"""
+        """Toggle agent mode across all registered roles (builtin, global, project)"""
         if not hasattr(self, "agent") or not self.agent:
             return
-        from core.mode_manager import ModeManager
+        from core.role_registry import RoleRegistry
 
-        available_modes = list(ModeManager.get_instance().load_modes().keys())
+        roles_dict = RoleRegistry.get_instance().list_roles(scope="main_only")
+        available_modes = list(roles_dict.keys())
         curr = getattr(self.agent, "mode", "act").lower()
         next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
         new_mode = available_modes[next_idx]

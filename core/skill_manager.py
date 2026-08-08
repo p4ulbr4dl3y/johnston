@@ -7,6 +7,10 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR, DEFAULT_IGNORE_DIRS
+from core.defaults.skills.handoff_skill import DEFAULT_HANDOFF_SKILL_CONTENT
+from core.defaults.skills.init_skill import DEFAULT_INIT_SKILL_CONTENT
+from core.defaults.skills.johnston_guide import JOHNSTON_GUIDE_FILES
+from core.defaults.skills.johnston_guide import SKILL_MD as DEFAULT_ARCHITECT_SKILL_CONTENT
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
@@ -58,150 +62,6 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
             return fm, body
     return {}, content
 
-DEFAULT_ARCHITECT_SKILL_CONTENT = """---
-name: johnston-architect
-description: Johnston system configurator & architect. Manages MCP servers, subagent definitions, rules, LLM providers, and skills with CLI self-verification.
----
-
-# Johnston Architect Skill
-
-You are the Johnston System Configurator & Architect. Your goal is to configure, customize, and extend Johnston safely according to user requests.
-
-## Core Capabilities & Instructions
-
-### 1. MCP Server Configuration (`johnston --mcp`)
-- Location: `~/.johnston/mcp.json` (global) or `.johnston/mcp.json` (project).
-- Format: JSON object containing server configurations (command, args, env, disabled).
-- Verification: Run `johnston --mcp` via shell tool to verify server registration.
-
-### 2. Custom Subagent Definitions (`johnston --subagents`)
-- Location: `~/.johnston/subagents/definitions/<name>.md` (global) or `.johnston/subagents/<name>.md` (project).
-- Format: Markdown with YAML frontmatter:
-  ```markdown
-  ---
-  name: reviewer
-  description: Code reviewer subagent
-  tools: read, grep, glob
-  model: deepseek-v4-flash
-  ---
-  System prompt instructions here...
-  ```
-- Verification: Run `johnston --subagents` via shell tool.
-
-### 3. Rules & Instructions (`johnston --rules`)
-- Location: `~/.johnston/rules/<name>.md` (global) or `.johnston/rules/<name>.md` (project).
-- Format: Markdown with optional YAML frontmatter:
-  ```markdown
-  ---
-  name: python_style
-  mode: action, explore
-  globs: "*.py"
-  ---
-  Rule instructions here...
-  ```
-- Verification: Run `johnston --rules` via shell tool.
-
-### 4. LLM Providers Setup (`johnston --models`)
-- Location: `~/.johnston/providers.json`.
-- Format: JSON object for OpenAI, Anthropic, Gemini, or Ollama endpoints:
-  ```json
-  "my_llm": {
-    "key": "my_llm",
-    "name": "Custom LLM",
-    "base_url": "https://api.myllm.com/v1",
-    "model": "model-v1",
-    "api_type": "openai",
-    "models": ["model-v1", "model-v2"],
-    "fetch_models": false
-  }
-  ```
-- Verification: Run `johnston --models` via shell tool.
-
-### 5. Skills Management (`johnston --skills`)
-- Location: `~/.johnston/skills/<name>/SKILL.md` (global) or `.johnston/skills/<name>/SKILL.md` (project).
-- Verification: Run `johnston --skills` via shell tool.
-
-### 6. Custom Execution Modes (`johnston --modes`)
-- Location: `~/.johnston/modes/<name>.md` (global) or `.johnston/modes/<name>.md` (project).
-- Format: Markdown with YAML frontmatter:
-  ```markdown
-  ---
-  name: Architect
-  description: High-level design mode
-  read_only: true
-  disallowed_tools: create, edit
-  ---
-  Custom system prompt here...
-  ```
-- Verification: Run `johnston --modes` via shell tool.
-
-### 7. Linters Configuration (`johnston --linters`)
-- Location: `~/.johnston/linters.json` (global only).
-- Model: presets in `core/linters_manager.py::PRESET_LINTERS` are syntax-only checks, keyed by language, with `cmd` placeholders `{file}` -> checked file and `{tmp}` -> scratch dir.
-  Presets (extensions in parens): python `.py` (ruff `E9,F`), js/ts (eslint@9), js_biome (Biome), rust (rustc --emit=metadata), c/cpp (gcc -fsyntax-only), ruby (ruby -c), php (php -l), json (jq empty), yaml (yamllint), toml (taplo check).
-- Format: `{"linters": {<name>: {"cmd": [...], "extensions": [...], "enabled": true|false}}}`; custom linters append to presets.
-- Availability: `scan_available` resolves via `which()` for system binaries, else offline-safe cache probe for uvx (`~/.cache/uv` or `UV_CACHE_DIR`) and npx (`~/.npm/_npx`); no network probing.
-- Enable/disable: persisted via `set_enabled` to the single config file.
-- Output handling: `LintersManager.run_for` filters noise lines (`Building `, `Downloading `, `Audited `, etc.); linter errors truncate to 10 lines, prefixed `ERR:`, and surface in-tool after edits (`create`/`edit` call `get_linters_manager().run_for(path)`).
-- Verification: Run `johnston --linters` via shell tool.
-"""
-
-DEFAULT_INIT_SKILL_CONTENT = """---
-name: init
-description: Guided AGENTS.md project setup
----
-
-# Repository Initialization
-
-## Goal
-Create or update `AGENTS.md` for this repository to help future AI sessions avoid mistakes and ramp up quickly.
-
-## Investigation Protocol
-Read high-value sources first:
-1. `README*`, root manifests, workspace config, lockfiles
-2. Build, test, lint, formatter, typecheck, and codegen config
-3. CI workflows and pre-commit / task runner config
-4. Existing instruction files (`AGENTS.md`, `CLAUDE.md`, `.cursor/rules/`, `.cursorrules`)
-
-If architecture is still unclear, inspect representative code files to find entrypoints and boundaries.
-
-## Writing Rules
-Include high-signal, repo-specific guidance:
-1. Exact commands and shortcuts the agent would otherwise guess wrong
-2. Architecture notes not obvious from filenames
-3. Conventions that differ from language or framework defaults
-
-When in doubt, omit. Prefer short sections and bullets.
-If `AGENTS.md` already exists, improve it in place rather than rewriting blindly."""
-
-DEFAULT_HANDOFF_SKILL_CONTENT = """---
-name: handoff
-description: Prepare a continuation note for the next AI session
----
-
-# Session Continuation Handoff Note
-
-## Goal
-Create or update `HANDOFF.md` in the repository working directory to enable another AI agent to continue work seamlessly.
-
-## Execution Constraints & Security
-1. Do not output the full handoff note in chat. Write or overwrite `HANDOFF.md` using file tools.
-2. Output only a brief 1-2 sentence confirmation linking to `HANDOFF.md` in chat.
-3. REDACT all sensitive information, including API keys, tokens, passwords, and personally identifiable information (PII).
-4. DO NOT infer or hallucinate completed work, decisions, inspected files, or test results not present in the conversation context.
-
-## Required Document Structure (`HANDOFF.md`)
-1. **Goal & User Intent**: High-level goal, current objective, and explicit user requirements.
-2. **Current State & Modified Files**: Work completed so far. Reference key modified/created files using exact paths (e.g. `path/file.ext#L10-L30`).
-3. **Decisions Made (Do Not Re-litigate)**: Architectural/technical choices agreed upon and the rationale behind them.
-4. **Verification & Test Status**: Explicit commands run (e.g. `uv run pytest`) and their exact results (PASS/FAIL).
-5. **Remaining Tasks & Open Questions**: Actionable next steps, unresolved questions, or blockers.
-6. **Active / Recommended Skills & Tools**: Skills or tools used in this session or recommended for the next session.
-
-## Writing Rules
-1. If there is little or no prior session context, state that explicitly in the file.
-2. Prefer concise sections and bullet points.
-3. Do not dump entire source files or raw conversation logs into `HANDOFF.md`. Use file links for existing code. You MAY write detailed Markdown explanations, architectural specs, or essential code snippets if crucial for continuation."""
 
 
 class SkillManager:
@@ -217,16 +77,36 @@ class SkillManager:
 
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
+        from tools.base import atomic_write_text
 
-        default_skills = [
-            ("johnston-architect", DEFAULT_ARCHITECT_SKILL_CONTENT, "Custom Execution Modes"),
+        # 1. Provision johnston-guide with references/
+        guide_dir = os.path.join(self.global_dir, "johnston-guide")
+        for rel_path, file_content in JOHNSTON_GUIDE_FILES.items():
+            target_path = os.path.join(guide_dir, rel_path)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            if not os.path.exists(target_path):
+                try:
+                    atomic_write_text(target_path, file_content.strip())
+                except Exception:
+                    pass
+
+        # 2. Provision johnston-architect alias for backward compatibility
+        architect_dir = os.path.join(self.global_dir, "johnston-architect")
+        architect_file = os.path.join(architect_dir, "SKILL.md")
+        if not os.path.exists(architect_file):
+            try:
+                os.makedirs(architect_dir, exist_ok=True)
+                atomic_write_text(architect_file, DEFAULT_ARCHITECT_SKILL_CONTENT.strip())
+            except Exception:
+                pass
+
+        # 3. Single-file skills (init, handoff)
+        single_skills = [
             ("init", DEFAULT_INIT_SKILL_CONTENT, "Repository Initialization"),
             ("handoff", DEFAULT_HANDOFF_SKILL_CONTENT, "Session Continuation Handoff Note"),
         ]
 
-        from tools.base import atomic_write_text
-
-        for skill_name, skill_content, check_marker in default_skills:
+        for skill_name, skill_content, check_marker in single_skills:
             skill_dir = os.path.join(self.global_dir, skill_name)
             skill_file = os.path.join(skill_dir, "SKILL.md")
             should_write = False

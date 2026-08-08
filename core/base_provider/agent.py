@@ -473,11 +473,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     target = extract_tool_display(t_name, args)
                     yield ("tool", t_name, target, args)
 
-                    from core.mode_manager import ModeManager
+                    from core.role_registry import RoleRegistry
                     current_mode = getattr(self, "mode", "act").lower()
-                    mode_def = ModeManager.get_instance().get_mode(current_mode)
+                    role_def = RoleRegistry.get_instance().get_role(current_mode)
 
-                    policy_err = self._tool_policy_error(t_name, args, mode_def)
+                    policy_err = self._tool_policy_error(t_name, args, role_def)
                     if policy_err:
                         tool_result = policy_err
                     else:
