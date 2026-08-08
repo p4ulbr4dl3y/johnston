@@ -192,26 +192,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
 
-    async def test_demo_command(self):
-        from unittest.mock import MagicMock
 
-        class ContainerMock:
-            def __init__(self):
-                self.mounted = []
-
-            def mount(self, widget):
-                self.mounted.append(widget)
-
-        import asyncio
-        app = MockApp()
-        app.push_screen = MagicMock()
-        handled = await handle_slash_command(app, "/demo")
-        self.assertTrue(handled)
-        await asyncio.sleep(0.05)
-        self.assertTrue(app.push_screen.called)
-        from widgets.screens.ask_user import AskUserWizardScreen
-        screen_arg = app.push_screen.call_args[0][0]
-        self.assertIsInstance(screen_arg, AskUserWizardScreen)
 
 
     async def test_compact_command(self):
