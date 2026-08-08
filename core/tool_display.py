@@ -1,4 +1,3 @@
-import os
 import re
 from typing import Any, Dict
 
@@ -11,24 +10,6 @@ def _truncate(target: str, max_len: int = 60) -> str:
     if len(target) > max_len:
         return target[:25] + "..." + target[-32:]
     return target
-
-
-def _format_path_display(val: str, cwd: str | None = None) -> str:
-    """Format file path for UI tool chips: relative if inside project root, absolute if outside."""
-    if not isinstance(val, str) or not val:
-        return ""
-    val_str = val.strip()
-    if os.path.isabs(val_str):
-        root = os.path.realpath(cwd or os.getcwd())
-        try:
-            abs_val = os.path.realpath(val_str)
-            if abs_val == root or abs_val.startswith(root + os.sep):
-                rel = os.path.relpath(abs_val, root).replace("\\", "/")
-                if not rel.startswith(".."):
-                    return rel
-        except Exception:
-            pass
-    return val_str
 
 
 def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
@@ -84,7 +65,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
     for key in ("TargetFile", "target_file", "path", "file", "file_path", "filepath", "filename", "image_path"):
         val = args.get(key)
         if isinstance(val, str) and val:
-            return _truncate(_format_path_display(val, cwd=cwd))
+            return _truncate(val.strip())
 
     # Generic: prefer a query/prompt argument when present (e.g., search, subagent)
     q_val = args.get("query") or args.get("prompt")

@@ -13,11 +13,9 @@ class TestToolDisplay(unittest.TestCase):
     def test_path_formatting_relative_and_absolute(self):
         import os
         root = os.path.realpath("/app/project")
-        # File inside project root -> formatted as relative path
         in_path = os.path.join(root, "src", "main.py")
-        self.assertEqual(extract_tool_display("create", {"TargetFile": in_path}, cwd=root), "src/main.py")
+        self.assertEqual(extract_tool_display("create", {"TargetFile": in_path}, cwd=root), in_path)
 
-        # File outside project root -> formatted as absolute path
         out_path = os.path.realpath("/tmp/other/file.py")
         self.assertEqual(extract_tool_display("create", {"TargetFile": out_path}, cwd=root), out_path)
 

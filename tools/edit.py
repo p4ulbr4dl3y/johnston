@@ -29,7 +29,7 @@ def _preserve_quote_style(old_str: str, actual_old_str: str, new_str: str) -> st
     has_single = LEFT_SINGLE_CURLY_QUOTE in actual_old_str or RIGHT_SINGLE_CURLY_QUOTE in actual_old_str
 
     if not has_double and not has_single:
-        return new_str
+        return normalize_quotes(new_str)
 
     res = new_str
     if has_double:
@@ -143,6 +143,19 @@ def apply_chunk_replacements(
     # Sort chunks descending by start_line to prevent line-offset drift during multi-chunk replacement
     parsed_chunks.sort(key=lambda item: (item["start_line"] or 0), reverse=True)
 
+    # Check for overlapping explicit line ranges among chunks
+    ranged_chunks = [c for c in parsed_chunks if c["start_line"] is not None and c["end_line"] is not None]
+    for i in range(len(ranged_chunks)):
+        for j in range(i + 1, len(ranged_chunks)):
+            c1, c2 = ranged_chunks[i], ranged_chunks[j]
+            s1, e1 = c1["start_line"], c1["end_line"]
+            s2, e2 = c2["start_line"], c2["end_line"]
+            if max(s1, s2) <= min(e1, e2):
+                raise ValueError(
+                    f"ERR: replacement chunks {c1['idx']} (lines {s1}-{e1}) and "
+                    f"{c2['idx']} (lines {s2}-{e2}) overlap in '{path}'"
+                )
+
     lines = content.splitlines(keepends=True)
     for c in parsed_chunks:
         target = c["target"]
@@ -217,7 +230,8 @@ def apply_chunk_replacements(
             new_sub_text = sub_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
             sub_replacement_lines = new_sub_text.splitlines(keepends=True)
             if sub_text.endswith(("\n", "\r")) and sub_replacement_lines and not sub_replacement_lines[-1].endswith(("\n", "\r")):
-                sub_replacement_lines[-1] += "\n"
+                eol = "\r\n" if sub_text.endswith("\r\n") else "\n"
+                sub_replacement_lines[-1] += eol
             lines[start_idx:effective_end_idx] = sub_replacement_lines
 
         else:

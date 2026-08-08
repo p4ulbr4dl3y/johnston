@@ -192,6 +192,25 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
 
+    async def test_demo_command(self):
+        from unittest.mock import MagicMock
+
+        class ContainerMock:
+            def __init__(self):
+                self.mounted = []
+
+            def mount(self, widget):
+                self.mounted.append(widget)
+
+        app = MockApp()
+        container = ContainerMock()
+        app.query_one = lambda selector, *args: container if selector == "#app-container" else (app.chat_view if selector == "#chat-view" else MagicMock())
+        handled = await handle_slash_command(app, "/demo")
+        self.assertTrue(handled)
+        self.assertEqual(len(container.mounted), 1)
+        from widgets.inline_question import InlineQuestionBar
+        self.assertIsInstance(container.mounted[0], InlineQuestionBar)
+
 
     async def test_compact_command(self):
         class DetailedMockAgent(MockAgent):

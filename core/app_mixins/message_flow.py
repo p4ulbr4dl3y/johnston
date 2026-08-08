@@ -54,12 +54,12 @@ class MessageFlowMixin:
         if not user_text and not attachments:
             return
 
-        chat_input = self.query_one("#message-input", ChatInput)
-        chat_input.focus()
-
         if user_text and user_text.startswith("/"):
             asyncio.create_task(self._exec_slash_command(user_text))
             return
+
+        chat_input = self.query_one("#message-input", ChatInput)
+        chat_input.focus()
 
         if not user_text and attachments:
             user_text = "What is in this image?"
