@@ -11,17 +11,18 @@ from tools.base import BaseTool
 MAX_SUBAGENT_RESULT_CHARS = 15000
 
 
-def _truncate_subagent_result(text: str) -> str:
+def _truncate_subagent_result(text: str, task_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
-    remains available via manage_subagent(action='status')."""
+    remains available in log_path and via manage_subagent(action='status')."""
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
+    from core.config import SUBAGENT_LOGS_DIR
+    log_path = os.path.join(SUBAGENT_LOGS_DIR, f"{task_id}.log") if task_id else "log file"
     return (
         text[:MAX_SUBAGENT_RESULT_CHARS]
-        + "\n... [subagent result truncated to keep parent context lean; "
-        "inspect the full session via manage_subagent(action='status')]"
+        + f"\n... [Subagent result truncated. Full log saved to {log_path}. Read via view_file or inspect via manage_subagent(action='status')]"
     )
 
 
@@ -200,7 +201,7 @@ class InvokeSubagentTool(BaseTool):
 
                 ctx.refresh_status()
 
-                result_text = _truncate_subagent_result(acc[0]) or "Completed with no text output."
+                result_text = _truncate_subagent_result(acc[0], task_id) or "Completed with no text output."
                 msg = (
                     f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
                     f"<task_result>\n{result_text}\n</task_result>\n"
