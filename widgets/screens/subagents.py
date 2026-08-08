@@ -19,10 +19,17 @@ class SubagentsScreen(ModalScreen[None]):
     ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
+        ("tab", "kill_subagent", "Kill Subagent"),
         ("k", "kill_subagent", "Kill Subagent"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ]
+
+    def action_quit_app(self) -> None:
+        if hasattr(self.app, "exit"):
+            self.app.exit()
+        elif hasattr(self.app, "action_quit"):
+            self.app.action_quit()
 
     def __init__(self):
         super().__init__()
