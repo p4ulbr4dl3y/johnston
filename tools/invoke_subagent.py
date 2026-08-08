@@ -110,39 +110,30 @@ class InvokeSubagentTool(BaseTool):
         session.branch_name = wt_branch or ""
         session.add_event({"type": "user", "text": prompt})
 
-        # Disable nested Task tool calls (recursion guard) and background task management
+        # Disable nested subagent spawning, background task management, and UI questions for subagents
         subagent.allow_task = False
         original_tools = getattr(subagent, "tools", []) or []
-        excluded_tools = {"subagent", "Subagent", "invoke_subagent", "InvokeSubagent", "Task", "task", "manage_task", "ManageTask"}
+        excluded_tools = {"invoke_subagent", "manage_subagent", "manage_task", "ask_user"}
         subagent.tools = [
             t for t in original_tools
-            if t.get("function", {}).get("name") not in excluded_tools
+            if t.get("function", {}).get("name", "").lower() not in excluded_tools
         ]
 
         from core.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
-        from core.subagent_registry import SubagentRegistry
-        registry = SubagentRegistry.get_instance()
-        registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
-        definition = registry.get_definition(subagent_type)
+        from core.role_registry import RoleRegistry
+        registry = RoleRegistry.get_instance()
+        registry.load_roles(project_dir=getattr(ctx.app, "project_dir", None))
+        definition = registry.get_role(subagent_type)
 
+        subagent.mode = definition.key
         subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
         if definition.model:
             subagent.model = definition.model
 
-        if subagent_type == "explorer":
-            edit_tool_names = {
-                "create", "edit", "replace_file_content", "multi_replace_file_content",
-                "Create", "Edit", "Replace_File_Content", "Multi_Replace_File_Content"
-            }
+        if definition.read_only or definition.disallowed_tools or definition.allowed_tools:
             subagent.tools = [
                 t for t in subagent.tools
-                if t.get("function", {}).get("name") not in edit_tool_names
-            ]
-
-        if definition.tools:
-            subagent.tools = [
-                t for t in subagent.tools
-                if t.get("function", {}).get("name") in definition.tools
+                if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
             ]
 
         import copy

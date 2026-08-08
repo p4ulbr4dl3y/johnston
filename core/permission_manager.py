@@ -35,7 +35,10 @@ class PermissionManager:
         return cls._instance
 
     def get_group_for_tool(self, tool_name: str) -> Optional[str]:
-        return self.tool_to_group.get(tool_name.lower())
+        from tools.registry import ALIAS_MAP
+        clean = (tool_name or "").strip().lower()
+        canonical = ALIAS_MAP.get(clean, clean)
+        return self.tool_to_group.get(canonical)
 
     @staticmethod
     def normalize_action(action: str, default: str = "ask") -> str:

@@ -128,6 +128,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             {"questions": [{"question_text": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
             app=mock_app,
         )
+        self.assertIn("Yes", res)
     async def test_minimized_flow_resumed_by_callback(self):
         tool = AskUserTool()
         mock_app = MagicMock()

@@ -110,6 +110,16 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         cmd_names = [name for name, _ in suggestions]
         self.assertIn("/skills", cmd_names)
         self.assertIn("/johnston-architect", cmd_names)
+        self.assertIn("/johnston-guide", cmd_names)
+
+    def test_johnston_guide_references_created(self):
+        sm = SkillManager()
+        guide_dir = os.path.join(sm.global_dir, "johnston-guide")
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "SKILL.md")))
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "cli_flags.md")))
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "mcp.md")))
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "modes.md")))
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "linters.md")))
 
     async def test_skill_slash_command_execution(self):
         from core.commands import handle_slash_command
@@ -121,10 +131,10 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         os.chdir(self.old_cwd)
         SkillManager._instance = None
         app = MockApp()
-        handled = await handle_slash_command(app, "/johnston-architect configure MCP")
+        handled = await handle_slash_command(app, "/johnston-guide configure MCP")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("johnston-architect", app.ai_prompts[0][0])
+        self.assertIn("johnston-guide", app.ai_prompts[0][0])
         self.assertIn("configure MCP", app.ai_prompts[0][0])
 
     async def test_multi_skill_slash_command_execution(self):

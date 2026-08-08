@@ -105,14 +105,14 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = ["mcp_tool_test"]
 
         mock_mode_mgr = MagicMock()
-        mock_mode_mgr.get_mode.return_value = mock_mode_def
+        mock_mode_mgr.get_role.return_value = mock_mode_def
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
+             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_mode_mgr):
             mock_app = MagicMock()
             mock_app.mode = "plan"
             res = await execute_tool("mcp_tool_test", {"arg": "val"}, app=mock_app)
-            self.assertIn("ERR: tool 'mcp_tool_test' disabled in plan mode", res)
+            self.assertIn("ERR: tool 'mcp_tool_test' disabled in plan role", res)
 
     async def test_execute_tool_mcp_success(self):
         mock_mcp_mgr = MagicMock()
@@ -125,10 +125,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = []
 
         mock_mode_mgr = MagicMock()
-        mock_mode_mgr.get_mode.return_value = mock_mode_def
+        mock_mode_mgr.get_role.return_value = mock_mode_def
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
+             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
             self.assertEqual(res, "MCP Executed Output")
             mock_mcp_mgr.call_tool.assert_called_once_with("exposed_mcp_tool", {"foo": "bar"})
@@ -144,10 +144,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = []
 
         mock_mode_mgr = MagicMock()
-        mock_mode_mgr.get_mode.return_value = mock_mode_def
+        mock_mode_mgr.get_role.return_value = mock_mode_def
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
+             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("faulty_mcp", {})
             self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res)
 
@@ -162,10 +162,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = []
 
         mock_mode_mgr = MagicMock()
-        mock_mode_mgr.get_mode.return_value = mock_mode_def
+        mock_mode_mgr.get_role.return_value = mock_mode_def
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr):
+             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_mode_mgr):
             res = await execute_tool("none_mcp", {})
             self.assertEqual(res, "ERR: unknown tool 'none_mcp'")
 
@@ -181,8 +181,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.name = name
         mock_mode_def.disallowed_tools = []
         mock_mode_mgr = MagicMock()
-        mock_mode_mgr.get_mode.return_value = mock_mode_def
-        return patch("core.mode_manager.ModeManager.get_instance", return_value=mock_mode_mgr)
+        mock_mode_mgr.get_role.return_value = mock_mode_def
+        return patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_mode_mgr)
 
     async def test_execute_tool_permission_denied(self):
         mock_pm = MagicMock()

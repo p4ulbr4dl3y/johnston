@@ -6,8 +6,11 @@ import subprocess
 import time
 from typing import Any, Dict, List, Tuple
 
+from core.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
+
+__all__ = ["DEFAULT_SYSTEM_PROMPT", "SUBAGENT_DEFAULT_SYSTEM_PROMPT", "PromptBuilder"]
 
 _GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
 _GIT_INFO_CACHE_TTL = 30.0
@@ -113,37 +116,6 @@ def get_rules_snippet(mode: str = "act", cwd: str = None) -> str:
     return RulesManager.get_instance().get_formatted_rules(mode=mode, project_dir=cwd)
 
 
-DEFAULT_SYSTEM_PROMPT = """You are {model_name} operating inside Johnston CLI, pair programming with the user.
-
-## Primary Goal
-Assist the user with software engineering tasks through safe, high-quality, and precise code modifications and analysis.
-
-## Core Rules
-1. Research First: Inspect codebase via shell/read tools before editing. Never guess file paths or signatures.
-2. Read Before Edit: Always read file contents before modifying.
-3. Minimal Comments: Do not add unnecessary comments unless requested.
-4. Task Planning: Use update_plan for multi-step tasks. Mark steps completed promptly.
-5. Clarification: Use ask_user when intent or design requirements are ambiguous.
-6. Subagents & Delegation: Use `invoke_subagent` for parallel or non-blocking multi-step subtasks (sidecar tasks; max 5 concurrent). Always supply relative file paths from project root in subagent prompts (never parent absolute paths, so subagents stay inside their worktrees). Do NOT spawn subagents for simple file reads, code searches, or critical-path blocking work (do those locally). Use `workspace='branch'` for isolated git worktrees or parallel non-overlapping edits.
-7. Background & Async Rule: After launching any async action (background shell, subagent, async MCP), DO NOT call any further tools. End your response immediately. System notifies you when ready.
-8. Concise Communication: Be direct and clear. Summarize plan changes briefly.
-9. Tool Usage: Use available function tools directly. Do not claim missing tools when listed.
-10. Language Matching: Respond in the user's current message language.
-11. Image Handling: If an image or file preview is missing or unreadable in your context, state this directly. Do not execute code workarounds (like OCR) without explicit user instruction."""
-
-
-SUBAGENT_DEFAULT_SYSTEM_PROMPT = """You are {model_name} operating as an autonomous subagent inside Johnston CLI.
-
-## Primary Goal
-Execute the assigned bounded task independently, safely, and return a clear summary of findings or changes to the primary agent.
-
-## Core Rules
-1. Autonomous Operation: You have no UI interaction with the user. Do not attempt user prompts or UI mode switches.
-2. Relative Paths & Boundary: Always use relative file paths from your working directory (cwd). Stay strictly within your working directory/worktree.
-3. Research First: Read and inspect relevant files/codebase state before modifying.
-4. No Subagent Delegation: You cannot spawn subagents or manage background subagent tasks.
-5. Minimal Complexity (YAGNI): Implement exact requirements without extra refactoring or unsolicited git commits.
-6. Concise Reporting: Return a direct summary of actions taken, key findings, or code changes in your final response text. Do not create extra markdown report files unless explicitly requested."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
@@ -216,12 +188,12 @@ class PromptBuilder:
     def _build_system_prompt_uncached(self) -> str:
         cwd = self.cwd or os.getcwd()
         from core.mcp_manager import get_mcp_manager
-        from core.subagent_registry import SubagentRegistry
+        from core.role_registry import RoleRegistry
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
         subagents_snippet = (
-            "" if self.is_subagent else SubagentRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+            "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
         )
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
@@ -260,8 +232,8 @@ class PromptBuilder:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
         if not self.is_subagent:
-            from core.mode_manager import ModeManager
-            mode_def = ModeManager.get_instance().get_mode(self.mode, project_dir=cwd)
+            from core.role_registry import RoleRegistry
+            mode_def = RoleRegistry.get_instance().get_role(self.mode, project_dir=cwd)
             if mode_def.prompt:
                 sys_prompt += f"\n\n{mode_def.prompt}"
 
@@ -292,18 +264,40 @@ class PromptBuilder:
             if not t_name:
                 return True
             clean_name = t_name.lower()
-            if clean_name.startswith("functions."):
-                clean_name = clean_name.split(".", 1)[1]
             resolved = ALIAS_MAP.get(clean_name, clean_name)
+            if self.is_subagent:
+                subagent_forbidden = {
+                    "invoke_subagent", "subagent", "manage_subagent",
+                    "task", "manage_task", "ask_user"
+                }
+                if clean_name in subagent_forbidden or resolved in subagent_forbidden:
+                    return False
+
             return clean_name not in disallowed and resolved not in disallowed
 
         filtered_tools = [t for t in all_tools if _tool_allowed(t)]
 
-        if self.allow_task and not any(
+        if not self.is_subagent and self.allow_task and not any(
             t.get("function", {}).get("name") in ("invoke_subagent", "subagent", "Subagent") for t in filtered_tools
         ):
             filtered_tools.append(InvokeSubagentTool.schema)
 
         allowed_tools = [t for t in filtered_tools if _tool_allowed(t)]
-        allowed_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
-        return allowed_tools
+
+        def _sort_tool_schema(tool_dict: Dict[str, Any]) -> Dict[str, Any]:
+            import copy
+            t = copy.deepcopy(tool_dict)
+            fn = t.get("function", {})
+            params = fn.get("parameters", {})
+            if isinstance(params, dict):
+                props = params.get("properties")
+                if isinstance(props, dict):
+                    params["properties"] = dict(sorted(props.items()))
+                req = params.get("required")
+                if isinstance(req, list):
+                    params["required"] = sorted(req)
+            return t
+
+        sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]
+        sorted_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
+        return sorted_tools

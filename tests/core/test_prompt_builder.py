@@ -39,6 +39,34 @@ class TestPromptBuilder(unittest.TestCase):
         names = [t.get("function", {}).get("name") for t in tools]
         self.assertEqual(names, sorted(names))
 
+    def test_build_tools_properties_and_required_sorted_deterministically(self):
+        base_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "complex_tool",
+                    "description": "Test tool schema sorting",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "z_param": {"type": "string"},
+                            "a_param": {"type": "number"},
+                            "m_param": {"type": "boolean"},
+                        },
+                        "required": ["z_param", "a_param", "m_param"],
+                    },
+                },
+            }
+        ]
+        builder = PromptBuilder("Test", base_tools, mode="act", allow_task=False)
+        tools = builder.build_tools()
+        params = tools[0]["function"]["parameters"]
+        prop_keys = list(params["properties"].keys())
+        req_keys = params["required"]
+
+        self.assertEqual(prop_keys, ["a_param", "m_param", "z_param"])
+        self.assertEqual(req_keys, ["a_param", "m_param", "z_param"])
+
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], mode="act")
         sys_prompt = builder.build_system_prompt()

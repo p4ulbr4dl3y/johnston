@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from core.subagent_registry import SubagentRegistry
+from core.role_registry import RoleRegistry as SubagentRegistry
 from core.subagent_tracker import SubagentTracker
 
 
@@ -19,7 +19,7 @@ class TestSubagentRegistry(unittest.TestCase):
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            proj_subagents = os.path.join(tmpdir, ".johnston", "subagents")
+            proj_subagents = os.path.join(tmpdir, ".johnston", "roles")
             os.makedirs(proj_subagents, exist_ok=True)
 
             # 1. Create reviewer subagent definition
@@ -67,7 +67,7 @@ You run tests and report coverage.""")
             self.assertIn("## Subagents (use as `subagent_type` in `invoke_subagent`)", snippet)
             self.assertIn("### Builtin", snippet)
             self.assertIn("- `explorer`: Fast code exploration subagent", snippet)
-            self.assertIn("### Project (`.johnston/subagents/<name>.md`)", snippet)
+            self.assertIn("### Project (`.johnston/roles/<name>.md`)", snippet)
             self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
 
 
