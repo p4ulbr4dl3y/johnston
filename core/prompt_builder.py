@@ -124,12 +124,26 @@ Assist the user with software engineering tasks through safe, high-quality, and 
 3. Minimal Comments: Do not add unnecessary comments unless requested.
 4. Task Planning: Use update_plan for multi-step tasks. Mark steps completed promptly.
 5. Clarification: Use ask_user when intent or design requirements are ambiguous.
-6. Subagents & Delegation: Use `invoke_subagent` for parallel or non-blocking multi-step subtasks (sidecar tasks; max 5 concurrent). Always supply absolute file paths in subagent prompts. Do NOT spawn subagents for simple file reads, code searches, or critical-path blocking work (do those locally). Use `workspace='branch'` for isolated git worktrees or parallel non-overlapping edits.
+6. Subagents & Delegation: Use `invoke_subagent` for parallel or non-blocking multi-step subtasks (sidecar tasks; max 5 concurrent). Always supply relative file paths from project root in subagent prompts (never parent absolute paths, so subagents stay inside their worktrees). Do NOT spawn subagents for simple file reads, code searches, or critical-path blocking work (do those locally). Use `workspace='branch'` for isolated git worktrees or parallel non-overlapping edits.
 7. Background & Async Rule: After launching any async action (background shell, subagent, async MCP), DO NOT call any further tools. End your response immediately. System notifies you when ready.
 8. Concise Communication: Be direct and clear. Summarize plan changes briefly.
 9. Tool Usage: Use available function tools directly. Do not claim missing tools when listed.
 10. Language Matching: Respond in the user's current message language.
 11. Image Handling: If an image or file preview is missing or unreadable in your context, state this directly. Do not execute code workarounds (like OCR) without explicit user instruction."""
+
+
+SUBAGENT_DEFAULT_SYSTEM_PROMPT = """You are {model_name} operating as an autonomous subagent inside Johnston CLI.
+
+## Primary Goal
+Execute the assigned bounded task independently, safely, and return a clear summary of findings or changes to the primary agent.
+
+## Core Rules
+1. Autonomous Operation: You have no UI interaction with the user. Do not attempt user prompts or UI mode switches.
+2. Relative Paths & Boundary: Always use relative file paths from your working directory (cwd). Stay strictly within your working directory/worktree.
+3. Research First: Read and inspect relevant files/codebase state before modifying.
+4. No Subagent Delegation: You cannot spawn subagents or manage background subagent tasks.
+5. Minimal Complexity (YAGNI): Implement exact requirements without extra refactoring or unsolicited git commits.
+6. Concise Reporting: Return a direct summary of actions taken, key findings, or code changes in your final response text. Do not create extra markdown report files unless explicitly requested."""
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
@@ -165,6 +179,7 @@ class PromptBuilder:
         allow_task: bool = True,
         model_name: str = "",
         cwd: str = None,
+        is_subagent: bool = False,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -172,6 +187,7 @@ class PromptBuilder:
         self.allow_task = allow_task
         self.model_name = model_name
         self.cwd = os.path.realpath(cwd) if cwd else None
+        self.is_subagent = is_subagent
 
     def build_system_prompt(self) -> str:
         # Cache the fully-built prompt so that across the many tool-call steps of
@@ -186,6 +202,7 @@ class PromptBuilder:
             self.allow_task,
             self.model_name,
             cwd,
+            self.is_subagent,
             _instruction_mtimes(cwd),
         )
         now = time.time()
@@ -203,7 +220,9 @@ class PromptBuilder:
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
-        subagents_snippet = SubagentRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+        subagents_snippet = (
+            "" if self.is_subagent else SubagentRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+        )
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
         os_info = f"{platform.system()} {platform.release()}"
@@ -240,10 +259,11 @@ class PromptBuilder:
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        from core.mode_manager import ModeManager
-        mode_def = ModeManager.get_instance().get_mode(self.mode, project_dir=cwd)
-        if mode_def.prompt:
-            sys_prompt += f"\n\n{mode_def.prompt}"
+        if not self.is_subagent:
+            from core.mode_manager import ModeManager
+            mode_def = ModeManager.get_instance().get_mode(self.mode, project_dir=cwd)
+            if mode_def.prompt:
+                sys_prompt += f"\n\n{mode_def.prompt}"
 
         # Volatile metadata last: time/git change every turn, so keeping them at
         # the tail preserves the stable cached prefix for provider prompt caching.

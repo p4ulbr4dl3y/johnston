@@ -94,7 +94,8 @@ class SessionPersistenceMixin:
             if not ctx and self.agent.history:
                 from core.prompt_builder import PromptBuilder
                 from core.token_util import estimate_tokens
-                builder = PromptBuilder(self.agent.system_prompt, self.agent.tools, mode=getattr(self.agent, "mode", "act"))
+                is_subagent = getattr(self.agent, "is_subagent", False)
+                builder = PromptBuilder(self.agent.system_prompt, self.agent.tools, mode=getattr(self.agent, "mode", "act"), is_subagent=is_subagent)
                 sys_prompt = builder.build_system_prompt()
                 all_tools = builder.build_tools(provider_key=getattr(self.agent, "provider_key", ""), model_id=getattr(self.agent, "model", ""))
                 ctx = estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(self.agent.history)
