@@ -78,18 +78,14 @@ class ManageSubagentTool(BaseTool):
 
         if action == "status":
             from core.config import SUBAGENT_LOGS_DIR
-            log_file = os.path.join(tracker.storage_dir, f"{session.task_id}.json")
             result_log_file = os.path.join(SUBAGENT_LOGS_DIR, f"{session.task_id}.log")
 
             lines = [
                 f"Subagent Status ({session.task_id}):",
                 f"• Description: {session.description}",
-                f"• Type: {session.subagent_type}",
                 f"• Status: {session.status.upper()}",
-                f"• Mode: {'Background' if session.background else 'Foreground'}",
-                f"• Total Events: {len(session.events)}",
-                f"• Full Log File: {log_file}",
-                f"• Result Log File: {result_log_file}",
+                f"• Type: {session.subagent_type}",
+                f"• Log File: {result_log_file}",
             ]
 
             if os.path.exists(result_log_file):
