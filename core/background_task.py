@@ -127,10 +127,19 @@ class BackgroundTask:
 
                 if self.is_background and not self.was_killed and on_completed_cb and getattr(app, "is_app_active", True):
                     try:
+                        from tools.base import truncate_output
                         out_res = self.get_formatted_output()
-                        if len(out_res) > 3000:
-                            out_res = "... [Output truncated, showing last 3000 chars]\n" + out_res[-3000:]
-                        out_res = out_res if out_res.strip() else "OK: executed (no output)"
+                        if out_res.strip():
+                            out_res = truncate_output(
+                                out_res,
+                                max_chars=4000,
+                                hint="Pipe output to grep/head/tail if complete log is needed.",
+                                tool_name="shell",
+                                tool_id=self.task_id,
+                                from_end=True,
+                            )
+                        else:
+                            out_res = "OK: executed (no output)"
                         on_completed_cb(self.task_id, self.command, out_res)
                     except Exception:
                         pass
