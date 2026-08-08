@@ -505,6 +505,55 @@ class PermissionsCommand(BaseCommand):
         app.push_screen(PermissionsScreen(project_dir=project_dir))
 
 
+class DemoCommand(BaseCommand):
+    name = "/demo"
+    aliases = ["/askdemo"]
+    description = "Launch inline questions demo in the footer/input bar area"
+
+    async def execute(self, app) -> None:
+        from widgets.chat_input import ChatInput
+        from widgets.chat_view import ChatView
+        from widgets.inline_question import DEMO_QUESTIONS, InlineQuestionBar
+        from widgets.status_footer import StatusFooter
+
+        try:
+            msg_input = app.query_one("#message-input", ChatInput)
+            status_footer = app.query_one("#status-footer", StatusFooter)
+            msg_input.display = False
+            status_footer.display = False
+        except Exception:
+            msg_input = None
+            status_footer = None
+
+        def on_done(answers):
+            if msg_input:
+                msg_input.display = True
+                msg_input.focus()
+            if status_footer:
+                status_footer.display = True
+
+            if answers:
+                try:
+                    chat_view = app.query_one("#chat-view", ChatView)
+                    summary = "**Demo Answers:**\n" + "\n".join(
+                        f"- **Q{i + 1}:** {ans}" for i, ans in answers.items()
+                    )
+                    import asyncio
+
+                    asyncio.create_task(chat_view.add_user_message(summary))
+                except Exception:
+                    pass
+
+        bar = InlineQuestionBar(DEMO_QUESTIONS, callback=on_done)
+        try:
+            app.query_one("#app-container").mount(bar)
+        except Exception:
+            app.mount(bar)
+
+        if hasattr(app, "call_after_refresh"):
+            app.call_after_refresh(bar._force_focus)
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -520,6 +569,7 @@ COMMAND_CLASSES = [
     LintersCommand,
     CompactCommand,
     PermissionsCommand,
+    DemoCommand,
 ]
 
 
