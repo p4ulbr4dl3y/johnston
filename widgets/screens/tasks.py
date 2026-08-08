@@ -124,7 +124,7 @@ class TasksListScreen(ModalScreen[None]):
         for t in bg_tasks:
             # Exclude subagent tasks stored in background_tasks to avoid duplication with SubagentTracker
             task_id = getattr(t, "task_id", "")
-            if task_id.startswith("subagent-"):
+            if task_id.startswith("subagent-") or hasattr(t, "async_task"):
                 continue
             if getattr(t, "is_background", False):
                 items.append({
@@ -256,7 +256,7 @@ class TasksListScreen(ModalScreen[None]):
                             sess.async_task.cancel()
                         except Exception:
                             pass
-                    if hasattr(sess, "finish"):
+                    elif hasattr(sess, "finish"):
                         sess.finish("cancelled", "Terminated from tasks menu")
             else:
                 if getattr(raw, "is_running", False):
