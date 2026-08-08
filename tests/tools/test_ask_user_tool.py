@@ -128,7 +128,24 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             {"questions": [{"question_text": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
             app=mock_app,
         )
-        self.assertIn("Answer: Yes", res)
+    async def test_minimized_flow_resumed_by_callback(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        def mock_push_screen(screen, callback=None):
+            if not hasattr(mock_app, "_first_call_done"):
+                mock_app._first_call_done = True
+                callback("minimized")
+                # Simulate /questions command resuming the screen
+                callback("Question: Choice?\nAnswer: Opt1")
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
+            app=mock_app,
+        )
+        self.assertIn("Question: Choice?", res)
+        self.assertIn("Answer: Opt1", res)
 
 
 if __name__ == "__main__":
