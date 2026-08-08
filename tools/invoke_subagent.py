@@ -42,7 +42,7 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Detailed task prompt with clear boundaries and expected output format"},
+                    "prompt": {"type": "string", "description": "Detailed task prompt with absolute file paths, clear boundaries, and expected output format"},
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "subagent_type": {"type": "string", "description": "Subagent type: 'worker' (task execution) or 'explorer' (read-only analysis)"},
                     "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},

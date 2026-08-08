@@ -135,9 +135,13 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         def mock_push_screen(screen, callback=None):
             if not hasattr(mock_app, "_first_call_done"):
                 mock_app._first_call_done = True
-                callback("minimized")
-                # Simulate /questions command resuming the screen
-                callback("Question: Choice?\nAnswer: Opt1")
+                if callback:
+                    callback({"action": "minimize", "answers": {}, "q_idx": 0})
+                if hasattr(mock_app, "_pending_ask_user") and mock_app._pending_ask_user:
+                    mock_app._pending_ask_user()
+            else:
+                if callback:
+                    callback("Question: Choice?\nAnswer: Opt1")
 
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(

@@ -472,6 +472,22 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_not_called()
         app.push_screen.assert_called_once()
 
+    async def test_demo_command_spawns_tasks_and_agents(self):
+        from unittest.mock import MagicMock
+        from core.commands import DemoCommand
+
+        app = MockApp()
+        app.notify = MagicMock()
+        app.refresh_status_footer = MagicMock()
+        app.background_tasks = []
+
+        cmd = DemoCommand()
+        await cmd.execute(app)
+
+        self.assertEqual(len(app.background_tasks), 2)
+        app.notify.assert_called_once()
+        app.refresh_status_footer.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

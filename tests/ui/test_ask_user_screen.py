@@ -192,8 +192,8 @@ class TestAskUserWizardScreenUnit(unittest.TestCase):
         ws.focus_write_in_input()
         ws.focus_options_list()
 
-        # _on_key tab / shift+tab
-        event_tab = Key("tab", "tab")
+        # _on_key shift+tab
+        event_tab = Key("shift+tab", "shift+tab")
         event_tab.prevent_default = MagicMock()
         event_tab.stop = MagicMock()
         ws._on_key(event_tab)
