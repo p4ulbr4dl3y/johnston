@@ -505,6 +505,32 @@ class PermissionsCommand(BaseCommand):
         app.push_screen(PermissionsScreen(project_dir=project_dir))
 
 
+DEMO_QUESTIONS = [
+    {
+        "question_text": "Что хочешь сделать с этим багом?",
+        "options": [
+            "(Recommended) Починить сразу",
+            "Сначала написать тест",
+            "Только посмотреть код",
+            "Отложить до завтра",
+        ],
+    },
+    {
+        "question_text": "Какие файлы задействовать?",
+        "options": [
+            "core/session_manager.py",
+            "widgets/chat_input.py",
+            "widgets/status_footer.py",
+            "app.py",
+        ],
+    },
+    {
+        "question_text": "Опиши подробности свободным текстом:",
+        "options": [],
+    },
+]
+
+
 class DemoCommand(BaseCommand):
     name = "/demo"
     aliases = ["/askdemo"]
@@ -512,7 +538,6 @@ class DemoCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         from tools.ask_user import AskUserTool
-        from widgets.inline_question import DEMO_QUESTIONS
 
         try:
             from widgets.chat_view import ChatView
@@ -552,7 +577,7 @@ class QuestionsCommand(BaseCommand):
 
         if hasattr(app, "screen") and isinstance(app.screen, AskUserWizardScreen):
             if hasattr(app, "notify"):
-                app.notify("Question wizard is currently active.", title="Questions")
+                app.notify("Question wizard is currently active", severity="info")
             return
 
         pending_func = getattr(app, "_pending_ask_user", None)
@@ -560,7 +585,7 @@ class QuestionsCommand(BaseCommand):
             pending_func()
         else:
             if hasattr(app, "notify"):
-                app.notify("No pending questions. Type /demo to test.", title="Questions")
+                app.notify("No pending questions: type /demo to test", severity="warning")
 
 
 COMMAND_CLASSES = [

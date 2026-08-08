@@ -97,7 +97,7 @@ class AskUserTool(BaseTool):
                             setattr(ctx.app, "_pending_ask_user", lambda: _show_wizard(questions, saved_answers, saved_q_idx))
                             if hasattr(ctx.app, "notify"):
                                 try:
-                                    ctx.app.notify("Questions minimized. Type /questions to resume.", title="Questions")
+                                    ctx.app.notify("Questions minimized: type /questions to resume", severity="info")
                                 except Exception:
                                     pass
                         else:
