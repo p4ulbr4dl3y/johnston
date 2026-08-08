@@ -121,6 +121,20 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "modes.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "linters.md")))
 
+    def test_nested_reference_md_ignored_as_skill(self):
+        sm = SkillManager(project_dir=self.test_dir)
+        p_skill_dir = os.path.join(sm.project_dir_skills, "complex-skill")
+        os.makedirs(os.path.join(p_skill_dir, "references"), exist_ok=True)
+        with open(os.path.join(p_skill_dir, "SKILL.md"), "w") as f:
+            f.write("---\nname: complex-skill\ndescription: Main skill\n---\nMain body.")
+        with open(os.path.join(p_skill_dir, "references", "helper.md"), "w") as f:
+            f.write("---\nname: helper\ndescription: Helper doc\n---\nHelper body.")
+
+        skill_names = [s["name"] for s in sm.list_skills(include_hidden=True)]
+        self.assertIn("complex-skill", skill_names)
+        self.assertNotIn("helper", skill_names)
+
+
     async def test_skill_slash_command_execution(self):
         from core.commands import handle_slash_command
         try:

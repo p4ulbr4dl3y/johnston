@@ -151,7 +151,7 @@ class SkillManager:
             for root, dirs, files in os.walk(dir_path):
                 dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
                 for f in files:
-                    if f.endswith(".md"):
+                    if f == "SKILL.md":
                         md_files.append(os.path.join(root, f))
 
             for filepath in sorted(md_files):
