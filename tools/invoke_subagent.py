@@ -20,9 +20,12 @@ def _truncate_subagent_result(text: str, task_id: str = "") -> str:
         return text
     from core.config import SUBAGENT_LOGS_DIR
     log_path = os.path.join(SUBAGENT_LOGS_DIR, f"{task_id}.log") if task_id else "log file"
+    truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
+    shown_lines = truncated.count("\n") + (1 if truncated else 0)
+    next_line = shown_lines + 1
     return (
-        text[:MAX_SUBAGENT_RESULT_CHARS]
-        + f"\n... [Subagent result truncated. Full log saved to {log_path}. Read via view_file or inspect via manage_subagent(action='status')]"
+        truncated
+        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) or `manage_subagent(action='status')` to inspect remaining output.]"
     )
 
 
