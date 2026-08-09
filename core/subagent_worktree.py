@@ -183,3 +183,35 @@ class SubagentWorktreeManager:
                 shutil.rmtree(wt_path, ignore_errors=True)
             except Exception:
                 pass
+
+    @staticmethod
+    def append_worktree_diff_to_acc(
+        parent_dir: str,
+        wt_path: Optional[str],
+        wt_branch: Optional[str],
+        acc: list[str],
+        is_followup: bool = False,
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Collects worktree diff summary, appends diff text to acc, and cleans up worktree."""
+        if wt_path and wt_branch and os.path.isdir(wt_path):
+            diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(parent_dir, wt_path, wt_branch)
+            if has_changes and diff_text:
+                if is_followup:
+                    acc[0] = acc[0].rstrip() + (
+                        f"\n\n[Worktree Branch '{wt_branch}']\n"
+                        f"Changes updated on branch '{wt_branch}'. Run `git merge {wt_branch}` to apply.\n"
+                        f"After merging, ask the user via the ask_user tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
+                        f"{diff_text}"
+                    )
+                else:
+                    acc[0] += (
+                        f"\n\n[Worktree Branch '{wt_branch}']\n"
+                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
+                        f"After merging, clean up the branch with `git branch -d {wt_branch}`.\n\n"
+                        f"{diff_text}"
+                    )
+            keep_b = True if is_followup else has_changes
+            SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=keep_b)
+            return None, None
+        return wt_path, wt_branch
+

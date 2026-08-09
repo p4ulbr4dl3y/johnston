@@ -37,6 +37,15 @@ class ToolContext:
             self.app.refresh_status_footer()
 
     @property
+    def project_dir(self) -> str:
+        """Returns the project directory from host app, or fallback to self.cwd / os.getcwd()."""
+        if self.app:
+            pdir = getattr(self.app, "project_dir", None)
+            if isinstance(pdir, str) and pdir.strip():
+                return pdir
+        return self.cwd or os.getcwd()
+
+    @property
     def background_tasks(self) -> List[Any]:
         if self.app and hasattr(self.app, "background_tasks"):
             return self.app.background_tasks
