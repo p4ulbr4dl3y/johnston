@@ -408,9 +408,19 @@ class SessionStore:
 
     @staticmethod
     def _message_count(sess: AgentSession) -> int:
+        """Count agent loop iterations: assistant messages in history.
+
+        Each assistant message = one LLM call in the agent loop (user request,
+        tool executions, then final answer). Falls back to user-message count
+        for legacy sessions saved without agent_history.
+        """
+        if sess.agent_history:
+            assistant_msgs = [m for m in sess.agent_history if m.get("role") == "assistant"]
+            if assistant_msgs:
+                return len(assistant_msgs)
         if sess.messages:
             return len([m for m in sess.messages if m.get("type") == "user"])
-        return len(sess.agent_history)
+        return 0
 
     def children(self, parent_id: str) -> List[AgentSession]:
         return [s for s in self.list() if s.parent_id == parent_id]

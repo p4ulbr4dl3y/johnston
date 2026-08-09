@@ -61,6 +61,28 @@ class TestSessionManager(unittest.TestCase):
         self.assertEqual(out[3], {"type": "bot", "text": "Hello world", "final": True})
         self.assertEqual(out[4], {"type": "status_change", "status": "completed"})
 
+    def test_message_count_counts_agent_loop_iterations(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.agent_history = [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": None, "tool_calls": [{"id": "1"}]},
+            {"role": "tool", "tool_call_id": "1", "content": "ok"},
+            {"role": "assistant", "content": "done"},
+        ]
+        self.assertEqual(self.store._message_count(sess), 2)
+
+    def test_message_count_legacy_fallback_to_user_messages(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.messages = [{"type": "user", "text": "a"}, {"type": "bot", "text": "b"}]
+        self.assertEqual(self.store._message_count(sess), 1)
+
+    def test_message_count_empty(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        self.assertEqual(self.store._message_count(sess), 0)
+
     def test_normalize_messages_canonical_passthrough(self):
         from core.session_manager import normalize_messages
         raw = [
