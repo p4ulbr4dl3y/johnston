@@ -68,8 +68,19 @@ class SubagentViewScreen(BaseModalScreen[None]):
 
         if self.session:
             history_events = list(self.session.messages)
+            has_user_msg = any(isinstance(e, dict) and e.get("type") == "user" for e in history_events)
+            if not has_user_msg and getattr(self.session, "prompt", None):
+                await chat_view.add_user_message(self.session.prompt, animate=False)
+
             for evt in history_events:
                 await self._render_event(evt, animate=False)
+
+        if self.bot_msg:
+            try:
+                await self.bot_msg.finalize_stream()
+            except Exception:
+                pass
+            self.bot_msg = None
 
         await asyncio.sleep(0.1)
         chat_view._is_loading_session = False
@@ -125,29 +136,38 @@ class SubagentViewScreen(BaseModalScreen[None]):
                 self.thinking_widget.finish_thinking(evt.get("duration", 0.0), txt)
                 self.thinking_widget = None
         elif etype == "tool":
-            if "result_text" in evt:
+            if "result_text" in evt and not evt.get("tool_type"):
                 if self.current_tool_widget:
                     self.current_tool_widget.set_result(evt.get("result_text", ""))
             else:
-                if self.bot_msg and not self.bot_msg.content.strip():
-                    try:
-                        self.bot_msg.remove()
-                    except Exception:
-                        pass
-                self.bot_msg = None
+                if self.bot_msg:
+                    if not self.bot_msg.content.strip():
+                        try:
+                            self.bot_msg.remove()
+                        except Exception:
+                            pass
+                    else:
+                        await self.bot_msg.finalize_stream()
+                    self.bot_msg = None
                 self.current_tool_widget = await chat_view.add_tool_call(
-                    evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {}), animate=animate
+                    evt.get("tool_type", ""),
+                    evt.get("target", ""),
+                    result_text=evt.get("result_text", ""),
+                    args=evt.get("args", {}),
+                    animate=animate,
                 )
         elif etype == "bot":
             txt = evt.get("text", "")
             if txt:
                 if self.bot_msg is None:
                     self.bot_msg = await chat_view.add_bot_message(animate=animate)
-                self.bot_msg.content = txt
-                if evt.get("final"):
+                if evt.get("final") or not animate:
+                    await self.bot_msg.set_final_content(txt)
                     self.bot_msg = None
+                else:
+                    self.bot_msg.set_stream_content(txt)
         elif etype == "compaction_divider":
-            await chat_view.add_compaction_divider(evt.get("text", "Session Compacted"))
+            await chat_view.add_compaction_divider(evt.get("text", "Session Compacted"), animate=animate)
         elif etype == "status_change":
             pass
 
