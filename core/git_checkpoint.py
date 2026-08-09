@@ -2,8 +2,10 @@ import hashlib
 import os
 import subprocess
 import uuid
-from typing import List, Optional
+from contextlib import contextmanager
+from typing import Generator, List, Optional
 
+from core.git_utils import run_git
 from core.platform_utils import johnston_config_dir
 
 
@@ -193,17 +195,24 @@ class GitCheckpointManager:
         env: Optional[dict] = None,
         timeout: Optional[float] = None,
     ) -> subprocess.CompletedProcess:
+        return run_git(args=args, cwd=cwd, env=env, timeout=timeout)
+
+    @classmethod
+    @contextmanager
+    def _shadow_index_env(cls, shadow_dir: str, cwd: str) -> Generator[dict, None, None]:
+        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
+        env = os.environ.copy()
+        env["GIT_DIR"] = shadow_dir
+        env["GIT_WORK_TREE"] = cwd
+        env["GIT_INDEX_FILE"] = tmp_index
         try:
-            return subprocess.run(
-                ["git"] + args,
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                env=env,
-                timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
-            return subprocess.CompletedProcess(args=["git"] + args, returncode=124, stdout="", stderr="timeout")
+            yield env
+        finally:
+            if os.path.exists(tmp_index):
+                try:
+                    os.remove(tmp_index)
+                except Exception:
+                    pass
 
     @classmethod
     def _get_shadow_dir(cls, project_path: Optional[str] = None) -> tuple[str, str]:
@@ -306,13 +315,7 @@ class GitCheckpointManager:
             return None
         head_sha = head_res.stdout.strip()
 
-        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
-        env = os.environ.copy()
-        env["GIT_DIR"] = shadow_dir
-        env["GIT_WORK_TREE"] = cwd
-        env["GIT_INDEX_FILE"] = tmp_index
-
-        try:
+        with cls._shadow_index_env(shadow_dir, cwd) as env:
             cls._run_git(["add", "-A"], cwd=cwd, env=env)
             tree_res = cls._run_git(["write-tree"], cwd=cwd, env=env)
             if tree_res.returncode != 0:
@@ -332,12 +335,6 @@ class GitCheckpointManager:
             if ref_res.returncode == 0:
                 return commit_sha
             return None
-        finally:
-            if os.path.exists(tmp_index):
-                try:
-                    os.remove(tmp_index)
-                except Exception:
-                    pass
 
     @classmethod
     def restore_checkpoint(
@@ -432,13 +429,7 @@ class GitCheckpointManager:
             return None
         commit_sha = rev_res.stdout.strip()
 
-        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
-        env = os.environ.copy()
-        env["GIT_DIR"] = shadow_dir
-        env["GIT_WORK_TREE"] = cwd
-        env["GIT_INDEX_FILE"] = tmp_index
-
-        try:
+        with cls._shadow_index_env(shadow_dir, cwd) as env:
             cls._run_git(["add", "-A"], cwd=cwd, env=env)
             diff_res = cls._run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env)
             if diff_res.returncode != 0:
@@ -454,14 +445,6 @@ class GitCheckpointManager:
             if added == 0 and deleted == 0:
                 return "no changes"
             return f"+{added} / -{deleted}"
-        except Exception:
-            return None
-        finally:
-            if os.path.exists(tmp_index):
-                try:
-                    os.remove(tmp_index)
-                except Exception:
-                    pass
 
     @classmethod
     def get_diff_stats_batch(
@@ -485,13 +468,7 @@ class GitCheckpointManager:
 
         cls._ensure_shadow_exclude(shadow_dir)
 
-        tmp_index = os.path.join(shadow_dir, f"johnston_diff_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
-        env = os.environ.copy()
-        env["GIT_DIR"] = shadow_dir
-        env["GIT_WORK_TREE"] = cwd
-        env["GIT_INDEX_FILE"] = tmp_index
-
-        try:
+        with cls._shadow_index_env(shadow_dir, cwd) as env:
             add_res = cls._run_git(["add", "-A"], cwd=cwd, env=env, timeout=1.5)
             if add_res.returncode != 0:
                 return results
@@ -518,14 +495,8 @@ class GitCheckpointManager:
                     results[msg_idx] = "no changes"
                 else:
                     results[msg_idx] = f"+{added} / -{deleted}"
-        except Exception:
-            pass
-        finally:
-            if os.path.exists(tmp_index):
-                try:
-                    os.remove(tmp_index)
-                except Exception:
-                    pass
+
+        return results
 
         return results
 
