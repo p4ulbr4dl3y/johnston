@@ -17,11 +17,11 @@ class CreateTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "content": {"type": "string", "description": "Full file content"}
+                    "content": {"type": "string", "description": "Full file content"},
                 },
-                "required": ["path", "content"]
-            }
-        }
+                "required": ["path", "content"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
@@ -62,4 +62,3 @@ class CreateTool(BaseTool):
                 return f"file '{path}' created.{linter_output}"
         except Exception as e:
             return format_tool_error("file", detail=str(e), name=path)
-

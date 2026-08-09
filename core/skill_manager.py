@@ -3,6 +3,7 @@ Skill Manager for Johnston.
 Handles global skills (~/.johnston/skills/) and project-level skills (<cwd>/.johnston/skills/).
 Supports YAML frontmatter parsing from SKILL.md and *.md files.
 """
+
 import os
 from typing import Any, Dict, List, Optional
 
@@ -15,7 +16,6 @@ from core.frontmatter import parse_frontmatter
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
-
 
 
 class SkillManager:
@@ -120,7 +120,11 @@ class SkillManager:
 
                 desc = fm.get("description", "").strip()
                 if not desc and body:
-                    lines = [line.strip("# ").strip() for line in body.splitlines() if line.strip() and not line.startswith("#")]
+                    lines = [
+                        line.strip("# ").strip()
+                        for line in body.splitlines()
+                        if line.strip() and not line.startswith("#")
+                    ]
                     desc = lines[0] if lines else ""
 
                 hidden_val = str(fm.get("hidden", "")).lower()
@@ -201,6 +205,7 @@ class SkillManager:
                 new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
 
             from core.platform_utils import atomic_write_text
+
             atomic_write_text(filepath, new_content)
 
             return new_hidden
@@ -216,7 +221,7 @@ class SkillManager:
         project_skills = []
 
         for s in skills:
-            desc = f": {s['description']}" if s['description'] else ""
+            desc = f": {s['description']}" if s["description"] else ""
             line = f"- `{s['name']}`{desc}"
             if s.get("scope") == "project":
                 project_skills.append(line)
@@ -234,5 +239,3 @@ class SkillManager:
             lines.extend(project_skills)
 
         return "\n".join(lines)
-
-

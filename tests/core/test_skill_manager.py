@@ -101,11 +101,13 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(re_hidden_state)
 
     def test_skills_command_registered(self):
-        from core.commands import COMMAND_REGISTRY
+        from widgets.commands import COMMAND_REGISTRY
+
         self.assertIn("/skills", COMMAND_REGISTRY)
 
     def test_skill_command_suggestions(self):
         from widgets.command_suggestions import get_all_command_suggestions
+
         suggestions = get_all_command_suggestions()
         cmd_names = [name for name, _ in suggestions]
         self.assertIn("/skills", cmd_names)
@@ -134,13 +136,13 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("complex-skill", skill_names)
         self.assertNotIn("helper", skill_names)
 
-
     async def test_skill_slash_command_execution(self):
-        from core.commands import handle_slash_command
+        from widgets.commands import handle_slash_command
+
         try:
             from tests.core.test_commands import MockApp
         except ImportError:
-            from core.test_commands import MockApp
+            from tests.ui.test_commands import MockApp
 
         os.chdir(self.old_cwd)
         SkillManager._instance = None
@@ -152,11 +154,12 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("configure MCP", app.ai_prompts[0][0])
 
     async def test_multi_skill_slash_command_execution(self):
-        from core.commands import handle_slash_command
+        from widgets.commands import handle_slash_command
+
         try:
             from tests.core.test_commands import MockApp
         except ImportError:
-            from core.test_commands import MockApp
+            from tests.ui.test_commands import MockApp
 
         os.chdir(self.old_cwd)
         SkillManager._instance = None
@@ -167,6 +170,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("johnston-guide", app.ai_prompts[0][0])
         self.assertIn("caveman", app.ai_prompts[0][0])
         self.assertIn("refactor code", app.ai_prompts[0][0])
+
 
 if __name__ == "__main__":
     unittest.main()

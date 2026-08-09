@@ -65,7 +65,5 @@ class HelpScreen(BaseModalScreen[None]):
             return
         await super()._on_key(event)
 
-
     def action_close(self) -> None:
         self.dismiss(None)
-

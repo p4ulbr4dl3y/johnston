@@ -27,20 +27,26 @@ class ProviderManager:
         self._providers_mtime = 0.0
         self._providers_file_path = ""
 
-    def _get_config_data(self) -> dict:
-        if not os.path.exists(CONFIG_FILE):
-            return {}
+    def _cached_json(self, path: str, cache_attr: str, mtime_attr: str, file_attr: str, default: Any) -> Any:
+        """Reads a JSON file, returning a cached value when the file is unchanged (by mtime)."""
+        if not os.path.exists(path):
+            return default
         try:
-            mtime = os.path.getmtime(CONFIG_FILE)
-            if self._config_cache and getattr(self, "_config_file_path", "") == CONFIG_FILE and self._config_mtime == mtime:
-                return self._config_cache
-            data = read_json(CONFIG_FILE, {})
-            self._config_cache = data if isinstance(data, dict) else {}
-            self._config_mtime = mtime
-            self._config_file_path = CONFIG_FILE
-            return self._config_cache
+            mtime = os.path.getmtime(path)
+            cached = getattr(self, cache_attr)
+            if cached and getattr(self, file_attr, "") == path and getattr(self, mtime_attr) == mtime:
+                return cached
+            data = read_json(path, default)
+            data = data if isinstance(data, dict) else {}
+            setattr(self, cache_attr, data)
+            setattr(self, mtime_attr, mtime)
+            setattr(self, file_attr, path)
+            return data
         except Exception:
-            return {}
+            return default
+
+    def _get_config_data(self) -> dict:
+        return self._cached_json(CONFIG_FILE, "_config_cache", "_config_mtime", "_config_file_path", {})
 
     def _read_config(self) -> dict:
         """Reads CONFIG_FILE, falling back to {} on missing/corrupt file."""
@@ -65,22 +71,16 @@ class ProviderManager:
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         providers = dict(DEFAULT_JSON_PROVIDERS)
-        if os.path.exists(PROVIDERS_JSON_FILE):
+        data = self._cached_json(
+            PROVIDERS_JSON_FILE, "_providers_cache", "_providers_mtime", "_providers_file_path", {}
+        )
+        if isinstance(data, dict):
             try:
-                mtime = os.path.getmtime(PROVIDERS_JSON_FILE)
-                if self._providers_cache and getattr(self, "_providers_file_path", "") == PROVIDERS_JSON_FILE and self._providers_mtime == mtime:
-                    data = self._providers_cache
-                else:
-                    data = read_json(PROVIDERS_JSON_FILE, {})
-                    self._providers_cache = data if isinstance(data, dict) else {}
-                    self._providers_mtime = mtime
-                    self._providers_file_path = PROVIDERS_JSON_FILE
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        if isinstance(v, dict):
-                            merged = dict(DEFAULT_JSON_PROVIDERS.get(k, {}))
-                            merged.update(v)
-                            providers[k] = merged
+                for k, v in data.items():
+                    if isinstance(v, dict):
+                        merged = dict(DEFAULT_JSON_PROVIDERS.get(k, {}))
+                        merged.update(v)
+                        providers[k] = merged
             except Exception:
                 pass
         return providers
@@ -341,6 +341,7 @@ class ProviderManager:
                                 m_name = m.get("name")
                                 if m_name:
                                     from core.models_catalog import catalog
+
                                     catalog._names[m_id] = m_name
                                     catalog._names[m_id.split("/")[-1]] = m_name
                                 ctx_len = (
@@ -357,6 +358,7 @@ class ProviderManager:
         if models:
             try:
                 from core.models_catalog import catalog
+
                 catalog.save_cache()
             except Exception:
                 pass
@@ -368,9 +370,7 @@ class ProviderManager:
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:
             atomic_write_json(
-                cache_path,
-                {"updated_at": time.time(), "models": models, "model_limits": model_limits},
-                indent=2
+                cache_path, {"updated_at": time.time(), "models": models, "model_limits": model_limits}, indent=2
             )
         except Exception as e:
             logger.warning("Error writing models cache: %s", e)
@@ -390,33 +390,32 @@ class ProviderManager:
         key_val = self.get_api_key(provider_key) or pdata.get("api_key", "")
         return bool(key_val and str(key_val).strip())
 
-    async def fetch_models_grouped(self, force_refresh: bool = False, connected_only: bool = True, include_disabled: bool = False) -> Dict[str, Dict[str, Any]]:
+    async def fetch_models_grouped(
+        self, force_refresh: bool = False, connected_only: bool = True, include_disabled: bool = False
+    ) -> Dict[str, Dict[str, Any]]:
         """Returns model dictionaries grouped by provider (only connected/configured providers by default)"""
         providers = self.load_providers(include_disabled=include_disabled)
         active_providers = [
-            (p_key, p_data) for p_key, p_data in providers.items()
+            (p_key, p_data)
+            for p_key, p_data in providers.items()
             if include_disabled or not p_data.get("disabled", False)
         ]
         if connected_only:
             connected = [
-                (p_key, p_data) for p_key, p_data in active_providers
-                if self.is_provider_connected(p_key, p_data)
+                (p_key, p_data) for p_key, p_data in active_providers if self.is_provider_connected(p_key, p_data)
             ]
             if connected:
                 active_providers = connected
             else:
                 return {}
 
-        results = await asyncio.gather(*[
-            self.fetch_models_for_provider(p_key, force_refresh=force_refresh)
-            for p_key, _ in active_providers
-        ], return_exceptions=True)
+        results = await asyncio.gather(
+            *[self.fetch_models_for_provider(p_key, force_refresh=force_refresh) for p_key, _ in active_providers],
+            return_exceptions=True,
+        )
 
         grouped = {}
         for (p_key, p_data), res in zip(active_providers, results):
             if isinstance(res, list) and res:
-                grouped[p_key] = {
-                    "name": p_data["name"],
-                    "models": res
-                }
+                grouped[p_key] = {"name": p_data["name"], "models": res}
         return grouped

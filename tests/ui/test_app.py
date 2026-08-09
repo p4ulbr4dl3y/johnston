@@ -23,7 +23,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.focus()
 
             # 1. Test /help
-            from core.commands import handle_slash_command
+            from widgets.commands import handle_slash_command
+
             await handle_slash_command(app, "/help")
             await pilot.pause(0.2)
             self.assertIsInstance(app.screen, HelpScreen)
@@ -69,7 +70,10 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             # 6. Test /models and model search
             from unittest.mock import AsyncMock
-            app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o", "flash"]}})
+
+            app.pm.fetch_models_grouped = AsyncMock(
+                return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o", "flash"]}}
+            )
             await handle_slash_command(app, "/models")
             await pilot.pause(0.5)
             self.assertIsInstance(app.screen, ModelScreen)
@@ -252,7 +256,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Prompt 2", ran_prompts)
                 self.assertEqual(len(app.message_queue), 0)
                 chat_view = app.query_one(ChatView)
-                dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
+                dividers = [
+                    c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"
+                ]
                 self.assertEqual(len(dividers), 1)
 
     def test_resume_tip_on_exit(self):
@@ -291,10 +297,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
     async def test_modal_ctrl_c_quit(self):
         from unittest.mock import AsyncMock
+
         app = JohnstonApp()
         app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o"]}})
         async with app.run_test() as pilot:
-            from core.commands import handle_slash_command
+            from widgets.commands import handle_slash_command
+
             await handle_slash_command(app, "/models")
             await pilot.pause(0.2)
             self.assertIsInstance(app.screen, ModelScreen)

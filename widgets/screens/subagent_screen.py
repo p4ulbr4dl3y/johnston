@@ -39,6 +39,7 @@ class SubagentViewScreen(BaseModalScreen[None]):
         store = getattr(self.app, "sm", None) if self.app else None
         if store is None:
             from core.session_manager import SessionStore
+
             store = SessionStore.get_instance()
 
         curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
@@ -47,9 +48,11 @@ class SubagentViewScreen(BaseModalScreen[None]):
             self.session = store.find_session_by_description_or_id(self.session_id_or_desc)
 
         if not self.session:
+
             async def _no_sess():
                 bm = await chat_view.add_bot_message()
                 bm.content = f"Subagent `{self.session_id_or_desc}` session details not found."
+
             self.run_worker(_no_sess())
             return
 

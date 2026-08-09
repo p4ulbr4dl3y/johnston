@@ -28,7 +28,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="create",
             target="test.txt",
             result_text="Success",
-            args={"path": "test.txt", "content": "hello\nworld"}
+            args={"path": "test.txt", "content": "hello\nworld"},
         )
         widget.render_header()
         self.assertFalse(widget.is_expanded)
@@ -38,9 +38,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_tool_call_widget_toggle_expand_syntax(self):
         widget = ToolCallWidget(
-            tool_type="create",
-            target="test.py",
-            args={"path": "test.py", "content": "def foo():\n    return 42"}
+            tool_type="create", target="test.py", args={"path": "test.py", "content": "def foo():\n    return 42"}
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
@@ -65,7 +63,11 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="edit",
             target="test.py",
             result_text=diff_text,
-            args={"path": "test.py", "old_string": "def multiply(a, b):", "new_string": "def multiply(a: float, b: float) -> float:\n    return a * b"}
+            args={
+                "path": "test.py",
+                "old_string": "def multiply(a, b):",
+                "new_string": "def multiply(a: float, b: float) -> float:\n    return a * b",
+            },
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
@@ -87,10 +89,7 @@ class TestToolExpansion(unittest.TestCase):
             " </script>\n"
         )
         widget = ToolCallWidget(
-            tool_type="edit",
-            target="index.html",
-            result_text=diff_text,
-            args={"path": "index.html"}
+            tool_type="edit", target="index.html", result_text=diff_text, args={"path": "index.html"}
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
@@ -124,7 +123,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="edit",
             target="test.py",
             result_text=error_text,
-            args={"path": "test.py", "target_content": "foo", "replacement_content": "bar"}
+            args={"path": "test.py", "target_content": "foo", "replacement_content": "bar"},
         )
         widget.set_result(error_text)
         widget.toggle_expanded()
@@ -133,13 +132,10 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(content, error_text)
 
     def test_hints_stripped_from_ui_display_but_retained_in_result_text(self):
-        full_text = "ERR: target not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
-        widget = ToolCallWidget(
-            tool_type="edit",
-            target="test.py",
-            result_text=full_text,
-            args={"path": "test.py"}
+        full_text = (
+            "ERR: target not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
         )
+        widget = ToolCallWidget(tool_type="edit", target="test.py", result_text=full_text, args={"path": "test.py"})
         widget.set_result(full_text, is_error=True)
         widget.toggle_expanded()
 
@@ -156,7 +152,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="create",
             target="/some/dir",
             result_text=error_text,
-            args={"path": "/some/dir", "content": "some content"}
+            args={"path": "/some/dir", "content": "some content"},
         )
         widget.set_result(error_text)
         widget.toggle_expanded()
@@ -166,12 +162,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_update_plan_error_display(self):
         error_text = "ERR: 'plan' must be non-empty"
-        widget = ToolCallWidget(
-            tool_type="update_plan",
-            target="plan",
-            result_text=error_text,
-            args={"plan": []}
-        )
+        widget = ToolCallWidget(tool_type="update_plan", target="plan", result_text=error_text, args={"plan": []})
         widget.set_result(error_text)
         widget.toggle_expanded()
         self.assertEqual(widget.status, "error")
@@ -191,10 +182,7 @@ class TestToolExpansion(unittest.TestCase):
             "</body>\n"
         )
         widget = ToolCallWidget(
-            tool_type="edit",
-            target="index.html",
-            result_text=diff_text,
-            args={"path": "index.html"}
+            tool_type="edit", target="index.html", result_text=diff_text, args={"path": "index.html"}
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
@@ -207,18 +195,10 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_edit_tool_html_tags_rendering(self):
         diff_text = (
-            "@@ -274,5 +274,5 @@\n"
-            "+ </button>\n"
-            "+ </form>\n"
-            "+ <p id=\"cta-success\">\n"
-            "+ Talk to Sales instead\n"
-            " </div>\n"
+            '@@ -274,5 +274,5 @@\n+ </button>\n+ </form>\n+ <p id="cta-success">\n+ Talk to Sales instead\n </div>\n'
         )
         widget = ToolCallWidget(
-            tool_type="edit",
-            target="index.html",
-            result_text=diff_text,
-            args={"path": "index.html"}
+            tool_type="edit", target="index.html", result_text=diff_text, args={"path": "index.html"}
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
@@ -236,8 +216,8 @@ class TestToolExpansion(unittest.TestCase):
                 "TargetFile": "index.html",
                 "TargetContent": "const form = document.getElementById('cta-form');",
                 "ReplacementContent": "// CTA form handler\nconst form = document.getElementById('cta-form');",
-                "StartLine": 330
-            }
+                "StartLine": 330,
+            },
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
@@ -255,18 +235,10 @@ class TestToolExpansion(unittest.TestCase):
             args={
                 "TargetFile": "app.py",
                 "ReplacementChunks": [
-                    {
-                        "TargetContent": "x = 1",
-                        "ReplacementContent": "x = 10",
-                        "StartLine": 15
-                    },
-                    {
-                        "TargetContent": "y = 2",
-                        "ReplacementContent": "y = 20",
-                        "StartLine": 45
-                    }
-                ]
-            }
+                    {"TargetContent": "x = 1", "ReplacementContent": "x = 10", "StartLine": 15},
+                    {"TargetContent": "y = 2", "ReplacementContent": "y = 20", "StartLine": 45},
+                ],
+            },
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
@@ -279,11 +251,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("45 + y = 20", rendered_plain)
 
     def test_shell_tool_append_output(self):
-        widget = ToolCallWidget(
-            tool_type="shell",
-            target="echo 'live stream'",
-            args={"command": "echo 'live stream'"}
-        )
+        widget = ToolCallWidget(tool_type="shell", target="echo 'live stream'", args={"command": "echo 'live stream'"})
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
 
@@ -294,18 +262,14 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(content, "line 1\nline 2")
 
     def test_read_tool_not_expandable(self):
-        widget = ToolCallWidget(
-            tool_type="read",
-            target="test.py",
-            args={"path": "test.py"}
-        )
+        widget = ToolCallWidget(tool_type="read", target="test.py", args={"path": "test.py"})
         self.assertFalse(widget.is_expandable())
 
     def test_create_tool_content_strips_trailing_newline(self):
         widget = ToolCallWidget(
             tool_type="create",
             target="test.html",
-            args={"path": "test.html", "content": "<html>\n<body>\n</body>\n</html>\n"}
+            args={"path": "test.html", "content": "<html>\n<body>\n</body>\n</html>\n"},
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
@@ -320,7 +284,7 @@ class TestToolExpansion(unittest.TestCase):
         widget = ToolCallWidget(
             tool_type="create",
             target=file_path,
-            args={"path": file_path}  # no 'content' in args
+            args={"path": file_path},  # no 'content' in args
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
@@ -342,6 +306,7 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_thinking_widget_toggle_expand(self):
         from widgets.chat_view import ThinkingWidget
+
         tw = ThinkingWidget("Thinking about problem...")
         tw.finish_thinking(2.5, "Detailed thought process...")
         self.assertFalse(tw.is_expanded)
@@ -369,26 +334,22 @@ class TestToolExpansion(unittest.TestCase):
         self.assertEqual(start, 1)
         self.assertEqual(path, "flappy.html")
 
-
-
     def test_shell_tool_output_escapes_invalid_rich_markup(self):
         widget = ToolCallWidget(
             tool_type="shell",
             target="python -m pytest",
             result_text="Found error: [tag=e1]\n",
-            args={"command": "python -m pytest"}
+            args={"command": "python -m pytest"},
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, r"Found error: \[tag=e1]")
 
-
-
-
     def test_chat_view_toggle_expand(self):
         from unittest.mock import PropertyMock, patch
 
         from widgets.chat_view import ChatView, ThinkingWidget
+
         chat_view = ChatView(show_welcome=False)
         tw = ThinkingWidget("Some deep thought")
         tc1 = ToolCallWidget(tool_type="create", target="a.txt", args={"path": "a.txt", "content": "1"})
@@ -421,14 +382,9 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_web_fetch_tool_not_expandable(self):
         url = "https://example.com/doc.html"
-        widget = ToolCallWidget(
-            tool_type="web_fetch",
-            target=url,
-            args={"url": url}
-        )
+        widget = ToolCallWidget(tool_type="web_fetch", target=url, args={"url": url})
         self.assertFalse(widget.is_expandable())
 
 
 if __name__ == "__main__":
     unittest.main()
-

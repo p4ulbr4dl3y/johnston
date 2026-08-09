@@ -7,7 +7,14 @@ from widgets.status_footer import StatusFooter
 
 
 class DummyTask:
-    def __init__(self, task_id: str, is_running: bool = True, is_background: bool = True, session_id: str = "test-session", kind: str = "shell"):
+    def __init__(
+        self,
+        task_id: str,
+        is_running: bool = True,
+        is_background: bool = True,
+        session_id: str = "test-session",
+        kind: str = "shell",
+    ):
         self.task_id = task_id
         self.kind = kind
         self.is_running = is_running

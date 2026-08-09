@@ -9,14 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
     from core.provider_manager import ProviderManager
 
+
 class TestProviderManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
 
         # Patch config values inside provider_manager
         self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
-        self.config_file_patcher = patch("core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
-        self.providers_json_patcher = patch("core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json"))
+        self.config_file_patcher = patch(
+            "core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json")
+        )
+        self.providers_json_patcher = patch(
+            "core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
+        )
 
         self.config_dir_patcher.start()
         self.config_file_patcher.start()
@@ -60,12 +65,7 @@ class TestProviderManager(unittest.TestCase):
         mock_client = MagicMock()
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "data": [
-                {"id": "model-a"},
-                {"id": "model-b"}
-            ]
-        }
+        mock_resp.json.return_value = {"data": [{"id": "model-a"}, {"id": "model-b"}]}
         mock_client.get = AsyncMock(return_value=mock_resp)
         mock_client_cls.return_value.__aenter__.return_value = mock_client
 
@@ -84,14 +84,17 @@ class TestProviderManager(unittest.TestCase):
         # Create a custom provider entry in providers.json without a "model" property
         providers_file = os.path.join(self.test_dir, "providers.json")
         with open(providers_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "custom_no_model": {
-                    "key": "custom_no_model",
-                    "name": "Custom No Model",
-                    "base_url": "https://api.example.com/v1",
-                    "models": ["model-1", "model-2"]
-                }
-            }, f)
+            json.dump(
+                {
+                    "custom_no_model": {
+                        "key": "custom_no_model",
+                        "name": "Custom No Model",
+                        "base_url": "https://api.example.com/v1",
+                        "models": ["model-1", "model-2"],
+                    }
+                },
+                f,
+            )
 
         pm = ProviderManager()
         pm.set_active_provider_key("custom_no_model")
@@ -135,7 +138,5 @@ class TestProviderManager(unittest.TestCase):
         self.assertIn("openai", res)
 
 
-
 if __name__ == "__main__":
     unittest.main()
-

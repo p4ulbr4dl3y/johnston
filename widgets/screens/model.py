@@ -28,7 +28,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             items=items,
             default_value=default_val,
             show_search=True,
-            search_placeholder="Search models..."
+            search_placeholder="Search models...",
         )
 
     @staticmethod
@@ -46,7 +46,9 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         clean_t = catalog.get_model_display_name(target_prov or p_key, target_model).lower()
         return bool(clean_m and clean_t and clean_m == clean_t)
 
-    def _build_data(self) -> Tuple[List[Union[str, Option]], List[Union[str, Tuple[str, str], None]], Union[str, Tuple[str, str], None]]:
+    def _build_data(
+        self,
+    ) -> Tuple[List[Union[str, Option]], List[Union[str, Tuple[str, str], None]], Union[str, Tuple[str, str], None]]:
         options: List[Union[str, Option]] = []
         items: List[Union[str, Tuple[str, str], None]] = []
         default_val: Union[str, Tuple[str, str], None] = None
@@ -113,5 +115,3 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                     break
 
         return options, items, default_val
-
-

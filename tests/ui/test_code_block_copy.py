@@ -30,6 +30,7 @@ class TestCodeBlockCopy(unittest.TestCase):
 
     def test_custom_markdown_fence_compose_without_theme(self):
         from textual._context import active_app
+
         mock_app = MagicMock()
         mock_app._compose_stacks = [[]]
         token = active_app.set(mock_app)

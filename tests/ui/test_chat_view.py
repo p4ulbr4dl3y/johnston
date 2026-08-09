@@ -39,7 +39,9 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             children = list(chat_view.children)
-            self.assertEqual([type(child).__name__ for child in children[-3:]], ["UserMessage", "BotMessage", "ToolCallWidget"])
+            self.assertEqual(
+                [type(child).__name__ for child in children[-3:]], ["UserMessage", "BotMessage", "ToolCallWidget"]
+            )
             self.assertIsInstance(tool, ToolCallWidget)
             self.assertEqual(chat_view.get_user_messages()[-1][1], "first")
 
@@ -121,7 +123,9 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((tool, server, args), ("add_cell", "colab", {"x": 1}))
 
         # Case 2: PascalCase keys (ToolName / ServerName / Arguments)
-        item2 = ToolCallWidget("call_mcp", "", "", args={"ServerName": "colab-mcp", "ToolName": "run_cell", "Arguments": {"y": 2}})
+        item2 = ToolCallWidget(
+            "call_mcp", "", "", args={"ServerName": "colab-mcp", "ToolName": "run_cell", "Arguments": {"y": 2}}
+        )
         tool2, server2, args2 = item2._extract_mcp_call_info()
         self.assertEqual((tool2, server2, args2), ("run_cell", "colab-mcp", {"y": 2}))
 
@@ -359,8 +363,9 @@ class TestMarkdownHelpers(unittest.TestCase):
 
         md.update = MagicMock(return_value=completed_coro())
         calls = []
-        with patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True), patch(
-            "asyncio.get_running_loop", side_effect=RuntimeError
+        with (
+            patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True),
+            patch("asyncio.get_running_loop", side_effect=RuntimeError),
         ):
             safe_update_markdown(md, "content", on_done=lambda: calls.append(1))
         self.assertEqual(calls, [1])
@@ -431,15 +436,7 @@ class TestDiffRenderable(unittest.TestCase):
 
 class TestFormatEditDiff(unittest.TestCase):
     def test_format_edit_diff_basic_hunk(self):
-        diff = (
-            "--- a/file.py\n"
-            "+++ b/file.py\n"
-            "@@ -1,3 +1,3 @@\n"
-            " def keep():\n"
-            "-    old = 1\n"
-            "+    new = 2\n"
-            "     return\n"
-        )
+        diff = "--- a/file.py\n+++ b/file.py\n@@ -1,3 +1,3 @@\n def keep():\n-    old = 1\n+    new = 2\n     return\n"
         result = format_edit_diff(diff, "file.py")
         self.assertIsInstance(result, DiffRenderable)
         text = result.plain
@@ -448,26 +445,11 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("new = 2", text)
 
     def test_format_edit_diff_linter_feedback_and_success_prefix(self):
-        diff = (
-            "[Linter Feedback]:\n"
-            "some linter noise\n"
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-a\n"
-            "+b\n"
-        )
+        diff = "[Linter Feedback]:\nsome linter noise\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
         result = format_edit_diff(diff, "f.py")
         self.assertNotIn("Linter", result.plain)
 
-        diff2 = (
-            "Success: file 'f.py' updated\n"
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-a\n"
-            "+b\n"
-        )
+        diff2 = "Success: file 'f.py' updated\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
         result2 = format_edit_diff(diff2, "f.py")
         self.assertNotIn("Success", result2.plain)
 
@@ -488,13 +470,7 @@ class TestFormatEditDiff(unittest.TestCase):
         result = format_edit_diff(html_js, "index.html")
         self.assertIn("console", result.plain)
 
-        html_css = (
-            "--- a/style.html\n"
-            "+++ b/style.html\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-body { color: red; }\n"
-            "+div { color: blue; }\n"
-        )
+        html_css = "--- a/style.html\n+++ b/style.html\n@@ -1,1 +1,1 @@\n-body { color: red; }\n+div { color: blue; }\n"
         result2 = format_edit_diff(html_css, "style.html")
         self.assertIn("color", result2.plain)
 
@@ -513,40 +489,18 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("trailing garbage line", result.plain)
 
     def test_format_edit_diff_empty_code_lines_and_no_lexer(self):
-        diff = (
-            "--- a/f.txt\n"
-            "+++ b/f.txt\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-\n"
-            "+\n"
-        )
+        diff = "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-\n+\n"
         result = format_edit_diff(diff, "f.txt")
         self.assertIsInstance(result, DiffRenderable)
 
     def test_format_edit_diff_http_path_and_multi_hunk_numbers(self):
-        diff = (
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1,2 +10,2 @@\n"
-            "-line1\n"
-            "-line2\n"
-            "+lineA\n"
-            "+lineB\n"
-        )
+        diff = "--- a/f.py\n+++ b/f.py\n@@ -1,2 +10,2 @@\n-line1\n-line2\n+lineA\n+lineB\n"
         result = format_edit_diff(diff, "https://example.com/f.py")
         self.assertIsInstance(result, DiffRenderable)
         self.assertIn("lineA", result.plain)
 
     def test_format_edit_diff_empty_lines_and_hunk_marker_without_ranges(self):
-        diff = (
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1 +1 @@\n"
-            " context\n"
-            "-\n"
-            "+\n"
-            " tail\n"
-        )
+        diff = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n context\n-\n+\n tail\n"
         result = format_edit_diff(diff, "f.py")
         self.assertIsInstance(result, DiffRenderable)
 
@@ -588,15 +542,7 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("preamble line", result.plain)
 
     def test_format_edit_diff_empty_path_and_empty_context_line(self):
-        diff = (
-            "--- a/f\n"
-            "+++ b/f\n"
-            "@@ -1,2 +1,2 @@\n"
-            " a\n"
-            "\n"
-            "-b\n"
-            "+c\n"
-        )
+        diff = "--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n a\n\n-b\n+c\n"
         result = format_edit_diff(diff, "")
         self.assertIsInstance(result, DiffRenderable)
 
@@ -612,35 +558,17 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("const", result.plain)
 
     def test_format_edit_diff_css_after_script_detection(self):
-        diff = (
-            "--- a/q.html\n"
-            "+++ b/q.html\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-body { margin: 0; }\n"
-            "+div { padding: 0; }\n"
-        )
+        diff = "--- a/q.html\n+++ b/q.html\n@@ -1,1 +1,1 @@\n-body { margin: 0; }\n+div { padding: 0; }\n"
         result = format_edit_diff(diff, "q.html")
         self.assertIn("margin", result.plain)
 
     def test_format_edit_diff_js_without_script_tag(self):
-        diff = (
-            "--- a/r.html\n"
-            "+++ b/r.html\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-function init() { return 1; }\n"
-            "+const value = 2;\n"
-        )
+        diff = "--- a/r.html\n+++ b/r.html\n@@ -1,1 +1,1 @@\n-function init() { return 1; }\n+const value = 2;\n"
         result = format_edit_diff(diff, "r.html")
         self.assertIn("function", result.plain)
 
     def test_format_edit_diff_lexer_exception_fallback(self):
-        diff = (
-            "--- a/f.unknownext\n"
-            "+++ b/f.unknownext\n"
-            "@@ -1,1 +1,1 @@\n"
-            "-line one\n"
-            "+line two\n"
-        )
+        diff = "--- a/f.unknownext\n+++ b/f.unknownext\n@@ -1,1 +1,1 @@\n-line one\n+line two\n"
         result = format_edit_diff(diff, "f.unknownext")
         self.assertIn("line one", result.plain)
 
@@ -899,9 +827,11 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
 
     async def test_add_user_message_when_unattached_waits(self):
         chat_view = ChatView()
-        with patch.object(ChatView, "is_attached", new_callable=PropertyMock, return_value=False), patch.object(
-            chat_view, "_wait_until_attached", new_callable=AsyncMock
-        ) as wait_mock, patch.object(chat_view, "mount", new_callable=AsyncMock):
+        with (
+            patch.object(ChatView, "is_attached", new_callable=PropertyMock, return_value=False),
+            patch.object(chat_view, "_wait_until_attached", new_callable=AsyncMock) as wait_mock,
+            patch.object(chat_view, "mount", new_callable=AsyncMock),
+        ):
             msg = await chat_view.add_user_message("waiting")
         wait_mock.assert_awaited_once()
         self.assertIsInstance(msg, UserMessage)
@@ -1027,9 +957,11 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
 
     async def test_add_widgets_when_unattached_wait(self):
         chat_view = ChatView()
-        with patch.object(ChatView, "is_attached", new_callable=PropertyMock, return_value=False), patch.object(
-            chat_view, "_wait_until_attached", new_callable=AsyncMock
-        ) as wait_mock, patch.object(chat_view, "mount", new_callable=AsyncMock):
+        with (
+            patch.object(ChatView, "is_attached", new_callable=PropertyMock, return_value=False),
+            patch.object(chat_view, "_wait_until_attached", new_callable=AsyncMock) as wait_mock,
+            patch.object(chat_view, "mount", new_callable=AsyncMock),
+        ):
             bot = await chat_view.add_bot_message()
             thinking = await chat_view.add_thinking_widget()
             tool = await chat_view.add_tool_call("shell", "cmd")
@@ -1176,7 +1108,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget = ToolCallWidget("shell", "cmd")
         self.assertEqual(widget._format_compact_dict({}), "")
         self.assertEqual(widget._format_compact_dict("nope"), "")
-        self.assertEqual(widget._format_compact_dict({"a": 1}), '{a: 1}')
+        self.assertEqual(widget._format_compact_dict({"a": 1}), "{a: 1}")
         self.assertEqual(
             widget._format_compact_dict({"this_key_is_way_too_long_for_sure": "value"}),
             '{this_key_is_way_t...: "value"}',
@@ -1307,15 +1239,17 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         return ToolCallWidget(tool_type, target, result_text=result_text, args=args, **kwargs)
 
     def test_render_header_update_plan_dict_and_list(self):
-        widget = self._widget("update_plan", "plan", args={"plan": {"entries": [
-            {"status": "completed"}, {"status": "pending"}
-        ]}})
+        widget = self._widget(
+            "update_plan", "plan", args={"plan": {"entries": [{"status": "completed"}, {"status": "pending"}]}}
+        )
         widget.render_header()
         self.assertIn("[1/2 completed]", str(widget.header_label.render()))
 
-        widget2 = self._widget("update_plan", "plan", args={"plan": [
-            {"status": "done"}, {"status": "pending"}, {"step": "x", "status": "in_progress"}
-        ]})
+        widget2 = self._widget(
+            "update_plan",
+            "plan",
+            args={"plan": [{"status": "done"}, {"status": "pending"}, {"step": "x", "status": "in_progress"}]},
+        )
         widget2.render_header()
         self.assertIn("[1/3 completed]", str(widget2.header_label.render()))
 
@@ -1388,9 +1322,10 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def test_on_click_invoke_subagent_pushes_screen(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
-        with patch("widgets.screens.subagent_screen.SubagentViewScreen") as screen_cls, patch.object(
-            ToolCallWidget, "app", new_callable=PropertyMock
-        ) as app_prop:
+        with (
+            patch("widgets.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
             app_prop.return_value = MagicMock()
             widget.on_click(event)
         screen_cls.assert_called_once()
@@ -1399,9 +1334,10 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def test_on_click_manage_shell_and_expandable(self):
         widget = self._widget("manage_shell", "t", args={"description": "desc"})
         event = MagicMock()
-        with patch("widgets.screens.subagent_screen.SubagentViewScreen"), patch.object(
-            ToolCallWidget, "app", new_callable=PropertyMock
-        ) as app_prop:
+        with (
+            patch("widgets.screens.subagent_screen.SubagentViewScreen"),
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
             app_prop.return_value = MagicMock()
             widget.on_click(event)
         event.stop.assert_called_once()
@@ -1409,9 +1345,10 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def test_on_click_exception_is_suppressed(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
-        with patch("widgets.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")), patch.object(
-            ToolCallWidget, "app", new_callable=PropertyMock
-        ) as app_prop:
+        with (
+            patch("widgets.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")),
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
             app_prop.return_value = MagicMock()
             widget.on_click(event)
         event.stop.assert_called_once()
@@ -1501,12 +1438,16 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w2 = self._widget("edit", "@@ -1,1 +1,1 @@\n-a\n+b\n", args={"path": "f.py"})
         w2.render_content()
 
-        w3 = self._widget("edit", "", args={
-            "path": "f.py",
-            "ReplacementChunks": [
-                {"TargetContent": "old", "ReplacementContent": "new", "StartLine": 2},
-            ],
-        })
+        w3 = self._widget(
+            "edit",
+            "",
+            args={
+                "path": "f.py",
+                "ReplacementChunks": [
+                    {"TargetContent": "old", "ReplacementContent": "new", "StartLine": 2},
+                ],
+            },
+        )
         w3.render_content()
 
         w4 = self._widget("edit", "", args={"old_string": "old", "new_string": "new", "StartLine": 1})
@@ -1522,9 +1463,15 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
     def test_render_content_update_plan(self):
         w = self._widget("update_plan", "Error: nope", args={})
         w.render_content()
-        w2 = self._widget("update_plan", "", args={"plan": [{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}]})
+        w2 = self._widget(
+            "update_plan",
+            "",
+            args={"plan": [{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}]},
+        )
         w2.render_content()
-        plan_text = w2._format_plan_display([{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}], "explanation")
+        plan_text = w2._format_plan_display(
+            [{"step": "s", "status": "in_progress"}, {"step": "done step", "status": "completed"}], "explanation"
+        )
         self.assertIn("s", plan_text.plain)
         self.assertIn("done step", plan_text.plain)
 
@@ -1624,9 +1571,10 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertTrue(w.content_widget.display)
 
         w2 = self._widget("shell", "")
-        with patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])), patch.object(
-            w2.content_widget, "update"
-        ) as upd:
+        with (
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])),
+            patch.object(w2.content_widget, "update") as upd,
+        ):
             w2.render_content()
         upd.assert_called_once_with("(No output)")
 
@@ -1634,14 +1582,19 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         task = MagicMock()
         task.task_id = "7"
         task.is_running = True
-        with patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[task])), patch.object(
-            w3.content_widget, "update"
-        ) as upd:
+        with (
+            patch.object(
+                ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[task])
+            ),
+            patch.object(w3.content_widget, "update") as upd,
+        ):
             w3.render_content()
         self.assertIn("Running command", str(upd.call_args.args[0]))
 
         w4 = self._widget("shell", "")
-        with patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])):
+        with patch.object(
+            ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])
+        ):
             w4.render_content()
 
     def test_render_content_get_mcp_schema(self):

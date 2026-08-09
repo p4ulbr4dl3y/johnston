@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, Dict
 
 from textual import events
 from textual.widgets import Select
@@ -50,6 +51,7 @@ class ActionsMixin:
     def on_click(self, event: events.Click) -> None:
         """Any mouse click returns focus to input unless text is selected or interacting with focusable widgets"""
         from textual.screen import ModalScreen
+
         if isinstance(self.screen, ModalScreen):
             return
         target = getattr(event, "widget", None) or getattr(event, "target", None)
@@ -109,9 +111,11 @@ class ActionsMixin:
                 self.notify(f"Copy failed: {e}", severity="error")
             finally:
                 self.screen.clear_selection()
+
                 async def reset_flag():
                     await asyncio.sleep(0.05)
                     self.selection_copy_active = False
+
                 asyncio.create_task(reset_flag())
         else:
             self.screen.clear_selection()
@@ -122,3 +126,43 @@ class ActionsMixin:
             sess = self.sm.get(self.current_session_id)
             history = sess.agent_history if sess else None
             self.pm.recreate_active_agent(self, provider_key=event.value, history=history)
+
+    async def confirm_permission(
+        self, screen_name: str, args: Dict[str, Any], reason: str, perm_name: str | None = None
+    ) -> bool:
+        """Shows the permission confirmation screen and applies session overrides for confirmed tools.
+
+        Returns True if the user granted access ('allow' or 'always_allow'), False otherwise.
+        This is the UI-side implementation of tool permission prompting, owned by the app
+        layer so that the tools layer stays independent of Textual widgets.
+        """
+        from core.permission_manager import PermissionManager
+        from widgets.screens.permission_confirm import PermissionConfirmScreen
+
+        pm = PermissionManager.get_instance()
+        screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
+
+        result = None
+        if hasattr(self, "push_screen_wait"):
+            try:
+                result = await self.push_screen_wait(screen)
+            except TypeError:
+                result = None
+
+        if result is None:
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+
+            def on_dismiss(r: Any) -> None:
+                if not future.done():
+                    future.set_result(r)
+
+            self.push_screen(screen, callback=on_dismiss)
+            result = await future
+
+        if result == "always_allow":
+            if perm_name:
+                pm.set_session_override(perm_name, "allow")
+            if perm_name == "shell":
+                pm.set_session_override("shell_guard", "allow")
+        return result in ("allow", "always_allow")

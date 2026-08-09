@@ -49,6 +49,7 @@ Always run uv instead of pip.""")
     def test_deduplicate_when_global_and_project_paths_match(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             from unittest.mock import patch
+
             rules_dir = os.path.join(tmpdir, "rules")
             os.makedirs(rules_dir, exist_ok=True)
             with open(os.path.join(rules_dir, "rule1.md"), "w", encoding="utf-8") as f:

@@ -115,11 +115,18 @@ class ErrorHandlingMixin:
 
         # 2. Non-retryable error terms
         non_retryable_terms = [
-            "invalid api key", "unauthorized", "authentication",
-            "invalid_api_key", "context_length_exceeded",
-            "context window", "maximum context length",
-            "invalid request", "model_not_found", "permission_denied",
-            "account_deactivated", "billing_not_active"
+            "invalid api key",
+            "unauthorized",
+            "authentication",
+            "invalid_api_key",
+            "context_length_exceeded",
+            "context window",
+            "maximum context length",
+            "invalid request",
+            "model_not_found",
+            "permission_denied",
+            "account_deactivated",
+            "billing_not_active",
         ]
         if any(term in err_str for term in non_retryable_terms):
             return False
@@ -127,7 +134,16 @@ class ErrorHandlingMixin:
         # 3. Known non-retryable OpenAI exception types
         try:
             import openai
-            if isinstance(err, (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError, openai.NotFoundError)):
+
+            if isinstance(
+                err,
+                (
+                    openai.AuthenticationError,
+                    openai.PermissionDeniedError,
+                    openai.BadRequestError,
+                    openai.NotFoundError,
+                ),
+            ):
                 return False
         except ImportError:
             pass
@@ -144,6 +160,7 @@ class ErrorHandlingMixin:
         # 6. HTTPX exception types
         try:
             import httpx
+
             if isinstance(err, (httpx.TimeoutException, httpx.NetworkError)):
                 return True
             if isinstance(err, httpx.HTTPStatusError):
@@ -156,16 +173,36 @@ class ErrorHandlingMixin:
         # 7. OpenAI retryable exception types
         try:
             import openai
-            if isinstance(err, (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError)):
+
+            if isinstance(
+                err,
+                (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError),
+            ):
                 return True
         except ImportError:
             pass
 
         # 8. Fallback retryable terms
         retryable_terms = [
-            "timeout", "timed out", "rate limit", "429", "500", "502", "503", "504", "524", "529",
-            "connection", "network", "server error", "reset", "refused", "overloaded",
-            "chunk timeout", "service unavailable", "gateway timeout"
+            "timeout",
+            "timed out",
+            "rate limit",
+            "429",
+            "500",
+            "502",
+            "503",
+            "504",
+            "524",
+            "529",
+            "connection",
+            "network",
+            "server error",
+            "reset",
+            "refused",
+            "overloaded",
+            "chunk timeout",
+            "service unavailable",
+            "gateway timeout",
         ]
         if any(term in err_str for term in retryable_terms):
             return True
@@ -217,7 +254,7 @@ class ErrorHandlingMixin:
                 if parsed_img:
                     is_img = True
                     img_path = parsed_img.get("path", "image")
-                elif isinstance(content, str) and ("\"type\": \"image\"" in content or "[Image file:" in content):
+                elif isinstance(content, str) and ('"type": "image"' in content or "[Image file:" in content):
                     is_img = True
                     path_match = re.search(r"['\"]path['\"]\s*:\s*['\"]([^'\"]+)['\"]", content)
                     if path_match:

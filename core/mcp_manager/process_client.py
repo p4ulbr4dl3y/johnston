@@ -1,6 +1,7 @@
 """
 Stdio JSON-RPC 2.0 client for MCP servers.
 """
+
 import asyncio
 import json
 import os
@@ -15,7 +16,9 @@ from typing import Any, Dict, List, Optional, Tuple
 class MCPProcessClient:
     """Stdio JSON-RPC 2.0 client for MCP servers with Async Multiplexing support."""
 
-    def __init__(self, name: str, command: str | List[str], cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None):
+    def __init__(
+        self, name: str, command: str | List[str], cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
+    ):
         self.name = name
         if isinstance(command, str):
             self.cmd = [command]
@@ -50,7 +53,11 @@ class MCPProcessClient:
                 line_bytes = await asyncio.to_thread(self.process.stdout.readline)
                 if not line_bytes:
                     break
-                line_str = line_bytes.decode("utf-8", errors="replace").strip() if isinstance(line_bytes, bytes) else str(line_bytes).strip()
+                line_str = (
+                    line_bytes.decode("utf-8", errors="replace").strip()
+                    if isinstance(line_bytes, bytes)
+                    else str(line_bytes).strip()
+                )
                 if not line_str.startswith("{"):
                     continue
                 try:
@@ -77,28 +84,24 @@ class MCPProcessClient:
             except Exception:
                 await asyncio.sleep(0.05)
 
-    def _send_request_sync(self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    def _send_request_sync(
+        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
         self.req_id += 1
         current_id = self.req_id
-        req = {
-            "jsonrpc": "2.0",
-            "id": current_id,
-            "method": method
-        }
+        req = {"jsonrpc": "2.0", "id": current_id, "method": method}
         if params is not None:
             req["params"] = params
         self._send(req)
         return self._read_response(req_id=current_id, timeout=timeout)
 
-    async def _send_request_async(self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    async def _send_request_async(
+        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
         self._start_async_reader()
         self.req_id += 1
         current_id = self.req_id
-        req = {
-            "jsonrpc": "2.0",
-            "id": current_id,
-            "method": method
-        }
+        req = {"jsonrpc": "2.0", "id": current_id, "method": method}
         if params is not None:
             req["params"] = params
 
@@ -318,8 +321,8 @@ class MCPProcessClient:
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "johnston", "version": "1.0.0"}
-            }
+                "clientInfo": {"name": "johnston", "version": "1.0.0"},
+            },
         }
         self._send(init_req)
         res = self._read_response(req_id=self.req_id, timeout=5.0)
@@ -327,7 +330,9 @@ class MCPProcessClient:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
         if "error" in res:
-            err_msg = res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
+            err_msg = (
+                res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
+            )
             self.last_error = f"MCP init error: {err_msg}"
             return False
 
@@ -336,16 +341,22 @@ class MCPProcessClient:
         return True
 
     async def _initialize_async(self) -> bool:
-        res = await self._send_request_async("initialize", params={
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "johnston", "version": "1.0.0"}
-        }, timeout=5.0)
+        res = await self._send_request_async(
+            "initialize",
+            params={
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "johnston", "version": "1.0.0"},
+            },
+            timeout=5.0,
+        )
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
         if "error" in res:
-            err_msg = res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
+            err_msg = (
+                res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
+            )
             self.last_error = f"MCP init error: {err_msg}"
             return False
 
@@ -357,11 +368,7 @@ class MCPProcessClient:
         with self._lock:
             self.req_id += 1
             current_id = self.req_id
-            req = {
-                "jsonrpc": "2.0",
-                "id": current_id,
-                "method": "tools/list"
-            }
+            req = {"jsonrpc": "2.0", "id": current_id, "method": "tools/list"}
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=5.0)
             if res and "result" in res:

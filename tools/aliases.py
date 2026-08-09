@@ -4,6 +4,7 @@ Centralizes the alias maps so the registry stays focused on dispatch. The regist
 imports these tables and provides the `normalize_tool_name`/`normalize_tool_args`
 helpers that resolve against them.
 """
+
 from typing import Dict
 
 ALIAS_MAP: Dict[str, str] = {

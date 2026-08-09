@@ -243,7 +243,6 @@ def print_roles():
             print()
 
 
-
 def print_subagents():
     """Print available subagent roles to stdout"""
     from core.role_registry import RoleRegistry
@@ -312,6 +311,7 @@ def run_headless_prompt(
         finally:
             try:
                 from core.mcp_manager import get_mcp_manager
+
                 get_mcp_manager().stop_all()
             except Exception:
                 pass

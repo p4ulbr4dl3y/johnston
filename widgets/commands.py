@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 class BaseCommand:
     """Base class for slash commands"""
+
     name: str = ""
     description: str = ""
 
@@ -49,10 +50,12 @@ class NewCommand(BaseCommand):
         for w in [w for w in getattr(app, "workers", []) if w.is_running]:
             w.cancel()
         from core.background_task import kill_all_background_tasks
+
         kill_all_background_tasks(getattr(app, "background_tasks", []))
         if hasattr(app, "background_tasks"):
             app.background_tasks.clear()
         from core.subagent_stream import cancel_running_subagents
+
         cancel_running_subagents(app.sm)
         # Reset generation state synchronously: cancelled workers clear is_generating
         # in their own finally, but that runs asynchronously, so /new could leave the
@@ -213,6 +216,7 @@ class RewindCommand(BaseCommand):
 
         try:
             from core.git_checkpoint import GitCheckpointManager
+
             checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, proj_path)
             if curr_sid and checkpoints_enabled:
                 seq_indices = list(range(len(user_msgs)))
@@ -272,16 +276,22 @@ class RewindCommand(BaseCommand):
                     elif hasattr(app.agent, "history"):
                         app.agent.history = []
 
-
                 # Restore Git checkpoint state if available
                 if curr_sid:
+
                     async def _restore_git_bg():
                         try:
                             from core.git_checkpoint import GitCheckpointManager
-                            await asyncio.to_thread(GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path)
-                            await asyncio.to_thread(GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path)
+
+                            await asyncio.to_thread(
+                                GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path
+                            )
+                            await asyncio.to_thread(
+                                GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path
+                            )
                         except Exception as e:
                             logger.warning("Git checkpoint restore failed: %s", e)
+
                     asyncio.create_task(_restore_git_bg())
 
                 app.refresh_status_footer()
@@ -297,7 +307,9 @@ class RewindCommand(BaseCommand):
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
             app.query_one("#message-input").focus()
 
-        app.push_screen(RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected)
+        app.push_screen(
+            RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected
+        )
 
 
 class ResumeCommand(BaseCommand):
@@ -343,8 +355,6 @@ class TasksCommand(BaseCommand):
             app.notify("No active background tasks", severity="warning")
             return
         app.push_screen(TasksListScreen(default_tab=0))
-
-
 
 
 class SkillsCommand(BaseCommand):
@@ -405,6 +415,7 @@ class CompactCommand(BaseCommand):
             if hasattr(app, "query_one"):
                 try:
                     from widgets.chat_view import ChatView
+
                     cv = app.query_one(ChatView)
                     if cv and hasattr(cv, "add_event_divider"):
                         chat_view = cv
@@ -447,7 +458,6 @@ class CompactCommand(BaseCommand):
             app.notify("Active agent does not support context compaction", severity="warning")
 
 
-
 class PermissionsCommand(BaseCommand):
     name = "/permissions"
     aliases = ["/permission", "/perms"]
@@ -455,7 +465,12 @@ class PermissionsCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         from widgets.screens.permissions import PermissionsScreen
-        project_dir = getattr(app, "project_dir", None) or getattr(getattr(app, "agent", None), "project_dir", None) or os.getcwd()
+
+        project_dir = (
+            getattr(app, "project_dir", None)
+            or getattr(getattr(app, "agent", None), "project_dir", None)
+            or os.getcwd()
+        )
         app.push_screen(PermissionsScreen(project_dir=project_dir))
 
 
@@ -498,13 +513,12 @@ COMMAND_CLASSES = [
 ]
 
 
-
-
 COMMAND_REGISTRY = {}
 for cls in COMMAND_CLASSES:
     COMMAND_REGISTRY[cls.name] = cls
     for alias in getattr(cls, "aliases", []):
         COMMAND_REGISTRY[alias] = cls
+
 
 async def handle_slash_command(app, command_text: str) -> bool:
     """Executes command if registered or skill found. Returns True if handled."""
@@ -516,8 +530,18 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
     # Normalization of Cyrillic homoglyphs to Latin (to handle layout errors)
     homoglyphs = {
-        'а': 'a', 'в': 'b', 'е': 'e', 'к': 'k', 'м': 'm', 'н': 'h',
-        'о': 'o', 'р': 'p', 'с': 'c', 'т': 't', 'у': 'y', 'х': 'x'
+        "а": "a",
+        "в": "b",
+        "е": "e",
+        "к": "k",
+        "м": "m",
+        "н": "h",
+        "о": "o",
+        "р": "p",
+        "с": "c",
+        "т": "t",
+        "у": "y",
+        "х": "x",
     }
     normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
 
@@ -528,7 +552,6 @@ async def handle_slash_command(app, command_text: str) -> bool:
         except TypeError:
             await cmd_instance.execute(app)
         return True
-
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
     words = command_text.strip().split()
@@ -558,6 +581,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
                     with open(s["location"], "r", encoding="utf-8") as f:
                         raw_c = f.read()
                     from core.skill_manager import parse_frontmatter
+
                     _, body = parse_frontmatter(raw_c)
                     content = body.strip()
                 except Exception:
@@ -573,8 +597,10 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
         try:
             from widgets.chat_view import ChatView
+
             chat_view = app.query_one(ChatView)
             import asyncio
+
             asyncio.create_task(chat_view.add_user_message(command_text))
             app.trigger_ai_response(prompt, show_in_ui=False)
         except Exception:

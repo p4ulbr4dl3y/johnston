@@ -21,6 +21,7 @@ class DummyHostApp(App[None]):
     def on_mount(self) -> None:
         def callback(res=None):
             self.dismiss_result = res
+
         self.push_screen(self.screen_to_test, callback=callback)
 
     def refresh_status_footer(self):
@@ -33,7 +34,6 @@ def _make_store(tmpdir: str) -> SessionStore:
 
 
 class TestSubagentStreamAndScreen(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -46,8 +46,12 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
 
     def _mk(self, sid: str, desc: str, prompt: str, role: str = "worker"):
         sess = self.store.create_subagent(
-            parent_id="sess-main", subagent_id=sid, role=role,
-            description=desc, prompt=prompt, status="running",
+            parent_id="sess-main",
+            subagent_id=sid,
+            role=role,
+            description=desc,
+            prompt=prompt,
+            status="running",
         )
         return sess
 
@@ -87,6 +91,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
 
     def test_record_subagent_step_canonical_format(self):
         from core.subagent_stream import record_subagent_step
+
         sess = self._mk("task-canon", "canonical", "prompt")
         acc = [""]
         record_subagent_step(("thinking_start", "Thinking...", ""), sess, acc)
@@ -110,6 +115,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
 
     def test_record_subagent_step_thinking_info_and_outro(self):
         from core.subagent_stream import record_subagent_step
+
         sess = self._mk("task-info", "info", "prompt")
         acc = [""]
         record_subagent_step(("thinking", "Auto-compacting...", ""), sess, acc)
@@ -151,7 +157,6 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
 
 
 class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -164,8 +169,12 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     def _mk(self, sid: str, desc: str, prompt: str, role: str = "worker"):
         sess = self.store.create_subagent(
-            parent_id="sess-main", subagent_id=sid, role=role,
-            description=desc, prompt=prompt, status="running",
+            parent_id="sess-main",
+            subagent_id=sid,
+            role=role,
+            description=desc,
+            prompt=prompt,
+            status="running",
         )
         return sess
 
@@ -264,6 +273,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
             from widgets.chat_view import ThinkingWidget, ToolCallWidget
+
             tw = screen.query_one(ThinkingWidget)
             tc = screen.query_one(ToolCallWidget)
             self.assertFalse(tw.is_expandable())
@@ -273,7 +283,9 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_subagent_screen_prompt_and_canonical_tool_history(self):
         sess = self._mk("task-canon-hist", "Canon Agent", "My initial subagent prompt")
-        sess.add_event({"type": "tool", "tool_type": "shell", "target": "ls", "args": {"cmd": "ls"}, "result_text": "file.txt"})
+        sess.add_event(
+            {"type": "tool", "tool_type": "shell", "target": "ls", "args": {"cmd": "ls"}, "result_text": "file.txt"}
+        )
         sess.add_event({"type": "bot", "text": "Done", "final": True})
 
         screen = SubagentViewScreen("task-canon-hist")
@@ -284,6 +296,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             from widgets.chat_messages import UserMessage
             from widgets.chat_view import ToolCallWidget
+
             um = screen.query_one(UserMessage)
             self.assertIn("My initial subagent prompt", um.raw_text)
             tc = screen.query_one(ToolCallWidget)
@@ -295,4 +308,3 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

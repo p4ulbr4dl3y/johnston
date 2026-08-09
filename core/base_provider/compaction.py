@@ -113,12 +113,14 @@ class CompactionMixin:
 
                     # Inject synthetic tool responses for any missing tool_call_ids in this assistant message
                     for missing_id, fn_name in missing_tool_call_ids:
-                        sanitized.append({
-                            "role": "tool",
-                            "tool_call_id": missing_id,
-                            "name": fn_name,
-                            "content": f"[Tool call '{fn_name}' execution was interrupted or cancelled]"
-                        })
+                        sanitized.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": missing_id,
+                                "name": fn_name,
+                                "content": f"[Tool call '{fn_name}' execution was interrupted or cancelled]",
+                            }
+                        )
                         known_tool_call_ids.add(missing_id)
 
                     continue
@@ -128,7 +130,7 @@ class CompactionMixin:
                 if tc_id and tc_id not in known_tool_call_ids:
                     item = {
                         "role": "user",
-                        "content": f"[Tool Output ({item.get('name', 'tool')}): {item.get('content', '')}]"
+                        "content": f"[Tool Output ({item.get('name', 'tool')}): {item.get('content', '')}]",
                     }
 
             sanitized.append(item)
@@ -171,14 +173,30 @@ class CompactionMixin:
 
         agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
-        m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
+        m_name = catalog.get_model_display_name(
+            getattr(self, "provider_key", ""), getattr(self, "model", "")
+        ) or getattr(self, "model", "")
         is_subagent = getattr(self, "is_subagent", False)
-        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name, cwd=getattr(self, "cwd", None), is_subagent=is_subagent)
+        builder = PromptBuilder(
+            self.system_prompt,
+            self.tools,
+            mode=agent_mode,
+            allow_task=allow_task,
+            model_name=m_name,
+            cwd=getattr(self, "cwd", None),
+            is_subagent=is_subagent,
+        )
         sys_prompt = builder.build_system_prompt()
-        all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+        all_tools = builder.build_tools(
+            provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
+        )
         sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 
-        tokens_before = self.last_context_tokens if getattr(self, "last_context_tokens", 0) > sys_tokens else (sys_tokens + estimate_tokens(self.history))
+        tokens_before = (
+            self.last_context_tokens
+            if getattr(self, "last_context_tokens", 0) > sys_tokens
+            else (sys_tokens + estimate_tokens(self.history))
+        )
 
         # Find clean user boundary to split history (preserve 4+ recent messages when available)
         target_tail_start = max(1, len(self.history) - 4)
@@ -208,6 +226,7 @@ class CompactionMixin:
                 content_str = str(msg.get("content", ""))
                 if "<summary>" in content_str and "</summary>" in content_str:
                     import re
+
                     m = re.search(r"<summary>(.*?)</summary>", content_str, re.DOTALL)
                     if m:
                         previous_summary = m.group(1).strip()
@@ -238,10 +257,12 @@ class CompactionMixin:
                 if text_content:
                     pruned_history.append({"role": "assistant", "content": text_content})
             else:
-                pruned_history.append({
-                    "role": role if role in ("user", "system", "assistant") else "user",
-                    "content": content if isinstance(content, str) else str(content)
-                })
+                pruned_history.append(
+                    {
+                        "role": role if role in ("user", "system", "assistant") else "user",
+                        "content": content if isinstance(content, str) else str(content),
+                    }
+                )
 
         # Merge consecutive messages with the same role to prevent OpenAI API 400 Bad Request errors
         merged_history = []
@@ -264,19 +285,19 @@ class CompactionMixin:
             "## Objective\n"
             "- [one or two brief sentences describing what the user is trying to accomplish]\n\n"
             "## Important Details\n"
-            "- [constraints/preferences, decisions and why, important facts/assumptions, exact context needed to continue, or \"(none)\"]\n\n"
+            '- [constraints/preferences, decisions and why, important facts/assumptions, exact context needed to continue, or "(none)"]\n\n'
             "## Work State\n"
             "### Completed\n"
-            "- [finished work, verified facts, or changes made; otherwise \"(none)\"]\n\n"
+            '- [finished work, verified facts, or changes made; otherwise "(none)"]\n\n'
             "### Active\n"
-            "- [current work, partial changes, or investigation state; otherwise \"(none)\"]\n\n"
+            '- [current work, partial changes, or investigation state; otherwise "(none)"]\n\n'
             "### Blocked\n"
-            "- [blockers, failing commands, or unknowns; otherwise \"(none)\"]\n\n"
+            '- [blockers, failing commands, or unknowns; otherwise "(none)"]\n\n'
             "## Next Move\n"
-            "1. [immediate concrete action, or \"(none)\"]\n"
-            "2. [next action if known, or \"(none)\"]\n\n"
+            '1. [immediate concrete action, or "(none)"]\n'
+            '2. [next action if known, or "(none)"]\n\n'
             "## Relevant Files\n"
-            "- [file or directory path: why it matters, or \"(none)\"]\n"
+            '- [file or directory path: why it matters, or "(none)"]\n'
             "</template>\n\n"
             "Rules:\n"
             "- Keep every section, even when empty.\n"
@@ -296,13 +317,13 @@ class CompactionMixin:
 
         user_instruction = "Generate the context summary now based on the above history."
         if merged_history and merged_history[-1].get("role") == "user":
-            merged_history[-1]["content"] = f"{merged_history[-1].get('content', '')}\n\n[Instruction]: {user_instruction}".strip()
+            merged_history[-1]["content"] = (
+                f"{merged_history[-1].get('content', '')}\n\n[Instruction]: {user_instruction}".strip()
+            )
         else:
             merged_history.append({"role": "user", "content": user_instruction})
 
-        compact_messages = [
-            {"role": "system", "content": prompt_header + summary_template}
-        ] + merged_history
+        compact_messages = [{"role": "system", "content": prompt_header + summary_template}] + merged_history
 
         summary_text = ""
         last_err = None
@@ -310,6 +331,7 @@ class CompactionMixin:
             # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
             try:
                 from core.adapters import get_adapter
+
                 adapter = get_adapter(getattr(self, "api_type", "openai"))
                 chunks = []
                 async for tag, payload in adapter.stream_chat(
@@ -331,9 +353,7 @@ class CompactionMixin:
             if not summary_text and hasattr(self.client, "chat") and hasattr(self.client.chat, "completions"):
                 try:
                     res = await self.client.chat.completions.create(
-                        model=self.model,
-                        messages=compact_messages,
-                        stream=False
+                        model=self.model, messages=compact_messages, stream=False
                     )
                     if res:
                         choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
@@ -347,7 +367,11 @@ class CompactionMixin:
                             first_choice = choices[0]
                             if isinstance(first_choice, dict):
                                 msg_obj = first_choice.get("message", {})
-                                summary_text = msg_obj.get("content", "") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", "")
+                                summary_text = (
+                                    msg_obj.get("content", "")
+                                    if isinstance(msg_obj, dict)
+                                    else getattr(msg_obj, "content", "")
+                                )
                             else:
                                 msg_obj = getattr(first_choice, "message", None)
                                 if msg_obj:
@@ -373,15 +397,14 @@ class CompactionMixin:
                 "</conversation-checkpoint>"
             )
 
-            new_history = [
-                {"role": "user", "content": checkpoint_content}
-            ] + recent_tail
+            new_history = [{"role": "user", "content": checkpoint_content}] + recent_tail
 
             self.history = new_history
             tokens_after = sys_tokens + estimate_tokens(new_history)
             self.last_context_tokens = tokens_after
 
             from core.models_catalog import format_context_tokens
+
             def _fmt(t: int) -> str:
                 return f"{t:,}" if t < 10000 else format_context_tokens(t)
 

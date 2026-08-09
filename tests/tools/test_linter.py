@@ -36,7 +36,9 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         mock_exec_cmd.return_value = "file.py:1:1: F401 'os' imported but unused"
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
         lm.load_linters = MagicMock(return_value=[fake_linter("python")])
-        with patch.object(lm, "render_cmd", side_effect=lambda lint, path: [c.replace("{file}", path) for c in lint["cmd"]]):
+        with patch.object(
+            lm, "render_cmd", side_effect=lambda lint, path: [c.replace("{file}", path) for c in lint["cmd"]]
+        ):
             py_file = os.path.join(self.temp_dir.name, "test.py")
             with open(py_file, "w") as f:
                 f.write("import os\n")
@@ -128,6 +130,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
 
     def test_cached_which(self):
         from core.linters_manager import _cached_which
+
         _cached_which.cache_clear()
         res = _cached_which("python3") or _cached_which("python") or _cached_which("ls")
         self.assertIsNotNone(res)

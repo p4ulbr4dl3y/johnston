@@ -11,8 +11,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             "plan": [
                 {"step": "Analyze requirements", "status": "completed"},
                 {"step": "Implement new tool", "status": "in_progress"},
-                {"step": "Run pytest suite", "status": "pending"}
-            ]
+                {"step": "Run pytest suite", "status": "pending"},
+            ],
         }
         res = await tool.execute(args)
         self.assertIn("plan updated (1/3 completed)", res)
@@ -85,4 +85,3 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

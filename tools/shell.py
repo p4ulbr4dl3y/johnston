@@ -14,7 +14,7 @@ from core.platform_utils import (
 )
 from tools.base import BaseTool, format_tool_error, tail_output, truncate_output
 
-SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
+SLEEP_CHAIN_REGEX = re.compile(r"^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$", re.DOTALL)
 _TASK_ID_COUNTER = itertools.count(1)
 
 
@@ -22,9 +22,21 @@ def _new_task_id() -> str:
     return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
+def _truncate_output(res: str) -> str:
+    return truncate_output(
+        res,
+        max_chars=4000,
+        hint="Pipe output to grep/head/tail if complete log is needed.",
+        tool_name="shell",
+        from_end=True,
+    )
+
+
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command. Moves to background past timeout (default 120s). Destructive commands confirm."
+    description = (
+        "Run a terminal command. Moves to background past timeout (default 120s). Destructive commands confirm."
+    )
 
     schema = {
         "type": "function",
@@ -47,6 +59,7 @@ class ShellTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
+
         args = normalize_tool_args("shell", args)
         ctx = self._ensure_context(ctx)
         cmd = args.get("command", "").strip()
@@ -70,9 +83,11 @@ class ShellTool(BaseTool):
 
         skip_confirm = bool(args.get("skip_confirm", False))
         from core.shell_guard import analyze_shell_command
+
         is_safe, reason = analyze_shell_command(cmd)
 
         from core.permission_manager import PermissionManager
+
         pm = PermissionManager.get_instance()
         project_dir = getattr(ctx, "cwd", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
         effective_perms = pm.get_effective_permissions(project_dir)
@@ -82,6 +97,7 @@ class ShellTool(BaseTool):
         if sg_enabled and not is_safe and not skip_confirm and session_override != "allow" and ctx.app:
             try:
                 from tools.registry import prompt_permission_confirmation
+
                 confirmed = await prompt_permission_confirmation(
                     ctx.app, "shell", {"command": cmd}, reason, perm_name="shell"
                 )
@@ -127,7 +143,7 @@ class ShellTool(BaseTool):
                 res = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 if not res.strip():
                     return "(no output)"
-                return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
+                return _truncate_output(res)
             except asyncio.TimeoutError:
                 await terminate_process(p)
                 if read_task:
@@ -203,7 +219,7 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             if not res.strip():
                 return "(no output)"
-            return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
+            return _truncate_output(res)
         except asyncio.TimeoutError:
             task.is_background = True
 
@@ -217,17 +233,17 @@ class ShellTool(BaseTool):
                 f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
             )
         except asyncio.CancelledError:
-            if 'task' in locals() and task:
+            if "task" in locals() and task:
                 task.kill_sync()
                 task.close_pty()
-            elif 'p' in locals() and p:
+            elif "p" in locals() and p:
                 try:
                     p.kill()
                 except Exception:
                     pass
             raise
         finally:
-            if 'task' in locals() and task and not getattr(task, "is_background", False):
+            if "task" in locals() and task and not getattr(task, "is_background", False):
                 if ctx.app and hasattr(ctx.app, "background_tasks") and task in ctx.app.background_tasks:
                     ctx.app.background_tasks.remove(task)
 

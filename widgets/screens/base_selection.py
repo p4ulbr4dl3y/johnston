@@ -72,6 +72,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             self.filtered_options = list(self.raw_options)
         else:
             import re
+
             tokens = query_raw.split()
             filtered_options = []
             filtered_items = []

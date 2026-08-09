@@ -36,11 +36,35 @@ WINDOWS_DESTRUCTIVE_COMMANDS = {
 IGNORED_COMMAND_PREFIXES = {"rtk", "env", "time", "nohup", "nice", "sudo"}
 
 # Flags that consume a following argument (e.g. 'sudo -u root rm').
-FLAG_WITH_ARG = {"-u", "--user", "-g", "--group", "-p", "--password", "-h", "--host", "-l", "--login", "-c", "--command", "-m", "-n", "-t", "-S", "--setenv", "-C", "--chdir", "-w", "--workdir"}
+FLAG_WITH_ARG = {
+    "-u",
+    "--user",
+    "-g",
+    "--group",
+    "-p",
+    "--password",
+    "-h",
+    "--host",
+    "-l",
+    "--login",
+    "-c",
+    "--command",
+    "-m",
+    "-n",
+    "-t",
+    "-S",
+    "--setenv",
+    "-C",
+    "--chdir",
+    "-w",
+    "--workdir",
+}
 
 # Indirection patterns that can smuggle destructive commands past token checks.
 COMMAND_SUBSTITUTION_RE = re.compile(r"\$\(|\$\(\(|`")
-SHELL_WRAPPER_RE = re.compile(r"(?:\bsh\b|\bbash\b|\bzsh\b|\bk\b|\bpython3?\b|\bperl\b|\bnode\b|\bruby\b)\s+-(?:c|e)\b", re.IGNORECASE)
+SHELL_WRAPPER_RE = re.compile(
+    r"(?:\bsh\b|\bbash\b|\bzsh\b|\bk\b|\bpython3?\b|\bperl\b|\bnode\b|\bruby\b)\s+-(?:c|e)\b", re.IGNORECASE
+)
 XARGS_RE = re.compile(r"\bxargs\b", re.IGNORECASE)
 FIND_DELETE_RE = re.compile(r"\bfind\b.*\s-delete\b", re.IGNORECASE)
 

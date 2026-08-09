@@ -4,8 +4,8 @@ import shutil
 import tempfile
 import unittest
 
-from core.commands import COMMAND_REGISTRY
 from core.mcp_manager import MCPManager
+from widgets.commands import COMMAND_REGISTRY
 
 
 class TestMCPManager(unittest.TestCase):
@@ -24,28 +24,21 @@ class TestMCPManager(unittest.TestCase):
 
         # Write global MCP server
         with open(mm.global_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "mcpServers": {
-                    "global-server": {
-                        "command": "python",
-                        "args": ["-m", "mcp_server"],
-                        "disabled": False
+            json.dump(
+                {
+                    "mcpServers": {
+                        "global-server": {"command": "python", "args": ["-m", "mcp_server"], "disabled": False}
                     }
-                }
-            }, f)
+                },
+                f,
+            )
 
         # Write project MCP server
         os.makedirs(os.path.dirname(mm.project_file), exist_ok=True)
         with open(mm.project_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "mcpServers": {
-                    "project-server": {
-                        "command": "node",
-                        "args": ["server.js"],
-                        "disabled": False
-                    }
-                }
-            }, f)
+            json.dump(
+                {"mcpServers": {"project-server": {"command": "node", "args": ["server.js"], "disabled": False}}}, f
+            )
 
         servers = mm.load_servers()
         names = [s["name"] for s in servers]
@@ -63,14 +56,7 @@ class TestMCPManager(unittest.TestCase):
     def test_same_file_global_and_project(self):
         mcp_file = os.path.join(self.test_dir, "mcp.json")
         with open(mcp_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "mcpServers": {
-                    "my-server": {
-                        "command": "python",
-                        "args": ["-m", "mcp_server"]
-                    }
-                }
-            }, f)
+            json.dump({"mcpServers": {"my-server": {"command": "python", "args": ["-m", "mcp_server"]}}}, f)
 
         mm = MCPManager(project_dir=self.test_dir)
         mm.global_file = mcp_file
@@ -86,13 +72,18 @@ class TestMCPManager(unittest.TestCase):
 
     def test_namespacing_and_timeout(self):
         mm = MCPManager(project_dir=self.test_dir)
+
         # Mock client tools
         class DummyClient:
             def __init__(self, name, tools):
                 self.name = name
                 self.tools = tools
-            def start(self): return True
-            def call_tool(self, tool_name, args, **kwargs): return f"result from {self.name}:{tool_name}"
+
+            def start(self):
+                return True
+
+            def call_tool(self, tool_name, args, **kwargs):
+                return f"result from {self.name}:{tool_name}"
 
         c1 = DummyClient("serverA", [{"name": "search", "description": "s1"}])
         c2 = DummyClient("serverB", [{"name": "search", "description": "s2"}])
@@ -101,7 +92,7 @@ class TestMCPManager(unittest.TestCase):
         # Mock load_servers
         mm.load_servers = lambda: [
             {"name": "serverA", "command": "python", "disabled": False},
-            {"name": "serverB", "command": "python", "disabled": False}
+            {"name": "serverB", "command": "python", "disabled": False},
         ]
 
         tools = mm.get_active_tools()
@@ -122,8 +113,12 @@ class TestMCPManager(unittest.TestCase):
             def __init__(self, name, tools):
                 self.name = name
                 self.tools = tools
-            def start(self): return True
-            def call_tool(self, tool_name, args, **kwargs): return f"executed {self.name}:{tool_name}"
+
+            def start(self):
+                return True
+
+            def call_tool(self, tool_name, args, **kwargs):
+                return f"executed {self.name}:{tool_name}"
 
         c1 = DummyClient("eagerServer", [{"name": "eager_tool", "description": "eager desc"}])
         c2 = DummyClient("lazyServer", [{"name": "lazy_tool", "description": "lazy desc"}])
@@ -131,7 +126,7 @@ class TestMCPManager(unittest.TestCase):
 
         mm.load_servers = lambda: [
             {"name": "eagerServer", "command": "python", "disabled": False, "mode": "eager"},
-            {"name": "lazyServer", "command": "python", "disabled": False, "mode": "lazy"}
+            {"name": "lazyServer", "command": "python", "disabled": False, "mode": "lazy"},
         ]
 
         eager_tools = mm.get_active_tools(mode="eager")
@@ -212,6 +207,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
     def test_get_mcp_manager_singleton(self):
         from core.mcp_manager import get_mcp_manager
+
         inst1 = get_mcp_manager(self.test_dir)
         self.assertEqual(inst1.project_dir, os.path.realpath(self.test_dir))
         dir2 = tempfile.mkdtemp()
@@ -225,12 +221,18 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         from unittest.mock import MagicMock, patch
 
         from core.mcp_manager import MCPProcessClient
+
         client = MCPProcessClient("test", "echo")
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 1
 
-        client._buffer = json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}) + "\n" + json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}) + "\n"
+        client._buffer = (
+            json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
+            + "\n"
+            + json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}})
+            + "\n"
+        )
         with patch.object(client, "fetch_tools") as mock_fetch:
             res = client._read_response(req_id=1, timeout=0.1)
             mock_fetch.assert_called_once()
@@ -240,14 +242,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         mm = MCPManager(project_dir=self.test_dir)
         mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
         with open(mm.global_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "mcpServers": {
-                    "test-server": {
-                        "command": "python",
-                        "mode": "eager"
-                    }
-                }
-            }, f)
+            json.dump({"mcpServers": {"test-server": {"command": "python", "mode": "eager"}}}, f)
 
         res_mode = mm.toggle_mode("test-server")
         self.assertEqual(res_mode, "lazy")
@@ -279,9 +274,14 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
             with unittest.mock.patch("os.set_blocking"):
                 # Mock _read_response for initialize and list_tools
                 init_res = {"jsonrpc": "2.0", "id": 1, "result": {"capabilities": {}}}
-                list_res = {"jsonrpc": "2.0", "id": 2, "result": {"tools": [{"name": "foo", "description": "foo tool"}]}}
+                list_res = {
+                    "jsonrpc": "2.0",
+                    "id": 2,
+                    "result": {"tools": [{"name": "foo", "description": "foo tool"}]},
+                }
 
                 read_responses = [init_res, list_res]
+
                 def mock_read(req_id=None, timeout=None):
                     if read_responses:
                         return read_responses.pop(0)
@@ -294,7 +294,11 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 self.assertEqual(client.tools[0]["name"], "foo")
 
                 # Test call_tool success
-                call_res = {"jsonrpc": "2.0", "id": 3, "result": {"content": [{"type": "text", "text": "hello result"}]}}
+                call_res = {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "result": {"content": [{"type": "text", "text": "hello result"}]},
+                }
                 read_responses = [call_res, list_res]
                 res_str = client.call_tool("foo", {"arg": 1})
                 self.assertEqual(res_str, "hello result")
@@ -316,13 +320,19 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
     def test_out_of_order_responses_buffering(self):
         from core.mcp_manager import MCPProcessClient
+
         client = MCPProcessClient("buffer_test", "echo 1")
         client.process = unittest.mock.MagicMock()
         client.process.stdout = unittest.mock.MagicMock()
 
         # Simulate out of order json lines in buffer
         # e.g., line 1 is id=2, line 2 is id=1
-        client._buffer = json.dumps({"jsonrpc": "2.0", "id": 2, "result": "res2"}) + "\n" + json.dumps({"jsonrpc": "2.0", "id": 1, "result": "res1"}) + "\n"
+        client._buffer = (
+            json.dumps({"jsonrpc": "2.0", "id": 2, "result": "res2"})
+            + "\n"
+            + json.dumps({"jsonrpc": "2.0", "id": 1, "result": "res1"})
+            + "\n"
+        )
 
         # Request id=1
         res1 = client._read_response(req_id=1)
@@ -337,6 +347,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
     def test_client_call_tool_not_running(self):
         from core.mcp_manager import MCPProcessClient
+
         client = MCPProcessClient("dead_server", ["invalid_command_xyz_12345"])
         client.start = lambda: False
         res = client.call_tool("foo", {})
@@ -351,14 +362,11 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 "description": "Open a web URL",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "url": {"type": "string"},
-                        "timeout": {"type": "integer"}
-                    }
-                }
+                    "properties": {"url": {"type": "string"}, "timeout": {"type": "integer"}},
+                },
             },
             "_mcp_server": "browser",
-            "_mcp_tool_name": "open_url"
+            "_mcp_tool_name": "open_url",
         }
         mm.get_cached_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
         snippet = mm.get_system_prompt_snippet()

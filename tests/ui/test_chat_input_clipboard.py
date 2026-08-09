@@ -23,9 +23,12 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
         chat_input.update_attachment_bar = MagicMock()
 
         mock_img = Image.new("RGB", (100, 50))
-        with patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)), patch(
-            "os.makedirs"
-        ), patch("os.path.getsize", return_value=1024), patch.object(Image.Image, "save"):
+        with (
+            patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+            patch("os.makedirs"),
+            patch("os.path.getsize", return_value=1024),
+            patch.object(Image.Image, "save"),
+        ):
             res = await chat_input.try_paste_clipboard_image()
             self.assertTrue(res)
             self.assertEqual(len(chat_input.clipboard_attachments), 1)

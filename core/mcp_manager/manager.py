@@ -2,6 +2,7 @@
 MCP (Model Context Protocol) Manager for Johnston.
 Handles global (~/.johnston/mcp.json) and project (.johnston/mcp.json) MCP servers.
 """
+
 import asyncio
 import atexit
 import json
@@ -21,6 +22,7 @@ PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
 
 _mcp_manager_instance: Optional["MCPManager"] = None
 
+
 def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
     global _mcp_manager_instance
     if _mcp_manager_instance is None:
@@ -31,6 +33,7 @@ def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
             _mcp_manager_instance.project_dir = real_p
             _mcp_manager_instance.project_file = os.path.join(real_p, PROJECT_MCP_FILE)
     return _mcp_manager_instance
+
 
 class MCPManager:
     def __init__(self, project_dir: Optional[str] = None):
@@ -54,6 +57,7 @@ class MCPManager:
 
     def ensure_default_configs(self):
         from core.config_helpers import ensure_json_config
+
         ensure_json_config(self.global_file, {"mcpServers": {}})
 
     def load_servers(self) -> List[Dict[str, Any]]:
@@ -104,7 +108,11 @@ class MCPManager:
         if not target:
             return None
 
-        file_to_update = self.project_file if target["scope"] == "project" and os.path.exists(self.project_file) else self.global_file
+        file_to_update = (
+            self.project_file
+            if target["scope"] == "project" and os.path.exists(self.project_file)
+            else self.global_file
+        )
 
         try:
             cfg = {"mcpServers": {}}
@@ -130,13 +138,16 @@ class MCPManager:
                 cfg["mcpServers"][name] = server_dict
 
             from core.platform_utils import atomic_write_json
+
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
             logger.warning("Failed to update config for MCP server %s: %s", name, e)
 
         return target
 
-    def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, server_mode: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
+    def _format_tool_schema(
+        self, tool: Dict[str, Any], server_name: str, server_mode: str, seen_names: Dict[str, str]
+    ) -> Optional[Dict[str, Any]]:
         """Formats tool dict to OpenAI function format and handles name collisions across servers."""
         t_name = tool.get("name")
         if not t_name:
@@ -380,7 +391,9 @@ class MCPManager:
                 matches.extend(caps)
         return sorted(set(matches))
 
-    def _resolve_target_client_and_tool(self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None) -> Tuple[Optional[MCPProcessClient], Optional[str]]:
+    def _resolve_target_client_and_tool(
+        self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None
+    ) -> Tuple[Optional[MCPProcessClient], Optional[str]]:
         """Helper to match exposed/raw tool_name against active MCP clients."""
         req_server = target_server
         req_tool = tool_name
@@ -406,7 +419,13 @@ class MCPManager:
                         return client, o_name
         return None, None
 
-    def call_tool(self, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None, timeout: Optional[float] = None) -> Optional[str]:
+    def call_tool(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        target_server: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name, namespaced server_name__tool_name, or explicit target_server.
@@ -417,7 +436,13 @@ class MCPManager:
             return client.call_tool(o_name, arguments, timeout=timeout)
         return None
 
-    async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None, timeout: Optional[float] = None) -> Optional[str]:
+    async def call_tool_async(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        target_server: Optional[str] = None,
+        timeout: Optional[float] = None,
+    ) -> Optional[str]:
         active_tools = await self.get_active_tools_async(mode="all")
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
@@ -460,7 +485,7 @@ class MCPManager:
 
             lazy_lines = [
                 "## MCP Servers",
-                "The following MCP servers are loaded lazily. Use `call_mcp` (server, tool, arguments) to execute."
+                "The following MCP servers are loaded lazily. Use `call_mcp` (server, tool, arguments) to execute.",
             ]
             for s_name, t_list in lazy_by_server.items():
                 lazy_lines.append(f"\n### {s_name} (Lazy)")
@@ -476,10 +501,7 @@ class MCPManager:
             sections.append("\n".join(lazy_lines))
 
         if eager_tools:
-            eager_lines = [
-                "## Eager MCP Tools",
-                "Available Eager MCP tools in system context:"
-            ]
+            eager_lines = ["## Eager MCP Tools", "Available Eager MCP tools in system context:"]
             for t in eager_tools:
                 fn = t.get("function", {})
                 desc = fn.get("description", "")

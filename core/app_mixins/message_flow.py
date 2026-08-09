@@ -5,9 +5,9 @@ import time
 
 from textual import events, work
 
-from core.commands import handle_slash_command
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
+from widgets.commands import handle_slash_command
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,10 @@ class MessageFlowMixin:
                 if msg_idx >= 0:
                     proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
                     from core.git_checkpoint import GitCheckpointManager
-                    await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
+
+                    await asyncio.to_thread(
+                        GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path
+                    )
         except Exception as e:
             logger.warning("Git checkpoint creation failed: %s", e)
 
@@ -103,10 +106,12 @@ class MessageFlowMixin:
         is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
         if not is_connected or not getattr(self.agent, "model", ""):
             if not is_connected:
-                from core.commands import ProvidersCommand
+                from widgets.commands import ProvidersCommand
+
                 await ProvidersCommand().execute(self)
             else:
-                from core.commands import ModelsCommand
+                from widgets.commands import ModelsCommand
+
                 await ModelsCommand().execute(self)
             self.is_generating = False
             return
@@ -218,9 +223,12 @@ class MessageFlowMixin:
                     partial = (bot_msg.content if bot_msg else "").strip()
                     if partial:
                         self.agent.history.append({"role": "assistant", "content": partial})
-                    self.agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+                    self.agent.history.append(
+                        {"role": "user", "content": "[System Note: Response interrupted by user]"}
+                    )
                     try:
                         from core.token_util import estimate_tokens
+
                         sys_tok = getattr(self.agent, "_last_sys_tokens", 0)
                         hist_tok = estimate_tokens(self.agent.history)
                         self.agent.last_context_tokens = sys_tok + hist_tok
@@ -260,9 +268,7 @@ class MessageFlowMixin:
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
                 if next_item is not None:
-                    asyncio.create_task(self._process_queued_message(
-                        next_item[0], next_item[1], next_item[2]
-                    ))
+                    asyncio.create_task(self._process_queued_message(next_item[0], next_item[1], next_item[2]))
 
     def _pop_queued_for_current_session(self):
         """Pop the first queued message bound to the current session, or None."""
@@ -284,6 +290,7 @@ class MessageFlowMixin:
             return
         try:
             from tools.base import format_background_notification
+
             msg = format_background_notification("Background shell", command_str, task_id, result)
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:

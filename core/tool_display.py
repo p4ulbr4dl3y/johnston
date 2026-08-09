@@ -52,6 +52,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
 
     if name in ("manage_shell", "manage_subagent"):
         from tools.registry import normalize_tool_args
+
         nargs = normalize_tool_args(name, args)
         act = nargs.get("action") or ""
         tid = nargs.get("task_id") or ""

@@ -12,6 +12,7 @@ class TestToolDisplay(unittest.TestCase):
 
     def test_path_formatting_relative_and_absolute(self):
         import os
+
         root = os.path.realpath("/app/project")
         in_path = os.path.join(root, "src", "main.py")
         self.assertEqual(extract_tool_display("create", {"TargetFile": in_path}, cwd=root), in_path)
@@ -32,8 +33,6 @@ class TestToolDisplay(unittest.TestCase):
     def test_manage_shell_action_and_id(self):
         res = extract_tool_display("manage_shell", {"action": "status", "task_id": "shell_123"})
         self.assertEqual(res, "status shell_123")
-
-
 
     def test_get_mcp_schema_tool_target(self):
         res = extract_tool_display("get_mcp_schema", {"server": "colab", "tool": "search"})
@@ -58,13 +57,14 @@ class TestToolDisplay(unittest.TestCase):
             {
                 "TargetFile": "/path/to/index.html",
                 "Instruction": "replace button",
-                "ReplacementContent": "<a>Get Started</a>"
-            }
+                "ReplacementContent": "<a>Get Started</a>",
+            },
         )
         self.assertEqual(res, "/path/to/index.html")
 
     def test_image_read_not_expandable(self):
         from widgets.chat_view import ToolCallWidget
+
         # Image file target
         w1 = ToolCallWidget("read", "/path/to/123.png", args={"path": "/path/to/123.png"})
         self.assertFalse(w1.is_expandable())
@@ -81,7 +81,7 @@ class TestToolDisplay(unittest.TestCase):
             "create",
             "foo.py",
             args={"path": "foo.py", "content": "def bar(): pass"},
-            result_text="OK: file 'foo.py' updated.\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass\n[Linter Feedback]: F821 undefined name"
+            result_text="OK: file 'foo.py' updated.\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass\n[Linter Feedback]: F821 undefined name",
         )
         w_diff.is_expanded = True
         w_diff.render_content()
@@ -91,18 +91,19 @@ class TestToolDisplay(unittest.TestCase):
             "create",
             "foo.py",
             args={"path": "foo.py", "content": "print('hello')"},
-            result_text="OK: file 'foo.py' created.\n[Hint: extra hint]"
+            result_text="OK: file 'foo.py' created.\n[Hint: extra hint]",
         )
         w_new.is_expanded = True
         w_new.render_content()
 
     def test_edit_tool_cleaning_system_noise(self):
         from widgets.chat_view import ToolCallWidget
+
         widget = ToolCallWidget(
             "edit",
             "code.py",
             args={"target_file": "code.py", "target_content": "a", "replacement_content": "b"},
-            result_text="OK: file 'code.py' updated.\n\n--- code.py (old)\n+++ code.py (new)\n@@ -1,1 +1,1 @@\n-a\n+b\n[Linter Feedback]: F841 unused variable\n[Hint: Some system hint]"
+            result_text="OK: file 'code.py' updated.\n\n--- code.py (old)\n+++ code.py (new)\n@@ -1,1 +1,1 @@\n-a\n+b\n[Linter Feedback]: F841 unused variable\n[Hint: Some system hint]",
         )
         diff_renderable = widget._format_edit_diff(widget.result_text, "code.py")
         formatted_text = "\n".join(t.plain for t in diff_renderable.formatted_lines)
@@ -112,8 +113,11 @@ class TestToolDisplay(unittest.TestCase):
 
     def test_shell_cleaning_system_noise(self):
         from widgets.chat_view import ToolCallWidget
+
         widget = ToolCallWidget("shell", "echo test", args={"command": "echo test"})
-        cleaned = widget._clean_bash_output("Command is running in the background [Background Task ID: task-1]\nYou will be notified automatically\nreal output")
+        cleaned = widget._clean_bash_output(
+            "Command is running in the background [Background Task ID: task-1]\nYou will be notified automatically\nreal output"
+        )
         self.assertEqual(cleaned, "real output")
 
 

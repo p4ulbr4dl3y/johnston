@@ -11,7 +11,11 @@ class TestTruncateOutput(unittest.TestCase):
 
         self.assertIn("Full output saved to", res)
         self.assertIn("Use read tool or shell (grep/head/tail) to inspect", res)
-        log_path = [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0].rstrip(".").rstrip("]")
+        log_path = (
+            [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0]
+            .rstrip(".")
+            .rstrip("]")
+        )
         self.assertTrue(os.path.exists(log_path))
 
         with open(log_path, "r", encoding="utf-8") as f:
@@ -55,6 +59,7 @@ class TestTruncateOutput(unittest.TestCase):
 
     def test_truncate_output_json_pretty_formatting(self):
         import json
+
         large_json_dict = {"status": "success", "data": ["item_" + str(i) for i in range(500)]}
         single_line_json = json.dumps(large_json_dict)
         self.assertNotIn("\n", single_line_json)
@@ -73,9 +78,8 @@ class TestTruncateOutput(unittest.TestCase):
 
     def test_format_line_pagination_single_line_error_hint(self):
         from tools.utils import format_line_pagination
+
         res = format_line_pagination(["single line content"], start_line=140, path="test.log")
         self.assertIn("ERR: range 'read': start_line (140) exceeds total file line count (1)", res)
         self.assertIn("File has only 1 total line", res)
         self.assertIn("content_offset", res)
-
-

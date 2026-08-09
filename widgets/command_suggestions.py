@@ -3,8 +3,8 @@ import time
 
 from textual.widgets import OptionList
 
-from core.commands import COMMAND_REGISTRY
 from core.skill_manager import SkillManager
+from widgets.commands import COMMAND_REGISTRY
 
 _command_suggestions_cache: list[tuple[str, str]] = []
 _command_suggestions_cache_time: float = 0.0
@@ -67,14 +67,22 @@ class CommandSuggestions(OptionList):
         real_cwd = os.path.realpath(cwd)
         home = os.path.realpath(os.path.expanduser("~"))
 
-        is_home_or_root = (real_cwd == home or os.path.dirname(real_cwd) == real_cwd)
+        is_home_or_root = real_cwd == home or os.path.dirname(real_cwd) == real_cwd
         max_files = 300 if is_home_or_root else 1000
 
         from core.defaults.config import DEFAULT_IGNORE_DIRS
 
         ignore_dirs = DEFAULT_IGNORE_DIRS | {
-            ".idea", ".vscode", ".gemini", ".cache",
-            "Library", ".Trash", "Applications", "Pictures", "Movies", "Music"
+            ".idea",
+            ".vscode",
+            ".gemini",
+            ".cache",
+            "Library",
+            ".Trash",
+            "Applications",
+            "Pictures",
+            "Movies",
+            "Music",
         }
         try:
             for root, dirs, files in os.walk(cwd):
@@ -138,7 +146,7 @@ class CommandSuggestions(OptionList):
         at_idx = check_text.rfind("@")
         if at_idx != -1:
             if at_idx == 0 or check_text[at_idx - 1] in " \t\n":
-                query_part = check_text[at_idx + 1:]
+                query_part = check_text[at_idx + 1 :]
                 if " " not in query_part and "\n" not in query_part:
                     self.clear_options()
                     self.mode = "file"
@@ -178,6 +186,7 @@ class CommandSuggestions(OptionList):
         if self.highlighted < len(self.current_matched):
             try:
                 from widgets.chat_input import ChatInput
+
                 chat_input = self.app.query_one("#message-input", ChatInput)
                 if self.mode == "command":
                     chosen_cmd = self.current_matched[self.highlighted]

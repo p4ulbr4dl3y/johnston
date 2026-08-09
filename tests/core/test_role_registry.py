@@ -80,12 +80,7 @@ You run tests and report coverage.""")
             self.assertEqual(tester.allowed_tools, ["shell"])
 
     def test_is_tool_allowed_validation(self):
-        role_ro = AgentRole(
-            key="reviewer",
-            name="Reviewer",
-            read_only=True,
-            allowed_tools=["read", "grep"]
-        )
+        role_ro = AgentRole(key="reviewer", name="Reviewer", read_only=True, allowed_tools=["read", "grep"])
 
         # Read tool in allowed list -> ok
         self.assertIsNone(role_ro.is_tool_allowed("read"))
@@ -99,12 +94,7 @@ You run tests and report coverage.""")
         self.assertIsNone(role_tool_error(role_ro, "read"))
 
     def test_alias_resolution_in_is_tool_allowed(self):
-        role_ro = AgentRole(
-            key="reviewer",
-            name="Reviewer",
-            read_only=True,
-            disallowed_tools=["invoke_subagent"]
-        )
+        role_ro = AgentRole(key="reviewer", name="Reviewer", read_only=True, disallowed_tools=["invoke_subagent"])
 
         # Alias 'subagent' resolves to 'invoke_subagent' via ALIAS_MAP -> blocked
         self.assertIsNotNone(role_ro.is_tool_allowed("subagent"))
@@ -127,13 +117,13 @@ You run tests and report coverage.""")
             os.makedirs(roles_dir, exist_ok=True)
             md_path = os.path.join(roles_dir, "architect.md")
             with open(md_path, "w", encoding="utf-8") as f:
-                f.write('''---
+                f.write("""---
 name: Architect
 description: High-level design role
 read_only: true
 disallowed_tools: [create, edit]
 ---
-Architect prompt content''')
+Architect prompt content""")
 
             reg = RoleRegistry()
             roles = reg.load_roles(project_dir=tmpdir, include_global=False)

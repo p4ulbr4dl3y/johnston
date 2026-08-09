@@ -60,7 +60,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
                     {
                         "id": "call_1",
                         "type": "function",
-                    "function": {"name": "shell", "arguments": '{"command": "ls"}'},
+                        "function": {"name": "shell", "arguments": '{"command": "ls"}'},
                     }
                 ],
             },
@@ -113,17 +113,24 @@ class TestAdapterMessageNormalization(unittest.TestCase):
 
     def test_anthropic_image_tool_result(self):
         import json
-        img_json = json.dumps({
-            "type": "image",
-            "path": "foo.png",
-            "media_type": "image/jpeg",
-            "base64": "QUFBQQ==",
-            "summary": "[Image file: foo.png (100x100)]"
-        })
+
+        img_json = json.dumps(
+            {
+                "type": "image",
+                "path": "foo.png",
+                "media_type": "image/jpeg",
+                "base64": "QUFBQQ==",
+                "summary": "[Image file: foo.png (100x100)]",
+            }
+        )
         messages = [
             {"role": "user", "content": "Read img"},
-            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"foo.png"}'}}]},
-            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"foo.png"}'}}],
+            },
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json},
         ]
         _, final = AnthropicAdapter._to_anthropic_messages(messages)
         user_tool_turn = final[-1]
@@ -137,17 +144,24 @@ class TestAdapterMessageNormalization(unittest.TestCase):
 
     def test_gemini_image_tool_result(self):
         import json
-        img_json = json.dumps({
-            "type": "image",
-            "path": "bar.jpg",
-            "media_type": "image/jpeg",
-            "base64": "QkJCQg==",
-            "summary": "[Image file: bar.jpg (200x200)]"
-        })
+
+        img_json = json.dumps(
+            {
+                "type": "image",
+                "path": "bar.jpg",
+                "media_type": "image/jpeg",
+                "base64": "QkJCQg==",
+                "summary": "[Image file: bar.jpg (200x200)]",
+            }
+        )
         messages = [
             {"role": "user", "content": "Read img"},
-            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"bar.jpg"}'}}]},
-            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"bar.jpg"}'}}],
+            },
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json},
         ]
         _, contents = GeminiAdapter()._to_gemini(messages)
         # Verify functionResponse and inlineData in a single user turn
@@ -162,17 +176,24 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         import json
 
         from core.adapters import format_messages_for_openai
-        img_json = json.dumps({
-            "type": "image",
-            "path": "baz.png",
-            "media_type": "image/png",
-            "base64": "Q0NDQw==",
-            "summary": "[Image file: baz.png]"
-        })
+
+        img_json = json.dumps(
+            {
+                "type": "image",
+                "path": "baz.png",
+                "media_type": "image/png",
+                "base64": "Q0NDQw==",
+                "summary": "[Image file: baz.png]",
+            }
+        )
         messages = [
             {"role": "user", "content": "Read img"},
-            {"role": "assistant", "content": "", "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"baz.png"}'}}]},
-            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json}
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"id": "call_img", "function": {"name": "read", "arguments": '{"path":"baz.png"}'}}],
+            },
+            {"role": "tool", "tool_call_id": "call_img", "name": "read", "content": img_json},
         ]
         formatted = format_messages_for_openai(messages)
         tool_msg = formatted[2]
@@ -189,13 +210,16 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         import json
 
         from core.adapters import format_messages_for_openai
-        img_json = json.dumps({
-            "type": "image",
-            "path": "img.png",
-            "media_type": "image/png",
-            "base64": "SU1H",
-            "summary": "[Image file: img.png]"
-        })
+
+        img_json = json.dumps(
+            {
+                "type": "image",
+                "path": "img.png",
+                "media_type": "image/png",
+                "base64": "SU1H",
+                "summary": "[Image file: img.png]",
+            }
+        )
         messages = [
             {"role": "user", "content": "Run 2 tools"},
             {
@@ -323,14 +347,23 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_tool_call_assembly(self):
         chunks = [
-            _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, id="c1", name="shell", arguments='{"com')]))]),
+            _MockChunk(
+                choices=[
+                    _MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, id="c1", name="shell", arguments='{"com')]))
+                ]
+            ),
             _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, arguments='mand":"ls"}')]))]),
         ]
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
         with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
             adapter = OpenAIAdapter()
-            events = [e async for e in adapter.stream_chat("http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "shell"}}])]
+            events = [
+                e
+                async for e in adapter.stream_chat(
+                    "http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "shell"}}]
+                )
+            ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
@@ -356,7 +389,10 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"message_stop"}',
         ]
         with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e
+                async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello")
         usage = [e for e in events if e[0] == "adapter_usage"]
@@ -372,7 +408,10 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"message_stop"}',
         ]
         with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e
+                async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
@@ -385,16 +424,22 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
         ]
         with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello")
         usage = [e for e in events if e[0] == "adapter_usage"]
         self.assertEqual(usage[0][1]["total_tokens"], 15)
 
     async def test_stream_function_call(self):
-        lines = ['data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"shell","args":{"command":"ls"}}}]}}]}']
+        lines = [
+            'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"shell","args":{"command":"ls"}}}]}}]}'
+        ]
         with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
@@ -408,7 +453,9 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             '{"done":true,"prompt_eval_count":10,"eval_count":5}',
         ]
         with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual("".join(texts), "Hello world")
         usage = [e for e in events if e[0] == "adapter_usage"]
@@ -420,7 +467,9 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             '{"done":true,"prompt_eval_count":5,"eval_count":0}',
         ]
         with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
@@ -437,9 +486,9 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         self.assertIn("key", sys_p)
 
     def test_anthropic_assistant_list_content(self):
-        _, msgs = AnthropicAdapter._to_anthropic_messages([
-            {"role": "assistant", "content": [{"type": "text", "text": "P1"}, {"type": "text", "text": "P2"}]}
-        ])
+        _, msgs = AnthropicAdapter._to_anthropic_messages(
+            [{"role": "assistant", "content": [{"type": "text", "text": "P1"}, {"type": "text", "text": "P2"}]}]
+        )
         texts = [b["text"] for b in msgs[0]["content"] if b.get("type") == "text"]
         self.assertEqual(len(texts), 2)
 
@@ -453,28 +502,32 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         self.assertIsNone(sys_instr)
         self.assertEqual(contents, [])
 
-
-
     def test_gemini_tool_non_dict_content(self):
         _, contents = GeminiAdapter()._to_gemini([{"role": "tool", "name": "shell", "content": 12345}])
         fr = [p for c in contents for p in c["parts"] if "functionResponse" in p]
         self.assertEqual(len(fr), 1)
 
     def test_ollama_system_role(self):
-        msgs = OllamaAdapter._to_ollama_messages([{"role": "system", "content": "Be nice"}, {"role": "user", "content": "hi"}])
+        msgs = OllamaAdapter._to_ollama_messages(
+            [{"role": "system", "content": "Be nice"}, {"role": "user", "content": "hi"}]
+        )
         self.assertEqual(msgs[0]["role"], "system")
 
     def test_ollama_assistant_list_content(self):
-        msgs = OllamaAdapter._to_ollama_messages([{"role": "assistant", "content": [{"type": "text", "text": "hello"}]}])
+        msgs = OllamaAdapter._to_ollama_messages(
+            [{"role": "assistant", "content": [{"type": "text", "text": "hello"}]}]
+        )
         # Ollama passes content through as-is (truthy values preserved)
         self.assertEqual(msgs[0]["role"], "assistant")
         self.assertEqual(msgs[0]["content"], [{"type": "text", "text": "hello"}])
 
     def test_ollama_tool_role(self):
-        msgs = OllamaAdapter._to_ollama_messages([
-            {"role": "user", "content": "do it"},
-            {"role": "tool", "tool_call_id": "c1", "content": "result text"},
-        ])
+        msgs = OllamaAdapter._to_ollama_messages(
+            [
+                {"role": "user", "content": "do it"},
+                {"role": "tool", "tool_call_id": "c1", "content": "result text"},
+            ]
+        )
         tool_msg = next(m for m in msgs if m["role"] == "tool")
         self.assertEqual(tool_msg["content"], "result text")
 
@@ -503,13 +556,16 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
                     async def aiter_lines(self):
                         if False:
                             yield ""
+
                 return _CM()
 
         with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
-                "http://x", "k", "m",
+                "http://x",
+                "k",
+                "m",
                 [{"role": "system", "content": "You are helpful."}, {"role": "user", "content": "hi"}],
-            tools=[{"type": "function", "function": {"name": "shell", "parameters": {}}}],
+                tools=[{"type": "function", "function": {"name": "shell", "parameters": {}}}],
             ):
                 pass
 
@@ -544,11 +600,15 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
                     async def aiter_lines(self):
                         if False:
                             yield ""
+
                 return _CM()
 
         with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
-                "http://x", "k", "m", [{"role": "user", "content": "hi"}],
+                "http://x",
+                "k",
+                "m",
+                [{"role": "user", "content": "hi"}],
             ):
                 pass
 
@@ -568,7 +628,9 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
         mock_client = MagicMock()
         mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
         with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
-            events = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
+            events = [
+                e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
         usage = [e for e in events if e[0] == "adapter_usage"]
         self.assertEqual(usage[0][1]["cache_read_tokens"], 40)
         self.assertEqual(usage[0][1]["prompt_tokens"], 100)

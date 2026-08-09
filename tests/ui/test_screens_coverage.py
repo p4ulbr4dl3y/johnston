@@ -188,7 +188,9 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_input_changed(self):
         mgr = MagicMock()
-        mgr.load_servers.return_value = [{"name": "srv", "command": "py", "disabled": False, "mode": "eager", "scope": "global"}]
+        mgr.load_servers.return_value = [
+            {"name": "srv", "command": "py", "disabled": False, "mode": "eager", "scope": "global"}
+        ]
         screen = self._make_screen(mgr)
         async with CoverageHostApp(screen).run_test() as pilot:
             await pilot.pause()

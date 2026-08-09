@@ -86,12 +86,14 @@ class TestMCPScreen(unittest.TestCase):
         mock_mgr = MagicMock()
         mock_get_mgr.return_value = mock_mgr
         from widgets.screens.mcp import MCPScreen
+
         s = MCPScreen()
         self.assertEqual(s.servers, [])
         self.assertEqual(s.mm, mock_mgr)
 
     def test_bindings(self):
         from widgets.screens.mcp import MCPScreen
+
         keys = [b[0] for b in MCPScreen.BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("tab", keys)
@@ -105,7 +107,9 @@ class TestProvidersScreen(unittest.TestCase):
             "auth": {"key": "auth", "name": "AuthProv"},
             "on": {"key": "on", "name": "OnProv"},
         }
-        s = ProvidersScreen(providers=providers, active_key="active", configured_keys={"on": "key"}, disabled_providers=["off"])
+        s = ProvidersScreen(
+            providers=providers, active_key="active", configured_keys={"on": "key"}, disabled_providers=["off"]
+        )
         opts, items = s.raw_options, s.raw_items
         self.assertEqual(items, ["active", "off", "auth", "on"])
         self.assertIn("ACTIVE", next(o for o, i in zip(opts, items) if i == "active"))
@@ -114,7 +118,9 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertIn("ON", next(o for o, i in zip(opts, items) if i == "on"))
 
     def test_provider_without_key_shows_auth(self):
-        s = ProvidersScreen(providers={"custom": {"key": "custom", "name": "Custom"}}, active_key="", configured_keys={})
+        s = ProvidersScreen(
+            providers={"custom": {"key": "custom", "name": "Custom"}}, active_key="", configured_keys={}
+        )
         self.assertIn("AUTH", s.raw_options[0])
 
     def test_default_falls_back_to_first(self):
@@ -123,6 +129,7 @@ class TestProvidersScreen(unittest.TestCase):
 
     def test_tab_key_toggles_disabled(self):
         from unittest.mock import MagicMock
+
         providers = {"p1": {"key": "p1", "name": "P1"}}
         pm = MagicMock()
         s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={}, pm=pm)
@@ -131,7 +138,9 @@ class TestProvidersScreen(unittest.TestCase):
         opt_list.highlighted = 0
         search_input = MagicMock()
         search_input.value = ""
-        s.query_one = MagicMock(side_effect=lambda id_name, *args: opt_list if "option-list" in id_name else search_input)
+        s.query_one = MagicMock(
+            side_effect=lambda id_name, *args: opt_list if "option-list" in id_name else search_input
+        )
         event = MagicMock(key="tab")
         s._on_key(event)
         self.assertIn("p1", s.disabled_set)
@@ -159,6 +168,7 @@ class TestSkillScreens(unittest.TestCase):
     @patch("widgets.screens.skills.SkillManager")
     def test_detail_init(self, _):
         from widgets.screens.skills import SkillDetailScreen
+
         skill = {"name": "my-skill", "description": "Does things", "scope": "project"}
         s = SkillDetailScreen(skill)
         self.assertEqual(s.skill, skill)
@@ -166,6 +176,7 @@ class TestSkillScreens(unittest.TestCase):
     @patch("widgets.screens.skills.SkillManager")
     def test_detail_bindings(self, _):
         from widgets.screens.skills import SkillDetailScreen
+
         keys = [b[0] for b in SkillDetailScreen.BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("enter", keys)
@@ -173,9 +184,13 @@ class TestSkillScreens(unittest.TestCase):
     @patch("widgets.screens.skills.SkillManager")
     def test_list_init_with_skills(self, mock_sm_cls):
         mock_sm = MagicMock()
-        mock_sm.list_skills.return_value = [{"name": "skill-a", "scope": "global"}, {"name": "skill-b", "scope": "project"}]
+        mock_sm.list_skills.return_value = [
+            {"name": "skill-a", "scope": "global"},
+            {"name": "skill-b", "scope": "project"},
+        ]
         mock_sm_cls.return_value = mock_sm
         from widgets.screens.skills import SkillsScreen
+
         s = SkillsScreen()
         self.assertEqual(len(s.options), 2)
         self.assertIn("GLOBAL", s.options[0])
@@ -187,6 +202,7 @@ class TestSkillScreens(unittest.TestCase):
         mock_sm.list_skills.return_value = []
         mock_sm_cls.return_value = mock_sm
         from widgets.screens.skills import SkillsScreen
+
         s = SkillsScreen()
         self.assertEqual(s.options, [])
 
@@ -197,6 +213,7 @@ class TestSkillScreens(unittest.TestCase):
         mock_sm.toggle_hidden.return_value = False
         mock_sm_cls.return_value = mock_sm
         from widgets.screens.skills import SkillsScreen
+
         s = SkillsScreen()
         self.assertEqual(len(s.options), 1)
         self.assertIn("[HIDDEN]", s.options[0])
@@ -212,4 +229,3 @@ class TestSkillScreens(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -9,6 +9,7 @@ from widgets.chat_welcome import WelcomeWidget
 
 class ChatView(VerticalScroll):
     """Scrollable chat stream"""
+
     can_focus = False
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
@@ -86,7 +87,9 @@ class ChatView(VerticalScroll):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
-    async def add_tool_call(self, tool_type: str, target: str, result_text: str = "", args: dict = None, animate: bool = True) -> ToolCallWidget:
+    async def add_tool_call(
+        self, tool_type: str, target: str, result_text: str = "", args: dict = None, animate: bool = True
+    ) -> ToolCallWidget:
         self.clear_welcome()
 
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
@@ -154,7 +157,10 @@ class ChatView(VerticalScroll):
         elif mode_clean in ("last", "focused", "focus"):
             focused = self.app.focused if hasattr(self, "app") and self.app else None
             target_widget = None
-            if focused and (isinstance(focused, (ThinkingWidget, ToolCallWidget)) and getattr(focused, "is_expandable", lambda: False)()):
+            if focused and (
+                isinstance(focused, (ThinkingWidget, ToolCallWidget))
+                and getattr(focused, "is_expandable", lambda: False)()
+            ):
                 target_widget = focused
             else:
                 target_widget = expandables[-1]

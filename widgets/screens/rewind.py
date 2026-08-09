@@ -33,10 +33,4 @@ class RewindScreen(BaseSelectionScreen[int]):
 
         items = [msg[0] for msg in user_messages]
         default_val = items[-1] if items else -1
-        super().__init__(
-            title=title,
-            options=options,
-            items=items,
-            default_value=default_val
-        )
-
+        super().__init__(title=title, options=options, items=items, default_value=default_val)

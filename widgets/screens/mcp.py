@@ -25,6 +25,7 @@ class MCPScreen(BaseModalScreen[None]):
         self.servers: list[Dict[str, Any]] = []
         self.filtered_servers: list[Dict[str, Any]] = []
         self.search_query = ""
+        self._warmup_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
@@ -44,7 +45,11 @@ class MCPScreen(BaseModalScreen[None]):
             pass
 
         # Non-blocking background warmup for unstarted MCP servers
-        asyncio.create_task(self._warmup_tools())
+        self._warmup_task = asyncio.create_task(self._warmup_tools())
+
+    def on_unmount(self) -> None:
+        if self._warmup_task and not self._warmup_task.done():
+            self._warmup_task.cancel()
 
     async def _warmup_tools(self) -> None:
         try:
@@ -70,7 +75,8 @@ class MCPScreen(BaseModalScreen[None]):
             self.filtered_servers = list(self.servers)
         else:
             self.filtered_servers = [
-                s for s in self.servers
+                s
+                for s in self.servers
                 if q in s.get("name", "").lower()
                 or q in s.get("scope", "").lower()
                 or q in s.get("command", "").lower()
@@ -92,8 +98,8 @@ class MCPScreen(BaseModalScreen[None]):
 
         for s in self.filtered_servers:
             disabled = s.get("disabled", False)
-            scope_tag = status_tag(s['scope'])
-            mode_tag = status_tag(s.get('mode', 'eager'))
+            scope_tag = status_tag(s["scope"])
+            mode_tag = status_tag(s.get("mode", "eager"))
             name = s["name"]
 
             if disabled:
@@ -119,7 +125,7 @@ class MCPScreen(BaseModalScreen[None]):
                 elif err:
                     opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Error")
                 else:
-                    stag = status_tag('ERR') if (not cmd and not url) else status_tag('ON')
+                    stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
                     opt_list.add_option(f"{stag} {scope_tag} {mode_tag} {name}")
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
@@ -190,5 +196,3 @@ class MCPScreen(BaseModalScreen[None]):
 
             if hasattr(self.app, "refresh_status_footer"):
                 self.app.refresh_status_footer()
-
-

@@ -37,13 +37,18 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
                     tool_msg["content"] = summary_text
                     tool_batch.append(tool_msg)
 
-                    pending_user_images.append({
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": f"Image preview ({summary_text}):"},
-                            {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val}}
-                        ]
-                    })
+                    pending_user_images.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": f"Image preview ({summary_text}):"},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val},
+                                },
+                            ],
+                        }
+                    )
                 else:
                     tool_batch.append(curr_msg)
                 i += 1
@@ -128,8 +133,11 @@ class OpenAIAdapter(BaseApiAdapter):
         for idx in sorted(tool_calls):
             tc = tool_calls[idx]
             if tc["name"]:
-                yield ("adapter_tool_call", {
-                    "id": tc["id"] or f"call_{idx}",
-                    "name": tc["name"],
-                    "arguments": tc["arguments"] or "{}",
-                })
+                yield (
+                    "adapter_tool_call",
+                    {
+                        "id": tc["id"] or f"call_{idx}",
+                        "name": tc["name"],
+                        "arguments": tc["arguments"] or "{}",
+                    },
+                )

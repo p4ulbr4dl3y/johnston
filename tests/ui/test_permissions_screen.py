@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from textual.app import App
 from textual.events import Key
 
-from core.commands import COMMAND_REGISTRY
+from widgets.commands import COMMAND_REGISTRY
 from widgets.screens.permissions import PermissionsScreen
 
 

@@ -44,17 +44,16 @@ class AskUserTool(BaseTool):
                                 "options": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "List of selectable options. If recommending an option, mark it with '(Recommended)'."
-                                }
-
+                                    "description": "List of selectable options. If recommending an option, mark it with '(Recommended)'.",
+                                },
                             },
-                            "required": ["question_text", "options"]
-                        }
+                            "required": ["question_text", "options"],
+                        },
                     }
                 },
-                "required": ["questions"]
-            }
-        }
+                "required": ["questions"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
@@ -64,10 +63,12 @@ class AskUserTool(BaseTool):
         # Fallback: a single question passed as {question|question_text, options/choices}.
         single_q_text = args.get("question") or args.get("question_text")
         if (not questions_list or not isinstance(questions_list, list)) and single_q_text:
-            questions_list = [{
-                "question_text": single_q_text,
-                "options": args.get("options") or args.get("choices"),
-            }]
+            questions_list = [
+                {
+                    "question_text": single_q_text,
+                    "options": args.get("options") or args.get("choices"),
+                }
+            ]
 
         if not questions_list or not isinstance(questions_list, list):
             return format_tool_error("params", name="questions", detail="missing or invalid")
@@ -82,10 +83,9 @@ class AskUserTool(BaseTool):
                 options = q.get("choices")
             if not q_text or not isinstance(options, list):
                 continue
-            validated_questions.append({
-                "question_text": q_text,
-                "options": _sort_recommended_first([str(opt) for opt in options])
-            })
+            validated_questions.append(
+                {"question_text": q_text, "options": _sort_recommended_first([str(opt) for opt in options])}
+            )
 
         if not validated_questions:
             return format_tool_error("params", name="questions", detail="missing or invalid")
@@ -104,7 +104,11 @@ class AskUserTool(BaseTool):
                         if isinstance(result, dict) and result.get("action") == "minimize":
                             saved_answers = result.get("answers", {})
                             saved_q_idx = result.get("q_idx", 0)
-                            setattr(ctx.app, "_pending_ask_user", lambda: _show_wizard(questions, saved_answers, saved_q_idx))
+                            setattr(
+                                ctx.app,
+                                "_pending_ask_user",
+                                lambda: _show_wizard(questions, saved_answers, saved_q_idx),
+                            )
                             if hasattr(ctx.app, "notify"):
                                 try:
                                     ctx.app.notify("Questions minimized: type /questions to resume", severity="info")
@@ -138,6 +142,3 @@ class AskUserTool(BaseTool):
                     setattr(ctx.app, "_pending_ask_user", None)
                 return format_tool_error("prompt", detail=str(e))
         return format_tool_error("context", name="app", detail="unavailable")
-
-
-

@@ -137,7 +137,7 @@ class ParsingMixin:
             if escaped:
                 escaped = False
                 continue
-            if char == '\\':
+            if char == "\\":
                 escaped = True
                 continue
             if char == '"':
@@ -145,21 +145,21 @@ class ParsingMixin:
                 continue
             if in_string:
                 continue
-            if char in '[{':
+            if char in "[{":
                 stack.append(char)
-            elif char == ']' and stack and stack[-1] == '[':
+            elif char == "]" and stack and stack[-1] == "[":
                 stack.pop()
-            elif char == '}' and stack and stack[-1] == '{':
+            elif char == "}" and stack and stack[-1] == "{":
                 stack.pop()
 
         repair = ""
         if in_string:
             repair += '"'
         for opener in reversed(stack):
-            if opener == '[':
-                repair += ']'
-            elif opener == '{':
-                repair += '}'
+            if opener == "[":
+                repair += "]"
+            elif opener == "{":
+                repair += "}"
 
         try:
             return json.loads(text + repair)
@@ -182,11 +182,7 @@ class ParsingMixin:
         if parsed is not None:
             pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
             syntax = TransparentSyntax(
-                pretty_json,
-                "json",
-                theme=CODE_THEME,
-                word_wrap=False,
-                background_color="default"
+                pretty_json, "json", theme=CODE_THEME, word_wrap=False, background_color="default"
             )
             if footer:
                 return Group(syntax, Text("\n" + footer.strip()))
@@ -199,7 +195,19 @@ class ParsingMixin:
         if not text:
             return False
         cleaned = text.strip().lower()
-        if cleaned.startswith(("err:", "error:", "[error]", "exception:", "failed:", "failure:", "fatal:", "permission denied", "command failed")):
+        if cleaned.startswith(
+            (
+                "err:",
+                "error:",
+                "[error]",
+                "exception:",
+                "failed:",
+                "failure:",
+                "fatal:",
+                "permission denied",
+                "command failed",
+            )
+        ):
             return True
         if "traceback (most recent call last):" in cleaned or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
             return True
@@ -224,13 +232,7 @@ class ParsingMixin:
             or args.get("Name")
             or "call_mcp"
         )
-        server = (
-            args.get("server")
-            or args.get("Server")
-            or args.get("server_name")
-            or args.get("ServerName")
-            or ""
-        )
+        server = args.get("server") or args.get("Server") or args.get("server_name") or args.get("ServerName") or ""
         mcp_args = None
         for k in ("arguments", "Arguments", "args", "Args"):
             if k in args and isinstance(args[k], dict):
@@ -239,9 +241,20 @@ class ParsingMixin:
 
         if mcp_args is None:
             meta_keys = {
-                "tool", "Tool", "tool_name", "ToolName", "name", "Name",
-                "server", "Server", "server_name", "ServerName",
-                "arguments", "Arguments", "args", "Args",
+                "tool",
+                "Tool",
+                "tool_name",
+                "ToolName",
+                "name",
+                "Name",
+                "server",
+                "Server",
+                "server_name",
+                "ServerName",
+                "arguments",
+                "Arguments",
+                "args",
+                "Args",
             }
             mcp_args = {k: v for k, v in args.items() if k not in meta_keys}
 
@@ -284,21 +297,88 @@ class ParsingMixin:
             return "{...}"
 
 
+class _DisplayNamesDict(dict):
+    CANONICAL_NAMES = {
+        "read": "Read",
+        "create": "Create",
+        "edit": "Edit",
+        "multi_edit": "Edit",
+        "shell": "Shell",
+        "ask_user": "AskUser",
+        "manage_shell": "ManageShell",
+        "invoke_subagent": "InvokeSubagent",
+        "manage_subagent": "ManageSubagent",
+        "web_fetch": "WebFetch",
+        "update_plan": "UpdatePlan",
+        "call_mcp": "CallMCP",
+    }
+
+    def get(self, key, default=None):
+        from tools.registry import normalize_tool_name
+
+        canonical = normalize_tool_name(key)
+        if canonical in self.CANONICAL_NAMES:
+            return self.CANONICAL_NAMES[canonical]
+        return super().get(key, default)
+
+    def __getitem__(self, key):
+        res = self.get(key, None)
+        if res is None:
+            raise KeyError(key)
+        return res
+
+    def __contains__(self, key):
+        return True
+
+
+class _SystemToolsSet(set):
+    def __contains__(self, item):
+        if not isinstance(item, str):
+            return False
+        from tools.registry import REGISTRY, normalize_tool_name
+
+        lower = item.lower()
+        canonical = normalize_tool_name(lower)
+        if canonical in REGISTRY or canonical in ("get_mcp_schema", "call_mcp", "update_plan"):
+            return True
+        return super().__contains__(item) or super().__contains__(lower)
+
+
 class ToolScrollBox(Vertical):
     """Horizontal scroll box for tool code/diff view"""
+
     pass
 
 
 class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     """Tool call widget (Create, Read, Edit, Shell) with expansion support"""
+
     can_focus = False
     ALLOW_SELECT = False
 
     EXPANDABLE_TOOLS = {
-        "create", "edit", "multi_edit", "shell", "bash", "update_plan", "plan",
-        "replace_file_content", "multi_replace_file_content", "replace", "multi_replace", "write_to_file",
-        "call_mcp_tool", "call_mcp",
-        "Create", "Edit", "MultiEdit", "Shell", "Bash", "Plan", "CallMCPTool", "CallMCP"
+        "create",
+        "edit",
+        "multi_edit",
+        "shell",
+        "bash",
+        "update_plan",
+        "plan",
+        "replace_file_content",
+        "multi_replace_file_content",
+        "replace",
+        "multi_replace",
+        "write_to_file",
+        "call_mcp_tool",
+        "call_mcp",
+        "Create",
+        "Edit",
+        "MultiEdit",
+        "Shell",
+        "Bash",
+        "Plan",
+        "CallMCPTool",
+        "CallMCP",
     }
 
     IMAGE_EXTENSIONS = IMAGE_EXTENSIONS
@@ -310,10 +390,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         except Exception:
             pass
         from tools.registry import normalize_tool_name
+
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
         if canonical in ("read", "web_fetch", "ask_user", "manage_shell", "manage_subagent", "invoke_subagent"):
             return False
-        if canonical in self.EXPANDABLE_TOOLS or canonical in ("call_mcp", "create", "edit", "multi_edit", "shell", "update_plan"):
+        if canonical in self.EXPANDABLE_TOOLS:
             return True
         if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
             return True
@@ -327,16 +408,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pass
         return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_shell")
 
-    def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
+    def __init__(
+        self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None
+    ):
         classes = f"tool-call tool-{tool_type.lower()}"
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
         from tools.registry import normalize_tool_name
+
         self.tool_type = tool_type
         self.canonical_tool = normalize_tool_name(tool_type)
         if isinstance(target, str):
-            target = re.sub(r'\s+', ' ', target.replace("\n", " ").replace("\r", " ")).strip()
+            target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
         self.target = target
         self.result_text = result_text
         self.args = args or {}
@@ -364,7 +448,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if not text:
             return ""
         clean = self._clean_hints_for_ui(text)
-        clean = re.sub(r'\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', clean)
+        clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
         return escape(clean)
 
     def compose(self) -> ComposeResult:
@@ -403,49 +487,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.is_expanded:
             self.render_content()
 
-    class _DisplayNamesDict(dict):
-        CANONICAL_NAMES = {
-            "read": "Read",
-            "create": "Create",
-            "edit": "Edit",
-            "multi_edit": "Edit",
-            "shell": "Shell",
-            "ask_user": "AskUser",
-            "manage_shell": "ManageShell",
-            "invoke_subagent": "InvokeSubagent",
-            "manage_subagent": "ManageSubagent",
-            "web_fetch": "WebFetch",
-            "update_plan": "UpdatePlan",
-            "call_mcp": "CallMCP",
-        }
-
-        def get(self, key, default=None):
-            from tools.registry import normalize_tool_name
-            canonical = normalize_tool_name(key)
-            if canonical in self.CANONICAL_NAMES:
-                return self.CANONICAL_NAMES[canonical]
-            return super().get(key, default)
-
-        def __getitem__(self, key):
-            res = self.get(key, None)
-            if res is None:
-                raise KeyError(key)
-            return res
-
-        def __contains__(self, key):
-            return True
-
-    class _SystemToolsSet(set):
-        def __contains__(self, item):
-            if not isinstance(item, str):
-                return False
-            from tools.registry import REGISTRY, normalize_tool_name
-            lower = item.lower()
-            canonical = normalize_tool_name(lower)
-            if canonical in REGISTRY or canonical in ("get_mcp_schema", "call_mcp", "update_plan"):
-                return True
-            return super().__contains__(item) or super().__contains__(lower)
-
     DISPLAY_NAMES = _DisplayNamesDict()
     SYSTEM_TOOLS = _SystemToolsSet()
 
@@ -462,7 +503,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     target_str = f"[{completed}/{total} completed]"
                 elif isinstance(plan_data, list):
                     total = len(plan_data)
-                    completed = sum(1 for item in plan_data if isinstance(item, dict) and item.get("status") in ("completed", "done"))
+                    completed = sum(
+                        1
+                        for item in plan_data
+                        if isinstance(item, dict) and item.get("status") in ("completed", "done")
+                    )
                     target_str = f"[{completed}/{total} completed]"
             self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
         elif self.canonical_tool == "call_mcp" and self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
@@ -479,9 +524,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 compact = f'{{server: "{server}"}}' if server else "{}"
             escaped_compact = escape(compact)
             self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
-        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in ("invoke_subagent", "manage_shell", "manage_subagent", "ask_user"):
+        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
+            "invoke_subagent",
+            "manage_shell",
+            "manage_subagent",
+            "ask_user",
+        ):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
             from core.tool_display import extract_tool_display
+
             project_dir = None
             try:
                 project_dir = getattr(self.app, "project_dir", None)
@@ -508,11 +559,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.canonical_tool in ("invoke_subagent", "manage_shell"):
             args = self.args if isinstance(self.args, dict) else {}
             from tools.registry import normalize_tool_args
+
             nargs = normalize_tool_args(self.canonical_tool, args)
             session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
             identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
             try:
                 from widgets.screens.subagent_screen import SubagentViewScreen
+
                 self.app.push_screen(SubagentViewScreen(identifier))
             except Exception:
                 pass
@@ -539,6 +592,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self._raw_bash_buffer = ""
         self._raw_bash_buffer += text
         from core.background_task import process_carriage_returns
+
         cleaned = self._clean_bash_output(self._raw_bash_buffer)
         self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
@@ -552,16 +606,28 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.content_widget.display = True
             self.md_widget.display = False
             from tools.registry import normalize_tool_args
+
             nargs = normalize_tool_args(self.canonical_tool, self.args)
             file_path = nargs.get("path") or nargs.get("target_file") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._check_is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
-                elif raw_text and ("@@" in raw_text or "--- a/" in raw_text or "+++ b/" in raw_text or " updated " in raw_text or " updated (" in raw_text):
+                elif raw_text and (
+                    "@@" in raw_text
+                    or "--- a/" in raw_text
+                    or "+++ b/" in raw_text
+                    or " updated " in raw_text
+                    or " updated (" in raw_text
+                ):
                     diff_text = raw_text
                     if "@@" not in diff_text and "--- a/" not in diff_text:
-                        content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content") or ""
+                        content = (
+                            self.args.get("content")
+                            or self.args.get("CodeContent")
+                            or self.args.get("code_content")
+                            or ""
+                        )
                         new_lines = content.splitlines() if content else []
                         cnt = len(new_lines) or 1
                         d_lines = [
@@ -593,7 +659,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                                 theme=CODE_THEME,
                                 line_numbers=True,
                                 word_wrap=False,
-                                background_color="default"
+                                background_color="default",
                             )
                             self.content_widget.update(syntax)
                         except Exception:
@@ -601,7 +667,16 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             self.content_widget.update(rendered)
                     else:
                         self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
-            elif self.tool_type in ("edit", "Edit", "multi_edit", "MultiEdit", "replace_file_content", "multi_replace_file_content", "replace", "multi_replace"):
+            elif self.tool_type in (
+                "edit",
+                "Edit",
+                "multi_edit",
+                "MultiEdit",
+                "replace_file_content",
+                "multi_replace_file_content",
+                "replace",
+                "multi_replace",
+            ):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._check_is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
@@ -609,6 +684,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     diff_text = raw_text
                     if not diff_text or "@@" not in diff_text:
                         from widgets.lexer_utils import build_edit_diff_text
+
                         diff_text = build_edit_diff_text(self.args, file_path or "file", self.tool_type)
 
                     if diff_text:
@@ -650,7 +726,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
-                                    background_color="default"
+                                    background_color="default",
                                 )
                                 self.content_widget.update(syntax)
                             except Exception:
@@ -701,7 +777,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                                     line_numbers=True,
                                     start_line=start_line,
                                     word_wrap=False,
-                                    background_color="default"
+                                    background_color="default",
                                 )
                                 self.content_widget.update(syntax)
                             except Exception:
@@ -737,11 +813,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 full_display = "\n".join(display_parts)
                 try:
                     syntax = TransparentSyntax(
-                        full_display,
-                        "json",
-                        theme=CODE_THEME,
-                        word_wrap=False,
-                        background_color="default"
+                        full_display, "json", theme=CODE_THEME, word_wrap=False, background_color="default"
                     )
                     self.content_widget.update(syntax)
                 except Exception:

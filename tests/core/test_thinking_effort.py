@@ -61,9 +61,11 @@ class TestThinkingEffortProviderManager(unittest.TestCase):
                     f,
                 )
 
-            with unittest.mock.patch.object(pm_mod, "CONFIG_FILE", config_path), unittest.mock.patch.object(
-                pm_mod, "PROVIDERS_JSON_FILE", providers_path
-            ), unittest.mock.patch.object(pm_mod, "CONFIG_DIR", tmp):
+            with (
+                unittest.mock.patch.object(pm_mod, "CONFIG_FILE", config_path),
+                unittest.mock.patch.object(pm_mod, "PROVIDERS_JSON_FILE", providers_path),
+                unittest.mock.patch.object(pm_mod, "CONFIG_DIR", tmp),
+            ):
                 pm = pm_mod.ProviderManager()
                 self.assertEqual(pm.get_provider_thinking_effort("custom", "m1"), "auto")
 
@@ -104,7 +106,9 @@ class TestThinkingEffortOpenAIRequest(unittest.IsolatedAsyncioTestCase):
         mock_response = unittest.mock.MagicMock()
         mock_response.__aiter__.side_effect = mock_aiter
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as create:
             create.return_value = mock_response
             events = []
             async for event in agent.stream_steps("hello"):
@@ -157,7 +161,9 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
             ]
 
         with unittest.mock.patch("core.adapters.anthropic.httpx.AsyncClient", Client):
-            async for _ in AnthropicAdapter().stream_chat("", "key", "claude-test", [{"role": "user", "content": "hi"}], thinking_effort="medium"):
+            async for _ in AnthropicAdapter().stream_chat(
+                "", "key", "claude-test", [{"role": "user", "content": "hi"}], thinking_effort="medium"
+            ):
                 pass
         self.assertEqual(_FakeHttpClient.captured_payload["output_config"], {"effort": "medium"})
 
@@ -168,7 +174,9 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
             lines = ['data: {"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}']
 
         with unittest.mock.patch("core.adapters.gemini.httpx.AsyncClient", Client):
-            async for _ in GeminiAdapter().stream_chat("", "key", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high"):
+            async for _ in GeminiAdapter().stream_chat(
+                "", "key", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high"
+            ):
                 pass
         self.assertEqual(
             _FakeHttpClient.captured_payload["generationConfig"]["thinkingConfig"],
@@ -182,14 +190,16 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
             lines = ['{"done": true, "prompt_eval_count": 1, "eval_count": 1}']
 
         with unittest.mock.patch("core.adapters.ollama.httpx.AsyncClient", Client):
-            async for _ in OllamaAdapter().stream_chat("", "", "qwen3", [{"role": "user", "content": "hi"}], thinking_effort="low"):
+            async for _ in OllamaAdapter().stream_chat(
+                "", "", "qwen3", [{"role": "user", "content": "hi"}], thinking_effort="low"
+            ):
                 pass
         self.assertEqual(_FakeHttpClient.captured_payload["think"], "low")
 
 
 class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
     async def test_command_saves_effort_and_preserves_mode(self):
-        from core.commands import ThinkingEffortCommand
+        from widgets.commands import ThinkingEffortCommand
 
         class Agent:
             def __init__(self):

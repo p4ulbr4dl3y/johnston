@@ -14,6 +14,7 @@ class WriteInInput(Input):
         self.cursor_position = val_len
         try:
             from textual.widgets._input import Selection
+
             self.selection = Selection(val_len, val_len)
         except Exception:
             try:
@@ -85,10 +86,12 @@ class ConfirmScreen(BaseModalScreen[str]):
 
     def on_mount(self) -> None:
         import time
+
         self._mount_time = time.time()
 
     def action_confirm(self) -> None:
         import time
+
         if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
             return
         self.dismiss("confirm")
@@ -129,6 +132,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
 
     def on_mount(self) -> None:
         import time
+
         self._mount_time = time.time()
         self.update_step()
         self.call_after_refresh(self._force_modal_focus)
@@ -189,7 +193,13 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                     input_field.value = ""
 
                 for idx, opt in enumerate(self.options):
-                    is_selected = bool(prev_answer and ((idx < len(self.raw_options) and prev_answer == self.raw_options[idx]) or (idx == len(self.options) - 1 and prev_answer not in self.raw_options)))
+                    is_selected = bool(
+                        prev_answer
+                        and (
+                            (idx < len(self.raw_options) and prev_answer == self.raw_options[idx])
+                            or (idx == len(self.options) - 1 and prev_answer not in self.raw_options)
+                        )
+                    )
                     tag = r"\[✓]" if is_selected else r"\[ ]"
                     opt_list.add_option(f"{tag} {opt}")
 
@@ -215,7 +225,6 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                 blocks.append(f"**{q_clean}**\n\n{ans_display}")
 
             summary = "\n\n&nbsp;\n\n".join(blocks)
-
 
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**\n\n" + summary)
@@ -260,6 +269,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if not self.raw_options or self.q_idx >= len(self.questions):
             return
         import time
+
         if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
             return
         if event.option_index != len(self.options) - 1:
@@ -269,6 +279,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         import time
+
         if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
             return
         self.submit_current_step()

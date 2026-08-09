@@ -81,14 +81,14 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
     subagent.allow_task = False
     excluded_tools = SUBAGENT_EXCLUDED_TOOLS
     subagent.tools = [
-        t for t in (getattr(subagent, "tools", None) or [])
+        t
+        for t in (getattr(subagent, "tools", None) or [])
         if t.get("function", {}).get("name", "").lower() not in excluded_tools
     ]
 
     if definition.read_only or definition.disallowed_tools or definition.allowed_tools:
         subagent.tools = [
-            t for t in subagent.tools
-            if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
+            t for t in subagent.tools if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
         ]
 
     custom_tools = []
@@ -108,6 +108,7 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
 
 def merge_subagent_metrics(subagent: Any, context: Any) -> None:
     """Merges token consumption and cost metrics from subagent into parent app agent."""
+
     def _val(obj: Any, attr: str, default: Any = 0) -> Any:
         v = getattr(obj, attr, default)
         if isinstance(v, (int, float)) and not isinstance(v, bool):
@@ -183,6 +184,7 @@ async def run_subagent_stream_bg(
             sid = session_id or session.id
             if truncate_result:
                 from tools.invoke_subagent import _truncate_subagent_result
+
                 result_text = _truncate_subagent_result(acc[0], sid) or "Completed with no text output."
             else:
                 result_text = acc[0].strip() or "Completed with no text output."

@@ -54,6 +54,7 @@ class AgentRole:
 
         try:
             from tools.registry import normalize_tool_name
+
             resolved = normalize_tool_name(clean)
         except Exception:
             resolved = clean
@@ -86,6 +87,7 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
         clean = clean.split(".", 1)[1]
     try:
         from tools.registry import normalize_tool_name
+
         resolved = normalize_tool_name(clean)
     except Exception:
         resolved = clean
@@ -95,6 +97,7 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
     if getattr(role_def, "read_only", False) and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
         return format_tool_error(f"tool '{clean}' disabled in read-only {getattr(role_def, 'name', 'Role')} role")
     return None
+
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
     "act": AgentRole(
@@ -145,8 +148,12 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "3. Edit / Implementation Request: State clearly that you are in Explore mode and tell the user to press Shift+Tab to switch to Act mode."
         ),
         disallowed_tools=[
-            "create", "edit", "multi_edit",
-            "write_to_file", "replace_file_content", "multi_replace_file_content"
+            "create",
+            "edit",
+            "multi_edit",
+            "write_to_file",
+            "replace_file_content",
+            "multi_replace_file_content",
         ],
         scope="any",
         source="builtin",
@@ -158,8 +165,12 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         read_only=True,
         prompt=DEFAULT_SUBAGENT_ROLES["explorer"]["system_prompt"],
         disallowed_tools=[
-            "create", "edit", "multi_edit",
-            "write_to_file", "replace_file_content", "multi_replace_file_content"
+            "create",
+            "edit",
+            "multi_edit",
+            "write_to_file",
+            "replace_file_content",
+            "multi_replace_file_content",
         ],
         scope="subagent_only",
         source="builtin",
@@ -226,7 +237,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         ),
         scope="main_only",
         source="builtin",
-    )
+    ),
 }
 
 
@@ -276,10 +287,7 @@ class RoleRegistry:
         if not scope:
             return self.roles
         clean_scope = scope.lower().strip()
-        return {
-            k: v for k, v in self.roles.items()
-            if v.scope in ("any", clean_scope)
-        }
+        return {k: v for k, v in self.roles.items() if v.scope in ("any", clean_scope)}
 
     def reload(self, project_dir: Optional[str] = None) -> None:
         self.load_roles(project_dir=project_dir)

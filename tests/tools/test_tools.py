@@ -13,6 +13,7 @@ class MockAgent:
     def __init__(self, mode="explore"):
         self.mode = mode
 
+
 class MockApp:
     def __init__(self, mode="explore"):
         self.agent = MockAgent(mode=mode)
@@ -32,6 +33,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
         from core.permission_manager import PermissionManager
+
         PermissionManager.get_instance().set_session_override("shell", "allow")
 
     async def test_create_allows_johnston_config(self):
@@ -124,6 +126,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write(b"%PDF-1.7 mock content")
 
         from unittest.mock import patch
+
         with patch("tools.read.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
             res_pdf = await tool.execute({"path": pdf_path})
             self.assertIn("Converted PDF Header", res_pdf)
@@ -156,15 +159,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await read_tool.execute({"path": file_path})
 
         # Edit on directory error
-        res_edit_dir = await tool.execute({"target_file": self.test_dir, "target_content": "a", "replacement_content": "b"})
+        res_edit_dir = await tool.execute(
+            {"target_file": self.test_dir, "target_content": "a", "replacement_content": "b"}
+        )
         self.assertIn("is a directory", res_edit_dir)
 
         # Successful edit
-        res = await tool.execute({
-            "target_file": file_path,
-            "target_content": "return 42",
-            "replacement_content": "return 100"
-        })
+        res = await tool.execute(
+            {"target_file": file_path, "target_content": "return 42", "replacement_content": "return 100"}
+        )
         self.assertIn("-    return 42", res)
         self.assertIn("+    return 100", res)
         with open(file_path, "r", encoding="utf-8") as f:
@@ -174,11 +177,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("msg = “hello”\n")
         await read_tool.execute({"path": file_path})
-        await tool.execute({
-            "target_file": file_path,
-            "target_content": 'msg = "hello"',
-            "replacement_content": 'msg = "world"'
-        })
+        await tool.execute(
+            {"target_file": file_path, "target_content": 'msg = "hello"', "replacement_content": 'msg = "world"'}
+        )
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "msg = ”world”\n")
 
@@ -186,20 +187,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("line1\nline2\nline3\n")
         await read_tool.execute({"path": file_path})
-        await tool.execute({
-            "target_file": file_path,
-            "target_content": "line2",
-            "replacement_content": ""
-        })
+        await tool.execute({"target_file": file_path, "target_content": "line2", "replacement_content": ""})
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "line1\nline3\n")
 
         # Old string not found error
-        res_not_found = await tool.execute({
-            "path": file_path,
-            "old_string": "non_existent_text",
-            "new_string": "abc"
-        })
+        res_not_found = await tool.execute({"path": file_path, "old_string": "non_existent_text", "new_string": "abc"})
         self.assertIn("ERR:", res_not_found)
         self.assertIn("not found", res_not_found)
 
@@ -207,11 +200,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("dup\ndup\n")
         await read_tool.execute({"path": file_path})
-        res_dup = await tool.execute({
-            "path": file_path,
-            "old_string": "dup",
-            "new_string": "unique"
-        })
+        res_dup = await tool.execute({"path": file_path, "old_string": "dup", "new_string": "unique"})
         self.assertIn("matches 2 occurrences", res_dup)
 
     async def test_shell_tool(self):
@@ -265,6 +254,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_tool_aliases_and_case(self):
         from tools.registry import execute_tool
+
         file_path = os.path.join(self.test_dir, "alias_test.txt")
 
         # Test capitalized tool name "Create"
@@ -291,12 +281,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w") as f:
             f.write("dummy")
         from unittest.mock import patch
+
         with patch("os.path.getsize", return_value=20 * 1024 * 1024):
             res = await tool.execute({"path": file_path})
             self.assertIn("exceeds 10MB", res)
 
     async def test_format_line_pagination_string_args(self):
         from tools.utils import format_line_pagination
+
         lines = ["line 1", "line 2", "line 3", "line 4"]
         res = format_line_pagination(lines, start_line="2", end_line="3")
         self.assertIn("line 2", res)
@@ -305,12 +297,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_format_line_pagination_max_800_cap(self):
         from tools.utils import format_line_pagination
+
         lines = [f"line {i}" for i in range(1, 1500)]
         res = format_line_pagination(lines, start_line=1, end_line=1200)
         self.assertIn("Lines 1-800 of 1499", res)
 
     async def test_format_line_pagination_char_limit_line_boundary(self):
         from tools.utils import format_line_pagination
+
         long_line = "x" * 100
         lines = [long_line for _ in range(500)]
         # max_chars=300 -> each line formatted is ~109 chars ("    1 | x...x")
@@ -318,12 +312,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = format_line_pagination(lines, start_line=1, end_line=500, max_chars=300)
         self.assertIn("Lines 1-2 of 500", res)
         self.assertIn("Use start_line=3", res)
-        self.assertIn("Warning: Output truncated at line 2 before target line 500 due to character limit (300 chars)", res)
-
-
+        self.assertIn(
+            "Warning: Output truncated at line 2 before target line 500 due to character limit (300 chars)", res
+        )
 
     async def test_ask_user_validation(self):
         from tools.ask_user import AskUserTool
+
         tool = AskUserTool()
         # Invalid questions structure
         res = await tool.execute({"questions": [{"invalid_key": "foo"}]})
@@ -331,6 +326,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_replace_file_content_line_range(self):
         from tools.edit import EditTool
+
         file_path = os.path.join(self.test_dir, "range_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("val = 1\nval = 1\nval = 1\n")
@@ -338,13 +334,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Replace val = 1 only on line 2 (start_line=2, end_line=2)
-        res = await tool.execute({
-            "target_file": file_path,
-            "target_content": "val = 1",
-            "replacement_content": "val = 42",
-            "start_line": 2,
-            "end_line": 2
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "target_content": "val = 1",
+                "replacement_content": "val = 42",
+                "start_line": 2,
+                "end_line": 2,
+            }
+        )
         self.assertIn("-val = 1", res)
         self.assertIn("+val = 42", res)
 
@@ -354,6 +352,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_replace_file_content_out_of_range_error(self):
         from tools.edit import EditTool
+
         file_path = os.path.join(self.test_dir, "range_err.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("first_line = 1\nsecond_line = 2\ntarget_line = 3\ntarget_line = 3\n")
@@ -361,18 +360,21 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Search for target_line = 3 in lines 1-2 when multiple exist in file
-        res = await tool.execute({
-            "target_file": file_path,
-            "target_content": "target_line = 3",
-            "replacement_content": "target_line = 99",
-            "start_line": 1,
-            "end_line": 2
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "target_content": "target_line = 3",
+                "replacement_content": "target_line = 99",
+                "start_line": 1,
+                "end_line": 2,
+            }
+        )
         self.assertIn("ERR: match: target not found in specified range", res)
         self.assertIn("matches multiple occurrences (2)", res)
 
     async def test_edit_tool_line_range_miss_fallback(self):
         from tools.edit import EditTool
+
         file_path = os.path.join(self.test_dir, "fallback_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("val_a = 1\nval_b = 2\nunique_target = 42\nval_c = 4\n")
@@ -380,31 +382,36 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Range 1-2 does not include unique_target = 42 (line 3), but fallback succeeds because it is unique!
-        res = await tool.execute({
-            "target_file": file_path,
-            "target_content": "unique_target = 42",
-            "replacement_content": "unique_target = 100",
-            "start_line": 1,
-            "end_line": 2
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "target_content": "unique_target = 42",
+                "replacement_content": "unique_target = 100",
+                "start_line": 1,
+                "end_line": 2,
+            }
+        )
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertIn("unique_target = 100", f.read())
 
         # Start line out of bounds, but target unique in file -> fallback succeeds!
-        res_oob = await tool.execute({
-            "target_file": file_path,
-            "target_content": "unique_target = 100",
-            "replacement_content": "unique_target = 200",
-            "start_line": 50,
-            "end_line": 60
-        })
+        res_oob = await tool.execute(
+            {
+                "target_file": file_path,
+                "target_content": "unique_target = 100",
+                "replacement_content": "unique_target = 200",
+                "start_line": 50,
+                "end_line": 60,
+            }
+        )
         self.assertNotIn("ERR:", res_oob)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertIn("unique_target = 200", f.read())
 
     async def test_edit_tool_end_line_auto_expansion(self):
         from tools.edit import EditTool
+
         file_path = os.path.join(self.test_dir, "auto_expand.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def sample():\n    a = 1\n    b = 2\n    c = 3\n    return a + b + c\n")
@@ -412,13 +419,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # target_content is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
-        res = await tool.execute({
-            "target_file": file_path,
-            "target_content": "    a = 1\n    b = 2\n    c = 3",
-            "replacement_content": "    a = 10\n    b = 20\n    c = 30",
-            "start_line": 2,
-            "end_line": 3
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "target_content": "    a = 1\n    b = 2\n    c = 3",
+                "replacement_content": "    a = 10\n    b = 20\n    c = 30",
+                "start_line": 2,
+                "end_line": 3,
+            }
+        )
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -432,23 +441,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await ReadTool().execute({"path": file_path})
 
         tool = MultiEditTool()
-        res = await tool.execute({
-            "target_file": file_path,
-            "replacement_chunks": [
-                {
-                    "start_line": 1,
-                    "end_line": 2,
-                    "target_content": "return 1",
-                    "replacement_content": "return 100"
-                },
-                {
-                    "start_line": 4,
-                    "end_line": 5,
-                    "target_content": "return 2",
-                    "replacement_content": "return 200"
-                }
-            ]
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "replacement_chunks": [
+                    {"start_line": 1, "end_line": 2, "target_content": "return 1", "replacement_content": "return 100"},
+                    {"start_line": 4, "end_line": 5, "target_content": "return 2", "replacement_content": "return 200"},
+                ],
+            }
+        )
         self.assertIn("return 100", res)
         self.assertIn("return 200", res)
 
@@ -473,11 +474,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_tool_doc_caching(self):
         from tools.read import convert_doc_to_markdown_sync
+
         pdf_path = os.path.join(self.test_dir, "cached_doc.pdf")
         with open(pdf_path, "wb") as f:
             f.write(b"%PDF-1.7 mock content")
 
         from unittest.mock import patch
+
         with patch("tools.read.set_cached_doc_markdown") as mock_set:
             with patch("markitdown.MarkItDown") as mock_md_cls:
                 mock_md = mock_md_cls.return_value
@@ -492,6 +495,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         import json
 
         from PIL import Image
+
         img_path = os.path.join(self.test_dir, "sample.png")
         img = Image.new("RGB", (2000, 1000), color=(255, 0, 0))
         img.save(img_path, format="PNG")
@@ -510,6 +514,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         import json
 
         from PIL import Image
+
         img_path = os.path.join(self.test_dir, "sample_detail.jpg")
         img = Image.new("RGB", (3000, 3000), color=(0, 255, 0))
         img.save(img_path, format="JPEG")

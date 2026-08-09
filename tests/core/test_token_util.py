@@ -10,6 +10,7 @@ class DummyUsage:
         self.completion_tokens = completion
         self.total_tokens = total
 
+
 class TestTokenUtil(unittest.TestCase):
     def test_estimate_tokens(self):
         self.assertEqual(estimate_tokens("1234"), 1)
@@ -43,6 +44,7 @@ class TestTokenUtil(unittest.TestCase):
 
     def test_models_catalog_context_window(self):
         from core.models_catalog import format_context_tokens, get_context_window
+
         self.assertEqual(format_context_tokens(128000), "128k")
         self.assertEqual(format_context_tokens(200000), "200k")
         self.assertEqual(format_context_tokens(1000000), "1M")
@@ -71,6 +73,7 @@ class TestTokenUtil(unittest.TestCase):
         # Pure ASCII must keep the classic 4 chars/token ratio (back-compat).
         self.assertEqual(estimate_tokens("1234"), 1)
         self.assertEqual(estimate_tokens("12345678"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

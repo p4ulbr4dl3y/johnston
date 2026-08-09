@@ -15,11 +15,11 @@ class ManageShellTool(BaseTool):
                 "properties": {
                     "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"]},
                     "task_id": {"type": "string", "description": "Background task ID"},
-                    "input": {"type": "string", "description": "Input text for send_input"}
+                    "input": {"type": "string", "description": "Input text for send_input"},
                 },
-                "required": ["action"]
-            }
-        }
+                "required": ["action"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:

@@ -13,7 +13,7 @@ class RuleDefinition:
         content: str,
         modes: Optional[List[str]] = None,
         globs: Optional[List[str]] = None,
-        source: str = "global"
+        source: str = "global",
     ):
         self.name = name
         self.content = content
@@ -85,17 +85,13 @@ class RulesManager:
             modes = parse_csv_list(modes_raw)
             globs = parse_csv_list(globs_raw)
 
-            return RuleDefinition(
-                name=name,
-                content=content,
-                modes=modes,
-                globs=globs,
-                source=source
-            )
+            return RuleDefinition(name=name, content=content, modes=modes, globs=globs, source=source)
         except Exception:
             return None
 
-    def get_formatted_rules(self, mode: str = "act", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None) -> str:
+    def get_formatted_rules(
+        self, mode: str = "act", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
+    ) -> str:
         rules = self.load_rules(project_dir=project_dir)
         matching = []
         for r in rules:

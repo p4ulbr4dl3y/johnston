@@ -9,14 +9,13 @@ class ResumeScreen(BaseSelectionScreen[str]):
     def __init__(self, sessions: list[dict]):
         options = []
         for s in sessions:
-            title = " ".join(str(s.get('title', '')).replace("\n", " ").replace("\r", " ").split())
+            title = " ".join(str(s.get("title", "")).replace("\n", " ").replace("\r", " ").split())
             max_title_len = 30
             title_text = f"{title[:max_title_len]}..." if len(title) > max_title_len else title
             escaped_title = escape(title_text)
-            count = s.get('message_count', 0)
+            count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"
             options.append(f"{escaped_title} [dim]{escape(f'[{count} {step_str}]')}[/dim]")
-
 
         items = [s["id"] for s in sessions]
         default_val = items[0] if items else ""
@@ -26,6 +25,5 @@ class ResumeScreen(BaseSelectionScreen[str]):
             items=items,
             default_value=default_val,
             show_search=True,
-            search_placeholder="Search sessions..."
+            search_placeholder="Search sessions...",
         )
-

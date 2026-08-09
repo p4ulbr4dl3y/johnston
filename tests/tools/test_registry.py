@@ -7,6 +7,7 @@ from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         from core.permission_manager import PermissionManager
+
         PermissionManager.get_instance().set_session_override("call_mcp", "allow")
 
     def test_normalize_tool_name(self):
@@ -48,10 +49,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(norm_edit["new_str"], "b")
 
         # Test multi_edit chunk aliases
-        norm_multi = normalize_tool_args("multi_edit", {
-            "file": "baz.py",
-            "chunks": [{"search": "a", "replace": "b"}]
-        })
+        norm_multi = normalize_tool_args("multi_edit", {"file": "baz.py", "chunks": [{"search": "a", "replace": "b"}]})
         self.assertEqual(norm_multi["target_file"], "baz.py")
         self.assertEqual(norm_multi["edits"][0]["old_str"], "a")
         self.assertEqual(norm_multi["edits"][0]["new_str"], "b")
@@ -116,6 +114,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         # Test additional aliases resolution
         from tools.registry import ALIAS_MAP
+
         self.assertEqual(ALIAS_MAP["edit_file"], "edit")
         self.assertEqual(ALIAS_MAP["spawn_subagent"], "invoke_subagent")
         self.assertEqual(ALIAS_MAP["mcp"], "call_mcp")
@@ -129,11 +128,14 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         # Canonical 'multi_edit' must reach MultiEditTool, not be aliased to 'edit'
         from tools.edit import MultiEditTool
         from tools.registry import REGISTRY
+
         self.assertIs(REGISTRY["multi_edit"], MultiEditTool)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("allow", "")
-        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm), \
-             patch.object(MultiEditTool, "execute", new=AsyncMock(return_value="MULTI_EDIT_OK")):
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch.object(MultiEditTool, "execute", new=AsyncMock(return_value="MULTI_EDIT_OK")),
+        ):
             res = await execute_tool("multi_edit", {"target_file": "x.py", "replacement_chunks": []})
         self.assertEqual(res, "MULTI_EDIT_OK")
 
@@ -171,8 +173,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+        ):
             mock_app = MagicMock()
             mock_app.mode = "plan"
             res = await execute_tool("mcp_tool_test", {"arg": "val"}, app=mock_app)
@@ -191,8 +195,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+        ):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
             self.assertEqual(res, "MCP Executed Output")
             mock_mcp_mgr.call_tool.assert_called_once_with("exposed_mcp_tool", {"foo": "bar"})
@@ -210,8 +216,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+        ):
             res = await execute_tool("faulty_mcp", {})
             self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res)
 
@@ -228,8 +236,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+        ):
             res = await execute_tool("none_mcp", {})
             self.assertEqual(res, "ERR: unknown 'none_mcp'")
 
@@ -257,27 +267,27 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_tool_permission_ask_confirmed(self):
         mock_app = MagicMock()
-        mock_app.push_screen_wait = AsyncMock(return_value="allow")
+        mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res)
-        mock_app.push_screen_wait.assert_awaited_once()
+        mock_app.confirm_permission.assert_awaited_once()
 
     async def test_execute_tool_permission_ask_always_allow(self):
         mock_app = MagicMock()
-        mock_app.push_screen_wait = AsyncMock(return_value="always_allow")
+        mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res)
-        mock_pm.set_session_override.assert_called_once_with("read", "allow")
+        mock_app.confirm_permission.assert_awaited_once()
 
     async def test_execute_tool_permission_ask_denied_by_user(self):
         mock_app = MagicMock()
-        mock_app.push_screen_wait = AsyncMock(return_value="no")
+        mock_app.confirm_permission = AsyncMock(return_value=False)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
@@ -298,9 +308,11 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("deny", "MCP policy blocks it")
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             self._mock_mode(), \
-             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            self._mock_mode(),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+        ):
             res = await execute_tool("mcp_deny", {})
         self.assertEqual(res, "ERR: denied 'mcp_deny': by permission policy")
 
@@ -310,41 +322,47 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             self._mock_mode(), \
-             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            self._mock_mode(),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+        ):
             res = await execute_tool("mcp_ask", {})
         self.assertEqual(res, "ERR: denied 'mcp_ask': requires user confirmation (Confirm MCP call)")
 
     async def test_execute_tool_mcp_permission_ask_always_allow(self):
         mock_app = MagicMock()
         mock_app.app = mock_app
-        mock_app.push_screen_wait = AsyncMock(return_value="always_allow")
+        mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_mcp_mgr = MagicMock()
         mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_allow"}}]
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
         mock_mcp_mgr.call_tool.return_value = "MCP Executed"
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             self._mock_mode(), \
-             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            self._mock_mode(),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+        ):
             res = await execute_tool("mcp_allow", {"x": 1}, app=mock_app)
         self.assertEqual(res, "MCP Executed")
-        mock_pm.set_session_override.assert_called_once_with("call_mcp", "allow")
+        mock_app.confirm_permission.assert_awaited_once()
 
     async def test_execute_tool_mcp_permission_ask_denied_by_user(self):
         mock_app = MagicMock()
         mock_app.app = mock_app
-        mock_app.push_screen_wait = AsyncMock(return_value="no")
+        mock_app.confirm_permission = AsyncMock(return_value=False)
         mock_mcp_mgr = MagicMock()
         mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_no"}}]
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
-             self._mock_mode(), \
-             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            self._mock_mode(),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+        ):
             res = await execute_tool("mcp_no", {}, app=mock_app)
         self.assertEqual(res, "ERR: denied 'mcp_no': by user")
 
@@ -361,8 +379,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             async def call_tool_async(self, tool_name, arguments, target_server=None, timeout=None):
                 return "async mcp output"
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=_FakeMCPManager()), \
-             self._mock_mode():
+        with patch("core.mcp_manager.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
             res = await execute_tool("async_mcp", {"q": 1})
         self.assertEqual(res, "async mcp output")
 

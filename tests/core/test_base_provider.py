@@ -13,6 +13,7 @@ from tools.registry import execute_tool
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         from core.permission_manager import PermissionManager
+
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
         pm.set_session_override("manage_shell", "allow")
@@ -49,11 +50,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
         # Test valid Edit
-        res_edit = await execute_tool("edit", {
-            "path": file_path,
-            "old_string": "line2",
-            "new_string": "line_two"
-        })
+        res_edit = await execute_tool("edit", {"path": file_path, "old_string": "line2", "new_string": "line_two"})
         self.assertIn("line2", res_edit)  # check diff contains old text
         self.assertIn("line_two", res_edit)  # check diff contains new text
 
@@ -76,22 +73,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
-        res_edit = await execute_tool("edit", {
-            "path": file_path,
-            "old_string": "missing_line",
-            "new_string": "replacement"
-        })
+        res_edit = await execute_tool(
+            "edit", {"path": file_path, "old_string": "missing_line", "new_string": "replacement"}
+        )
         self.assertIn("ERR: match: exact block not found", res_edit)
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
         await execute_tool("create", {"path": file_path, "content": "duplicate\nmiddle\nduplicate"})
 
-        res_edit = await execute_tool("edit", {
-            "path": file_path,
-            "old_string": "duplicate",
-            "new_string": "replacement"
-        })
+        res_edit = await execute_tool(
+            "edit", {"path": file_path, "old_string": "duplicate", "new_string": "replacement"}
+        )
         self.assertIn("matches 2 occurrences", res_edit)
 
     async def test_shell_tool_sync(self):
@@ -100,18 +93,14 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res_shell.strip(), "hello shell")
 
     def test_compact_command_registered(self):
-        from core.commands import COMMAND_REGISTRY
+        from widgets.commands import COMMAND_REGISTRY
+
         self.assertIn("/compact", COMMAND_REGISTRY)
-
-
 
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         self.addAsyncCleanup(agent.close)
-        agent.history = [
-            {"role": "user", "content": "hi"},
-            {"role": "assistant", "content": "hello"}
-        ]
+        agent.history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
         success, msg = await agent.compact_history()
         self.assertFalse(success)
         self.assertIn("too short", msg)
@@ -121,11 +110,15 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(agent.close)
         agent.history = [
             {"role": "user", "content": "Fix bug in auth.py"},
-            {"role": "assistant", "content": "Checking auth.py", "tool_calls": [{"function": {"name": "read", "arguments": "auth.py"}}]},
+            {
+                "role": "assistant",
+                "content": "Checking auth.py",
+                "tool_calls": [{"function": {"name": "read", "arguments": "auth.py"}}],
+            },
             {"role": "tool", "content": "def login(): return False"},
             {"role": "user", "content": "Change to return True"},
             {"role": "assistant", "content": "Updated auth.py"},
-            {"role": "user", "content": "Run tests"}
+            {"role": "user", "content": "Run tests"},
         ]
 
         # Mock OpenAI chat completion call
@@ -134,17 +127,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         mock_choice.message.content = "## Objective\n- Fix auth.py\n\n## Work State\n### Completed\n- Updated login\n\n## Next Move\n1. Run tests\n\n## Relevant Files\n- auth.py"
         mock_response.choices = [mock_choice]
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = mock_response
             success, msg = await agent.compact_history()
 
             self.assertTrue(success)
             self.assertIn("compacted successfully", msg)
-            self.assertEqual(len(agent.history), 4) # 1 summary + 3 tail messages starting at user turn
+            self.assertEqual(len(agent.history), 4)  # 1 summary + 3 tail messages starting at user turn
             self.assertIn("<conversation-checkpoint>", agent.history[0]["content"])
             self.assertIn("## Objective", agent.history[0]["content"])
             self.assertIn("auth.py", agent.history[0]["content"])
-
 
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
@@ -157,16 +151,23 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "e" * 200},
         ]
         compacted = False
+
         async def mock_compact():
             nonlocal compacted
             compacted = True
             return True, "compacted"
 
-        with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
+        with unittest.mock.patch(
+            "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+        ) as mock_limit:
             mock_limit.return_value = 100
-            with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
+            with unittest.mock.patch.object(
+                agent, "compact_history", new_callable=unittest.mock.AsyncMock
+            ) as mock_comp:
                 mock_comp.return_value = (True, "compacted")
-                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
                     mock_create.side_effect = Exception("Stop stream")
                     try:
                         async for _ in agent.stream_steps("trigger"):
@@ -187,15 +188,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         import tempfile
 
         from core.session_manager import SessionStore
+
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
         _store = SessionStore(project_path=_tmp.name)
         _old = SessionStore._instance
         SessionStore._instance = _store
         self.addCleanup(setattr, SessionStore, "_instance", _old)
+
         class DummySubAgent:
             system_prompt = "system"
             tools = []
+
             async def stream_steps(self, prompt):
                 yield ("bot_text", "Subagent answer for: " + prompt, "")
 
@@ -214,15 +218,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         import tempfile
 
         from core.session_manager import SessionStore
+
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
         _store = SessionStore(project_path=_tmp.name)
         _old = SessionStore._instance
         SessionStore._instance = _store
         self.addCleanup(setattr, SessionStore, "_instance", _old)
+
         class DummySubAgent:
             system_prompt = "system"
             tools = []
+
             async def stream_steps(self, prompt):
                 yield ("bot_text", "BG Subagent answer", "")
 
@@ -245,7 +252,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 pass
 
         app = DummyApp()
-        res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
+        res = await execute_tool(
+            "subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app
+        )
         self.assertIn("subagent 'bg job' launched", res)
         # Subagents live in the session store, not in the shell task registry.
         self.assertEqual(app.background_tasks, [])
@@ -256,6 +265,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     def test_truncate_output_helper(self):
         from tools.base import truncate_output
+
         short_text = "hello"
         self.assertEqual(truncate_output(short_text, max_chars=10), "hello")
 
@@ -266,7 +276,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Use line ranges.", truncated)
 
     def test_agent_cost_usd_calculation(self):
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         self.assertEqual(agent.cost_usd, 0.0)
         metrics = agent.get_metrics()
         self.assertEqual(metrics["cost_usd"], 0.0)
@@ -278,7 +290,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.cost_usd, 0.0)
 
     def test_clear_history_resets_sys_tokens_for_new_session(self):
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         # Simulate a prior session having streamed once, caching sys+tools tokens.
         agent._last_sys_tokens = 3100
         agent.history = [{"role": "user", "content": "old session"}]
@@ -294,7 +308,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent._last_sys_tokens, 0)
 
     def test_truncate_history_to_user_message(self):
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         agent.history = [
             {"role": "user", "content": "Msg 0"},
             {"role": "assistant", "content": "Resp 0"},
@@ -314,9 +330,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent.truncate_history_to_user_message(0)
         self.assertEqual(len(agent.history), 0)
 
-
     async def test_stream_steps_history_updated_on_exception(self):
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         agent.client = unittest.mock.AsyncMock()
         agent.client.chat.completions.create.side_effect = Exception("API connection error")
 
@@ -330,7 +347,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.history[0]["content"], "Hello test")
 
     async def test_stream_steps_without_chunk_usage(self):
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         self.addAsyncCleanup(agent.close)
 
         mock_chunk = unittest.mock.MagicMock(spec=["choices"])
@@ -350,7 +369,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         mock_response = unittest.mock.MagicMock()
         mock_response.__aiter__ = mock_aiter
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = mock_response
 
             steps = []
@@ -371,7 +392,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "Look at this"},
             {"role": "assistant", "content": "Done", "tool_calls": [{"id": "call_1", "function": {"name": "read"}}]},
             {"role": "tool", "tool_call_id": "call_1", "name": "read", "content": "file contents"},
-            {"role": "tool", "tool_call_id": "call_orphan", "name": "edit", "content": "orphan content"}
+            {"role": "tool", "tool_call_id": "call_orphan", "name": "edit", "content": "orphan content"},
         ]
 
         sanitized = agent.sanitize_history_for_model(history)
@@ -391,11 +412,15 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         history = [
             {"role": "user", "content": "Run tools"},
-            {"role": "assistant", "content": None, "tool_calls": [
-                {"id": "call_1", "function": {"name": "read"}},
-                {"id": "call_2", "function": {"name": "shell"}}
-            ]},
-            {"role": "user", "content": "Next question"}
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {"id": "call_1", "function": {"name": "read"}},
+                    {"id": "call_2", "function": {"name": "shell"}},
+                ],
+            },
+            {"role": "user", "content": "Next question"},
         ]
 
         sanitized = agent.sanitize_history_for_model(history)
@@ -445,9 +470,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         mock_choice.delta = mock_delta
         usage_chunk = unittest.mock.MagicMock(spec=["choices", "usage"])
         usage_chunk.choices = []
-        usage_chunk.usage = unittest.mock.MagicMock(
-            prompt_tokens=100, completion_tokens=20, total_tokens=120
-        )
+        usage_chunk.usage = unittest.mock.MagicMock(prompt_tokens=100, completion_tokens=20, total_tokens=120)
         usage_chunk.usage.prompt_tokens_details = unittest.mock.MagicMock(cached_tokens=80)
         text_chunk = unittest.mock.MagicMock(spec=["choices"])
         text_chunk.choices = [mock_choice]
@@ -469,13 +492,29 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 yield ("adapter_usage", dict(cached_usage))
                 yield ("adapter_text", "done")
 
-        agent_openai = BaseAgent(api_key="t", model="test-model", base_url="http://t", system_prompt="t", provider_key="tprov", api_type="openai")
+        agent_openai = BaseAgent(
+            api_key="t",
+            model="test-model",
+            base_url="http://t",
+            system_prompt="t",
+            provider_key="tprov",
+            api_type="openai",
+        )
         self.addAsyncCleanup(agent_openai.close)
-        agent_anthropic = BaseAgent(api_key="t", model="test-model", base_url="http://t", system_prompt="t", provider_key="tprov", api_type="anthropic")
+        agent_anthropic = BaseAgent(
+            api_key="t",
+            model="test-model",
+            base_url="http://t",
+            system_prompt="t",
+            provider_key="tprov",
+            api_type="anthropic",
+        )
         self.addAsyncCleanup(agent_anthropic.close)
 
         with patch.object(catalog, "get_model_pricing", return_value=pricing):
-            with patch.object(agent_openai.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            with patch.object(
+                agent_openai.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
                 mock_create.return_value = mock_response
                 async for _ in agent_openai.stream_steps("hi"):
                     pass
@@ -494,7 +533,11 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")
 
         # Retryable errors
-        self.assertTrue(agent._is_retryable_error(RuntimeError("Stream chunk timeout: No response received from provider 'test' for 30.0s.")))
+        self.assertTrue(
+            agent._is_retryable_error(
+                RuntimeError("Stream chunk timeout: No response received from provider 'test' for 30.0s.")
+            )
+        )
         self.assertTrue(agent._is_retryable_error(TimeoutError("Connection timed out")))
         self.assertTrue(agent._is_retryable_error(Exception("HTTP 429 Too Many Requests")))
         self.assertTrue(agent._is_retryable_error(Exception("HTTP 502 Bad Gateway")))
@@ -502,10 +545,14 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         # Non-retryable errors
         self.assertFalse(agent._is_retryable_error(Exception("Invalid API key provided")))
         self.assertFalse(agent._is_retryable_error(Exception("HTTP 401 Unauthorized")))
-        self.assertFalse(agent._is_retryable_error(Exception("context_length_exceeded: maximum context length is 4096 tokens")))
+        self.assertFalse(
+            agent._is_retryable_error(Exception("context_length_exceeded: maximum context length is 4096 tokens"))
+        )
 
     async def test_stream_steps_retry_success(self):
-        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01)
+        agent = BaseAgent(
+            api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01
+        )
         self.addAsyncCleanup(agent.close)
 
         mock_delta = unittest.mock.MagicMock()
@@ -526,6 +573,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         mock_response.__aiter__ = mock_aiter
 
         attempts = 0
+
         async def mock_create(*args, **kwargs):
             nonlocal attempts
             attempts += 1
@@ -547,10 +595,13 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("hello after retry" in e[1] for e in bot_texts))
 
     async def test_stream_steps_non_retryable_fails_immediately(self):
-        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01)
+        agent = BaseAgent(
+            api_key="t", model="test-model", base_url="http://t", provider_key="tprov", max_retries=3, retry_delay=0.01
+        )
         self.addAsyncCleanup(agent.close)
 
         attempts = 0
+
         async def mock_create(*args, **kwargs):
             nonlocal attempts
             attempts += 1
@@ -577,7 +628,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         tool_call_mock.function.name = "read"
         tool_call_mock.function.arguments = '{"path": "test.txt"}'
 
-
         mock_delta1 = unittest.mock.MagicMock()
         mock_delta1.reasoning_content = "Thinking about file..."
         mock_delta1.reasoning = None
@@ -594,8 +644,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         mock_delta2.model_extra = None
         mock_delta2.content = "File read complete"
         mock_delta2.tool_calls = None
-
-
 
         chunk2 = unittest.mock.MagicMock(spec=["choices"])
         chunk2.choices = [unittest.mock.MagicMock(delta=mock_delta2)]
@@ -617,7 +665,11 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             return mock_responses.pop(0)
 
         with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="file content result"):
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool",
+                new_callable=unittest.mock.AsyncMock,
+                return_value="file content result",
+            ):
                 events = []
                 async for evt in agent.stream_steps("Read file test.txt"):
                     events.append(evt)
@@ -627,11 +679,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(len(thinking_evts) > 0)
         self.assertIn("Thinking about file...", thinking_evts[-1][1])
 
-
         # Check tool execution yielded
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(len(tool_evts), 1)
-
 
         # Check final text
         bot_texts = [e for e in events if e[0] == "bot_text"]
@@ -646,9 +696,19 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         messages = [
             {"role": "user", "content": "Look at image"},
-            {"role": "assistant", "content": None, "tool_calls": [{"id": "c1", "function": {"name": "read", "arguments": '{"path":"1.png"}'}}]},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{"id": "c1", "function": {"name": "read", "arguments": '{"path":"1.png"}'}}],
+            },
             {"role": "tool", "tool_call_id": "c1", "content": '{"type": "image", "path": "1.png", "base64": "QUFB"}'},
-            {"role": "user", "content": [{"type": "text", "text": "Preview:"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB"}}]}
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Preview:"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB"}},
+                ],
+            },
         ]
 
         sanitized = agent._sanitize_vision_error_messages(messages)
@@ -657,17 +717,22 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")
-        self.assertIn("[Hint: You do not support vision. Tell user you cannot view images. Do not retry.]", tool_msg["content"])
+        self.assertIn(
+            "[Hint: You do not support vision. Tell user you cannot view images. Do not retry.]", tool_msg["content"]
+        )
 
     async def test_stream_cancelled_error_records_tokens(self):
         import asyncio
+
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", provider_key="tprov")
         self.addAsyncCleanup(agent.close)
 
         chunk = unittest.mock.MagicMock()
         chunk.usage = None
         choice = unittest.mock.MagicMock()
-        delta = unittest.mock.NonCallableMagicMock(spec=["content", "tool_calls", "reasoning_content", "reasoning", "model_extra"])
+        delta = unittest.mock.NonCallableMagicMock(
+            spec=["content", "tool_calls", "reasoning_content", "reasoning", "model_extra"]
+        )
         delta.content = "hi"
         delta.tool_calls = None
         delta.reasoning_content = None
@@ -685,7 +750,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             def __aiter__(self):
                 return slow_iter()
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock, return_value=MockAsyncStream()):
+        with unittest.mock.patch.object(
+            agent.client.chat.completions,
+            "create",
+            new_callable=unittest.mock.AsyncMock,
+            return_value=MockAsyncStream(),
+        ):
             gen = agent.stream_steps("Hello cancelled")
             await gen.__anext__()
             try:
@@ -724,11 +794,17 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
             return 0
 
         with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
-            with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
+            with unittest.mock.patch(
+                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            ) as mock_limit:
                 mock_limit.return_value = 100  # threshold = 75
-                with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
+                with unittest.mock.patch.object(
+                    agent, "compact_history", new_callable=unittest.mock.AsyncMock
+                ) as mock_comp:
                     mock_comp.return_value = (True, "compacted")
-                    with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                    with unittest.mock.patch.object(
+                        agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                    ) as mock_create:
                         mock_create.side_effect = Exception("Stop stream")
                         try:
                             async for _ in agent.stream_steps("trigger"):
@@ -741,6 +817,7 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
 class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
     async def test_read_only_blocks_write_aliases(self):
         from core.role_registry import AgentRole
+
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
         role_def = AgentRole("explore", "Explore", read_only=True, disallowed_tools=["write_file", "create", "edit"])
@@ -750,6 +827,7 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
 
     async def test_disallowed_tools_blocks_aliases(self):
         from core.role_registry import AgentRole
+
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
         role_def = AgentRole("locked", "Locked", disallowed_tools=["shell"])
@@ -851,7 +929,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         fake_mgr.ensure_tools_ready_async = unittest.mock.AsyncMock(return_value=None)
         with unittest.mock.patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
             with unittest.mock.patch("core.mcp_manager.get_mcp_manager", return_value=fake_mgr):
-                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
                     mock_create.side_effect = Exception("Stop stream")
                     try:
                         async for _ in agent.stream_steps("hi"):
@@ -864,7 +944,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         fake_mgr.ensure_tools_ready_async = unittest.mock.AsyncMock(side_effect=RuntimeError("mcp down"))
         with unittest.mock.patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
             with unittest.mock.patch("core.mcp_manager.get_mcp_manager", return_value=fake_mgr):
-                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
                     mock_create.side_effect = Exception("Stop stream")
                     try:
                         async for _ in agent.stream_steps("hi"):
@@ -894,11 +976,17 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             return 0
 
         with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
-            with unittest.mock.patch("core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock) as mock_limit:
+            with unittest.mock.patch(
+                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            ) as mock_limit:
                 mock_limit.return_value = 100  # threshold = 75
-                with unittest.mock.patch.object(agent, "compact_history", new_callable=unittest.mock.AsyncMock) as mock_comp:
+                with unittest.mock.patch.object(
+                    agent, "compact_history", new_callable=unittest.mock.AsyncMock
+                ) as mock_comp:
                     mock_comp.side_effect = Exception("ctx overflow")
-                    with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+                    with unittest.mock.patch.object(
+                        agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                    ) as mock_create:
                         mock_create.side_effect = Exception("Stop stream")
                         events = []
                         try:
@@ -922,11 +1010,17 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         logged = []
         with unittest.mock.patch("tools.read.process_image_file_sync", side_effect=fake_process):
-            with unittest.mock.patch("core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)):
-                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            with unittest.mock.patch(
+                "core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)
+            ):
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
                     mock_create.return_value = _MockStream([_text_chunk("ok")])
                     events = []
-                    async for evt in agent.stream_steps("Look", attachments=[_Attachment("a.png"), _Attachment("bad.png")]):
+                    async for evt in agent.stream_steps(
+                        "Look", attachments=[_Attachment("a.png"), _Attachment("bad.png")]
+                    ):
                         events.append(evt)
 
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
@@ -969,12 +1063,17 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             [
                 ("adapter_tool_call", {"id": "c1", "name": "read", "arguments": '{"path": "a.txt"}'}),
                 ("adapter_tool_call", {"name": "shell", "arguments": "{}"}),
-                ("adapter_usage", {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cache_read_tokens": 0}),
+                (
+                    "adapter_usage",
+                    {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cache_read_tokens": 0},
+                ),
             ],
             [("adapter_text", "final answer")],
         ]
         with unittest.mock.patch("core.adapters.get_adapter", return_value=_FakeAdapter(streams)):
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="tool ok"):
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="tool ok"
+            ):
                 events = []
                 async for evt in agent.stream_steps("run tools"):
                     events.append(evt)
@@ -991,7 +1090,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_extra_body_passed_to_create(self):
         agent = self._make_agent(extra_body={"temperature": 0.2})
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = _MockStream([_text_chunk("hi")])
             events = []
             async for evt in agent.stream_steps("hello"):
@@ -1003,7 +1104,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_create_retry_without_stream_options_and_reasoning_effort(self):
         agent = self._make_agent(reasoning_effort="high")
         response = _MockStream([_text_chunk("ok")])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [TypeError("got an unexpected keyword argument 'reasoning_effort'"), response]
             events = []
             async for evt in agent.stream_steps("hi"):
@@ -1019,7 +1122,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_chunk_timeout_raises_runtime_error(self):
         agent = self._make_agent(chunk_timeout=0.05, max_retries=1)
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = _BlockingStream([])
             events = []
             async for evt in agent.stream_steps("hi"):
@@ -1037,7 +1142,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             {"data": {"choices": [dict_choice]}},
             _Chunk(choices=None, data=unittest.mock.MagicMock(choices=[obj_choice])),
         ]
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = _MockStream(chunks)
             events = []
             async for evt in agent.stream_steps("hi"):
@@ -1053,7 +1160,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             _Chunk(choices=[unittest.mock.MagicMock(delta=_delta(reasoning_content="thinking hard"))]),
             _text_chunk("answer"),
         ]
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = _MockStream(chunks)
             events = []
             async for evt in agent.stream_steps("hi"):
@@ -1072,7 +1181,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         pricing = {"prompt": 0.01, "completion": 0.03}
         chunks = [_usage_chunk(100, 20, 120, cached=80), _text_chunk("hi")]
         with unittest.mock.patch.object(catalog, "get_model_pricing", return_value=pricing):
-            with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            with unittest.mock.patch.object(
+                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
                 mock_create.return_value = _BlockingStream(chunks)
                 gen = agent.stream_steps("hi")
                 await gen.__anext__()
@@ -1092,8 +1203,13 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         img_json = json.dumps({"base64": "QUFB", "media_type": "image/png"})
         with unittest.mock.patch("tools.read.process_image_file_sync", return_value=img_json):
-            with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
-                mock_create.side_effect = [Exception("No endpoints found that support image input"), _MockStream([_text_chunk("ok")])]
+            with unittest.mock.patch.object(
+                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
+                mock_create.side_effect = [
+                    Exception("No endpoints found that support image input"),
+                    _MockStream([_text_chunk("ok")]),
+                ]
                 events = []
                 async for evt in agent.stream_steps("Look", attachments=[_Attachment("a.png")]):
                     events.append(evt)
@@ -1108,7 +1224,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         timeout_err = RuntimeError("Stream chunk timeout: No response received from provider 'tprov' for 30.0s.")
         first = _MockStream([_text_chunk("partial")], exc=timeout_err)
         second = _MockStream([_text_chunk("done")])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [first, second]
             events = []
             async for evt in agent.stream_steps("test"):
@@ -1122,7 +1240,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_thinking_end_at_stream_end(self):
         agent = self._make_agent()
         chunk = _Chunk(choices=[unittest.mock.MagicMock(delta=_delta(reasoning_content="deep thought"))])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = _MockStream([chunk])
             events = []
             async for evt in agent.stream_steps("hi"):
@@ -1137,9 +1257,13 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         first = _MockStream([_tool_call_chunk(0, "tc_1", "read", "not-json{")])
         second = _MockStream([_text_chunk("ok")])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [first, second]
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
+            ) as mock_exec:
                 events = []
                 async for evt in agent.stream_steps("read it"):
                     events.append(evt)
@@ -1155,10 +1279,14 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         first = _MockStream([_tool_call_chunk(0, "tc_1", "shell", '{"command": "pwd"}')])
         second = _MockStream([_text_chunk("ok")])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [first, second]
             with unittest.mock.patch.object(agent, "_tool_policy_error", return_value="blocked by policy"):
-                with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock) as mock_exec:
+                with unittest.mock.patch(
+                    "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
+                ) as mock_exec:
                     events = []
                     async for evt in agent.stream_steps("run shell"):
                         events.append(evt)
@@ -1171,9 +1299,13 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         first = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
         second = _MockStream([_text_chunk("ok")])
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [first, second]
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
+            ) as mock_exec:
                 mock_exec.side_effect = Exception("boom")
                 events = []
                 async for evt in agent.stream_steps("read it"):
@@ -1195,9 +1327,13 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             _tool_call_chunk(1, "tc_1", "read", '{"path": "2.png"}'),
             _tool_call_chunk(2, "tc_2", "read", '{"path": "3.png"}'),
         ]
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [_MockStream(chunks), _MockStream([_text_chunk("ok")])]
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
+            ) as mock_exec:
                 mock_exec.side_effect = results
                 events = []
                 async for evt in agent.stream_steps("show images"):
@@ -1214,9 +1350,13 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             _tool_call_chunk(1, "tc_1", "read", '{"path": "2.txt"}'),
             _tool_call_chunk(2, "tc_2", "read", '{"path": "3.txt"}'),
         ]
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.side_effect = [_MockStream(chunks), _MockStream([_text_chunk("ok")])]
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with unittest.mock.patch(
+                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
+            ) as mock_exec:
                 mock_exec.side_effect = [{"type": "image", "path": "y.png"}, {"a": 1}, None]
                 events = []
                 async for evt in agent.stream_steps("do stuff"):
@@ -1237,9 +1377,15 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         first = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
         second = _MockStream([_text_chunk("ok")])
         with unittest.mock.patch.object(agent, "_compact_messages_if_needed", side_effect=fake_compact):
-            with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+            with unittest.mock.patch.object(
+                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
                 mock_create.side_effect = [first, second]
-                with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="tool ok"):
+                with unittest.mock.patch(
+                    "core.base_provider.agent.execute_tool",
+                    new_callable=unittest.mock.AsyncMock,
+                    return_value="tool ok",
+                ):
                     events = []
                     async for evt in agent.stream_steps("run tool"):
                         events.append(evt)
@@ -1254,7 +1400,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
     async def test_drain_keeps_foreign_session_and_consumes_own(self):
         """Foreign-session messages must not cause an infinite loop and must stay queued."""
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         self.addAsyncCleanup(agent.close)
 
         app = unittest.mock.MagicMock()
@@ -1283,7 +1431,9 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         mock_response = unittest.mock.MagicMock()
         mock_response.__aiter__ = mock_aiter
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = mock_response
             steps = []
             async for step in agent.stream_steps("Hi"):
@@ -1297,7 +1447,9 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
 
     async def test_drain_only_foreign_does_not_loop(self):
         """A queue containing only foreign-session messages must terminate."""
-        agent = BaseAgent(api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov")
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
         self.addAsyncCleanup(agent.close)
 
         app = unittest.mock.MagicMock()
@@ -1325,7 +1477,9 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         mock_response = unittest.mock.MagicMock()
         mock_response.__aiter__ = mock_aiter
 
-        with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
             mock_create.return_value = mock_response
             steps = []
             async for step in agent.stream_steps("Hi"):
@@ -1338,4 +1492,3 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

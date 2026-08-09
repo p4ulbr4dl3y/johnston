@@ -11,7 +11,9 @@ from core.base_provider.errors import ErrorHandlingMixin
 
 class TestFormatApiError(unittest.TestCase):
     def test_opencode_upstream_error(self):
-        err = Exception("Error code: 401 - {'type': 'error', 'error': {'type': 'AuthError', 'message': 'Request blocked by upstream provider.'}}")
+        err = Exception(
+            "Error code: 401 - {'type': 'error', 'error': {'type': 'AuthError', 'message': 'Request blocked by upstream provider.'}}"
+        )
         res = format_api_error(err)
         self.assertEqual(res, "**API Error (401 AuthError):** `Request blocked by upstream provider.`")
 
@@ -22,7 +24,7 @@ class TestFormatApiError(unittest.TestCase):
                 "error": {
                     "message": "Incorrect API key provided",
                     "type": "invalid_request_error",
-                    "code": "invalid_api_key"
+                    "code": "invalid_api_key",
                 }
             }
 
@@ -32,13 +34,7 @@ class TestFormatApiError(unittest.TestCase):
     def test_anthropic_error(self):
         class MockAnthropicError(Exception):
             status_code = 403
-            body = {
-                "type": "error",
-                "error": {
-                    "type": "authentication_error",
-                    "message": "invalid x-api-key"
-                }
-            }
+            body = {"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}}
 
         res = format_api_error(MockAnthropicError())
         self.assertEqual(res, "**API Error (403 authentication_error):** `invalid x-api-key`")
@@ -46,13 +42,7 @@ class TestFormatApiError(unittest.TestCase):
     def test_gemini_error(self):
         class MockGeminiError(Exception):
             status_code = 400
-            body = {
-                "error": {
-                    "code": 400,
-                    "message": "API key not valid",
-                    "status": "INVALID_ARGUMENT"
-                }
-            }
+            body = {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT"}}
 
         res = format_api_error(MockGeminiError())
         self.assertEqual(res, "**API Error (400):** `API key not valid`")

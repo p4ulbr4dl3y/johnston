@@ -24,11 +24,11 @@ class ManageSubagentTool(BaseTool):
                     "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
                     "task_id": {"type": "string", "description": "Target task session_id or description"},
                     "message": {"type": "string", "description": "Follow-up message for subagent"},
-                    "background": {"type": "boolean", "description": "Run follow-up message asynchronously"}
+                    "background": {"type": "boolean", "description": "Run follow-up message asynchronously"},
                 },
-                "required": ["action"]
-            }
-        }
+                "required": ["action"],
+            },
+        },
     }
 
     def _get_store(self, app: Any) -> SessionStore:
@@ -48,6 +48,7 @@ class ManageSubagentTool(BaseTool):
 
         if action == "list":
             from core.role_registry import RoleRegistry
+
             registry = RoleRegistry.get_instance()
             registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
             defs = registry.list_subagent_roles()
@@ -60,7 +61,9 @@ class ManageSubagentTool(BaseTool):
             if show_all:
                 target_sessions = store.list(kind="subagent")
             else:
-                target_sessions = store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
+                target_sessions = (
+                    store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
+                )
             if target_sessions:
                 lines.append("\nActive/Past Subagent Sessions:")
                 for sess in target_sessions:
@@ -98,7 +101,9 @@ class ManageSubagentTool(BaseTool):
                     elif etype == "status_change":
                         lines.append(f"  [Status]: {evt.get('status')}")
 
-                lines.append("\nNote: Subagent is still running. STOP calling manage_subagent(status) in a loop and end your turn now.")
+                lines.append(
+                    "\nNote: Subagent is still running. STOP calling manage_subagent(status) in a loop and end your turn now."
+                )
             return "\n".join(lines)
 
         elif action == "kill":
@@ -132,6 +137,7 @@ class ManageSubagentTool(BaseTool):
                     # Restore role behavior (system prompt, model, tool filtering)
                     # so follow-ups match the original spawn, even after restart.
                     from core.subagent_stream import apply_subagent_role
+
                     apply_subagent_role(
                         subagent,
                         session.role,
@@ -147,6 +153,7 @@ class ManageSubagentTool(BaseTool):
                 branch_name = session.branch_name
                 if not os.path.isdir(project_dir):
                     from core.subagent_worktree import SubagentWorktreeManager
+
                     parent_dir = ctx.project_dir
                     reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
                     if reattached:
@@ -175,10 +182,19 @@ class ManageSubagentTool(BaseTool):
                     ctx.project_dir, wt_path, wt_branch, acc, is_followup=True
                 )
 
-            run_bg = bool(args["background"]) if "background" in args else session.background if hasattr(session, "background") else True
+            run_bg = (
+                bool(args["background"])
+                if "background" in args
+                else session.background
+                if hasattr(session, "background")
+                else True
+            )
             if run_bg:
                 from tools.base import format_background_notification
-                notification_hdr = format_background_notification("Subagent follow-up", session.description, session.id, "{result_text}")
+
+                notification_hdr = format_background_notification(
+                    "Subagent follow-up", session.description, session.id, "{result_text}"
+                )
                 bg_task = asyncio.create_task(
                     run_subagent_stream_bg(
                         subagent,

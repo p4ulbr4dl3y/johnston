@@ -18,15 +18,17 @@ class TestProviderManagerJson(unittest.TestCase):
                     "key": "custom_json",
                     "name": "Custom JSON LLM",
                     "base_url": "http://localhost:8080/v1",
-                    "model": "my-custom-model"
+                    "model": "my-custom-model",
                 }
             }
             with open(json_file, "w", encoding="utf-8") as f:
                 json.dump(sample_data, f)
 
-            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), \
-                 patch("core.provider_manager.CONFIG_FILE", config_file), \
-                  patch("core.provider_manager.CONFIG_DIR", tmpdir):
+            with (
+                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.provider_manager.CONFIG_FILE", config_file),
+                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+            ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
 
@@ -41,6 +43,7 @@ class TestProviderManagerJson(unittest.TestCase):
 
     def test_fetch_models_universal_static_list(self):
         import asyncio
+
         async def _test():
             with tempfile.TemporaryDirectory() as tmpdir:
                 json_file = os.path.join(tmpdir, "providers.json")
@@ -53,15 +56,17 @@ class TestProviderManagerJson(unittest.TestCase):
                         "base_url": "http://invalid-host-no-models-endpoint:9999/v1",
                         "model": "model-1",
                         "fetch_models": False,
-                        "models": ["model-1", "model-2", "model-3"]
+                        "models": ["model-1", "model-2", "model-3"],
                     }
                 }
                 with open(json_file, "w", encoding="utf-8") as f:
                     json.dump(sample_data, f)
 
-                with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), \
-                     patch("core.provider_manager.CONFIG_FILE", config_file), \
-                          patch("core.provider_manager.CONFIG_DIR", tmpdir):
+                with (
+                    patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                    patch("core.provider_manager.CONFIG_FILE", config_file),
+                    patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                ):
                     pm = ProviderManager()
                     models = await pm.fetch_models_for_provider("no_models_endpoint", force_refresh=True)
                     self.assertEqual(models, ["model-1", "model-2", "model-3"])
@@ -77,9 +82,11 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
             with open(json_file, "w", encoding="utf-8") as f:
                 f.write("{not json")
 
-            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), patch(
-                "core.provider_manager.CONFIG_FILE", config_file
-            ), patch("core.provider_manager.CONFIG_DIR", tmpdir):
+            with (
+                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.provider_manager.CONFIG_FILE", config_file),
+                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+            ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
 
@@ -104,9 +111,11 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                     f,
                 )
 
-            with patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file), patch(
-                "core.provider_manager.CONFIG_FILE", config_file
-            ), patch("core.provider_manager.CONFIG_DIR", tmpdir):
+            with (
+                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.provider_manager.CONFIG_FILE", config_file),
+                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+            ):
                 pm = ProviderManager()
                 pm.set_provider_model("custom_json", "saved-model")
                 pm.set_active_provider_key("custom_json")

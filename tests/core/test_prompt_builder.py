@@ -76,7 +76,7 @@ class TestPromptBuilder(unittest.TestCase):
         pb_exp = PromptBuilder(
             "System prompt test",
             [{"function": {"name": "read"}}, {"function": {"name": "create"}}, {"function": {"name": "edit"}}],
-            mode="explore"
+            mode="explore",
         )
         prompt_exp = pb_exp.build_system_prompt()
         tools_exp = pb_exp.build_tools()
@@ -117,6 +117,7 @@ class TestPromptBuilder(unittest.TestCase):
         from unittest.mock import patch
 
         import core.prompt_builder as pb
+
         pb._SYSTEM_PROMPT_CACHE.clear()
         builder = PromptBuilder("Cache stability marker", [], mode="act")
         first = builder.build_system_prompt()
@@ -130,14 +131,18 @@ class TestPromptBuilder(unittest.TestCase):
 
     def test_build_system_prompt_cache_invalidates_on_mode_change(self):
         import core.prompt_builder as pb
+
         pb._SYSTEM_PROMPT_CACHE.clear()
         action_prompt = PromptBuilder("Mode invalidate marker", [], mode="act").build_system_prompt()
         explore_prompt = PromptBuilder("Mode invalidate marker", [], mode="explore").build_system_prompt()
         # Different mode -> different cache key -> rebuilt with the explore block
         self.assertIn("## Execution Mode: ACT", action_prompt)
         self.assertIn("## Execution Mode: EXPLORE", explore_prompt)
+
     def test_build_system_prompt_substitutes_model_name(self):
-        builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], mode="act", model_name="Gemini 3.6 Flash")
+        builder = PromptBuilder(
+            "You are {model_name} operating inside Johnston CLI", [], mode="act", model_name="Gemini 3.6 Flash"
+        )
         prompt = builder.build_system_prompt()
         self.assertIn("You are Gemini 3.6 Flash operating inside Johnston CLI", prompt)
 

@@ -8,11 +8,32 @@ from rich.text import Text
 from widgets.chat_markdown import TOKEN_COLORS
 
 EXTENSION_MAPPING = {
-    "py": "python", "js": "javascript", "jsx": "jsx", "ts": "typescript", "tsx": "tsx",
-    "html": "html", "css": "css", "scss": "scss", "json": "json", "yaml": "yaml",
-    "yml": "yaml", "md": "markdown", "sh": "bash", "bash": "bash", "zsh": "bash",
-    "rs": "rust", "go": "go", "c": "c", "cpp": "cpp", "h": "c", "hpp": "cpp",
-    "sql": "sql", "toml": "toml", "ini": "ini", "dockerfile": "dockerfile", "xml": "xml"
+    "py": "python",
+    "js": "javascript",
+    "jsx": "jsx",
+    "ts": "typescript",
+    "tsx": "tsx",
+    "html": "html",
+    "css": "css",
+    "scss": "scss",
+    "json": "json",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "md": "markdown",
+    "sh": "bash",
+    "bash": "bash",
+    "zsh": "bash",
+    "rs": "rust",
+    "go": "go",
+    "c": "c",
+    "cpp": "cpp",
+    "h": "c",
+    "hpp": "cpp",
+    "sql": "sql",
+    "toml": "toml",
+    "ini": "ini",
+    "dockerfile": "dockerfile",
+    "xml": "xml",
 }
 
 
@@ -56,7 +77,7 @@ def lex_block_to_line_texts(
 
         while len(line_texts) < len(code_lines):
             line_texts.append(Text())
-        return line_texts[:len(code_lines)]
+        return line_texts[: len(code_lines)]
     except Exception:
         return [Text(line) for line in code_lines]
 
@@ -74,13 +95,15 @@ def generate_chunk_unified_diff(
     if not old_content and not new_content:
         return []
 
-    d_lines = list(difflib.unified_diff(
-        old_content.splitlines(),
-        new_content.splitlines(),
-        fromfile=file_path or "file",
-        tofile=file_path or "file",
-        lineterm="",
-    ))
+    d_lines = list(
+        difflib.unified_diff(
+            old_content.splitlines(),
+            new_content.splitlines(),
+            fromfile=file_path or "file",
+            tofile=file_path or "file",
+            lineterm="",
+        )
+    )
     if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
         h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
         if h_m:
@@ -95,6 +118,7 @@ def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "
     if not isinstance(args, dict):
         return ""
     from tools.registry import normalize_tool_args
+
     norm = normalize_tool_args(tool_name, args)
 
     chunks = norm.get("edits")
@@ -115,4 +139,3 @@ def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "
             diff_parts.extend(generate_chunk_unified_diff(old_s, new_s, file_path, start_l))
 
     return "\n".join(diff_parts) if diff_parts else ""
-

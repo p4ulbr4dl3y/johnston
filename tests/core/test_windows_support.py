@@ -31,8 +31,9 @@ class TestPlatformUtils(unittest.TestCase):
             self.assertTrue(is_windows())
 
     def test_windows_config_dir_uses_appdata(self):
-        with patch("core.platform_utils.is_windows", return_value=True), patch.dict(
-            os.environ, {"APPDATA": r"C:\Users\me\AppData\Roaming"}
+        with (
+            patch("core.platform_utils.is_windows", return_value=True),
+            patch.dict(os.environ, {"APPDATA": r"C:\Users\me\AppData\Roaming"}),
         ):
             self.assertEqual(johnston_config_dir(), Path(r"C:\Users\me\AppData\Roaming") / "johnston")
 
@@ -143,8 +144,9 @@ class TestClipboardRetrieval(unittest.TestCase):
             self.assertEqual(img, mock_img)
 
     def test_get_clipboard_file_from_pil(self):
-        with patch("PIL.ImageGrab.grabclipboard", return_value=["/tmp/test.png"]), patch(
-            "os.path.exists", return_value=True
+        with (
+            patch("PIL.ImageGrab.grabclipboard", return_value=["/tmp/test.png"]),
+            patch("os.path.exists", return_value=True),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertEqual(file_path, "/tmp/test.png")
@@ -170,8 +172,9 @@ class TestClipboardRetrieval(unittest.TestCase):
             self.assertIsNone(img)
 
     def test_get_clipboard_empty_returns_none(self):
-        with patch("PIL.ImageGrab.grabclipboard", return_value=None), patch(
-            "core.platform_utils.is_windows", return_value=True
+        with (
+            patch("PIL.ImageGrab.grabclipboard", return_value=None),
+            patch("core.platform_utils.is_windows", return_value=True),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)

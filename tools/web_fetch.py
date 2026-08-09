@@ -23,6 +23,7 @@ def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> 
 
     try:
         from tools.read import convert_doc_to_markdown_sync
+
         return convert_doc_to_markdown_sync(tmp_path)
     finally:
         if os.path.exists(tmp_path):
@@ -44,11 +45,11 @@ class WebFetchTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "HTTP or HTTPS URL to fetch"},
-                    "raw": {"type": "boolean", "description": "Skip Markdown conversion, return raw response"}
+                    "raw": {"type": "boolean", "description": "Skip Markdown conversion, return raw response"},
                 },
-                "required": ["url"]
-            }
-        }
+                "required": ["url"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
@@ -77,7 +78,9 @@ class WebFetchTool(BaseTool):
                     if cl:
                         try:
                             if int(cl) > MAX_RESPONSE_SIZE:
-                                return format_tool_error("file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB", name=url)
+                                return format_tool_error(
+                                    "file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024 * 1024)}MB", name=url
+                                )
                         except ValueError:
                             pass
                     # Stream the body with a hard cap so an oversized or chunked
@@ -87,7 +90,9 @@ class WebFetchTool(BaseTool):
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > MAX_RESPONSE_SIZE:
-                            return format_tool_error("file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB", name=url)
+                            return format_tool_error(
+                                "file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024 * 1024)}MB", name=url
+                            )
                         chunks.append(chunk)
                     content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
@@ -102,9 +107,14 @@ class WebFetchTool(BaseTool):
         else:
             if "application/pdf" in content_type or url.lower().endswith(".pdf"):
                 suffix = ".pdf"
-            elif "application/vnd.openxmlformats-officedocument.wordprocessingml" in content_type or url.lower().endswith(".docx"):
+            elif (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml" in content_type
+                or url.lower().endswith(".docx")
+            ):
                 suffix = ".docx"
-            elif "application/vnd.openxmlformats-officedocument.spreadsheetml" in content_type or url.lower().endswith(".xlsx"):
+            elif "application/vnd.openxmlformats-officedocument.spreadsheetml" in content_type or url.lower().endswith(
+                ".xlsx"
+            ):
                 suffix = ".xlsx"
             else:
                 suffix = ".html"
@@ -122,4 +132,3 @@ class WebFetchTool(BaseTool):
             max_chars=8000,
             tool_name="web_fetch",
         )
-

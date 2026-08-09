@@ -23,9 +23,7 @@ class GeminiAdapter(BaseApiAdapter):
     streaming functionCall parts, and reports usageMetadata.
     """
 
-    def _content_to_parts(
-        self, content: Any, msg: Dict[str, Any], role: str
-    ) -> List[Dict[str, Any]]:
+    def _content_to_parts(self, content: Any, msg: Dict[str, Any], role: str) -> List[Dict[str, Any]]:
         parts: List[Dict[str, Any]] = []
         if isinstance(content, str):
             if content:
@@ -49,9 +47,7 @@ class GeminiAdapter(BaseApiAdapter):
                 parts.append({"functionCall": {"name": fn_name, "args": args_obj}})
         return parts or [{"text": ""}]
 
-    def _to_gemini(
-        self, messages: List[Dict[str, Any]]
-    ) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _to_gemini(self, messages: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
         system_instruction: Optional[Dict[str, Any]] = None
         contents: List[Dict[str, Any]] = []
         pending_tools: List[Dict[str, Any]] = []
@@ -130,11 +126,13 @@ class GeminiAdapter(BaseApiAdapter):
             function_declarations = []
             for t in tools:
                 fn = t.get("function", {}) if isinstance(t.get("function"), dict) else {}
-                function_declarations.append({
-                    "name": fn.get("name"),
-                    "description": fn.get("description", ""),
-                    "parameters": fn.get("parameters", {}),
-                })
+                function_declarations.append(
+                    {
+                        "name": fn.get("name"),
+                        "description": fn.get("description", ""),
+                        "parameters": fn.get("parameters", {}),
+                    }
+                )
             payload["tools"] = [{"functionDeclarations": function_declarations}]
 
         async with httpx.AsyncClient() as client:
@@ -160,11 +158,14 @@ class GeminiAdapter(BaseApiAdapter):
                                 yield ("adapter_text", p["text"])
                             elif "functionCall" in p:
                                 fc = p.get("functionCall") or {}
-                                yield ("adapter_tool_call", {
-                                    "id": f"call_{uuid.uuid4().hex[:8]}",
-                                    "name": fc.get("name", ""),
-                                    "arguments": normalize_tool_arguments_str(fc.get("args")),
-                                })
+                                yield (
+                                    "adapter_tool_call",
+                                    {
+                                        "id": f"call_{uuid.uuid4().hex[:8]}",
+                                        "name": fc.get("name", ""),
+                                        "arguments": normalize_tool_arguments_str(fc.get("args")),
+                                    },
+                                )
 
                     um = evt.get("usageMetadata")
                     if um:
