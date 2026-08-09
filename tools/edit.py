@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, atomic_write_text, resolve_path
+from tools.base import BaseTool, make_unified_diff, resolve_path, try_int, write_file_text
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -117,19 +117,9 @@ def apply_chunk_replacements(
         if replacement is None:
             raise ValueError(f"ERR: chunk {idx} missing 'replacement_content' or 'new_string'")
 
-        s_line = c.get("start_line")
-        e_line = c.get("end_line")
+        s_line_int = try_int(c.get("start_line"))
+        e_line_int = try_int(c.get("end_line"))
         allow_mult = bool(c.get("allow_multiple", False))
-
-        try:
-            s_line_int = int(s_line) if s_line is not None else None
-        except (ValueError, TypeError):
-            s_line_int = None
-
-        try:
-            e_line_int = int(e_line) if e_line is not None else None
-        except (ValueError, TypeError):
-            e_line_int = None
 
         parsed_chunks.append({
             "idx": idx,
@@ -254,14 +244,7 @@ def apply_chunk_replacements(
             lines = new_text.splitlines(keepends=True)
 
     new_content = "".join(lines)
-    diff_lines = list(difflib.unified_diff(
-        content.splitlines(),
-        new_content.splitlines(),
-        fromfile=path + " (old)",
-        tofile=path + " (new)",
-        lineterm=""
-    ))
-    diff_output = "\n".join(diff_lines)
+    diff_output = make_unified_diff(content, new_content, fromfile=path + " (old)", tofile=path + " (new)")
     return new_content, diff_output
 
 
@@ -276,8 +259,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
         new_content, diff = apply_chunk_replacements(content, raw_chunks, path)
-        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        atomic_write_text(path, new_content)
+        write_file_text(path, new_content)
         return diff
 
     try:

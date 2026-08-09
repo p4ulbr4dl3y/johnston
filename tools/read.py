@@ -5,7 +5,7 @@ import subprocess
 import time
 from typing import Any, Dict, Tuple
 
-from tools.base import BaseTool, resolve_path
+from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"
@@ -187,10 +187,9 @@ class ReadTool(BaseTool):
             parent_dir = os.path.dirname(path) or "."
             hint = ""
             if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
-                import difflib
                 filename = os.path.basename(path)
                 entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
-                matches = difflib.get_close_matches(filename, entries, n=3, cutoff=0.4)
+                matches = get_fuzzy_matches(filename, entries, n=3, cutoff=0.4)
                 if matches:
                     hint = f" [Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
                 elif entries:
@@ -254,10 +253,7 @@ class ReadTool(BaseTool):
             try:
                 content_offset = args.get("content_offset")
                 if content_offset is not None:
-                    try:
-                        content_offset = max(0, int(content_offset))
-                    except (ValueError, TypeError):
-                        content_offset = 0
+                    content_offset = max(0, try_int(content_offset, 0))
 
                 def _read_file_lines(file_path: str, offset: int | None):
                     with open(file_path, "rb") as f:

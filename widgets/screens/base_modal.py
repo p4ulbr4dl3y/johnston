@@ -24,5 +24,8 @@ class BaseModalScreen(ModalScreen[T]):
     def action_quit_app(self) -> None:
         self.app.exit()
 
+    def action_quit(self) -> None:
+        self.app.exit()
+
     def action_cancel(self) -> None:
         self.dismiss(None)

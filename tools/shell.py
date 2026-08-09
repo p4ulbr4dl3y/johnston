@@ -12,7 +12,7 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool, tail_output, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
 _TASK_ID_COUNTER = itertools.count(1)
@@ -203,11 +203,7 @@ class ShellTool(BaseTool):
 
                 raw_out = task.get_formatted_output()
                 if raw_out.strip():
-                    if len(raw_out) > 2000:
-                        out_tail = "... [Output truncated, showing last 2000 chars]\n" + raw_out[-2000:]
-                    else:
-                        out_tail = raw_out
-                    recent_output_str = f"\n\nRecent Output:\n{out_tail}"
+                    recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
                 else:
                     recent_output_str = "\n\nRecent Output: (No output yet)"
                 return (
@@ -232,11 +228,7 @@ class ShellTool(BaseTool):
 
             raw_out = task.get_formatted_output()
             if raw_out.strip():
-                if len(raw_out) > 2000:
-                    out_tail = "... [Output truncated, showing last 2000 chars]\n" + raw_out[-2000:]
-                else:
-                    out_tail = raw_out
-                recent_output_str = f"\n\nRecent Output:\n{out_tail}"
+                recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
             else:
                 recent_output_str = "\n\nRecent Output: (No output yet)"
             return (

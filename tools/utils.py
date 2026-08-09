@@ -1,4 +1,6 @@
 
+from tools.base import try_int
+
 DEFAULT_LINE_WINDOW = 800
 
 
@@ -20,27 +22,21 @@ def format_line_pagination(
         return f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
 
     if start_line is not None:
-        try:
-            start_line_int = int(start_line)
-            if start_line_int > total_lines:
-                path_str = f" in '{path}'" if path else ""
-                if total_lines == 1:
-                    hint_str = "File has only 1 total line (e.g. minified JSON/log). Re-run read tool with start_line=1 and content_offset, or use shell tools (jq/grep)."
-                else:
-                    hint_str = f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
-                return (
-                    f"ERR: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
-                    f"[Hint: {hint_str}]"
-                )
-            start_line = start_line_int
-        except (ValueError, TypeError):
-            start_line = None
+        start_line_int = try_int(start_line)
+        if start_line_int is not None and start_line_int > total_lines:
+            path_str = f" in '{path}'" if path else ""
+            if total_lines == 1:
+                hint_str = "File has only 1 total line (e.g. minified JSON/log). Re-run read tool with start_line=1 and content_offset, or use shell tools (jq/grep)."
+            else:
+                hint_str = f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
+            return (
+                f"ERR: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
+                f"[Hint: {hint_str}]"
+            )
+        start_line = start_line_int
 
     if end_line is not None:
-        try:
-            end_line = int(end_line)
-        except (ValueError, TypeError):
-            end_line = None
+        end_line = try_int(end_line)
 
     start = 1
     if start_line is not None:
