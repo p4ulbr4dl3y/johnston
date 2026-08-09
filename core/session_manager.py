@@ -1,11 +1,11 @@
 import hashlib
-import json
 import os
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR, PROJECTS_DIR  # noqa: F401
+from core.platform_utils import read_json, write_json
 
 
 class SessionManager:
@@ -46,21 +46,22 @@ class SessionManager:
             if filename.endswith(".json"):
                 filepath = os.path.join(self.sessions_dir, filename)
                 try:
-                    with open(filepath, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        ui_msgs = data.get("ui_messages") or data.get("messages") or []
-                        agent_history = data.get("agent_history") or []
+                    data = read_json(filepath)
+                    if not data or not isinstance(data, dict):
+                        continue
+                    ui_msgs = data.get("ui_messages") or data.get("messages") or []
+                    agent_history = data.get("agent_history") or []
 
-                        if not ui_msgs and not agent_history:
-                            continue
+                    if not ui_msgs and not agent_history:
+                        continue
 
-                        sessions.append({
-                            "id": data.get("id", filename[:-5]),
-                            "title": data.get("title", "Untitled"),
-                            "created_at": data.get("created_at", 0),
-                            "updated_at": data.get("updated_at", 0),
-                            "message_count": len(ui_msgs) if ui_msgs else len(agent_history)
-                        })
+                    sessions.append({
+                        "id": data.get("id", filename[:-5]),
+                        "title": data.get("title", "Untitled"),
+                        "created_at": data.get("created_at", 0),
+                        "updated_at": data.get("updated_at", 0),
+                        "message_count": len(ui_msgs) if ui_msgs else len(agent_history)
+                    })
                 except Exception as e:
                     print(f"Error reading session {filename}: {e}")
 
@@ -71,13 +72,7 @@ class SessionManager:
         if not session_id:
             return None
         filepath = os.path.join(self.sessions_dir, f"{session_id}.json")
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"Error loading session {session_id}: {e}")
-        return None
+        return read_json(filepath, default=None)
 
     def save_session(self, session_id: str, data: Dict[str, Any]):
         """Saves session ONLY if it contains at least one message"""
@@ -98,32 +93,10 @@ class SessionManager:
         if "created_at" not in data:
             data["created_at"] = time.time()
 
-        temp_filepath = f"{filepath}.tmp.{uuid.uuid4().hex[:6]}"
-        try:
-            with open(temp_filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(temp_filepath, filepath)
-        except Exception:
-            if os.path.exists(temp_filepath):
-                try:
-                    os.remove(temp_filepath)
-                except Exception:
-                    pass
-            raise
-
+        write_json(filepath, data)
         self.set_active_session_id(session_id)
 
     def set_active_session_id(self, session_id: str):
-        cfg = {}
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-            except Exception:
-                cfg = {}
-
+        cfg = read_json(self.config_file, {})
         cfg["active_session_id"] = session_id
-        with open(self.config_file, "w", encoding="utf-8") as f:
-            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        write_json(self.config_file, cfg)

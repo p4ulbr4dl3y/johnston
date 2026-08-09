@@ -19,6 +19,52 @@ def johnston_config_dir() -> Path:
     return Path.home() / ".johnston"
 
 
+def atomic_write_text(path: str, content: str) -> None:
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    import tempfile
+    fd, tmp_path = tempfile.mkstemp(prefix=".johnston-", suffix=".tmp", dir=directory, text=True)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+        raise
+
+
+def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
+    import json
+    content = json.dumps(data, indent=indent, ensure_ascii=False)
+    atomic_write_text(path, content)
+
+
+def read_json(path: str, default: Any = None) -> Any:
+    """Reads JSON file safely, returning default if missing, empty, or invalid."""
+    if not path or not os.path.exists(path):
+        return default
+    try:
+        import json
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return default
+            return json.loads(content)
+    except Exception:
+        return default
+
+
+def write_json(path: str, data: Any, indent: int = 2) -> None:
+    """Atomically writes data to JSON file."""
+    atomic_write_json(path, data, indent=indent)
+
+
 def shell_executable() -> str | None:
     if is_windows():
         for candidate in ("pwsh", "powershell", "cmd"):

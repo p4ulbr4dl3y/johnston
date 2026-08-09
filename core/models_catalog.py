@@ -13,6 +13,7 @@ from typing import Dict, Iterable, List, Set
 import httpx
 
 from core.config import CONFIG_DIR
+from core.platform_utils import atomic_write_json, read_json
 
 MODELS_DEV_URL = "https://models.dev/api.json"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -53,25 +54,18 @@ class ModelsCatalog:
         self.load_cache()
 
     def load_cache(self) -> bool:
-        loaded = False
-        target_file = CACHE_FILE if os.path.exists(CACHE_FILE) else None
-        if target_file:
-            try:
-                with open(target_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self._limits = data.get("model_limits", {})
-                    self._output_limits = data.get("output_limits", {})
-                    self._reasoning = data.get("reasoning_models", [])
-                    self._open_weights = data.get("open_weights_models", [])
-                    self._names = data.get("model_names", {})
-                    self._descriptions = data.get("model_descriptions", {})
-                    self._pricing = data.get("model_pricing", {})
-                    self._updated_at = float(data.get("updated_at", 0.0))
-                loaded = True
-            except Exception:
-                pass
-
-        return loaded
+        data = read_json(CACHE_FILE)
+        if data and isinstance(data, dict):
+            self._limits = data.get("model_limits", {})
+            self._output_limits = data.get("output_limits", {})
+            self._reasoning = data.get("reasoning_models", [])
+            self._open_weights = data.get("open_weights_models", [])
+            self._names = data.get("model_names", {})
+            self._descriptions = data.get("model_descriptions", {})
+            self._pricing = data.get("model_pricing", {})
+            self._updated_at = float(data.get("updated_at", 0.0))
+            return True
+        return False
 
     def save_cache(
         self,
@@ -79,8 +73,6 @@ class ModelsCatalog:
         model_names: Dict[str, str] = None,
         model_pricing: Dict[str, Dict[str, float]] = None,
     ):
-        os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
-        temp_file = CACHE_FILE + ".tmp"
         try:
             now = time.time()
             self._updated_at = now
@@ -94,16 +86,9 @@ class ModelsCatalog:
                 "model_descriptions": self._descriptions,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
             }
-            with open(temp_file, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2, ensure_ascii=False)
-            os.replace(temp_file, CACHE_FILE)
+            atomic_write_json(CACHE_FILE, payload, indent=2)
         except Exception as e:
             print(f"Error saving models catalog cache: {e}")
-            if os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except Exception:
-                    pass
 
     async def refresh(self, force: bool = False, max_age: float = 86400) -> Dict[str, int]:
         if not force and self._limits and (time.time() - getattr(self, "_updated_at", 0.0) < max_age):

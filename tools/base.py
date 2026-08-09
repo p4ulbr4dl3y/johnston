@@ -1,9 +1,29 @@
 import json
 import os
-import tempfile
 from typing import Any, Dict
 
+from core.platform_utils import (
+    atomic_write_json,
+    atomic_write_text,
+    read_json,
+    write_json,
+)
 from tools.context import ToolContext
+
+__all__ = [
+    "atomic_write_json",
+    "atomic_write_text",
+    "read_json",
+    "write_json",
+    "resolve_path",
+    "write_file_text",
+    "try_int",
+    "tail_output",
+    "make_unified_diff",
+    "get_fuzzy_matches",
+    "truncate_output",
+    "BaseTool",
+]
 
 
 def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
@@ -14,30 +34,6 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
     if os.path.isabs(path_str):
         return os.path.abspath(os.path.expanduser(path_str))
     return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
-
-
-def atomic_write_text(path: str, content: str) -> None:
-    directory = os.path.dirname(path) or "."
-    os.makedirs(directory, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(prefix=".johnston-", suffix=".tmp", dir=directory, text=True)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp_path, path)
-    except Exception:
-        if os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-        raise
-
-
-def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
-    content = json.dumps(data, indent=indent, ensure_ascii=False)
-    atomic_write_text(path, content)
 
 
 def write_file_text(path: str, content: str) -> None:

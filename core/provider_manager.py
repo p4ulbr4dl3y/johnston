@@ -8,6 +8,7 @@ import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.defaults.providers import DEFAULT_JSON_PROVIDERS
+from core.platform_utils import atomic_write_json
 from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 
 
@@ -18,7 +19,7 @@ class ProviderManager:
 
     def invalidate_cache(self):
         self._config_cache = {}
-        self._config_mtime = 0.0
+        self._config_mtime = 0
         self._config_file_path = ""
         self._providers_cache = {}
         self._providers_mtime = 0.0
@@ -41,11 +42,9 @@ class ProviderManager:
             return {}
 
     def _save_config(self, data: Dict[str, Any]) -> None:
-        from tools.base import atomic_write_json
         atomic_write_json(CONFIG_FILE, data, indent=2)
 
     def _save_providers_json(self, data: Dict[str, Any]) -> None:
-        from tools.base import atomic_write_json
         atomic_write_json(PROVIDERS_JSON_FILE, data, indent=2)
 
     def ensure_config_dir(self):
@@ -379,7 +378,6 @@ class ProviderManager:
 
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:
-            from tools.base import atomic_write_json
             atomic_write_json(
                 cache_path,
                 {"updated_at": time.time(), "models": models, "model_limits": model_limits},

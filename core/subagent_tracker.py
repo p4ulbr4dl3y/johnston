@@ -1,8 +1,8 @@
-import json
 import os
 from typing import Any, Callable, Dict, List, Optional
 
-from core.config import SUBAGENT_SESSIONS_DIR, SUBAGENTS_DIR
+from core.config import SUBAGENT_LOGS_DIR, SUBAGENT_SESSIONS_DIR, SUBAGENTS_DIR
+from core.platform_utils import atomic_write_json, read_json
 
 
 class SubagentSessionData:
@@ -122,18 +122,16 @@ class SubagentTracker:
                     if fname.endswith(".json"):
                         fpath = os.path.join(dpath, fname)
                         try:
-                            with open(fpath, "r", encoding="utf-8") as f:
-                                data = json.load(f)
-                            sess = SubagentSessionData.from_dict(data)
-                            if sess.task_id not in self.sessions:
-                                self.sessions[sess.task_id] = sess
+                            data = read_json(fpath)
+                            if data:
+                                sess = SubagentSessionData.from_dict(data)
+                                if sess.task_id not in self.sessions:
+                                    self.sessions[sess.task_id] = sess
                         except Exception:
                             pass
 
     def save_session(self, sess: SubagentSessionData) -> None:
         try:
-            from core.config import SUBAGENT_LOGS_DIR
-            from tools.base import atomic_write_json
             os.makedirs(self.storage_dir, exist_ok=True)
             os.makedirs(SUBAGENT_LOGS_DIR, exist_ok=True)
             fpath = os.path.join(self.storage_dir, f"{sess.task_id}.json")
