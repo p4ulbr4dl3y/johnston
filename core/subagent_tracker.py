@@ -54,8 +54,8 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     elif etype in ("bot_text", "outro"):
         text_accumulator[0] = val1
         session.add_event({"type": "bot", "text": text_accumulator[0], "final": True})
-    elif etype == "compaction_divider":
-        session.add_event({"type": "compaction_divider", "text": val1 or "Session Compacted"})
+    elif etype == "event_divider":
+        session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
 
 
 def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:

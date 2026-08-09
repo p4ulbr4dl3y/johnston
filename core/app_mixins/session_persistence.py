@@ -6,7 +6,7 @@ from typing import Optional
 from widgets.chat_view import (
     BotMessage,
     ChatView,
-    CompactionDivider,
+    EventDivider,
     ThinkingWidget,
     ToolCallWidget,
     UserMessage,
@@ -61,9 +61,9 @@ class SessionPersistenceMixin:
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
                             await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
-                        elif mtype == "compaction_divider":
+                        elif mtype == "event_divider":
                             ctxt = msg.get("text", "Session Compacted")
-                            await chat_view.add_compaction_divider(ctxt, animate=False)
+                            await chat_view.add_event_divider(ctxt, animate=False)
                         elif mtype == "status_change":
                             pass
                         if len(chat_view.children) % 5 == 0:
@@ -142,9 +142,9 @@ class SessionPersistenceMixin:
                     "result_text": getattr(child, "result_text", ""),
                     "args": getattr(child, "args", {})
                 })
-            elif isinstance(child, CompactionDivider):
+            elif isinstance(child, EventDivider):
                 messages.append({
-                    "type": "compaction_divider",
+                    "type": "event_divider",
                     "text": getattr(child, "divider_title", "Session Compacted")
                 })
 

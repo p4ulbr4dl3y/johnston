@@ -18,14 +18,14 @@ from widgets.chat_markdown import (
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.chat_messages import BotMessage, CompactionDivider, ThinkingWidget, UserMessage
+from widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
 from widgets.chat_tools import DiffRenderable, ToolCallWidget, ToolScrollBox, format_edit_diff
 from widgets.chat_welcome import WelcomeWidget
 
 __all__ = [
     "BotMessage",
     "ChatView",
-    "CompactionDivider",
+    "EventDivider",
     "CustomMarkdownFence",
     "CustomMarkdownTable",
     "CustomMarkdownTableContent",

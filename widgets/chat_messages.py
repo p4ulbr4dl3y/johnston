@@ -10,14 +10,14 @@ from textual.widgets import Label, Markdown, Static
 from widgets.chat_markdown import _handle_markdown_task_done, clean_markdown_for_rendering, safe_update_markdown
 
 
-class CompactionDivider(Static):
-    """Full-width centered divider for session compaction or events"""
+class EventDivider(Static):
+    """Full-width centered divider for session events (compaction, interruption, etc)"""
     can_focus = False
     ALLOW_SELECT = False
 
     def __init__(self, title: str = "Session Compacted"):
         self.divider_title = title
-        super().__init__(Rule(title, style="dim #71717a"), classes="compaction-divider")
+        super().__init__(Rule(title, style="dim #71717a"), classes="event-divider")
 
     def update_title(self, title: str) -> None:
         self.divider_title = title

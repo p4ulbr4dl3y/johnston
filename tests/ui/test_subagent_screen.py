@@ -97,7 +97,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         record_subagent_step(("bot_chunk", "Hel", ""), sess, acc)
         record_subagent_step(("bot_delta", "Hello world", ""), sess, acc)
         record_subagent_step(("bot_text", "Final answer", ""), sess, acc)
-        record_subagent_step(("compaction_divider", "Session Compacted", ""), sess, acc)
+        record_subagent_step(("event_divider", "Session Compacted", ""), sess, acc)
 
         msgs = sess.messages
         self.assertEqual(msgs[0], {"type": "thinking", "text": "Final thought", "duration": 1.0})
@@ -106,7 +106,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
             {"type": "tool", "tool_type": "read", "target": "x", "args": {"path": "x"}, "result_text": "contents"},
         )
         self.assertEqual(msgs[2], {"type": "bot", "text": "Final answer", "final": True})
-        self.assertEqual(msgs[3], {"type": "compaction_divider", "text": "Session Compacted"})
+        self.assertEqual(msgs[3], {"type": "event_divider", "text": "Session Compacted"})
         self.assertEqual(acc[0], "Final answer")
 
     def test_record_subagent_step_thinking_info_and_outro(self):

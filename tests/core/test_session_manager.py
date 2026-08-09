@@ -90,7 +90,7 @@ class TestSessionManager(unittest.TestCase):
             {"type": "thinking", "text": "t", "duration": 2.0},
             {"type": "tool", "tool_type": "read", "target": "x", "result_text": "ok"},
             {"type": "bot", "text": "answer", "final": True},
-            {"type": "compaction_divider", "text": "Session Compacted"},
+            {"type": "event_divider", "text": "Session Compacted"},
         ]
         self.assertEqual(normalize_messages(raw), raw)
 

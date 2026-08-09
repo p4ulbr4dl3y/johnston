@@ -10,11 +10,11 @@ from app import JohnstonApp
 from widgets.chat_view import (
     BotMessage,
     ChatView,
-    CompactionDivider,
     CustomMarkdownFence,
     CustomMarkdownTable,
     CustomMarkdownTableContent,
     DiffRenderable,
+    EventDivider,
     ThinkingWidget,
     ToolCallWidget,
     TransparentSyntax,
@@ -397,9 +397,9 @@ class TestCleanMarkdownExtended(unittest.TestCase):
         self.assertIn("plain star", cleaned)
 
 
-class TestCompactionDivider(unittest.TestCase):
-    def test_compaction_divider_init_and_update(self):
-        divider = CompactionDivider("Custom Title")
+class TestEventDivider(unittest.TestCase):
+    def test_event_divider_init_and_update(self):
+        divider = EventDivider("Custom Title")
         self.assertEqual(divider.divider_title, "Custom Title")
         divider.update_title("New Title")
         self.assertEqual(divider.divider_title, "New Title")
@@ -911,10 +911,10 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             chat_view = app.query_one(ChatView)
             thinking = await chat_view.add_thinking_widget("Thinking...", animate=False)
-            divider = await chat_view.add_compaction_divider("Session Compacted", animate=False)
+            divider = await chat_view.add_event_divider("Session Compacted", animate=False)
             await pilot.pause()
             self.assertIsInstance(thinking, ThinkingWidget)
-            self.assertIsInstance(divider, CompactionDivider)
+            self.assertIsInstance(divider, EventDivider)
 
     async def test_add_tool_call_sequential_flag(self):
         app = JohnstonApp()
@@ -1033,12 +1033,12 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             bot = await chat_view.add_bot_message()
             thinking = await chat_view.add_thinking_widget()
             tool = await chat_view.add_tool_call("shell", "cmd")
-            divider = await chat_view.add_compaction_divider()
+            divider = await chat_view.add_event_divider()
         self.assertEqual(wait_mock.await_count, 4)
         self.assertIsInstance(bot, BotMessage)
         self.assertIsInstance(thinking, ThinkingWidget)
         self.assertIsInstance(tool, ToolCallWidget)
-        self.assertIsInstance(divider, CompactionDivider)
+        self.assertIsInstance(divider, EventDivider)
 
     async def test_toggle_expand_default_toggle_all(self):
         app = JohnstonApp()

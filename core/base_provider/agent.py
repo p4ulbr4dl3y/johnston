@@ -217,7 +217,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 success, _ = await self.compact_history()
                 if success:
                     compacted_this_turn = True
-                    yield ("compaction_divider", "Session Compacted", "")
+                    yield ("event_divider", "Session Compacted", "")
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
@@ -560,13 +560,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 )
                 if compacted_in_loop:
                     compacted_this_turn = True
-                    yield ("compaction_divider", "Session Compacted", "")
+                    yield ("event_divider", "Session Compacted", "")
                     yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:
             error_msg = format_api_error(err)
             clean_msg = error_msg.replace("**API Error:**", "API Error:").replace("**", "").replace("`", "").strip()
-            yield ("compaction_divider", clean_msg, "")
+            yield ("event_divider", clean_msg, "")
         finally:
             if len(messages) > 1:
                 self.history = self.sanitize_history_for_model(messages[1:])
