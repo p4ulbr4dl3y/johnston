@@ -1,7 +1,8 @@
 import os
 from typing import Any, Dict, Optional, Tuple
 
-from core.config import CONFIG_FILE, DEFAULT_PERMISSIONS, PROJECT_PERMISSIONS_FILE
+from core.config import CONFIG_FILE, PROJECT_PERMISSIONS_FILE
+from core.defaults.config import DEFAULT_PERMISSIONS
 from core.platform_utils import atomic_write_json, read_json
 from core.shell_guard import analyze_shell_command
 

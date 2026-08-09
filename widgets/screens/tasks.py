@@ -4,7 +4,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
 
-from core.config import THEME_MUTED
+from core.defaults.config import THEME_MUTED
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
