@@ -103,7 +103,7 @@ class StatusFooter(Static):
             curr_sid = getattr(self.app, "current_session_id", None)
             if curr_sid:
                 bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) == curr_sid]
-            bash_tasks = [t for t in bg_tasks if not (getattr(t, "task_id", "").startswith("subagent-") or hasattr(t, "async_task"))]
+            bash_tasks = [t for t in bg_tasks if getattr(t, "kind", "") != "subagent"]
             active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)])
 
             from core.session_manager import SessionStore
@@ -112,7 +112,7 @@ class StatusFooter(Static):
             sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
             st_running = len([s for s in sessions if getattr(s, "status", "") == "running"])
 
-            subagents_bg = [t for t in bg_tasks if getattr(t, "task_id", "").startswith("subagent-") or hasattr(t, "async_task")]
+            subagents_bg = [t for t in bg_tasks if getattr(t, "kind", "") == "subagent"]
             bg_running = len([t for t in subagents_bg if getattr(t, "is_running", False)])
 
             subagents_active = max(st_running, bg_running)
