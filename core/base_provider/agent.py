@@ -522,6 +522,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 )
                 if compacted_in_loop:
                     compacted_this_turn = True
+                    yield ("compaction_divider", "Session Compacted", "")
                     yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:
