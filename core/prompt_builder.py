@@ -2,11 +2,11 @@ import asyncio
 import datetime
 import os
 import platform
-import subprocess
 import time
 from typing import Any, Dict, List, Tuple
 
 from core.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
+from core.git_utils import run_git
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
 
@@ -58,28 +58,13 @@ async def get_git_info_async(cwd: str = None) -> str:
 
 
 def _compute_git_info(cwd: str = None) -> str:
-    kw = {} if not cwd else {"cwd": cwd}
-    try:
-        branch = subprocess.check_output(
-            ["git", "branch", "--show-current"],
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=1,
-            **kw,
-        ).strip()
-        if branch:
-            return f"branch '{branch}'"
-        rev = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=1,
-            **kw,
-        ).strip()
-        if rev:
-            return f"detached HEAD ({rev})"
-    except Exception:
-        pass
+    res = run_git(["branch", "--show-current"], cwd=cwd, timeout=1)
+    if res.returncode == 0 and res.stdout.strip():
+        return f"branch '{res.stdout.strip()}'"
+
+    rev_res = run_git(["rev-parse", "--short", "HEAD"], cwd=cwd, timeout=1)
+    if rev_res.returncode == 0 and rev_res.stdout.strip():
+        return f"detached HEAD ({rev_res.stdout.strip()})"
     return ""
 
 

@@ -1,7 +1,9 @@
 import os
 import shutil
-import subprocess
 from typing import Optional, Tuple
+
+from core.config import WORKTREES_DIR
+from core.git_utils import run_git
 
 
 class SubagentWorktreeManager:
@@ -11,17 +13,8 @@ class SubagentWorktreeManager:
     def is_git_repo(path: str) -> bool:
         if not path or not os.path.exists(path):
             return False
-        try:
-            res = subprocess.run(
-                ["git", "rev-parse", "--is-inside-work-tree"],
-                cwd=path,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            return res.returncode == 0 and res.stdout.strip() == "true"
-        except Exception:
-            return False
+        res = run_git(["rev-parse", "--is-inside-work-tree"], cwd=path, timeout=5)
+        return res.returncode == 0 and res.stdout.strip() == "true"
 
     @staticmethod
     def create_worktree(project_dir: str, task_id: str) -> Tuple[Optional[str], Optional[str]]:
@@ -32,7 +25,7 @@ class SubagentWorktreeManager:
         if not SubagentWorktreeManager.is_git_repo(project_dir):
             return None, None
 
-        base_worktree_dir = os.path.expanduser("~/.johnston/worktrees")
+        base_worktree_dir = WORKTREES_DIR
         os.makedirs(base_worktree_dir, exist_ok=True)
 
         wt_path = os.path.join(base_worktree_dir, task_id)
@@ -41,18 +34,9 @@ class SubagentWorktreeManager:
         # Clean up any leftover worktree or branch with same task_id
         SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
 
-        try:
-            res = subprocess.run(
-                ["git", "worktree", "add", "-b", branch_name, wt_path, "HEAD"],
-                cwd=project_dir,
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            if res.returncode == 0 and os.path.exists(wt_path):
-                return wt_path, branch_name
-        except Exception:
-            pass
+        res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=15)
+        if res.returncode == 0 and os.path.exists(wt_path):
+            return wt_path, branch_name
 
         return None, None
 
@@ -62,25 +46,16 @@ class SubagentWorktreeManager:
         if not SubagentWorktreeManager.is_git_repo(project_dir) or not branch_name:
             return None
 
-        base_worktree_dir = os.path.expanduser("~/.johnston/worktrees")
+        base_worktree_dir = WORKTREES_DIR
         os.makedirs(base_worktree_dir, exist_ok=True)
 
         wt_path = os.path.join(base_worktree_dir, task_id)
         if os.path.exists(wt_path):
             return wt_path
 
-        try:
-            res = subprocess.run(
-                ["git", "worktree", "add", wt_path, branch_name],
-                cwd=project_dir,
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-            if res.returncode == 0 and os.path.exists(wt_path):
-                return wt_path
-        except Exception:
-            pass
+        res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=15)
+        if res.returncode == 0 and os.path.exists(wt_path):
+            return wt_path
 
         return None
 
@@ -92,52 +67,31 @@ class SubagentWorktreeManager:
 
         try:
             # Check if there are uncommitted worktree changes
-            status_res = subprocess.run(
-                ["git", "status", "--short"],
-                cwd=wt_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            status_res = run_git(["status", "--short"], cwd=wt_path, timeout=10)
             changes = status_res.stdout.strip()
             if changes:
                 # Stage & commit uncommitted worktree changes to the branch with fallback git author config
-                subprocess.run(["git", "add", "-A"], cwd=wt_path, capture_output=True, text=True, timeout=10)
-                subprocess.run(
+                run_git(["add", "-A"], cwd=wt_path, timeout=10)
+                run_git(
                     [
-                        "git",
                         "-c", "user.name=Johnston Subagent",
                         "-c", "user.email=subagent@johnston.local",
                         "commit",
                         "-m", f"subagent: automatic save for {branch_name}",
                     ],
                     cwd=wt_path,
-                    capture_output=True,
-                    text=True,
                     timeout=10,
                 )
 
             # Get base commit SHA of main project_dir
             base_sha = "HEAD"
             if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
-                base_res = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
-                    cwd=project_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
+                base_res = run_git(["rev-parse", "HEAD"], cwd=project_dir, timeout=5)
                 if base_res.returncode == 0 and base_res.stdout.strip():
                     base_sha = base_res.stdout.strip()
 
             # Diff worktree against parent project_dir base commit
-            diff_res = subprocess.run(
-                ["git", "diff", base_sha],
-                cwd=wt_path,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            diff_res = run_git(["diff", base_sha], cwd=wt_path, timeout=10)
             diff_text = diff_res.stdout.strip()
             if not diff_text:
                 return "", False
@@ -155,28 +109,10 @@ class SubagentWorktreeManager:
         """Safely removes git worktree and optionally deletes the branch if empty."""
         if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
             if wt_path:
-                try:
-                    subprocess.run(
-                        ["git", "worktree", "remove", "--force", wt_path],
-                        cwd=project_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                except Exception:
-                    pass
+                run_git(["worktree", "remove", "--force", wt_path], cwd=project_dir, timeout=10)
 
             if branch_name and not keep_branch:
-                try:
-                    subprocess.run(
-                        ["git", "branch", "-D", branch_name],
-                        cwd=project_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                except Exception:
-                    pass
+                run_git(["branch", "-D", branch_name], cwd=project_dir, timeout=10)
 
         if wt_path and os.path.exists(wt_path):
             try:
@@ -214,4 +150,3 @@ class SubagentWorktreeManager:
             SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=keep_b)
             return None, None
         return wt_path, wt_branch
-
