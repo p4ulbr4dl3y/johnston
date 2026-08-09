@@ -103,7 +103,7 @@ def truncate_output(
     if len(text) <= max_chars:
         return text
 
-    from core.config import LAST_TOOL_LOG_FILE, LOGS_DIR
+    from core.config import LOGS_DIR
 
     log_content = text
     is_json = False
@@ -117,6 +117,7 @@ def truncate_output(
         except Exception:
             pass
 
+    log_path = None
     if save_log:
         import uuid
         name_prefix = f"{tool_name}_" if tool_name else "tool_"
@@ -127,12 +128,8 @@ def truncate_output(
             os.makedirs(LOGS_DIR, exist_ok=True)
             with open(log_path, "w", encoding="utf-8") as f:
                 f.write(log_content)
-            with open(LAST_TOOL_LOG_FILE, "w", encoding="utf-8") as f:
-                f.write(log_content)
         except Exception:
             pass
-    else:
-        log_path = LAST_TOOL_LOG_FILE
 
     format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
 

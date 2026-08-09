@@ -1,7 +1,6 @@
 import os
 import unittest
 
-from core.config import LAST_TOOL_LOG_FILE
 from tools.base import truncate_output
 
 
@@ -10,10 +9,10 @@ class TestTruncateOutput(unittest.TestCase):
         large_text = "A" * 5000
         res = truncate_output(large_text, max_chars=1000)
 
-        log_path = LAST_TOOL_LOG_FILE
-        self.assertTrue(os.path.exists(log_path))
         self.assertIn("Full output saved to", res)
         self.assertIn("Use read tool or shell (grep/head/tail) to inspect", res)
+        log_path = [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0].rstrip(".").rstrip("]")
+        self.assertTrue(os.path.exists(log_path))
 
         with open(log_path, "r", encoding="utf-8") as f:
             content = f.read()
