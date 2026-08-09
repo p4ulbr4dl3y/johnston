@@ -1,4 +1,5 @@
 from core.thinking_effort import EFFORT_AUTO, display_thinking_effort
+from widgets.screens.base_modal import status_tag
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -14,7 +15,7 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
         }
         options = []
         for item in items:
-            prefix = r"\[ACTIVE] " if item == current else ""
+            prefix = f"{status_tag('ACTIVE')} " if item == current else ""
             options.append(f"{prefix}{item} - {descriptions[item]}")
         super().__init__(
             "### **Select Thinking Effort**",
@@ -23,3 +24,4 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
             current,
             show_search=False,
         )
+

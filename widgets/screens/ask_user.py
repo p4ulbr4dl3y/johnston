@@ -1,8 +1,9 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
+
+from widgets.screens.base_modal import BaseModalScreen
 
 
 class WriteInInput(Input):
@@ -63,16 +64,13 @@ class WriteInInput(Input):
         await super()._on_key(event)
 
 
-class ConfirmScreen(ModalScreen[str]):
+class ConfirmScreen(BaseModalScreen[str]):
     """Modal screen for requesting confirmation from the user (yes/no/cancel)"""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("left", "go_back", "Back"),
         ("enter", "confirm", "Confirm"),
-        ("ctrl+c", "quit", "Exit"),
-        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self, summary: str):
@@ -81,10 +79,9 @@ class ConfirmScreen(ModalScreen[str]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown("### **Confirm Your Answers**", classes="modal-markdown modal-markdown-centered")
+            yield Markdown("### **Confirmation Required**", classes="modal-markdown modal-markdown-centered")
             yield Markdown(self.summary, classes="modal-markdown")
             yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
-
 
     def on_mount(self) -> None:
         import time
@@ -102,14 +99,10 @@ class ConfirmScreen(ModalScreen[str]):
     def action_cancel(self) -> None:
         self.dismiss("cancelled")
 
-    def action_quit(self) -> None:
-        self.app.exit()
 
-
-class AskUserWizardScreen(ModalScreen[str]):
+class AskUserWizardScreen(BaseModalScreen[str]):
     """Unified modal screen that handles multi-question wizard without flickering."""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("tab", "minimize", "Minimize"),
@@ -117,8 +110,6 @@ class AskUserWizardScreen(ModalScreen[str]):
         ("right", "go_next", "Next"),
         ("enter", "go_next", "Next / Confirm"),
         ("space", "toggle_selection", "Toggle Selection"),
-        ("ctrl+c", "quit", "Exit"),
-        ("ctrl+q", "quit", "Exit"),
     ]
 
     def __init__(self, questions: list[dict], answers: dict | None = None, q_idx: int = 0):

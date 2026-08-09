@@ -1,24 +1,18 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.linters_manager import get_linters_manager
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
-class LintersScreen(ModalScreen[None]):
+class LintersScreen(BaseModalScreen[None]):
     """Modal screen for managing linters: enable/disable."""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self):
         super().__init__()
@@ -75,10 +69,10 @@ class LintersScreen(ModalScreen[None]):
             available = avail.get(name, False)
 
             if available:
-                status = r"\[ON]" if enabled else r"\[OFF]"
+                status = status_tag("ON" if enabled else "OFF")
                 extra = " — enabled" if enabled else " — disabled"
             else:
-                status = r"\[N/A]"
+                status = status_tag("N/A")
                 extra = " — not installed"
             opt_list.add_option(f"{status} {label}{extra}")
 
