@@ -2,7 +2,7 @@
 
 SKILL_MD = """---
 name: johnston-guide
-description: Master Johnston system manual and reference. Manages CLI flags, MCP servers, subagent definitions, rules, LLM providers, linters, execution modes, tools, and custom execution modes.
+description: Master Johnston system manual and reference. Manages CLI flags, MCP servers, roles, rules, LLM providers, linters, tools, and custom subagent definitions.
 ---
 
 # Johnston System Guide
@@ -14,13 +14,13 @@ You are operating inside Johnston CLI. Use this master guide to understand and c
 When performing specific configuration tasks, inspect ONLY the relevant reference document:
 
 1. **CLI Flags & Startup Options**: [references/cli_flags.md](file://references/cli_flags.md)
-   - Command line flags (`--models`, `--skills`, `--mcp`, `--modes`, `--rules`, `--subagents`, `--linters`, `--resume`, `--version`).
+   - Command line flags (`--models`, `--skills`, `--mcp`, `--roles`, `--rules`, `--subagents`, `--linters`, `--resume`, `--version`).
 
 2. **MCP Servers**: [references/mcp.md](file://references/mcp.md)
    - Configuration files, JSON schema, stdio commands, registration, and debugging (`johnston --mcp`).
 
-3. **Custom Subagent Definitions**: [references/subagents.md](file://references/subagents.md)
-   - Creating custom subagents (`~/.johnston/subagents/definitions/` or `.johnston/subagents/`), frontmatter schema, roles, and tool restrictions (`johnston --subagents`).
+3. **Roles (Execution Modes & Subagents)**: [references/roles.md](file://references/roles.md)
+   - Unified role definitions for execution modes and subagents (`~/.johnston/roles/` or `.johnston/roles/`, `johnston --roles`).
 
 4. **Rules & Project Guidelines**: [references/rules.md](file://references/rules.md)
    - Global rules (`~/.johnston/rules/`), project rules (`.johnston/rules/`), mode filtering, and `AGENTS.md` integration (`johnston --rules`).
@@ -28,8 +28,6 @@ When performing specific configuration tasks, inspect ONLY the relevant referenc
 5. **LLM Providers & Keys**: [references/providers.md](file://references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
 
-6. **Execution Modes**: [references/modes.md](file://references/modes.md)
-   - Read-only, architect, and custom agent execution modes (`~/.johnston/modes/` or `.johnston/modes/`, `johnston --modes`).
 
 7. **Linters & Syntax Guards**: [references/linters.md](file://references/linters.md)
    - Syntax linters (`~/.johnston/linters.json`), presets (ruff, eslint, biome, rustc), auto-scan, and verification (`johnston --linters`).
@@ -51,7 +49,7 @@ CLI_FLAGS_MD = """# Johnston CLI Flags & Commands Reference
 - `johnston --models`: List available providers and configured models.
 - `johnston --skills`: List registered global and project skills.
 - `johnston --mcp`: List configured Model Context Protocol (MCP) servers and tool status.
-- `johnston --modes`: List available agent execution modes.
+- `johnston --roles`: List available agent roles (execution modes + subagents).
 - `johnston --rules`: Display active rules and project instructions (`AGENTS.md`, `CLAUDE.md`, `.johnston/rules/`).
 - `johnston --subagents`: List available subagent definitions (builtin + custom).
 - `johnston --linters`: List configured linters and their availability (`ruff`, `eslint`, `rustc`, etc.).
@@ -89,23 +87,38 @@ MCP_MD = """# MCP (Model Context Protocol) Server Configuration Reference
 - Run `johnston --mcp` via shell tool to verify server registration and readiness.
 """
 
-SUBAGENTS_MD = """# Subagent Configuration & Creation Reference
+ROLES_MD = """# Roles Reference (Execution Modes & Subagents)
 
 ## Locations
-- Global definitions: `~/.johnston/subagents/definitions/<name>.md`
-- Project definitions: `.johnston/subagents/<name>.md`
+- Global roles: `~/.johnston/roles/<name>.md`
+- Project roles: `.johnston/roles/<name>.md`
 
 ## Frontmatter Format
 ```markdown
 ---
 name: reviewer
 description: Code reviewer subagent
+scope: subagent_only
 tools: read, grep, glob
 model: deepseek-v4-flash
 ---
 
-System prompt instructions for the subagent...
+System prompt instructions for the role...
 ```
+
+## Scope
+- `any` (default): available as both execution mode and subagent type.
+- `subagent_only`: usable only as `subagent_type` in `invoke_subagent`.
+- `main_only`: usable only as main agent execution mode (not a subagent).
+
+## Frontmatter Fields
+- `name`: Role identifier (defaults to filename).
+- `description`: Summary of purpose.
+- `scope`: `any`, `subagent_only`, or `main_only`.
+- `tools` / `allowed_tools`: Comma-separated whitelist of permitted tool names.
+- `disallowed_tools`: Comma-separated list of blocked tool names.
+- `read_only`: Boolean flag blocking state-changing operations.
+- `model`: Specific LLM model override (subagents).
 
 ## Tool Isolation & Worktree Modes
 Subagents can be invoked via `invoke_subagent` tool with:
@@ -124,7 +137,7 @@ RULES_MD = """# Rules & Directives Reference
 ```markdown
 ---
 name: python_style
-mode: action, explore
+mode: act, explore
 globs: "*.py"
 ---
 Rule instructions here...
@@ -145,26 +158,6 @@ PROVIDERS_MD = """# LLM Providers Configuration Reference
 - `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`
 """
 
-MODES_MD = """# Agent Execution Modes Reference
-
-## Locations
-- Global modes: `~/.johnston/modes/<name>.md`
-- Project modes: `.johnston/modes/<name>.md`
-
-## Format
-```markdown
----
-name: Architect
-description: High-level design mode
-read_only: true
-disallowed_tools: create, edit
----
-Custom system prompt here...
-```
-
-## Verification
-- Run `johnston --modes` via shell tool to verify active modes.
-"""
 
 LINTERS_MD = """# Linters & Syntax Guards Reference
 
@@ -206,10 +199,9 @@ JOHNSTON_GUIDE_FILES = {
     "SKILL.md": SKILL_MD,
     "references/cli_flags.md": CLI_FLAGS_MD,
     "references/mcp.md": MCP_MD,
-    "references/subagents.md": SUBAGENTS_MD,
+    "references/roles.md": ROLES_MD,
     "references/rules.md": RULES_MD,
     "references/providers.md": PROVIDERS_MD,
-    "references/modes.md": MODES_MD,
     "references/linters.md": LINTERS_MD,
     "references/tools.md": TOOLS_MD,
 }

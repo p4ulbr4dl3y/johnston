@@ -16,7 +16,6 @@ from cli import (
     main,
     print_mcp,
     print_models,
-    print_modes,
     print_rules,
     print_skills,
     print_subagents,
@@ -31,7 +30,6 @@ __all__ = [
     "print_skills",
     "print_mcp",
     "print_rules",
-    "print_modes",
     "print_subagents",
     "run_headless_prompt",
 ]

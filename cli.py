@@ -242,10 +242,6 @@ def print_roles():
             print()
 
 
-def print_modes():
-    """Print available agent execution modes to stdout"""
-    print_roles()
-
 
 def print_subagents():
     """Print available subagent definitions to stdout"""
@@ -340,8 +336,7 @@ def main():
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
-    parser.add_argument("--modes", action="store_true", help="List available agent execution modes")
-    parser.add_argument("--roles", action="store_true", help="List available unified agent roles")
+    parser.add_argument("--roles", action="store_true", help="List available agent roles (modes + subagents)")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
     parser.add_argument("--linters", action="store_true", help="List configured linters")
@@ -353,7 +348,7 @@ def main():
         print(f"johnston {get_version()}")
         sys.exit(0)
 
-    if args.modes or args.roles:
+    if args.roles:
         print_roles()
         sys.exit(0)
 

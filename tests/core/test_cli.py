@@ -7,12 +7,11 @@ from app import (
     get_version,
     print_mcp,
     print_models,
-    print_modes,
     print_rules,
     print_skills,
     print_subagents,
 )
-from cli import print_linters, run_headless_prompt
+from cli import print_linters, print_roles, run_headless_prompt
 
 
 class TestCLI(unittest.TestCase):
@@ -79,10 +78,10 @@ class TestCLI(unittest.TestCase):
         output = f.getvalue()
         self.assertIn("Active Rules & Project Instructions:", output)
 
-    def test_print_modes(self):
+    def test_print_roles(self):
         f = io.StringIO()
         with redirect_stdout(f):
-            print_modes()
+            print_roles()
         output = f.getvalue()
         self.assertIn("Available Agent Roles & Modes:", output)
 
@@ -355,7 +354,7 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("No rules or project instruction files", f.getvalue())
 
 
-    def test_print_modes_with_disallowed_tools(self):
+    def test_print_roles_with_disallowed_tools(self):
         f = io.StringIO()
         with patch("core.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
@@ -367,7 +366,7 @@ class TestCLIAdvanced(unittest.TestCase):
             role_mgr.load_roles.return_value = {"act": role}
             mock_cls.get_instance.return_value = role_mgr
             with redirect_stdout(f):
-                print_modes()
+                print_roles()
         out = f.getvalue()
         self.assertIn("Act (act)", out)
         self.assertIn("Disallowed tools: rm", out)
@@ -523,9 +522,9 @@ class TestMainFlags(unittest.TestCase):
                     main()
         self.assertEqual(cm.exception.code, 0)
 
-    def test_main_modes_flag(self):
-        with patch("sys.argv", ["johnston", "--modes"]):
-            with patch("cli.print_modes"):
+    def test_main_roles_flag(self):
+        with patch("sys.argv", ["johnston", "--roles"]):
+            with patch("cli.print_roles"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
                     main()

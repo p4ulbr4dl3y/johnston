@@ -12,19 +12,18 @@ Johnston is configured via global settings in `~/.johnston/` and project-level o
 ├── providers.json                  # Custom and configured LLM provider definitions
 ├── mcp.json                        # Global MCP server configurations
 ├── linters.json                    # Linter presets & enabled state
-├── subagents/definitions/*.md      # Custom subagent definitions
+├── roles/*.md                      # Unified role definitions (modes + subagents)
 ├── rules/*.md                      # Global system prompt rules
 ├── skills/<skill_name>/SKILL.md    # Global skills
-└── modes/*.md                      # Custom execution modes
+```
 
 <project_root>/
 ├── .johnston/                      # Project-specific overrides
 │   ├── mcp.json
 │   ├── linters.json
-│   ├── subagents/*.md
+│   ├── roles/*.md
 │   ├── rules/*.md
-│   ├── skills/<skill_name>/SKILL.md
-│   └── modes/*.md
+│   └── skills/<skill_name>/SKILL.md
 ```
 
 ---
@@ -124,37 +123,47 @@ Presets are **syntax-only**: they detect parse errors and fatal issues, not styl
 
 ---
 
-## 4. Custom Subagent Definitions (`subagents/`)
+## 4. Roles: Execution Modes & Subagents (`roles/`)
 
-Subagents run autonomous sub-tasks in isolated conversation contexts.
+Roles unify agent execution modes and subagent definitions into a single markdown format. The `scope` field controls where each role is usable.
 
-- **Global location:** `~/.johnston/subagents/definitions/<name>.md`
-- **Project location:** `.johnston/subagents/<name>.md`
-- **CLI Management:** `johnston --subagents`
+- **Global location:** `~/.johnston/roles/<name>.md`
+- **Project location:** `.johnston/roles/<name>.md`
+- **CLI Management:** `johnston --roles` (all roles), `johnston --subagents` (subagent-scoped roles)
 
-### Built-in Subagents
-- `explore`: Read-only, fast codebase research subagent.
-- `general`: Multi-step execution subagent.
+### Scope
+- `any` (default): available as both execution mode and subagent type.
+- `subagent_only`: usable only as `subagent_type` in `invoke_subagent`.
+- `main_only`: usable only as main agent execution mode (not a subagent).
+
+### Built-in Roles
+- `act`: Full execution and implementation role (`any`).
+- `explore`: Read-only Q&A, codebase research, and planning role (`any`).
+- `orchestrate`: Orchestrator role that plans and delegates subtasks (`main_only`).
+- `worker`: General multi-step execution subagent (`subagent_only`).
+- `explorer`: Fast code exploration subagent (`subagent_only`).
 
 ### Markdown Format Example (`reviewer.md`)
 ```markdown
 ---
 name: reviewer
 description: Code reviewer subagent
+scope: subagent_only
 tools: read, grep, glob
 model: deepseek-v4-flash
 ---
-
-## Subagent Mode: REVIEWER
 
 Inspect git diffs and code changes. Focus on potential bugs, security issues, and style violations.
 ```
 
 ### Supported Frontmatter Fields
-- `name`: Subagent identifier (defaults to filename).
+- `name`: Role identifier (defaults to filename).
 - `description`: Summary of purpose.
-- `tools`: Comma-separated list of permitted tool names.
-- `model`: Specific LLM model override for this subagent.
+- `scope`: `any`, `subagent_only`, or `main_only`.
+- `tools` / `allowed_tools`: Comma-separated whitelist of permitted tool names.
+- `disallowed_tools`: Comma-separated list of blocked tool names.
+- `read_only`: Boolean flag blocking state-changing operations.
+- `model`: Specific LLM model override for this role.
 
 ---
 
@@ -170,7 +179,7 @@ Inject system prompt rules globally or per-project. Rules can be conditionally t
 ```markdown
 ---
 name: python_style
-modes: [action, explore]
+modes: [act, explore]
 globs: ["*.py", "src/**/*.py"]
 description: Python PEP 8 & Ruff guidelines
 ---
@@ -181,7 +190,7 @@ description: Python PEP 8 & Ruff guidelines
 ```
 
 ### Frontmatter Filtering Rules
-- `modes` / `mode`: List of execution modes (`action`, `explore`, or custom modes) where rule applies. If omitted, applies to all modes.
+- `modes` / `mode`: List of execution modes (`act`, `explore`, or custom modes) where rule applies. If omitted, applies to all modes.
 - `globs` / `glob`: File pattern matchers (e.g. `["*.py"]`). Rule activates when user edits or touches matching files.
 
 ---
@@ -258,35 +267,6 @@ Detailed step-by-step guidance...
 
 ---
 
-## 8. Custom Execution Modes (`modes/`)
+## 8. Roles Overview (`roles/`)
 
-Define isolated execution modes to restrict or customize agent behavior (e.g. read-only exploration, architect planning mode).
-
-- **Global location:** `~/.johnston/modes/<name>.md`
-- **Project location:** `.johnston/modes/<name>.md`
-- **CLI Management:** `johnston --modes`
-
-### Built-in Modes
-- `action`: Full read, write, shell, and task execution permissions.
-- `explore`: Read-only mode. File creation/edits are blocked; state-changing shell commands (e.g. `rm`, `git commit`, `>`) are strictly forbidden.
-
-### Custom Mode Example (`architect.md`)
-```markdown
----
-key: architect
-name: Architect
-description: High-level design & architecture planning mode
-read_only: true
-disallowed_tools: [create, edit, multi_edit]
----
-
-## Execution Mode: ARCHITECT
-
-You are in high-level architecture planning mode. Analyze code structure, propose design patterns, and output plans. Do not execute file edits directly.
-```
-
-### Mode Parameters
-- `key`: Unique mode key (e.g. `architect`).
-- `name`: Display name.
-- `read_only`: Boolean flag blocking state-changing operations.
-- `disallowed_tools`: List of specific tool names disabled in this mode.
+Roles replace the legacy `modes/` and `subagents/` directories. See [Section 4](#4-roles-execution-modes--subagents-roles) for the unified format.

@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from core.config import CONFIG_DIR, SUBAGENT_DEFS_DIR
+from core.config import CONFIG_DIR
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.defaults.subagents import DEFAULT_DEFINITIONS_DATA
 from core.defaults.tools import WRITE_TOOLS
@@ -110,10 +110,6 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
     if getattr(role_def, "read_only", False) and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
         return f"ERR: tool '{clean}' disabled in read-only {getattr(role_def, 'name', 'Role')} role"
     return None
-
-
-mode_tool_error = role_tool_error
-
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
     "act": AgentRole(
@@ -256,7 +252,6 @@ class RoleRegistry:
 
     def __init__(self):
         self.roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
-        self.definitions = self.roles
         self.current_project_dir: Optional[str] = None
 
     @classmethod
@@ -274,7 +269,6 @@ class RoleRegistry:
         dirs = []
         if include_global:
             dirs.append((os.path.join(CONFIG_DIR, "roles"), "global"))
-            dirs.append((SUBAGENT_DEFS_DIR, "global"))
 
         dirs.append((os.path.join(p_dir, ".johnston", "roles"), "project"))
 
@@ -284,7 +278,6 @@ class RoleRegistry:
                 roles[role.key] = role
 
         self.roles = roles
-        self.definitions = roles
         return roles
 
     def get_role(self, key: str, project_dir: Optional[str] = None) -> AgentRole:
@@ -305,15 +298,6 @@ class RoleRegistry:
 
     def reload(self, project_dir: Optional[str] = None) -> None:
         self.load_roles(project_dir=project_dir)
-
-    def get_definition(self, subagent_type: str) -> AgentRole:
-        return self.get_role(subagent_type)
-
-    def get_mode(self, key: str, project_dir: Optional[str] = None) -> AgentRole:
-        return self.get_role(key, project_dir=project_dir)
-
-    def load_modes(self, project_dir: Optional[str] = None, include_global: bool = True) -> Dict[str, AgentRole]:
-        return self.load_roles(project_dir=project_dir, include_global=include_global)
 
     def list_definitions(self) -> Dict[str, AgentRole]:
         return {k: v for k, v in self.roles.items() if v.scope in ("any", "subagent_only")}

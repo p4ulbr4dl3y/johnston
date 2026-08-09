@@ -1,7 +1,7 @@
 import os
 from typing import Any, Callable, Dict, List, Optional
 
-from core.config import SUBAGENT_LOGS_DIR, SUBAGENT_SESSIONS_DIR, SUBAGENTS_DIR
+from core.config import SUBAGENT_LOGS_DIR, SUBAGENT_SESSIONS_DIR
 from core.platform_utils import atomic_write_json, read_json
 
 
@@ -115,7 +115,7 @@ class SubagentTracker:
         return cls._instance
 
     def _load_all_sessions(self) -> None:
-        dirs_to_check = [self.storage_dir, SUBAGENTS_DIR]
+        dirs_to_check = [self.storage_dir]
         for dpath in dirs_to_check:
             if os.path.exists(dpath):
                 for fname in os.listdir(dpath):

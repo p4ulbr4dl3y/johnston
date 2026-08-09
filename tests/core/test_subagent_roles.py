@@ -2,18 +2,18 @@ import os
 import tempfile
 import unittest
 
-from core.role_registry import RoleRegistry as SubagentRegistry
+from core.role_registry import RoleRegistry
 from core.subagent_tracker import SubagentTracker
 
 
-class TestSubagentRegistry(unittest.TestCase):
+class TestSubagentRoles(unittest.TestCase):
     def test_default_definitions(self):
-        registry = SubagentRegistry.get_instance()
+        registry = RoleRegistry.get_instance()
         defs = registry.list_definitions()
         self.assertIn("explorer", defs)
         self.assertIn("worker", defs)
 
-        explorer_def = registry.get_definition("explorer")
+        explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "explorer")
         self.assertIn("## Subagent Type: EXPLORER", explorer_def.system_prompt)
 
@@ -44,20 +44,20 @@ model: gpt-4o
 ---
 You run tests and report coverage.""")
 
-            registry = SubagentRegistry()
+            registry = RoleRegistry()
             registry.reload(project_dir=tmpdir)
             defs = registry.list_definitions()
 
             self.assertIn("reviewer", defs)
             self.assertIn("tester", defs)
 
-            reviewer_def = registry.get_definition("reviewer")
+            reviewer_def = registry.get_role("reviewer")
             self.assertEqual(reviewer_def.description, "Code reviewer subagent")
             self.assertEqual(reviewer_def.tools, ["read", "grep", "glob"])
             self.assertEqual(reviewer_def.model, "deepseek-v4-flash")
             self.assertIn("senior code reviewer", reviewer_def.system_prompt)
 
-            tester_def = registry.get_definition("tester")
+            tester_def = registry.get_role("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
             self.assertEqual(tester_def.tools, ["shell"])
             self.assertEqual(tester_def.model, "gpt-4o")

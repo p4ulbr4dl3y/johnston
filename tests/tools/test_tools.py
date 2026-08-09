@@ -43,7 +43,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_edit_allows_johnston_config(self):
         tool = EditTool()
-        target = os.path.join(self.test_dir, ".johnston", "modes", "custom.md")
+        target = os.path.join(self.test_dir, ".johnston", "roles", "custom.md")
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write("old")
