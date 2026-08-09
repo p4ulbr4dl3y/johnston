@@ -7,8 +7,9 @@ from widgets.status_footer import StatusFooter
 
 
 class DummyTask:
-    def __init__(self, task_id: str, is_running: bool = True, is_background: bool = True, session_id: str = "test-session"):
+    def __init__(self, task_id: str, is_running: bool = True, is_background: bool = True, session_id: str = "test-session", kind: str = "shell"):
         self.task_id = task_id
+        self.kind = kind
         self.is_running = is_running
         self.is_background = is_background
         self.session_id = session_id
@@ -48,8 +49,8 @@ class FooterTestApp(App):
 
         self.background_tasks = [
             DummyTask("bash-1", is_running=True),
-            DummyTask("subagent-1", is_running=True),
-            DummyTask("subagent-2", is_running=False),
+            DummyTask("subagent-1", is_running=True, kind="subagent"),
+            DummyTask("subagent-2", is_running=False, kind="subagent"),
         ]
 
     def compose(self) -> ComposeResult:

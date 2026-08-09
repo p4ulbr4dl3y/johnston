@@ -111,7 +111,7 @@ class TasksListScreen(BaseModalScreen[None]):
         for t in bg_tasks:
             # Exclude subagent tasks stored in background_tasks to avoid duplication with subagent sessions
             task_id = getattr(t, "task_id", "")
-            if getattr(t, "kind", "") == "subagent" or task_id.startswith("subagent-"):
+            if getattr(t, "kind", "") == "subagent":
                 continue
             if getattr(t, "is_background", False):
                 items.append({
@@ -220,8 +220,6 @@ class TasksListScreen(BaseModalScreen[None]):
         is_subagent = (
             item["kind"] == "agent"
             or getattr(raw, "kind", "") == "subagent"
-            or item["id"].startswith("subagent-")
-            or getattr(raw, "async_task", None) is not None
         )
         if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen

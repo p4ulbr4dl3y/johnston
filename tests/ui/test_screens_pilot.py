@@ -144,21 +144,27 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_tasks_list_screen_option_selected_pilot(self):
         from textual.widgets.option_list import Option
 
-        task_sub = MagicMock()
-        task_sub.task_id = "task-sub"
-        task_sub.command = "sub task"
-        task_sub.is_background = True
-        task_sub.async_task = MagicMock()
-
+        # Subagent tasks (kind="subagent") are excluded from the shell list and
+        # shown once as subagent sessions from the store instead.
         task_normal = MagicMock()
         task_normal.task_id = "task-norm"
+        task_normal.kind = "shell"
         task_normal.command = "norm task"
         task_normal.is_background = True
-        del task_normal.async_task
+        task_normal.is_running = False
+        task_normal.session_id = "main-1"
+
+        sub_session = MagicMock()
+        sub_session.id = "sub-1"
+        sub_session.status = "running"
+        sub_session.description = "sub task"
 
         screen = TasksListScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = [task_sub, task_normal]
+        app.background_tasks = [task_normal]
+        app.current_session_id = "main-1"
+        app.sm = MagicMock()
+        app.sm.get_subagents_for_parent.return_value = [sub_session]
 
         async with app.run_test() as pilot:
             await pilot.pause()
