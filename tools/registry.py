@@ -286,7 +286,10 @@ async def check_and_confirm_permission(
     """
     from core.permission_manager import PermissionManager
     pm = PermissionManager.get_instance()
-    app_obj = getattr(context_or_app, "app", context_or_app)
+    if hasattr(context_or_app, "push_screen_wait"):
+        app_obj = context_or_app
+    else:
+        app_obj = getattr(context_or_app, "app", context_or_app)
     project_dir = (
         getattr(context_or_app, "cwd", None)
         or getattr(context_or_app, "project_dir", None)
