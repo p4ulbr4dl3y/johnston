@@ -2,6 +2,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR, MAX_CONCURRENT_SUBAGENTS, SUBAGENT_DEFS_DIR
+from core.defaults.subagents import DEFAULT_DEFINITIONS_DATA
 
 WRITE_TOOLS = {"create", "edit", "multi_edit"}
 
@@ -137,15 +138,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="worker",
         description="General multi-step execution subagent",
         read_only=False,
-        prompt=(
-            "## Subagent Type: WORKER\n\n"
-            "### Role & Purpose\n"
-            "Task execution subagent. Full tool access for code modifications, testing, and shell commands.\n\n"
-            "### Action Guidelines\n"
-            "1. Precision Edits: Use edit for single modifications and multi_edit for multiple non-adjacent changes.\n"
-            "2. Verification: Run linters or tests after edits to verify changes before completing.\n"
-            "3. Clean State: Ensure working tree is clean and code builds cleanly upon task finish."
-        ),
+        prompt=DEFAULT_DEFINITIONS_DATA["worker"]["system_prompt"],
         scope="subagent_only",
         source="builtin",
     ),
@@ -181,16 +174,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="explorer",
         description="Fast code exploration subagent",
         read_only=True,
-        prompt=(
-            "## Subagent Type: EXPLORER\n\n"
-            "### Role & Purpose\n"
-            "Read-only research and code analysis subagent.\n\n"
-            "### Constraints\n"
-            "1. Read-Only Mode: Creation, editing, and deletion tools are DISABLED.\n"
-            "2. No State Changes: Never run state-changing shell commands (no rm, mv, touch, or > / >> redirects).\n"
-            "3. Search Strategy: Use broad search (grep/find) first, then inspect targeted files. Use parallel calls for multiple file reads.\n"
-            "4. Response Only: Report findings purely via final text response."
-        ),
+        prompt=DEFAULT_DEFINITIONS_DATA["explorer"]["system_prompt"],
         disallowed_tools=[
             "create", "edit", "multi_edit",
             "write_to_file", "replace_file_content", "multi_replace_file_content"

@@ -50,10 +50,8 @@ class MCPManager:
         self.clients.clear()
 
     def ensure_default_configs(self):
-        os.makedirs(os.path.dirname(self.global_file), exist_ok=True)
-        if not os.path.exists(self.global_file):
-            from tools.base import atomic_write_json
-            atomic_write_json(self.global_file, {"mcpServers": {}}, indent=2)
+        from core.config_helpers import ensure_json_config
+        ensure_json_config(self.global_file, {"mcpServers": {}})
 
     def load_servers(self) -> List[Dict[str, Any]]:
         """

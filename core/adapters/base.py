@@ -1,3 +1,4 @@
+import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 
@@ -32,3 +33,38 @@ def sort_keys_recursive(obj: Any) -> Any:
     elif isinstance(obj, list):
         return [sort_keys_recursive(elem) for elem in obj]
     return obj
+
+
+def parse_tool_call_args(tc: dict) -> Tuple[str, Dict[str, Any]]:
+    """Helper to extract function name and normalized argument dict from tool call payloads."""
+    if not isinstance(tc, dict):
+        return "", {}
+    fn = tc.get("function", {})
+    if not isinstance(fn, dict):
+        fn = {}
+    fn_name = fn.get("name", "")
+    raw_args = fn.get("arguments", "{}")
+    if isinstance(raw_args, str):
+        try:
+            args_obj = json.loads(raw_args) if raw_args.strip() else {}
+        except Exception:
+            args_obj = {}
+    else:
+        args_obj = raw_args or {}
+    return fn_name, args_obj
+
+
+def extract_image_payload(tcontent: Any) -> Optional[Dict[str, Any]]:
+    """Extracts image payload dictionary from raw message content."""
+    if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+        return tcontent
+    if isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+        try:
+            data = json.loads(tcontent)
+            if isinstance(data, dict) and data.get("type") == "image":
+                return data
+        except Exception:
+            pass
+    return None
+
+

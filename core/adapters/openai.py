@@ -1,9 +1,8 @@
-import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.adapters.base import BaseApiAdapter
+from core.adapters.base import BaseApiAdapter, extract_image_payload
 from core.thinking_effort import build_openai_thinking_kwargs
 
 
@@ -27,16 +26,7 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
             while i < n and isinstance(messages[i], dict) and messages[i].get("role") == "tool":
                 curr_msg = messages[i]
                 tcontent = curr_msg.get("content", "")
-                parsed_img = None
-                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
-                    parsed_img = tcontent
-                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
-                    try:
-                        data = json.loads(tcontent)
-                        if isinstance(data, dict) and data.get("type") == "image":
-                            parsed_img = data
-                    except Exception:
-                        pass
+                parsed_img = extract_image_payload(tcontent)
 
                 if parsed_img and parsed_img.get("base64"):
                     summary_text = parsed_img.get("summary", "[Image content]")

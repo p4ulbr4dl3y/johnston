@@ -4,7 +4,12 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import BaseApiAdapter, sort_keys_recursive
+from core.adapters.base import (
+    BaseApiAdapter,
+    extract_image_payload,
+    parse_tool_call_args,
+    sort_keys_recursive,
+)
 from core.thinking_effort import build_anthropic_thinking_payload
 
 
@@ -59,17 +64,7 @@ class AnthropicAdapter(BaseApiAdapter):
             if role == "tool":
                 tc_id = msg.get("tool_call_id") or ""
                 tcontent = msg.get("content", "")
-
-                parsed_img = None
-                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
-                    parsed_img = tcontent
-                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
-                    try:
-                        data = json.loads(tcontent)
-                        if isinstance(data, dict) and data.get("type") == "image":
-                            parsed_img = data
-                    except Exception:
-                        pass
+                parsed_img = extract_image_payload(tcontent)
 
                 if parsed_img and parsed_img.get("base64"):
                     summary_text = parsed_img.get("summary", "[Image content]")
@@ -114,23 +109,11 @@ class AnthropicAdapter(BaseApiAdapter):
                         if isinstance(part, dict) and part.get("type") == "text":
                             blocks.append({"type": "text", "text": part.get("text", "")})
                 for tc in msg.get("tool_calls") or []:
-                    if not isinstance(tc, dict):
-                        continue
-                    fn = tc.get("function", {})
-                    if not isinstance(fn, dict):
-                        fn = {}
-                    raw_args = fn.get("arguments", "{}")
-                    if isinstance(raw_args, str):
-                        try:
-                            args_obj = json.loads(raw_args) if raw_args.strip() else {}
-                        except Exception:
-                            args_obj = {}
-                    else:
-                        args_obj = raw_args or {}
+                    fn_name, args_obj = parse_tool_call_args(tc)
                     blocks.append({
                         "type": "tool_use",
-                        "id": tc.get("id") or f"toolu_{uuid.uuid4().hex[:12]}",
-                        "name": fn.get("name", ""),
+                        "id": (tc.get("id") if isinstance(tc, dict) else None) or f"toolu_{uuid.uuid4().hex[:12]}",
+                        "name": fn_name,
                         "input": args_obj,
                     })
                 final.append({"role": "assistant", "content": blocks or [{"type": "text", "text": content or ""}]})

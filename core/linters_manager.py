@@ -157,10 +157,8 @@ class LintersManager:
         self.ensure_default_configs()
 
     def ensure_default_configs(self):
-        os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
-        if not os.path.exists(self.config_file):
-            from tools.base import atomic_write_json
-            atomic_write_json(self.config_file, {"linters": {}}, indent=2)
+        from core.config_helpers import ensure_json_config
+        ensure_json_config(self.config_file, {"linters": {}})
 
     # ------------------------------------------------------------------ load
 

@@ -1,13 +1,10 @@
-import os
 import re
 from typing import Any
-from urllib.parse import urlparse
 
-import pygments
 from pygments.lexers import get_lexer_by_name
 from rich.text import Span, Text
 
-from widgets.chat_markdown import TOKEN_COLORS
+from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
 
 
 class DiffRenderable:
@@ -48,51 +45,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
 
     diff_text = re.sub(r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE).strip()
 
-    def _guess_lexer(path_str: str) -> str:
-        if not path_str:
-            return "text"
-        clean_path = urlparse(path_str).path if path_str.startswith(("http://", "https://")) else path_str
-        ext = os.path.splitext(clean_path)[1].lower().lstrip(".")
-        mapping = {
-            "py": "python", "js": "javascript", "jsx": "jsx", "ts": "typescript", "tsx": "tsx",
-            "html": "html", "css": "css", "scss": "scss", "json": "json", "yaml": "yaml",
-            "yml": "yaml", "md": "markdown", "sh": "bash", "bash": "bash", "zsh": "bash",
-            "rs": "rust", "go": "go", "c": "c", "cpp": "cpp", "h": "c", "hpp": "cpp",
-            "sql": "sql", "toml": "toml", "ini": "ini", "dockerfile": "dockerfile", "xml": "xml"
-        }
-        return mapping.get(ext, ext or "text")
-
-    def _lex_block(code_lines: list[str], lexer: Any) -> list[Text]:
-        if not code_lines:
-            return []
-        if not lexer:
-            return [Text(line) for line in code_lines]
-        full_code = "\n".join(code_lines)
-        try:
-            tokens = pygments.lex(full_code, lexer)
-            line_texts = [Text()]
-            for tok_type, val in tokens:
-                parts = val.split("\n")
-                for idx, part in enumerate(parts):
-                    if idx > 0:
-                        line_texts.append(Text())
-                    if part:
-                        style = None
-                        curr = tok_type
-                        while curr:
-                            if curr in TOKEN_COLORS:
-                                style = TOKEN_COLORS[curr]
-                                break
-                            curr = curr.parent
-                        line_texts[-1].append(part, style=style)
-
-            while len(line_texts) < len(code_lines):
-                line_texts.append(Text())
-            return line_texts[:len(code_lines)]
-        except Exception:
-            return [Text(line) for line in code_lines]
-
-    lexer_name = _guess_lexer(file_path)
+    lexer_name = guess_lexer_name(file_path)
     try:
         lexer = get_lexer_by_name(lexer_name)
     except Exception:
@@ -151,8 +104,8 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
                 except Exception:
                     pass
 
-    old_texts = _lex_block(old_code_lines, lexer)
-    new_texts = _lex_block(new_code_lines, lexer)
+    old_texts = lex_block_to_line_texts(old_code_lines, lexer)
+    new_texts = lex_block_to_line_texts(new_code_lines, lexer)
 
     old_line = 0
     new_line = 0
