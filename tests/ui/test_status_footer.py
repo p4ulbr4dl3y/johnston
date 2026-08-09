@@ -7,10 +7,11 @@ from widgets.status_footer import StatusFooter
 
 
 class DummyTask:
-    def __init__(self, task_id: str, is_running: bool = True, is_background: bool = True):
+    def __init__(self, task_id: str, is_running: bool = True, is_background: bool = True, session_id: str = "test-session"):
         self.task_id = task_id
         self.is_running = is_running
         self.is_background = is_background
+        self.session_id = session_id
 
 
 class StubPM:
@@ -29,6 +30,7 @@ class StubPM:
 class FooterTestApp(App):
     def __init__(self):
         super().__init__()
+        self.current_session_id = "test-session"
         self.pm = MagicMock()
         self.pm.get_active_provider_key.return_value = "openai"
         self.pm.get_provider_thinking_effort.return_value = "high"
