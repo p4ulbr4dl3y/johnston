@@ -59,6 +59,39 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"questions": "invalid"})
         self.assertEqual(res, "ERR: invalid or missing 'questions' list")
 
+    async def test_single_question_fallback(self):
+        # A single {question, options} dict is wrapped into a questions list.
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        def mock_push_screen(screen, callback=None):
+            if callback:
+                callback("Question: Pick one\nAnswer: blue")
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"question": "Pick one", "options": ["red", "blue"]},
+            app=mock_app,
+        )
+        self.assertIn("Question: Pick one", res)
+        self.assertIn("Answer: blue", res)
+
+    async def test_single_question_with_choices_fallback(self):
+        # 'choices' is accepted as an alias for 'options' in the single-question form.
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        def mock_push_screen(screen, callback=None):
+            if callback:
+                callback("Question: Choose\nAnswer: x")
+
+        mock_app.push_screen = mock_push_screen
+        res = await tool.execute(
+            {"question_text": "Choose", "choices": ["x", "y"]},
+            app=mock_app,
+        )
+        self.assertIn("Answer: x", res)
+
 
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()
