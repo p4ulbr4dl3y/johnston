@@ -47,10 +47,18 @@ class FooterTestApp(App):
             "cost_usd": 0.05,
         }
 
+        class DummySession:
+            def __init__(self, status: str):
+                self.status = status
+
+        self.sm = MagicMock()
+        self.sm.get_subagents_for_parent.return_value = [
+            DummySession("running"),
+            DummySession("completed"),
+        ]
+
         self.background_tasks = [
             DummyTask("bash-1", is_running=True),
-            DummyTask("subagent-1", is_running=True, kind="subagent"),
-            DummyTask("subagent-2", is_running=False, kind="subagent"),
         ]
 
     def compose(self) -> ComposeResult:

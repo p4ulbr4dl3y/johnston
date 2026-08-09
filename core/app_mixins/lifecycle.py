@@ -50,21 +50,14 @@ class LifecycleMixin:
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
-        for task in getattr(self, "background_tasks", []):
-            try:
-                if hasattr(task, "kill_sync"):
-                    task.kill_sync()
-                elif hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
-                    asyncio.create_task(task.kill())
-                elif hasattr(task, "process") and task.process:
-                    try:
-                        task.process.terminate()
-                    except Exception as err:
-                        logger.debug(f"Process termination error: {err}")
-                if hasattr(task, "read_task") and task.read_task:
-                    task.read_task.cancel()
-            except Exception as err:
-                logger.debug(f"Task cleanup error: {err}")
+
+        from core.background_task import kill_all_background_tasks
+        kill_all_background_tasks(getattr(self, "background_tasks", []))
+        try:
+            from core.subagent_tracker import cancel_running_subagents
+            cancel_running_subagents(self.sm)
+        except Exception as err:
+            logger.debug(f"Subagent cleanup error: {err}")
 
         try:
             self.save_current_session()

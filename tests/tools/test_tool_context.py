@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 
 from tools.context import ToolContext
 
@@ -42,6 +43,17 @@ class TestToolContext(unittest.TestCase):
         ctx.refresh_status()
         self.assertEqual(ctx.background_tasks, [])
         self.assertIsNone(ctx.create_agent())
+
+    def test_add_background_task_prunes_finished(self):
+        app = MockApp()
+        ctx = ToolContext(app)
+        finished = MagicMock()
+        finished.is_running = False
+        running = MagicMock()
+        running.is_running = True
+        app.background_tasks = [finished, running]
+        ctx.add_background_task("task_new")
+        self.assertEqual(app.background_tasks, [running, "task_new"])
 
 class TestToolContextAdvanced(unittest.TestCase):
     def test_trigger_ai_response_with_method(self):

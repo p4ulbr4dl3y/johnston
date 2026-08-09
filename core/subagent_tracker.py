@@ -180,11 +180,6 @@ async def run_subagent_stream_bg(
         if cleanup_fn:
             cleanup_fn(acc)
         merge_subagent_metrics(subagent, ctx)
-        if session_id and ctx.background_tasks:
-            for t in ctx.background_tasks:
-                if getattr(t, "kind", "") == "subagent" and getattr(t, "id", "") == session_id:
-                    t.is_running = False
-
         ctx.refresh_status()
 
         if notification_template:
@@ -203,3 +198,30 @@ async def run_subagent_stream_bg(
             ctx.trigger_ai_response(msg)
 
     return acc[0]
+
+
+def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int:
+    """Cancels running subagent asyncio tasks and marks their sessions cancelled.
+
+    Subagent sessions are the single source of truth for running state, so
+    cancellation lives here instead of a parallel in-memory task registry.
+    """
+    if parent_id:
+        sessions = store.get_subagents_for_parent(parent_id)
+    else:
+        sessions = store.list(kind="subagent")
+
+    cancelled = 0
+    for sess in sessions:
+        if getattr(sess, "status", "") != "running":
+            continue
+        async_task = getattr(sess, "async_task", None)
+        if async_task and not async_task.done():
+            try:
+                async_task.cancel()
+            except Exception:
+                pass
+        sess.finish(STATUS_CANCELLED, "Cancelled")
+        store.save(sess)
+        cancelled += 1
+    return cancelled
