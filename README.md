@@ -39,11 +39,11 @@ irm https://raw.githubusercontent.com/p4ulbr4dl3y/johnston/main/install.ps1 | ie
 
 ```bash
 # Run tests
-uv run python -m unittest discover -s tests
+uv run pytest
 
 # Run tests with coverage
-uv run python -m coverage run -m unittest discover -s tests
-uv run python -m coverage report -m
+uv run coverage run -m pytest
+uv run coverage report -m
 
 # Check code style
 uv run ruff check .

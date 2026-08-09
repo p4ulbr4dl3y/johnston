@@ -2,7 +2,7 @@
 
 from typing import Dict
 
-DEFAULT_DEFINITIONS_DATA: Dict[str, dict] = {
+DEFAULT_SUBAGENT_ROLES: Dict[str, dict] = {
     "explorer": {
         "name": "explorer",
         "subagent_type": "explorer",

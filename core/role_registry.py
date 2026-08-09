@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.defaults.subagents import DEFAULT_DEFINITIONS_DATA
+from core.defaults.subagents import DEFAULT_SUBAGENT_ROLES
 from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 
@@ -42,22 +42,6 @@ class AgentRole:
     @property
     def system_prompt(self) -> str:
         return self.prompt
-
-    @system_prompt.setter
-    def system_prompt(self, val: str) -> None:
-        self.prompt = val
-
-    @property
-    def tools(self) -> List[str]:
-        return self.allowed_tools
-
-    @tools.setter
-    def tools(self, val: List[str]) -> None:
-        self.allowed_tools = val or []
-
-    @property
-    def subagent_type(self) -> str:
-        return self.key
 
     def is_tool_allowed(self, tool_name: str) -> Optional[str]:
         """Returns an error string if this role disables tool_name, else None."""
@@ -135,7 +119,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="worker",
         description="General multi-step execution subagent",
         read_only=False,
-        prompt=DEFAULT_DEFINITIONS_DATA["worker"]["system_prompt"],
+        prompt=DEFAULT_SUBAGENT_ROLES["worker"]["system_prompt"],
         scope="subagent_only",
         source="builtin",
     ),
@@ -171,7 +155,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="explorer",
         description="Fast code exploration subagent",
         read_only=True,
-        prompt=DEFAULT_DEFINITIONS_DATA["explorer"]["system_prompt"],
+        prompt=DEFAULT_SUBAGENT_ROLES["explorer"]["system_prompt"],
         disallowed_tools=[
             "create", "edit", "multi_edit",
             "write_to_file", "replace_file_content", "multi_replace_file_content"
@@ -299,12 +283,12 @@ class RoleRegistry:
     def reload(self, project_dir: Optional[str] = None) -> None:
         self.load_roles(project_dir=project_dir)
 
-    def list_definitions(self) -> Dict[str, AgentRole]:
+    def list_subagent_roles(self) -> Dict[str, AgentRole]:
         return {k: v for k, v in self.roles.items() if v.scope in ("any", "subagent_only")}
 
     def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
         self.load_roles(project_dir=project_dir)
-        subagent_roles = self.list_definitions()
+        subagent_roles = self.list_subagent_roles()
         if not subagent_roles:
             return ""
 

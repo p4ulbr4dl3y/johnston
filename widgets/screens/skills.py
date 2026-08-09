@@ -5,6 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
+from core.config import CONFIG_DIR
 from core.skill_manager import SkillManager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 
@@ -105,7 +106,7 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
             opt_list.clear_options()
             if not self.filtered_skills:
                 if not self.skills:
-                    opt_list.add_option("*No skills found in ~/.johnston/skills/ or .johnston/skills/*")
+                    opt_list.add_option(f"*No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/*")
                 else:
                     opt_list.add_option("*No matching skills found*")
                 return

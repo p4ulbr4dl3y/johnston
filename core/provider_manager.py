@@ -41,6 +41,18 @@ class ProviderManager:
         except Exception:
             return {}
 
+    def _read_config(self) -> dict:
+        """Reads CONFIG_FILE, falling back to {} on missing/corrupt file."""
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+            except Exception:
+                pass
+        return {}
+
     def _save_config(self, data: Dict[str, Any]) -> None:
         atomic_write_json(CONFIG_FILE, data, indent=2)
 
@@ -84,13 +96,7 @@ class ProviderManager:
         return self._get_config_data().get("disabled_providers", [])
 
     def set_provider_disabled(self, key: str, disabled: bool):
-        data = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+        data = self._read_config()
         disabled_set = set(data.get("disabled_providers", []))
         if disabled:
             disabled_set.add(key)
@@ -137,13 +143,7 @@ class ProviderManager:
         return self._get_config_data().get("active_provider", "")
 
     def set_active_provider_key(self, key: str):
-        data = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+        data = self._read_config()
         data["active_provider"] = key
         self._save_config(data)
         self.invalidate_cache()
@@ -152,13 +152,7 @@ class ProviderManager:
         return self._get_config_data().get("api_keys", {}).get(key, "")
 
     def set_provider_api_key(self, key: str, api_key: str):
-        data = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+        data = self._read_config()
         if "api_keys" not in data:
             data["api_keys"] = {}
         data["api_keys"][key] = api_key
@@ -167,13 +161,7 @@ class ProviderManager:
 
     def set_provider_model(self, key: str, model_name: str):
         """Saves selected model for provider to config and provider definition"""
-        data = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+        data = self._read_config()
         if "provider_models" not in data:
             data["provider_models"] = {}
         data["provider_models"][key] = model_name
@@ -192,13 +180,7 @@ class ProviderManager:
         self.invalidate_cache()
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
-        data = {}
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception:
-                data = {}
+        data = self._read_config()
 
         efforts = data.setdefault("provider_thinking_efforts", {})
         provider_efforts = efforts.setdefault(provider_key, {})

@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
+from core.config import CONFIG_DIR
 from core.mcp_manager import get_mcp_manager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 
@@ -60,7 +61,7 @@ class MCPScreen(BaseModalScreen[None]):
         opt_list.clear_options()
 
         if not self.servers:
-            opt_list.add_option("*No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)*")
+            opt_list.add_option(f"*No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)*")
             self.filtered_servers = []
             return
 

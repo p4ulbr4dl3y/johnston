@@ -90,7 +90,7 @@ class TestCLI(unittest.TestCase):
         with redirect_stdout(f):
             print_subagents()
         output = f.getvalue()
-        self.assertIn("Available Subagent Definitions & Roles:", output)
+        self.assertIn("Available Subagent Roles:", output)
 
     @patch("sys.argv", ["johnston", "-v"])
     def test_main_version(self):
@@ -375,11 +375,11 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.role_registry.RoleRegistry") as mock_cls:
             reg = MagicMock()
-            reg.list_definitions.return_value = {}
+            reg.list_subagent_roles.return_value = {}
             mock_cls.get_instance.return_value = reg
             with redirect_stdout(f):
                 print_subagents()
-        self.assertIn("No subagent definitions found", f.getvalue())
+        self.assertIn("No subagent roles found", f.getvalue())
 
     def test_print_subagents_with_defs(self):
         f = io.StringIO()
@@ -389,7 +389,7 @@ class TestCLIAdvanced(unittest.TestCase):
             dval.allowed_tools = ["shell"]
             dval.model = "gpt-4o"
             dval.source = "builtin"
-            reg.list_definitions.return_value = {"worker": dval}
+            reg.list_subagent_roles.return_value = {"worker": dval}
             mock_cls.get_instance.return_value = reg
             with redirect_stdout(f):
                 print_subagents()

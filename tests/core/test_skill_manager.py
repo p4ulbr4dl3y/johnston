@@ -118,7 +118,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "SKILL.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "cli_flags.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "mcp.md")))
-        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "modes.md")))
+        self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "roles.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "linters.md")))
 
     def test_nested_reference_md_ignored_as_skill(self):

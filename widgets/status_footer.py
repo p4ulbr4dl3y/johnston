@@ -118,7 +118,7 @@ class StatusFooter(Static):
             subagents_active = max(st_running, bg_running)
             subagents_total = max(len(sessions), len(subagents_bg))
 
-            agent_mode = getattr(agent, "mode", "action")
+            agent_mode = getattr(agent, "mode", "act")
 
             kwargs = {
                 "provider_key": pkey,

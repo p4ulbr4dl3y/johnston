@@ -96,7 +96,7 @@ def shell_env() -> dict[str, str]:
     return env
 
 
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tiff", ".heic", ".svg"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg", ".heic"}
 
 
 def is_image_file(path_str: str) -> bool:

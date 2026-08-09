@@ -5,11 +5,8 @@ import subprocess
 import time
 from typing import Any, Dict, Tuple
 
+from core.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
-
-IMAGE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"
-}
 
 DOC_EXTENSIONS = {
     ".pdf", ".docx", ".pptx", ".xlsx", ".epub"

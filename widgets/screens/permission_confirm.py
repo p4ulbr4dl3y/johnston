@@ -65,7 +65,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
 
         # Generate diff for Edit tools
         if self.tool_name in ("edit", "replace_file_content", "multi_replace_file_content", "multi_edit"):
-            from widgets.code_syntax import build_edit_diff_text
+            from widgets.lexer_utils import build_edit_diff_text
             return build_edit_diff_text(self.args, target_path or "file")
 
         return ""

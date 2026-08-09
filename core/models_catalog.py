@@ -13,6 +13,7 @@ from typing import Dict, Iterable, List, Set
 import httpx
 
 from core.config import CONFIG_DIR
+from core.defaults.config import DEFAULT_CONTEXT_LIMIT
 from core.platform_utils import atomic_write_json, read_json
 
 MODELS_DEV_URL = "https://models.dev/api.json"
@@ -20,8 +21,6 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_catalog_cache.json")
 CACHE_TTL = 86400  # 24 hours
-
-DEFAULT_CONTEXT_LIMIT = 128000
 
 
 def format_context_tokens(tokens: int) -> str:
@@ -90,7 +89,7 @@ class ModelsCatalog:
         except Exception as e:
             print(f"Error saving models catalog cache: {e}")
 
-    async def refresh(self, force: bool = False, max_age: float = 86400) -> Dict[str, int]:
+    async def refresh(self, force: bool = False, max_age: float = CACHE_TTL) -> Dict[str, int]:
         if not force and self._limits and (time.time() - getattr(self, "_updated_at", 0.0) < max_age):
             return self._limits
 
