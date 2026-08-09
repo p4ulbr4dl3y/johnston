@@ -15,6 +15,13 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(normalize_tool_name("write_to_file"), "create")
         self.assertEqual(normalize_tool_name("unknown_tool"), "unknown_tool")
         self.assertEqual(normalize_tool_name(""), "")
+        # Canonical registry names win over alias entries
+        self.assertEqual(normalize_tool_name("multi_edit"), "multi_edit")
+        # Newly added aliases
+        self.assertEqual(normalize_tool_name("apply_patch"), "edit")
+        self.assertEqual(normalize_tool_name("curl"), "web_fetch")
+        self.assertEqual(normalize_tool_name("delegate"), "invoke_subagent")
+        self.assertEqual(normalize_tool_name("shells"), "manage_shell")
 
     def test_normalize_tool_args(self):
         # Test shell argument aliases
@@ -82,6 +89,22 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ALIAS_MAP["spawn_subagent"], "invoke_subagent")
         self.assertEqual(ALIAS_MAP["mcp"], "call_mcp")
         self.assertEqual(ALIAS_MAP["fetch"], "web_fetch")
+        self.assertEqual(ALIAS_MAP["patch"], "edit")
+        self.assertEqual(ALIAS_MAP["get"], "web_fetch")
+        self.assertEqual(ALIAS_MAP["shells"], "manage_shell")
+        self.assertNotIn("multi_edit", ALIAS_MAP)
+
+    async def test_execute_tool_multi_edit_routes_to_multiedit_tool(self):
+        # Canonical 'multi_edit' must reach MultiEditTool, not be aliased to 'edit'
+        from tools.edit import MultiEditTool
+        from tools.registry import REGISTRY
+        self.assertIs(REGISTRY["multi_edit"], MultiEditTool)
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("allow", "")
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm), \
+             patch.object(MultiEditTool, "execute", new=AsyncMock(return_value="MULTI_EDIT_OK")):
+            res = await execute_tool("multi_edit", {"target_file": "x.py", "replacement_chunks": []})
+        self.assertEqual(res, "MULTI_EDIT_OK")
 
     async def test_execute_tool_execution_exception(self):
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):

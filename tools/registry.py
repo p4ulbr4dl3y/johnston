@@ -45,18 +45,22 @@ ALIAS_MAP: Dict[str, str] = {
     "edit_file": "edit",
     "replace_file_content": "edit",
     "multi_replace_file_content": "edit",
-    "multi_edit": "edit",
-    "subagent": "invoke_subagent",
-    "spawn_subagent": "invoke_subagent",
-    "run_subagent": "invoke_subagent",
-    "call_mcp_tool": "call_mcp",
-    "mcp": "call_mcp",
-    "execute_mcp": "call_mcp",
     "update_file": "edit",
     "modify_file": "edit",
     "str_replace_editor": "edit",
     "replace": "edit",
     "multi_replace": "edit",
+    "patch": "edit",
+    "apply_patch": "edit",
+    "subagent": "invoke_subagent",
+    "spawn_subagent": "invoke_subagent",
+    "run_subagent": "invoke_subagent",
+    "delegate": "invoke_subagent",
+    "spawn": "invoke_subagent",
+    "run_agent": "invoke_subagent",
+    "call_mcp_tool": "call_mcp",
+    "mcp": "call_mcp",
+    "execute_mcp": "call_mcp",
     "terminal": "shell",
     "exec": "shell",
     "run_command": "shell",
@@ -70,8 +74,14 @@ ALIAS_MAP: Dict[str, str] = {
     "fetch": "web_fetch",
     "fetch_url": "web_fetch",
     "browse": "web_fetch",
+    "get": "web_fetch",
+    "curl": "web_fetch",
     "subagents": "manage_subagent",
     "kill_subagent": "manage_subagent",
+    "shells": "manage_shell",
+    "processes": "manage_shell",
+    "manage_processes": "manage_shell",
+    "bg_processes": "manage_shell",
 }
 
 
@@ -226,6 +236,8 @@ def normalize_tool_name(name: str) -> str:
     if not name:
         return ""
     clean = name.strip().lower()
+    if clean in REGISTRY:
+        return clean
     return ALIAS_MAP.get(clean, clean)
 
 
@@ -235,7 +247,7 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
         return {}
 
     clean_name = (tool_name or "").strip().lower()
-    resolved_name = ALIAS_MAP.get(clean_name, clean_name)
+    resolved_name = clean_name if clean_name in REGISTRY else ALIAS_MAP.get(clean_name, clean_name)
     param_aliases = PARAM_ALIAS_MAP.get(resolved_name, {})
 
     normalized = dict(args)
@@ -324,7 +336,7 @@ async def check_and_confirm_permission(
 async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> str:
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
-    resolved_name = ALIAS_MAP.get(clean_name, clean_name)
+    resolved_name = clean_name if clean_name in REGISTRY else ALIAS_MAP.get(clean_name, clean_name)
     args = normalize_tool_args(resolved_name, args)
 
     tool_cls = REGISTRY.get(resolved_name)
