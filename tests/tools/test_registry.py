@@ -55,8 +55,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(norm_invoke["subagent_type"], "explorer")
         norm_manage = normalize_tool_args("manage_subagent", {"task_id": "sub-2", "id": "sub-2"})
         self.assertEqual(norm_manage["session_id"], "sub-2")
-        # manage_task keeps its own task_id canonical arg untouched
-        norm_task = normalize_tool_args("manage_task", {"task_id": "bash-1"})
+        # manage_shell keeps its own task_id canonical arg untouched
+        norm_task = normalize_tool_args("manage_shell", {"task_id": "bash-1"})
         self.assertEqual(norm_task["task_id"], "bash-1")
 
     def test_get_default_tools(self):

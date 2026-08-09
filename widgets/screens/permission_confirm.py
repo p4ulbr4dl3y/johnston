@@ -99,7 +99,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 action_desc = f"Agent wants to launch subagent `{role}` with prompt:"
             else:
                 action_desc = f"Agent wants to launch subagent `{role}`"
-        elif self.tool_name in ("manage_task", "task"):
+        elif self.tool_name in ("manage_shell",):
             act = (self.args.get("action") or "manage").lower()
             t_id = self.args.get("task_id") or self.args.get("TaskId") or ""
 
@@ -156,7 +156,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name in ("manage_task", "task") and (self.args.get("action") or "").lower() == "send_input":
+            elif self.tool_name in ("manage_shell",) and (self.args.get("action") or "").lower() == "send_input":
                 inp = self.args.get("input") or self.args.get("Input") or ""
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```text\n{inp.strip()}\n```", classes="modal-diff-view")
@@ -169,7 +169,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 "shell", "run_command", "bash",
                 "read", "view_file", "read_file",
                 "web_fetch", "fetch_url",
-                "manage_task", "task",
+                "manage_shell",
                 "invoke_subagent", "subagent",
             ):
                 args_str = json.dumps(self.args, indent=2, ensure_ascii=False)

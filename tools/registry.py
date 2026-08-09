@@ -7,8 +7,8 @@ from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.invoke_subagent import InvokeSubagentTool
+from tools.manage_shell import ManageShellTool
 from tools.manage_subagent import ManageSubagentTool
-from tools.manage_task import ManageTaskTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
 from tools.update_plan import UpdatePlanTool
@@ -22,7 +22,7 @@ TOOL_CLASSES = [
     ShellTool,
     AskUserTool,
     CallMCPTool,
-    ManageTaskTool,
+    ManageShellTool,
     InvokeSubagentTool,
     ManageSubagentTool,
     UpdatePlanTool,
@@ -70,9 +70,6 @@ ALIAS_MAP: Dict[str, str] = {
     "fetch": "web_fetch",
     "fetch_url": "web_fetch",
     "browse": "web_fetch",
-    "task": "manage_task",
-    "tasks": "manage_task",
-    "kill_task": "manage_task",
     "subagents": "manage_subagent",
     "kill_subagent": "manage_subagent",
 }
@@ -202,7 +199,7 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
         "ids": "session_id",
         "subagent_ids": "session_id",
     },
-    "manage_task": {
+    "manage_shell": {
         "cmd": "action",
         "command": "action",
         "id": "task_id",

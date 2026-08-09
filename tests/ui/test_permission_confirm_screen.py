@@ -101,8 +101,8 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             ("read", {"path": "c.py"}),
             ("web_fetch", {"url": "https://example.com"}),
             ("invoke_subagent", {"role": "coder", "prompt": "fix bug"}),
-            ("manage_task", {"action": "kill", "task_id": "t1"}),
-            ("manage_task", {"action": "send_input", "task_id": "t1", "input": "hello"}),
+            ("manage_shell", {"action": "kill", "task_id": "t1"}),
+            ("manage_shell", {"action": "send_input", "task_id": "t1", "input": "hello"}),
             ("other_tool", {"foo": "bar"}),
         ]
 
@@ -126,14 +126,14 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
 
-    async def test_compose_manage_task_status_list_other(self):
+    async def test_compose_manage_shell_status_list_other(self):
         cases = [
             {"action": "status", "task_id": "t1"},
             {"action": "list"},
             {"action": "unknown"},
         ]
         for args in cases:
-            screen = PermissionConfirmScreen("manage_task", args)
+            screen = PermissionConfirmScreen("manage_shell", args)
             async with HostApp(screen).run_test() as pilot:
                 await pilot.pause()
 

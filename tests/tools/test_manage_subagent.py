@@ -157,7 +157,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
                 self.tools = [
                     {"function": {"name": "read"}},
                     {"function": {"name": "invoke_subagent"}},
-                    {"function": {"name": "manage_task"}},
+                    {"function": {"name": "manage_shell"}},
                     {"function": {"name": "ask_user"}},
                     {"function": {"name": "shell"}},
                 ]
@@ -189,7 +189,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)
         self.assertNotIn("invoke_subagent", tool_names)
-        self.assertNotIn("manage_task", tool_names)
+        self.assertNotIn("manage_shell", tool_names)
         self.assertNotIn("ask_user", tool_names)
         self.assertIn("Subagent Type: WORKER", sess.agent.system_prompt)
 

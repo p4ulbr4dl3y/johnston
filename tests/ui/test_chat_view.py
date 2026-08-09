@@ -1275,7 +1275,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "[Background Task ID: 42] Command running\n"
             "Command is running in the background\n"
             "You will be notified automatically\n"
-            "Use manage_task to inspect\n"
+            "Use manage_shell to inspect\n"
             "real output"
         )
         cleaned = widget._clean_bash_output(text)
@@ -1345,7 +1345,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget3 = self._widget("ask_user", "", args={"question": "q?"})
         widget3.render_header()
 
-        widget4 = self._widget("manage_task", "", args={"task_id": "t1"})
+        widget4 = self._widget("manage_shell", "", args={"task_id": "t1"})
         widget4.render_header()
 
         widget5 = self._widget("my_custom_thing", "t", args={"a": 1})
@@ -1396,8 +1396,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_manage_task_and_expandable(self):
-        widget = self._widget("manage_task", "t", args={"description": "desc"})
+    def test_on_click_manage_shell_and_expandable(self):
+        widget = self._widget("manage_shell", "t", args={"description": "desc"})
         event = MagicMock()
         with patch("widgets.screens.subagent_screen.SubagentViewScreen"), patch.object(
             ToolCallWidget, "app", new_callable=PropertyMock
