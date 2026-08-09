@@ -562,7 +562,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         self.assertEqual(attempts, 1)
-        api_errors = [e for e in events if e[0] == "compaction_divider" and "API Error" in e[1]]
+        api_errors = [e for e in events if e[0] == "event_divider" and "API Error" in e[1]]
         self.assertEqual(len(api_errors), 1)
         self.assertIn("Invalid API key", api_errors[0][1])
 
@@ -950,7 +950,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         fake_cb.allow_request.assert_called_once_with("tprov")
-        self.assertEqual(events[-1][0], "compaction_divider")
+        self.assertEqual(events[-1][0], "event_divider")
         self.assertIn("Circuit breaker for provider 'tprov' is OPEN", events[-1][1])
 
     async def test_adapter_tool_call_usage_and_text_stream(self):
@@ -1025,7 +1025,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             async for evt in agent.stream_steps("hi"):
                 events.append(evt)
 
-        self.assertEqual(events[-1][0], "compaction_divider")
+        self.assertEqual(events[-1][0], "event_divider")
         self.assertIn("Stream chunk timeout", events[-1][1])
         self.assertIn("tprov", events[-1][1])
 
@@ -1245,7 +1245,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                         events.append(evt)
 
         notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
-        dividers = [e for e in events if e[0] == "compaction_divider" and e[1] == "Session Compacted"]
+        dividers = [e for e in events if e[0] == "event_divider" and e[1] == "Session Compacted"]
         self.assertEqual(len(notices), 1)
         self.assertEqual(len(dividers), 1)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))

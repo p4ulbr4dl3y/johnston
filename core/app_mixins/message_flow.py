@@ -197,8 +197,8 @@ class MessageFlowMixin:
                         await self.save_current_session_async()
                     except Exception:
                         pass
-                elif event_type == "compaction_divider":
-                    await chat_view.add_compaction_divider(val1 or "Session Compacted")
+                elif event_type == "event_divider":
+                    await chat_view.add_event_divider(val1 or "Session Compacted")
                     self.refresh_status_footer()
                     try:
                         await self.save_current_session_async()
@@ -231,7 +231,7 @@ class MessageFlowMixin:
                     except Exception:
                         pass
                 try:
-                    await chat_view.add_compaction_divider("Response Interrupted")
+                    await chat_view.add_event_divider("Response Interrupted")
                 except Exception:
                     pass
 

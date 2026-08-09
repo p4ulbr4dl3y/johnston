@@ -94,5 +94,5 @@ class TestAgentCircuitBreakerIntegration(unittest.IsolatedAsyncioTestCase):
             events.append(event)
 
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0][0], "compaction_divider")
+        self.assertEqual(events[0][0], "event_divider")
         self.assertIn("Circuit breaker for provider 'test_prov' is OPEN", events[0][1])

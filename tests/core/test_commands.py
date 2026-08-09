@@ -47,7 +47,7 @@ class MockChatView:
         self.children.append(msg)
         return msg
 
-    async def add_compaction_divider(self, text="Session Compacted"):
+    async def add_event_divider(self, text="Session Compacted"):
         d = MockDivider(text)
         self.dividers.append(d)
         return d

@@ -426,9 +426,9 @@ class CompactCommand(BaseCommand):
                 try:
                     from widgets.chat_view import ChatView
                     cv = app.query_one(ChatView)
-                    if cv and hasattr(cv, "add_compaction_divider"):
+                    if cv and hasattr(cv, "add_event_divider"):
                         chat_view = cv
-                        divider = await chat_view.add_compaction_divider("Compacting session...")
+                        divider = await chat_view.add_event_divider("Compacting session...")
                 except Exception:
                     pass
 
@@ -443,8 +443,8 @@ class CompactCommand(BaseCommand):
 
                     if divider and hasattr(divider, "update_title"):
                         divider.update_title(title)
-                    elif chat_view and hasattr(chat_view, "add_compaction_divider"):
-                        await chat_view.add_compaction_divider(title)
+                    elif chat_view and hasattr(chat_view, "add_event_divider"):
+                        await chat_view.add_event_divider(title)
 
                     if hasattr(app, "refresh_status_footer"):
                         app.refresh_status_footer()

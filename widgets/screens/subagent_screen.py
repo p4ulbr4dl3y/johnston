@@ -166,8 +166,8 @@ class SubagentViewScreen(BaseModalScreen[None]):
                     self.bot_msg = None
                 else:
                     self.bot_msg.set_stream_content(txt)
-        elif etype == "compaction_divider":
-            await chat_view.add_compaction_divider(evt.get("text", "Session Compacted"), animate=animate)
+        elif etype == "event_divider":
+            await chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
         elif etype == "status_change":
             pass
 

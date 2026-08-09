@@ -2,7 +2,7 @@ import asyncio
 
 from textual.containers import VerticalScroll
 
-from widgets.chat_messages import BotMessage, CompactionDivider, ThinkingWidget, UserMessage
+from widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
 from widgets.chat_tools import ToolCallWidget
 from widgets.chat_welcome import WelcomeWidget
 
@@ -98,9 +98,9 @@ class ChatView(VerticalScroll):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
-    async def add_compaction_divider(self, text: str = "Session Compacted", animate: bool = True) -> CompactionDivider:
+    async def add_event_divider(self, text: str = "Session Compacted", animate: bool = True) -> EventDivider:
         self.clear_welcome()
-        widget = CompactionDivider(text)
+        widget = EventDivider(text)
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)

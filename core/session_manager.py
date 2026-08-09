@@ -26,7 +26,7 @@ def normalize_messages(messages: Optional[List[Any]]) -> List[Dict[str, Any]]:
     - "bot": {"type": "bot", "text", optional "final"}
     - "thinking": {"type": "thinking", "text", optional "duration"}
     - "tool": {"type": "tool", "tool_type", "target", "args", optional "result_text"}
-    - "compaction_divider": {"type": "compaction_divider", "text"}
+    - "event_divider": {"type": "event_divider", "text"}
     - "status_change": {"type": "status_change", "status", optional "error"}
 
     Legacy stream events (thinking_start/delta/end, bot_chunk/delta/text,

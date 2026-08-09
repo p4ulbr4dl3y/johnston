@@ -293,9 +293,9 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
 
-    async def test_compaction_divider(self):
+    async def test_event_divider(self):
         async def stream(prompt, attachments=None):
-            yield ("compaction_divider", "Compacted", "")
+            yield ("event_divider", "Compacted", "")
 
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
@@ -519,7 +519,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
                 self.assertTrue(app.is_generating)
                 chat_view = app.query_one(ChatView)
-                chat_view.add_compaction_divider = unittest.mock.AsyncMock(side_effect=Exception("boom"))
+                chat_view.add_event_divider = unittest.mock.AsyncMock(side_effect=Exception("boom"))
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
@@ -652,7 +652,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
 
     async def test_compaction_save_exception(self):
         async def stream(prompt, attachments=None):
-            yield ("compaction_divider", "Compacted", "")
+            yield ("event_divider", "Compacted", "")
 
         app = JohnstonApp()
         calls = {"n": 0}

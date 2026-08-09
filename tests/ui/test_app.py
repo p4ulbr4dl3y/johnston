@@ -308,7 +308,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             chat_view = app.query_one(ChatView)
             await chat_view.add_user_message("Hello")
-            divider = await chat_view.add_compaction_divider("Response Interrupted")
+            divider = await chat_view.add_event_divider("Response Interrupted")
             self.assertEqual(divider.divider_title, "Response Interrupted")
 
             app.save_current_session()
@@ -316,7 +316,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(sess)
             msgs = sess.messages
             self.assertTrue(
-                any(m.get("type") == "compaction_divider" and m.get("text") == "Response Interrupted" for m in msgs)
+                any(m.get("type") == "event_divider" and m.get("text") == "Response Interrupted" for m in msgs)
             )
 
     async def test_click_event_handler(self):
