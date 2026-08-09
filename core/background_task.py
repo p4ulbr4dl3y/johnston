@@ -35,8 +35,9 @@ def process_carriage_returns(text: str) -> str:
 
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
-    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None, session_id: str = None):
+    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None, session_id: str = None, kind: str = "shell"):
         self.task_id = task_id
+        self.kind = kind
         self.command = command
         self.process = process
         self.output = []
@@ -202,6 +203,7 @@ class BackgroundSubagent:
     """Manages background subagent"""
     def __init__(self, task_id: str, description: str, task: asyncio.Task, session_id: str = None):
         self.task_id = task_id
+        self.kind = "subagent"
         self.command = f"Subagent: {description}"
         self.process = None
         self.output = []

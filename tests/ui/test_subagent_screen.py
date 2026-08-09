@@ -78,12 +78,46 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(len(events_received), 2)
         self.assertEqual(sess.status, "completed")
 
-    def test_bot_delta_cumulative_text_handling(self):
+    def test_bot_cumulative_text_handling(self):
         sess = self._mk("task-delta", "delta subagent", "prompt", role="explore")
-        sess.add_event({"type": "bot_delta", "text": "Hello"})
-        sess.add_event({"type": "bot_delta", "text": "Hello world"})
+        sess.add_event({"type": "bot", "text": "Hello"})
+        sess.add_event({"type": "bot", "text": "Hello world"})
         self.assertEqual(len(sess.messages), 1)
         self.assertEqual(sess.messages[0]["text"], "Hello world")
+
+    def test_record_subagent_step_canonical_format(self):
+        from core.subagent_tracker import record_subagent_step
+        sess = self._mk("task-canon", "canonical", "prompt")
+        acc = [""]
+        record_subagent_step(("thinking_start", "Thinking...", ""), sess, acc)
+        record_subagent_step(("thinking_delta", "Thinking... deep", ""), sess, acc)
+        record_subagent_step(("thinking_end", "1.0", "Final thought"), sess, acc)
+        record_subagent_step(("tool", "read", "x", {"path": "x"}), sess, acc)
+        record_subagent_step(("tool_result", "contents", ""), sess, acc)
+        record_subagent_step(("bot_chunk", "Hel", ""), sess, acc)
+        record_subagent_step(("bot_delta", "Hello world", ""), sess, acc)
+        record_subagent_step(("bot_text", "Final answer", ""), sess, acc)
+        record_subagent_step(("compaction_divider", "Session Compacted", ""), sess, acc)
+
+        msgs = sess.messages
+        self.assertEqual(msgs[0], {"type": "thinking", "text": "Final thought", "duration": 1.0})
+        self.assertEqual(
+            msgs[1],
+            {"type": "tool", "tool_type": "read", "target": "x", "args": {"path": "x"}, "result_text": "contents"},
+        )
+        self.assertEqual(msgs[2], {"type": "bot", "text": "Final answer", "final": True})
+        self.assertEqual(msgs[3], {"type": "compaction_divider", "text": "Session Compacted"})
+        self.assertEqual(acc[0], "Final answer")
+
+    def test_record_subagent_step_thinking_info_and_outro(self):
+        from core.subagent_tracker import record_subagent_step
+        sess = self._mk("task-info", "info", "prompt")
+        acc = [""]
+        record_subagent_step(("thinking", "Auto-compacting...", ""), sess, acc)
+        record_subagent_step(("bot_delta", "partial", ""), sess, acc)
+        record_subagent_step(("outro", "final", ""), sess, acc)
+        self.assertEqual(sess.messages[0], {"type": "thinking", "text": "Auto-compacting...", "duration": 0.0})
+        self.assertEqual(sess.messages[1], {"type": "bot", "text": "final", "final": True})
 
     def test_subagent_view_screen_initialization(self):
         sess = self._mk("task-789", "my subagent", "do something")
@@ -96,7 +130,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
 
     def test_session_persistence(self):
         sess = self._mk("task-persist", "Persistent Agent", "save to disk", role="explore")
-        sess.add_event({"type": "bot_text", "text": "persisted output"})
+        sess.add_event({"type": "bot", "text": "persisted output", "final": True})
         self.store.save(sess)
 
         # Reload from disk
@@ -139,15 +173,15 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
     async def test_render_all_event_types_pilot(self):
         sess = self._mk("task-events", "Event Agent", "prompt")
         sess.add_event({"type": "user", "text": "hello subagent"})
-        sess.add_event({"type": "thinking_start", "val1": "thinking..."})
-        sess.add_event({"type": "thinking_delta", "val1": " delta"})
-        sess.add_event({"type": "thinking_end", "duration": 1.0, "content": "thought done"})
-        sess.add_event({"type": "bot_delta", "text": "   "})  # empty text, will be removed when tool arrives
+        sess.add_event({"type": "thinking", "text": "thinking..."})
+        sess.add_event({"type": "thinking", "text": "thinking... delta"})
+        sess.add_event({"type": "thinking", "text": "thought done", "duration": 1.0})
+        sess.add_event({"type": "bot", "text": "   "})  # empty text, will be removed when tool arrives
         sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py", "args": {"path": "main.py"}})
-        sess.add_event({"type": "tool_result", "result_text": "file contents"})
-        sess.add_event({"type": "bot_chunk", "text": " chunk message 1"})
-        sess.add_event({"type": "bot_chunk", "text": " chunk message 2"})
-        sess.add_event({"type": "bot_text", "text": "bot text message"})
+        sess.add_event({"type": "tool", "result_text": "file contents"})
+        sess.add_event({"type": "bot", "text": " chunk message 1"})
+        sess.add_event({"type": "bot", "text": " chunk message 2"})
+        sess.add_event({"type": "bot", "text": "bot text message", "final": True})
         sess.add_event({"type": "status_change", "status": "completed"})
 
         screen = SubagentViewScreen("task-events")
@@ -157,7 +191,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
             # Add live event via store
-            sess.add_event({"type": "bot_chunk", "text": " live chunk"})
+            sess.add_event({"type": "bot", "text": " live chunk", "final": True})
             await pilot.pause(0.2)
             # Check action_quit_app
             with patch.object(screen.app, "exit") as mock_exit:
@@ -201,19 +235,18 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             # Test edge cases where state variables are None or empty
             screen.thinking_widget = None
-            await screen._render_event({"type": "thinking_delta", "val1": "orphaned delta"})
-            await screen._render_event({"type": "thinking_end", "duration": 0.5, "content": "orphaned end"})
+            await screen._render_event({"type": "thinking", "text": "orphaned delta"})
+            await screen._render_event({"type": "thinking", "text": "orphaned end", "duration": 0.5})
 
             screen.current_tool_widget = None
-            await screen._render_event({"type": "tool_result", "result_text": "orphaned result"})
+            await screen._render_event({"type": "tool", "result_text": "orphaned result"})
 
-            await screen._render_event({"type": "bot_delta", "text": ""})
-            await screen._render_event({"type": "bot_chunk", "text": ""})
-            await screen._render_event({"type": "bot_text", "text": ""})
+            await screen._render_event({"type": "bot", "text": ""})
+            await screen._render_event({"type": "bot", "text": ""})
 
-            # Bot chunk when bot_msg is None
+            # Bot when bot_msg is None
             screen.bot_msg = None
-            await screen._render_event({"type": "bot_chunk", "text": "fresh chunk"})
+            await screen._render_event({"type": "bot", "text": "fresh chunk"})
             self.assertEqual(screen.bot_msg.content, "fresh chunk")
 
             await pilot.press("escape")
@@ -221,8 +254,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_subagent_screen_widgets_not_expandable(self):
         sess = self._mk("task-select", "Select Agent", "prompt")
-        sess.add_event({"type": "thinking_start", "val1": "thinking..."})
-        sess.add_event({"type": "thinking_end", "duration": 1.0, "content": "thought done"})
+        sess.add_event({"type": "thinking", "text": "thinking..."})
+        sess.add_event({"type": "thinking", "text": "thought done", "duration": 1.0})
         sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py"})
 
         screen = SubagentViewScreen("task-select")

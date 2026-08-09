@@ -49,7 +49,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
         sess = self._mk_subagent("sub-2", "Refactor module", "clean up code", role="worker")
         sess.add_event({"type": "user", "text": "clean up code"})
-        sess.add_event({"type": "bot_text", "text": "Done cleaning."})
+        sess.add_event({"type": "bot", "text": "Done cleaning.", "final": True})
 
         res_status = await tool.execute({"action": "status", "task_id": "sub-2"})
         self.assertIn("sub-2", res_status)
@@ -140,7 +140,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_sync_success(self):
         tool = ManageSubagentTool()
-        sess = self._mk_subagent("sub-sm3")
+        sess = self._mk_subagent("sub-sm3", role="worker")
 
         class MockSubagent:
             def __init__(self):
@@ -154,6 +154,17 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
                 self._merged_tokens_output = 0
                 self._merged_total_tokens = 0
                 self._merged_cost_usd = 0.0
+                self.tools = [
+                    {"function": {"name": "read"}},
+                    {"function": {"name": "invoke_subagent"}},
+                    {"function": {"name": "manage_task"}},
+                    {"function": {"name": "ask_user"}},
+                    {"function": {"name": "shell"}},
+                ]
+                self.mode = ""
+                self.system_prompt = ""
+                self.allow_task = True
+                self.model = ""
 
             async def stream_steps(self, message):
                 yield ("bot_text", "Subagent reply text")
@@ -171,6 +182,16 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Subagent reply text", res)
         self.assertIsNotNone(sess.agent)
         self.assertEqual(sess.status, "completed")
+        # Role is reapplied on follow-up so behavior matches the original spawn
+        self.assertFalse(sess.agent.allow_task)
+        self.assertEqual(sess.agent.mode, "worker")
+        tool_names = [t["function"]["name"] for t in sess.agent.tools]
+        self.assertIn("read", tool_names)
+        self.assertIn("shell", tool_names)
+        self.assertNotIn("invoke_subagent", tool_names)
+        self.assertNotIn("manage_task", tool_names)
+        self.assertNotIn("ask_user", tool_names)
+        self.assertIn("Subagent Type: WORKER", sess.agent.system_prompt)
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()

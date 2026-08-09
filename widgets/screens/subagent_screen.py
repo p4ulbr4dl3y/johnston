@@ -115,47 +115,39 @@ class SubagentViewScreen(BaseModalScreen[None]):
 
         if etype == "user":
             await chat_view.add_user_message(evt.get("text", ""), animate=animate)
-        elif etype == "thinking_start":
-            self.thinking_widget = await chat_view.add_thinking_widget(evt.get("val1", ""), animate=animate)
-        elif etype == "thinking_delta":
-            if self.thinking_widget:
-                self.thinking_widget.update_thinking(evt.get("val1", ""))
-        elif etype == "thinking_end":
-            if self.thinking_widget:
-                self.thinking_widget.finish_thinking(evt.get("duration", 0.0), evt.get("content", ""))
+        elif etype == "thinking":
+            txt = evt.get("text", "")
+            if self.thinking_widget is None:
+                self.thinking_widget = await chat_view.add_thinking_widget(txt, animate=animate)
+            else:
+                self.thinking_widget.update_thinking(txt)
+            if evt.get("duration") is not None:
+                self.thinking_widget.finish_thinking(evt.get("duration", 0.0), txt)
                 self.thinking_widget = None
         elif etype == "tool":
-            if self.bot_msg and not self.bot_msg.content.strip():
-                try:
-                    self.bot_msg.remove()
-                except Exception:
-                    pass
-            self.bot_msg = None
-            self.current_tool_widget = await chat_view.add_tool_call(
-                evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {}), animate=animate
-            )
-        elif etype == "tool_result":
-            if self.current_tool_widget:
-                self.current_tool_widget.set_result(evt.get("result_text", ""))
-        elif etype == "bot_delta":
-            txt = evt.get("text", "")
-            if txt:
-                if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
-                self.bot_msg.content = txt
-        elif etype == "bot_chunk":
-            txt = evt.get("text", "")
-            if txt:
-                if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
-                self.bot_msg.content += txt
-        elif etype == "bot_text":
-            txt = evt.get("text", "")
-            if txt:
-                if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
-                self.bot_msg.content = txt
+            if "result_text" in evt:
+                if self.current_tool_widget:
+                    self.current_tool_widget.set_result(evt.get("result_text", ""))
+            else:
+                if self.bot_msg and not self.bot_msg.content.strip():
+                    try:
+                        self.bot_msg.remove()
+                    except Exception:
+                        pass
                 self.bot_msg = None
+                self.current_tool_widget = await chat_view.add_tool_call(
+                    evt.get("tool_type", ""), evt.get("target", ""), args=evt.get("args", {}), animate=animate
+                )
+        elif etype == "bot":
+            txt = evt.get("text", "")
+            if txt:
+                if self.bot_msg is None:
+                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
+                self.bot_msg.content = txt
+                if evt.get("final"):
+                    self.bot_msg = None
+        elif etype == "compaction_divider":
+            await chat_view.add_compaction_divider(evt.get("text", "Session Compacted"))
         elif etype == "status_change":
             pass
 

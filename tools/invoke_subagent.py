@@ -128,45 +128,9 @@ class InvokeSubagentTool(BaseTool):
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 
-        # Disable nested subagent spawning, background task management, and UI questions for subagents
-        subagent.allow_task = False
-        original_tools = getattr(subagent, "tools", []) or []
-        excluded_tools = {"invoke_subagent", "manage_subagent", "manage_task", "ask_user"}
-        subagent.tools = [
-            t for t in original_tools
-            if t.get("function", {}).get("name", "").lower() not in excluded_tools
-        ]
-
-        from core.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
-        from core.role_registry import RoleRegistry
-        registry = RoleRegistry.get_instance()
-        registry.load_roles(project_dir=project_dir)
-        definition = registry.get_role(subagent_type)
-
-        subagent.mode = definition.key
-        subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
-        if definition.model:
-            subagent.model = definition.model
-
-        if definition.read_only or definition.disallowed_tools or definition.allowed_tools:
-            subagent.tools = [
-                t for t in subagent.tools
-                if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
-            ]
-
-        import copy
-        subagent_tools_custom = []
-        for t in subagent.tools:
-            if isinstance(t, dict) and t.get("function", {}).get("name") == "shell":
-                t_copy = copy.deepcopy(t)
-                t_copy["function"]["description"] = (
-                    "Run a synchronous terminal command with a configurable timeout (default 60s, max 300s). "
-                    "Processes terminate on timeout. Always use non-interactive flags (e.g. -y, --non-interactive) to prevent hanging."
-                )
-                subagent_tools_custom.append(t_copy)
-            else:
-                subagent_tools_custom.append(t)
-        subagent.tools = subagent_tools_custom
+        # Apply role definition: system prompt, model, and tool filtering
+        from core.subagent_tracker import apply_subagent_role
+        apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
 
         from core.subagent_tracker import run_subagent_stream_bg
         from core.subagent_worktree import SubagentWorktreeManager

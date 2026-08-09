@@ -109,9 +109,9 @@ class TasksListScreen(BaseModalScreen[None]):
             bg_tasks = list(all_bg_tasks)
 
         for t in bg_tasks:
-            # Exclude subagent tasks stored in background_tasks to avoid duplication with SubagentTracker
+            # Exclude subagent tasks stored in background_tasks to avoid duplication with subagent sessions
             task_id = getattr(t, "task_id", "")
-            if task_id.startswith("subagent-") or type(t).__name__ == "BackgroundSubagent":
+            if getattr(t, "kind", "") == "subagent" or task_id.startswith("subagent-"):
                 continue
             if getattr(t, "is_background", False):
                 items.append({
@@ -219,7 +219,7 @@ class TasksListScreen(BaseModalScreen[None]):
         raw = item["raw_obj"]
         is_subagent = (
             item["kind"] == "agent"
-            or type(raw).__name__ == "BackgroundSubagent"
+            or getattr(raw, "kind", "") == "subagent"
             or item["id"].startswith("subagent-")
             or getattr(raw, "async_task", None) is not None
         )
@@ -242,7 +242,7 @@ class TasksListScreen(BaseModalScreen[None]):
         if idx is not None and idx < len(tasks):
             item = tasks[idx]
             raw = item["raw_obj"]
-            is_subagent = item["kind"] == "agent" or type(raw).__name__ == "BackgroundSubagent"
+            is_subagent = item["kind"] == "agent" or getattr(raw, "kind", "") == "subagent"
             if is_subagent:
                 sess = raw
                 if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):
