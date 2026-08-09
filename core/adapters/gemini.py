@@ -4,7 +4,14 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import BaseApiAdapter, extract_image_payload, parse_tool_call_args
+from core.adapters.base import (
+    BaseApiAdapter,
+    build_adapter_usage_event,
+    check_httpx_response_status,
+    extract_image_details,
+    normalize_tool_arguments_str,
+    parse_tool_call_args,
+)
 from core.thinking_effort import build_gemini_thinking_config
 
 
@@ -63,18 +70,16 @@ class GeminiAdapter(BaseApiAdapter):
                 continue
             if role == "tool":
                 name = msg.get("name", "tool")
-                tcontent = msg.get("content", "")
-                parsed_img = extract_image_payload(tcontent)
+                img_info = extract_image_details(msg.get("content", ""))
 
-                if parsed_img and parsed_img.get("base64"):
-                    summary_text = parsed_img.get("summary", "[Image content]")
-                    media_type = parsed_img.get("media_type", "image/jpeg")
-                    b64_data = parsed_img.get("base64")
+                if img_info:
+                    summary_text, media_type, b64_data, _ = img_info
                     pending_tools.append({"functionResponse": {"name": name, "response": {"result": summary_text}}})
                     pending_tools.append({"text": f"Image preview ({summary_text}):"})
                     pending_tools.append({"inlineData": {"mimeType": media_type, "data": b64_data}})
                     continue
 
+                tcontent = msg.get("content", "")
                 if isinstance(tcontent, str):
                     try:
                         resp_obj = json.loads(tcontent) if tcontent.strip() else {}
@@ -109,8 +114,6 @@ class GeminiAdapter(BaseApiAdapter):
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_instruction, contents = self._to_gemini(messages)
         base = (base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
-        # alt=sse gives clean Server-Sent Events (data: lines) instead of a
-        # comma-separated JSON array, which is far simpler to parse incrementally.
         endpoint = f"{base}/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
         payload: Dict[str, Any] = {"contents": contents}
         if system_instruction:
@@ -136,14 +139,7 @@ class GeminiAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
-                if getattr(resp, "status_code", 200) >= 400:
-                    err_bytes = await resp.aread()
-                    err_body = err_bytes.decode("utf-8", errors="replace")
-                    raise httpx.HTTPStatusError(
-                        f"HTTP {resp.status_code}: {err_body}",
-                        request=resp.request,
-                        response=resp,
-                    )
+                await check_httpx_response_status(resp)
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
@@ -164,22 +160,18 @@ class GeminiAdapter(BaseApiAdapter):
                                 yield ("adapter_text", p["text"])
                             elif "functionCall" in p:
                                 fc = p.get("functionCall") or {}
-                                args = fc.get("args") or {}
-                                if not isinstance(args, str):
-                                    args = json.dumps(args, ensure_ascii=False)
                                 yield ("adapter_tool_call", {
                                     "id": f"call_{uuid.uuid4().hex[:8]}",
                                     "name": fc.get("name", ""),
-                                    "arguments": args or "{}",
+                                    "arguments": normalize_tool_arguments_str(fc.get("args")),
                                 })
 
                     um = evt.get("usageMetadata")
                     if um:
                         p_tok = um.get("promptTokenCount", 0) or 0
                         c_tok = um.get("candidatesTokenCount", 0) or 0
-                        yield ("adapter_usage", {
-                            "prompt_tokens": p_tok,
-                            "completion_tokens": c_tok,
-                            "total_tokens": um.get("totalTokenCount") or (p_tok + c_tok),
-                            "cache_read_tokens": 0,
-                        })
+                        yield build_adapter_usage_event(
+                            p_tok,
+                            c_tok,
+                            um.get("totalTokenCount") or (p_tok + c_tok),
+                        )

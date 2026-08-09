@@ -2,7 +2,11 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.adapters.base import BaseApiAdapter, extract_image_payload
+from core.adapters.base import (
+    BaseApiAdapter,
+    build_adapter_usage_event,
+    extract_image_details,
+)
 from core.thinking_effort import build_openai_thinking_kwargs
 
 
@@ -25,15 +29,10 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
             while i < n and isinstance(messages[i], dict) and messages[i].get("role") == "tool":
                 curr_msg = messages[i]
-                tcontent = curr_msg.get("content", "")
-                parsed_img = extract_image_payload(tcontent)
+                img_info = extract_image_details(curr_msg.get("content", ""))
 
-                if parsed_img and parsed_img.get("base64"):
-                    summary_text = parsed_img.get("summary", "[Image content]")
-                    media_type = parsed_img.get("media_type", "image/jpeg")
-                    b64_data = parsed_img.get("base64")
-                    detail_val = parsed_img.get("detail", "high")
-
+                if img_info:
+                    summary_text, media_type, b64_data, detail_val = img_info
                     tool_msg = dict(curr_msg)
                     tool_msg["content"] = summary_text
                     tool_batch.append(tool_msg)
@@ -96,12 +95,12 @@ class OpenAIAdapter(BaseApiAdapter):
                 prompt_details = getattr(u, "prompt_tokens_details", None)
                 if prompt_details:
                     cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
-                yield ("adapter_usage", {
-                    "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
-                    "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
-                    "total_tokens": getattr(u, "total_tokens", 0) or 0,
-                    "cache_read_tokens": cache_read,
-                })
+                yield build_adapter_usage_event(
+                    getattr(u, "prompt_tokens", 0),
+                    getattr(u, "completion_tokens", 0),
+                    getattr(u, "total_tokens", 0),
+                    cache_read,
+                )
             choices = getattr(chunk, "choices", None)
             if not choices and hasattr(chunk, "data"):
                 d = getattr(chunk, "data")
