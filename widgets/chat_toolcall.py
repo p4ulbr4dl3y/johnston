@@ -319,6 +319,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return True
         return self.tool_type in self.EXPANDABLE_TOOLS
 
+    def is_clickable_header(self) -> bool:
+        try:
+            if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
+                return False
+        except Exception:
+            pass
+        return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_shell")
+
     def __init__(self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None):
         classes = f"tool-call tool-{tool_type.lower()}"
         if is_sequential:
@@ -338,7 +346,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if result_text:
             self.status = "error" if self._check_is_error(result_text) else "done"
 
-        is_clickable = self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_shell")
+        is_clickable = self.is_clickable_header()
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
@@ -385,7 +393,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
-        if not self.is_expandable() and self.canonical_tool not in ("invoke_subagent", "manage_shell"):
+        if not self.is_clickable_header():
             self.is_expanded = False
             self.header_label.remove_class("tool-header-expandable")
             self.header_label.add_class("tool-header")
@@ -402,9 +410,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "edit": "Edit",
             "multi_edit": "Edit",
             "shell": "Shell",
+            "bash": "Shell",
             "ask_user": "AskUser",
-            "manage_shell": "ManageShell",
-            "invoke_subagent": "InvokeSubagent",
+            "manage_shell": "Background Task",
+            "invoke_subagent": "Subagent",
             "manage_subagent": "ManageSubagent",
             "web_fetch": "WebFetch",
             "update_plan": "UpdatePlan",
@@ -495,6 +504,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
 
     def on_click(self, event) -> None:
+        if not self.is_clickable_header():
+            return
         if self.canonical_tool in ("invoke_subagent", "manage_shell"):
             args = self.args if isinstance(self.args, dict) else {}
             session_id = args.get("session_id") or args.get("task_id") or getattr(self, "subagent_session_id", None)
