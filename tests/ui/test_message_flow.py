@@ -112,6 +112,49 @@ class TestQueueMessageUi(unittest.TestCase):
         self.assertEqual(len(obj.message_queue), 1)
 
 
+class TestHasQueuedMessages(unittest.TestCase):
+    def _agent(self, app):
+        agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+        agent.app = app
+        return agent
+
+    def test_no_app_returns_false(self):
+        agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
+        self.assertFalse(agent._has_queued_messages())
+
+    def test_subagent_returns_false(self):
+        app = MagicMock()
+        app.message_queue = [("hi", True, None, "s1")]
+        app.current_session_id = "s1"
+        agent = self._agent(app)
+        agent.is_subagent = True
+        self.assertFalse(agent._has_queued_messages())
+
+    def test_empty_queue_returns_false(self):
+        app = MagicMock()
+        app.message_queue = []
+        app.current_session_id = "s1"
+        self.assertFalse(self._agent(app)._has_queued_messages())
+
+    def test_matching_session_returns_true(self):
+        app = MagicMock()
+        app.message_queue = [("hi", True, None, "s1")]
+        app.current_session_id = "s1"
+        self.assertTrue(self._agent(app)._has_queued_messages())
+
+    def test_other_session_returns_false(self):
+        app = MagicMock()
+        app.message_queue = [("hi", True, None, "s_old")]
+        app.current_session_id = "s1"
+        self.assertFalse(self._agent(app)._has_queued_messages())
+
+    def test_none_session_item_matches(self):
+        app = MagicMock()
+        app.message_queue = [("hi", True, None)]
+        app.current_session_id = "s1"
+        self.assertTrue(self._agent(app)._has_queued_messages())
+
+
 class TestChatInputSubmitted(unittest.IsolatedAsyncioTestCase):
     async def test_empty_input_returns(self):
         app = JohnstonApp()

@@ -205,7 +205,6 @@ class MessageFlowMixin:
                     except Exception:
                         pass
         except (asyncio.CancelledError, RuntimeError, Exception) as e:
-            self.message_queue.clear()
             if thinking_widget:
                 try:
                     duration = time.time() - start_time
@@ -258,33 +257,28 @@ class MessageFlowMixin:
                     await self.save_current_session_async(force=True)
             except Exception:
                 pass
-            queued_items = []
-            curr_sid = getattr(self, "current_session_id", None)
-            while self.message_queue and getattr(self, "is_app_active", True):
-                candidate = self.message_queue.pop(0)
-                q_sid = candidate[3] if len(candidate) > 3 else None
-                if q_sid is not None and curr_sid is not None and q_sid != curr_sid:
-                    continue
-                queued_items.append(candidate)
+            self.is_generating = False
+            # Race guard: if a message was queued after the agent's last step
+            # check but before we finished, kick off a fresh generation.
+            if getattr(self, "is_app_active", True):
+                next_item = self._pop_queued_for_current_session()
+                if next_item is not None:
+                    asyncio.create_task(self._process_queued_message(
+                        next_item[0], next_item[1], next_item[2]
+                    ))
 
-            if queued_items:
-                prompts = [item[0] for item in queued_items if item[0]]
-                combined_prompt = "\n".join(prompts)
-                all_atts = []
-                for item in queued_items:
-                    atts = item[2] if len(item) > 2 and item[2] else None
-                    if atts:
-                        all_atts.extend(atts)
-                combined_atts = all_atts if all_atts else None
-                should_show = any(item[1] for item in queued_items if len(item) > 1 and item[1] is not None)
-                self.is_generating = False
-                asyncio.create_task(self._process_queued_message(combined_prompt, should_show, combined_atts))
-            else:
-                self.is_generating = False
+    def _pop_queued_for_current_session(self):
+        """Pop the first queued message bound to the current session, or None."""
+        curr_sid = getattr(self, "current_session_id", None)
+        for idx, item in enumerate(self.message_queue):
+            item_sid = item[3] if len(item) > 3 else None
+            if item_sid is None or curr_sid is None or item_sid == curr_sid:
+                return self.message_queue.pop(idx)
+        return None
 
-    async def _process_queued_message(self, prompt: str, show_in_ui: bool, attachments: list = None) -> None:
-        """Helper to trigger queued AI response on next event loop iteration after previous @work task finishes."""
-        await asyncio.sleep(0.01)
+    async def _process_queued_message(self, prompt, show_in_ui=True, attachments=None) -> None:
+        """Run a queued message on the next event-loop iteration after the @work task."""
+        await asyncio.sleep(0)
         self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:

@@ -235,9 +235,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/compact")
         self.assertTrue(handled)
         self.assertTrue(agent.compact_called)
-        self.assertEqual(len(triggered), 1)
-        self.assertEqual(triggered[0], ("Queued prompt during compact", True))
-        self.assertEqual(len(app.message_queue), 0)
+        # /compact does not drain the queue; it drains on the agent's next step.
+        self.assertEqual(len(triggered), 0)
+        self.assertEqual(len(app.message_queue), 1)
+        self.assertEqual(app.message_queue[0][0], "Queued prompt during compact")
 
     async def test_compact_command_cancellation_updates_divider(self):
         import asyncio

@@ -170,6 +170,21 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             logger.warning("%s: %s", error_prefix, e)
         return None
 
+    def _has_queued_messages(self) -> bool:
+        """True if the main app's queue has a message for the current session."""
+        app = getattr(self, "app", None)
+        if app is None or getattr(self, "is_subagent", False):
+            return False
+        mq = getattr(app, "message_queue", None)
+        if not mq:
+            return False
+        sid = getattr(app, "current_session_id", None)
+        for item in mq:
+            item_sid = item[3] if len(item) > 3 else None
+            if item_sid is None or sid is None or item_sid == sid:
+                return True
+        return False
+
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
@@ -227,6 +242,22 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
                 if messages and messages[0].get("role") == "system":
                     messages[0]["content"] = sys_prompt
+
+                # Drain queued user messages between agent steps (main app only).
+                app = getattr(self, "app", None)
+                if app is not None and not getattr(self, "is_subagent", False):
+                    mq = getattr(app, "message_queue", None)
+                    if mq:
+                        sid = getattr(app, "current_session_id", None)
+                        while mq:
+                            item = mq.pop(0)
+                            item_sid = item[3] if len(item) > 3 else None
+                            if item_sid is not None and sid is not None and item_sid != sid:
+                                # Different session: keep for that session, don't drop.
+                                mq.append(item)
+                                continue
+                            messages.append({"role": "user", "content": item[0]})
+                            yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
 
                 full_assistant_text = ""
                 step_usage = None
@@ -419,6 +450,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 if not tool_calls_dict:
                     messages.append({"role": "assistant", "content": full_assistant_text})
                     yield ("bot_text", full_assistant_text, "")
+                    # If user messages were queued during this turn, keep going
+                    # so the next while-iteration drains them as new steps.
+                    if self._has_queued_messages():
+                        continue
                     break
 
                 # Execute tool calls in the order the model emitted them. Dict insertion

@@ -175,6 +175,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async def fake_stream_steps(prompt, attachments=None):
             ran_prompts.append(prompt)
             ran_attachments.append(attachments)
+            # Emulate real agent: drain queued messages between steps.
+            mq = getattr(app, "message_queue", None)
+            while mq:
+                item = mq.pop(0)
+                ran_prompts.append(item[0])
+                ran_attachments.append(item[2] if len(item) > 2 else None)
             if False:
                 yield
 
@@ -202,8 +208,6 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ran_attachments[1], [fake_att])
                 self.assertFalse(app.is_generating)
                 self.assertEqual(len(app.message_queue), 0)
-                dividers = [c for c in app.query_one(ChatView).children if getattr(c, "divider_title", None) == "Queued Messages"]
-                self.assertEqual(len(dividers), 0)
 
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
@@ -244,7 +248,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.8)
 
                 self.assertIn("Prompt 1", ran_prompts)
-                self.assertNotIn("Prompt 2", ran_prompts)
+                # Queue is preserved on cancellation and processed by the race guard.
+                self.assertIn("Prompt 2", ran_prompts)
                 self.assertEqual(len(app.message_queue), 0)
                 chat_view = app.query_one(ChatView)
                 dividers = [c for c in chat_view.children if getattr(c, "divider_title", None) == "Response Interrupted"]
@@ -332,6 +337,14 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
         async def fake_stream_steps(prompt, attachments=None):
             ran_prompts.append(prompt)
+            mq = getattr(app, "message_queue", None)
+            sid = getattr(app, "current_session_id", None)
+            while mq:
+                item = mq.pop(0)
+                item_sid = item[3] if len(item) > 3 else None
+                if item_sid is not None and sid is not None and item_sid != sid:
+                    continue
+                ran_prompts.append(item[0])
             if False:
                 yield
 
@@ -356,6 +369,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                         break
 
                 self.assertEqual(ran_prompts, ["Current session prompt"])
+                # Old-session messages are dropped during drain.
                 self.assertEqual(len(app.message_queue), 0)
 
     async def test_background_command_session_binding(self):
@@ -399,7 +413,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             should_show = any(item[1] for item in queued if len(item) > 1 and item[1] is not None)
             self.assertFalse(should_show)
 
-    async def test_exception_clears_queue(self):
+    async def test_exception_preserves_queue(self):
         from unittest.mock import MagicMock, patch
 
         from core.base_provider import BaseAgent
@@ -420,13 +434,14 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 app.agent = agent
                 app.pm.create_active_agent = MagicMock(return_value=agent)
 
-                app.message_queue.append(("Should not run", False, None, app.current_session_id))
+                app.message_queue.append(("Pending", False, None, app.current_session_id))
                 app.generate_ai_response("Failing prompt")
                 for _ in range(40):
                     await pilot.pause(0.1)
-                    if len(app.message_queue) == 0 and not app.is_generating:
+                    if not app.is_generating:
                         break
 
+                # Queue survives the exception and is processed by the race guard.
                 self.assertEqual(len(app.message_queue), 0)
                 self.assertFalse(app.is_generating)
 
