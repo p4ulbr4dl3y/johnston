@@ -1,15 +1,9 @@
 import asyncio
-import difflib
 import os
 from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, atomic_write_text, resolve_path
-
-
-def _write_file(path: str, content: str) -> None:
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    atomic_write_text(path, content)
+from tools.base import BaseTool, make_unified_diff, resolve_path, write_file_text
 
 
 class CreateTool(BaseTool):
@@ -48,31 +42,22 @@ class CreateTool(BaseTool):
                 old_content = ""
 
         try:
-            await asyncio.to_thread(_write_file, path, content)
+            await asyncio.to_thread(write_file_text, path, content)
             linter_output = await get_linters_manager().run_for(path)
 
             if file_existed:
-                old_lines = old_content.splitlines()
-                new_lines = content.splitlines()
-                diff_lines = list(
-                    difflib.unified_diff(
-                        old_lines,
-                        new_lines,
-                        fromfile=f"a/{path}",
-                        tofile=f"b/{path}",
-                        lineterm="",
-                    )
-                )
-                if not diff_lines:
+                diff_text = make_unified_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
+                if not diff_text:
+                    new_lines = content.splitlines()
                     cnt = len(new_lines) or 1
                     diff_lines = [
                         f"--- a/{path}",
                         f"+++ b/{path}",
                         f"@@ -1,{cnt} +1,{cnt} @@",
                     ] + [" " + line for line in new_lines]
+                    diff_text = "\n".join(diff_lines)
 
-                diff_text = "\n".join(diff_lines).strip()
-                diff_part = f"\n\n{diff_text}" if diff_text else ""
+                diff_part = f"\n\n{diff_text.strip()}" if diff_text.strip() else ""
                 return f"OK: file '{path}' updated.{diff_part}{linter_output}"
             else:
                 return f"OK: file '{path}' created.{linter_output}"

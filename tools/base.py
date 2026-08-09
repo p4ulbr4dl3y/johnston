@@ -40,6 +40,60 @@ def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
     atomic_write_text(path, content)
 
 
+def write_file_text(path: str, content: str) -> None:
+    """Ensures parent directory exists and atomically writes text to file."""
+    atomic_write_text(path, content)
+
+
+def try_int(val: Any, default: int | None = None) -> int | None:
+    """Safely converts val to int, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def tail_output(text: str, max_chars: int = 2000) -> str:
+    """Returns tail of text with a truncation notice if max_chars is exceeded."""
+    if not text or len(text) <= max_chars:
+        return text
+    return f"... [Output truncated, showing last {max_chars} chars]\n{text[-max_chars:]}"
+
+
+def make_unified_diff(
+    old_content: str | list[str],
+    new_content: str | list[str],
+    fromfile: str = "old",
+    tofile: str = "new",
+) -> str:
+    """Generates unified diff text string from two strings or lists of lines."""
+    import difflib
+
+    old_l = old_content if isinstance(old_content, list) else old_content.splitlines()
+    new_l = new_content if isinstance(new_content, list) else new_content.splitlines()
+
+    diff_lines = list(difflib.unified_diff(
+        old_l,
+        new_l,
+        fromfile=fromfile,
+        tofile=tofile,
+        lineterm="",
+    ))
+    return "\n".join(diff_lines)
+
+
+def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: float = 0.4) -> list[str]:
+    """Returns close fuzzy matches using difflib."""
+    import difflib
+
+    if not word or not possibilities:
+        return []
+    return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
+
+
+
 def truncate_output(
     text: str,
     max_chars: int = 8000,

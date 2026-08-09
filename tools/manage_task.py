@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import BaseTool, tail_output
 
 
 class ManageTaskTool(BaseTool):
@@ -55,8 +55,7 @@ class ManageTaskTool(BaseTool):
                 return _task_not_found_msg(task_id)
             t = matching[0]
             out = t.get_formatted_output() if hasattr(t, "get_formatted_output") else "".join(t.output)
-            if len(out) > 4000:
-                out = "... [Output truncated, showing last 4000 chars]\n" + out[-4000:]
+            out = tail_output(out, 4000)
             if t.is_running:
                 return (
                     f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\n"
