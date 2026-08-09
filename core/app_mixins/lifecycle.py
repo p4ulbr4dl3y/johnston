@@ -54,7 +54,7 @@ class LifecycleMixin:
         from core.background_task import kill_all_background_tasks
         kill_all_background_tasks(getattr(self, "background_tasks", []))
         try:
-            from core.subagent_tracker import cancel_running_subagents
+            from core.subagent_stream import cancel_running_subagents
             cancel_running_subagents(self.sm)
         except Exception as err:
             logger.debug(f"Subagent cleanup error: {err}")

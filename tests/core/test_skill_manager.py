@@ -161,10 +161,10 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         os.chdir(self.old_cwd)
         SkillManager._instance = None
         app = MockApp()
-        handled = await handle_slash_command(app, "/johnston-architect /caveman refactor code")
+        handled = await handle_slash_command(app, "/johnston-guide /caveman refactor code")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("johnston-architect", app.ai_prompts[0][0])
+        self.assertIn("johnston-guide", app.ai_prompts[0][0])
         self.assertIn("caveman", app.ai_prompts[0][0])
         self.assertIn("refactor code", app.ai_prompts[0][0])
 

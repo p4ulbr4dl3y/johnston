@@ -123,10 +123,10 @@ class InvokeSubagentTool(BaseTool):
         session.add_event({"type": "user", "text": prompt})
 
         # Apply role definition: system prompt, model, and tool filtering
-        from core.subagent_tracker import apply_subagent_role
+        from core.subagent_stream import apply_subagent_role
         apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
 
-        from core.subagent_tracker import run_subagent_stream_bg
+        from core.subagent_stream import run_subagent_stream_bg
         from core.subagent_worktree import SubagentWorktreeManager
 
         def _cleanup_worktree_and_append_diff(acc):

@@ -41,26 +41,6 @@ class TestSessionManager(unittest.TestCase):
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded.messages[0]["text"], "hello")
 
-    def test_normalize_messages_legacy_to_canonical(self):
-        from core.session_manager import normalize_messages
-        raw = [
-            {"type": "user", "text": "hi"},
-            {"type": "thinking_start", "val1": "Thinking..."},
-            {"type": "thinking_delta", "val1": "Thinking... deep"},
-            {"type": "thinking_end", "duration": 1.0, "content": "Thought"},
-            {"type": "tool", "tool_type": "read", "target": "x", "args": {}},
-            {"type": "tool_result", "result_text": "ok"},
-            {"type": "bot_chunk", "text": "Hel"},
-            {"type": "bot_text", "text": "Hello world"},
-            {"type": "status_change", "status": "completed"},
-        ]
-        out = normalize_messages(raw)
-        self.assertEqual(out[0], {"type": "user", "text": "hi"})
-        self.assertEqual(out[1], {"type": "thinking", "text": "Thought", "duration": 1.0})
-        self.assertEqual(out[2], {"type": "tool", "tool_type": "read", "target": "x", "args": {}, "result_text": "ok"})
-        self.assertEqual(out[3], {"type": "bot", "text": "Hello world", "final": True})
-        self.assertEqual(out[4], {"type": "status_change", "status": "completed"})
-
     def test_message_count_counts_agent_loop_iterations(self):
         sid = self.store.generate_session_id()
         sess = self.store.create_main(sid)
@@ -72,35 +52,16 @@ class TestSessionManager(unittest.TestCase):
         ]
         self.assertEqual(self.store._message_count(sess), 2)
 
-    def test_message_count_legacy_fallback_to_user_messages(self):
-        sid = self.store.generate_session_id()
-        sess = self.store.create_main(sid)
-        sess.messages = [{"type": "user", "text": "a"}, {"type": "bot", "text": "b"}]
-        self.assertEqual(self.store._message_count(sess), 1)
-
     def test_message_count_empty(self):
         sid = self.store.generate_session_id()
         sess = self.store.create_main(sid)
         self.assertEqual(self.store._message_count(sess), 0)
 
-    def test_normalize_messages_canonical_passthrough(self):
-        from core.session_manager import normalize_messages
-        raw = [
-            {"type": "user", "text": "hi"},
-            {"type": "thinking", "text": "t", "duration": 2.0},
-            {"type": "tool", "tool_type": "read", "target": "x", "result_text": "ok"},
-            {"type": "bot", "text": "answer", "final": True},
-            {"type": "event_divider", "text": "Session Compacted"},
-        ]
-        self.assertEqual(normalize_messages(raw), raw)
-
-    def test_from_dict_normalizes_legacy_messages(self):
+    def test_from_dict_preserves_canonical_messages(self):
         sess = self.store.create_subagent(parent_id="main", subagent_id="legacy-1", role="worker")
         sess.messages = [
-            {"type": "thinking_start", "val1": "Thinking..."},
-            {"type": "thinking_end", "duration": 0.5, "content": "Done"},
-            {"type": "bot_chunk", "text": "hi"},
-            {"type": "bot_text", "text": "hello"},
+            {"type": "thinking", "text": "Done", "duration": 0.5},
+            {"type": "bot", "text": "hello", "final": True},
         ]
         self.store.save(sess)
         self.store._sessions.clear()

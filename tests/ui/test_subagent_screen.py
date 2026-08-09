@@ -32,7 +32,7 @@ def _make_store(tmpdir: str) -> SessionStore:
     return store
 
 
-class TestSubagentTrackerAndScreen(unittest.TestCase):
+class TestSubagentStreamAndScreen(unittest.TestCase):
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -86,7 +86,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(sess.messages[0]["text"], "Hello world")
 
     def test_record_subagent_step_canonical_format(self):
-        from core.subagent_tracker import record_subagent_step
+        from core.subagent_stream import record_subagent_step
         sess = self._mk("task-canon", "canonical", "prompt")
         acc = [""]
         record_subagent_step(("thinking_start", "Thinking...", ""), sess, acc)
@@ -110,7 +110,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "Final answer")
 
     def test_record_subagent_step_thinking_info_and_outro(self):
-        from core.subagent_tracker import record_subagent_step
+        from core.subagent_stream import record_subagent_step
         sess = self._mk("task-info", "info", "prompt")
         acc = [""]
         record_subagent_step(("thinking", "Auto-compacting...", ""), sess, acc)
