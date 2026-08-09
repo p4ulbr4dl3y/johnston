@@ -3,6 +3,7 @@ import os
 from typing import List, Optional
 
 from core.config import CONFIG_DIR
+from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 
 
 class RuleDefinition:
@@ -58,20 +59,10 @@ class RulesManager:
         p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
 
-        scanned_paths = set()
-        for dpath, source in dirs:
-            if not os.path.isdir(dpath):
-                continue
-            rpath = os.path.realpath(dpath)
-            if rpath in scanned_paths:
-                continue
-            scanned_paths.add(rpath)
-            for fname in sorted(os.listdir(dpath)):
-                fpath = os.path.join(dpath, fname)
-                if os.path.isfile(fpath) and (fname.endswith(".md") or fname.endswith(".markdown")):
-                    rule = self._parse_rule_file(fpath, source)
-                    if rule:
-                        rules.append(rule)
+        for fpath, source in iter_md_files(dirs):
+            rule = self._parse_rule_file(fpath, source)
+            if rule:
+                rules.append(rule)
 
         self.rules = rules
         return rules
@@ -84,32 +75,15 @@ class RulesManager:
                 return None
 
             base_name = os.path.splitext(os.path.basename(fpath))[0]
-            meta = {}
-            content = raw
-
-            if raw.startswith("---"):
-                parts = raw.split("---", 2)
-                if len(parts) >= 3:
-                    yaml_str = parts[1].strip()
-                    content = parts[2].strip()
-                    for line in yaml_str.splitlines():
-                        if ":" in line:
-                            k, v = line.split(":", 1)
-                            meta[k.strip().lower()] = v.strip().strip("\"'")
+            meta, content = parse_frontmatter(raw)
+            content = content.strip()
 
             name = meta.get("name") or base_name
             modes_raw = meta.get("mode") or meta.get("modes") or ""
             globs_raw = meta.get("globs") or meta.get("glob") or ""
 
-            modes = []
-            if modes_raw:
-                cleaned = modes_raw.strip("[]")
-                modes = [m.strip() for m in cleaned.split(",") if m.strip()]
-
-            globs = []
-            if globs_raw:
-                cleaned_g = globs_raw.strip("[]")
-                globs = [g.strip() for g in cleaned_g.split(",") if g.strip()]
+            modes = parse_csv_list(modes_raw)
+            globs = parse_csv_list(globs_raw)
 
             return RuleDefinition(
                 name=name,
