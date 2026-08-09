@@ -136,7 +136,7 @@ class SubagentWorktreeManager:
                     acc[0] = acc[0].rstrip() + (
                         f"\n\n[Worktree Branch '{wt_branch}']\n"
                         f"Changes updated on branch '{wt_branch}'. Run `git merge {wt_branch}` to apply.\n"
-                        f"After merging, ask the user via the ask_user tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
+                        f"After merging, ask the user via the `ask_user` tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
                         f"{diff_text}"
                     )
                 else:

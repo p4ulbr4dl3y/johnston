@@ -3,6 +3,7 @@ import os
 import re
 
 from core.platform_utils import terminate_process
+from tools.base import format_tool_error
 
 ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
@@ -151,7 +152,7 @@ class BackgroundTask:
 
     async def send_input(self, text: str) -> str:
         if not self.is_running:
-            return f"ERR: task '{self.task_id}' not running"
+            return format_tool_error("task", f"{self.task_id} not running")
         data = (text + "\n").encode("utf-8")
         try:
             if self.master_fd is not None:
@@ -162,9 +163,9 @@ class BackgroundTask:
                 await self.process.stdin.drain()
                 return f"OK: input sent to {self.task_id}"
             else:
-                return f"ERR: task '{self.task_id}' stdin not writable"
+                return format_tool_error("task", f"{self.task_id} stdin not writable")
         except Exception as e:
-            return f"ERR: send input to {self.task_id}: {e}"
+            return format_tool_error("task", f"send input to {self.task_id}: {e}")
 
     def kill_sync(self):
         self.was_killed = True

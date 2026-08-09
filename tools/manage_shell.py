@@ -46,7 +46,7 @@ class ManageShellTool(BaseTool):
 
         if action == "list":
             if not tasks:
-                return "OK: no tasks active"
+                return "no tasks active"
             lines = ["Active Background Tasks:"]
             for t in tasks:
                 status = "RUNNING" if t.is_running else "FINISHED"
@@ -69,7 +69,7 @@ class ManageShellTool(BaseTool):
                     f"you may call manage_shell(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{t.task_id}') to abort. "
                     "Otherwise, STOP calling manage_shell(status) in a loop and end your turn now."
                 )
-            return f"OK: {t.task_id} FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
+            return f"{t.task_id} FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 
         elif action in ("send_input", "input"):
             if not task_id:
@@ -103,7 +103,7 @@ class ManageShellTool(BaseTool):
                         t.process.kill()
                     t.is_running = False
                     ctx.refresh_status()
-                    return f"OK: {task_id} killed"
+                    return f"{task_id} killed"
                 except Exception as e:
                     return format_tool_error("kill", detail=str(e), name=task_id)
             return format_tool_error("notrunning", name=task_id)

@@ -62,6 +62,8 @@ class InvokeSubagentTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+        args = normalize_tool_args("invoke_subagent", args)
         ctx = self._ensure_context(app)
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
@@ -156,4 +158,4 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        return f"OK: subagent '{description}' launched ({session_id})"
+        return f"subagent '{description}' launched ({session_id})"

@@ -76,7 +76,7 @@ class UpdatePlanTool(BaseTool):
 
         completed_count = sum(1 for p in validated_plan if p["status"] == "completed")
         total_count = len(validated_plan)
-        summary = f"OK: plan updated ({completed_count}/{total_count} completed)"
+        summary = f"plan updated ({completed_count}/{total_count} completed)"
         if explanation:
             summary += f" {explanation}"
 

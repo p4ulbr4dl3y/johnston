@@ -32,7 +32,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("OK: file", res_create)
+        self.assertIn("file", res_create)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
@@ -81,7 +81,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             "old_string": "missing_line",
             "new_string": "replacement"
         })
-        self.assertIn("ERR: exact block not found", res_edit)
+        self.assertIn("ERR: match: exact block not found", res_edit)
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
@@ -181,7 +181,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertIn("OK: no tasks active", res_list)
+        self.assertIn("no tasks active", res_list)
 
     async def test_task_tool_foreground(self):
         import tempfile
@@ -208,7 +208,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "do research", "description": "research task"}, app=app)
-        self.assertIn("OK: subagent 'research task' launched", res)
+        self.assertIn("subagent 'research task' launched", res)
 
     async def test_task_tool_background(self):
         import tempfile
@@ -246,7 +246,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
-        self.assertIn("OK: subagent 'bg job' launched", res)
+        self.assertIn("subagent 'bg job' launched", res)
         # Subagents live in the session store, not in the shell task registry.
         self.assertEqual(app.background_tasks, [])
         sessions = _store.list(kind="subagent")

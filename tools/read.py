@@ -175,6 +175,8 @@ class ReadTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+        args = normalize_tool_args("read", args)
         ctx = self._ensure_context(app)
         raw_path = str(args.get("path") or "").strip()
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
@@ -249,7 +251,7 @@ class ReadTool(BaseTool):
                 return format_tool_error("doc", detail=str(e), name=path)
         else:
             try:
-                content_offset = args.get("offset", args.get("content_offset"))
+                content_offset = args.get("content_offset")
                 if content_offset is not None:
                     content_offset = max(0, try_int(content_offset, 0))
 
@@ -267,8 +269,8 @@ class ReadTool(BaseTool):
 
         from tools.utils import format_line_pagination
 
-        start_line = args.get("start", args.get("start_line"))
-        end_line = args.get("end", args.get("end_line"))
+        start_line = args.get("start_line")
+        end_line = args.get("end_line")
 
         raw_lines = [line.rstrip("\r\n") for line in lines]
         return format_line_pagination(

@@ -132,7 +132,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             {"questions": [{"question_text": "Cancel this?", "options": []}]},
             app=mock_app
         )
-        self.assertEqual(res, "OK: cancelled by user")
+        self.assertEqual(res, "cancelled by user")
 
     async def test_unknown_status_cancels(self):
         tool = AskUserTool()
@@ -144,7 +144,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
 
         mock_app.push_screen.side_effect = fake_push
         res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, app=mock_app)
-        self.assertIn("OK: cancelled by user", res)
+        self.assertIn("cancelled by user", res)
 
     async def test_execute_sorts_options_before_display(self):
         tool = AskUserTool()

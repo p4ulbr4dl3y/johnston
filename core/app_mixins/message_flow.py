@@ -179,14 +179,11 @@ class MessageFlowMixin:
                     if q_show:
                         await chat_view.add_user_message(q_msg, attachments=q_atts)
                     await self._create_git_checkpoint_async(chat_view)
-                elif event_type in ("bot_chunk", "bot_delta"):
+                elif event_type == "bot_delta":
                     if val1.strip():
                         if bot_msg is None:
                             bot_msg = await chat_view.add_bot_message()
-                        if event_type == "bot_delta":
-                            bot_msg.set_stream_content(val1)
-                        else:
-                            bot_msg.set_stream_content(bot_msg.content + val1)
+                        bot_msg.set_stream_content(val1)
                 elif event_type in ("bot_text", "outro"):
                     if val1.strip():
                         if bot_msg is None:

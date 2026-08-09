@@ -1,5 +1,5 @@
 
-from tools.base import try_int
+from tools.base import format_tool_error, try_int
 
 DEFAULT_LINE_WINDOW = 800
 
@@ -29,9 +29,11 @@ def format_line_pagination(
                 hint_str = "File has only 1 total line (e.g. minified JSON/log). Re-run read tool with start_line=1 and content_offset, or use shell tools (jq/grep)."
             else:
                 hint_str = f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
-            return (
-                f"ERR: start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
-                f"[Hint: {hint_str}]"
+            return format_tool_error(
+                "range",
+                f"start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
+                f"[Hint: {hint_str}]",
+                name="read",
             )
         start_line = start_line_int
 

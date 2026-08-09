@@ -28,7 +28,7 @@ DEFAULT_SUBAGENT_ROLES: Dict[str, dict] = {
             "### Role & Purpose\n"
             "Task execution subagent. Full tool access for code modifications, testing, and shell commands.\n\n"
             "### Action Guidelines\n"
-            "1. Precision Edits: Use edit for single modifications and multi_edit for multiple non-adjacent changes.\n"
+            "1. Precision Edits: Use `edit` for single modifications and `multi_edit` for multiple non-adjacent changes.\n"
             "2. Verification: Run linters or tests after edits to verify changes before completing.\n"
             "3. Clean State: Ensure working tree is clean and code builds cleanly upon task finish."
         ),

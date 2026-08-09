@@ -128,11 +128,11 @@ class AskUserTool(BaseTool):
 
                 if isinstance(res, str) and res.strip() and res != "cancelled":
                     return res
-                return "OK: cancelled by user"
+                return "cancelled by user"
             except asyncio.CancelledError:
                 if hasattr(ctx.app, "_pending_ask_user"):
                     setattr(ctx.app, "_pending_ask_user", None)
-                return "OK: cancelled by user"
+                return "cancelled by user"
             except Exception as e:
                 if hasattr(ctx.app, "_pending_ask_user"):
                     setattr(ctx.app, "_pending_ask_user", None)

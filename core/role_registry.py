@@ -6,6 +6,7 @@ from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.defaults.subagents import DEFAULT_SUBAGENT_ROLES
 from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
+from tools.base import format_tool_error
 
 
 class AgentRole:
@@ -59,15 +60,15 @@ class AgentRole:
 
         disallowed = [t.lower() for t in self.disallowed_tools]
         if clean in disallowed or resolved in disallowed:
-            return f"ERR: tool '{clean}' disabled in {self.name} role"
+            return format_tool_error(f"tool '{clean}' disabled in {self.name} role")
 
         if self.read_only and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
-            return f"ERR: tool '{clean}' disabled in read-only {self.name} role"
+            return format_tool_error(f"tool '{clean}' disabled in read-only {self.name} role")
 
         if self.allowed_tools:
             allowed = [t.lower() for t in self.allowed_tools]
             if clean not in allowed and resolved not in allowed:
-                return f"ERR: tool '{clean}' not in allowed tools list for {self.name} role"
+                return format_tool_error(f"tool '{clean}' not in allowed tools list for {self.name} role")
 
         return None
 
@@ -90,9 +91,9 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
         resolved = clean
 
     if clean in disallowed or resolved in disallowed:
-        return f"ERR: tool '{clean}' disabled in {getattr(role_def, 'name', 'Role')} role"
+        return format_tool_error(f"tool '{clean}' disabled in {getattr(role_def, 'name', 'Role')} role")
     if getattr(role_def, "read_only", False) and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
-        return f"ERR: tool '{clean}' disabled in read-only {getattr(role_def, 'name', 'Role')} role"
+        return format_tool_error(f"tool '{clean}' disabled in read-only {getattr(role_def, 'name', 'Role')} role")
     return None
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
@@ -106,7 +107,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "### Overview\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
             "### Action Rules\n"
-            "1. Precision Edits: Use edit for single edits and multi_edit for multiple non-adjacent edits.\n"
+            "1. Precision Edits: Use `edit` for single edits and `multi_edit` for multiple non-adjacent edits.\n"
             "2. Verification: Run tests or linters after editing to verify code changes.\n"
             "3. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
             "4. No Unsolicited Commits: Never execute git commits unless explicitly asked."
@@ -133,10 +134,10 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "### Overview\n"
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n\n"
             "### Critical Constraints\n"
-            "1. Code modification tools (create, edit, multi_edit) are DISABLED.\n"
+            "1. Code modification tools (`create`, `edit`, `multi_edit`) are DISABLED.\n"
             "2. You are STRICTLY PROHIBITED from running state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
             "3. Use shell ONLY for read-only inspection (ls/find/dir, grep/rg/select-string, git status, git log, git diff, cat/type).\n"
-            "4. NEVER call the ask_user tool to ask the user if they want to switch to Act mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to press Shift+Tab when ready.\n"
+            "4. NEVER call the `ask_user` tool to ask the user if they want to switch to Act mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to press Shift+Tab when ready.\n"
             "5. If the user asks to modify code, apply changes, or proceed with implementation while in Explore mode, NEVER claim you are applying changes. Immediately inform the user you are in read-only Explore mode and tell them to press Shift+Tab to switch to Act mode.\n\n"
             "### Response Guidelines\n"
             "1. Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
@@ -191,9 +192,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "3. Delegate mechanical, repeatable, and context-cheap work: isolated print/CLI "
             "functions, redirect_stdout tests, simple mocks, independent research, and "
             "independent experiments. These parallelize cleanly and transfer cheaply.\n"
-            "4. For analysis or reconnaissance, delegate to subagent_type 'explorer'. "
-            "For isolated execution, delegate to subagent_type 'worker'. Prefer "
-            "workspace='branch' for work that mutates state, then merge the branch.\n\n"
+            "4. For analysis or reconnaissance, delegate to `subagent_type` 'explorer'. "
+            "For isolated execution, delegate to `subagent_type` 'worker'. Prefer "
+            "`workspace='branch'` for work that mutates state, then merge the branch.\n\n"
             "### Orchestration Rules\n"
             "1. Decompose first, then delegate: lay out the subtasks and dependencies "
             "before launching anything.\n"
@@ -208,19 +209,19 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "duplicating that context across N subagents.\n"
             "5. Do not chain subagents recursively or delegate delegation — subagents "
             "cannot spawn subagents. You are the only orchestrator.\n"
-            "6. Use manage_subagent(action='status') sparingly to check on background work; "
+            "6. Use `manage_subagent(action='status')` sparingly to check on background work; "
             "never poll it in a loop. End your turn and let notifications arrive instead.\n\n"
             "### Integration Rules\n"
             "1. Collect and synthesize each subagent's <task_result> into a coherent "
             "response; do not dump raw results at the user.\n"
             "2. When subagents return on isolated branches, review the diffs, then ask the "
-            "user (via ask_user) before merging (`git merge <branch>`) and before deleting "
+            "user (via `ask_user`) before merging (`git merge <branch>`) and before deleting "
             "subagent-created branches (`git branch -D <branch>`).\n"
             "3. Verify integrated work with tests/linters before declaring completion. Pay "
             "special attention to regression in the shared harness (async workers, mocking "
             "read-only properties, UI event handlers) — that is the most expensive place for "
             "subagents to break silently.\n"
-            "4. Keep direct edits precise: use edit for single edits and multi_edit for "
+            "4. Keep direct edits precise: use `edit` for single edits and `multi_edit` for "
             "multiple non-adjacent edits. Never commit unless explicitly asked."
         ),
         scope="main_only",

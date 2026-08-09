@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, format_tool_error, make_unified_diff, resolve_path, write_file_text
+from tools.base import BaseTool, format_tool_error, make_unified_diff, read_file_text, resolve_path, write_file_text
 
 
 class CreateTool(BaseTool):
@@ -36,8 +36,7 @@ class CreateTool(BaseTool):
         old_content = ""
         if file_existed:
             try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    old_content = f.read()
+                old_content = read_file_text(path)
             except Exception:
                 old_content = ""
 
@@ -58,9 +57,9 @@ class CreateTool(BaseTool):
                     diff_text = "\n".join(diff_lines)
 
                 diff_part = f"\n\n{diff_text.strip()}" if diff_text.strip() else ""
-                return f"OK: file '{path}' updated.{diff_part}{linter_output}"
+                return f"file '{path}' updated.{diff_part}{linter_output}"
             else:
-                return f"OK: file '{path}' created.{linter_output}"
+                return f"file '{path}' created.{linter_output}"
         except Exception as e:
             return format_tool_error("file", detail=str(e), name=path)
 

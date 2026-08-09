@@ -13,7 +13,7 @@ from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERRO
 def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
     """Records a subagent execution step into the session in canonical message format.
 
-    Raw stream events (thinking_start/delta/end, bot_chunk/delta/text,
+    Raw stream events (thinking_start/delta/end, bot_delta/text,
     tool_result) are canonicalized here into shared types (thinking/bot/tool)
     before being appended via AgentSession.add_event.
     """
@@ -44,9 +44,6 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
     elif etype == "tool_result":
         session.add_event({"type": "tool", "result_text": val1})
-    elif etype == "bot_chunk":
-        text_accumulator[0] += val1
-        session.add_event({"type": "bot", "text": text_accumulator[0]})
     elif etype == "bot_delta":
         text_accumulator[0] = val1
         session.add_event({"type": "bot", "text": text_accumulator[0]})

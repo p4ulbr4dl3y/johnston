@@ -642,14 +642,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
 
-    async def test_bot_chunk_appends_content(self):
-        async def stream(prompt, attachments=None):
-            yield ("bot_delta", "hello", "")
-            yield ("bot_chunk", " world", "")
-
-        app = await self._run(stream)
-        self.assertFalse(app.is_generating)
-
     async def test_compaction_save_exception(self):
         async def stream(prompt, attachments=None):
             yield ("event_divider", "Compacted", "")
