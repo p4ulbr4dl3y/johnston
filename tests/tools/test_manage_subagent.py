@@ -115,17 +115,17 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
         self._mk_subagent("sub-sm1")
         res = await tool.execute({"action": "send_message", "session_id": "sub-sm1"}, app=MagicMock())
-        self.assertIn("ERR: 'message' required", res)
+        self.assertIn("ERR: params 'message': required", res)
 
     async def test_send_message_no_session_id(self):
         tool = ManageSubagentTool()
         res = await tool.execute({"action": "send_message", "message": "hi"})
-        self.assertIn("ERR: 'session_id' required for 'send_message'", res)
+        self.assertIn("ERR: params 'session_id': required for 'send_message'", res)
 
     async def test_send_message_task_not_found(self):
         tool = ManageSubagentTool()
         res = await tool.execute({"action": "send_message", "session_id": "ghost", "message": "hi"})
-        self.assertIn("ERR: session 'ghost' not found", res)
+        self.assertIn("ERR: notfound 'ghost'", res)
 
     async def test_send_message_no_agent_available(self):
         tool = ManageSubagentTool()
@@ -136,7 +136,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = None
         res = await tool.execute({"action": "send_message", "session_id": "sub-sm2", "message": "hi"}, app=mock_app)
-        self.assertIn("ERR: no active agent for sub-sm2", res)
+        self.assertIn("ERR: context 'sub-sm2': no active agent", res)
 
     async def test_send_message_sync_success(self):
         tool = ManageSubagentTool()
@@ -197,7 +197,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
         self._mk_subagent("sub-unk")
         res = await tool.execute({"action": "bogus", "session_id": "sub-unk"})
-        self.assertIn("ERR: unknown action 'bogus'", res)
+        self.assertIn("ERR: action 'bogus'", res)
         self.assertIn("bogus", res)
 
     async def test_send_message_background(self):
@@ -235,10 +235,10 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     async def test_status_and_kill_missing_session_id(self):
         tool = ManageSubagentTool()
         res_st = await tool.execute({"action": "status"})
-        self.assertIn("ERR: 'session_id' required for 'status'", res_st)
+        self.assertIn("ERR: params 'session_id': required for 'status'", res_st)
 
         res_kl = await tool.execute({"action": "kill"})
-        self.assertIn("ERR: 'session_id' required for 'kill'", res_kl)
+        self.assertIn("ERR: params 'session_id': required for 'kill'", res_kl)
 
 
 if __name__ == "__main__":

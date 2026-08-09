@@ -43,7 +43,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
         res = await tool.execute({"plan": ["invalid", {"step": ""}]})
-        self.assertIn("ERR: items need", res)
+        self.assertIn("ERR: params 'plan': items need", res)
 
     async def test_update_plan_app_integration(self):
         class MockApp:

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from tools.base import BaseTool
+from tools.base import BaseTool, format_tool_error
 
 
 class UpdatePlanTool(BaseTool):
@@ -41,7 +41,7 @@ class UpdatePlanTool(BaseTool):
         explanation = str(args.get("explanation") or "").strip()
 
         if not raw_plan or not isinstance(raw_plan, list):
-            return "ERR: 'plan' must be non-empty"
+            return format_tool_error("params", name="plan", detail="must be non-empty")
 
         validated_plan: List[Dict[str, str]] = []
         for idx, item in enumerate(raw_plan, start=1):
@@ -65,7 +65,7 @@ class UpdatePlanTool(BaseTool):
             })
 
         if not validated_plan:
-            return "ERR: items need 'step'/'status'"
+            return format_tool_error("params", name="plan", detail="items need 'step'/'status'")
 
         # Store active plan in app state if app exists
         if ctx.app:

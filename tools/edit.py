@@ -4,7 +4,7 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, make_unified_diff, resolve_path, try_int, write_file_text
+from tools.base import BaseTool, format_tool_error, make_unified_diff, resolve_path, try_int, write_file_text
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -255,9 +255,9 @@ def apply_chunk_replacements(
 async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> str:
     path = resolve_path(path_arg, cwd=cwd)
     if not path or not os.path.exists(path):
-        return f"ERR: file '{path}' not found"
+        return format_tool_error("file", name=path, detail="not found")
     if os.path.isdir(path):
-        return f"ERR: '{path}' is a directory"
+        return format_tool_error("file", name=path, detail="is a directory")
 
     def _do_edit():
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -271,7 +271,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
     except ValueError as ve:
         return str(ve)
     except Exception as e:
-        return f"ERR: file '{path}': {e}"
+        return format_tool_error("file", detail=str(e), name=path)
 
     linter_output = await get_linters_manager().run_for(path)
     return diff_output + linter_output

@@ -22,6 +22,9 @@ __all__ = [
     "make_unified_diff",
     "get_fuzzy_matches",
     "truncate_output",
+    "format_tool_error",
+    "maybe_truncate",
+    "format_background_notification",
     "BaseTool",
 ]
 
@@ -88,6 +91,50 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
         return []
     return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
 
+
+
+def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
+    """Unified error prefix for tool/agent messages.
+
+    Produces `ERR: <kind> '<name>': <detail>` (or `ERR: <kind>` when both name
+    and detail are empty). Matches the existing de-facto `ERR:` convention.
+    """
+    base = f"ERR: {kind}"
+    if name:
+        base += f" '{name}'"
+    if detail:
+        base += f": {detail}"
+    return base
+
+
+def maybe_truncate(
+    text: str,
+    max_chars: int = 8000,
+    anchor_head: bool = True,
+    suffix: str = "... [truncated]",
+) -> str:
+    """Token-efficient truncation: keep head (or tail) and append a short suffix.
+
+    Unlike truncate_output, this performs no log-file writes and no verbose
+    hints, so it is cheap for large tool payloads (file reads, shell output).
+    """
+    if not text or len(text) <= max_chars:
+        return text
+    if anchor_head:
+        return text[:max_chars] + suffix
+    return "..." + text[-max_chars:] + suffix
+
+
+def format_background_notification(kind: str, name: str, task_id: str, result: str) -> str:
+    """Unified template for background-task completion notifications.
+
+    Emitted as a user message when a background shell/subagent finishes:
+    `[System Notification] <kind> '<name>' (ID: <task_id>) completed.\n<task_result>\n<result>\n</task_result>`
+    """
+    return (
+        f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n"
+        f"<task_result>\n{result}\n</task_result>"
+    )
 
 
 def truncate_output(

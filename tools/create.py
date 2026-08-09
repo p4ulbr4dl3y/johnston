@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, make_unified_diff, resolve_path, write_file_text
+from tools.base import BaseTool, format_tool_error, make_unified_diff, resolve_path, write_file_text
 
 
 class CreateTool(BaseTool):
@@ -28,7 +28,7 @@ class CreateTool(BaseTool):
         ctx = self._ensure_context(app)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
         if os.path.isdir(path):
-            return f"ERR: '{path}' is a directory"
+            return format_tool_error("file", name=path, detail="is a directory")
 
         content = (args.get("content") or "").rstrip("\r\n")
 
@@ -62,5 +62,5 @@ class CreateTool(BaseTool):
             else:
                 return f"OK: file '{path}' created.{linter_output}"
         except Exception as e:
-            return f"ERR: file '{path}': {e}"
+            return format_tool_error("file", detail=str(e), name=path)
 

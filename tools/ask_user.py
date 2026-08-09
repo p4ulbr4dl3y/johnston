@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
-from tools.base import BaseTool
+from tools.base import BaseTool, format_tool_error
 
 
 def _is_recommended_option(opt: str) -> bool:
@@ -70,7 +70,7 @@ class AskUserTool(BaseTool):
             }]
 
         if not questions_list or not isinstance(questions_list, list):
-            return "ERR: invalid or missing 'questions' list"
+            return format_tool_error("params", name="questions", detail="missing or invalid")
 
         validated_questions = []
         for q in questions_list:
@@ -88,7 +88,7 @@ class AskUserTool(BaseTool):
             })
 
         if not validated_questions:
-            return "ERR: invalid or missing 'questions' list"
+            return format_tool_error("params", name="questions", detail="missing or invalid")
 
         if ctx.app and hasattr(ctx.app, "push_screen"):
             try:
@@ -136,8 +136,8 @@ class AskUserTool(BaseTool):
             except Exception as e:
                 if hasattr(ctx.app, "_pending_ask_user"):
                     setattr(ctx.app, "_pending_ask_user", None)
-                return f"ERR: prompt failed: {e}"
-        return "ERR: app instance not available"
+                return format_tool_error("prompt", detail=str(e))
+        return format_tool_error("context", name="app", detail="unavailable")
 
 
 

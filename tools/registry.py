@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
-from tools.base import BaseTool
+from tools.base import BaseTool, format_tool_error
 from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
@@ -373,7 +373,7 @@ async def check_and_confirm_permission(
     action, reason = pm.check_permission(target_perm_name, args, project_dir=project_dir)
 
     if action == "deny":
-        return f"ERR: tool '{display_name}' denied by permission policy"
+        return format_tool_error("denied", name=display_name, detail="by permission policy")
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             from widgets.screens.permission_confirm import PermissionConfirmScreen
@@ -385,9 +385,9 @@ async def check_and_confirm_permission(
                 if target_perm_name == "shell":
                     pm.set_session_override("shell_guard", "allow")
             elif res != "allow":
-                return f"ERR: tool '{display_name}' execution denied by user"
+                return format_tool_error("denied", name=display_name, detail="by user")
         else:
-            return f"ERR: tool '{display_name}' requires user confirmation ({reason})"
+            return format_tool_error("denied", name=display_name, detail=f"requires user confirmation ({reason})")
     return None
 
 
@@ -409,7 +409,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
             return await tool_inst.execute(args, ctx)
         except Exception as e:
-            return f"ERR: execute '{name}': {e}"
+            return format_tool_error("execute", detail=str(e), name=name)
 
     from core.mcp_manager import get_mcp_manager
     mcp_mgr = get_mcp_manager()
@@ -431,7 +431,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             resolved_target = ALIAS_MAP.get(matches[0], matches[0])
             desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
-        return f"ERR: unknown tool '{name}'{hint}"
+        return format_tool_error("unknown", detail=hint.strip(), name=name)
 
     from core.role_registry import RoleRegistry, role_tool_error
 
@@ -457,6 +457,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         if mcp_res is not None:
             return mcp_res
     except Exception as e:
-        return f"ERR: mcp '{name}': {e}"
+        return format_tool_error("mcp", detail=str(e), name=name)
 
-    return f"ERR: unknown tool '{name}'"
+    return format_tool_error("unknown", name=name)

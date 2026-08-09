@@ -8,7 +8,7 @@ from core.session_manager import (
     STATUS_ERROR,
     SessionStore,
 )
-from tools.base import BaseTool
+from tools.base import BaseTool, format_tool_error
 
 
 class ManageSubagentTool(BaseTool):
@@ -70,11 +70,11 @@ class ManageSubagentTool(BaseTool):
             return "\n".join(lines)
 
         if not session_id:
-            return "ERR: 'session_id' required for '" + action + "'"
+            return format_tool_error("params", name="session_id", detail=f"required for '{action}'")
 
         session = store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
         if not session:
-            return f"ERR: session '{session_id}' not found"
+            return format_tool_error("notfound", name=session_id)
 
         if action == "status":
             lines = [
@@ -118,7 +118,7 @@ class ManageSubagentTool(BaseTool):
 
         elif action == "send_message":
             if not message:
-                return "ERR: 'message' required for 'send_message'"
+                return format_tool_error("params", name="message", detail="required for 'send_message'")
 
             subagent = session.agent
             if not subagent:
@@ -155,7 +155,7 @@ class ManageSubagentTool(BaseTool):
                 subagent.cwd = project_dir
 
             if not subagent:
-                return f"ERR: no active agent for {session.id}"
+                return format_tool_error("context", name=session.id, detail="no active agent")
 
             session.status = "running"
             session.add_event({"type": "user", "text": message})
@@ -177,7 +177,8 @@ class ManageSubagentTool(BaseTool):
 
             run_bg = bool(args["background"]) if "background" in args else session.background if hasattr(session, "background") else True
             if run_bg:
-                notification_hdr = f"[System Notification] Follow-up to background subagent '{session.description}' (ID: {session.id}) completed."
+                from tools.base import format_background_notification
+                notification_hdr = format_background_notification("Subagent follow-up", session.description, session.id, "{result_text}")
                 bg_task = asyncio.create_task(
                     run_subagent_stream_bg(
                         subagent,
@@ -187,7 +188,7 @@ class ManageSubagentTool(BaseTool):
                         store,
                         cleanup_fn=_cleanup_followup,
                         error_prefix="Subagent message error",
-                        notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>",
+                        notification_template=notification_hdr,
                         session_id=session.id,
                         truncate_result=False,
                     )
@@ -205,11 +206,11 @@ class ManageSubagentTool(BaseTool):
                 except asyncio.CancelledError:
                     session.finish(STATUS_CANCELLED, "Cancelled by user")
                     store.save(session)
-                    return "ERR: subagent message cancelled"
+                    return format_tool_error("cancelled", name=session.id, detail="message cancelled")
                 except Exception as err:
                     session.finish(STATUS_ERROR, str(err))
                     store.save(session)
-                    return f"ERR: subagent message: {err}"
+                    return format_tool_error("subagent", detail=str(err), name=session.id)
                 finally:
                     _cleanup_followup(acc)
                     merge_subagent_metrics(subagent, ctx)
@@ -217,4 +218,4 @@ class ManageSubagentTool(BaseTool):
                 return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"
 
         else:
-            return f"ERR: unknown action '{action}'. Valid actions are: list, status, kill, send_message."
+            return format_tool_error("action", detail="valid: list, status, kill, send_message", name=action)

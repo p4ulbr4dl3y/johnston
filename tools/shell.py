@@ -12,7 +12,7 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
-from tools.base import BaseTool, tail_output, truncate_output
+from tools.base import BaseTool, format_tool_error, tail_output, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r'^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$', re.DOTALL)
 _TASK_ID_COUNTER = itertools.count(1)
@@ -60,10 +60,10 @@ class ShellTool(BaseTool):
             sec = float(m.group(1))
             remainder = (m.group(2) or "").strip()
             if sec > timeout:
-                return f"ERR: sleep duration ({sec}s) exceeds timeout ({timeout}s)"
+                return format_tool_error("reject", detail=f"sleep {sec}s exceeds timeout {timeout}s")
             await asyncio.sleep(sec)
             if not remainder:
-                return f"OK: slept {sec}s"
+                return f"slept {sec}s"
             cmd = remainder
 
         skip_confirm = bool(args.get("skip_confirm", False))
@@ -101,9 +101,9 @@ class ShellTool(BaseTool):
                 ctx.app.push_screen(screen, callback=on_dismiss)
                 confirmed = await future
                 if not confirmed:
-                    return "ERR: rejected by user"
+                    return format_tool_error("denied", name="shell", detail="by user")
             except Exception as e:
-                return f"ERR: permission prompt: {e}"
+                return format_tool_error("permission", detail=str(e), name="shell")
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
@@ -141,7 +141,7 @@ class ShellTool(BaseTool):
                         pass
                 res = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 if not res.strip():
-                    return "OK: executed (no output)"
+                    return "(no output)"
                 return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
             except asyncio.TimeoutError:
                 await terminate_process(p)
@@ -175,10 +175,8 @@ class ShellTool(BaseTool):
             task.start_reading(ctx.app, callback)
 
             return (
-                f"[Background Task ID: {task_id}] Command is running in background.\n\nRecent Output: (No output yet)\n\n"
-                "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
-                f"you may call manage_shell(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{task_id}') to abort. "
-                "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
+                f"[Background Task ID: {task_id}] running: '{cmd}'. "
+                f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
             )
 
         ctx.add_background_task(task)
@@ -207,10 +205,8 @@ class ShellTool(BaseTool):
                 else:
                     recent_output_str = "\n\nRecent Output: (No output yet)"
                 return (
-                    f"[Background Task ID: {task_id}] Command is running in background.{recent_output_str}\n\n"
-                    "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
-                    f"you may call manage_shell(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{task_id}') to abort. "
-                    "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
+                    f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
+                    f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
                 )
 
             if task.read_task:
@@ -221,7 +217,7 @@ class ShellTool(BaseTool):
             task.close_pty()
             res = task.get_formatted_output()
             if not res.strip():
-                return "OK: executed (no output)"
+                return "(no output)"
             return truncate_output(res, max_chars=4000, hint="Pipe output to grep/head/tail if complete log is needed.", tool_name="shell", from_end=True)
         except asyncio.TimeoutError:
             task.is_background = True
@@ -232,10 +228,8 @@ class ShellTool(BaseTool):
             else:
                 recent_output_str = "\n\nRecent Output: (No output yet)"
             return (
-                f"[Background Task ID: {task_id}] Command is running in background.{recent_output_str}\n\n"
-                "Note: If Recent Output shows an interactive prompt (e.g. asking for input, confirmation [y/N], password, or 'Press RETURN'), "
-                f"you may call manage_shell(action='send_input', task_id='{task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{task_id}') to abort. "
-                "Otherwise, STOP calling tools in a loop, inform the user that the command is running in the background, and end your turn."
+                f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
+                f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
             )
         except asyncio.CancelledError:
             if 'task' in locals() and task:

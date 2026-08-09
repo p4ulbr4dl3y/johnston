@@ -2,7 +2,7 @@ import inspect
 import json
 from typing import Any, Dict
 
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool, format_tool_error, truncate_output
 
 
 class CallMCPTool(BaseTool):
@@ -30,7 +30,7 @@ class CallMCPTool(BaseTool):
         arguments = args.get("arguments") or {}
 
         if not server or not tool:
-            return "ERR: 'server' and 'tool' params required"
+            return format_tool_error("params", name="server.tool", detail="required")
 
         from core.role_registry import RoleRegistry, role_tool_error
 
@@ -71,6 +71,6 @@ class CallMCPTool(BaseTool):
                     tool_name=f"mcp_{tool}",
                 )
         except Exception as e:
-            return f"ERR: failed '{server}.{tool}': {e}" + _get_schema_hint()
+            return format_tool_error("mcp", detail=str(e), name=f"{server}.{tool}") + _get_schema_hint()
 
-        return f"ERR: server/tool '{server}.{tool}' not found" + _get_schema_hint()
+        return format_tool_error("notfound", name=f"{server}.{tool}") + _get_schema_hint()

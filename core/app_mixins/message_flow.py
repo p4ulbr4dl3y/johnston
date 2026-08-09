@@ -286,10 +286,8 @@ class MessageFlowMixin:
         if not getattr(self, "is_app_active", True):
             return
         try:
-            msg = (
-                f"[System Notification] Background shell '{command_str}' (ID: {task_id}) completed.\n"
-                f"<task_result>\n{result}\n</task_result>"
-            )
+            from tools.base import format_background_notification
+            msg = format_background_notification("Background shell", command_str, task_id, result)
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:
                 self.message_queue.append((msg, False, None, curr_sid))

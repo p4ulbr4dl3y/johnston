@@ -46,7 +46,7 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
             res = await tool.execute({"server": "fs", "tool": "missing_tool"})
 
         self.assertIn("ERR", res)
-        self.assertIn("not found", res)
+        self.assertIn("ERR: notfound", res)
         self.assertIn("missing_tool", res)
 
     async def test_arguments_default_empty(self):

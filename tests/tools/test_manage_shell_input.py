@@ -41,4 +41,4 @@ class TestManageShellInput(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ctx
 
         res = await tool.execute({"action": "send_input", "task_id": "task_finished", "input": "test"}, app=mock_app)
-        self.assertIn("ERR: task 'task_finished' not running", res)
+        self.assertIn("ERR: notrunning 'task_finished'", res)

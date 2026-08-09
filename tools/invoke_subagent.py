@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.session_manager import SessionStore
-from tools.base import BaseTool
+from tools.base import BaseTool, format_tool_error
 
 MAX_SUBAGENT_RESULT_CHARS = 15000
 
@@ -69,7 +69,7 @@ class InvokeSubagentTool(BaseTool):
         workspace_mode = args.get("workspace", "inherit").strip().lower()
 
         if not prompt:
-            return "ERR: 'prompt' required"
+            return format_tool_error("params", name="prompt", detail="required")
 
         session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args["session_id"] = session_id
@@ -88,14 +88,13 @@ class InvokeSubagentTool(BaseTool):
         active_sessions = store.get_subagents_for_parent(parent_session_id) if parent_session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
-            return (
-                f"ERR: maximum concurrent subagents limit ({MAX_CONCURRENT_SUBAGENTS}) reached. "
-                "Wait for running subagents to finish or terminate them using `manage_subagent` action='kill'."
+            return format_tool_error(
+                "limit", detail=f"{MAX_CONCURRENT_SUBAGENTS} concurrent max; wait or manage_subagent(action='kill')"
             )
 
         subagent = ctx.create_agent()
         if not subagent:
-            return "ERR: no app context"
+            return format_tool_error("context", name="app", detail="unavailable")
         subagent.app = ctx.app
         subagent.is_subagent = True
 
@@ -136,7 +135,8 @@ class InvokeSubagentTool(BaseTool):
                 project_dir, wt_path, wt_branch, acc, is_followup=False
             )
 
-        notification_hdr = f"[System Notification] Background subagent '{description}' (ID: {session_id}) completed."
+        from tools.base import format_background_notification
+        notification_hdr = format_background_notification("Background subagent", description, session_id, "{result_text}")
         notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.)"
 
         bg_task = asyncio.create_task(
@@ -148,7 +148,7 @@ class InvokeSubagentTool(BaseTool):
                 store,
                 cleanup_fn=_cleanup_worktree_and_append_diff,
                 error_prefix="Subagent error",
-                notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>\n{notification_ftr}",
+                notification_template=f"{notification_hdr}\n{notification_ftr}",
                 session_id=session_id,
                 truncate_result=True,
             )
