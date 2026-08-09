@@ -462,18 +462,7 @@ class CompactCommand(BaseCommand):
                         app.save_current_session()
                     except Exception:
                         pass
-
-                if getattr(app, "message_queue", None):
-                    next_item = app.message_queue.pop(0)
-                    prompt = next_item[0]
-                    show_in_ui = next_item[1] if len(next_item) > 1 else True
-                    kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
-                    if hasattr(app, "trigger_ai_response"):
-                        app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
-                    else:
-                        app.is_generating = False
-                else:
-                    app.is_generating = False
+                app.is_generating = False
         else:
             app.notify("Active agent does not support context compaction", severity="warning")
 
