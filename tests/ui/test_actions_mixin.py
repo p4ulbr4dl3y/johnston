@@ -328,7 +328,8 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app._mouse_down_pos = (0, 0)
             app.screen.clear_selection = MagicMock()
-            app.screen.get_selected_text = MagicMock(return_value="")
+            app.screen.get_selected_text = MagicMock(return_value="selected chat text")
+            app.copy_to_clipboard = MagicMock()
             chat_view = MagicMock()
             chat_view.query.return_value = []
             with patch.object(app, "query_one", return_value=chat_view):
@@ -338,7 +339,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
                 event.widget = ChatView()
                 event.target = None
                 app.on_mouse_up(event)
-            app.screen.clear_selection.assert_called()
+            app.copy_to_clipboard.assert_called_once_with("selected chat text")
 
     async def test_on_mouse_up_welcome_query_clear(self):
         app = JohnstonApp()

@@ -244,3 +244,23 @@ async def terminate_process(process: Any, timeout: float = 1.0) -> None:
         except Exception:
             pass
 
+
+def copy_to_os_clipboard(text: str) -> None:
+    if not text:
+        return
+    try:
+        if is_windows():
+            p = subprocess.Popen(["clip"], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=text)
+        elif shutil.which("pbcopy"):
+            p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=text)
+        elif shutil.which("wl-copy"):
+            p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=text)
+        elif shutil.which("xclip"):
+            p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, text=True)
+            p.communicate(input=text)
+    except Exception:
+        pass
+

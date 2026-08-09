@@ -513,36 +513,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         "content": content_str
                     })
 
-                # Check for queued user messages to inject mid-generation
-                tool_app = getattr(self, "app", None)
-                if tool_app and getattr(tool_app, "message_queue", None):
-                    # Use a while loop to drain the queue in case multiple are queued
-                    curr_sid = getattr(tool_app, "current_session_id", None)
-                    while tool_app.message_queue:
-                        queued_item = tool_app.message_queue.pop(0)
-                        q_sid = queued_item[3] if len(queued_item) > 3 else None
-                        if q_sid is not None and curr_sid is not None and q_sid != curr_sid:
-                            continue
-                        q_msg = queued_item[0]
-                        q_show = queued_item[1] if len(queued_item) > 1 else True
-                        q_atts = queued_item[2] if len(queued_item) > 2 else None
-
-                        user_content = [{"type": "text", "text": q_msg}]
-                        if q_atts:
-                            for att in q_atts:
-                                att_path = getattr(att, "path", str(att))
-                                img_item = await self._process_attachment_image(
-                                    att_path, error_prefix="Error processing mid-generation attachment image"
-                                )
-                                if img_item:
-                                    user_content.append(img_item)
-
-                        yield ("queued_user_message", q_msg, q_atts, q_show)
-
-                        if len(user_content) == 1:
-                            messages.append({"role": "user", "content": q_msg})
-                        else:
-                            messages.append({"role": "user", "content": user_content})
 
                 self.history = messages[1:]
                 messages, compacted_in_loop = (

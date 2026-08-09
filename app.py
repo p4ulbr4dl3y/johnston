@@ -95,6 +95,15 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.message_queue = []
         self.is_generating = False
 
+    def copy_to_clipboard(self, text: str) -> None:
+        """Copy text to both Textual clipboard (OSC 52) and native OS clipboard."""
+        try:
+            super().copy_to_clipboard(text)
+        except Exception:
+            pass
+        from core.platform_utils import copy_to_os_clipboard
+        copy_to_os_clipboard(text)
+
 
 if __name__ == "__main__":
     main()
