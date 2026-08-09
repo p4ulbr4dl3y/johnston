@@ -1,3 +1,5 @@
+from rich.markup import escape
+
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -10,9 +12,10 @@ class ResumeScreen(BaseSelectionScreen[str]):
             title = " ".join(str(s.get('title', '')).replace("\n", " ").replace("\r", " ").split())
             max_title_len = 30
             title_text = f"{title[:max_title_len]}..." if len(title) > max_title_len else title
+            escaped_title = escape(title_text)
             count = s.get('message_count', 0)
             step_str = "step" if count == 1 else "steps"
-            options.append(f"{title_text} \\[{count} {step_str}]")
+            options.append(f"{escaped_title} [dim]{escape(f'[{count} {step_str}]')}[/dim]")
 
 
         items = [s["id"] for s in sessions]

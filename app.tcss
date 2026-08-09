@@ -468,6 +468,27 @@ SubagentViewScreen #modal-dialog {
     max-height: 90%;
 }
 
+SubagentViewScreen CustomMarkdownFence,
+SubagentViewScreen MarkdownFence {
+    background: #27272a;
+    border: none;
+    color: #f4f4f5;
+    padding: 0;
+    margin: 1 0;
+}
+
+SubagentViewScreen CustomMarkdownFence .fence-header,
+SubagentViewScreen MarkdownFence .fence-header {
+    display: none;
+}
+
+SubagentViewScreen CustomMarkdownFence #code-content,
+SubagentViewScreen MarkdownFence #code-content {
+    background: #27272a;
+    color: #f4f4f5;
+    padding: 0 1;
+}
+
 .modal-title {
     dock: top;
     width: 100%;

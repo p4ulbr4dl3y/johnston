@@ -256,7 +256,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         sess = self._mk("task-select", "Select Agent", "prompt")
         sess.add_event({"type": "thinking", "text": "thinking..."})
         sess.add_event({"type": "thinking", "text": "thought done", "duration": 1.0})
-        sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py"})
+        sess.add_event({"type": "tool", "tool_type": "edit", "target": "main.py"})
 
         screen = SubagentViewScreen("task-select")
         app = DummyHostApp(screen, store=self.store)
@@ -272,6 +272,28 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
+    async def test_subagent_screen_prompt_and_canonical_tool_history(self):
+        sess = self._mk("task-canon-hist", "Canon Agent", "My initial subagent prompt")
+        sess.add_event({"type": "tool", "tool_type": "shell", "target": "ls", "args": {"cmd": "ls"}, "result_text": "file.txt"})
+        sess.add_event({"type": "bot", "text": "Done", "final": True})
+
+        screen = SubagentViewScreen("task-canon-hist")
+        app = DummyHostApp(screen, store=self.store)
+        app.current_session_id = "sess-main"
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            from widgets.chat_messages import UserMessage
+            from widgets.chat_view import ToolCallWidget
+            um = screen.query_one(UserMessage)
+            self.assertIn("My initial subagent prompt", um.raw_text)
+            tc = screen.query_one(ToolCallWidget)
+            self.assertEqual(tc.tool_type, "shell")
+            self.assertEqual(tc.result_text, "file.txt")
+            await pilot.press("escape")
+            await pilot.pause()
+
 
 if __name__ == "__main__":
     unittest.main()
+
