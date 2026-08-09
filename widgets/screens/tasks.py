@@ -223,8 +223,8 @@ class TasksListScreen(BaseModalScreen[None]):
         )
         if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen
-            task_id = getattr(raw, "id", item["id"])
-            self.app.push_screen(SubagentViewScreen(task_id))
+            session_id = getattr(raw, "id", item["id"])
+            self.app.push_screen(SubagentViewScreen(session_id))
         else:
             self.app.push_screen(TaskConsoleScreen(raw))
 

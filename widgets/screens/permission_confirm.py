@@ -93,7 +93,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
             url = self.args.get("url") or self.args.get("Url") or ""
             action_desc = f"Agent wants to fetch `{url or 'URL'}`"
         elif self.tool_name in ("invoke_subagent", "subagent"):
-            role = self.args.get("role") or self.args.get("Role") or "Subagent"
+            role = self.args.get("subagent_type") or self.args.get("SubagentType") or self.args.get("role") or self.args.get("Role") or "Subagent"
             prompt = self.args.get("prompt") or self.args.get("Prompt") or ""
             if prompt:
                 action_desc = f"Agent wants to launch subagent `{role}` with prompt:"

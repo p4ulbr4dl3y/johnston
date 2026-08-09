@@ -248,7 +248,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
         self.assertIn("OK: subagent 'bg job' launched", res)
         self.assertEqual(len(app.background_tasks), 1)
-        self.assertTrue(app.background_tasks[0].task_id.startswith("subagent-"))
+        self.assertTrue(app.background_tasks[0].id.startswith("subagent-"))
 
     def test_truncate_output_helper(self):
         from tools.base import truncate_output

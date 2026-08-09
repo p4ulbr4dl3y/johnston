@@ -201,8 +201,8 @@ class BackgroundTask:
 
 class BackgroundSubagent:
     """Manages background subagent"""
-    def __init__(self, task_id: str, description: str, task: asyncio.Task, session_id: str = None):
-        self.task_id = task_id
+    def __init__(self, id: str, description: str, task: asyncio.Task, session_id: str = None):
+        self.id = id
         self.kind = "subagent"
         self.command = f"Subagent: {description}"
         self.process = None

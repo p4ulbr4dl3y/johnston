@@ -51,7 +51,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         sess.add_event({"type": "user", "text": "clean up code"})
         sess.add_event({"type": "bot", "text": "Done cleaning.", "final": True})
 
-        res_status = await tool.execute({"action": "status", "task_id": "sub-2"})
+        res_status = await tool.execute({"action": "status", "session_id": "sub-2"})
         self.assertIn("sub-2", res_status)
         self.assertIn("Refactor module", res_status)
         self.assertIn("[User]: clean up code", res_status)
@@ -64,12 +64,12 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
         sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
 
-        res_kill = await tool.execute({"action": "kill", "task_id": "sub-3"})
+        res_kill = await tool.execute({"action": "kill", "session_id": "sub-3"})
         self.assertIn("OK: sub-3 terminated", res_kill)
         self.assertEqual(sess.status, "cancelled")
 
         # Second kill on finished task
-        res_kill_again = await tool.execute({"action": "kill", "task_id": "sub-3"})
+        res_kill_again = await tool.execute({"action": "kill", "session_id": "sub-3"})
         self.assertIn("OK: sub-3 already in 'cancelled'", res_kill_again)
 
     def test_agent_session_deserialization(self):
@@ -114,17 +114,17 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     async def test_send_message_no_message(self):
         tool = ManageSubagentTool()
         self._mk_subagent("sub-sm1")
-        res = await tool.execute({"action": "send_message", "task_id": "sub-sm1"}, app=MagicMock())
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm1"}, app=MagicMock())
         self.assertIn("ERR: 'message' required", res)
 
-    async def test_send_message_no_task_id(self):
+    async def test_send_message_no_session_id(self):
         tool = ManageSubagentTool()
         res = await tool.execute({"action": "send_message", "message": "hi"})
-        self.assertIn("ERR: 'task_id' required for 'send_message'", res)
+        self.assertIn("ERR: 'session_id' required for 'send_message'", res)
 
     async def test_send_message_task_not_found(self):
         tool = ManageSubagentTool()
-        res = await tool.execute({"action": "send_message", "task_id": "ghost", "message": "hi"})
+        res = await tool.execute({"action": "send_message", "session_id": "ghost", "message": "hi"})
         self.assertIn("ERR: session 'ghost' not found", res)
 
     async def test_send_message_no_agent_available(self):
@@ -135,7 +135,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = None
-        res = await tool.execute({"action": "send_message", "task_id": "sub-sm2", "message": "hi"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm2", "message": "hi"}, app=mock_app)
         self.assertIn("ERR: no active agent for sub-sm2", res)
 
     async def test_send_message_sync_success(self):
@@ -177,7 +177,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
-        res = await tool.execute({"action": "send_message", "task_id": "sub-sm3", "message": "hello"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm3", "message": "hello"}, app=mock_app)
         self.assertIn("<task_result>", res)
         self.assertIn("Subagent reply text", res)
         self.assertIsNotNone(sess.agent)
@@ -196,7 +196,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_action(self):
         tool = ManageSubagentTool()
         self._mk_subagent("sub-unk")
-        res = await tool.execute({"action": "bogus", "task_id": "sub-unk"})
+        res = await tool.execute({"action": "bogus", "session_id": "sub-unk"})
         self.assertIn("ERR: unknown action 'bogus'", res)
         self.assertIn("bogus", res)
 
@@ -229,16 +229,16 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
 
-        res = await tool.execute({"action": "send_message", "task_id": "sub-bg", "message": "hello bg"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-bg", "message": "hello bg"}, app=mock_app)
         self.assertIn("OK: message sent to sub-bg", res)
 
-    async def test_status_and_kill_missing_task_id(self):
+    async def test_status_and_kill_missing_session_id(self):
         tool = ManageSubagentTool()
         res_st = await tool.execute({"action": "status"})
-        self.assertIn("ERR: 'task_id' required for 'status'", res_st)
+        self.assertIn("ERR: 'session_id' required for 'status'", res_st)
 
         res_kl = await tool.execute({"action": "kill"})
-        self.assertIn("ERR: 'task_id' required for 'kill'", res_kl)
+        self.assertIn("ERR: 'session_id' required for 'kill'", res_kl)
 
 
 if __name__ == "__main__":

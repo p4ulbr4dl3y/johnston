@@ -11,7 +11,7 @@ from tools.base import BaseTool
 MAX_SUBAGENT_RESULT_CHARS = 15000
 
 
-def _truncate_subagent_result(text: str, task_id: str = "") -> str:
+def _truncate_subagent_result(text: str, session_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
     is saved on truncation and the path is returned in the hint."""
@@ -21,7 +21,7 @@ def _truncate_subagent_result(text: str, task_id: str = "") -> str:
     import uuid
 
     from core.config import LOGS_DIR
-    log_name = f"{task_id or 'subagent'}-{uuid.uuid4().hex[:4]}.log"
+    log_name = f"{session_id or 'subagent'}-{uuid.uuid4().hex[:4]}.log"
     log_path = os.path.join(LOGS_DIR, log_name)
     try:
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -59,7 +59,7 @@ class InvokeSubagentTool(BaseTool):
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "subagent_type": {"type": "string", "description": "Subagent type: 'worker' (task execution) or 'explorer' (read-only analysis)"},
                     "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},
-                    "task_id": {"type": "string", "description": "Optional task ID"}
+                    "session_id": {"type": "string", "description": "Optional session ID for the spawned subagent (auto-generated if omitted)"}
                 },
                 "required": ["prompt", "description"]
             }
@@ -76,21 +76,21 @@ class InvokeSubagentTool(BaseTool):
         if not prompt:
             return "ERR: 'prompt' required"
 
-        task_id = args.get("task_id") or f"subagent-{uuid.uuid4().hex[:6]}"
-        args["task_id"] = task_id
+        session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
+        args["session_id"] = session_id
 
         if ctx.app and getattr(ctx.app, "current_tool_widget", None):
-            ctx.app.current_tool_widget.args["task_id"] = task_id
-            setattr(ctx.app.current_tool_widget, "subagent_task_id", task_id)
+            ctx.app.current_tool_widget.args["session_id"] = session_id
+            setattr(ctx.app.current_tool_widget, "subagent_session_id", session_id)
 
-        session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        parent_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
         if ctx.app and getattr(ctx.app, "sm", None):
             store = ctx.app.sm
         else:
             store = SessionStore.get_instance()
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
-        active_sessions = store.get_subagents_for_parent(session_id) if session_id else store.list(kind="subagent")
+        active_sessions = store.get_subagents_for_parent(parent_session_id) if parent_session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
             return (
@@ -110,14 +110,14 @@ class InvokeSubagentTool(BaseTool):
 
         if workspace_mode in ("branch", "share"):
             from core.subagent_worktree import SubagentWorktreeManager
-            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, task_id)
+            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, session_id)
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
 
         session = store.create_subagent(
-            parent_id=session_id or "",
-            subagent_id=task_id,
+            parent_id=parent_session_id or "",
+            subagent_id=session_id,
             role=subagent_type,
             description=description,
             prompt=prompt,
@@ -141,8 +141,8 @@ class InvokeSubagentTool(BaseTool):
                 project_dir, wt_path, wt_branch, acc, is_followup=False
             )
 
-        notification_hdr = f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed."
-        notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
+        notification_hdr = f"[System Notification] Background subagent '{description}' (ID: {session_id}) completed."
+        notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.)"
 
         bg_task = asyncio.create_task(
             run_subagent_stream_bg(
@@ -154,13 +154,13 @@ class InvokeSubagentTool(BaseTool):
                 cleanup_fn=_cleanup_worktree_and_append_diff,
                 error_prefix="Subagent error",
                 notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>\n{notification_ftr}",
-                task_id=task_id,
+                session_id=session_id,
                 truncate_result=True,
             )
         )
         session.async_task = bg_task
         curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
-        bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)
+        bg_sub = BackgroundSubagent(session_id, description, bg_task, session_id=curr_sid)
         ctx.add_background_task(bg_sub)
 
-        return f"OK: subagent '{description}' launched ({task_id})"
+        return f"OK: subagent '{description}' launched ({session_id})"

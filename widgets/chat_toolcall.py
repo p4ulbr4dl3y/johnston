@@ -497,8 +497,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def on_click(self, event) -> None:
         if self.canonical_tool in ("invoke_subagent", "manage_task"):
             args = self.args if isinstance(self.args, dict) else {}
-            task_id = args.get("task_id") or getattr(self, "subagent_task_id", None)
-            identifier = task_id or args.get("description") or args.get("prompt") or self.target
+            session_id = args.get("session_id") or args.get("task_id") or getattr(self, "subagent_session_id", None)
+            identifier = session_id or args.get("description") or args.get("prompt") or self.target
             try:
                 from widgets.screens.subagent_screen import SubagentViewScreen
                 self.app.push_screen(SubagentViewScreen(identifier))

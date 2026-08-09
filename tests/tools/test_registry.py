@@ -49,6 +49,16 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(norm_multi["edits"][0]["old_str"], "a")
         self.assertEqual(norm_multi["edits"][0]["new_str"], "b")
 
+        # Test subagent session_id aliases (legacy task_id maps to canonical session_id)
+        norm_invoke = normalize_tool_args("invoke_subagent", {"task_id": "sub-1", "role": "explorer"})
+        self.assertEqual(norm_invoke["session_id"], "sub-1")
+        self.assertEqual(norm_invoke["subagent_type"], "explorer")
+        norm_manage = normalize_tool_args("manage_subagent", {"task_id": "sub-2", "id": "sub-2"})
+        self.assertEqual(norm_manage["session_id"], "sub-2")
+        # manage_task keeps its own task_id canonical arg untouched
+        norm_task = normalize_tool_args("manage_task", {"task_id": "bash-1"})
+        self.assertEqual(norm_task["task_id"], "bash-1")
+
     def test_get_default_tools(self):
         tools = get_default_tools()
         self.assertIsInstance(tools, list)

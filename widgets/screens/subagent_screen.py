@@ -15,9 +15,9 @@ class SubagentViewScreen(BaseModalScreen[None]):
         ("escape", "close", "Close Screen"),
     ]
 
-    def __init__(self, task_id_or_desc: str):
+    def __init__(self, session_id_or_desc: str):
         super().__init__()
-        self.task_id_or_desc = task_id_or_desc
+        self.session_id_or_desc = session_id_or_desc
         self.session = None
         self.thinking_widget = None
         self.current_tool_widget = None
@@ -42,14 +42,14 @@ class SubagentViewScreen(BaseModalScreen[None]):
             store = SessionStore.get_instance()
 
         curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-        self.session = store.find_session_by_description_or_id(self.task_id_or_desc, parent_id=curr_session_id)
+        self.session = store.find_session_by_description_or_id(self.session_id_or_desc, parent_id=curr_session_id)
         if not self.session:
-            self.session = store.find_session_by_description_or_id(self.task_id_or_desc)
+            self.session = store.find_session_by_description_or_id(self.session_id_or_desc)
 
         if not self.session:
             async def _no_sess():
                 bm = await chat_view.add_bot_message()
-                bm.content = f"Subagent `{self.task_id_or_desc}` session details not found."
+                bm.content = f"Subagent `{self.session_id_or_desc}` session details not found."
             self.run_worker(_no_sess())
             return
 
