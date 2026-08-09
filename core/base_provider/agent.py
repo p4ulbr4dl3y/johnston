@@ -15,6 +15,7 @@ from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
+from tools.base import format_tool_error
 from tools.registry import execute_tool
 
 logger = logging.getLogger(__name__)
@@ -496,7 +497,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception as json_err:
-                        tool_result = f"ERR: tool '{t_name}' received invalid JSON arguments: {json_err}. Raw arguments: {raw_args}"
+                        tool_result = format_tool_error("invalid", detail=f"JSON arguments: {json_err}. Raw: {raw_args}", name=t_name)
                         yield ("tool", t_name, t_name, {})
                         yield ("tool_result", tool_result, "")
                         messages.append({
@@ -524,7 +525,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         try:
                             tool_result = await execute_tool(t_name, args, app=tool_app)
                         except Exception as e:
-                            tool_result = f"ERR: execute '{t_name}': {e}"
+                            tool_result = format_tool_error("execute", detail=str(e), name=t_name)
 
                     display_result = tool_result
                     if isinstance(tool_result, str) and (tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]):

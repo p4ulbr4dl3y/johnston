@@ -226,30 +226,17 @@ class CompactionMixin:
             if role == "tool":
                 text_content = content if isinstance(content, str) else str(content)
                 if len(text_content) > TOOL_OUTPUT_MAX_CHARS:
-                    text_content = text_content[:TOOL_OUTPUT_MAX_CHARS] + "\n... [tool output truncated for compaction]"
-                pruned_history.append({
-                    "role": "user",
-                    "content": f"[Tool Result]:\n{text_content}"
-                })
+                    text_content = text_content[:TOOL_OUTPUT_MAX_CHARS] + "... [tool output truncated]"
+                # Tool outputs are serialized as user on OpenAI wire, but no redundant
+                # `[Tool Result]:` wrapper — that label adds tokens with no signal.
+                pruned_history.append({"role": "user", "content": text_content})
             elif role == "assistant":
+                # tool_calls are already re-serialized as their own tool messages
+                # below, so include only the assistant's text content (no redundant
+                # `[Assistant tool call]: name(args)` duplication).
                 text_content = content if isinstance(content, str) else str(content)
-                tool_calls = msg.get("tool_calls")
-                if tool_calls and isinstance(tool_calls, list):
-                    tc_summaries = []
-                    for tc in tool_calls:
-                        if isinstance(tc, dict):
-                            fn = tc.get("function", {})
-                            tc_name = fn.get("name", "tool") if isinstance(fn, dict) else getattr(fn, "name", "tool")
-                            tc_args = fn.get("arguments", "") if isinstance(fn, dict) else getattr(fn, "arguments", "")
-                            tc_summaries.append(f"[Assistant tool call]: {tc_name}({tc_args})")
-                    tc_text = "\n".join(tc_summaries)
-                    text_content = f"{text_content}\n{tc_text}".strip() if text_content else tc_text
-
                 if text_content:
-                    pruned_history.append({
-                        "role": "assistant",
-                        "content": text_content
-                    })
+                    pruned_history.append({"role": "assistant", "content": text_content})
             else:
                 pruned_history.append({
                     "role": role if role in ("user", "system", "assistant") else "user",

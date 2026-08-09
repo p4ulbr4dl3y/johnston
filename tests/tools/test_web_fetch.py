@@ -44,12 +44,12 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_url_scheme(self):
         tool = WebFetchTool()
         res = await tool.execute({"url": "ftp://example.com"})
-        self.assertIn("ERR: invalid scheme 'ftp://example.com'", res)
+        self.assertIn("ERR: scheme 'ftp://example.com': must be http(s)", res)
 
     async def test_missing_url(self):
         tool = WebFetchTool()
         res = await tool.execute({"url": ""})
-        self.assertIn("ERR: 'url' required", res)
+        self.assertIn("ERR: params 'url': required", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_html_converted(self, mock_client_cls):
@@ -88,7 +88,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
             tool = WebFetchTool()
             res = await tool.execute({"url": "https://example.com/404"})
 
-        self.assertIn("ERR: 'https://example.com/404': HTTP 404", res)
+        self.assertIn("ERR: http 'https://example.com/404': 404 Not Found", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_oversize_content_length_rejected(self, mock_client_cls):
@@ -113,7 +113,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/big"})
-        self.assertIn("ERR: 'https://example.com/big' exceeds 10MB", res)
+        self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
     async def test_truncation_behavior(self, mock_client_cls):
@@ -184,7 +184,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/big"})
-        self.assertIn("ERR: 'https://example.com/big' exceeds 10MB", res)
+        self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_timeout_exception(self, mock_client_cls):
@@ -196,7 +196,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com"})
-        self.assertEqual(res, "ERR: 'https://example.com' timed out")
+        self.assertEqual(res, "ERR: timeout 'https://example.com'")
 
     @patch("httpx.AsyncClient")
     async def test_fetch_generic_exception(self, mock_client_cls):
@@ -208,7 +208,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com"})
-        self.assertIn("ERR: 'https://example.com':", res)
+        self.assertIn("ERR: fetch 'https://example.com': connection refused", res)
 
     @patch("httpx.AsyncClient")
     @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))

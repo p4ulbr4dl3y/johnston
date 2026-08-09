@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 import httpx
 
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool, format_tool_error, truncate_output
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -55,10 +55,10 @@ class WebFetchTool(BaseTool):
         self._ensure_context(app)
         url = args.get("url", "").strip()
         if not url:
-            return "ERR: 'url' required"
+            return format_tool_error("params", name="url", detail="required")
 
         if not (url.startswith("http://") or url.startswith("https://")):
-            return f"ERR: invalid scheme '{url}'"
+            return format_tool_error("scheme", name=url, detail="must be http(s)")
 
         raw_mode = bool(args.get("raw", False))
 
@@ -78,7 +78,7 @@ class WebFetchTool(BaseTool):
                     if cl:
                         try:
                             if int(cl) > MAX_RESPONSE_SIZE:
-                                return f"ERR: '{url}' exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB"
+                                return format_tool_error("file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB", name=url)
                         except ValueError:
                             pass
                     # Stream the body with a hard cap so an oversized or chunked
@@ -88,15 +88,15 @@ class WebFetchTool(BaseTool):
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > MAX_RESPONSE_SIZE:
-                            return f"ERR: '{url}' exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB"
+                            return format_tool_error("file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024*1024)}MB", name=url)
                         chunks.append(chunk)
                     content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
-            return f"ERR: '{url}': HTTP {e.response.status_code} {e.response.reason_phrase}"
+            return format_tool_error("http", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
         except httpx.TimeoutException:
-            return f"ERR: '{url}' timed out"
+            return format_tool_error("timeout", name=url)
         except Exception as e:
-            return f"ERR: '{url}': {e}"
+            return format_tool_error("fetch", detail=str(e), name=url)
 
         if raw_mode:
             text_content = content_bytes.decode("utf-8", errors="replace")

@@ -141,7 +141,7 @@ class BackgroundTask:
                                 from_end=True,
                             )
                         else:
-                            out_res = "OK: executed (no output)"
+                            out_res = "(no output)"
                         on_completed_cb(self.task_id, self.command, out_res)
                     except Exception:
                         pass

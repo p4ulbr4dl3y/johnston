@@ -145,19 +145,19 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_unknown_with_alias_hint(self):
         # Match that resolves to an alias target
         res = await execute_tool("catx", None)
-        self.assertIn("ERR: unknown tool 'catx'", res)
+        self.assertIn("ERR: unknown 'catx'", res)
         self.assertIn("Did you mean 'cat' (target: read)?", res)
 
     async def test_execute_tool_unknown_with_direct_hint(self):
         # Match that maps directly to a registry tool name
         res = await execute_tool("creats", None)
-        self.assertIn("ERR: unknown tool 'creats'", res)
+        self.assertIn("ERR: unknown 'creats'", res)
         self.assertIn("Did you mean 'create'?", res)
         self.assertNotIn("target:", res)
 
     async def test_execute_tool_unknown_no_hint(self):
         res = await execute_tool("zzzzzzzzz_unknown", None)
-        self.assertEqual(res, "ERR: unknown tool 'zzzzzzzzz_unknown'")
+        self.assertEqual(res, "ERR: unknown 'zzzzzzzzz_unknown'")
 
     async def test_execute_tool_mcp_disallowed_in_mode(self):
         mock_mcp_mgr = MagicMock()
@@ -231,7 +231,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr), \
              patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry):
             res = await execute_tool("none_mcp", {})
-            self.assertEqual(res, "ERR: unknown tool 'none_mcp'")
+            self.assertEqual(res, "ERR: unknown 'none_mcp'")
 
     def test_normalize_tool_args_non_dict_chunk(self):
         # Non-dict entries inside the edits list must pass through untouched.
@@ -253,7 +253,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
-            self.assertEqual(res, "ERR: tool 'read' denied by permission policy")
+            self.assertEqual(res, "ERR: denied 'read': by permission policy")
 
     async def test_execute_tool_permission_ask_confirmed(self):
         mock_app = MagicMock()
@@ -282,7 +282,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("ask", "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"}, app=mock_app)
-        self.assertEqual(res, "ERR: tool 'read' execution denied by user")
+        self.assertEqual(res, "ERR: denied 'read': by user")
 
     async def test_execute_tool_permission_ask_no_app(self):
         # No interactive app available -> fall back to a textual denial.
@@ -290,7 +290,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("ask", "No interactive app")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
-        self.assertEqual(res, "ERR: tool 'read' requires user confirmation (No interactive app)")
+        self.assertEqual(res, "ERR: denied 'read': requires user confirmation (No interactive app)")
 
     async def test_execute_tool_mcp_permission_denied(self):
         mock_mcp_mgr = MagicMock()
@@ -302,7 +302,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
              self._mock_mode(), \
              patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("mcp_deny", {})
-        self.assertEqual(res, "ERR: tool 'mcp_deny' denied by permission policy")
+        self.assertEqual(res, "ERR: denied 'mcp_deny': by permission policy")
 
     async def test_execute_tool_mcp_permission_ask_no_app(self):
         mock_mcp_mgr = MagicMock()
@@ -314,7 +314,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
              self._mock_mode(), \
              patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("mcp_ask", {})
-        self.assertEqual(res, "ERR: tool 'mcp_ask' requires user confirmation (Confirm MCP call)")
+        self.assertEqual(res, "ERR: denied 'mcp_ask': requires user confirmation (Confirm MCP call)")
 
     async def test_execute_tool_mcp_permission_ask_always_allow(self):
         mock_app = MagicMock()
@@ -346,7 +346,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
              self._mock_mode(), \
              patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("mcp_no", {}, app=mock_app)
-        self.assertEqual(res, "ERR: tool 'mcp_no' execution denied by user")
+        self.assertEqual(res, "ERR: denied 'mcp_no': by user")
 
     async def test_execute_tool_mcp_async_call(self):
         # Manager class whose type name does not end with "Mock" and which exposes

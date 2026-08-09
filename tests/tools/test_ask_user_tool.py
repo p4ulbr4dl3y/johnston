@@ -47,17 +47,17 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         res = await tool.execute({"questions": [{"question_text": "Test?", "options": ["a"]}]})
         self.assertIn("ERR", res)
-        self.assertIn("app instance not available", res)
+        self.assertIn("ERR: context 'app': unavailable", res)
 
     async def test_no_questions_returns_error(self):
         tool = AskUserTool()
         res = await tool.execute({})
-        self.assertEqual(res, "ERR: invalid or missing 'questions' list")
+        self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
     async def test_invalid_questions_type_returns_error(self):
         tool = AskUserTool()
         res = await tool.execute({"questions": "invalid"})
-        self.assertEqual(res, "ERR: invalid or missing 'questions' list")
+        self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
     async def test_single_question_fallback(self):
         # A single {question, options} dict is wrapped into a questions list.
@@ -101,7 +101,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             {"questions": [{"question_text": "Pick one", "options": ["red", "blue"]}]},
             app=mock_app,
         )
-        self.assertIn("ERR: prompt failed", res)
+        self.assertIn("ERR: prompt:", res)
 
     async def test_successful_interactive_flow(self):
         tool = AskUserTool()

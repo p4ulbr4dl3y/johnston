@@ -56,7 +56,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         mock_app = self._make_app([])
         res = await tool.execute({"action": "status", "task_id": "ghost"}, app=mock_app)
-        self.assertIn("ERR: task 'ghost' not found", res)
+        self.assertIn("ERR: notfound 'ghost'", res)
 
     async def test_status_running_task(self):
         tool = ManageShellTool()
@@ -88,7 +88,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         mock_app = self._make_app([])
         res = await tool.execute({"action": "kill", "task_id": "ghost"}, app=mock_app)
-        self.assertIn("ERR: task 'ghost' not found", res)
+        self.assertIn("ERR: notfound 'ghost'", res)
 
     async def test_kill_running_task(self):
         tool = ManageShellTool()
@@ -106,19 +106,19 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         t.is_running = False
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "kill", "task_id": "t-done"}, app=mock_app)
-        self.assertIn("not running", res)
+        self.assertIn("ERR: notrunning", res)
 
     async def test_unknown_action(self):
         tool = ManageShellTool()
         mock_app = self._make_app([])
         res = await tool.execute({"action": "bogus"}, app=mock_app)
-        self.assertIn("ERR: unknown action 'bogus'", res)
+        self.assertIn("ERR: action 'bogus'", res)
         self.assertIn("bogus", res)
 
     async def test_no_task_manager_no_app(self):
         tool = ManageShellTool()
         res = await tool.execute({"action": "list"})
-        self.assertIn("ERR: no task manager", res)
+        self.assertIn("ERR: manager 'none'", res)
 
 
 async def _noop_async():

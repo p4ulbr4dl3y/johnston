@@ -24,7 +24,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_sleep_chain_no_remainder(self):
         res = await self.tool.execute({"command": "sleep 0.001"})
-        self.assertEqual(res, "OK: slept 0.001s")
+        self.assertEqual(res, "slept 0.001s")
 
     async def test_sleep_chain_with_remainder(self):
         res = await self.tool.execute({"command": "sleep 0.001 && echo after_sleep"})
@@ -40,7 +40,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, app=mock_app)
-            self.assertEqual(res, "ERR: rejected by user")
+            self.assertEqual(res, "ERR: denied 'shell': by user")
 
     async def test_shell_safety_check_confirmed(self):
         mock_app = MagicMock()
@@ -60,7 +60,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, app=mock_app)
-            self.assertIn("ERR: permission prompt: Screen push failed", res)
+            self.assertIn("ERR: permission 'shell': Screen push failed", res)
 
     async def test_standard_pipe_execution(self):
         res = await self.tool.execute({"command": "echo std_pipe_test"})
@@ -123,7 +123,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_normal_execution_empty_output(self):
         res = await self.tool.execute({"command": "true"})
-        self.assertEqual(res, "OK: executed (no output)")
+        self.assertEqual(res, "(no output)")
 
     async def test_command_timeout_moved_to_background(self):
         mock_app = MagicMock()
@@ -146,7 +146,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, app=mock_app)
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("Command is running in background", res)
+            self.assertIn("running:", res)
             mock_ctx.add_background_task.assert_called_once()
 
     async def test_create_windows_process_powershell(self):
@@ -240,7 +240,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         ):
             res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True}, app=mock_app)
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("Command is running in background", res)
+            self.assertIn("running:", res)
             mock_ctx.add_background_task.assert_called_once()
 
     async def test_subagent_explicit_run_in_background_rejected(self):
@@ -284,7 +284,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             res = await exec_task
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("Command is running in background", res)
+            self.assertIn("running:", res)
 
     async def test_sync_task_cleaned_up_from_background_tasks(self):
         mock_app = MagicMock()
@@ -306,7 +306,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_sleep_chain_exceeds_timeout(self):
         res = await self.tool.execute({"command": "sleep 5", "timeout": 1})
-        self.assertEqual(res, "ERR: sleep duration (5.0s) exceeds timeout (1s)")
+        self.assertEqual(res, "ERR: reject: sleep 5.0s exceeds timeout 1s")
 
     async def test_subagent_no_stdout_stream(self):
         # p.stdout is None -> the stream reader exits immediately and empty
@@ -329,7 +329,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "true"}, app=mock_ctx)
-        self.assertEqual(res, "OK: executed (no output)")
+        self.assertEqual(res, "(no output)")
 
     async def test_subagent_read_task_drain_timeout(self):
         # Process finishes, but draining the read task times out -> ignored.
@@ -357,7 +357,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "true"}, app=mock_ctx)
-        self.assertEqual(res, "OK: executed (no output)")
+        self.assertEqual(res, "(no output)")
 
     async def test_subagent_timeout_read_task_exception_ignored(self):
         # Subagent timeout path: draining the read task after kill raises a

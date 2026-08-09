@@ -1147,7 +1147,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(tool_evts[0][2], "read")  # target falls back to tool name
-        err_results = [e for e in events if e[0] == "tool_result" and "invalid JSON" in e[1]]
+        err_results = [e for e in events if e[0] == "tool_result" and "ERR: invalid 'read': JSON" in e[1]]
         self.assertEqual(len(err_results), 1)
         mock_exec.assert_not_called()
 

@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, Tuple
 
 from core.platform_utils import IMAGE_EXTENSIONS
-from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
+from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
 
 DOC_EXTENSIONS = {
     ".pdf", ".docx", ".pptx", ".xlsx", ".epub"
@@ -193,7 +193,7 @@ class ReadTool(BaseTool):
                 elif entries:
                     sample = sorted(entries)[:5]
                     hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
-            return f"ERR: file '{path}' not found{hint}"
+            return format_tool_error("file", detail="not found" + hint, name=path)
 
         if os.path.isdir(path):
             try:
@@ -220,14 +220,14 @@ class ReadTool(BaseTool):
                     f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
                 )
             except Exception as e:
-                return f"ERR: listing '{path}': {e}"
+                return format_tool_error("listing", detail=str(e), name=path)
 
         try:
             file_size = os.path.getsize(path)
             if file_size > MAX_FILE_SIZE:
-                return f"ERR: '{path}' exceeds {MAX_FILE_SIZE // (1024*1024)}MB"
+                return format_tool_error("file", detail=f"exceeds {MAX_FILE_SIZE // (1024*1024)}MB", name=path)
         except OSError as e:
-            return f"ERR: check '{path}': {e}"
+            return format_tool_error("check", detail=str(e), name=path)
 
         ext = os.path.splitext(path)[1].lower()
 
@@ -238,7 +238,7 @@ class ReadTool(BaseTool):
                 image_json = await asyncio.to_thread(process_image_file_sync, path, detail_arg)
                 return image_json
             except Exception as e:
-                return f"ERR: image '{path}': {e}"
+                return format_tool_error("image", detail=str(e), name=path)
 
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
@@ -246,7 +246,7 @@ class ReadTool(BaseTool):
                 md_text = await asyncio.to_thread(convert_doc_to_markdown_sync, path)
                 lines = md_text.splitlines(keepends=True)
             except Exception as e:
-                return f"ERR: doc '{path}': {e}"
+                return format_tool_error("doc", detail=str(e), name=path)
         else:
             try:
                 content_offset = args.get("offset", args.get("content_offset"))
@@ -263,7 +263,7 @@ class ReadTool(BaseTool):
 
                 lines = await asyncio.to_thread(_read_file_lines, path, content_offset)
             except Exception as e:
-                return f"ERR: file '{path}': {e}"
+                return format_tool_error("file", detail=str(e), name=path)
 
         from tools.utils import format_line_pagination
 

@@ -320,7 +320,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         # Invalid questions structure
         res = await tool.execute({"questions": [{"invalid_key": "foo"}]})
-        self.assertIn("ERR: invalid or missing 'questions' list", res)
+        self.assertIn("ERR: params 'questions': missing or invalid", res)
 
     async def test_replace_file_content_line_range(self):
         from tools.edit import EditTool
