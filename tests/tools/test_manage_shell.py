@@ -16,7 +16,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         mock_app = self._make_app([])
         res = await tool.execute({"action": "list"}, app=mock_app)
-        self.assertIn("OK: no tasks active", res)
+        self.assertIn("no tasks active", res)
 
     async def test_list_scoped_to_current_session(self):
         tool = ManageShellTool()
@@ -97,7 +97,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         t.kill = MagicMock(return_value=_noop_async())
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "kill", "task_id": "t-kill"}, app=mock_app)
-        self.assertIn("OK: t-kill killed", res)
+        self.assertIn("t-kill killed", res)
         self.assertFalse(t.is_running)
 
     async def test_kill_not_running_task(self):

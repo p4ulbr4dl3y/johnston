@@ -4,7 +4,15 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from core.linters_manager import get_linters_manager
-from tools.base import BaseTool, format_tool_error, make_unified_diff, resolve_path, try_int, write_file_text
+from tools.base import (
+    BaseTool,
+    format_tool_error,
+    make_unified_diff,
+    read_file_text,
+    resolve_path,
+    try_int,
+    write_file_text,
+)
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -98,7 +106,7 @@ def apply_chunk_replacements(
     path: str
 ) -> Tuple[str, str]:
     if not raw_chunks:
-        raise ValueError("ERR: no replacement chunks provided")
+        raise ValueError(format_tool_error("params", "no replacement chunks provided"))
 
     parsed_chunks = []
     for idx, c in enumerate(raw_chunks, start=1):
@@ -108,10 +116,10 @@ def apply_chunk_replacements(
         if target is None:
             target = c.get("old_string")
         if target is None:
-            raise ValueError(f"ERR: chunk {idx} missing 'old_str' or 'target_content'")
+            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'old_str' or 'target_content'"))
 
         if target == "":
-            raise ValueError(f"ERR: chunk {idx} old_str (target_content) cannot be empty")
+            raise ValueError(format_tool_error("params", f"chunk {idx} old_str (target_content) cannot be empty"))
 
         replacement = c.get("new_str")
         if replacement is None:
@@ -119,7 +127,7 @@ def apply_chunk_replacements(
         if replacement is None:
             replacement = c.get("new_string")
         if replacement is None:
-            raise ValueError(f"ERR: chunk {idx} missing 'new_str' or 'replacement_content'")
+            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'new_str' or 'replacement_content'"))
 
         s_line_int = try_int(c.get("start_line"))
         e_line_int = try_int(c.get("end_line"))
@@ -146,8 +154,11 @@ def apply_chunk_replacements(
             s2, e2 = c2["start_line"], c2["end_line"]
             if max(s1, s2) <= min(e1, e2):
                 raise ValueError(
-                    f"ERR: replacement chunks {c1['idx']} (lines {s1}-{e1}) and "
-                    f"{c2['idx']} (lines {s2}-{e2}) overlap in '{path}'"
+                    format_tool_error(
+                        "range",
+                        f"replacement chunks {c1['idx']} (lines {s1}-{e1}) and "
+                        f"{c2['idx']} (lines {s2}-{e2}) overlap in '{path}'",
+                    )
                 )
 
     lines = content.splitlines(keepends=True)
@@ -193,8 +204,11 @@ def apply_chunk_replacements(
 
                 if not in_bounds:
                     raise ValueError(
-                        f"ERR: start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
-                        f"[Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]"
+                        format_tool_error(
+                            "range",
+                            f"start_line ({s_line}) exceeds file line count ({len(lines)}) in '{path}'. "
+                            f"[Hint: File has {len(lines)} total lines. Re-try edit with start_line between 1 and {len(lines)}]",
+                        )
                     )
 
                 target_first_line = actual_target_full.splitlines()[0] if actual_target_full.splitlines() else actual_target_full
@@ -207,18 +221,27 @@ def apply_chunk_replacements(
                 if full_count > 1 and not allow_mult:
                     loc_msg = f" Target content matches {full_count} occurrences in full file (around line {found_line})." if found_line else ""
                     raise ValueError(
-                        f"ERR: target not found in specified range ({s_line}-{e_line}) and matches multiple occurrences ({full_count}) in '{path}'.{loc_msg}{hint}"
+                        format_tool_error(
+                            "match",
+                            f"target not found in specified range ({s_line}-{e_line}) and matches multiple occurrences ({full_count}) in '{path}'.{loc_msg}{hint}",
+                        )
                     )
                 else:
                     loc_msg = f" Target content was found elsewhere around line {found_line}." if found_line else ""
                     raise ValueError(
-                        f"ERR: target not found in '{path}' ({s_line}-{e_line}).{loc_msg}{hint}"
+                        format_tool_error(
+                            "match",
+                            f"target not found in '{path}' ({s_line}-{e_line}).{loc_msg}{hint}",
+                        )
                     )
 
             if count > 1 and not allow_mult:
                 raise ValueError(
-                    f"ERR: target matches {count} occurrences in lines {s_line}-{e_line} of '{path}'. "
-                    f"Narrow start_line/end_line range or include more lines to make target unique."
+                    format_tool_error(
+                        "match",
+                        f"target matches {count} occurrences in lines {s_line}-{e_line} of '{path}'. "
+                        f"Narrow start_line/end_line range or include more lines to make target unique.",
+                    )
                 )
 
             new_sub_text = sub_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
@@ -236,12 +259,15 @@ def apply_chunk_replacements(
             if count == 0:
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
                 raise ValueError(
-                    f"ERR: exact block not found in '{path}'.{hint}"
+                    format_tool_error("match", f"exact block not found in '{path}'.{hint}")
                 )
             if count > 1 and not allow_mult:
                 raise ValueError(
-                    f"ERR: target matches {count} occurrences in '{path}'. "
-                    f"Specify start_line and end_line or include more surrounding lines to make target unique."
+                    format_tool_error(
+                        "match",
+                        f"target matches {count} occurrences in '{path}'. "
+                        f"Specify start_line and end_line or include more surrounding lines to make target unique.",
+                    )
                 )
 
             new_text = current_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
@@ -260,8 +286,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
         return format_tool_error("file", name=path, detail="is a directory")
 
     def _do_edit():
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read()
+        content = read_file_text(path)
         new_content, diff = apply_chunk_replacements(content, raw_chunks, path)
         write_file_text(path, new_content)
         return diff
@@ -300,20 +325,22 @@ class EditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+        args = normalize_tool_args("edit", args)
         ctx = self._ensure_context(app)
         path = args.get("path") or args.get("target_file", "")
-        chunks = args.get("edits") or args.get("replacement_chunks") or args.get("ReplacementChunks")
+        chunks = args.get("edits")
         if chunks and isinstance(chunks, list):
             return await _execute_edit_helper(path, chunks, cwd=ctx.cwd)
 
-        target_val = args.get("old_str", args.get("target_content", args.get("old_string", "")))
-        repl_val = args.get("new_str", args.get("replacement_content", args.get("new_string", "")))
+        target_val = args.get("old_str", "")
+        repl_val = args.get("new_str", "")
         chunk = {
-            "target_content": target_val,
-            "replacement_content": repl_val,
-            "start_line": args.get("start", args.get("start_line")),
-            "end_line": args.get("end", args.get("end_line")),
-            "allow_multiple": args.get("multiple", args.get("allow_multiple", False)),
+            "old_str": target_val,
+            "new_str": repl_val,
+            "start_line": args.get("start_line"),
+            "end_line": args.get("end_line"),
+            "allow_multiple": args.get("allow_multiple", False),
         }
         return await _execute_edit_helper(path, [chunk], cwd=ctx.cwd)
 
@@ -350,8 +377,10 @@ class MultiEditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+        args = normalize_tool_args("multi_edit", args)
         ctx = self._ensure_context(app)
         path = args.get("path") or args.get("target_file", "")
-        raw_chunks = args.get("edits") or args.get("replacement_chunks") or args.get("chunks") or []
+        raw_chunks = args.get("edits") or []
         return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)
 

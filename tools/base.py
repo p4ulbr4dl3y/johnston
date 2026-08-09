@@ -2,28 +2,19 @@ import json
 import os
 from typing import Any, Dict
 
-from core.platform_utils import (
-    atomic_write_json,
-    atomic_write_text,
-    read_json,
-    write_json,
-)
+from core.platform_utils import atomic_write_text
 from tools.context import ToolContext
 
 __all__ = [
-    "atomic_write_json",
-    "atomic_write_text",
-    "read_json",
-    "write_json",
     "resolve_path",
     "write_file_text",
+    "read_file_text",
     "try_int",
     "tail_output",
     "make_unified_diff",
     "get_fuzzy_matches",
     "truncate_output",
     "format_tool_error",
-    "maybe_truncate",
     "format_background_notification",
     "BaseTool",
 ]
@@ -42,6 +33,12 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
 def write_file_text(path: str, content: str) -> None:
     """Ensures parent directory exists and atomically writes text to file."""
     atomic_write_text(path, content)
+
+
+def read_file_text(path: str) -> str:
+    """Reads a text file."""
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 def try_int(val: Any, default: int | None = None) -> int | None:
@@ -105,24 +102,6 @@ def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
     if detail:
         base += f": {detail}"
     return base
-
-
-def maybe_truncate(
-    text: str,
-    max_chars: int = 8000,
-    anchor_head: bool = True,
-    suffix: str = "... [truncated]",
-) -> str:
-    """Token-efficient truncation: keep head (or tail) and append a short suffix.
-
-    Unlike truncate_output, this performs no log-file writes and no verbose
-    hints, so it is cheap for large tool payloads (file reads, shell output).
-    """
-    if not text or len(text) <= max_chars:
-        return text
-    if anchor_head:
-        return text[:max_chars] + suffix
-    return "..." + text[-max_chars:] + suffix
 
 
 def format_background_notification(kind: str, name: str, task_id: str, result: str) -> str:

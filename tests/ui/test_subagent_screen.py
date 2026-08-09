@@ -94,7 +94,6 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         record_subagent_step(("thinking_end", "1.0", "Final thought"), sess, acc)
         record_subagent_step(("tool", "read", "x", {"path": "x"}), sess, acc)
         record_subagent_step(("tool_result", "contents", ""), sess, acc)
-        record_subagent_step(("bot_chunk", "Hel", ""), sess, acc)
         record_subagent_step(("bot_delta", "Hello world", ""), sess, acc)
         record_subagent_step(("bot_text", "Final answer", ""), sess, acc)
         record_subagent_step(("event_divider", "Session Compacted", ""), sess, acc)

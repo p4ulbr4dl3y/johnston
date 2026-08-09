@@ -24,7 +24,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         ]
         with self.assertRaises(ValueError) as ctx:
             apply_chunk_replacements(content, raw_chunks, "dummy.py")
-        self.assertIn("ERR: replacement chunks", str(ctx.exception))
+        self.assertIn("ERR: range: replacement chunks", str(ctx.exception))
         self.assertIn("overlap", str(ctx.exception))
 
     def test_non_overlapping_chunks_success(self):

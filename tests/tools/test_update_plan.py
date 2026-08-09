@@ -15,7 +15,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("OK: plan updated (1/3 completed)", res)
+        self.assertIn("plan updated (1/3 completed)", res)
         self.assertIn("Refactoring module for safety", res)
 
     async def test_update_plan_tool_invalid_payload(self):
@@ -32,13 +32,13 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             "plan": [
                 "not a dict item",  # non-dict item skipped
                 {"step": "   ", "status": "pending"},  # empty step skipped
-                {"text": "Use text fallback", "status": "done"},  # 'done' -> 'completed'
-                {"step": "Todo item", "status": "todo"},  # 'todo' -> 'pending'
+                {"text": "Use text fallback", "status": "in_progress"},  # 'text' fallback used
                 {"step": "Unknown status item", "status": "random_status"},  # invalid status -> 'pending'
+                {"step": "Completed item", "status": "completed"},
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("OK: plan updated (1/3 completed)", res)
+        self.assertIn("plan updated (1/3 completed)", res)
 
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
@@ -64,7 +64,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             },
             app=app,
         )
-        self.assertIn("OK: plan updated (0/1 completed)", res)
+        self.assertIn("plan updated (0/1 completed)", res)
         self.assertTrue(app.updated)
         self.assertEqual(app.current_plan_explanation, "App update test")
         self.assertEqual(app.current_plan, [{"step": "Step 1", "status": "in_progress"}])
@@ -80,7 +80,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             {"plan": [{"step": "Step 1", "status": "completed"}]},
             app=app,
         )
-        self.assertIn("OK: plan updated (1/1 completed)", res)
+        self.assertIn("plan updated (1/1 completed)", res)
 
 
 if __name__ == "__main__":

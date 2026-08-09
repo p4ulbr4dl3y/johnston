@@ -65,12 +65,12 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
 
         res_kill = await tool.execute({"action": "kill", "session_id": "sub-3"})
-        self.assertIn("OK: sub-3 terminated", res_kill)
+        self.assertIn("sub-3 terminated", res_kill)
         self.assertEqual(sess.status, "cancelled")
 
         # Second kill on finished task
         res_kill_again = await tool.execute({"action": "kill", "session_id": "sub-3"})
-        self.assertIn("OK: sub-3 already in 'cancelled'", res_kill_again)
+        self.assertIn("sub-3 already in 'cancelled'", res_kill_again)
 
     def test_agent_session_deserialization(self):
         data = {
@@ -230,7 +230,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm.create_active_agent.return_value = mock_agent
 
         res = await tool.execute({"action": "send_message", "session_id": "sub-bg", "message": "hello bg"}, app=mock_app)
-        self.assertIn("OK: message sent to sub-bg", res)
+        self.assertIn("message sent to sub-bg", res)
 
     async def test_status_and_kill_missing_session_id(self):
         tool = ManageSubagentTool()

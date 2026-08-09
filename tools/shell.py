@@ -46,6 +46,8 @@ class ShellTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+        args = normalize_tool_args("shell", args)
         ctx = self._ensure_context(app)
         cmd = args.get("command", "").strip()
 
@@ -109,13 +111,13 @@ class ShellTool(BaseTool):
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         p = await self._create_std_process(cmd, env, cwd=proc_cwd)
 
-        run_in_bg = bool(args.get("background", args.get("run_in_background", False)))
+        run_in_bg = bool(args.get("run_in_background", False))
 
         # Synchronous execution mode for subagents (no background task)
         if ctx.is_subagent:
             if run_in_bg:
                 await terminate_process(p)
-                return "ERR: no background in subagent"
+                return format_tool_error("background", name="shell")
 
             output_chunks = []
 
@@ -152,7 +154,7 @@ class ShellTool(BaseTool):
                         pass
                 raw_out = process_carriage_returns(strip_ansi("".join(output_chunks)))
                 partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-                return f"ERR: timed out after {timeout}s{partial_str}"
+                return format_tool_error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
             except asyncio.CancelledError:
                 await terminate_process(p)
                 raise

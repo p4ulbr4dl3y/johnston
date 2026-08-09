@@ -38,7 +38,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "permissions.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
-        self.assertIn("OK:", res)
+        self.assertIn("file", res)
         self.assertTrue(os.path.exists(target))
 
     async def test_edit_allows_johnston_config(self):
@@ -134,12 +134,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Create file in non-existent directory
         res = await tool.execute({"path": file_path, "content": "Hello World"})
-        self.assertIn("OK: file", res)
+        self.assertIn("file", res)
         self.assertTrue(os.path.exists(file_path))
 
         # Update existing file (should return diff and updated status)
         res_update = await tool.execute({"path": file_path, "content": "Hello Universe"})
-        self.assertIn("OK: file", res_update)
+        self.assertIn("file", res_update)
         self.assertIn("-Hello World", res_update)
         self.assertIn("+Hello Universe", res_update)
 
@@ -262,13 +262,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Alias Content"})
-        self.assertIn("OK: file", res_create)
+        self.assertIn("file", res_create)
         self.assertTrue(os.path.exists(file_path))
 
         # Test alias "write" -> "create"
         file_path2 = os.path.join(self.test_dir, "write_test.txt")
         res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
-        self.assertIn("OK: file", res_write)
+        self.assertIn("file", res_write)
 
         # Test alias "cat" -> "read"
         res_cat = await execute_tool("cat", {"path": file_path2})
@@ -361,7 +361,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             "start_line": 1,
             "end_line": 2
         })
-        self.assertIn("ERR: target not found in specified range", res)
+        self.assertIn("ERR: match: target not found in specified range", res)
         self.assertIn("matches multiple occurrences (2)", res)
 
     async def test_edit_tool_line_range_miss_fallback(self):

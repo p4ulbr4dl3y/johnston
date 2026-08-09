@@ -103,7 +103,7 @@ class ManageSubagentTool(BaseTool):
 
         elif action == "kill":
             if session.status != "running":
-                return f"OK: {session.id} already in '{session.status}'"
+                return f"{session.id} already in '{session.status}'"
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -114,7 +114,7 @@ class ManageSubagentTool(BaseTool):
             session.finish(STATUS_CANCELLED, "Cancelled via manage_subagent tool")
             store.save(session)
 
-            return f"OK: {session.id} terminated"
+            return f"{session.id} terminated"
 
         elif action == "send_message":
             if not message:
@@ -195,7 +195,7 @@ class ManageSubagentTool(BaseTool):
                 )
                 session.async_task = bg_task
 
-                return f"OK: message sent to {session.id}"
+                return f"message sent to {session.id}"
             else:
                 acc = [""]
                 try:

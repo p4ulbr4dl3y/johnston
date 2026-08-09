@@ -221,7 +221,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
-            self.assertIn("ERR: timed out after 5s", res)
+            self.assertIn("ERR: timeout 'shell': timed out after 5s", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
 
@@ -255,7 +255,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True})
-            self.assertIn("ERR: no background in subagent", res)
+            self.assertIn("ERR: background 'shell'", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
 
@@ -385,7 +385,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
-        self.assertIn("ERR: timed out after 5s", res)
+        self.assertIn("ERR: timeout 'shell': timed out after 5s", res)
 
     async def test_subagent_shell_execution_cancelled(self):
         mock_ctx = MagicMock()
