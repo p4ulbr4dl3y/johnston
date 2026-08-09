@@ -163,23 +163,29 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
     """Follow-up subagents must recover their isolated worktree cwd/branch after reload."""
 
     def test_session_persists_project_dir_and_branch(self):
-        from core.subagent_tracker import SubagentSessionData
+        import tempfile
 
-        sess = SubagentSessionData("sub-abc", "desc", "prompt", "worker", True)
-        sess.project_dir = "/tmp/wt/sub-abc"
-        sess.branch_name = "subagent-sub-abc"
-        data = sess.to_dict()
-        self.assertEqual(data["project_dir"], "/tmp/wt/sub-abc")
-        self.assertEqual(data["branch_name"], "subagent-sub-abc")
+        from core.session_manager import AgentSession, SessionStore
 
-        restored = SubagentSessionData.from_dict(data)
-        self.assertEqual(restored.project_dir, "/tmp/wt/sub-abc")
-        self.assertEqual(restored.branch_name, "subagent-sub-abc")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = SessionStore(project_path=tmpdir)
+            sess = store.create_subagent(
+                parent_id="sess-main", subagent_id="sub-abc",
+                role="worker", description="desc", prompt="prompt",
+                project_dir="/tmp/wt/sub-abc", branch_name="subagent-sub-abc",
+            )
+            data = sess.to_dict()
+            self.assertEqual(data["project_dir"], "/tmp/wt/sub-abc")
+            self.assertEqual(data["branch_name"], "subagent-sub-abc")
+
+            restored = AgentSession.from_dict(data)
+            self.assertEqual(restored.project_dir, "/tmp/wt/sub-abc")
+            self.assertEqual(restored.branch_name, "subagent-sub-abc")
 
     def test_from_dict_defaults_empty(self):
-        from core.subagent_tracker import SubagentSessionData
+        from core.session_manager import AgentSession
 
-        restored = SubagentSessionData.from_dict({"task_id": "x"})
+        restored = AgentSession.from_dict({"id": "x", "kind": "subagent"})
         self.assertEqual(restored.project_dir, "")
         self.assertEqual(restored.branch_name, "")
 

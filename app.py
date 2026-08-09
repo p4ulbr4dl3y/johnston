@@ -39,7 +39,7 @@ from core.app_mixins.message_flow import MessageFlowMixin
 from core.app_mixins.session_persistence import SessionPersistenceMixin
 from core.commands import handle_slash_command  # noqa: F401  (re-exported for tests patching app.handle_slash_command)
 from core.provider_manager import ProviderManager
-from core.session_manager import SessionManager
+from core.session_manager import SessionStore
 
 
 class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, App):
@@ -68,7 +68,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.pm = ProviderManager()
         if provider:
             self.pm.set_active_provider_key(provider)
-        self.sm = SessionManager()
+        self.sm = SessionStore()
         self.agent = self.pm.create_active_agent()
         if model and self.agent:
             self.agent.model = model
@@ -80,7 +80,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
         self.resume_session_id = resume_session_id
         if resume_session_id:
-            sess = self.sm.load_session(resume_session_id)
+            sess = self.sm.get(resume_session_id)
             if sess:
                 self.current_session_id = resume_session_id
             else:

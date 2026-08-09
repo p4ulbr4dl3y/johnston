@@ -184,8 +184,15 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: no tasks active", res_list)
 
     async def test_task_tool_foreground(self):
-        from core.subagent_tracker import SubagentTracker
-        SubagentTracker.get_instance().sessions.clear()
+        import tempfile
+
+        from core.session_manager import SessionStore
+        _tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(_tmp.cleanup)
+        _store = SessionStore(project_path=_tmp.name)
+        _old = SessionStore._instance
+        SessionStore._instance = _store
+        self.addCleanup(setattr, SessionStore, "_instance", _old)
         class DummySubAgent:
             system_prompt = "system"
             tools = []
@@ -204,8 +211,15 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: subagent 'research task' launched", res)
 
     async def test_task_tool_background(self):
-        from core.subagent_tracker import SubagentTracker
-        SubagentTracker.get_instance().sessions.clear()
+        import tempfile
+
+        from core.session_manager import SessionStore
+        _tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(_tmp.cleanup)
+        _store = SessionStore(project_path=_tmp.name)
+        _old = SessionStore._instance
+        SessionStore._instance = _store
+        self.addCleanup(setattr, SessionStore, "_instance", _old)
         class DummySubAgent:
             system_prompt = "system"
             tools = []
@@ -1227,7 +1241,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                         events.append(evt)
 
         notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
+        dividers = [e for e in events if e[0] == "compaction_divider" and e[1] == "Session Compacted"]
         self.assertEqual(len(notices), 1)
+        self.assertEqual(len(dividers), 1)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 
 

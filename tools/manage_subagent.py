@@ -2,7 +2,12 @@ import asyncio
 import os
 from typing import Any, Dict
 
-from core.subagent_tracker import SubagentTracker
+from core.session_manager import (
+    STATUS_CANCELLED,
+    STATUS_COMPLETED,
+    STATUS_ERROR,
+    SessionStore,
+)
 from tools.base import BaseTool
 
 
@@ -39,13 +44,18 @@ class ManageSubagentTool(BaseTool):
         }
     }
 
+    def _get_store(self, app: Any) -> SessionStore:
+        if app and getattr(app, "sm", None):
+            return app.sm
+        return SessionStore.get_instance()
+
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         action = (args.get("action") or "").strip().lower()
         task_id = (args.get("task_id") or "").strip()
         message = (args.get("message") or "").strip()
 
-        tracker = SubagentTracker.get_instance()
+        store = self._get_store(ctx.app)
 
         curr_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
 
@@ -60,51 +70,41 @@ class ManageSubagentTool(BaseTool):
                 lines.append(f"• Type: '{dname}' [{dval.source}] — {dval.description}")
 
             show_all = bool(args.get("all", False))
-            target_sessions = list(tracker.sessions.values()) if show_all else tracker.get_sessions_for_session(curr_session_id)
+            if show_all:
+                target_sessions = store.list(kind="subagent")
+            else:
+                target_sessions = store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
             if target_sessions:
                 lines.append("\nActive/Past Subagent Sessions:")
                 for sess in target_sessions:
                     lines.append(
-                        f"• ID: {sess.task_id} | Status: {sess.status.upper()} | Type: {sess.subagent_type} | Description: {sess.description}"
+                        f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Description: {sess.description}"
                     )
             return "\n".join(lines)
 
         if not task_id:
             return "ERR: 'task_id' required for '" + action + "'"
 
-        session = tracker.find_session_by_description_or_id(task_id, session_id=curr_session_id)
+        session = store.find_session_by_description_or_id(task_id, parent_id=curr_session_id)
         if not session:
             return f"ERR: session '{task_id}' not found"
 
         if action == "status":
-            from core.config import SUBAGENT_LOGS_DIR
-            result_log_file = os.path.join(SUBAGENT_LOGS_DIR, f"{session.task_id}.log")
-
             lines = [
-                f"Subagent Status ({session.task_id}):",
+                f"Subagent Status ({session.id}):",
                 f"• Description: {session.description}",
                 f"• Status: {session.status.upper()}",
-                f"• Type: {session.subagent_type}",
-                f"• Log File: {result_log_file}",
+                f"• Type: {session.role}",
             ]
-
-            if os.path.exists(result_log_file):
-                try:
-                    with open(result_log_file, "r", encoding="utf-8") as f:
-                        log_content = f.read().strip()
-                    if log_content:
-                        lines.append(f"\nFinal Response Snippet:\n{log_content[:2000]}")
-                except Exception:
-                    pass
 
             if session.status == "running":
                 lines.append("\nRecent Events Log:")
-                recent = session.events[-15:]
+                recent = session.messages[-15:]
                 for evt in recent:
                     etype = evt.get("type")
                     if etype == "user":
                         lines.append(f"  [User]: {evt.get('text')}")
-                    elif etype == "bot_text":
+                    elif etype in ("bot_text", "bot_delta", "bot_chunk"):
                         lines.append(f"  [Bot]: {evt.get('text')[:150]}...")
                     elif etype == "tool":
                         lines.append(f"  [Tool]: {evt.get('tool_type')} ({evt.get('target')})")
@@ -116,7 +116,7 @@ class ManageSubagentTool(BaseTool):
 
         elif action == "kill":
             if session.status != "running":
-                return f"OK: {session.task_id} already in '{session.status}'"
+                return f"OK: {session.id} already in '{session.status}'"
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -124,9 +124,10 @@ class ManageSubagentTool(BaseTool):
                 except Exception:
                     pass
 
-            session.finish("cancelled", "Cancelled via manage_subagent tool")
+            session.finish(STATUS_CANCELLED, "Cancelled via manage_subagent tool")
+            store.save(session)
 
-            return f"OK: {session.task_id} terminated"
+            return f"OK: {session.id} terminated"
 
         elif action == "send_message":
             if not message:
@@ -138,7 +139,7 @@ class ManageSubagentTool(BaseTool):
                 if subagent:
                     subagent.app = ctx.app
                     subagent.is_subagent = True
-                    hist = session.to_dict().get("agent_history", []) if hasattr(session, "to_dict") else []
+                    hist = session.agent_history
                     if hist:
                         subagent.history = hist
                     session.agent = subagent
@@ -152,14 +153,14 @@ class ManageSubagentTool(BaseTool):
                 if not os.path.isdir(project_dir):
                     from core.subagent_worktree import SubagentWorktreeManager
                     parent_dir = ctx.project_dir
-                    reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.task_id, branch_name)
+                    reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
                     if reattached:
                         project_dir = reattached
                 subagent.project_dir = project_dir
                 subagent.cwd = project_dir
 
             if not subagent:
-                return f"ERR: no active agent for {session.task_id}"
+                return f"ERR: no active agent for {session.id}"
 
             session.status = "running"
             session.add_event({"type": "user", "text": message})
@@ -179,36 +180,40 @@ class ManageSubagentTool(BaseTool):
                     ctx.project_dir, wt_path, wt_branch, acc, is_followup=True
                 )
 
-            run_bg = bool(args["background"]) if "background" in args else session.background
+            run_bg = bool(args["background"]) if "background" in args else session.background if hasattr(session, "background") else True
             if run_bg:
-                notification_hdr = f"[System Notification] Follow-up to background subagent '{session.description}' (ID: {session.task_id}) completed."
+                notification_hdr = f"[System Notification] Follow-up to background subagent '{session.description}' (ID: {session.id}) completed."
                 bg_task = asyncio.create_task(
                     run_subagent_stream_bg(
                         subagent,
                         message,
                         session,
                         ctx,
+                        store,
                         cleanup_fn=_cleanup_followup,
                         error_prefix="Subagent message error",
                         notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>",
-                        task_id=session.task_id,
+                        task_id=session.id,
                         truncate_result=False,
                     )
                 )
                 session.async_task = bg_task
 
-                return f"OK: message sent to {session.task_id}"
+                return f"OK: message sent to {session.id}"
             else:
                 acc = [""]
                 try:
                     async for step in subagent.stream_steps(message):
                         record_subagent_step(step, session, acc)
-                    session.finish("completed")
+                    session.finish(STATUS_COMPLETED)
+                    store.save(session)
                 except asyncio.CancelledError:
-                    session.finish("cancelled", "Cancelled by user")
+                    session.finish(STATUS_CANCELLED, "Cancelled by user")
+                    store.save(session)
                     return "ERR: subagent message cancelled"
                 except Exception as err:
-                    session.finish("error", str(err))
+                    session.finish(STATUS_ERROR, str(err))
+                    store.save(session)
                     return f"ERR: subagent message: {err}"
                 finally:
                     _cleanup_followup(acc)

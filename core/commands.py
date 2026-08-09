@@ -60,6 +60,7 @@ class NewCommand(BaseCommand):
         app.is_generating = False
         app.message_queue.clear()
         app.current_session_id = app.sm.generate_session_id()
+        app.sm.create_main(app.current_session_id)
         chat_view = app.query_one(ChatView)
         await chat_view.remove_children()
         chat_view.check_welcome()
@@ -325,7 +326,7 @@ class ResumeCommand(BaseCommand):
     description = "Resume a saved session"
 
     async def execute(self, app) -> None:
-        sessions = app.sm.list_sessions()
+        sessions = app.sm.list_main_sessions()
         if not sessions:
             app.notify("No saved sessions in this project", severity="warning")
             return

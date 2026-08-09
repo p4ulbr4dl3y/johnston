@@ -17,8 +17,8 @@ class SessionPersistenceMixin:
 
     def load_session_ui(self, session_id: str) -> None:
         """Load session state into UI and agent history"""
-        session_data = self.sm.load_session(session_id)
-        if not session_data:
+        session = self.sm.get(session_id)
+        if not session:
             return
 
         self.current_session_id = session_id
@@ -31,9 +31,9 @@ class SessionPersistenceMixin:
             child.remove()
 
         # Restore complete element history in UI (user, bot, thinking, tool)
-        saved_ui_msgs = session_data.get("ui_messages", [])
+        saved_msgs = session.messages
 
-        async def _restore_ui_messages(msgs: list):
+        async def _restore_messages(msgs: list):
             try:
                 for msg in msgs:
                     if not isinstance(msg, dict):
@@ -43,7 +43,7 @@ class SessionPersistenceMixin:
                         if mtype == "user":
                             text = msg.get("text", "")
                             await chat_view.add_user_message(text, animate=False)
-                        elif mtype == "bot":
+                        elif mtype in ("bot", "bot_text", "bot_delta"):
                             text = msg.get("text", "")
                             bm = await chat_view.add_bot_message(animate=False)
                             await bm.set_final_content(text)
@@ -52,15 +52,28 @@ class SessionPersistenceMixin:
                             txt = msg.get("text", "")
                             tw = await chat_view.add_thinking_widget(animate=False)
                             tw.finish_thinking(dur, txt)
+                        elif mtype in ("thinking_start", "thinking_delta", "thinking_end"):
+                            txt = msg.get("text", "") or msg.get("val1", "") or msg.get("content", "")
+                            tw = await chat_view.add_thinking_widget(animate=False)
+                            tw.finish_thinking(msg.get("duration", 0.0), txt)
                         elif mtype == "tool":
                             ttype = msg.get("tool_type", "")
                             target = msg.get("target", "")
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
                             await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
+                        elif mtype == "tool_result":
+                            rtext = msg.get("result_text", "")
+                            if chat_view.children:
+                                for child in reversed(chat_view.children):
+                                    if isinstance(child, ToolCallWidget):
+                                        child.set_result(rtext)
+                                        break
                         elif mtype == "compaction_divider":
                             ctxt = msg.get("text", "Session Compacted")
                             await chat_view.add_compaction_divider(ctxt, animate=False)
+                        elif mtype == "status_change":
+                            pass
                         if len(chat_view.children) % 5 == 0:
                             await asyncio.sleep(0)
                     except Exception as err:
@@ -80,17 +93,17 @@ class SessionPersistenceMixin:
             except Exception:
                 pass
 
-        self.run_worker(_restore_ui_messages(saved_ui_msgs))
+        self.run_worker(_restore_messages(saved_msgs))
 
         # Restore agent context
         if hasattr(self.agent, "history"):
-            self.agent.history = session_data.get("agent_history", [])
-            self.agent.tokens_input = session_data.get("tokens_input", 0)
-            self.agent.tokens_output = session_data.get("tokens_output", 0)
-            self.agent.total_tokens = session_data.get("total_tokens", 0)
-            self.agent.cost_usd = session_data.get("cost_usd", 0.0)
+            self.agent.history = session.agent_history
+            self.agent.tokens_input = session.tokens_input
+            self.agent.tokens_output = session.tokens_output
+            self.agent.total_tokens = session.total_tokens
+            self.agent.cost_usd = session.cost_usd
 
-            ctx = session_data.get("last_context_tokens", 0)
+            ctx = session.last_context_tokens
             if not ctx and self.agent.history:
                 from core.prompt_builder import PromptBuilder
                 from core.token_util import estimate_tokens
@@ -112,25 +125,25 @@ class SessionPersistenceMixin:
 
         user_msgs = chat_view.get_user_messages()
         if not user_msgs:
-            return {"ui_messages": []}
+            return {"messages": []}
 
         first_msg = user_msgs[0][1]
         title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
 
-        ui_messages = []
+        messages = []
         for child in chat_view.children:
             if isinstance(child, UserMessage):
-                ui_messages.append({"type": "user", "text": child.raw_text})
+                messages.append({"type": "user", "text": child.raw_text})
             elif isinstance(child, BotMessage):
-                ui_messages.append({"type": "bot", "text": child.content})
+                messages.append({"type": "bot", "text": child.content})
             elif isinstance(child, ThinkingWidget):
-                ui_messages.append({
+                messages.append({
                     "type": "thinking",
                     "duration": getattr(child, "duration_seconds", 0.0),
                     "text": getattr(child, "thinking_text", "")
                 })
             elif isinstance(child, ToolCallWidget):
-                ui_messages.append({
+                messages.append({
                     "type": "tool",
                     "tool_type": getattr(child, "tool_type", ""),
                     "target": getattr(child, "target", ""),
@@ -138,7 +151,7 @@ class SessionPersistenceMixin:
                     "args": getattr(child, "args", {})
                 })
             elif isinstance(child, CompactionDivider):
-                ui_messages.append({
+                messages.append({
                     "type": "compaction_divider",
                     "text": getattr(child, "divider_title", "Session Compacted")
                 })
@@ -148,7 +161,7 @@ class SessionPersistenceMixin:
         return {
             "id": self.current_session_id,
             "title": title,
-            "ui_messages": ui_messages,
+            "messages": messages,
             "agent_history": agent_history,
             "tokens_input": getattr(self.agent, "tokens_input", 0),
             "tokens_output": getattr(self.agent, "tokens_output", 0),
@@ -161,8 +174,23 @@ class SessionPersistenceMixin:
         """Save complete UI element state to ~/.johnston/projects/<project>/sessions"""
         session_data = self._get_current_session_data()
         if session_data is not None:
-            self.sm.save_session(self.current_session_id, session_data)
+            self._write_session_data(session_data)
             self.refresh_status_footer()
+
+    def _write_session_data(self, session_data: dict) -> None:
+        """Write collected session data into the store (no UI access — safe for threads)."""
+        session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
+        session.description = session.description or session_data.get("title", "")
+        session.messages = session_data.get("messages", [])
+        session.agent_history = session_data.get("agent_history", [])
+        session.tokens_input = session_data.get("tokens_input", 0)
+        session.tokens_output = session_data.get("tokens_output", 0)
+        session.total_tokens = session_data.get("total_tokens", 0)
+        session.cost_usd = session_data.get("cost_usd", 0.0)
+        session.last_context_tokens = session_data.get("last_context_tokens", 0)
+        session.touch()
+        self.sm.save(session)
+        self.sm.set_active_session_id(self.current_session_id)
 
     async def save_current_session_async(self, force: bool = False) -> None:
         """Collect session data on main UI thread, then save to disk in background thread."""
@@ -173,5 +201,5 @@ class SessionPersistenceMixin:
         self._last_session_save_time = now
         session_data = self._get_current_session_data()
         if session_data is not None:
-            await asyncio.to_thread(self.sm.save_session, self.current_session_id, session_data)
+            await asyncio.to_thread(self._write_session_data, session_data)
             self.refresh_status_footer()

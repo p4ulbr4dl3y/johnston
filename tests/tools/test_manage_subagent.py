@@ -1,44 +1,53 @@
+import tempfile
 import unittest
 from unittest.mock import MagicMock
 
-from core.subagent_tracker import SubagentTracker
+from core.session_manager import AgentSession, SessionStore
 from tools.manage_subagent import ManageSubagentTool
+
+
+def _make_store(tmpdir: str) -> SessionStore:
+    store = SessionStore(project_path=tmpdir)
+    return store
 
 
 class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        import tempfile
-
-        from core.subagent_tracker import SUBAGENT_SESSIONS_DIR
-        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        self.tracker = SubagentTracker.get_instance()
-        self.tracker.storage_dir = self.temp_dir.name
-        self.tracker.sessions.clear()
+        self.store = _make_store(self.temp_dir.name)
+        self.store._sessions.clear()
+        # Track old instance to avoid cross-test pollution
+        self._old_instance = SessionStore._instance
+        SessionStore._instance = self.store
 
     async def asyncTearDown(self):
-        for sess in list(self.tracker.sessions.values()):
-            if sess.async_task and not sess.async_task.done():
-                sess.async_task.cancel()
-        self.tracker.sessions.clear()
-        self.tracker.storage_dir = self.old_dir
-        self.temp_dir.cleanup()
+        SessionStore._instance = self._old_instance
+
+    def _mk_subagent(self, sid: str, desc: str, prompt: str, role: str = "worker", status: str = "running") -> AgentSession:
+        return self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id=sid,
+            role=role,
+            description=desc,
+            prompt=prompt,
+            status=status,
+        )
 
     async def test_list_action(self):
         tool = ManageSubagentTool()
         res_empty = await tool.execute({"action": "list"})
         self.assertIn("Available Subagent Roles", res_empty)
 
-        self.tracker.create_session("sub-1", "Search files", "find python files", "explore", False)
+        self._mk_subagent("sub-1", "Search files", "find python files", role="explore")
         res_list = await tool.execute({"action": "list"})
         self.assertIn("sub-1", res_list)
         self.assertIn("Search files", res_list)
 
     async def test_status_action(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-2", "Refactor module", "clean up code", "worker", True)
+        sess = self._mk_subagent("sub-2", "Refactor module", "clean up code", role="worker")
         sess.add_event({"type": "user", "text": "clean up code"})
         sess.add_event({"type": "bot_text", "text": "Done cleaning."})
 
@@ -46,12 +55,14 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sub-2", res_status)
         self.assertIn("Refactor module", res_status)
         self.assertIn("[User]: clean up code", res_status)
-        self.assertIn("Log File:", res_status)
-        self.assertIn("sub-2.log", res_status)
+        # No log-file path / snippet: status is metadata-only now
+        self.assertNotIn("Log File:", res_status)
+        self.assertNotIn(".log", res_status)
+        self.assertNotIn("Final Response Snippet", res_status)
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-3", "Long running task", "do heavy work", "worker", True)
+        sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
 
         res_kill = await tool.execute({"action": "kill", "task_id": "sub-3"})
         self.assertIn("OK: sub-3 terminated", res_kill)
@@ -61,18 +72,18 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         res_kill_again = await tool.execute({"action": "kill", "task_id": "sub-3"})
         self.assertIn("OK: sub-3 already in 'cancelled'", res_kill_again)
 
-    def test_subagent_session_data_agent_history_deserialization(self):
-        from core.subagent_tracker import SubagentSessionData
+    def test_agent_session_deserialization(self):
         data = {
-            "task_id": "sub-test",
+            "id": "sub-test",
+            "kind": "subagent",
+            "parent_id": "sess-main",
+            "role": "worker",
+            "status": "completed",
             "description": "test desc",
             "prompt": "test prompt",
-            "subagent_type": "worker",
-            "background": False,
-            "status": "completed",
             "agent_history": [{"role": "user", "content": "Prior prompt"}, {"role": "assistant", "content": "Prior response"}]
         }
-        sess = SubagentSessionData.from_dict(data)
+        sess = AgentSession.from_dict(data)
         self.assertEqual(len(sess.agent_history), 2)
         self.assertEqual(sess.to_dict()["agent_history"], data["agent_history"])
 
@@ -80,26 +91,29 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        import tempfile
-
-        from core.subagent_tracker import SUBAGENT_SESSIONS_DIR, SubagentTracker
-        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        self.tracker = SubagentTracker.get_instance()
-        self.tracker.storage_dir = self.temp_dir.name
-        self.tracker.sessions.clear()
+        self.store = _make_store(self.temp_dir.name)
+        self._old_instance = SessionStore._instance
+        SessionStore._instance = self.store
 
     async def asyncTearDown(self):
-        for sess in list(self.tracker.sessions.values()):
-            if sess.async_task and not sess.async_task.done():
-                sess.async_task.cancel()
-        self.tracker.sessions.clear()
-        self.tracker.storage_dir = self.old_dir
+        SessionStore._instance = self._old_instance
+
+    def _mk_subagent(self, sid: str, desc: str = "Task", prompt: str = "prompt", role: str = "worker", status: str = "running", background: bool = False) -> AgentSession:
+        return self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id=sid,
+            role=role,
+            description=desc,
+            prompt=prompt,
+            status=status,
+            background=background,
+        )
 
     async def test_send_message_no_message(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-sm1", "Task", "prompt", "worker", False)
+        self._mk_subagent("sub-sm1")
         res = await tool.execute({"action": "send_message", "task_id": "sub-sm1"}, app=MagicMock())
         self.assertIn("ERR: 'message' required", res)
 
@@ -115,9 +129,10 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_no_agent_available(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-sm2", "Task", "prompt", "worker", False)
+        self._mk_subagent("sub-sm2")
         mock_app = MagicMock()
         mock_app.current_session_id = None
+        mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = None
         res = await tool.execute({"action": "send_message", "task_id": "sub-sm2", "message": "hi"}, app=mock_app)
@@ -125,7 +140,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_message_sync_success(self):
         tool = ManageSubagentTool()
-        sess = self.tracker.create_session("sub-sm3", "Task", "prompt", "worker", False)
+        sess = self._mk_subagent("sub-sm3")
 
         class MockSubagent:
             def __init__(self):
@@ -148,6 +163,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.current_session_id = None
         mock_app.project_dir = None
         mock_app.agent = None
+        mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
         res = await tool.execute({"action": "send_message", "task_id": "sub-sm3", "message": "hello"}, app=mock_app)
@@ -158,14 +174,14 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-unk", "Task", "prompt", "worker", False)
+        self._mk_subagent("sub-unk")
         res = await tool.execute({"action": "bogus", "task_id": "sub-unk"})
         self.assertIn("ERR: unknown action 'bogus'", res)
         self.assertIn("bogus", res)
 
     async def test_send_message_background(self):
         tool = ManageSubagentTool()
-        self.tracker.create_session("sub-bg", "Task", "prompt", "worker", True)
+        self._mk_subagent("sub-bg", background=True)
 
         class MockSubagent:
             def __init__(self):
@@ -188,12 +204,12 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.current_session_id = None
         mock_app.project_dir = None
         mock_app.agent = None
+        mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
 
         res = await tool.execute({"action": "send_message", "task_id": "sub-bg", "message": "hello bg"}, app=mock_app)
         self.assertIn("OK: message sent to sub-bg", res)
-
 
     async def test_status_and_kill_missing_task_id(self):
         tool = ManageSubagentTool()
@@ -206,4 +222,3 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

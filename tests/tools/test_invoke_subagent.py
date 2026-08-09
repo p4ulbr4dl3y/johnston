@@ -2,35 +2,40 @@ import tempfile
 import unittest
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.subagent_tracker import SUBAGENT_SESSIONS_DIR, SubagentTracker
+from core.session_manager import SessionStore
 from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool, _truncate_subagent_result
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        self.tracker = SubagentTracker.get_instance()
-        self.tracker.storage_dir = self.temp_dir.name
-        self.tracker.sessions.clear()
+        self.store = SessionStore(project_path=self.temp_dir.name)
+        self._old_instance = SessionStore._instance
+        SessionStore._instance = self.store
 
     async def asyncTearDown(self):
-        for sess in list(self.tracker.sessions.values()):
-            if sess.async_task and not sess.async_task.done():
-                sess.async_task.cancel()
-        self.tracker.sessions.clear()
-        self.tracker.storage_dir = self.old_dir
+        SessionStore._instance = self._old_instance
         self.temp_dir.cleanup()
 
     async def test_max_concurrent_subagents_limit(self):
+        from unittest.mock import MagicMock
         tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_app.current_session_id = "sess-main"
+        mock_app.sm = self.store
+        mock_ctx = MagicMock()
+        mock_ctx.app = mock_app
+        mock_ctx.background_tasks = []
+        tool._ensure_context = lambda app=None: mock_ctx
 
-        # Populate tracker with MAX_CONCURRENT_SUBAGENTS running sessions
+        # Populate store with MAX_CONCURRENT_SUBAGENTS running sessions
         for i in range(MAX_CONCURRENT_SUBAGENTS):
-            sess = self.tracker.create_session(f"task-{i}", f"Task {i}", "prompt", "worker", True)
-            sess.status = "running"
+            self.store.create_subagent(
+                parent_id="sess-main", subagent_id=f"task-{i}",
+                role="worker", description=f"Task {i}", prompt="prompt", status="running",
+            )
 
         # Attempt to spawn one more
         res = await tool.execute({"prompt": "another task", "description": "Over limit"})
@@ -55,6 +60,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx.app = mock_app
         mock_ctx.create_agent.return_value = mock_agent
         mock_ctx.background_tasks = []
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
 
         tool._ensure_context = lambda app=None: mock_ctx
 
@@ -86,6 +93,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx.app = mock_app
         mock_ctx.create_agent.return_value = mock_agent
         mock_ctx.background_tasks = []
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
 
         tool._ensure_context = lambda app=None: mock_ctx
 
