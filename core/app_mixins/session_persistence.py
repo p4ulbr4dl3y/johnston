@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from typing import Optional
 
@@ -10,6 +11,8 @@ from widgets.chat_view import (
     ToolCallWidget,
     UserMessage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SessionPersistenceMixin:
@@ -66,7 +69,7 @@ class SessionPersistenceMixin:
                         if len(chat_view.children) % 5 == 0:
                             await asyncio.sleep(0)
                     except Exception as err:
-                        print(f"Warning: error restoring UI message item: {err}")
+                        logger.warning("Error restoring UI message item: %s", err)
             except Exception as err:
                 try:
                     self.notify(f"UI restoration failed: {err}", severity="warning")

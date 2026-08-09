@@ -1,5 +1,5 @@
 import asyncio
-import json
+import logging
 import os
 import time
 from typing import Any, Dict, List, Optional
@@ -8,8 +8,10 @@ import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.defaults.providers import DEFAULT_JSON_PROVIDERS
-from core.platform_utils import atomic_write_json
+from core.platform_utils import atomic_write_json, read_json
 from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderManager:
@@ -32,8 +34,7 @@ class ProviderManager:
             mtime = os.path.getmtime(CONFIG_FILE)
             if self._config_cache and getattr(self, "_config_file_path", "") == CONFIG_FILE and self._config_mtime == mtime:
                 return self._config_cache
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            data = read_json(CONFIG_FILE, {})
             self._config_cache = data if isinstance(data, dict) else {}
             self._config_mtime = mtime
             self._config_file_path = CONFIG_FILE
@@ -43,15 +44,8 @@ class ProviderManager:
 
     def _read_config(self) -> dict:
         """Reads CONFIG_FILE, falling back to {} on missing/corrupt file."""
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-            except Exception:
-                pass
-        return {}
+        data = read_json(CONFIG_FILE, {})
+        return data if isinstance(data, dict) else {}
 
     def _save_config(self, data: Dict[str, Any]) -> None:
         atomic_write_json(CONFIG_FILE, data, indent=2)
@@ -77,8 +71,7 @@ class ProviderManager:
                 if self._providers_cache and getattr(self, "_providers_file_path", "") == PROVIDERS_JSON_FILE and self._providers_mtime == mtime:
                     data = self._providers_cache
                 else:
-                    with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
-                        data = json.load(f)
+                    data = read_json(PROVIDERS_JSON_FILE, {})
                     self._providers_cache = data if isinstance(data, dict) else {}
                     self._providers_mtime = mtime
                     self._providers_file_path = PROVIDERS_JSON_FILE
@@ -169,14 +162,13 @@ class ProviderManager:
 
         # Also update JSON providers file if present
         if os.path.exists(PROVIDERS_JSON_FILE):
-            try:
-                with open(PROVIDERS_JSON_FILE, "r", encoding="utf-8") as f:
-                    jdata = json.load(f)
-                if key in jdata:
+            jdata = read_json(PROVIDERS_JSON_FILE, {})
+            if isinstance(jdata, dict) and key in jdata:
+                try:
                     jdata[key]["model"] = model_name
                     self._save_providers_json(jdata)
-            except Exception:
-                pass
+                except Exception:
+                    pass
         self.invalidate_cache()
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
@@ -308,15 +300,12 @@ class ProviderManager:
             fallback = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
             cached_models = []
             if os.path.exists(cache_path):
-                try:
-                    with open(cache_path, "r", encoding="utf-8") as f:
-                        cdata = json.load(f)
-                        age = time.time() - cdata.get("updated_at", 0)
-                        cached_models = cdata.get("models", [])
-                        if age < 86400 and cached_models:
-                            return cached_models
-                except Exception:
-                    pass
+                cdata = read_json(cache_path, {})
+                if isinstance(cdata, dict):
+                    age = time.time() - cdata.get("updated_at", 0)
+                    cached_models = cdata.get("models", [])
+                    if age < 86400 and cached_models:
+                        return cached_models
 
             # If no cache and no static fallback list, fetch models directly
             if not cached_models and not fallback and api_key:
@@ -363,7 +352,7 @@ class ProviderManager:
                                 if ctx_len and isinstance(ctx_len, (int, float)):
                                     model_limits[m_id] = int(ctx_len)
             except Exception as e:
-                print(f"Error fetching models for {provider_key}: {e}")
+                logger.warning("Error fetching models for %s: %s", provider_key, e)
 
         if models:
             try:
@@ -384,7 +373,7 @@ class ProviderManager:
                 indent=2
             )
         except Exception as e:
-            print(f"Error writing models cache: {e}")
+            logger.warning("Error writing models cache: %s", e)
 
         return models
 

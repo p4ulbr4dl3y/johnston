@@ -4,7 +4,7 @@ Fetches model context limits, reasoning capabilities, and pricing dynamically
 from models.dev and OpenRouter catalog APIs with local cache fallbacks.
 """
 import asyncio
-import json
+import logging
 import os
 import re
 import time
@@ -15,6 +15,8 @@ import httpx
 from core.config import CONFIG_DIR
 from core.defaults.config import DEFAULT_CONTEXT_LIMIT
 from core.platform_utils import atomic_write_json, read_json
+
+logger = logging.getLogger(__name__)
 
 MODELS_DEV_URL = "https://models.dev/api.json"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -87,7 +89,7 @@ class ModelsCatalog:
             }
             atomic_write_json(CACHE_FILE, payload, indent=2)
         except Exception as e:
-            print(f"Error saving models catalog cache: {e}")
+            logger.warning("Error saving models catalog cache: %s", e)
 
     async def refresh(self, force: bool = False, max_age: float = CACHE_TTL) -> Dict[str, int]:
         if not force and self._limits and (time.time() - getattr(self, "_updated_at", 0.0) < max_age):
@@ -166,7 +168,7 @@ class ModelsCatalog:
                                         model_pricing[full_id] = pricing_item
                                         model_pricing[alias_id] = pricing_item
                 except Exception as e:
-                    print(f"Error parsing models.dev response: {e}")
+                    logger.warning("Error parsing models.dev response: %s", e)
 
             # 2. Parse OpenRouter response
             if isinstance(openrouter_res, httpx.Response) and openrouter_res.status_code == 200:
@@ -199,7 +201,7 @@ class ModelsCatalog:
                                 model_pricing.setdefault(m_id, pricing_item)
                                 model_pricing.setdefault(short_id, pricing_item)
                 except Exception as e:
-                    print(f"Error parsing OpenRouter response: {e}")
+                    logger.warning("Error parsing OpenRouter response: %s", e)
 
             self._limits = model_limits
             self._output_limits = output_limits
@@ -212,7 +214,7 @@ class ModelsCatalog:
 
             self.save_cache()
         except Exception as e:
-            print(f"Error fetching models catalog: {e}")
+            logger.warning("Error fetching models catalog: %s", e)
         return self._limits
 
     def _get_all_catalog_keys(self) -> Set[str]:
@@ -335,16 +337,13 @@ class ModelsCatalog:
         if provider_id:
             prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
             if os.path.exists(prov_cache):
-                try:
-                    with open(prov_cache, "r", encoding="utf-8") as f:
-                        cdata = json.load(f)
-                        lims = cdata.get("model_limits", {})
-                        if lims:
-                            res_prov = self._resolve_catalog_key(provider_id, model_id, lims, tag=f"prov_{provider_id}_limits")
-                            if res_prov and res_prov in lims:
-                                return lims[res_prov]
-                except Exception:
-                    pass
+                cdata = read_json(prov_cache, {})
+                if isinstance(cdata, dict):
+                    lims = cdata.get("model_limits", {})
+                    if lims:
+                        res_prov = self._resolve_catalog_key(provider_id, model_id, lims, tag=f"prov_{provider_id}_limits")
+                        if res_prov and res_prov in lims:
+                            return lims[res_prov]
 
         return DEFAULT_CONTEXT_LIMIT
 

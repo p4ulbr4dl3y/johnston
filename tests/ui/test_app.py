@@ -477,7 +477,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         app.trigger_ai_response = MagicMock()
 
-        with patch("app.handle_slash_command", new_callable=AsyncMock) as mock_handle:
+        with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=AsyncMock) as mock_handle:
             mock_handle.return_value = True
 
             async with app.run_test() as pilot:

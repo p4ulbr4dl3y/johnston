@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -15,6 +16,8 @@ from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinkin
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
 from tools.registry import execute_tool
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
@@ -164,7 +167,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     }
                 }
         except Exception as e:
-            print(f"{error_prefix}: {e}")
+            logger.warning("%s: %s", error_prefix, e)
         return None
 
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
