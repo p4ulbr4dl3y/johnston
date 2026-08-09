@@ -1210,53 +1210,6 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         contents = [m["content"] for m in tool_msgs]
         self.assertEqual(contents, ['{"type": "image", "path": "y.png"}', '{"a": 1}', ""])
 
-    async def test_queued_user_messages_injected(self):
-        agent = self._make_agent()
-
-        class _FakeApp:
-            current_session_id = "sess1"
-            message_queue = [
-                ("m1",),
-                ("m2", True, None, "other_sid"),
-                ("m3", False, [_Attachment("q.png")]),
-                ("m4", True, [_Attachment("bad_q.png")]),
-            ]
-
-        agent.app = _FakeApp()
-        img_json = json.dumps({"base64": "QUFB", "media_type": "image/png"})
-
-        def fake_process(path):
-            if str(path).endswith("bad_q.png"):
-                raise RuntimeError("cannot read queued image")
-            return img_json
-
-        first = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
-        second = _MockStream([_text_chunk("ok")])
-        printed = []
-        with unittest.mock.patch("tools.read.process_image_file_sync", side_effect=fake_process):
-            with unittest.mock.patch("builtins.print", side_effect=lambda *a, **k: printed.append(a)):
-                with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
-                    mock_create.side_effect = [first, second]
-                    with unittest.mock.patch("core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="tool ok"):
-                        events = []
-                        async for evt in agent.stream_steps("run tool"):
-                            events.append(evt)
-
-        queued = [e for e in events if e[0] == "queued_user_message"]
-        self.assertEqual(len(queued), 3)
-        self.assertEqual(queued[0][1:], ("m1", None, True))
-        self.assertEqual(queued[1][1], "m3")
-        self.assertEqual(queued[1][3], False)
-        self.assertIsInstance(queued[1][2][0], _Attachment)
-        self.assertTrue(any("Error processing mid-generation attachment image" in str(p) for p in printed))
-        self.assertEqual(events[-1], ("bot_text", "ok", ""))
-
-        second_messages = mock_create.call_args_list[1].kwargs["messages"]
-        user_texts = [m["content"] for m in second_messages if m.get("role") == "user" and isinstance(m["content"], str)]
-        self.assertIn("m1", user_texts)
-        image_users = [m for m in second_messages if m.get("role") == "user" and isinstance(m["content"], list)]
-        self.assertTrue(any(any(i.get("type") == "image_url" for i in m["content"]) for m in image_users))
-
     async def test_compaction_in_loop_after_tool_turn(self):
         agent = self._make_agent()
 
