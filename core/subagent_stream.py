@@ -1,8 +1,7 @@
 """Subagent streaming helpers operating on the unified AgentSession model.
 
-The SubagentTracker singleton and SubagentSessionData class are gone: subagent
-sessions are AgentSession records (kind="subagent") stored per-project under
-sessions/<parent_id>.subagents/ via SessionStore.
+Subagent sessions are AgentSession records (kind="subagent") stored per-project
+under sessions/<parent_id>.subagents/ via SessionStore.
 """
 
 import asyncio
@@ -15,8 +14,8 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     """Records a subagent execution step into the session in canonical message format.
 
     Raw stream events (thinking_start/delta/end, bot_chunk/delta/text,
-    tool_result) are coalesced by AgentSession.add_event into the same
-    canonical types used by main session snapshots (thinking/bot/tool).
+    tool_result) are canonicalized here into shared types (thinking/bot/tool)
+    before being appended via AgentSession.add_event.
     """
     import math
 

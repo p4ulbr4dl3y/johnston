@@ -52,7 +52,7 @@ class NewCommand(BaseCommand):
         kill_all_background_tasks(getattr(app, "background_tasks", []))
         if hasattr(app, "background_tasks"):
             app.background_tasks.clear()
-        from core.subagent_tracker import cancel_running_subagents
+        from core.subagent_stream import cancel_running_subagents
         cancel_running_subagents(app.sm)
         # Reset generation state synchronously: cancelled workers clear is_generating
         # in their own finally, but that runs asynchronously, so /new could leave the
@@ -550,7 +550,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
         return True
 
 
-    # Multi-skill & single-skill slash command execution (e.g. /johnston-architect /caveman request)
+    # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
     words = command_text.strip().split()
     sm = SkillManager()
     loaded_skills = []

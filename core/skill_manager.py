@@ -11,7 +11,6 @@ from core.defaults.config import DEFAULT_IGNORE_DIRS
 from core.defaults.skills.handoff_skill import DEFAULT_HANDOFF_SKILL_CONTENT
 from core.defaults.skills.init_skill import DEFAULT_INIT_SKILL_CONTENT
 from core.defaults.skills.johnston_guide import JOHNSTON_GUIDE_FILES
-from core.defaults.skills.johnston_guide import SKILL_MD as DEFAULT_ARCHITECT_SKILL_CONTENT
 from core.frontmatter import parse_frontmatter
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
@@ -45,17 +44,7 @@ class SkillManager:
                 except Exception:
                     pass
 
-        # 2. Provision johnston-architect alias for backward compatibility
-        architect_dir = os.path.join(self.global_dir, "johnston-architect")
-        architect_file = os.path.join(architect_dir, "SKILL.md")
-        if not os.path.exists(architect_file):
-            try:
-                os.makedirs(architect_dir, exist_ok=True)
-                atomic_write_text(architect_file, DEFAULT_ARCHITECT_SKILL_CONTENT.strip())
-            except Exception:
-                pass
-
-        # 3. Single-file skills (init, handoff)
+        # 2. Single-file skills (init, handoff)
         single_skills = [
             ("init", DEFAULT_INIT_SKILL_CONTENT, "Repository Initialization"),
             ("handoff", DEFAULT_HANDOFF_SKILL_CONTENT, "Session Continuation Handoff Note"),

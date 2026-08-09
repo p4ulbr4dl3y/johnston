@@ -131,7 +131,7 @@ class ManageSubagentTool(BaseTool):
                         subagent.history = hist
                     # Restore role behavior (system prompt, model, tool filtering)
                     # so follow-ups match the original spawn, even after restart.
-                    from core.subagent_tracker import apply_subagent_role
+                    from core.subagent_stream import apply_subagent_role
                     apply_subagent_role(
                         subagent,
                         session.role,
@@ -161,7 +161,7 @@ class ManageSubagentTool(BaseTool):
             session.add_event({"type": "user", "text": message})
             session.add_event({"type": "status_change", "status": "running"})
 
-            from core.subagent_tracker import (
+            from core.subagent_stream import (
                 merge_subagent_metrics,
                 record_subagent_step,
                 run_subagent_stream_bg,
