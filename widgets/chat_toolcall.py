@@ -1,4 +1,3 @@
-import difflib
 import json
 import os
 import re
@@ -595,51 +594,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 else:
                     diff_text = raw_text
                     if not diff_text or "@@" not in diff_text:
-                        chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks")
-                        diff_parts = []
-                        if chunks and isinstance(chunks, list):
-                            for chunk in chunks:
-                                if isinstance(chunk, dict):
-                                    old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or ""
-                                    new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or ""
-                                    start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
-                                    if old_c or new_c:
-                                        d_lines = list(difflib.unified_diff(
-                                            old_c.splitlines(),
-                                            new_c.splitlines(),
-                                            fromfile=file_path or "file",
-                                            tofile=file_path or "file",
-                                            lineterm=""
-                                        ))
-                                        if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                                            h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                                            if h_m:
-                                                old_cnt = h_m.group(2) or "1"
-                                                new_cnt = h_m.group(4) or "1"
-                                                d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                                        diff_parts.extend(d_lines)
-                        else:
-                            old_s = self.args.get("old_string") or self.args.get("target_content") or self.args.get("TargetContent") or ""
-                            new_s = self.args.get("new_string") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
-                            start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
-                            if old_s or new_s:
-                                d_lines = list(difflib.unified_diff(
-                                    old_s.splitlines(),
-                                    new_s.splitlines(),
-                                    fromfile=file_path or "file",
-                                    tofile=file_path or "file",
-                                    lineterm=""
-                                ))
-                                if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                                    h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                                    if h_m:
-                                        old_cnt = h_m.group(2) or "1"
-                                        new_cnt = h_m.group(4) or "1"
-                                        d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                                diff_parts.extend(d_lines)
-
-                        if diff_parts:
-                            diff_text = "\n".join(diff_parts)
+                        from widgets.code_syntax import build_edit_diff_text
+                        diff_text = build_edit_diff_text(self.args, file_path or "file")
 
                     if diff_text:
                         formatted_diff = self._format_edit_diff(diff_text, file_path)
