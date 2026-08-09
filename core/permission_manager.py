@@ -1,8 +1,8 @@
-import json
 import os
 from typing import Any, Dict, Optional, Tuple
 
 from core.config import CONFIG_FILE, DEFAULT_PERMISSIONS, PROJECT_PERMISSIONS_FILE
+from core.platform_utils import atomic_write_json, read_json
 from core.shell_guard import analyze_shell_command
 
 
@@ -62,14 +62,8 @@ class PermissionManager:
         self.session_overrides.clear()
 
     def _load_json_config(self, filepath: str) -> Dict[str, Any]:
-        if not filepath or not os.path.exists(filepath):
-            return {}
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
+        data = read_json(filepath, {})
+        return data if isinstance(data, dict) else {}
 
     def update_permission(
         self,
@@ -83,8 +77,6 @@ class PermissionManager:
         Raises ValueError on invalid target_type or action.
         Saves to project permissions file if project_dir is set, otherwise global config.
         """
-        from tools.base import atomic_write_json
-
         if target_type not in ("group", "tool", "shell_guard"):
             raise ValueError(f"Invalid target_type: '{target_type}'")
 
