@@ -594,7 +594,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 else:
                     diff_text = raw_text
                     if not diff_text or "@@" not in diff_text:
-                        from widgets.code_syntax import build_edit_diff_text
+                        from widgets.lexer_utils import build_edit_diff_text
                         diff_text = build_edit_diff_text(self.args, file_path or "file")
 
                     if diff_text:

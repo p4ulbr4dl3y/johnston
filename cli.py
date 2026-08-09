@@ -8,6 +8,7 @@ try:
 except ImportError:
     tomllib = None  # type: ignore
 
+from core.config import CONFIG_DIR
 from core.provider_manager import ProviderManager
 
 
@@ -66,7 +67,7 @@ def print_skills():
     skills = SkillManager().list_skills()
     print("Available Johnston Skills:")
     if not skills:
-        print("  No skills found (~/.johnston/skills/ or .johnston/skills/)")
+        print(f"  No skills found ({CONFIG_DIR}/skills/ or .johnston/skills/)")
         return
     for idx, s in enumerate(skills):
         scope = f"[{s.get('scope', 'global')}]"
@@ -87,7 +88,7 @@ def print_mcp():
     servers = mgr.load_servers()
     print("Configured MCP Servers:")
     if not servers:
-        print("  No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)")
+        print(f"  No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)")
         return
 
     tools_by_server = {}
@@ -154,7 +155,7 @@ def print_linters():
     availability = mgr.scan_available()
     print("Configured Linters:")
     if not linters:
-        print("  No linters configured (~/.johnston/linters.json)")
+        print(f"  No linters configured ({CONFIG_DIR}/linters.json)")
         return
 
     for idx, lint in enumerate(linters):
@@ -244,14 +245,14 @@ def print_roles():
 
 
 def print_subagents():
-    """Print available subagent definitions to stdout"""
+    """Print available subagent roles to stdout"""
     from core.role_registry import RoleRegistry
 
     registry = RoleRegistry.get_instance()
-    defs = registry.list_definitions()
-    print("Available Subagent Definitions & Roles:")
+    defs = registry.list_subagent_roles()
+    print("Available Subagent Roles:")
     if not defs:
-        print("  No subagent definitions found.")
+        print("  No subagent roles found.")
         return
     for dname, dval in defs.items():
         tools_str = f" | Tools: {', '.join(dval.allowed_tools)}" if dval.allowed_tools else ""
@@ -338,7 +339,7 @@ def main():
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
     parser.add_argument("--roles", action="store_true", help="List available agent roles (modes + subagents)")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
-    parser.add_argument("--subagents", action="store_true", help="List available subagent definitions and sessions")
+    parser.add_argument("--subagents", action="store_true", help="List available subagent roles and sessions")
     parser.add_argument("--linters", action="store_true", help="List configured linters")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 

@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core.config import CONFIG_DIR, PROJECTS_DIR  # noqa: F401
+from core.config import PROJECTS_DIR
 from core.platform_utils import read_json, write_json
 
 

@@ -9,7 +9,7 @@ from core.subagent_tracker import SubagentTracker
 class TestSubagentRoles(unittest.TestCase):
     def test_default_definitions(self):
         registry = RoleRegistry.get_instance()
-        defs = registry.list_definitions()
+        defs = registry.list_subagent_roles()
         self.assertIn("explorer", defs)
         self.assertIn("worker", defs)
 
@@ -46,20 +46,20 @@ You run tests and report coverage.""")
 
             registry = RoleRegistry()
             registry.reload(project_dir=tmpdir)
-            defs = registry.list_definitions()
+            defs = registry.list_subagent_roles()
 
             self.assertIn("reviewer", defs)
             self.assertIn("tester", defs)
 
             reviewer_def = registry.get_role("reviewer")
             self.assertEqual(reviewer_def.description, "Code reviewer subagent")
-            self.assertEqual(reviewer_def.tools, ["read", "grep", "glob"])
+            self.assertEqual(reviewer_def.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(reviewer_def.model, "deepseek-v4-flash")
             self.assertIn("senior code reviewer", reviewer_def.system_prompt)
 
             tester_def = registry.get_role("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
-            self.assertEqual(tester_def.tools, ["shell"])
+            self.assertEqual(tester_def.allowed_tools, ["shell"])
             self.assertEqual(tester_def.model, "gpt-4o")
             self.assertIn("run tests and report coverage", tester_def.system_prompt)
 

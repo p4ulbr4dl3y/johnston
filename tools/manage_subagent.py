@@ -53,9 +53,9 @@ class ManageSubagentTool(BaseTool):
             from core.role_registry import RoleRegistry
             registry = RoleRegistry.get_instance()
             registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
-            defs = registry.list_definitions()
+            defs = registry.list_subagent_roles()
 
-            lines = ["Available Subagent Definitions:"]
+            lines = ["Available Subagent Roles:"]
             for dname, dval in defs.items():
                 lines.append(f"• Type: '{dname}' [{dval.source}] — {dval.description}")
 

@@ -41,13 +41,13 @@ Configure Model Context Protocol (MCP) servers to extend Johnston's toolset.
 Each MCP server operates in one of two tool loading modes:
 
 1. **`eager` (Default):**
-   - Tools are registered as native LLM functions (e.g. `mcp_<server_name>_<tool_name>`).
+   - Tools are registered as native LLM functions using their raw tool name; on name collision between servers, the name is prefixed as `<server_name>__<tool_name>`.
    - Complete JSON schemas are passed in every prompt.
    - Ideal for frequently used, lightweight servers.
 
 2. **`lazy`:**
    - Tools are **not** loaded as full JSON schemas into context.
-   - Johnston injects a lightweight summary block (`<mcp_servers>`) listing available servers and tools.
+   - Johnston injects a lightweight summary block (`## MCP Servers`) listing available servers and tools.
    - The LLM invokes tools on demand using the universal `call_mcp` wrapper.
    - Ideal for large MCP servers (e.g. documentation, search toolkits) to minimize token consumption.
 
@@ -80,7 +80,7 @@ Each MCP server operates in one of two tool loading modes:
 Johnston runs fast, **syntax-only** linters after `create`/`edit` tool writes to catch broken code early. Linters are managed interactively with the `/linters` modal (or `/lint`) and stored in config.
 
 - **Global location:** `~/.johnston/linters.json`
-- **Project location:** `.johnston/linters.json` (overrides global by name)
+- **CLI Management:** `johnston --linters`
 
 ### Presets
 
@@ -89,18 +89,15 @@ Johnston runs fast, **syntax-only** linters after `create`/`edit` tool writes to
 | `python` | `.py` | uvx | `uvx ruff check -q --select E9,F` |
 | `js` / `ts` | `.js .mjs .cjs .jsx` / `.ts .tsx` | npx | `npx --yes eslint@9 --no-config-lookup` |
 | `js_biome` | JS/TS/JSX + `.css` | npx/global | `biome lint --only=correctness` |
-| `go` | `.go` | system (gofmt) | `gofmt -e` |
 | `rust` | `.rs` | system (rustc) | `rustc --edition 2021 --emit=metadata` |
-| `c` / `cpp` | `.c .h` / `.cc .cpp .hpp` | system (gcc) | `gcc -fsyntax-only` |
+| `c` / `cpp` | `.c .h` / `.cc .cpp .cxx .hpp .hh` | system (gcc) | `gcc -fsyntax-only` |
 | `ruby` | `.rb` | system | `ruby -c` |
 | `php` | `.php` | brew (heavy) | `php -l` |
-| `bash` | `.sh .bash` | system | `bash -n` |
 | `json` | `.json` | system (jq) | `jq empty` |
-| `html` | `.html .htm` | system (tidy) | `tidy -q -e` |
 | `yaml` | `.yaml .yml` | uvx | `uvx yamllint --no-warnings` |
 | `toml` | `.toml` | uvx | `uvx taplo check` |
 
-Presets are **syntax-only**: they detect parse errors and fatal issues, not style. System tools (gofmt, rustc, gcc, ruby, bash, jq, tidy) are detected via `which`; uvx/npx-managed tools are detected from the local tool cache. Only available linters run automatically — missing ones are skipped silently. uvx/npx fetch the tool on first run, no manual install step needed.
+Presets are **syntax-only**: they detect parse errors and fatal issues, not style. System tools (rustc, gcc, ruby, php, jq) are detected via `which`; uvx/npx-managed tools are detected from the local tool cache. Only available linters run automatically — missing ones are skipped silently. uvx/npx fetch the tool on first run, no manual install step needed.
 
 ### File Format Example
 
@@ -157,13 +154,15 @@ Inspect git diffs and code changes. Focus on potential bugs, security issues, an
 ```
 
 ### Supported Frontmatter Fields
-- `name`: Role identifier (defaults to filename).
+- `name` / `key` / `subagent_type`: Role identifier (defaults to filename).
 - `description`: Summary of purpose.
 - `scope`: `any`, `subagent_only`, or `main_only`.
 - `tools` / `allowed_tools`: Comma-separated whitelist of permitted tool names.
 - `disallowed_tools`: Comma-separated list of blocked tool names.
 - `read_only`: Boolean flag blocking state-changing operations.
 - `model`: Specific LLM model override for this role.
+- `allowed_shell_commands`: Comma-separated list of permitted shell commands.
+- `workspace_allowlist`: Comma-separated list of allowed workspace paths.
 
 ---
 
@@ -263,7 +262,7 @@ Detailed step-by-step guidance...
 
 ### Special Attributes & Multi-file Support
 - `hidden` / `user_invocable`: Controls whether skill is visible in system prompt / list.
-- **Multi-file Skills:** Johnston scans subdirectories inside the skill directory and injects a `<skill_files>` file tree index into the prompt so the agent can discover auxiliary reference files.
+- **Multi-file Skills:** Auxiliary files (scripts/, references/) live inside the skill directory; the agent discovers them by reading the skill's `SKILL.md` and listing the directory contents.
 
 ---
 

@@ -32,7 +32,7 @@ class SkillManager:
 
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
-        from tools.base import atomic_write_text
+        from core.platform_utils import atomic_write_text
 
         # 1. Provision johnston-guide with references/
         guide_dir = os.path.join(self.global_dir, "johnston-guide")
@@ -211,7 +211,7 @@ class SkillManager:
             else:
                 new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
 
-            from tools.base import atomic_write_text
+            from core.platform_utils import atomic_write_text
             atomic_write_text(filepath, new_content)
 
             return new_hidden

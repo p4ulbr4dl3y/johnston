@@ -28,11 +28,10 @@ When performing specific configuration tasks, inspect ONLY the relevant referenc
 5. **LLM Providers & Keys**: [references/providers.md](file://references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
 
-
-7. **Linters & Syntax Guards**: [references/linters.md](file://references/linters.md)
+6. **Linters & Syntax Guards**: [references/linters.md](file://references/linters.md)
    - Syntax linters (`~/.johnston/linters.json`), presets (ruff, eslint, biome, rustc), auto-scan, and verification (`johnston --linters`).
 
-8. **Custom & Builtin Tools**: [references/tools.md](file://references/tools.md)
+7. **Custom & Builtin Tools**: [references/tools.md](file://references/tools.md)
    - Builtin tool execution, shell permissions, and adding custom tools.
 
 ## Token Optimization & Execution Rules
@@ -45,21 +44,17 @@ CLI_FLAGS_MD = """# Johnston CLI Flags & Commands Reference
 
 ## Key CLI Commands & Startup Flags
 
-- `johnston` / `johnston cli`: Start interactive Textual UI application.
+- `johnston`: Start interactive Textual UI application (entry point `cli:main`).
+- `uv run python cli.py`: Run locally from a checkout.
 - `johnston --models`: List available providers and configured models.
 - `johnston --skills`: List registered global and project skills.
 - `johnston --mcp`: List configured Model Context Protocol (MCP) servers and tool status.
 - `johnston --roles`: List available agent roles (execution modes + subagents).
 - `johnston --rules`: Display active rules and project instructions (`AGENTS.md`, `CLAUDE.md`, `.johnston/rules/`).
-- `johnston --subagents`: List available subagent definitions (builtin + custom).
+- `johnston --subagents`: List available subagent roles (builtin + custom).
 - `johnston --linters`: List configured linters and their availability (`ruff`, `eslint`, `rustc`, etc.).
 - `johnston --resume <session_id>`: Resume a previous conversation session.
 - `johnston -v` / `johnston --version`: Show Johnston application version.
-
-## Environment Variables
-- `JOHNSTON_CONFIG_DIR`: Override global config root (default: `~/.johnston`).
-- `JOHNSTON_MODEL`: Pre-select model alias on launch.
-- `JOHNSTON_EFFORT`: Pre-select thinking effort mode (`auto`, `low`, `medium`, `high`).
 """
 
 MCP_MD = """# MCP (Model Context Protocol) Server Configuration Reference
@@ -150,12 +145,13 @@ PROVIDERS_MD = """# LLM Providers Configuration Reference
 - Global provider config: `~/.johnston/providers.json`
 
 ## Supported API Types
-- `openai` (OpenAI, OpenRouter, Groq, xAI, DeepSeek, LocalAI/Ollama)
+- `openai` (OpenAI, OpenRouter, Groq, xAI, DeepSeek, custom OpenAI-compatible endpoints)
 - `anthropic` (Anthropic Claude API)
 - `gemini` (Google Gemini REST API)
+- `ollama` (local Ollama)
 
-## Environment Keys
-- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`
+## API Keys
+- Keys are stored in `~/.johnston/config.json` under `api_keys` (managed via `johnston --models`), not in environment variables.
 """
 
 
@@ -187,11 +183,12 @@ LINTERS_MD = """# Linters & Syntax Guards Reference
 TOOLS_MD = """# Johnston Tools Reference
 
 ## Builtin Tools
-- `read`, `edit`, `multi_edit`, `write_file`, `grep`, `glob`, `find`, `shell`
-- `invoke_subagent`, `send_message`, `ask_user`, `update_plan`
+- `read`, `create`, `edit`, `multi_edit`, `shell`, `ask_user`
+- `call_mcp`, `invoke_subagent`, `manage_subagent`, `manage_task`, `update_plan`, `web_fetch`
+- Common aliases: `write_file` → `create`, `replace_file_content` → `edit`, `terminal`/`bash` → `shell`, `fetch` → `web_fetch`.
 
 ## Permissions
-- Permissions defined in `~/.johnston/permissions.json` and `.johnston/permissions.json`.
+- Global permissions stored in `~/.johnston/config.json` (`permissions` section); project overrides in `.johnston/permissions.json`.
 - Shell command guard validates safety of commands run via `shell` tool.
 """
 

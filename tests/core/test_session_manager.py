@@ -11,11 +11,9 @@ with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROJECTS_DIR"
 class TestSessionManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        # Patch PROJECTS_DIR and CONFIG_DIR for the SessionManager instance we will test
+        # Patch PROJECTS_DIR for the SessionManager instance we will test
         self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
-        self.config_dir_patcher = patch("core.session_manager.CONFIG_DIR", self.test_dir)
         self.projects_dir_patcher.start()
-        self.config_dir_patcher.start()
 
         # Initialize session manager under temporary project path
         self.project_path = os.path.join(self.test_dir, "my_project")
@@ -24,7 +22,6 @@ class TestSessionManager(unittest.TestCase):
 
     def tearDown(self):
         self.projects_dir_patcher.stop()
-        self.config_dir_patcher.stop()
         shutil.rmtree(self.test_dir)
 
     def test_init_dirs(self):
@@ -97,16 +94,13 @@ class TestSessionManagerRegression(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
-        self.config_dir_patcher = patch("core.session_manager.CONFIG_DIR", os.path.join(self.test_dir, "config"))
         self.projects_dir_patcher.start()
-        self.config_dir_patcher.start()
         self.project_path = os.path.join(self.test_dir, "my_project")
         os.makedirs(self.project_path, exist_ok=True)
         self.sm = SessionManager(project_path=self.project_path)
 
     def tearDown(self):
         self.projects_dir_patcher.stop()
-        self.config_dir_patcher.stop()
         shutil.rmtree(self.test_dir)
 
     def test_load_session_returns_none_for_malformed_json(self):
@@ -152,9 +146,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.p1 = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
-        self.p2 = patch("core.session_manager.CONFIG_DIR", self.test_dir)
         self.p1.start()
-        self.p2.start()
         self.project_path = os.path.join(self.test_dir, "proj")
         os.makedirs(self.project_path, exist_ok=True)
         from core.session_manager import SessionManager
@@ -162,7 +154,6 @@ class TestSessionManagerPureReader(unittest.TestCase):
 
     def tearDown(self):
         self.p1.stop()
-        self.p2.stop()
         shutil.rmtree(self.test_dir)
 
     def test_list_sessions_does_not_delete_empty_files(self):
