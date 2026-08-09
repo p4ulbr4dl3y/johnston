@@ -3,24 +3,15 @@ from typing import Generic, TypeVar
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
+
+from widgets.screens.base_modal import BaseModalScreen
 
 T = TypeVar("T")
 
 
-class BaseSelectionScreen(ModalScreen[T], Generic[T]):
+class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
     """Base class for selection modal screens with OptionList"""
-
-    ALLOW_SELECT = False
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(
         self,
@@ -29,7 +20,9 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         items: list[T],
         default_value: T,
         show_search: bool = False,
-        search_placeholder: str = "Search..."
+        search_placeholder: str = "Search...",
+        hint_text: str = "enter: select • ↑/↓: navigate • esc: cancel",
+        option_list_id: str = "modal-option-list",
     ):
         super().__init__()
         self.title = title
@@ -38,6 +31,8 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         self.default_value = default_value
         self.show_search = show_search
         self.search_placeholder = search_placeholder
+        self.hint_text = hint_text
+        self.option_list_id = option_list_id
         self.filtered_items = list(items)
         self.filtered_options = list(options)
 
@@ -46,11 +41,11 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             yield Markdown(self.title, classes="modal-markdown modal-markdown-centered")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id="modal-search-input")
-            yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: select • ↑/↓: navigate • esc: cancel", id="modal-hint")
+            yield OptionList(*self.filtered_options, id=self.option_list_id)
+            yield Label(self.hint_text, id="modal-hint")
 
     def on_mount(self) -> None:
-        opt_list = self.query_one("#modal-option-list", OptionList)
+        opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         default_idx = None
         if self.default_value is not None and self.default_value in self.raw_items:
             try:
@@ -120,7 +115,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             self.filtered_options = filtered_options
             self.filtered_items = filtered_items
 
-        opt_list = self.query_one("#modal-option-list", OptionList)
+        opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         opt_list.clear_options()
         opt_list.add_options(self.filtered_options)
         default_idx = None
@@ -132,7 +127,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
         opt_list.highlighted = default_idx
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        opt_list = self.query_one("#modal-option-list", OptionList)
+        opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         idx = opt_list.highlighted
         if idx is not None and 0 <= idx < len(self.filtered_items):
             item = self.filtered_items[idx]
@@ -157,7 +152,7 @@ class BaseSelectionScreen(ModalScreen[T], Generic[T]):
             try:
                 search_input = self.query_one("#modal-search-input", Input)
                 if search_input.has_focus:
-                    opt_list = self.query_one("#modal-option-list", OptionList)
+                    opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
                     if opt_list.highlighted is None:
                         for i, it in enumerate(self.filtered_items):
                             if it is not None:

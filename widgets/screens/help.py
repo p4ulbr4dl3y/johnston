@@ -1,8 +1,9 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
+
+from widgets.screens.base_modal import BaseModalScreen
 
 COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
 * `/models` — Switch active model across providers
@@ -29,19 +30,13 @@ KEYBINDINGS_BODY_MD = """* `Shift+Tab` — Toggle Action / Explore mode
 * `Ctrl+C` / `Ctrl+Q` — Exit application"""
 
 
-class HelpScreen(ModalScreen[None]):
+class HelpScreen(BaseModalScreen[None]):
     """Modal help screen with 2 tabs: Commands & Keybindings"""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close"),
         ("enter", "close", "Close"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self):
         super().__init__()

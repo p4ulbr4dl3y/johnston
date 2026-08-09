@@ -3,40 +3,32 @@ from typing import Any, Dict, Optional
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.skill_manager import SkillManager
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
-class SkillDetailScreen(ModalScreen[bool]):
+class SkillDetailScreen(BaseModalScreen[bool]):
     """Modal screen displaying full details of a skill with option to activate"""
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("enter", "activate", "Activate"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, skill: Dict[str, Any]):
         super().__init__()
         self.skill = skill
 
     def compose(self) -> ComposeResult:
-        scope_tag = self.skill.get("scope", "global").upper()
-        header_md = f"### **Skill: {self.skill['name']}** (`[{scope_tag}]`)"
+        scope_str = self.skill.get("scope", "global")
+        header_md = f"### **Skill: {self.skill['name']}** (`{status_tag(scope_str)}`)"
         desc = self.skill.get("description", "").strip() or "No description provided."
 
         with Vertical(id="modal-dialog"):
             yield Markdown(header_md, classes="modal-markdown modal-markdown-centered")
             yield Markdown(desc, classes="modal-markdown")
             yield Label("enter: activate • esc: cancel", id="modal-hint")
-
-
 
     def action_cancel(self) -> None:
         self.dismiss(False)
@@ -45,19 +37,13 @@ class SkillDetailScreen(ModalScreen[bool]):
         self.dismiss(True)
 
 
-class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
+class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
     """Modal screen for listing available skills (global and project) as one-liners"""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
         ("tab", "toggle_hidden", "Toggle Hidden"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self):
         super().__init__()
@@ -73,9 +59,9 @@ class SkillsScreen(ModalScreen[Optional[Dict[str, Any]]]):
         self.skills = self.sm.list_skills(include_hidden=True)
         self.options = []
         for s in self.skills:
-            scope_tag = rf"\[{s['scope'].upper()}]"
-            status_tag = r"\[HIDDEN]" if s.get("hidden") else r"\[VISIBLE]"
-            self.options.append(f"{scope_tag} {status_tag} {s['name']}")
+            scope_t = status_tag(s['scope'])
+            stat_t = status_tag("HIDDEN" if s.get("hidden") else "VISIBLE")
+            self.options.append(f"{scope_t} {stat_t} {s['name']}")
         self.filtered_skills = list(self.skills)
         self.filtered_options = list(self.options)
 

@@ -2,23 +2,17 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, OptionList, RichLog
 
 from core.config import THEME_MUTED
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
-class TaskConsoleScreen(ModalScreen[None]):
+class TaskConsoleScreen(BaseModalScreen[None]):
     """Modal screen for viewing console output of a specific task in real-time"""
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "back", "Back to list"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, bg_task):
         super().__init__()
@@ -30,7 +24,6 @@ class TaskConsoleScreen(ModalScreen[None]):
             yield Markdown("### **Console Output**", classes="modal-markdown modal-markdown-centered")
             yield RichLog(id="console-log", highlight=False, markup=False)
             yield Label("esc: cancel", id="modal-hint")
-
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -52,9 +45,8 @@ class TaskConsoleScreen(ModalScreen[None]):
         self.dismiss()
 
 
-class TasksListScreen(ModalScreen[None]):
+class TasksListScreen(BaseModalScreen[None]):
     """Modal screen with background tasks list and tabs for All, Agents, and Shell tasks."""
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Manager"),
         ("k", "kill_task", "Kill Task"),
@@ -62,12 +54,7 @@ class TasksListScreen(ModalScreen[None]):
         ("right", "next_tab", "Next Tab"),
         ("tab", "next_tab", "Next Tab"),
         ("backtab", "prev_tab", "Previous Tab"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, default_tab: int = 0):
         super().__init__()
@@ -216,9 +203,9 @@ class TasksListScreen(ModalScreen[None]):
             cmd = item["command"]
             if len(cmd) > 35:
                 cmd = cmd[:32] + "..."
-            status_tag = f"\\[{item['status_str']}]"
-            kind_tag = f"\\[{item['kind'].capitalize()}]" if self.active_tab == 0 else ""
-            prefix = f"{status_tag} {kind_tag}".strip()
+            s_tag = status_tag(item['status_str'])
+            kind_tag = status_tag(item['kind'].capitalize()) if self.active_tab == 0 else ""
+            prefix = f"{s_tag} {kind_tag}".strip()
             opt_list.add_option(f"{prefix} {cmd}")
 
         if current_highlighted is not None and current_highlighted < len(tasks):

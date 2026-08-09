@@ -2,25 +2,19 @@ import asyncio
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown
 
 from core.subagent_tracker import SubagentTracker
 from widgets.chat_view import ChatView
+from widgets.screens.base_modal import BaseModalScreen
 
 
-class SubagentViewScreen(ModalScreen[None]):
+class SubagentViewScreen(BaseModalScreen[None]):
     """Modal screen for watching subagent execution in a full chat window without input panel."""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "close", "Close Screen"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, task_id_or_desc: str):
         super().__init__()

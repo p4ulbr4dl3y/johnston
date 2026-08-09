@@ -4,25 +4,19 @@ from typing import Any, Dict
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.mcp_manager import get_mcp_manager
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
-class MCPScreen(ModalScreen[None]):
+class MCPScreen(BaseModalScreen[None]):
     """Modal screen for enabling/disabling and toggling Eager/Lazy modes of MCP servers"""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
         ("tab", "toggle_mode", "Toggle Eager/Lazy"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self):
         super().__init__()
@@ -97,13 +91,12 @@ class MCPScreen(ModalScreen[None]):
 
         for s in self.filtered_servers:
             disabled = s.get("disabled", False)
-            scope_tag = rf"\[{s['scope'].upper()}]"
-            mode_tag = rf"\[{s.get('mode', 'eager').upper()}]"
+            scope_tag = status_tag(s['scope'])
+            mode_tag = status_tag(s.get('mode', 'eager'))
             name = s["name"]
 
             if disabled:
-                status_tag = r"\[OFF]"
-                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name}")
+                opt_list.add_option(f"{status_tag('OFF')} {scope_tag} {mode_tag} {name}")
                 continue
 
             tool_cnt = tools_per_server.get(name, 0)
@@ -111,27 +104,22 @@ class MCPScreen(ModalScreen[None]):
             cmd = s.get("command")
 
             if tool_cnt > 0:
-                status_tag = r"\[ON]"
                 tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
-                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — {tool_info}")
+                opt_list.add_option(f"{status_tag('ON')} {scope_tag} {mode_tag} {name} — {tool_info}")
             elif url and not cmd:
-                status_tag = r"\[ERR]"
-                opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — URL unsupported")
+                opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — URL unsupported")
             else:
                 client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
                 err = getattr(client, "last_error", None) if client else None
                 if err and "Process start failed" in err:
-                    status_tag = r"\[ERR]"
-                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Start failed")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Start failed")
                 elif err and "timeout" in err.lower():
-                    status_tag = r"\[ERR]"
-                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Timeout")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Timeout")
                 elif err:
-                    status_tag = r"\[ERR]"
-                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name} — Error")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Error")
                 else:
-                    status_tag = r"\[ERR]" if (not cmd and not url) else r"\[ON]"
-                    opt_list.add_option(f"{status_tag} {scope_tag} {mode_tag} {name}")
+                    stag = status_tag('ERR') if (not cmd and not url) else status_tag('ON')
+                    opt_list.add_option(f"{stag} {scope_tag} {mode_tag} {name}")
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
             opt_list.highlighted = prev_highlighted

@@ -4,24 +4,19 @@ from typing import Any, Dict, List, Optional
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.permission_manager import PermissionManager
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 
-class PermissionsScreen(ModalScreen[None]):
+class PermissionsScreen(BaseModalScreen[None]):
     """Tabbed Modal screen for managing tool permissions (Groups, Tools, Scope)."""
 
-    ALLOW_SELECT = False
     BINDINGS = [
         ("escape", "cancel", "Close"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
+        ("tab", "next_tab", "Switch Tab"),
     ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, project_dir: Optional[str] = None, use_project_scope: bool = False):
         super().__init__()
@@ -168,21 +163,15 @@ class PermissionsScreen(ModalScreen[None]):
 
         for it in self.filtered_items:
             if it["type"] == "scope":
-                status = r"\[ACTIVE]" if it["action"] == "active" else (r"\[ON]" if it["action"] == "on" else r"\[N/A]")
+                status = status_tag("ACTIVE") if it["action"] == "active" else (status_tag("ON") if it["action"] == "on" else status_tag("N/A"))
                 desc = f" — {it['desc']}" if it.get("desc") else ""
                 opt_list.add_option(f"{status} {it['label']}{desc}")
             elif it["type"] == "shell_guard":
-                status = r"\[ON]" if it["action"] == "allow" else r"\[OFF]"
+                status = status_tag("ON" if it["action"] == "allow" else "OFF")
                 opt_list.add_option(f"{status} {it['label']}")
             else:
                 act = it["action"].upper()
-                if act == "ALLOW":
-                    status = r"\[ALLOW]"
-                elif act == "DENY":
-                    status = r"\[DENY]"
-                else:
-                    status = r"\[ASK]"
-
+                status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
                 desc = f" — {it['desc']}" if (it.get("desc") and it.get("type") == "group") else ""
                 opt_list.add_option(f"{status} {it['label']}{desc}")
 

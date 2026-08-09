@@ -1,9 +1,9 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Input, Label, Markdown, OptionList
 
+from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -24,7 +24,8 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             items=items,
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
-            search_placeholder="Search providers..."
+            search_placeholder="Search providers...",
+            hint_text="enter: connect • tab: toggle • ↑/↓: navigate • esc: cancel",
         )
 
     def _build_options(self):
@@ -38,25 +39,17 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             is_disabled = key in self.disabled_set or p.get("disabled", False)
 
             if is_disabled:
-                status_tag = r"\[OFF]"
+                stag = status_tag("OFF")
             elif is_active:
-                status_tag = r"\[ACTIVE]"
+                stag = status_tag("ACTIVE")
             elif has_key:
-                status_tag = r"\[ON]"
+                stag = status_tag("ON")
             else:
-                status_tag = r"\[AUTH]"
+                stag = status_tag("AUTH")
 
-            options.append(f"{status_tag} {name}")
+            options.append(f"{stag} {name}")
             items.append(key)
         return options, items
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown(self.title, classes="modal-markdown modal-markdown-centered")
-            if self.show_search:
-                yield Input(placeholder=self.search_placeholder, id="modal-search-input")
-            yield OptionList(*self.filtered_options, id="modal-option-list")
-            yield Label("enter: connect • tab: toggle • ↑/↓: navigate • esc: cancel", id="modal-hint")
 
     BINDINGS = [
         ("tab", "toggle_disabled", "Toggle Disabled"),
@@ -97,17 +90,8 @@ class ProvidersScreen(BaseSelectionScreen[str]):
         super()._on_key(event)
 
 
-class ApiKeyInputScreen(ModalScreen[str | None]):
+class ApiKeyInputScreen(BaseModalScreen[str | None]):
     """Modal API key input screen"""
-    ALLOW_SELECT = False
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ]
-
-    def action_quit_app(self) -> None:
-        self.app.exit()
 
     def __init__(self, provider_name: str, provider_key: str, current_key: str = ""):
         super().__init__()

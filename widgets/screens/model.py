@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple, Union
 from textual.widgets.option_list import Option
 
 from core.models_catalog import catalog
+from widgets.screens.base_modal import status_tag
 from widgets.screens.base_selection import BaseSelectionScreen
 
 
@@ -79,8 +80,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 for idx, m in enumerate(p_models):
                     clean_m = catalog.get_model_display_name(p_key, m)
                     is_active = bool(active_idx is not None and idx == active_idx)
-                    status_tag = r"\[ACTIVE]"
-                    opt_label = f"   {status_tag} {clean_m}" if is_active else f"   {clean_m}"
+                    opt_label = f"   {status_tag('ACTIVE')} {clean_m}" if is_active else f"   {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
@@ -100,8 +100,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             for idx, m in enumerate(p_models):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
                 is_active = bool(active_idx is not None and idx == active_idx)
-                status_tag = r"\[ACTIVE]"
-                opt_label = f"{status_tag} {clean_m}" if is_active else clean_m
+                opt_label = f"{status_tag('ACTIVE')} {clean_m}" if is_active else clean_m
                 options.append(opt_label)
                 items.append(m)
                 if is_active:
