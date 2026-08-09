@@ -462,8 +462,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("No active background tasks", severity="warning")
         app.push_screen.assert_not_called()
 
-        # Task with is_background=True
-        t_bg = BackgroundTask("t-bg", "sleep 100", None)
+        # Task with is_background=True and matching session_id
+        t_bg = BackgroundTask("t-bg", "sleep 100", None, session_id="test_session_id")
         t_bg.is_background = True
         app.background_tasks = [t_bg]
         app.notify.reset_mock()
@@ -472,8 +472,36 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_not_called()
         app.push_screen.assert_called_once()
 
+    async def test_tasks_command_filters_by_session_id(self):
+        from unittest.mock import MagicMock
+        from core.background_task import BackgroundTask
+        from core.commands import TasksCommand
+
+        app = MockApp()
+        app.current_session_id = "sess-a"
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+
+        # Task belonging to another session
+        t_other = BackgroundTask("t-other", "echo 1", None, session_id="sess-b")
+        t_other.is_background = True
+
+        # Task without session_id
+        t_none = BackgroundTask("t-none", "echo 2", None, session_id=None)
+        t_none.is_background = True
+
+        app.background_tasks = [t_other, t_none]
+
+        cmd = TasksCommand()
+        await cmd.execute(app)
+
+        # Should notify no active tasks because neither matches current session 'sess-a'
+        app.notify.assert_called_once_with("No active background tasks", severity="warning")
+        app.push_screen.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 

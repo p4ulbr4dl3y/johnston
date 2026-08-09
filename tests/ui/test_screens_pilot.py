@@ -12,7 +12,6 @@ from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.subagent_screen import SubagentViewScreen
-from widgets.screens.subagents import SubagentsScreen
 from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
 
 
@@ -240,24 +239,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         # Calling update when not mounted
         screen._is_mounted = False
         screen.update_tasks_list()
-
-    async def test_subagents_screen_pilot(self):
-        from core.subagent_tracker import SubagentTracker
-        tracker = SubagentTracker.get_instance()
-        tracker.storage_dir = self.test_dir
-        tracker.sessions.clear()
-        tracker.create_session("sub-p1", "Pilot subagent", "do work", "worker", False)
-
-        try:
-            screen = SubagentsScreen()
-            app = DummyHostApp(screen)
-
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                await pilot.press("escape")
-                await pilot.pause()
-        finally:
-            tracker.sessions.clear()
 
 
     async def test_help_screen_pilot(self):

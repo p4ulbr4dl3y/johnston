@@ -117,7 +117,7 @@ class TasksListScreen(ModalScreen[None]):
         all_bg_tasks = getattr(self.app, "background_tasks", []) if hasattr(self, "app") and self.app else []
         curr_sid = getattr(self.app, "current_session_id", None) if hasattr(self, "app") and self.app else None
         if curr_sid:
-            bg_tasks = [t for t in all_bg_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+            bg_tasks = [t for t in all_bg_tasks if getattr(t, "session_id", None) == curr_sid]
         else:
             bg_tasks = list(all_bg_tasks)
 
@@ -140,9 +140,7 @@ class TasksListScreen(ModalScreen[None]):
         from core.subagent_tracker import SubagentTracker
         st = SubagentTracker.get_instance()
         st._load_all_sessions()
-        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
-        if not sessions and curr_sid:
-            sessions = st.get_sessions_for_session(None)
+        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else list(st.sessions.values())
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()

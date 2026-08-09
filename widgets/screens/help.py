@@ -9,7 +9,6 @@ COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
 * `/thinking` — Set reasoning effort / thinking budget
 * `/new` — Start a new chat session
 * `/compact` — Compact session conversation history
-* `/subagents` — View and manage active subagents
 * `/tasks` — View and manage background tasks
 * `/skills` — Browse and activate available skills
 * `/mcp` — Manage MCP servers (eager / lazy)

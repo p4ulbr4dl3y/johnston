@@ -353,7 +353,7 @@ class TasksCommand(BaseCommand):
         all_tasks = getattr(app, "background_tasks", [])
         curr_sid = getattr(app, "current_session_id", None)
         if curr_sid:
-            tasks = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+            tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
         else:
             tasks = list(all_tasks)
         tasks = [t for t in tasks if getattr(t, "is_background", False)]
@@ -362,33 +362,6 @@ class TasksCommand(BaseCommand):
             return
         app.push_screen(TasksListScreen(default_tab=0))
 
-
-class SubagentsCommand(BaseCommand):
-    name = "/subagents"
-    aliases = ["/agents", "/subagent"]
-    description = "Browse and manage subagents"
-
-    async def execute(self, app) -> None:
-        from core.subagent_tracker import SubagentTracker
-        all_tasks = getattr(app, "background_tasks", [])
-        curr_sid = getattr(app, "current_session_id", None)
-        if curr_sid:
-            tasks = [t for t in all_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
-        else:
-            tasks = list(all_tasks)
-        tasks = [t for t in tasks if getattr(t, "is_background", False)]
-
-        st = SubagentTracker.get_instance()
-        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
-        if not sessions and curr_sid:
-            sessions = st.get_sessions_for_session(None)
-
-        if not tasks and not sessions:
-            app.notify("No active background tasks", severity="warning")
-            return
-
-        from widgets.screens.tasks import TasksListScreen
-        app.push_screen(TasksListScreen(default_tab=1))
 
 
 
@@ -545,7 +518,6 @@ COMMAND_CLASSES = [
     RewindCommand,
     ResumeCommand,
     TasksCommand,
-    SubagentsCommand,
     SkillsCommand,
     MCPCommand,
     LintersCommand,
