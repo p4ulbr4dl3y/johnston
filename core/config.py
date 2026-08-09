@@ -18,55 +18,8 @@ TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 WORKTREES_DIR = os.path.join(CONFIG_DIR, "worktrees")
 PROMPT_HISTORY_FILE = os.path.join(CONFIG_DIR, "prompt_history.json")
 
-# Agent Execution Limits & Timeouts
-DEFAULT_CONTEXT_LIMIT = 128000
-CONTEXT_COMPACTION_THRESHOLD_RATIO = 0.75
-MAX_CONCURRENT_SUBAGENTS = 5
-
-# Theme Palette Constants (Monochrome Slate)
-THEME_PRIMARY = "#ffffff"
-THEME_SECONDARY = "#f4f4f5"
-THEME_MUTED = "#71717a"
-THEME_SUBTLE = "#e4e4e7"
-
-# Standard Ignored Directories
-DEFAULT_IGNORE_DIRS = {
-    ".git",
-    ".johnston",
-    "venv",
-    ".venv",
-    "env",
-    ".env",
-    "node_modules",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-    ".next",
-    ".nuxt",
-}
-
 # Image Extensions for UI
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".tiff", ".svg"}
 
-# Permissions Defaults
+# Permissions Defaults (path to project-level permissions file)
 PROJECT_PERMISSIONS_FILE = ".johnston/permissions.json"
-
-DEFAULT_PERMISSIONS = {
-    "default": "ask",
-    "groups": {
-        "read": "allow",
-        "write": "allow",
-        "net": "ask",
-        "exec": "ask",
-    },
-    "tools": {},
-    "shell_guard": {
-        "enabled": True,
-    },
-}
-
-
-

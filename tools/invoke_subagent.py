@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Dict
 
 from core.background_task import BackgroundSubagent
-from core.config import MAX_CONCURRENT_SUBAGENTS
+from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_tracker import SubagentTracker
 from tools.base import BaseTool
 

@@ -1,11 +1,11 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from core.config import CONFIG_DIR, MAX_CONCURRENT_SUBAGENTS, SUBAGENT_DEFS_DIR
+from core.config import CONFIG_DIR, SUBAGENT_DEFS_DIR
+from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.defaults.subagents import DEFAULT_DEFINITIONS_DATA
+from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
-
-WRITE_TOOLS = {"create", "edit", "multi_edit"}
 
 
 class AgentRole:

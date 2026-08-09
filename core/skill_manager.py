@@ -6,7 +6,8 @@ Supports YAML frontmatter parsing from SKILL.md and *.md files.
 import os
 from typing import Any, Dict, List, Optional
 
-from core.config import CONFIG_DIR, DEFAULT_IGNORE_DIRS
+from core.config import CONFIG_DIR
+from core.defaults.config import DEFAULT_IGNORE_DIRS
 from core.defaults.skills.handoff_skill import DEFAULT_HANDOFF_SKILL_CONTENT
 from core.defaults.skills.init_skill import DEFAULT_INIT_SKILL_CONTENT
 from core.defaults.skills.johnston_guide import JOHNSTON_GUIDE_FILES

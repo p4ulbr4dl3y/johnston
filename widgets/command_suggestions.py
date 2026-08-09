@@ -70,7 +70,7 @@ class CommandSuggestions(OptionList):
         is_home_or_root = (real_cwd == home or os.path.dirname(real_cwd) == real_cwd)
         max_files = 300 if is_home_or_root else 1000
 
-        from core.config import DEFAULT_IGNORE_DIRS
+        from core.defaults.config import DEFAULT_IGNORE_DIRS
 
         ignore_dirs = DEFAULT_IGNORE_DIRS | {
             ".idea", ".vscode", ".gemini", ".cache",

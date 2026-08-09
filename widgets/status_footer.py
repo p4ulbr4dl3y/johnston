@@ -3,7 +3,7 @@ import os
 from rich.table import Table
 from textual.widgets import Static
 
-from core.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
+from core.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import catalog, format_context_tokens
 from core.thinking_effort import display_thinking_effort
 
