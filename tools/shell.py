@@ -24,7 +24,7 @@ def _new_task_id() -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command. Commands running longer than timeout (default 120s) are automatically moved to the background. Destructive commands require user confirmation."
+    description = "Run a terminal command. Moves to background past timeout (default 120s). Destructive commands confirm."
 
     schema = {
         "type": "function",
@@ -37,8 +37,8 @@ class ShellTool(BaseTool):
                         "type": "string",
                         "description": "Terminal command to run (executed relative to project root)",
                     },
-                    "timeout": {"type": "integer", "description": "Optional timeout in seconds (default: 120, max: 600)"},
-                    "run_in_background": {"type": "boolean", "description": "Set to true to run this command in the background immediately."},
+                    "timeout": {"type": "integer", "description": "Timeout in seconds (default 120, max 600)"},
+                    "background": {"type": "boolean", "description": "Run command in background immediately"},
                 },
                 "required": ["command"],
             },
@@ -109,7 +109,7 @@ class ShellTool(BaseTool):
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         p = await self._create_std_process(cmd, env, cwd=proc_cwd)
 
-        run_in_bg = bool(args.get("run_in_background", False))
+        run_in_bg = bool(args.get("background", args.get("run_in_background", False)))
 
         # Synchronous execution mode for subagents (no background task)
         if ctx.is_subagent:

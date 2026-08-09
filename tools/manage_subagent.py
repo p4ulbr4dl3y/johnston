@@ -13,7 +13,7 @@ from tools.base import BaseTool
 
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
-    description = "Manage active and historical subagents. Actions: list, status, kill, send_message."
+    description = "Manage active and historical subagents: list, status, kill, send_message."
     schema = {
         "type": "function",
         "function": {
@@ -21,23 +21,10 @@ class ManageSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["list", "status", "kill", "send_message"],
-                        "description": "Action type"
-                    },
-                    "session_id": {
-                        "type": "string",
-                        "description": "Target subagent session_id or description"
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Follow-up message for subagent"
-                    },
-                    "background": {
-                        "type": "boolean",
-                        "description": "Run follow-up message asynchronously"
-                    }
+                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
+                    "task_id": {"type": "string", "description": "Target task session_id or description"},
+                    "message": {"type": "string", "description": "Follow-up message for subagent"},
+                    "background": {"type": "boolean", "description": "Run follow-up message asynchronously"}
                 },
                 "required": ["action"]
             }

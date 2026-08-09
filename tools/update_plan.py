@@ -6,9 +6,8 @@ from tools.base import BaseTool
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Update the task plan. Provide an optional explanation and a list of plan items, "
-        "each with a step and status ('pending', 'in_progress', 'completed'). "
-        "At most one step should be in_progress at a time."
+        "Update the task plan. Each item: step + status (pending/in_progress/completed). "
+        "Max one step in_progress at a time."
     )
     schema = {
         "type": "function",
@@ -17,25 +16,15 @@ class UpdatePlanTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "explanation": {
-                        "type": "string",
-                        "description": "Optional explanation for this plan update."
-                    },
+                    "explanation": {"type": "string", "description": "Explanation for this plan update"},
                     "plan": {
                         "type": "array",
                         "description": "List of plan items",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "step": {
-                                    "type": "string",
-                                    "description": "Task step text (short, 5-7 words)."
-                                },
-                                "status": {
-                                    "type": "string",
-                                    "enum": ["pending", "in_progress", "completed"],
-                                    "description": "Step status."
-                                }
+                                "step": {"type": "string", "description": "Task step text (short)"},
+                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed"], "description": "Step status"}
                             },
                             "required": ["step", "status"]
                         }

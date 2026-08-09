@@ -26,7 +26,7 @@ def _sort_recommended_first(options: list[str]) -> list[str]:
 
 class AskUserTool(BaseTool):
     name = "ask_user"
-    description = "Ask the user questions with pre-defined options and write-in answers. Use when user intent or requirements are ambiguous."
+    description = "Ask the user questions with options and write-in answers. Use when intent is ambiguous."
     schema = {
         "type": "function",
         "function": {

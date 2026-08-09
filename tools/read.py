@@ -154,7 +154,7 @@ def process_image_file_sync(path: str, detail: str | None = None) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read file contents (max 800 lines per call). Pass start_line and end_line for targeted ranges. Auto-converts PDF/DOCX to Markdown. Supports images."
+    description = "Read files (max 800 lines). Auto-converts PDF/DOCX to Markdown, supports images."
     schema = {
         "type": "function",
         "function": {
@@ -163,10 +163,11 @@ class ReadTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "File path"},
-                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "content_offset": {"type": "integer", "description": "Byte offset"},
-                    "detail": {"type": "string", "description": "Image detail level: 'high' (default 1568px), 'low' (512px), or 'original' (2048px)"}
+                    "start": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end": {"type": "integer", "description": "End line (inclusive)"},
+                    "offset": {"type": "integer", "description": "Byte offset"},
+                    "detail": {"type": "string", "description": "Image detail: high (default), low, original"},
+                    "raw": {"type": "boolean", "description": "Return raw response for URL"}
                 },
                 "required": ["path"]
             }
@@ -248,7 +249,7 @@ class ReadTool(BaseTool):
                 return f"ERR: doc '{path}': {e}"
         else:
             try:
-                content_offset = args.get("content_offset")
+                content_offset = args.get("offset", args.get("content_offset"))
                 if content_offset is not None:
                     content_offset = max(0, try_int(content_offset, 0))
 
@@ -266,8 +267,8 @@ class ReadTool(BaseTool):
 
         from tools.utils import format_line_pagination
 
-        start_line = args.get("start_line")
-        end_line = args.get("end_line")
+        start_line = args.get("start", args.get("start_line"))
+        end_line = args.get("end", args.get("end_line"))
 
         raw_lines = [line.rstrip("\r\n") for line in lines]
         return format_line_pagination(

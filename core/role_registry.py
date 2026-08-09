@@ -307,7 +307,7 @@ class RoleRegistry:
             elif role.source == "project":
                 project_list.append(line)
 
-        lines = ["## Subagents (use as `subagent_type` in `invoke_subagent`)"]
+        lines = ["## Subagents (use as `type` in `invoke_subagent`)"]
         if builtins:
             lines.append("\n### Builtin")
             lines.extend(builtins)

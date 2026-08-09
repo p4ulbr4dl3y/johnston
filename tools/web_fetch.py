@@ -34,7 +34,7 @@ def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> 
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch content from a web URL. Automatically converts HTML/PDF/DOCX to Markdown cleanly. Specify url, and optionally raw."
+    description = "Fetch a URL. Converts HTML/PDF/DOCX to Markdown. raw returns raw text."
 
     schema = {
         "type": "function",
@@ -44,7 +44,7 @@ class WebFetchTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "url": {"type": "string", "description": "HTTP or HTTPS URL to fetch"},
-                    "raw": {"type": "boolean", "description": "If true, skip Markdown conversion and return raw response text"}
+                    "raw": {"type": "boolean", "description": "Skip Markdown conversion, return raw response"}
                 },
                 "required": ["url"]
             }

@@ -5,7 +5,7 @@ from tools.base import BaseTool, tail_output
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Manage background shell processes. Actions: list, status, kill, send_input."
+    description = "Manage background shell processes: list, status, kill, send_input."
     schema = {
         "type": "function",
         "function": {
@@ -13,7 +13,7 @@ class ManageShellTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"], "description": "Action type"},
+                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"]},
                     "task_id": {"type": "string", "description": "Background task ID"},
                     "input": {"type": "string", "description": "Input text for send_input"}
                 },
