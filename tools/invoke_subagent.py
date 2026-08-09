@@ -93,7 +93,7 @@ class InvokeSubagentTool(BaseTool):
 
         wt_path = None
         wt_branch = None
-        project_dir = getattr(ctx.app, "project_dir", None) or os.getcwd()
+        project_dir = ctx.project_dir
 
         if workspace_mode in ("branch", "share"):
             from core.subagent_worktree import SubagentWorktreeManager
@@ -122,7 +122,7 @@ class InvokeSubagentTool(BaseTool):
         from core.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
         from core.role_registry import RoleRegistry
         registry = RoleRegistry.get_instance()
-        registry.load_roles(project_dir=getattr(ctx.app, "project_dir", None))
+        registry.load_roles(project_dir=project_dir)
         definition = registry.get_role(subagent_type)
 
         subagent.mode = definition.key
@@ -150,61 +150,31 @@ class InvokeSubagentTool(BaseTool):
                 subagent_tools_custom.append(t)
         subagent.tools = subagent_tools_custom
 
-        from core.subagent_tracker import merge_subagent_metrics, record_subagent_step
-
-        def _record_step(step, acc):
-            record_subagent_step(step, session, acc)
-
-        def _merge_metrics():
-            merge_subagent_metrics(subagent, ctx)
-            ctx.refresh_status()
+        from core.subagent_tracker import run_subagent_stream_bg
+        from core.subagent_worktree import SubagentWorktreeManager
 
         def _cleanup_worktree_and_append_diff(acc):
             nonlocal wt_path, wt_branch
-            if wt_path and wt_branch:
-                from core.subagent_worktree import SubagentWorktreeManager
-                diff_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(project_dir, wt_path, wt_branch)
-                if has_changes and diff_text:
-                    acc[0] += (
-                        f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
-                        f"After merging, clean up the branch with `git branch -d {wt_branch}`.\n\n"
-                        f"{diff_text}"
-                    )
-                SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, wt_branch, keep_branch=has_changes)
-                wt_path = None
-                wt_branch = None
+            wt_path, wt_branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
+                project_dir, wt_path, wt_branch, acc, is_followup=False
+            )
 
-        async def _run_bg():
-            acc = [""]
-            try:
-                async for step in subagent.stream_steps(prompt):
-                    _record_step(step, acc)
-                session.finish("completed")
-            except asyncio.CancelledError:
-                acc[0] = "[Subagent cancelled]"
-                session.finish("cancelled", "Cancelled by user")
-            except Exception as err:
-                acc[0] = f"[Subagent error: {err}]"
-                session.finish("error", str(err))
-            finally:
-                _cleanup_worktree_and_append_diff(acc)
-                _merge_metrics()
-                for t in ctx.background_tasks:
-                    if getattr(t, "task_id", "") == task_id:
-                        t.is_running = False
+        notification_hdr = f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed."
+        notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
 
-                ctx.refresh_status()
-
-                result_text = _truncate_subagent_result(acc[0], task_id) or "Completed with no text output."
-                msg = (
-                    f"[System Notification] Background subagent '{description}' (ID: {task_id}) completed.\n"
-                    f"<task_result>\n{result_text}\n</task_result>\n"
-                    f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', task_id='{task_id}', message='...')`.)"
-                )
-                ctx.trigger_ai_response(msg)
-
-        bg_task = asyncio.create_task(_run_bg())
+        bg_task = asyncio.create_task(
+            run_subagent_stream_bg(
+                subagent,
+                prompt,
+                session,
+                ctx,
+                cleanup_fn=_cleanup_worktree_and_append_diff,
+                error_prefix="Subagent error",
+                notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>\n{notification_ftr}",
+                task_id=task_id,
+                truncate_result=True,
+            )
+        )
         session.async_task = bg_task
         curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
         bg_sub = BackgroundSubagent(task_id, description, bg_task, session_id=curr_sid)

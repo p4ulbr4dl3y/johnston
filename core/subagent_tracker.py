@@ -315,3 +315,57 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
         subagent._merged_tokens_output = cur_out
         subagent._merged_total_tokens = cur_tot
         subagent._merged_cost_usd = cur_cost
+
+
+async def run_subagent_stream_bg(
+    subagent: Any,
+    prompt_or_message: str,
+    session: SubagentSessionData,
+    ctx: Any,
+    cleanup_fn: Optional[Callable[[list[str]], None]] = None,
+    error_prefix: str = "Subagent error",
+    notification_template: str = "",
+    task_id: Optional[str] = None,
+    truncate_result: bool = False,
+) -> str:
+    """Executes a subagent step stream in background with error handling, session finish, cleanup, and UI notifications."""
+    import asyncio
+    acc = [""]
+    try:
+        async for step in subagent.stream_steps(prompt_or_message):
+            record_subagent_step(step, session, acc)
+        session.finish("completed")
+    except asyncio.CancelledError:
+        acc[0] = "[Subagent cancelled]"
+        session.finish("cancelled", "Cancelled by user")
+    except Exception as err:
+        acc[0] = f"[{error_prefix}: {err}]"
+        session.finish("error", str(err))
+    finally:
+        if cleanup_fn:
+            cleanup_fn(acc)
+        merge_subagent_metrics(subagent, ctx)
+        if task_id and ctx.background_tasks:
+            for t in ctx.background_tasks:
+                if getattr(t, "task_id", "") == task_id:
+                    t.is_running = False
+
+        ctx.refresh_status()
+
+        if notification_template:
+            tid = task_id or session.task_id
+            if truncate_result:
+                from tools.invoke_subagent import _truncate_subagent_result
+                result_text = _truncate_subagent_result(acc[0], tid) or "Completed with no text output."
+            else:
+                result_text = acc[0].strip() or "Completed with no text output."
+
+            msg = notification_template.format(
+                task_id=tid,
+                result_text=result_text,
+                description=session.description,
+            )
+            ctx.trigger_ai_response(msg)
+
+    return acc[0]
+
