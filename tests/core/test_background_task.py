@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from core.background_task import BackgroundSubagent, BackgroundTask, process_carriage_returns, strip_ansi
+from core.background_task import BackgroundTask, kill_all_background_tasks, process_carriage_returns, strip_ansi
 
 
 class TestStripAnsi(unittest.TestCase):
@@ -161,18 +161,34 @@ class TestBackgroundTaskLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: input sent to task_3", res)
         mock_stdin.write.assert_called_once_with(b"hello stdin\n")
 
-    async def test_background_subagent_kill(self):
-        async def dummy_subagent():
-            await asyncio.sleep(100)
 
-        task = asyncio.create_task(dummy_subagent())
-        subagent = BackgroundSubagent("sub_1", "explore codebase", task)
-        self.assertTrue(subagent.is_running)
 
-        await subagent.kill()
-        await asyncio.sleep(0.01)
-        self.assertFalse(subagent.is_running)
-        self.assertTrue(task.cancelled() or task.cancelling())
+class TestKillAllBackgroundTasks(unittest.TestCase):
+    def test_kills_each_task_sync(self):
+        t1 = BackgroundTask("t1", "cmd", MagicMock())
+        t1.kill_sync = MagicMock()
+        t2 = BackgroundTask("t2", "cmd", MagicMock())
+        t2.kill_sync = MagicMock()
+
+        kill_all_background_tasks([t1, t2])
+
+        t1.kill_sync.assert_called_once()
+        t2.kill_sync.assert_called_once()
+
+    def test_skips_tasks_without_kill(self):
+        plain = object()
+        # Should not raise on arbitrary objects
+        kill_all_background_tasks([plain])
+
+    def test_read_task_cancelled(self):
+        t = BackgroundTask("t3", "cmd", MagicMock())
+        t.kill_sync = MagicMock()
+        t.read_task = MagicMock()
+        t.read_task.done.return_value = False
+
+        kill_all_background_tasks([t])
+
+        t.read_task.cancel.assert_called_once()
 
 
 if __name__ == "__main__":

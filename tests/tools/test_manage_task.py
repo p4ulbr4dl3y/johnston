@@ -18,6 +18,20 @@ class TestManageTaskTool(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"action": "list"}, app=mock_app)
         self.assertIn("OK: no tasks active", res)
 
+    async def test_list_scoped_to_current_session(self):
+        tool = ManageTaskTool()
+        t1 = BackgroundTask("t1", "echo hi", MagicMock())
+        t1.session_id = "sess-A"
+        t2 = BackgroundTask("t2", "ls -la", MagicMock())
+        t2.session_id = "sess-B"
+        mock_app = self._make_app([t1, t2])
+        mock_app.current_session_id = "sess-A"
+        res = await tool.execute({"action": "list"}, app=mock_app)
+        self.assertIn("t1", res)
+        self.assertIn("echo hi", res)
+        self.assertNotIn("t2", res)
+        self.assertNotIn("ls -la", res)
+
     async def test_list_with_tasks(self):
         tool = ManageTaskTool()
         t1 = BackgroundTask("t1", "echo hello", MagicMock())

@@ -3,7 +3,6 @@ import os
 import uuid
 from typing import Any, Dict
 
-from core.background_task import BackgroundSubagent
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.session_manager import SessionStore
 from tools.base import BaseTool
@@ -159,8 +158,6 @@ class InvokeSubagentTool(BaseTool):
             )
         )
         session.async_task = bg_task
-        curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
-        bg_sub = BackgroundSubagent(session_id, description, bg_task, session_id=curr_sid)
-        ctx.add_background_task(bg_sub)
+        ctx.refresh_status()
 
         return f"OK: subagent '{description}' launched ({session_id})"

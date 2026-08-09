@@ -247,8 +247,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         app = DummyApp()
         res = await execute_tool("subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app)
         self.assertIn("OK: subagent 'bg job' launched", res)
-        self.assertEqual(len(app.background_tasks), 1)
-        self.assertTrue(app.background_tasks[0].id.startswith("subagent-"))
+        # Subagents live in the session store, not in the shell task registry.
+        self.assertEqual(app.background_tasks, [])
+        sessions = _store.list(kind="subagent")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].description, "bg job")
+        self.assertEqual(sessions[0].status, "running")
 
     def test_truncate_output_helper(self):
         from tools.base import truncate_output

@@ -33,6 +33,7 @@ def process_carriage_returns(text: str) -> str:
     return "\n".join(filtered)
 
 
+
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
     def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None, session_id: str = None, kind: str = "shell"):
@@ -199,44 +200,20 @@ class BackgroundTask:
         self.output.append("\n[Task terminated by user]\n")
 
 
-class BackgroundSubagent:
-    """Manages background subagent"""
-    def __init__(self, id: str, description: str, task: asyncio.Task, session_id: str = None):
-        self.id = id
-        self.kind = "subagent"
-        self.command = f"Subagent: {description}"
-        self.process = None
-        self.output = []
-        self._is_running_override = None
-        self.is_background = True
-        self.async_task = task
-        self.session_id = session_id
-
-    @property
-    def is_running(self) -> bool:
-        if self._is_running_override is not None:
-            return self._is_running_override
-        if self.async_task and not self.async_task.done():
-            return True
-        return False
-
-    @is_running.setter
-    def is_running(self, val: bool) -> None:
-        self._is_running_override = val
-
-    def kill_sync(self):
-        if self.async_task and not self.async_task.done():
-            try:
-                self.async_task.cancel()
-            except Exception:
-                pass
-        self.is_running = False
-
-    async def kill(self):
-        if self.is_running and self.async_task:
-            try:
-                self.async_task.cancel()
-            except Exception:
-                pass
-        self.is_running = False
-        self.output.append("\n[Subagent task terminated by user]\n")
+def kill_all_background_tasks(tasks) -> None:
+    """Kills every background shell task in the list (used on app exit and /new)."""
+    for task in tasks:
+        try:
+            if hasattr(task, "kill_sync"):
+                task.kill_sync()
+            elif hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
+                asyncio.create_task(task.kill())
+            elif hasattr(task, "process") and task.process:
+                try:
+                    task.process.terminate()
+                except Exception:
+                    pass
+            if hasattr(task, "read_task") and task.read_task:
+                task.read_task.cancel()
+        except Exception:
+            pass

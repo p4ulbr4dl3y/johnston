@@ -109,10 +109,7 @@ class TasksListScreen(BaseModalScreen[None]):
             bg_tasks = list(all_bg_tasks)
 
         for t in bg_tasks:
-            # Exclude subagent tasks stored in background_tasks to avoid duplication with subagent sessions
             task_id = getattr(t, "task_id", "")
-            if getattr(t, "kind", "") == "subagent":
-                continue
             if getattr(t, "is_background", False):
                 items.append({
                     "id": task_id,
@@ -217,10 +214,7 @@ class TasksListScreen(BaseModalScreen[None]):
 
     def _open_task_details(self, item: dict) -> None:
         raw = item["raw_obj"]
-        is_subagent = (
-            item["kind"] == "agent"
-            or getattr(raw, "kind", "") == "subagent"
-        )
+        is_subagent = item["kind"] == "agent"
         if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen
             session_id = getattr(raw, "id", item["id"])
@@ -240,7 +234,7 @@ class TasksListScreen(BaseModalScreen[None]):
         if idx is not None and idx < len(tasks):
             item = tasks[idx]
             raw = item["raw_obj"]
-            is_subagent = item["kind"] == "agent" or getattr(raw, "kind", "") == "subagent"
+            is_subagent = item["kind"] == "agent"
             if is_subagent:
                 sess = raw
                 if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):

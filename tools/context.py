@@ -58,6 +58,11 @@ class ToolContext:
                     setattr(task, "session_id", getattr(self.app, "current_session_id", None))
                 except AttributeError:
                     pass
+            # Finished output is delivered via the completion callback, so prune
+            # done tasks to keep the registry limited to active ones.
+            self.app.background_tasks[:] = [
+                t for t in self.app.background_tasks if getattr(t, "is_running", False)
+            ]
             self.app.background_tasks.append(task)
         self.refresh_status()
 

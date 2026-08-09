@@ -46,16 +46,14 @@ class NewCommand(BaseCommand):
     description = "Start a new chat session"
 
     async def execute(self, app) -> None:
-        import asyncio
         for w in [w for w in getattr(app, "workers", []) if w.is_running]:
             w.cancel()
-        for task in getattr(app, "background_tasks", []):
-            if hasattr(task, "kill_sync"):
-                task.kill_sync()
-            elif hasattr(task, "kill") and asyncio.iscoroutinefunction(task.kill):
-                asyncio.create_task(task.kill())
+        from core.background_task import kill_all_background_tasks
+        kill_all_background_tasks(getattr(app, "background_tasks", []))
         if hasattr(app, "background_tasks"):
             app.background_tasks.clear()
+        from core.subagent_tracker import cancel_running_subagents
+        cancel_running_subagents(app.sm)
         # Reset generation state synchronously: cancelled workers clear is_generating
         # in their own finally, but that runs asynchronously, so /new could leave the
         # app stuck "generating" and swallow subsequent input into the queue.
@@ -354,7 +352,14 @@ class TasksCommand(BaseCommand):
         else:
             tasks = list(all_tasks)
         tasks = [t for t in tasks if getattr(t, "is_background", False)]
-        if not tasks:
+
+        store = getattr(app, "sm", None)
+        sessions = []
+        if store:
+            store.list(kind="subagent")
+            sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
+
+        if not tasks and not sessions:
             app.notify("No active background tasks", severity="warning")
             return
         app.push_screen(TasksListScreen(default_tab=0))
