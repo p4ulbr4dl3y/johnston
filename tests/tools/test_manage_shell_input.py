@@ -3,11 +3,11 @@ from unittest.mock import MagicMock
 
 from core.background_task import BackgroundTask
 from tools.context import ToolContext
-from tools.manage_task import ManageTaskTool
+from tools.manage_shell import ManageShellTool
 
 
-class TestManageTaskInput(unittest.IsolatedAsyncioTestCase):
-    async def test_manage_task_send_input(self):
+class TestManageShellInput(unittest.IsolatedAsyncioTestCase):
+    async def test_manage_shell_send_input(self):
         async def dummy_drain():
             pass
 
@@ -19,7 +19,7 @@ class TestManageTaskInput(unittest.IsolatedAsyncioTestCase):
 
         bg_task = BackgroundTask("task_interactive", "read name", mock_proc)
 
-        tool = ManageTaskTool()
+        tool = ManageShellTool()
         mock_app = MagicMock()
         mock_app.background_tasks = [bg_task]
         ctx = ToolContext(mock_app)
@@ -29,12 +29,12 @@ class TestManageTaskInput(unittest.IsolatedAsyncioTestCase):
         self.assertIn("OK: input sent to task_interactive", res)
         mock_stdin.write.assert_called_once_with(b"John Doe\n")
 
-    async def test_manage_task_send_input_not_running(self):
+    async def test_manage_shell_send_input_not_running(self):
         mock_proc = MagicMock()
         bg_task = BackgroundTask("task_finished", "echo hello", mock_proc)
         bg_task.is_running = False
 
-        tool = ManageTaskTool()
+        tool = ManageShellTool()
         mock_app = MagicMock()
         mock_app.background_tasks = [bg_task]
         ctx = ToolContext(mock_app)

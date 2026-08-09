@@ -3,13 +3,13 @@ from typing import Any, Dict
 from tools.base import BaseTool, tail_output
 
 
-class ManageTaskTool(BaseTool):
-    name = "manage_task"
-    description = "Manage background CLI tasks. Actions: list, status, kill, send_input."
+class ManageShellTool(BaseTool):
+    name = "manage_shell"
+    description = "Manage background shell processes. Actions: list, status, kill, send_input."
     schema = {
         "type": "function",
         "function": {
-            "name": "manage_task",
+            "name": "manage_shell",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -66,8 +66,8 @@ class ManageTaskTool(BaseTool):
                 return (
                     f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\n"
                     "Note: If Recent Output shows an interactive prompt (e.g., asking for input, confirmation [y/N], or 'Press RETURN'), "
-                    f"you may call manage_task(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_task(action='kill', task_id='{t.task_id}') to abort. "
-                    "Otherwise, STOP calling manage_task(status) in a loop and end your turn now."
+                    f"you may call manage_shell(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{t.task_id}') to abort. "
+                    "Otherwise, STOP calling manage_shell(status) in a loop and end your turn now."
                 )
             return f"OK: {t.task_id} FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
 

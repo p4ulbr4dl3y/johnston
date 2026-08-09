@@ -79,7 +79,7 @@ class PermissionsScreen(BaseModalScreen[None]):
                 "shell": "Shell",
                 "ask_user": "AskUser",
                 "call_mcp": "CallMCP",
-                "manage_task": "ManageTask",
+                "manage_shell": "ManageShell",
                 "invoke_subagent": "InvokeSubagent",
                 "manage_subagent": "ManageSubagent",
                 "update_plan": "UpdatePlan",

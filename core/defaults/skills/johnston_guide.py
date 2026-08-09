@@ -184,7 +184,7 @@ TOOLS_MD = """# Johnston Tools Reference
 
 ## Builtin Tools
 - `read`, `create`, `edit`, `multi_edit`, `shell`, `ask_user`
-- `call_mcp`, `invoke_subagent`, `manage_subagent`, `manage_task`, `update_plan`, `web_fetch`
+- `call_mcp`, `invoke_subagent`, `manage_subagent`, `manage_shell`, `update_plan`, `web_fetch`
 - Common aliases: `write_file` → `create`, `replace_file_content` → `edit`, `terminal`/`bash` → `shell`, `fetch` → `web_fetch`.
 
 ## Permissions

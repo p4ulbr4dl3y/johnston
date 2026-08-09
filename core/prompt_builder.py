@@ -253,7 +253,7 @@ class PromptBuilder:
             if self.is_subagent:
                 subagent_forbidden = {
                     "invoke_subagent", "subagent", "manage_subagent",
-                    "task", "manage_task", "ask_user"
+                    "manage_shell", "manage_subagent", "ask_user"
                 }
                 if clean_name in subagent_forbidden or resolved in subagent_forbidden:
                     return False

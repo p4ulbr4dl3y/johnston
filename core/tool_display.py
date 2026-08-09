@@ -50,7 +50,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
         desc = args.get("description") or args.get("prompt") or ""
         return _truncate(f'"{desc}"') if desc else tool_name
 
-    if name in ("manage_task", "manage_subagent"):
+    if name in ("manage_shell", "manage_subagent"):
         act = args.get("action") or ""
         tid = args.get("session_id") or args.get("task_id") or ""
         if act and tid:

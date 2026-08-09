@@ -11,7 +11,7 @@ class PermissionManager:
     """Manages tool execution permissions (allow, ask, deny) with config cascade and shell_guard."""
 
     GROUPS = {
-        "read": {"read", "ask_user", "update_plan", "manage_task", "manage_subagent"},
+        "read": {"read", "ask_user", "update_plan", "manage_shell", "manage_subagent"},
         "write": {"create", "edit"},
         "net": {"web_fetch", "call_mcp"},
         "exec": {"shell", "invoke_subagent"},

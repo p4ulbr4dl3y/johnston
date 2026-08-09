@@ -82,7 +82,7 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
 
     # Disable nested subagent spawning, background task management, and UI questions
     subagent.allow_task = False
-    excluded_tools = {"invoke_subagent", "manage_subagent", "manage_task", "ask_user"}
+    excluded_tools = {"invoke_subagent", "manage_subagent", "manage_shell", "ask_user"}
     subagent.tools = [
         t for t in (getattr(subagent, "tools", None) or [])
         if t.get("function", {}).get("name", "").lower() not in excluded_tools

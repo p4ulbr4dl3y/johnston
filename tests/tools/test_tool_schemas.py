@@ -30,9 +30,9 @@ class TestToolSchemas(unittest.TestCase):
         self.assertNotIn("skip_confirm", props)
         self.assertNotIn("no_background", props)
 
-    def test_manage_task_action_has_enum_and_required(self):
-        from tools.manage_task import ManageTaskTool
-        params = ManageTaskTool.schema["function"]["parameters"]
+    def test_manage_shell_action_has_enum_and_required(self):
+        from tools.manage_shell import ManageShellTool
+        params = ManageShellTool.schema["function"]["parameters"]
         self.assertEqual(
             params["properties"]["action"]["enum"],
             ["list", "status", "kill", "send_input"],

@@ -74,7 +74,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("edit", tool_names)
         self.assertIn("Read-only research and code analysis subagent", mock_agent.system_prompt)
 
-    async def test_subagent_tool_exclusion_of_manage_task_and_recursion_guards(self):
+    async def test_subagent_tool_exclusion_of_manage_shell_and_recursion_guards(self):
         from unittest.mock import MagicMock
         tool = InvokeSubagentTool()
 
@@ -84,7 +84,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             {"function": {"name": "read"}},
             {"function": {"name": "shell"}},
             {"function": {"name": "invoke_subagent"}},
-            {"function": {"name": "manage_task"}},
+            {"function": {"name": "manage_shell"}},
         ]
         mock_agent.system_prompt = "Base prompt"
         mock_agent.stream_steps.return_value = (x for x in [])
@@ -105,7 +105,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)
         self.assertNotIn("invoke_subagent", tool_names)
-        self.assertNotIn("manage_task", tool_names)
+        self.assertNotIn("manage_shell", tool_names)
 
     def test_truncate_subagent_result_short(self):
         self.assertEqual(_truncate_subagent_result("short result"), "short result")

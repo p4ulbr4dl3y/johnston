@@ -104,7 +104,7 @@ class FormattingMixin:
         cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", text)
         cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
         cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
-        cleaned = re.sub(r"Use (manage_task|ManageTask) to inspect[^\n]*", "", cleaned)
+        cleaned = re.sub(r"Use (manage_shell|ManageShell) to inspect[^\n]*", "", cleaned)
         return cleaned.strip()
 
     def _format_code_with_line_numbers(self, code: str) -> str:
@@ -311,7 +311,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pass
         from tools.registry import normalize_tool_name
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
-        if canonical in ("read", "web_fetch", "ask_user", "manage_task", "manage_subagent", "invoke_subagent"):
+        if canonical in ("read", "web_fetch", "ask_user", "manage_shell", "manage_subagent", "invoke_subagent"):
             return False
         if canonical in self.EXPANDABLE_TOOLS or canonical in ("call_mcp", "create", "edit", "multi_edit", "shell", "update_plan"):
             return True
@@ -338,7 +338,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if result_text:
             self.status = "error" if self._check_is_error(result_text) else "done"
 
-        is_clickable = self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_task")
+        is_clickable = self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_shell")
         header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
@@ -385,7 +385,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
-        if not self.is_expandable() and self.canonical_tool not in ("invoke_subagent", "manage_task"):
+        if not self.is_expandable() and self.canonical_tool not in ("invoke_subagent", "manage_shell"):
             self.is_expanded = False
             self.header_label.remove_class("tool-header-expandable")
             self.header_label.add_class("tool-header")
@@ -403,7 +403,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "multi_edit": "Edit",
             "shell": "Shell",
             "ask_user": "AskUser",
-            "manage_task": "ManageTask",
+            "manage_shell": "ManageShell",
             "invoke_subagent": "InvokeSubagent",
             "manage_subagent": "ManageSubagent",
             "web_fetch": "WebFetch",
@@ -471,7 +471,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 compact = f'{{server: "{server}"}}' if server else "{}"
             escaped_compact = escape(compact)
             self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
-        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in ("invoke_subagent", "manage_task", "manage_subagent", "ask_user"):
+        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in ("invoke_subagent", "manage_shell", "manage_subagent", "ask_user"):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
             from core.tool_display import extract_tool_display
             project_dir = None
@@ -495,7 +495,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
 
     def on_click(self, event) -> None:
-        if self.canonical_tool in ("invoke_subagent", "manage_task"):
+        if self.canonical_tool in ("invoke_subagent", "manage_shell"):
             args = self.args if isinstance(self.args, dict) else {}
             session_id = args.get("session_id") or args.get("task_id") or getattr(self, "subagent_session_id", None)
             identifier = session_id or args.get("description") or args.get("prompt") or self.target

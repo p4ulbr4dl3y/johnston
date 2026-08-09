@@ -15,7 +15,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         from core.permission_manager import PermissionManager
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
-        pm.set_session_override("manage_task", "allow")
+        pm.set_session_override("manage_shell", "allow")
         pm.set_session_override("invoke_subagent", "allow")
 
     def setUp(self):
@@ -175,12 +175,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                         pass
                     mock_comp.assert_called_once()
 
-    async def test_manage_task_tool(self):
+    async def test_manage_shell_tool(self):
         class DummyApp:
             background_tasks = []
 
         app = DummyApp()
-        res_list = await execute_tool("manage_task", {"action": "list"}, app=app)
+        res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
         self.assertIn("OK: no tasks active", res_list)
 
     async def test_task_tool_foreground(self):
