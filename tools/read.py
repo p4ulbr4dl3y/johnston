@@ -154,7 +154,7 @@ def process_image_file_sync(path: str, detail: str | None = None) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read file contents with 800-line window pagination. Auto-converts PDF/DOCX to Markdown. Supports viewing images (PNG, JPG, WEBP, etc)."
+    description = "Read file contents (max 800 lines per call). Pass start_line and end_line for targeted ranges. Auto-converts PDF/DOCX to Markdown. Supports images."
     schema = {
         "type": "function",
         "function": {
