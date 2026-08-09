@@ -410,9 +410,7 @@ class TestActionsSelectChanged(unittest.TestCase):
         event = MagicMock()
         event.value = "openai"
         ActionsMixin.on_select_changed(obj, event)
-        obj.pm.set_active_provider_key.assert_called_once_with("openai")
-        obj.refresh_status_footer.assert_called_once()
-        self.assertEqual(obj.agent.history, [{"role": "user", "content": "hi"}])
+        obj.pm.recreate_active_agent.assert_called_once_with(obj, provider_key="openai", history=[{"role": "user", "content": "hi"}])
 
     def test_on_select_changed_none_value(self):
         obj = MagicMock()
@@ -436,7 +434,7 @@ class TestActionsSelectChanged(unittest.TestCase):
         event = MagicMock()
         event.value = "anthropic"
         ActionsMixin.on_select_changed(obj, event)
-        obj.refresh_status_footer.assert_called_once()
+        obj.pm.recreate_active_agent.assert_called_once_with(obj, provider_key="anthropic", history=None)
 
 
 if __name__ == "__main__":
