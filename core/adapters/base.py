@@ -68,3 +68,56 @@ def extract_image_payload(tcontent: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
+def extract_image_details(tcontent: Any) -> Optional[Tuple[str, str, str, str]]:
+    """Extracts (summary_text, media_type, base64_data, detail) from image tool content if present."""
+    parsed_img = extract_image_payload(tcontent)
+    if parsed_img and parsed_img.get("base64"):
+        summary_text = parsed_img.get("summary", "[Image content]")
+        media_type = parsed_img.get("media_type", "image/jpeg")
+        b64_data = parsed_img.get("base64")
+        detail_val = parsed_img.get("detail", "high")
+        return summary_text, media_type, b64_data, detail_val
+    return None
+
+
+def build_adapter_usage_event(
+    prompt_tokens: Any = 0,
+    completion_tokens: Any = 0,
+    total_tokens: Optional[Any] = None,
+    cache_read_tokens: Any = 0,
+) -> Tuple[str, Dict[str, Any]]:
+    """Formats standard ('adapter_usage', dict) tuple for provider adapters."""
+    p_tok = int(prompt_tokens or 0)
+    c_tok = int(completion_tokens or 0)
+    t_tok = int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
+    return ("adapter_usage", {
+        "prompt_tokens": p_tok,
+        "completion_tokens": c_tok,
+        "total_tokens": t_tok,
+        "cache_read_tokens": int(cache_read_tokens or 0),
+    })
+
+
+async def check_httpx_response_status(resp: Any) -> None:
+    """Checks httpx response status and raises HTTPStatusError with body on failure."""
+    if getattr(resp, "status_code", 200) >= 400:
+        err_bytes = await resp.aread()
+        err_body = err_bytes.decode("utf-8", errors="replace")
+        import httpx
+        raise httpx.HTTPStatusError(
+            f"HTTP {resp.status_code}: {err_body}",
+            request=resp.request,
+            response=resp,
+        )
+
+
+def normalize_tool_arguments_str(raw: Any) -> str:
+    """Converts dict or string arguments into clean JSON string format."""
+    if isinstance(raw, str):
+        return raw or "{}"
+    if raw is None:
+        return "{}"
+    return json.dumps(raw, ensure_ascii=False)
+
+
+

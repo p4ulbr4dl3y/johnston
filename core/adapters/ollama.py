@@ -4,7 +4,13 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import BaseApiAdapter, parse_tool_call_args
+from core.adapters.base import (
+    BaseApiAdapter,
+    build_adapter_usage_event,
+    check_httpx_response_status,
+    normalize_tool_arguments_str,
+    parse_tool_call_args,
+)
 from core.thinking_effort import build_ollama_thinking_payload
 
 
@@ -58,14 +64,7 @@ class OllamaAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
-                if getattr(resp, "status_code", 200) >= 400:
-                    err_bytes = await resp.aread()
-                    err_body = err_bytes.decode("utf-8", errors="replace")
-                    raise httpx.HTTPStatusError(
-                        f"HTTP {resp.status_code}: {err_body}",
-                        request=resp.request,
-                        response=resp,
-                    )
+                await check_httpx_response_status(resp)
                 async for line in resp.aiter_lines():
                     if not line:
                         continue
@@ -83,21 +82,13 @@ class OllamaAdapter(BaseApiAdapter):
                         fn = tc.get("function", {})
                         if not isinstance(fn, dict):
                             fn = {}
-                        args = fn.get("arguments", {})
-                        if not isinstance(args, str):
-                            args = json.dumps(args, ensure_ascii=False)
                         yield ("adapter_tool_call", {
                             "id": f"call_{uuid.uuid4().hex[:8]}",
                             "name": fn.get("name", ""),
-                            "arguments": args or "{}",
+                            "arguments": normalize_tool_arguments_str(fn.get("arguments")),
                         })
                     if evt.get("done"):
                         in_tok = evt.get("prompt_eval_count", 0) or 0
                         out_tok = evt.get("eval_count", 0) or 0
                         if in_tok or out_tok:
-                            yield ("adapter_usage", {
-                                "prompt_tokens": in_tok,
-                                "completion_tokens": out_tok,
-                                "total_tokens": in_tok + out_tok,
-                                "cache_read_tokens": 0,
-                            })
+                            yield build_adapter_usage_event(in_tok, out_tok)

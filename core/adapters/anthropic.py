@@ -6,7 +6,9 @@ import httpx
 
 from core.adapters.base import (
     BaseApiAdapter,
-    extract_image_payload,
+    build_adapter_usage_event,
+    check_httpx_response_status,
+    extract_image_details,
     parse_tool_call_args,
     sort_keys_recursive,
 )
@@ -63,13 +65,10 @@ class AnthropicAdapter(BaseApiAdapter):
                 continue
             if role == "tool":
                 tc_id = msg.get("tool_call_id") or ""
-                tcontent = msg.get("content", "")
-                parsed_img = extract_image_payload(tcontent)
+                img_info = extract_image_details(msg.get("content", ""))
 
-                if parsed_img and parsed_img.get("base64"):
-                    summary_text = parsed_img.get("summary", "[Image content]")
-                    media_type = parsed_img.get("media_type", "image/jpeg")
-                    b64_data = parsed_img.get("base64")
+                if img_info:
+                    summary_text, media_type, b64_data, _ = img_info
                     pending_tools.append({
                         "type": "tool_result",
                         "tool_use_id": tc_id,
@@ -87,6 +86,7 @@ class AnthropicAdapter(BaseApiAdapter):
                     })
                     continue
 
+                tcontent = msg.get("content", "")
                 if not isinstance(tcontent, str):
                     tcontent = json.dumps(tcontent, ensure_ascii=False)
                 pending_tools.append({
@@ -99,7 +99,12 @@ class AnthropicAdapter(BaseApiAdapter):
             _flush_tools()
 
             if role == "user":
-                final.append({"role": "user", "content": content if content is not None else ""})
+                if isinstance(content, str):
+                    final.append({"role": "user", "content": content})
+                elif isinstance(content, list):
+                    final.append({"role": "user", "content": content})
+                else:
+                    final.append({"role": "user", "content": json.dumps(content)})
             elif role == "assistant":
                 blocks: List[Dict[str, Any]] = []
                 if isinstance(content, str) and content:
@@ -112,13 +117,14 @@ class AnthropicAdapter(BaseApiAdapter):
                     fn_name, args_obj = parse_tool_call_args(tc)
                     blocks.append({
                         "type": "tool_use",
-                        "id": (tc.get("id") if isinstance(tc, dict) else None) or f"toolu_{uuid.uuid4().hex[:12]}",
+                        "id": tc.get("id") or f"call_{uuid.uuid4().hex[:8]}",
                         "name": fn_name,
                         "input": args_obj,
                     })
-                final.append({"role": "assistant", "content": blocks or [{"type": "text", "text": content or ""}]})
+                final.append({"role": "assistant", "content": blocks or [{"type": "text", "text": ""}]})
 
         _flush_tools()
+        apply_anthropic_rolling_cache(final)
         return system_prompt, final
 
     async def stream_chat(
@@ -132,45 +138,45 @@ class AnthropicAdapter(BaseApiAdapter):
         thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_prompt, anthropic_msgs = self._to_anthropic_messages(messages)
-        apply_anthropic_rolling_cache(anthropic_msgs)
-        endpoint_url = f"{(base_url or 'https://api.anthropic.com/v1').rstrip('/')}/messages"
+        endpoint_url = f"{(base_url or 'https://api.anthropic.com').rstrip('/')}/v1/messages"
         headers = {
-            "x-api-key": api_key,
+            "x-api-key": api_key or "",
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
+            "anthropic-beta": "prompt-caching-2024-07-31",
         }
-        payload = {
+        payload: Dict[str, Any] = {
             "model": model,
-            "max_tokens": max_tokens if max_tokens and max_tokens > 0 else 8192,
             "messages": anthropic_msgs,
+            "max_tokens": max_tokens or 4096,
             "stream": True,
         }
         payload.update(build_anthropic_thinking_payload(thinking_effort))
-        # Anthropic prompt caching: mark the stable system prompt and the final
-        # tool definition as ephemeral cache breakpoints. The system prompt +
-        # tool schemas (~2-4k tokens) are identical across the tool-call steps of
-        # a turn, so they are read from cache on steps 2..N at ~10% of the price.
+
         if system_prompt:
-            payload["system"] = [
-                {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
-            ]
+            payload["system"] = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
         else:
             payload["system"] = ""
+
         if tools:
-            native_tools = [
-                {
-                    "name": (t.get("function", {}) or {}).get("name"),
-                    "description": (t.get("function", {}) or {}).get("description", ""),
-                    "input_schema": sort_keys_recursive((t.get("function", {}) or {}).get("parameters", {})),
-                }
-                for t in tools
-            ]
-            if native_tools:
-                native_tools[-1]["cache_control"] = {"type": "ephemeral"}
-            payload["tools"] = native_tools
+            converted_tools = []
+            for t in tools:
+                fn = t.get("function", {})
+                fn_name = fn.get("name", "")
+                if not fn_name:
+                    continue
+                converted_tools.append({
+                    "name": fn_name,
+                    "description": fn.get("description", ""),
+                    "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+                })
+            if converted_tools:
+                sorted_tools = sort_keys_recursive(converted_tools)
+                sorted_tools[-1]["cache_control"] = {"type": "ephemeral"}
+                payload["tools"] = sorted_tools
 
         tool_blocks: Dict[int, Dict[str, str]] = {}
-        pending_usage: Dict[str, int] = {
+        pending_usage = {
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "cache_read_tokens": 0,
@@ -178,14 +184,7 @@ class AnthropicAdapter(BaseApiAdapter):
 
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
-                if getattr(resp, "status_code", 200) >= 400:
-                    err_bytes = await resp.aread()
-                    err_body = err_bytes.decode("utf-8", errors="replace")
-                    raise httpx.HTTPStatusError(
-                        f"HTTP {resp.status_code}: {err_body}",
-                        request=resp.request,
-                        response=resp,
-                    )
+                await check_httpx_response_status(resp)
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
@@ -234,8 +233,9 @@ class AnthropicAdapter(BaseApiAdapter):
                         if u.get("output_tokens") is not None:
                             pending_usage["completion_tokens"] = u.get("output_tokens", 0) or 0
                     elif etype == "message_stop":
-                        pending_usage["total_tokens"] = (
-                            pending_usage["prompt_tokens"] + pending_usage["completion_tokens"]
+                        yield build_adapter_usage_event(
+                            pending_usage["prompt_tokens"],
+                            pending_usage["completion_tokens"],
+                            cache_read_tokens=pending_usage["cache_read_tokens"],
                         )
-                        yield ("adapter_usage", dict(pending_usage))
                         pending_usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_read_tokens": 0}
