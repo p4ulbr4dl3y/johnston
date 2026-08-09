@@ -9,7 +9,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class MCPProcessClient:
@@ -128,28 +128,31 @@ class MCPProcessClient:
         finally:
             self._pending_futures.pop(current_id, None)
 
+    def _build_popen_kwargs(self) -> Dict[str, Any]:
+        """Helper to assemble standard Popen keyword arguments for MCP server process."""
+        run_env = os.environ.copy()
+        if self.env:
+            run_env.update(self.env)
+        return {
+            "args": self.cmd,
+            "stdin": subprocess.PIPE,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "cwd": self.cwd or os.getcwd(),
+            "env": run_env,
+            "text": True,
+            "bufsize": 1,
+        }
+
     def start(self) -> bool:
         self._stopped = False
         if self.process and self.process.poll() is None:
             self._start_async_reader()
             return True
 
-        run_env = os.environ.copy()
-        if self.env:
-            run_env.update(self.env)
-
         self.last_error = None
         try:
-            self.process = subprocess.Popen(
-                self.cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=self.cwd or os.getcwd(),
-                env=run_env,
-                text=True,
-                bufsize=1
-            )
+            self.process = subprocess.Popen(**self._build_popen_kwargs())
             self._buffer = ""
             init_ok = self._initialize()
             if not init_ok:
@@ -168,23 +171,11 @@ class MCPProcessClient:
             self._start_async_reader()
             return True
 
-        run_env = os.environ.copy()
-        if self.env:
-            run_env.update(self.env)
-
         self.last_error = None
         try:
-            self.process = await asyncio.to_thread(
-                subprocess.Popen,
-                self.cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=self.cwd or os.getcwd(),
-                env=run_env,
-                text=True,
-                bufsize=1,
-            )
+            kwargs = self._build_popen_kwargs()
+            args = kwargs.pop("args")
+            self.process = await asyncio.to_thread(subprocess.Popen, args, **kwargs)
             self._start_async_reader()
             init_ok = await self._initialize_async()
             if not init_ok:
@@ -383,49 +374,59 @@ class MCPProcessClient:
             self.tools = res["result"].get("tools", [])
         return self.tools
 
+    def _build_call_payload(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
+        """Helper to create JSON-RPC tool call payload with incremented request id."""
+        self.req_id += 1
+        current_id = self.req_id
+        req = {
+            "jsonrpc": "2.0",
+            "id": current_id,
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": arguments,
+            },
+        }
+        return current_id, req
+
+    def _parse_tool_response(self, tool_name: str, res: Optional[Dict[str, Any]]) -> str:
+        """Helper to parse MCP tool call JSON-RPC response or error dict into string output."""
+        if not res:
+            return f"Error: No response from MCP server '{self.name}'"
+        if "error" in res:
+            err_val = res["error"]
+            err_msg = err_val.get("message", str(err_val)) if isinstance(err_val, dict) else str(err_val)
+            return f"MCP Error: {err_msg}"
+
+        result = res.get("result", {})
+        content_items = result.get("content", [])
+        output_parts = []
+        for item in content_items:
+            if item.get("type") == "text":
+                output_parts.append(item.get("text", ""))
+            else:
+                output_parts.append(json.dumps(item, ensure_ascii=False))
+
+        output_text = "\n".join(output_parts).strip()
+        if output_text:
+            return output_text
+
+        return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
+
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
         with self._lock:
             if not self.process or self.process.poll() is not None:
                 if not self.start():
                     return f"Error: MCP server '{self.name}' process is not running"
 
-            self.req_id += 1
-            current_id = self.req_id
-            req = {
-                "jsonrpc": "2.0",
-                "id": current_id,
-                "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": arguments
-                }
-            }
+            current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=timeout)
-            if not res:
-                return f"Error: No response from MCP server '{self.name}'"
-            if "error" in res:
-                return f"MCP Error: {res['error'].get('message', res['error'])}"
-
-            result = res.get("result", {})
-            content_items = result.get("content", [])
-            output_parts = []
-            for item in content_items:
-                if item.get("type") == "text":
-                    output_parts.append(item.get("text", ""))
-                else:
-                    output_parts.append(json.dumps(item, ensure_ascii=False))
-
             try:
                 self.fetch_tools()
             except Exception:
                 pass
-
-            output_text = "\n".join(output_parts).strip()
-            if output_text:
-                return output_text
-
-            return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
+            return self._parse_tool_response(tool_name, res)
 
     async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
         try:
@@ -438,17 +439,7 @@ class MCPProcessClient:
                 return f"Error: MCP server '{self.name}' process is not running"
 
         self._start_async_reader()
-        self.req_id += 1
-        current_id = self.req_id
-        req = {
-            "jsonrpc": "2.0",
-            "id": current_id,
-            "method": "tools/call",
-            "params": {
-                "name": tool_name,
-                "arguments": arguments
-            }
-        }
+        current_id, req = self._build_call_payload(tool_name, arguments)
 
         fut = loop.create_future()
         self._pending_futures[current_id] = fut
@@ -474,29 +465,9 @@ class MCPProcessClient:
             self._pending_futures.pop(current_id, None)
             raise
 
-        if not res:
-            return f"Error: No response from MCP server '{self.name}'"
-        if "error" in res:
-            err_val = res["error"]
-            err_msg = err_val.get("message", str(err_val)) if isinstance(err_val, dict) else str(err_val)
-            return f"MCP Error: {err_msg}"
-
-        result = res.get("result", {})
-        content_items = result.get("content", [])
-        output_parts = []
-        for item in content_items:
-            if item.get("type") == "text":
-                output_parts.append(item.get("text", ""))
-            else:
-                output_parts.append(json.dumps(item, ensure_ascii=False))
-
         try:
             await self.fetch_tools_async()
         except Exception:
             pass
 
-        output_text = "\n".join(output_parts).strip()
-        if output_text:
-            return output_text
-
-        return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
+        return self._parse_tool_response(tool_name, res)

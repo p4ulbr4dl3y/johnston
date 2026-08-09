@@ -7,7 +7,7 @@ import atexit
 import json
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
 from core.mcp_manager.process_client import MCPProcessClient
@@ -94,19 +94,12 @@ class MCPManager:
 
         return list(servers.values())
 
-    def toggle_server(self, name: str) -> bool:
-        """
-        Toggles disabled state of server by name.
-        Saves updated state to the appropriate config file (project or global).
-        Returns new enabled state (True = enabled, False = disabled).
-        """
+    def _update_server_config(self, name: str, key_updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Helper to read-modify-write MCP server config files atomically."""
         servers = self.load_servers()
         target = next((s for s in servers if s["name"] == name), None)
         if not target:
-            return False
-
-        new_disabled = not target.get("disabled", False)
-        target["disabled"] = new_disabled
+            return None
 
         file_to_update = self.project_file if target["scope"] == "project" and os.path.exists(self.project_file) else self.global_file
 
@@ -120,21 +113,64 @@ class MCPManager:
                 cfg["mcpServers"] = {}
 
             if name in cfg["mcpServers"]:
-                cfg["mcpServers"][name]["disabled"] = new_disabled
+                cfg["mcpServers"][name].update(key_updates)
             else:
-                cfg["mcpServers"][name] = {
+                server_dict = {
                     "command": target.get("command"),
                     "args": target.get("args"),
                     "env": target.get("env"),
                     "url": target.get("url"),
                     "mode": target.get("mode", "eager"),
-                    "disabled": new_disabled
+                    "disabled": target.get("disabled", False),
                 }
+                server_dict.update(key_updates)
+                cfg["mcpServers"][name] = server_dict
 
             from tools.base import atomic_write_json
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
-            print(f"Failed to toggle MCP server {name}: {e}")
+            print(f"Failed to update config for MCP server {name}: {e}")
+
+        return target
+
+    def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, server_mode: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
+        """Formats tool dict to OpenAI function format and handles name collisions across servers."""
+        t_name = tool.get("name")
+        if not t_name:
+            return None
+
+        exposed_name = t_name
+        if t_name in seen_names and seen_names[t_name] != server_name:
+            exposed_name = f"{server_name}__{t_name}"
+        else:
+            seen_names[t_name] = server_name
+
+        return {
+            "type": "function",
+            "function": {
+                "name": exposed_name,
+                "description": tool.get("description", ""),
+                "parameters": tool.get("inputSchema", {"type": "object", "properties": {}}),
+            },
+            "_mcp_server": server_name,
+            "_mcp_tool_name": t_name,
+            "_mcp_mode": server_mode,
+        }
+
+    def toggle_server(self, name: str) -> bool:
+        """
+        Toggles disabled state of server by name.
+        Saves updated state to the appropriate config file (project or global).
+        Returns new enabled state (True = enabled, False = disabled).
+        """
+        servers = self.load_servers()
+        target = next((s for s in servers if s["name"] == name), None)
+        if not target:
+            return False
+
+        new_disabled = not target.get("disabled", False)
+        if self._update_server_config(name, {"disabled": new_disabled}) is None:
+            return False
 
         # Stop client if disabled
         if new_disabled and name in self.clients:
@@ -157,33 +193,8 @@ class MCPManager:
         curr_mode = target.get("mode", "eager")
         new_mode = "lazy" if curr_mode == "eager" else "eager"
 
-        file_to_update = self.project_file if target["scope"] == "project" and os.path.exists(self.project_file) else self.global_file
-
-        try:
-            cfg = {"mcpServers": {}}
-            if os.path.exists(file_to_update):
-                with open(file_to_update, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-
-            if "mcpServers" not in cfg:
-                cfg["mcpServers"] = {}
-
-            if name in cfg["mcpServers"]:
-                cfg["mcpServers"][name]["mode"] = new_mode
-            else:
-                cfg["mcpServers"][name] = {
-                    "command": target.get("command"),
-                    "args": target.get("args"),
-                    "env": target.get("env"),
-                    "url": target.get("url"),
-                    "mode": new_mode,
-                    "disabled": target.get("disabled", False)
-                }
-
-            from tools.base import atomic_write_json
-            atomic_write_json(file_to_update, cfg, indent=2)
-        except Exception as e:
-            print(f"Failed to toggle mode for MCP server {name}: {e}")
+        if self._update_server_config(name, {"mode": new_mode}) is None:
+            return "eager"
 
         return new_mode
 
@@ -233,27 +244,9 @@ class MCPManager:
                     pass
 
             for t in client.tools:
-                t_name = t.get("name")
-                if not t_name:
-                    continue
-
-                exposed_name = t_name
-                if t_name in seen_names and seen_names[t_name] != name:
-                    exposed_name = f"{name}__{t_name}"
-                else:
-                    seen_names[t_name] = name
-
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": exposed_name,
-                        "description": t.get("description", ""),
-                        "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
-                    },
-                    "_mcp_server": name,
-                    "_mcp_tool_name": t_name,
-                    "_mcp_mode": s_mode
-                })
+                formatted = self._format_tool_schema(t, name, s_mode, seen_names)
+                if formatted:
+                    tools.append(formatted)
 
         return tools
 
@@ -299,27 +292,9 @@ class MCPManager:
                     pass
 
             for t in client.tools:
-                t_name = t.get("name")
-                if not t_name:
-                    continue
-
-                exposed_name = t_name
-                if t_name in seen_names and seen_names[t_name] != name:
-                    exposed_name = f"{name}__{t_name}"
-                else:
-                    seen_names[t_name] = name
-
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": exposed_name,
-                        "description": t.get("description", ""),
-                        "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
-                    },
-                    "_mcp_server": name,
-                    "_mcp_tool_name": t_name,
-                    "_mcp_mode": s_mode
-                })
+                formatted = self._format_tool_schema(t, name, s_mode, seen_names)
+                if formatted:
+                    tools.append(formatted)
 
         return tools
 
@@ -341,26 +316,9 @@ class MCPManager:
                 continue
 
             for tool in client.tools:
-                tool_name = tool.get("name")
-                if not tool_name:
-                    continue
-                exposed_name = tool_name
-                if tool_name in seen_names and seen_names[tool_name] != server_name:
-                    exposed_name = f"{server_name}__{tool_name}"
-                else:
-                    seen_names[tool_name] = server_name
-
-                tools.append({
-                    "type": "function",
-                    "function": {
-                        "name": exposed_name,
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("inputSchema", {"type": "object", "properties": {}}),
-                    },
-                    "_mcp_server": server_name,
-                    "_mcp_tool_name": tool_name,
-                    "_mcp_mode": server_mode,
-                })
+                formatted = self._format_tool_schema(tool, server_name, server_mode, seen_names)
+                if formatted:
+                    tools.append(formatted)
 
         return tools
 
@@ -419,60 +377,48 @@ class MCPManager:
                 matches.extend(caps)
         return sorted(set(matches))
 
+    def _resolve_target_client_and_tool(self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None) -> Tuple[Optional[MCPProcessClient], Optional[str]]:
+        """Helper to match exposed/raw tool_name against active MCP clients."""
+        req_server = target_server
+        req_tool = tool_name
+
+        if "__" in tool_name and not req_server:
+            req_server, req_tool = tool_name.split("__", 1)
+
+        for t in active_tools:
+            fn = t.get("function", {})
+            s_name = t.get("_mcp_server")
+            o_name = t.get("_mcp_tool_name")
+            exposed_name = fn.get("name")
+
+            if req_server:
+                if s_name == req_server and (o_name == req_tool or exposed_name == tool_name):
+                    client = self.clients.get(s_name)
+                    if client:
+                        return client, o_name
+            else:
+                if exposed_name == tool_name or o_name == tool_name:
+                    client = self.clients.get(s_name)
+                    if client:
+                        return client, o_name
+        return None, None
+
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None, timeout: Optional[float] = None) -> Optional[str]:
         """
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name, namespaced server_name__tool_name, or explicit target_server.
         """
-        req_server = target_server
-        req_tool = tool_name
-
-        if "__" in tool_name and not req_server:
-            req_server, req_tool = tool_name.split("__", 1)
-
         active_tools = self.get_active_tools(mode="all")
-        for t in active_tools:
-            fn = t.get("function", {})
-            s_name = t.get("_mcp_server")
-            o_name = t.get("_mcp_tool_name")
-            exposed_name = fn.get("name")
-
-            if req_server:
-                if s_name == req_server and (o_name == req_tool or exposed_name == tool_name):
-                    client = self.clients.get(s_name)
-                    if client:
-                        return client.call_tool(o_name, arguments, timeout=timeout)
-            else:
-                if exposed_name == tool_name or o_name == tool_name:
-                    client = self.clients.get(s_name)
-                    if client:
-                        return client.call_tool(o_name, arguments, timeout=timeout)
+        client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
+        if client and o_name:
+            return client.call_tool(o_name, arguments, timeout=timeout)
         return None
 
     async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None, timeout: Optional[float] = None) -> Optional[str]:
-        req_server = target_server
-        req_tool = tool_name
-
-        if "__" in tool_name and not req_server:
-            req_server, req_tool = tool_name.split("__", 1)
-
         active_tools = await self.get_active_tools_async(mode="all")
-        for t in active_tools:
-            fn = t.get("function", {})
-            s_name = t.get("_mcp_server")
-            o_name = t.get("_mcp_tool_name")
-            exposed_name = fn.get("name")
-
-            if req_server:
-                if s_name == req_server and (o_name == req_tool or exposed_name == tool_name):
-                    client = self.clients.get(s_name)
-                    if client:
-                        return await client.call_tool_async(o_name, arguments, timeout=timeout)
-            else:
-                if exposed_name == tool_name or o_name == tool_name:
-                    client = self.clients.get(s_name)
-                    if client:
-                        return await client.call_tool_async(o_name, arguments, timeout=timeout)
+        client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
+        if client and o_name:
+            return await client.call_tool_async(o_name, arguments, timeout=timeout)
         return None
 
     def get_tool_schema(self, server_name: str, tool_name: str) -> Optional[Dict[str, Any]]:
