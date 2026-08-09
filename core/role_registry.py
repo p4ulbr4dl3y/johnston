@@ -146,7 +146,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "2. Verification: Run linters or tests after edits to verify changes before completing.\n"
             "3. Clean State: Ensure working tree is clean and code builds cleanly upon task finish."
         ),
-        scope="any",
+        scope="subagent_only",
         source="builtin",
     ),
     "explore": AgentRole(
@@ -195,7 +195,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "create", "edit", "multi_edit",
             "write_to_file", "replace_file_content", "multi_replace_file_content"
         ],
-        scope="any",
+        scope="subagent_only",
         source="builtin",
     ),
     "orchestrate": AgentRole(

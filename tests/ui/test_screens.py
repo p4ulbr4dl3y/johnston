@@ -211,35 +211,6 @@ class TestSkillScreens(unittest.TestCase):
         mock_sm.toggle_hidden.assert_called_once_with("skill-a")
 
 
-class TestSubagentsScreen(unittest.TestCase):
-    def setUp(self):
-        from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
-        self.old_dir = SUBAGENTS_DIR
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp_dir.cleanup)
-        self.tracker = SubagentTracker.get_instance()
-        self.tracker.storage_dir = self.temp_dir.name
-        self.tracker.sessions.clear()
-
-    def tearDown(self):
-        for sess in list(self.tracker.sessions.values()):
-            if sess.async_task and not sess.async_task.done():
-                sess.async_task.cancel()
-        self.tracker.sessions.clear()
-        self.tracker.storage_dir = self.old_dir
-
-    def test_init(self):
-        from widgets.screens.subagents import SubagentsScreen
-        s = SubagentsScreen()
-        self.assertEqual(s.sessions, [])
-
-    def test_bindings(self):
-        from widgets.screens.subagents import SubagentsScreen
-        keys = [b[0] for b in SubagentsScreen.BINDINGS]
-        self.assertIn("escape", keys)
-        self.assertIn("tab", keys)
-
-
 if __name__ == "__main__":
     unittest.main()
 
