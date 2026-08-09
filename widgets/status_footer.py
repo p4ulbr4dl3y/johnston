@@ -102,16 +102,14 @@ class StatusFooter(Static):
             bg_tasks = getattr(self.app, "background_tasks", [])
             curr_sid = getattr(self.app, "current_session_id", None)
             if curr_sid:
-                bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) in (curr_sid, None)]
+                bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) == curr_sid]
             bash_tasks = [t for t in bg_tasks if not (getattr(t, "task_id", "").startswith("subagent-") or hasattr(t, "async_task"))]
             active_bg_tasks = len([t for t in bash_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)])
 
             from core.subagent_tracker import SubagentTracker
             st = SubagentTracker.get_instance()
             st._load_all_sessions()
-            sessions = st.get_sessions_for_session(curr_sid) if curr_sid else []
-            if not sessions and curr_sid:
-                sessions = st.get_sessions_for_session(None)
+            sessions = st.get_sessions_for_session(curr_sid) if curr_sid else list(st.sessions.values())
             st_running = len([s for s in sessions if getattr(s, "status", "") == "running"])
 
             subagents_bg = [t for t in bg_tasks if getattr(t, "task_id", "").startswith("subagent-") or hasattr(t, "async_task")]
