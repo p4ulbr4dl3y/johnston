@@ -142,38 +142,59 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
     },
     "edit": {
         "path": "target_file",
+        "target_file": "target_file",
+        "TargetFile": "target_file",
         "file_path": "target_file",
         "filepath": "target_file",
         "file": "target_file",
         "filename": "target_file",
         "target_content": "old_str",
+        "TargetContent": "old_str",
+        "old_str": "old_str",
         "old_content": "old_str",
+        "old_string": "old_str",
         "search": "old_str",
         "oldStr": "old_str",
         "old": "old_str",
-        "old_string": "old_str",
         "replacement_content": "new_str",
+        "ReplacementContent": "new_str",
+        "new_str": "new_str",
         "new_content": "new_str",
+        "new_string": "new_str",
         "replace": "new_str",
         "newStr": "new_str",
         "new": "new_str",
-        "new_string": "new_str",
+        "start_line": "start_line",
+        "StartLine": "start_line",
+        "start": "start_line",
+        "end_line": "end_line",
+        "EndLine": "end_line",
+        "end": "end_line",
+        "allow_multiple": "allow_multiple",
+        "multiple": "allow_multiple",
         "desc": "description",
         "prompt": "instruction",
         "replacement_chunks": "edits",
+        "ReplacementChunks": "edits",
         "chunks": "edits",
         "changes": "edits",
         "replacements": "edits",
     },
     "multi_edit": {
         "path": "target_file",
+        "target_file": "target_file",
+        "TargetFile": "target_file",
         "file_path": "target_file",
         "filepath": "target_file",
         "file": "target_file",
         "replacement_chunks": "edits",
+        "ReplacementChunks": "edits",
         "chunks": "edits",
         "changes": "edits",
         "replacements": "edits",
+        "start_line": "start_line",
+        "end_line": "end_line",
+        "allow_multiple": "allow_multiple",
     },
     "web_fetch": {
         "uri": "url",
@@ -270,33 +291,52 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
 
     normalized = dict(args)
     for k, v in list(args.items()):
-        if k in param_aliases:
-            canonical = param_aliases[k]
+        canon_key = k
+        if k not in param_aliases:
+            # Case-insensitive fallback (e.g. PascalCase -> lowercase)
+            canon_key = k.lower()
+        if canon_key in param_aliases:
+            canonical = param_aliases[canon_key]
             if canonical not in normalized or normalized[canonical] is None:
                 normalized[canonical] = v
 
     if resolved_name in ("multi_edit", "edit") and isinstance(normalized.get("edits"), list):
         chunk_aliases = {
             "target_content": "old_str",
+            "TargetContent": "old_str",
             "old_content": "old_str",
             "search": "old_str",
             "oldStr": "old_str",
             "old": "old_str",
             "replacement_content": "new_str",
+            "ReplacementContent": "new_str",
             "new_content": "new_str",
             "replace": "new_str",
             "newStr": "new_str",
             "new": "new_str",
+            "start_line": "start_line",
+            "StartLine": "start_line",
+            "start": "start_line",
+            "end_line": "end_line",
+            "EndLine": "end_line",
+            "end": "end_line",
+            "allow_multiple": "allow_multiple",
+            "multiple": "allow_multiple",
         }
         normalized_edits = []
         for chunk in normalized["edits"]:
             if isinstance(chunk, dict):
                 c_norm = dict(chunk)
                 for ck, cv in list(chunk.items()):
+                    ck_l = ck[0].lower() + ck[1:] if ck else ck
                     if ck in chunk_aliases:
                         canon_c = chunk_aliases[ck]
-                        if canon_c not in c_norm or c_norm[canon_c] is None:
-                            c_norm[canon_c] = cv
+                    elif ck_l in chunk_aliases:
+                        canon_c = chunk_aliases[ck_l]
+                    else:
+                        continue
+                    if canon_c not in c_norm or c_norm[canon_c] is None:
+                        c_norm[canon_c] = cv
                 normalized_edits.append(c_norm)
             else:
                 normalized_edits.append(chunk)

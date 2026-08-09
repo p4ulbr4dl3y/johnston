@@ -103,7 +103,7 @@ System prompt instructions for the role...
 
 ## Scope
 - `any` (default): available as both execution mode and subagent type.
-- `subagent_only`: usable only as `subagent_type` in `invoke_subagent`.
+- `subagent_only`: usable only as `type` in `invoke_subagent`.
 - `main_only`: usable only as main agent execution mode (not a subagent).
 
 ## Frontmatter Fields

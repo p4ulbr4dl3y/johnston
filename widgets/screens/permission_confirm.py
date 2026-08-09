@@ -66,18 +66,14 @@ class PermissionConfirmScreen(ModalScreen[str]):
         # Generate diff for Edit tools
         if self.tool_name in ("edit", "replace_file_content", "multi_replace_file_content", "multi_edit"):
             from widgets.lexer_utils import build_edit_diff_text
-            return build_edit_diff_text(self.args, target_path or "file")
+            return build_edit_diff_text(self.args, target_path or "file", self.tool_name)
 
         return ""
 
     def compose(self) -> ComposeResult:
-        target_path = (
-            self.args.get("path")
-            or self.args.get("target_file")
-            or self.args.get("filepath")
-            or self.args.get("file")
-            or ""
-        )
+        from tools.registry import normalize_tool_args
+        nargs = normalize_tool_args(self.tool_name, self.args)
+        target_path = nargs.get("path") or nargs.get("target_file") or ""
 
         if self.tool_name in ("create", "write", "write_to_file"):
             file_exists = bool(target_path and os.path.isfile(target_path))
@@ -90,18 +86,18 @@ class PermissionConfirmScreen(ModalScreen[str]):
         elif self.tool_name in ("read", "view_file", "read_file"):
             action_desc = f"Agent wants to read `{target_path or 'file'}`"
         elif self.tool_name in ("web_fetch", "fetch_url"):
-            url = self.args.get("url") or self.args.get("Url") or ""
+            url = nargs.get("url") or ""
             action_desc = f"Agent wants to fetch `{url or 'URL'}`"
         elif self.tool_name in ("invoke_subagent", "subagent"):
-            role = self.args.get("subagent_type") or self.args.get("SubagentType") or self.args.get("role") or self.args.get("Role") or "Subagent"
-            prompt = self.args.get("prompt") or self.args.get("Prompt") or ""
+            role = nargs.get("type") or nargs.get("subagent_type") or "Subagent"
+            prompt = nargs.get("prompt") or ""
             if prompt:
                 action_desc = f"Agent wants to launch subagent `{role}` with prompt:"
             else:
                 action_desc = f"Agent wants to launch subagent `{role}`"
         elif self.tool_name in ("manage_shell",):
-            act = (self.args.get("action") or "manage").lower()
-            t_id = self.args.get("task_id") or self.args.get("TaskId") or ""
+            act = (nargs.get("action") or "manage").lower()
+            t_id = nargs.get("task_id") or ""
 
             if act == "kill":
                 action_desc = f"Agent wants to cancel task `{t_id}`" if t_id else "Agent wants to cancel background task"
@@ -135,13 +131,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Static(formatted_diff, classes="modal-diff-view")
                 else:
-                    code_content = (
-                        self.args.get("content")
-                        or self.args.get("CodeContent")
-                        or self.args.get("code_content")
-                        or self.args.get("code")
-                        or ""
-                    )
+                    code_content = nargs.get("content") or nargs.get("code") or ""
                     ext = os.path.splitext(target_path)[1].lstrip(".") or "py"
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```{ext}\n{code_content.strip()}\n```", classes="modal-diff-view")
@@ -151,17 +141,17 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name in ("shell", "run_command", "bash"):
-                cmd = self.args.get("command") or self.args.get("cmd") or self.args.get("command_line") or ""
+                cmd = nargs.get("command") or ""
                 from core.platform_utils import is_windows
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name in ("manage_shell",) and (self.args.get("action") or "").lower() == "send_input":
-                inp = self.args.get("input") or self.args.get("Input") or ""
+            elif self.tool_name in ("manage_shell",) and (nargs.get("action") or "").lower() == "send_input":
+                inp = nargs.get("input") or ""
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```text\n{inp.strip()}\n```", classes="modal-diff-view")
             elif self.tool_name in ("invoke_subagent", "subagent"):
-                prompt = self.args.get("prompt") or self.args.get("Prompt") or ""
+                prompt = nargs.get("prompt") or ""
                 if prompt:
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```text\n{prompt.strip()}\n```", classes="modal-diff-view")

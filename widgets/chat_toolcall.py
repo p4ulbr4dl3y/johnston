@@ -412,7 +412,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "shell": "Shell",
             "bash": "Shell",
             "ask_user": "AskUser",
-            "manage_shell": "Background Task",
+            "manage_shell": "ManageShell",
             "invoke_subagent": "Subagent",
             "manage_subagent": "ManageSubagent",
             "web_fetch": "WebFetch",
@@ -508,8 +508,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         if self.canonical_tool in ("invoke_subagent", "manage_shell"):
             args = self.args if isinstance(self.args, dict) else {}
-            session_id = args.get("session_id") or args.get("task_id") or getattr(self, "subagent_session_id", None)
-            identifier = session_id or args.get("description") or args.get("prompt") or self.target
+            from tools.registry import normalize_tool_args
+            nargs = normalize_tool_args(self.canonical_tool, args)
+            session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
+            identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
             try:
                 from widgets.screens.subagent_screen import SubagentViewScreen
                 self.app.push_screen(SubagentViewScreen(identifier))
@@ -550,7 +552,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         try:
             self.content_widget.display = True
             self.md_widget.display = False
-            file_path = self.args.get("TargetFile") or self.args.get("target_file") or self.args.get("path") or self.args.get("file") or self.target
+            from tools.registry import normalize_tool_args
+            nargs = normalize_tool_args(self.canonical_tool, self.args)
+            file_path = nargs.get("path") or nargs.get("target_file") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._check_is_error(raw_text):
@@ -606,7 +610,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     diff_text = raw_text
                     if not diff_text or "@@" not in diff_text:
                         from widgets.lexer_utils import build_edit_diff_text
-                        diff_text = build_edit_diff_text(self.args, file_path or "file")
+                        diff_text = build_edit_diff_text(self.args, file_path or "file", self.tool_type)
 
                     if diff_text:
                         formatted_diff = self._format_edit_diff(diff_text, file_path)

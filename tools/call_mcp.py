@@ -1,13 +1,13 @@
 import inspect
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from tools.base import BaseTool, truncate_output
 
 
 class CallMCPTool(BaseTool):
     name = "call_mcp"
-    description = "Execute a lazy-loaded MCP tool by server name, tool name, and arguments."
+    description = "Execute a lazy-loaded MCP tool by server, tool name, and arguments."
     schema = {
         "type": "function",
         "function": {
@@ -24,7 +24,7 @@ class CallMCPTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Optional[Any] = None) -> str:
+    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         server = args.get("server")
         tool = args.get("tool")
         arguments = args.get("arguments") or {}

@@ -51,8 +51,10 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
         return _truncate(f'"{desc}"') if desc else tool_name
 
     if name in ("manage_shell", "manage_subagent"):
-        act = args.get("action") or ""
-        tid = args.get("session_id") or args.get("task_id") or ""
+        from tools.registry import normalize_tool_args
+        nargs = normalize_tool_args(name, args)
+        act = nargs.get("action") or ""
+        tid = nargs.get("task_id") or ""
         if act and tid:
             return _truncate(f"{act} {tid}")
         if tid:

@@ -90,25 +90,27 @@ def generate_chunk_unified_diff(
     return d_lines
 
 
-def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
-    """Generates unified diff text from tool arguments (supporting replacement_chunks and single old/new strings)."""
+def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "edit") -> str:
+    """Generates unified diff text from tool arguments via the registry alias resolver."""
     if not isinstance(args, dict):
         return ""
+    from tools.registry import normalize_tool_args
+    norm = normalize_tool_args(tool_name, args)
 
-    chunks = args.get("ReplacementChunks") or args.get("replacement_chunks") or args.get("edits")
+    chunks = norm.get("edits")
     diff_parts = []
     if chunks and isinstance(chunks, list):
         for chunk in chunks:
             if isinstance(chunk, dict):
-                old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or chunk.get("old_str") or ""
-                new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or chunk.get("new_str") or ""
-                start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
+                old_c = chunk.get("old_str", "")
+                new_c = chunk.get("new_str", "")
+                start_l = chunk.get("start_line") or 1
                 if old_c or new_c:
                     diff_parts.extend(generate_chunk_unified_diff(old_c, new_c, file_path, start_l))
     else:
-        old_s = args.get("old_string") or args.get("old_str") or args.get("target_content") or args.get("TargetContent") or ""
-        new_s = args.get("new_string") or args.get("new_str") or args.get("replacement_content") or args.get("ReplacementContent") or ""
-        start_l = args.get("StartLine") or args.get("start_line") or 1
+        old_s = norm.get("old_str", "")
+        new_s = norm.get("new_str", "")
+        start_l = norm.get("start_line") or 1
         if old_s or new_s:
             diff_parts.extend(generate_chunk_unified_diff(old_s, new_s, file_path, start_l))
 

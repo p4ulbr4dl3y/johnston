@@ -40,25 +40,21 @@ def _truncate_subagent_result(text: str, session_id: str = "") -> str:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        f"Launch an autonomous subagent for a bounded, non-blocking subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
-        "Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
+        f"Launch an autonomous subagent for a bounded subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+        "Returns <task_result>. workspace='branch' returns branch name and diff summary."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "invoke_subagent",
-            "description": (
-                f"Launch an autonomous subagent for a bounded, non-blocking subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
-                "Returns <task_result> on completion. When workspace='branch', returns created git branch name and diff summary to merge."
-            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Detailed task prompt with relative file paths from project root, clear boundaries, and expected output format"},
+                    "prompt": {"type": "string", "description": "Task prompt with relative paths, boundaries, output format"},
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
-                    "subagent_type": {"type": "string", "description": "Subagent type: 'worker' (task execution) or 'explorer' (read-only analysis)"},
-                    "workspace": {"type": "string", "description": "Workspace: 'inherit' (current directory) or 'branch' (isolated git worktree; returns branch name and diff summary on completion to merge via `git merge`)"},
-                    "session_id": {"type": "string", "description": "Optional session ID for the spawned subagent (auto-generated if omitted)"}
+                    "type": {"type": "string", "description": "Subagent type: worker or explorer"},
+                    "workspace": {"type": "string", "description": "Workspace: inherit or branch"},
+                    "task_id": {"type": "string", "description": "Task ID (auto-generated if omitted)"}
                 },
                 "required": ["prompt", "description"]
             }

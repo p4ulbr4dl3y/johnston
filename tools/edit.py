@@ -102,20 +102,24 @@ def apply_chunk_replacements(
 
     parsed_chunks = []
     for idx, c in enumerate(raw_chunks, start=1):
-        target = c.get("target_content")
+        target = c.get("old_str")
+        if target is None:
+            target = c.get("target_content")
         if target is None:
             target = c.get("old_string")
         if target is None:
-            raise ValueError(f"ERR: chunk {idx} missing 'target_content' or 'old_string'")
+            raise ValueError(f"ERR: chunk {idx} missing 'old_str' or 'target_content'")
 
         if target == "":
-            raise ValueError(f"ERR: chunk {idx} target_content (old_string) cannot be empty")
+            raise ValueError(f"ERR: chunk {idx} old_str (target_content) cannot be empty")
 
-        replacement = c.get("replacement_content")
+        replacement = c.get("new_str")
+        if replacement is None:
+            replacement = c.get("replacement_content")
         if replacement is None:
             replacement = c.get("new_string")
         if replacement is None:
-            raise ValueError(f"ERR: chunk {idx} missing 'replacement_content' or 'new_string'")
+            raise ValueError(f"ERR: chunk {idx} missing 'new_str' or 'replacement_content'")
 
         s_line_int = try_int(c.get("start_line"))
         e_line_int = try_int(c.get("end_line"))
@@ -283,40 +287,40 @@ class EditTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "target_file": {"type": "string", "description": "File path"},
-                    "target_content": {"type": "string", "description": "Code block to replace"},
-                    "replacement_content": {"type": "string", "description": "New code block"},
-                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"}
+                    "path": {"type": "string", "description": "File path"},
+                    "old_str": {"type": "string", "description": "Code block to replace"},
+                    "new_str": {"type": "string", "description": "New code block"},
+                    "start": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end": {"type": "integer", "description": "End line (inclusive)"},
+                    "multiple": {"type": "boolean", "description": "Allow multiple matches"}
                 },
-                "required": ["target_file", "target_content", "replacement_content"]
+                "required": ["path", "old_str", "new_str"]
             }
         }
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
-        path = args.get("target_file") or args.get("path", "")
-        chunks = args.get("replacement_chunks") or args.get("ReplacementChunks")
+        path = args.get("path") or args.get("target_file", "")
+        chunks = args.get("edits") or args.get("replacement_chunks") or args.get("ReplacementChunks")
         if chunks and isinstance(chunks, list):
             return await _execute_edit_helper(path, chunks, cwd=ctx.cwd)
 
-        target_val = args.get("target_content") if "target_content" in args else args.get("old_string", "")
-        repl_val = args.get("replacement_content") if "replacement_content" in args else args.get("new_string", "")
+        target_val = args.get("old_str", args.get("target_content", args.get("old_string", "")))
+        repl_val = args.get("new_str", args.get("replacement_content", args.get("new_string", "")))
         chunk = {
             "target_content": target_val,
             "replacement_content": repl_val,
-            "start_line": args.get("start_line"),
-            "end_line": args.get("end_line"),
-            "allow_multiple": args.get("allow_multiple", False),
+            "start_line": args.get("start", args.get("start_line")),
+            "end_line": args.get("end", args.get("end_line")),
+            "allow_multiple": args.get("multiple", args.get("allow_multiple", False)),
         }
         return await _execute_edit_helper(path, [chunk], cwd=ctx.cwd)
 
 
 class MultiEditTool(BaseTool):
     name = "multi_edit"
-    description = "Replace multiple non-contiguous code blocks in a single file."
+    description = "Replace multiple non-contiguous code blocks in one file."
     schema = {
         "type": "function",
         "function": {
@@ -324,30 +328,30 @@ class MultiEditTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "target_file": {"type": "string", "description": "File path"},
-                    "replacement_chunks": {
+                    "path": {"type": "string", "description": "File path"},
+                    "edits": {
                         "type": "array",
                         "description": "List of edit chunks",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "target_content": {"type": "string", "description": "Exact text to replace"},
-                                "replacement_content": {"type": "string", "description": "New code block"},
-                                "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
-                                "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                                "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"}
+                                "old_str": {"type": "string", "description": "Exact text to replace"},
+                                "new_str": {"type": "string", "description": "New code block"},
+                                "start": {"type": "integer", "description": "Start line (1-indexed)"},
+                                "end": {"type": "integer", "description": "End line (inclusive)"},
+                                "multiple": {"type": "boolean", "description": "Allow multiple matches"}
                             }
                         }
                     }
                 },
-                "required": ["target_file", "replacement_chunks"]
+                "required": ["path", "edits"]
             }
         }
     }
 
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
-        path = args.get("target_file") or args.get("path", "")
-        raw_chunks = args.get("replacement_chunks") or args.get("chunks") or []
+        path = args.get("path") or args.get("target_file", "")
+        raw_chunks = args.get("edits") or args.get("replacement_chunks") or args.get("chunks") or []
         return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)
 

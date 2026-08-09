@@ -8,7 +8,7 @@ from tools.base import BaseTool, make_unified_diff, resolve_path, write_file_tex
 
 class CreateTool(BaseTool):
     name = "create"
-    description = "Create a new file or update an existing file with specified content. Creates parent directories automatically."
+    description = "Create or update a file with content. Creates parent dirs automatically."
     schema = {
         "type": "function",
         "function": {
