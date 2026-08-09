@@ -324,10 +324,10 @@ class EditTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
         args = normalize_tool_args("edit", args)
-        ctx = self._ensure_context(app)
+        ctx = self._ensure_context(ctx)
         path = args.get("path") or args.get("target_file", "")
         chunks = args.get("edits")
         if chunks and isinstance(chunks, list):
@@ -376,10 +376,10 @@ class MultiEditTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
         args = normalize_tool_args("multi_edit", args)
-        ctx = self._ensure_context(app)
+        ctx = self._ensure_context(ctx)
         path = args.get("path") or args.get("target_file", "")
         raw_chunks = args.get("edits") or []
         return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)

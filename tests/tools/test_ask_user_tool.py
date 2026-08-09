@@ -71,7 +71,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"question": "Pick one", "options": ["red", "blue"]},
-            app=mock_app,
+            ctx=mock_app,
         )
         self.assertIn("Question: Pick one", res)
         self.assertIn("Answer: blue", res)
@@ -88,7 +88,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"question_text": "Choose", "choices": ["x", "y"]},
-            app=mock_app,
+            ctx=mock_app,
         )
         self.assertIn("Answer: x", res)
 
@@ -99,7 +99,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen.side_effect = RuntimeError("no display available")
         res = await tool.execute(
             {"questions": [{"question_text": "Pick one", "options": ["red", "blue"]}]},
-            app=mock_app,
+            ctx=mock_app,
         )
         self.assertIn("ERR: prompt:", res)
 
@@ -114,7 +114,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"questions": [{"question_text": "Choose item", "options": ["Option A", "Option B"]}]},
-            app=mock_app
+            ctx=mock_app,
         )
         self.assertIn("Question: Choose item", res)
         self.assertIn("Answer: Option A", res)
@@ -130,7 +130,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"questions": [{"question_text": "Cancel this?", "options": []}]},
-            app=mock_app
+            ctx=mock_app,
         )
         self.assertEqual(res, "cancelled by user")
 
@@ -143,7 +143,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
                 callback({"status": "unknown_garbage"})
 
         mock_app.push_screen.side_effect = fake_push
-        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, app=mock_app)
+        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=mock_app)
         self.assertIn("cancelled by user", res)
 
     async def test_execute_sorts_options_before_display(self):
@@ -159,7 +159,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"questions": [{"question_text": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
-            app=mock_app,
+            ctx=mock_app,
         )
         self.assertIn("Yes", res)
     async def test_minimized_flow_resumed_by_callback(self):
@@ -180,7 +180,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen = mock_push_screen
         res = await tool.execute(
             {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
-            app=mock_app,
+            ctx=mock_app,
         )
         self.assertIn("Question: Choice?", res)
         self.assertIn("Answer: Opt1", res)

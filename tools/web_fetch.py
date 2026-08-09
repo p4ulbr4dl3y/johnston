@@ -51,8 +51,7 @@ class WebFetchTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         url = args.get("url", "").strip()
         if not url:
             return format_tool_error("params", name="url", detail="required")

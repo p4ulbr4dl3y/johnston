@@ -19,6 +19,7 @@ Screen {
     background: #09090b;
     padding: 0;
     margin: 0;
+    layers: default overlay;
 }
 
 ScrollBar, ScrollBarCorner {
@@ -26,10 +27,6 @@ ScrollBar, ScrollBarCorner {
     visibility: hidden !important;
     width: 0 !important;
     height: 0 !important;
-}
-
-Screen {
-    layers: default overlay;
 }
 
 Screen, *, ScrollBar, ScrollBarCorner {
@@ -223,14 +220,6 @@ MarkdownBlock {
     padding: 0;
 }
 
-MarkdownBlockQuote {
-    height: auto;
-    margin: 1 0 0 0;
-    padding: 0 1;
-    background: #18181b;
-    border-left: solid #71717a;
-}
-
 MarkdownBlockQuote MarkdownParagraph {
     margin: 0;
     padding: 0;
@@ -245,17 +234,6 @@ MarkdownBlockQuote MarkdownBlockQuote {
 
 MarkdownHeader {
     margin: 1 0 0 0;
-}
-
-MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4, MarkdownH5, MarkdownH6 {
-    margin: 0;
-}
-
-MarkdownHorizontalRule {
-    border-bottom: solid #27272a;
-    height: 1;
-    margin: 1 0 0 0;
-    padding: 0;
 }
 
 Markdown BulletList {

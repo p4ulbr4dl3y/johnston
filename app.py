@@ -11,28 +11,6 @@ import logging
 
 logger = logging.getLogger("johnston.app")
 
-from cli import (
-    get_version,
-    main,
-    print_mcp,
-    print_models,
-    print_rules,
-    print_skills,
-    print_subagents,
-    run_headless_prompt,
-)
-
-__all__ = [
-    "JohnstonApp",
-    "main",
-    "get_version",
-    "print_models",
-    "print_skills",
-    "print_mcp",
-    "print_rules",
-    "print_subagents",
-    "run_headless_prompt",
-]
 from core.app_mixins.actions import ActionsMixin
 from core.app_mixins.lifecycle import LifecycleMixin
 from core.app_mixins.message_flow import MessageFlowMixin
@@ -103,4 +81,5 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
 
 if __name__ == "__main__":
+    from cli import main
     main()

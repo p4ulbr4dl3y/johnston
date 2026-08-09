@@ -3,15 +3,17 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import MagicMock, mock_open, patch
 
-from app import (
+from cli import (
     get_version,
+    print_linters,
     print_mcp,
     print_models,
+    print_roles,
     print_rules,
     print_skills,
     print_subagents,
+    run_headless_prompt,
 )
-from cli import print_linters, print_roles, run_headless_prompt
 
 
 class TestCLI(unittest.TestCase):
@@ -227,7 +229,7 @@ class TestCLIAdvanced(unittest.TestCase):
         pm.get_api_key.return_value = ""
         with patch("cli.ProviderManager", return_value=pm):
             with redirect_stdout(f):
-                from app import print_models
+                from cli import print_models
                 print_models()
         self.assertIn("Available Johnston Providers & Models:", f.getvalue())
 
@@ -241,7 +243,7 @@ class TestCLIAdvanced(unittest.TestCase):
         pm.get_api_key.return_value = "sk-123"
         with patch("cli.ProviderManager", return_value=pm):
             with redirect_stdout(f):
-                from app import print_models
+                from cli import print_models
                 print_models()
         out = f.getvalue()
         self.assertIn("* [openai] OpenAI [key set]", out)

@@ -7,6 +7,7 @@ under sessions/<parent_id>.subagents/ via SessionStore.
 import asyncio
 from typing import Any, Callable, Optional
 
+from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, AgentSession
 
 
@@ -78,7 +79,7 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
 
     # Disable nested subagent spawning, background task management, and UI questions
     subagent.allow_task = False
-    excluded_tools = {"invoke_subagent", "manage_subagent", "manage_shell", "ask_user"}
+    excluded_tools = SUBAGENT_EXCLUDED_TOOLS
     subagent.tools = [
         t for t in (getattr(subagent, "tools", None) or [])
         if t.get("function", {}).get("name", "").lower() not in excluded_tools

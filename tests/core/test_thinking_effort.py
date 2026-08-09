@@ -216,6 +216,11 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
             def create_active_agent(self):
                 return Agent()
 
+            def recreate_active_agent(self, app, provider_key=None):
+                app.agent = Agent()
+                app.agent.mode = app.mode
+                app.refresh_status_footer()
+
         class Input:
             focused = False
 

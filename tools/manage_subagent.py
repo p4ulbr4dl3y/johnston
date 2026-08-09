@@ -36,8 +36,8 @@ class ManageSubagentTool(BaseTool):
             return app.sm
         return SessionStore.get_instance()
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        ctx = self._ensure_context(ctx)
         action = (args.get("action") or "").strip().lower()
         session_id = (args.get("session_id") or "").strip()
         message = (args.get("message") or "").strip()

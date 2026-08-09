@@ -224,5 +224,5 @@ class BaseTool:
         # subagent flag, and working directory (cwd/project_dir) it carries.
         return ToolContext(app=ctx_or_app)
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         raise NotImplementedError
