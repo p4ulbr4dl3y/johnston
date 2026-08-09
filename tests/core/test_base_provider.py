@@ -916,9 +916,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 raise RuntimeError("cannot read")
             return img_json
 
-        printed = []
+        logged = []
         with unittest.mock.patch("tools.read.process_image_file_sync", side_effect=fake_process):
-            with unittest.mock.patch("builtins.print", side_effect=lambda *a, **k: printed.append(a)):
+            with unittest.mock.patch("core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)):
                 with unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create:
                     mock_create.return_value = _MockStream([_text_chunk("ok")])
                     events = []
@@ -926,7 +926,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                         events.append(evt)
 
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
-        self.assertTrue(any("Error processing attachment image" in str(p) for p in printed))
+        self.assertTrue(any("Error processing attachment image" in str(p) for p in logged))
         messages = mock_create.call_args.kwargs["messages"]
         user_content = messages[1]["content"]
         self.assertEqual(user_content[0], {"type": "text", "text": "Look"})

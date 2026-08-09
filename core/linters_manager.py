@@ -6,7 +6,6 @@ enable/disable and availability scanning.
 """
 import asyncio
 import functools
-import json
 import os
 import shutil
 import tempfile
@@ -14,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 from core.defaults.linters import NOISE_PREFIXES, PRESET_LINTERS
-from core.platform_utils import is_windows
+from core.platform_utils import is_windows, read_json
 
 GLOBAL_LINTERS_FILE = os.path.join(CONFIG_DIR, "linters.json")
 
@@ -50,9 +49,8 @@ class LintersManager:
         """
         merged: Dict[str, Dict[str, Any]] = {}
         try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+            cfg = read_json(self.config_file, {})
+            if isinstance(cfg, dict):
                 section = cfg.get("linters", {})
                 if isinstance(section, dict):
                     for name, entry in section.items():
@@ -129,8 +127,9 @@ class LintersManager:
         try:
             cfg: Dict[str, Any] = {"linters": {}}
             if os.path.exists(file_to_update):
-                with open(file_to_update, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+                cfg = read_json(file_to_update, {})
+                if not isinstance(cfg, dict):
+                    cfg = {"linters": {}}
             if not isinstance(cfg.get("linters"), dict):
                 cfg["linters"] = {}
 

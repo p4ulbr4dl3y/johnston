@@ -54,7 +54,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("app.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
                 app.trigger_ai_response = MagicMock()
@@ -65,7 +65,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("app.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
                 app.trigger_ai_response = MagicMock()
@@ -76,7 +76,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("app.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = True
                 app._queue_message_ui = MagicMock()
@@ -87,7 +87,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("app.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
                 mock_h.side_effect = Exception("boom")
                 await app._exec_slash_command("/help")
             app.notify.assert_called_once()
@@ -137,7 +137,7 @@ class TestChatInputSubmitted(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             with patch(
-                "app.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 event = MagicMock()
                 event.value = "/help"

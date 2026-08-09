@@ -37,7 +37,6 @@ from core.app_mixins.actions import ActionsMixin
 from core.app_mixins.lifecycle import LifecycleMixin
 from core.app_mixins.message_flow import MessageFlowMixin
 from core.app_mixins.session_persistence import SessionPersistenceMixin
-from core.commands import handle_slash_command  # noqa: F401  (re-exported for tests patching app.handle_slash_command)
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionStore
 

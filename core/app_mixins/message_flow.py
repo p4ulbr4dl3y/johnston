@@ -1,12 +1,16 @@
 import asyncio
+import logging
 import math
 import time
 
 from textual import events, work
 
+from core.commands import handle_slash_command
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 from widgets.status_footer import StatusFooter
+
+logger = logging.getLogger(__name__)
 
 
 class MessageFlowMixin:
@@ -23,7 +27,6 @@ class MessageFlowMixin:
 
     async def _exec_slash_command(self, user_text: str) -> None:
         try:
-            from app import handle_slash_command  # noqa: PLC0415
             processed = await handle_slash_command(self, user_text)
             if not processed:
                 if user_text.startswith("/") and len(user_text.split()) == 1:
@@ -91,7 +94,7 @@ class MessageFlowMixin:
                     from core.git_checkpoint import GitCheckpointManager
                     await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
         except Exception as e:
-            print(f"Git checkpoint creation failed: {e}")
+            logger.warning("Git checkpoint creation failed: %s", e)
 
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:

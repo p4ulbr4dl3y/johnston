@@ -5,12 +5,15 @@ Handles global (~/.johnston/mcp.json) and project (.johnston/mcp.json) MCP serve
 import asyncio
 import atexit
 import json
+import logging
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
 from core.mcp_manager.process_client import MCPProcessClient
+
+logger = logging.getLogger(__name__)
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
 PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
@@ -129,7 +132,7 @@ class MCPManager:
             from core.platform_utils import atomic_write_json
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
-            print(f"Failed to update config for MCP server {name}: {e}")
+            logger.warning("Failed to update config for MCP server %s: %s", name, e)
 
         return target
 

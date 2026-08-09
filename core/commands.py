@@ -1,5 +1,5 @@
-
 import asyncio
+import logging
 import os
 from typing import Any, Optional
 
@@ -18,6 +18,8 @@ from widgets.modal_screens import (
     TasksListScreen,
     ThinkingEffortScreen,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class BaseCommand:
@@ -301,7 +303,7 @@ class RewindCommand(BaseCommand):
                             await asyncio.to_thread(GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path)
                             await asyncio.to_thread(GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path)
                         except Exception as e:
-                            print(f"Git checkpoint restore failed: {e}")
+                            logger.warning("Git checkpoint restore failed: %s", e)
                     asyncio.create_task(_restore_git_bg())
 
                 app.refresh_status_footer()
