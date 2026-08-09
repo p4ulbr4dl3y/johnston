@@ -5,8 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.PROJECTS_DIR", "/dummy"):
-    from core.session_manager import SessionStore
+from core.session_manager import SessionStore
 
 
 def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore:
@@ -41,6 +40,51 @@ class TestSessionManager(unittest.TestCase):
         loaded = self.store.get(sid)
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded.messages[0]["text"], "hello")
+
+    def test_normalize_messages_legacy_to_canonical(self):
+        from core.session_manager import normalize_messages
+        raw = [
+            {"type": "user", "text": "hi"},
+            {"type": "thinking_start", "val1": "Thinking..."},
+            {"type": "thinking_delta", "val1": "Thinking... deep"},
+            {"type": "thinking_end", "duration": 1.0, "content": "Thought"},
+            {"type": "tool", "tool_type": "read", "target": "x", "args": {}},
+            {"type": "tool_result", "result_text": "ok"},
+            {"type": "bot_chunk", "text": "Hel"},
+            {"type": "bot_text", "text": "Hello world"},
+            {"type": "status_change", "status": "completed"},
+        ]
+        out = normalize_messages(raw)
+        self.assertEqual(out[0], {"type": "user", "text": "hi"})
+        self.assertEqual(out[1], {"type": "thinking", "text": "Thought", "duration": 1.0})
+        self.assertEqual(out[2], {"type": "tool", "tool_type": "read", "target": "x", "args": {}, "result_text": "ok"})
+        self.assertEqual(out[3], {"type": "bot", "text": "Hello world", "final": True})
+        self.assertEqual(out[4], {"type": "status_change", "status": "completed"})
+
+    def test_normalize_messages_canonical_passthrough(self):
+        from core.session_manager import normalize_messages
+        raw = [
+            {"type": "user", "text": "hi"},
+            {"type": "thinking", "text": "t", "duration": 2.0},
+            {"type": "tool", "tool_type": "read", "target": "x", "result_text": "ok"},
+            {"type": "bot", "text": "answer", "final": True},
+            {"type": "compaction_divider", "text": "Session Compacted"},
+        ]
+        self.assertEqual(normalize_messages(raw), raw)
+
+    def test_from_dict_normalizes_legacy_messages(self):
+        sess = self.store.create_subagent(parent_id="main", subagent_id="legacy-1", role="worker")
+        sess.messages = [
+            {"type": "thinking_start", "val1": "Thinking..."},
+            {"type": "thinking_end", "duration": 0.5, "content": "Done"},
+            {"type": "bot_chunk", "text": "hi"},
+            {"type": "bot_text", "text": "hello"},
+        ]
+        self.store.save(sess)
+        self.store._sessions.clear()
+        loaded = self.store.get("legacy-1")
+        self.assertEqual(loaded.messages[0], {"type": "thinking", "text": "Done", "duration": 0.5})
+        self.assertEqual(loaded.messages[1], {"type": "bot", "text": "hello", "final": True})
 
     def test_list_main_sessions(self):
         sid1 = self.store.generate_session_id()

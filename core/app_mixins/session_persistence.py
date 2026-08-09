@@ -43,7 +43,7 @@ class SessionPersistenceMixin:
                         if mtype == "user":
                             text = msg.get("text", "")
                             await chat_view.add_user_message(text, animate=False)
-                        elif mtype in ("bot", "bot_text", "bot_delta"):
+                        elif mtype == "bot":
                             text = msg.get("text", "")
                             bm = await chat_view.add_bot_message(animate=False)
                             await bm.set_final_content(text)
@@ -52,23 +52,12 @@ class SessionPersistenceMixin:
                             txt = msg.get("text", "")
                             tw = await chat_view.add_thinking_widget(animate=False)
                             tw.finish_thinking(dur, txt)
-                        elif mtype in ("thinking_start", "thinking_delta", "thinking_end"):
-                            txt = msg.get("text", "") or msg.get("val1", "") or msg.get("content", "")
-                            tw = await chat_view.add_thinking_widget(animate=False)
-                            tw.finish_thinking(msg.get("duration", 0.0), txt)
                         elif mtype == "tool":
                             ttype = msg.get("tool_type", "")
                             target = msg.get("target", "")
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
                             await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
-                        elif mtype == "tool_result":
-                            rtext = msg.get("result_text", "")
-                            if chat_view.children:
-                                for child in reversed(chat_view.children):
-                                    if isinstance(child, ToolCallWidget):
-                                        child.set_result(rtext)
-                                        break
                         elif mtype == "compaction_divider":
                             ctxt = msg.get("text", "Session Compacted")
                             await chat_view.add_compaction_divider(ctxt, animate=False)

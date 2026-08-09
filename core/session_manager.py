@@ -18,6 +18,54 @@ def _now() -> float:
     return time.time()
 
 
+def normalize_messages(messages: Optional[List[Any]]) -> List[Dict[str, Any]]:
+    """Normalize legacy subagent event logs into the canonical message format.
+
+    Canonical types shared with main session snapshots:
+    - "user": {"type": "user", "text"}
+    - "bot": {"type": "bot", "text", optional "final"}
+    - "thinking": {"type": "thinking", "text", optional "duration"}
+    - "tool": {"type": "tool", "tool_type", "target", "args", optional "result_text"}
+    - "compaction_divider": {"type": "compaction_divider", "text"}
+    - "status_change": {"type": "status_change", "status", optional "error"}
+
+    Legacy stream events (thinking_start/delta/end, bot_chunk/delta/text,
+    tool_result) are coalesced into their canonical equivalents.
+    """
+    out: List[Dict[str, Any]] = []
+    for evt in messages or []:
+        if not isinstance(evt, dict):
+            out.append(evt)
+            continue
+        etype = evt.get("type", "")
+        if etype in ("bot_text", "bot_delta", "bot_chunk"):
+            if out and out[-1].get("type") == "bot":
+                out[-1]["text"] = evt.get("text", "")
+                if etype == "bot_text":
+                    out[-1]["final"] = True
+            else:
+                out.append({"type": "bot", "text": evt.get("text", "")})
+        elif etype in ("thinking_start", "thinking_delta", "thinking_end"):
+            text = evt.get("text", "") or evt.get("val1", "") or evt.get("content", "")
+            if out and out[-1].get("type") == "thinking" and "duration" not in out[-1]:
+                out[-1]["text"] = text
+                if etype == "thinking_end":
+                    out[-1]["duration"] = evt.get("duration", 0.0) or 0.0
+            else:
+                msg: Dict[str, Any] = {"type": "thinking", "text": text}
+                if etype == "thinking_end":
+                    msg["duration"] = evt.get("duration", 0.0) or 0.0
+                out.append(msg)
+        elif etype == "tool_result":
+            if out and out[-1].get("type") == "tool":
+                out[-1]["result_text"] = evt.get("result_text", "")
+            else:
+                out.append({"type": "tool", "result_text": evt.get("result_text", "")})
+        else:
+            out.append(dict(evt))
+    return out
+
+
 class AgentSession:
     """Unified session model for main chat sessions and subagent task sessions.
 
@@ -67,15 +115,34 @@ class AgentSession:
     # -- live event streaming (subagents) ---------------------------------
 
     def add_event(self, event: Dict[str, Any]) -> None:
-        """Append a stream event, coalescing consecutive bot chunks/deltas."""
+        """Append a stream event, coalescing consecutive chunks into canonical messages.
+
+        Canonical message types (shared with main session snapshots):
+        - "bot": text of a reply, coalesced (replace) across stream chunks
+        - "thinking": text + optional duration, coalesced until thinking finishes
+        - "tool": tool call, with "result_text" merged into the same message
+        """
         etype = event.get("type", "")
-        if etype in ("bot_chunk", "bot_delta", "thinking_delta") and self.messages and self.messages[-1].get("type") == etype:
+        last = self.messages[-1] if self.messages else None
+
+        if etype == "bot" and last and last.get("type") == "bot":
+            last["text"] = event.get("text", "")
+            if event.get("final"):
+                last["final"] = True
+        elif etype == "thinking" and last and last.get("type") == "thinking" and "duration" not in last:
+            last["text"] = event.get("text", "")
+            if event.get("duration") is not None:
+                last["duration"] = event["duration"]
+        elif etype == "tool" and "result_text" in event and last and last.get("type") == "tool" and "result_text" not in last:
+            last["result_text"] = event["result_text"]
+        elif etype in ("bot_chunk", "bot_delta", "thinking_delta") and last and last.get("type") == etype:
+            # Legacy coalescing for older callers writing raw stream chunks.
             new_text = event.get("text", "")
             if etype == "bot_delta":
-                self.messages[-1]["text"] = new_text
+                last["text"] = new_text
             else:
-                last_text = self.messages[-1].get("text", "")
-                self.messages[-1]["text"] = last_text + new_text
+                last_text = last.get("text", "")
+                last["text"] = last_text + new_text
         else:
             self.messages.append(event)
             self.updated_at = _now()
@@ -143,7 +210,7 @@ class AgentSession:
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )
-        sess.messages = data.get("messages", [])
+        sess.messages = normalize_messages(data.get("messages", []))
         sess.agent_history = data.get("agent_history", [])
         sess.tokens_input = data.get("tokens_input", 0) or 0
         sess.tokens_output = data.get("tokens_output", 0) or 0

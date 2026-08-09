@@ -104,7 +104,7 @@ class ManageSubagentTool(BaseTool):
                     etype = evt.get("type")
                     if etype == "user":
                         lines.append(f"  [User]: {evt.get('text')}")
-                    elif etype in ("bot_text", "bot_delta", "bot_chunk"):
+                    elif etype == "bot":
                         lines.append(f"  [Bot]: {evt.get('text')[:150]}...")
                     elif etype == "tool":
                         lines.append(f"  [Tool]: {evt.get('tool_type')} ({evt.get('target')})")
@@ -142,6 +142,14 @@ class ManageSubagentTool(BaseTool):
                     hist = session.agent_history
                     if hist:
                         subagent.history = hist
+                    # Restore role behavior (system prompt, model, tool filtering)
+                    # so follow-ups match the original spawn, even after restart.
+                    from core.subagent_tracker import apply_subagent_role
+                    apply_subagent_role(
+                        subagent,
+                        session.role,
+                        project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
+                    )
                     session.agent = subagent
 
             # Restore the isolated worktree context for follow-up so the subagent
