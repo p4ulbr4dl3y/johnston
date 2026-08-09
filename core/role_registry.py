@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR, MAX_CONCURRENT_SUBAGENTS, SUBAGENT_DEFS_DIR
 from core.defaults.subagents import DEFAULT_DEFINITIONS_DATA
+from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 
 WRITE_TOOLS = {"create", "edit", "multi_edit"}
 
@@ -277,23 +278,10 @@ class RoleRegistry:
 
         dirs.append((os.path.join(p_dir, ".johnston", "roles"), "project"))
 
-        scanned_paths = set()
-        for dpath, source in dirs:
-            if not os.path.isdir(dpath):
-                continue
-            rpath = os.path.realpath(dpath)
-            if rpath in scanned_paths:
-                continue
-            scanned_paths.add(rpath)
-
-            for fname in sorted(os.listdir(dpath)):
-                fpath = os.path.join(dpath, fname)
-                if not os.path.isfile(fpath):
-                    continue
-                if fname.endswith(".md") or fname.endswith(".markdown"):
-                    role = self._parse_md_role(fpath, source)
-                    if role:
-                        roles[role.key] = role
+        for fpath, source in iter_md_files(dirs):
+            role = self._parse_md_role(fpath, source)
+            if role:
+                roles[role.key] = role
 
         self.roles = roles
         self.definitions = roles
@@ -372,18 +360,8 @@ class RoleRegistry:
                 return None
 
             base_key = os.path.splitext(os.path.basename(fpath))[0]
-            meta = {}
-            prompt = raw
-
-            if raw.startswith("---"):
-                parts = raw.split("---", 2)
-                if len(parts) >= 3:
-                    yaml_str = parts[1].strip()
-                    prompt = parts[2].strip()
-                    for line in yaml_str.splitlines():
-                        if ":" in line:
-                            k, v = line.split(":", 1)
-                            meta[k.strip().lower()] = v.strip().strip("\"'")
+            meta, prompt = parse_frontmatter(raw)
+            prompt = prompt.strip()
 
             key = meta.get("key") or meta.get("name") or meta.get("subagent_type") or base_key
             name = meta.get("name") or key.capitalize()
@@ -392,15 +370,8 @@ class RoleRegistry:
             model = meta.get("model", "")
             scope = meta.get("scope", "any")
 
-            def _parse_list(key_name: str) -> List[str]:
-                raw_val = meta.get(key_name, "")
-                if not raw_val:
-                    return []
-                cleaned_val = raw_val.strip("[]")
-                return [v.strip() for v in cleaned_val.split(",") if v.strip()]
-
-            disallowed_tools = _parse_list("disallowed_tools")
-            allowed_tools = _parse_list("tools") or _parse_list("allowed_tools")
+            disallowed_tools = parse_csv_list(meta.get("disallowed_tools"))
+            allowed_tools = parse_csv_list(meta.get("tools")) or parse_csv_list(meta.get("allowed_tools"))
 
             return AgentRole(
                 key=key,
@@ -410,8 +381,8 @@ class RoleRegistry:
                 read_only=read_only_val,
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
-                allowed_shell_commands=_parse_list("allowed_shell_commands"),
-                workspace_allowlist=_parse_list("workspace_allowlist"),
+                allowed_shell_commands=parse_csv_list(meta.get("allowed_shell_commands")),
+                workspace_allowlist=parse_csv_list(meta.get("workspace_allowlist")),
                 model=model,
                 scope=scope,
                 source=source,
