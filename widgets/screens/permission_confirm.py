@@ -1,7 +1,5 @@
-import difflib
 import json
 import os
-import re
 from typing import Any, Dict, Optional
 
 from textual.app import ComposeResult
@@ -67,51 +65,8 @@ class PermissionConfirmScreen(ModalScreen[str]):
 
         # Generate diff for Edit tools
         if self.tool_name in ("edit", "replace_file_content", "multi_replace_file_content", "multi_edit"):
-            chunks = self.args.get("ReplacementChunks") or self.args.get("replacement_chunks") or self.args.get("edits")
-            diff_parts = []
-            if chunks and isinstance(chunks, list):
-                for chunk in chunks:
-                    if isinstance(chunk, dict):
-                        old_c = chunk.get("TargetContent") or chunk.get("target_content") or chunk.get("old_string") or chunk.get("old_str") or ""
-                        new_c = chunk.get("ReplacementContent") or chunk.get("replacement_content") or chunk.get("new_string") or chunk.get("new_str") or ""
-                        start_l = chunk.get("StartLine") or chunk.get("start_line") or 1
-                        if old_c or new_c:
-                            d_lines = list(difflib.unified_diff(
-                                old_c.splitlines(),
-                                new_c.splitlines(),
-                                fromfile=target_path or "file",
-                                tofile=target_path or "file",
-                                lineterm=""
-                            ))
-                            if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                                h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                                if h_m:
-                                    old_cnt = h_m.group(2) or "1"
-                                    new_cnt = h_m.group(4) or "1"
-                                    d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                            diff_parts.extend(d_lines)
-            else:
-                old_s = self.args.get("old_string") or self.args.get("old_str") or self.args.get("target_content") or self.args.get("TargetContent") or ""
-                new_s = self.args.get("new_string") or self.args.get("new_str") or self.args.get("replacement_content") or self.args.get("ReplacementContent") or ""
-                start_l = self.args.get("StartLine") or self.args.get("start_line") or 1
-                if old_s or new_s:
-                    d_lines = list(difflib.unified_diff(
-                        old_s.splitlines(),
-                        new_s.splitlines(),
-                        fromfile=target_path or "file",
-                        tofile=target_path or "file",
-                        lineterm=""
-                    ))
-                    if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-                        h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-                        if h_m:
-                            old_cnt = h_m.group(2) or "1"
-                            new_cnt = h_m.group(4) or "1"
-                            d_lines[2] = f"@@ -{start_l},{old_cnt} +{start_l},{new_cnt} @@"
-                    diff_parts.extend(d_lines)
-
-            if diff_parts:
-                return "\n".join(diff_parts)
+            from widgets.code_syntax import build_edit_diff_text
+            return build_edit_diff_text(self.args, target_path or "file")
 
         return ""
 
