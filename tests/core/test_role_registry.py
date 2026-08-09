@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from core.role_registry import AgentRole, RoleRegistry, mode_tool_error
+from core.role_registry import AgentRole, RoleRegistry, role_tool_error
 
 
 class TestRoleRegistry(unittest.TestCase):
@@ -74,7 +74,7 @@ You run tests and report coverage.""")
             defs = reg.list_definitions()
 
             self.assertIn("tester", defs)
-            tester = reg.get_definition("tester")
+            tester = reg.get_role("tester")
             self.assertEqual(tester.description, "Automated testing role")
             self.assertEqual(tester.allowed_tools, ["shell"])
 
@@ -93,9 +93,9 @@ You run tests and report coverage.""")
         # Edit is write tool & read_only -> blocked
         self.assertIsNotNone(role_ro.is_tool_allowed("edit"))
 
-        # Test mode_tool_error helper
-        self.assertIsNotNone(mode_tool_error(role_ro, "edit"))
-        self.assertIsNone(mode_tool_error(role_ro, "read"))
+        # Test role_tool_error helper
+        self.assertIsNotNone(role_tool_error(role_ro, "edit"))
+        self.assertIsNone(role_tool_error(role_ro, "read"))
 
     def test_alias_resolution_in_is_tool_allowed(self):
         role_ro = AgentRole(

@@ -10,8 +10,8 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         import tempfile
 
-        from core.subagent_tracker import SUBAGENTS_DIR
-        self.old_dir = SUBAGENTS_DIR
+        from core.subagent_tracker import SUBAGENT_SESSIONS_DIR
+        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()
@@ -82,8 +82,8 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         import tempfile
 
-        from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
-        self.old_dir = SUBAGENTS_DIR
+        from core.subagent_tracker import SUBAGENT_SESSIONS_DIR, SubagentTracker
+        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()

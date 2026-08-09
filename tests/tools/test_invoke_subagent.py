@@ -2,14 +2,14 @@ import tempfile
 import unittest
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
+from core.subagent_tracker import SUBAGENT_SESSIONS_DIR, SubagentTracker
 from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool, _truncate_subagent_result
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        self.old_dir = SUBAGENTS_DIR
+        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()

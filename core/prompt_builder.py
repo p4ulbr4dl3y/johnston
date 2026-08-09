@@ -230,7 +230,7 @@ class PromptBuilder:
 
     def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
-        from core.mode_manager import ModeManager
+        from core.role_registry import RoleRegistry
         from tools.registry import ALIAS_MAP
 
         mcp_mgr = get_mcp_manager()
@@ -241,7 +241,7 @@ class PromptBuilder:
 
         all_tools = list(self.base_tools) + clean_mcp_tools
 
-        mode_def = ModeManager.get_instance().get_mode(self.mode)
+        mode_def = RoleRegistry.get_instance().get_role(self.mode)
         disallowed = {t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])}
 
         def _tool_allowed(tool_item: Dict[str, Any]) -> bool:

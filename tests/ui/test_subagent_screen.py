@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from textual.app import App
 
-from core.subagent_tracker import SUBAGENTS_DIR, SubagentTracker
+from core.subagent_tracker import SUBAGENT_SESSIONS_DIR, SubagentTracker
 from widgets.screens.subagent_screen import SubagentViewScreen
 
 
@@ -29,7 +29,7 @@ class DummyHostApp(App[None]):
 class TestSubagentTrackerAndScreen(unittest.TestCase):
 
     def setUp(self):
-        self.old_dir = SUBAGENTS_DIR
+        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()
@@ -111,7 +111,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
 class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
-        self.old_dir = SUBAGENTS_DIR
+        self.old_dir = SUBAGENT_SESSIONS_DIR
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.tracker = SubagentTracker.get_instance()
