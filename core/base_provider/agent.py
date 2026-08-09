@@ -111,6 +111,41 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             "cost_usd": getattr(self, "cost_usd", 0.0)
         }
 
+    def _accumulate_usage(
+        self,
+        step_usage: Optional[Dict[str, Any]] = None,
+        prompt_tokens_est: int = 0,
+        output_tokens_est: int = 0,
+    ) -> None:
+        """Accumulates input/output/cache tokens and estimates USD cost based on model pricing."""
+        pricing = catalog.get_model_pricing(self.provider_key, self.model)
+        p_prompt = pricing.get("prompt", 0.0)
+        p_comp = pricing.get("completion", 0.0)
+
+        if step_usage and step_usage.get("total_tokens", 0) > 0:
+            in_tok = step_usage.get("prompt_tokens", 0)
+            out_tok = step_usage.get("completion_tokens", 0)
+            cache_read_tok = step_usage.get("cache_read_tokens", 0)
+            uncached_in = max(0, in_tok - cache_read_tok)
+
+            # Cached input is discounted differently per provider:
+            # Anthropic ~90% off (0.1x), OpenAI-compatible ~50% off (0.5x).
+            cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
+            cost = (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
+
+            self.tokens_input += in_tok
+            self.tokens_output += out_tok
+            self.tokens_cache_read += cache_read_tok
+            self.last_context_tokens = in_tok
+            self.total_tokens += step_usage.get("total_tokens", in_tok + out_tok)
+            self.cost_usd += cost
+        else:
+            self.tokens_input += prompt_tokens_est
+            self.tokens_output += output_tokens_est
+            self.last_context_tokens = prompt_tokens_est
+            self.total_tokens += (prompt_tokens_est + output_tokens_est)
+            self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
+
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
@@ -337,28 +372,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         circuit_breaker.record_success(pkey)
                         break
                     except asyncio.CancelledError:
-                        pricing = catalog.get_model_pricing(self.provider_key, self.model)
-                        p_prompt = pricing.get("prompt", 0.0)
-                        p_comp = pricing.get("completion", 0.0)
-
-                        if step_usage and step_usage.get("total_tokens", 0) > 0:
-                            in_tok = step_usage["prompt_tokens"]
-                            out_tok = step_usage["completion_tokens"]
-                            cache_read_tok = step_usage.get("cache_read_tokens", 0)
-                            uncached_in = max(0, in_tok - cache_read_tok)
-                            cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
-                            self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
-                        else:
-                            in_tok = prompt_tokens_est
-                            out_tok = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
-                            cache_read_tok = 0
-                            self.cost_usd += (in_tok * p_prompt + out_tok * p_comp)
-
-                        self.tokens_input += in_tok
-                        self.tokens_output += out_tok
-                        self.tokens_cache_read += cache_read_tok
-                        self.last_context_tokens = in_tok
-                        self.total_tokens += (in_tok + out_tok)
+                        output_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
+                        self._accumulate_usage(step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_est)
                         raise
                     except Exception as api_err:
                         if self._is_vision_error(api_err):
@@ -383,32 +398,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         circuit_breaker.record_failure(pkey)
                         raise api_err
 
-                pricing = catalog.get_model_pricing(self.provider_key, self.model)
-                p_prompt = pricing.get("prompt", 0.0)
-                p_comp = pricing.get("completion", 0.0)
-
-                if step_usage and step_usage.get("total_tokens", 0) > 0:
-                    in_tok = step_usage["prompt_tokens"]
-                    out_tok = step_usage["completion_tokens"]
-                    cache_read_tok = step_usage.get("cache_read_tokens", 0)
-                    uncached_in = max(0, in_tok - cache_read_tok)
-
-                    self.tokens_input += in_tok
-                    self.tokens_output += out_tok
-                    self.tokens_cache_read += cache_read_tok
-                    self.last_context_tokens = in_tok
-                    self.total_tokens += step_usage["total_tokens"]
-                    # Cached input is discounted differently per provider:
-                    # Anthropic ~90% off (0.1x), OpenAI-compatible ~50% off (0.5x).
-                    cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
-                    self.cost_usd += (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
-                else:
-                    output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
-                    self.tokens_input += prompt_tokens_est
-                    self.tokens_output += output_tokens_est
-                    self.last_context_tokens = prompt_tokens_est
-                    self.total_tokens += (prompt_tokens_est + output_tokens_est)
-                    self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
+                output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
+                self._accumulate_usage(step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_tokens_est)
 
                 if thinking_started:
                     dt = time.time() - thinking_t0

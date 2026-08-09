@@ -376,14 +376,7 @@ class CompactionMixin:
             # Account for summarizer tokens and cost in cumulative session metrics
             compact_in = estimate_tokens(compact_messages)
             compact_out = estimate_tokens(summary_text)
-            pricing = catalog.get_model_pricing(self.provider_key, self.model)
-            p_prompt = pricing.get("prompt", 0.0)
-            p_comp = pricing.get("completion", 0.0)
-
-            self.tokens_input += compact_in
-            self.tokens_output += compact_out
-            self.total_tokens += (compact_in + compact_out)
-            self.cost_usd += (compact_in * p_prompt + compact_out * p_comp)
+            self._accumulate_usage(prompt_tokens_est=compact_in, output_tokens_est=compact_out)
 
             checkpoint_content = (
                 "<conversation-checkpoint>\n"
