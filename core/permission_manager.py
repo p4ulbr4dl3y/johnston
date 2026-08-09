@@ -36,9 +36,8 @@ class PermissionManager:
         return cls._instance
 
     def get_group_for_tool(self, tool_name: str) -> Optional[str]:
-        from tools.registry import ALIAS_MAP
-        clean = (tool_name or "").strip().lower()
-        canonical = ALIAS_MAP.get(clean, clean)
+        from tools.registry import normalize_tool_name
+        canonical = normalize_tool_name(tool_name or "")
         return self.tool_to_group.get(canonical)
 
     @staticmethod
@@ -54,9 +53,8 @@ class PermissionManager:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
         normalized = self.normalize_action(action)
         if normalized in self.VALID_ACTIONS:
-            from tools.registry import ALIAS_MAP
-            clean = (tool_name or "").strip().lower()
-            canonical = ALIAS_MAP.get(clean, clean)
+            from tools.registry import normalize_tool_name
+            canonical = normalize_tool_name(tool_name or "")
             self.session_overrides[canonical] = normalized
 
     def clear_session_overrides(self) -> None:
@@ -83,8 +81,8 @@ class PermissionManager:
 
         target_name = (target_name or "").strip().lower()
         if target_type == "tool":
-            from tools.registry import ALIAS_MAP
-            target_name = ALIAS_MAP.get(target_name, target_name)
+            from tools.registry import normalize_tool_name
+            target_name = normalize_tool_name(target_name)
 
         if target_type == "shell_guard":
             if action.lower() not in ("allow", "deny", "true", "false", "enabled", "disabled"):
@@ -184,8 +182,8 @@ class PermissionManager:
         Returns (action, reason) where action is 'allow', 'ask', or 'deny'.
         """
         raw_tool = (tool_name or "").strip().lower()
-        from tools.registry import ALIAS_MAP, normalize_tool_args
-        canonical_name = ALIAS_MAP.get(raw_tool, raw_tool)
+        from tools.registry import normalize_tool_args, normalize_tool_name
+        canonical_name = normalize_tool_name(raw_tool)
         norm_args = normalize_tool_args(canonical_name, args or {})
 
         effective_perms = self.get_effective_permissions(project_dir)

@@ -1,14 +1,12 @@
 from typing import Any, Dict
 
-from tools.registry import ALIAS_MAP
-
 
 class ToolMixin:
     """Mixin providing tool-name canonicalization and runtime tool-policy checks for BaseAgent."""
 
     def _canonical_tool_name(self, tool_name: str) -> str:
-        clean_name = (tool_name or "").strip()
-        return ALIAS_MAP.get(clean_name.lower(), clean_name)
+        from tools.registry import normalize_tool_name
+        return normalize_tool_name(tool_name or "")
 
     def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
         from core.role_registry import role_tool_error

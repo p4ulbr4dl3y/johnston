@@ -52,8 +52,8 @@ class AgentRole:
             clean = clean.split(".", 1)[1]
 
         try:
-            from tools.registry import ALIAS_MAP
-            resolved = ALIAS_MAP.get(clean, clean)
+            from tools.registry import normalize_tool_name
+            resolved = normalize_tool_name(clean)
         except Exception:
             resolved = clean
 
@@ -84,8 +84,8 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
     if clean.startswith("functions."):
         clean = clean.split(".", 1)[1]
     try:
-        from tools.registry import ALIAS_MAP
-        resolved = ALIAS_MAP.get(clean, clean)
+        from tools.registry import normalize_tool_name
+        resolved = normalize_tool_name(clean)
     except Exception:
         resolved = clean
 
