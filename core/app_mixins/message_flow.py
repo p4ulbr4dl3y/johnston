@@ -79,6 +79,20 @@ class MessageFlowMixin:
             kwargs = {"attachments": attachments} if attachments else {}
             self.generate_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
+    async def _create_git_checkpoint_async(self, chat_view) -> None:
+        try:
+            await self.save_current_session_async()
+            curr_sid = getattr(self, "current_session_id", None)
+            if curr_sid:
+                user_msgs = chat_view.get_user_messages()
+                msg_idx = len(user_msgs) - 1
+                if msg_idx >= 0:
+                    proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
+                    from core.git_checkpoint import GitCheckpointManager
+                    await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
+        except Exception as e:
+            print(f"Git checkpoint creation failed: {e}")
+
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
@@ -102,18 +116,7 @@ class MessageFlowMixin:
 
         bot_msg = None
 
-        await self.save_current_session_async()
-        curr_sid = getattr(self, "current_session_id", None)
-        if curr_sid:
-            user_msgs = chat_view.get_user_messages()
-            msg_idx = len(user_msgs) - 1
-            if msg_idx >= 0:
-                try:
-                    proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
-                    from core.git_checkpoint import GitCheckpointManager
-                    await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
-                except Exception as e:
-                    print(f"Git checkpoint creation failed: {e}")
+        await self._create_git_checkpoint_async(chat_view)
 
         full_prompt = user_text
 
@@ -172,18 +175,7 @@ class MessageFlowMixin:
                     q_show = val3 if val3 is not None else True
                     if q_show:
                         await chat_view.add_user_message(q_msg, attachments=q_atts)
-                    try:
-                        await self.save_current_session_async()
-                        curr_sid = getattr(self, "current_session_id", None)
-                        if curr_sid:
-                            user_msgs = chat_view.get_user_messages()
-                            msg_idx = len(user_msgs) - 1
-                            if msg_idx >= 0:
-                                proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
-                                from core.git_checkpoint import GitCheckpointManager
-                                await asyncio.to_thread(GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path)
-                    except Exception as e:
-                        print(f"Error handling queued_user_message checkpoint: {e}")
+                    await self._create_git_checkpoint_async(chat_view)
                 elif event_type in ("bot_chunk", "bot_delta"):
                     if val1.strip():
                         if bot_msg is None:

@@ -146,6 +146,27 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             self.total_tokens += (prompt_tokens_est + output_tokens_est)
             self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
 
+    @staticmethod
+    async def _process_attachment_image(att_path: str, error_prefix: str = "Error processing attachment image") -> Optional[Dict[str, Any]]:
+        try:
+            from tools.read import process_image_file_sync
+            img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
+            img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
+            if isinstance(img_dict, dict) and img_dict.get("base64"):
+                media_type = img_dict.get("media_type", "image/jpeg")
+                b64_data = img_dict.get("base64")
+                detail_val = img_dict.get("detail", "high")
+                return {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{media_type};base64,{b64_data}",
+                        "detail": detail_val
+                    }
+                }
+        except Exception as e:
+            print(f"{error_prefix}: {e}")
+        return None
+
     async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
@@ -187,23 +208,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             user_content: List[Dict[str, Any]] = [{"type": "text", "text": user_text}]
             for idx, att in enumerate(attachments):
                 att_path = getattr(att, "path", str(att))
-                try:
-                    from tools.read import process_image_file_sync
-                    img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
-                    img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
-                    if isinstance(img_dict, dict) and img_dict.get("base64"):
-                        media_type = img_dict.get("media_type", "image/jpeg")
-                        b64_data = img_dict.get("base64")
-                        detail_val = img_dict.get("detail", "high")
-                        user_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{media_type};base64,{b64_data}",
-                                "detail": detail_val
-                            }
-                        })
-                except Exception as e:
-                    print(f"Error processing attachment image: {e}")
+                img_item = await self._process_attachment_image(att_path)
+                if img_item:
+                    user_content.append(img_item)
             messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
         else:
             messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
@@ -524,23 +531,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         if q_atts:
                             for att in q_atts:
                                 att_path = getattr(att, "path", str(att))
-                                try:
-                                    from tools.read import process_image_file_sync
-                                    img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
-                                    img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
-                                    if isinstance(img_dict, dict) and img_dict.get("base64"):
-                                        media_type = img_dict.get("media_type", "image/jpeg")
-                                        b64_data = img_dict.get("base64")
-                                        detail_val = img_dict.get("detail", "high")
-                                        user_content.append({
-                                            "type": "image_url",
-                                            "image_url": {
-                                                "url": f"data:{media_type};base64,{b64_data}",
-                                                "detail": detail_val
-                                            }
-                                        })
-                                except Exception as e:
-                                    print(f"Error processing mid-generation attachment image: {e}")
+                                img_item = await self._process_attachment_image(
+                                    att_path, error_prefix="Error processing mid-generation attachment image"
+                                )
+                                if img_item:
+                                    user_content.append(img_item)
 
                         yield ("queued_user_message", q_msg, q_atts, q_show)
 

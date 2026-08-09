@@ -135,14 +135,6 @@ class ActionsMixin:
     def on_select_changed(self, event: Select.Changed) -> None:
         """Switch agent provider from ~/.johnston config"""
         if event.value and isinstance(event.value, str) and event.value != "none":
-            current_mode = getattr(self, "mode", getattr(self.agent, "mode", "act"))
-            self.pm.set_active_provider_key(event.value)
-            self.agent = self.pm.create_active_agent()
-            self.agent.mode = current_mode
-            self.agent.app = self
-            self.mode = current_mode
-            if hasattr(self.agent, "history"):
-                sess = self.sm.load_session(self.current_session_id)
-                if sess:
-                    self.agent.history = sess.get("agent_history", [])
-            self.refresh_status_footer()
+            sess = self.sm.load_session(self.current_session_id)
+            history = sess.get("agent_history", []) if sess else None
+            self.pm.recreate_active_agent(self, provider_key=event.value, history=history)
