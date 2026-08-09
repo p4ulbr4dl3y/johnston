@@ -158,7 +158,7 @@ async def run_subagent_stream_bg(
     cleanup_fn: Optional[Callable[[list], None]] = None,
     error_prefix: str = "Subagent error",
     notification_template: str = "",
-    task_id: Optional[str] = None,
+    session_id: Optional[str] = None,
     truncate_result: bool = False,
 ) -> str:
     """Executes a subagent step stream in background with error handling, session finish, cleanup, and UI notifications."""
@@ -180,23 +180,23 @@ async def run_subagent_stream_bg(
         if cleanup_fn:
             cleanup_fn(acc)
         merge_subagent_metrics(subagent, ctx)
-        if task_id and ctx.background_tasks:
+        if session_id and ctx.background_tasks:
             for t in ctx.background_tasks:
-                if getattr(t, "task_id", "") == task_id:
+                if getattr(t, "kind", "") == "subagent" and getattr(t, "id", "") == session_id:
                     t.is_running = False
 
         ctx.refresh_status()
 
         if notification_template:
-            tid = task_id or session.id
+            sid = session_id or session.id
             if truncate_result:
                 from tools.invoke_subagent import _truncate_subagent_result
-                result_text = _truncate_subagent_result(acc[0], tid) or "Completed with no text output."
+                result_text = _truncate_subagent_result(acc[0], sid) or "Completed with no text output."
             else:
                 result_text = acc[0].strip() or "Completed with no text output."
 
             msg = notification_template.format(
-                task_id=tid,
+                session_id=sid,
                 result_text=result_text,
                 description=session.description,
             )

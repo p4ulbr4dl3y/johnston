@@ -1386,7 +1386,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         render_mock.assert_not_called()
 
     def test_on_click_invoke_subagent_pushes_screen(self):
-        widget = self._widget("invoke_subagent", "prompt", args={"task_id": "abc"})
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         with patch("widgets.screens.subagent_screen.SubagentViewScreen") as screen_cls, patch.object(
             ToolCallWidget, "app", new_callable=PropertyMock
@@ -1407,7 +1407,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         event.stop.assert_called_once()
 
     def test_on_click_exception_is_suppressed(self):
-        widget = self._widget("invoke_subagent", "prompt", args={"task_id": "abc"})
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         with patch("widgets.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")), patch.object(
             ToolCallWidget, "app", new_callable=PropertyMock

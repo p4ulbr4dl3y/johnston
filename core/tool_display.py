@@ -52,7 +52,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
 
     if name in ("manage_task", "manage_subagent"):
         act = args.get("action") or ""
-        tid = args.get("task_id") or args.get("subagent_id") or ""
+        tid = args.get("session_id") or args.get("task_id") or ""
         if act and tid:
             return _truncate(f"{act} {tid}")
         if tid:

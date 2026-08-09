@@ -17,8 +17,8 @@ class SubagentWorktreeManager:
         return res.returncode == 0 and res.stdout.strip() == "true"
 
     @staticmethod
-    def create_worktree(project_dir: str, task_id: str) -> Tuple[Optional[str], Optional[str]]:
-        """Creates an isolated git worktree and branch for subagent task_id.
+    def create_worktree(project_dir: str, session_id: str) -> Tuple[Optional[str], Optional[str]]:
+        """Creates an isolated git worktree and branch for subagent session_id.
 
         Returns (worktree_path, branch_name) on success, or (None, None) if unavailable.
         """
@@ -28,10 +28,10 @@ class SubagentWorktreeManager:
         base_worktree_dir = WORKTREES_DIR
         os.makedirs(base_worktree_dir, exist_ok=True)
 
-        wt_path = os.path.join(base_worktree_dir, task_id)
-        branch_name = task_id if task_id.startswith("subagent-") else f"subagent-{task_id}"
+        wt_path = os.path.join(base_worktree_dir, session_id)
+        branch_name = session_id if session_id.startswith("subagent-") else f"subagent-{session_id}"
 
-        # Clean up any leftover worktree or branch with same task_id
+        # Clean up any leftover worktree or branch with same session_id
         SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
 
         res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=15)
@@ -41,7 +41,7 @@ class SubagentWorktreeManager:
         return None, None
 
     @staticmethod
-    def attach_worktree(project_dir: str, task_id: str, branch_name: str) -> Optional[str]:
+    def attach_worktree(project_dir: str, session_id: str, branch_name: str) -> Optional[str]:
         """Re-attaches a worktree directory to an existing subagent branch for follow-up execution."""
         if not SubagentWorktreeManager.is_git_repo(project_dir) or not branch_name:
             return None
@@ -49,7 +49,7 @@ class SubagentWorktreeManager:
         base_worktree_dir = WORKTREES_DIR
         os.makedirs(base_worktree_dir, exist_ok=True)
 
-        wt_path = os.path.join(base_worktree_dir, task_id)
+        wt_path = os.path.join(base_worktree_dir, session_id)
         if os.path.exists(wt_path):
             return wt_path
 

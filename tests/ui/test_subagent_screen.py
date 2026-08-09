@@ -125,7 +125,7 @@ class TestSubagentTrackerAndScreen(unittest.TestCase):
         screen = SubagentViewScreen("task-789")
         screen.session = store.find_session_by_description_or_id("task-789")
         self.assertEqual(screen.session, sess)
-        self.assertEqual(screen.task_id_or_desc, "task-789")
+        self.assertEqual(screen.session_id_or_desc, "task-789")
         self.assertFalse(screen.ALLOW_SELECT)
 
     def test_session_persistence(self):

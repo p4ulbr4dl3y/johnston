@@ -39,10 +39,17 @@ class TestToolSchemas(unittest.TestCase):
         )
         self.assertIn("action", params["required"])
 
-    def test_subagent_schema_has_task_id(self):
+    def test_subagent_schema_has_session_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
-        self.assertIn("task_id", props)
+        self.assertIn("session_id", props)
+        self.assertNotIn("task_id", props)
+
+    def test_manage_subagent_schema_has_session_id(self):
+        from tools.manage_subagent import ManageSubagentTool
+        props = ManageSubagentTool.schema["function"]["parameters"]["properties"]
+        self.assertIn("session_id", props)
+        self.assertNotIn("task_id", props)
 
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):

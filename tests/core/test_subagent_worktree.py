@@ -31,13 +31,13 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         self.assertFalse(SubagentWorktreeManager.is_git_repo("/non/existent/path"))
 
     def test_create_and_cleanup_worktree_with_changes(self):
-        task_id = "test-wt-12345"
-        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+        session_id = "test-wt-12345"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id)
 
         self.assertIsNotNone(wt_path)
         self.assertIsNotNone(branch_name)
         self.assertTrue(os.path.exists(wt_path))
-        self.assertEqual(branch_name, f"subagent-{task_id}")
+        self.assertEqual(branch_name, f"subagent-{session_id}")
 
         # Modify file inside worktree
         wt_file = os.path.join(wt_path, "README.md")
@@ -60,8 +60,8 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         subprocess.run(["git", "branch", "-D", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
 
     def test_cleanup_worktree_no_changes_deletes_branch(self):
-        task_id = "test-wt-no-changes"
-        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+        session_id = "test-wt-no-changes"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id)
 
         diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
         self.assertFalse(has_changes)
@@ -76,8 +76,8 @@ class TestSubagentWorktreeManager(unittest.TestCase):
 
     def test_worktree_manual_commits_by_subagent_detected(self):
         """Verify that if subagent manually runs git commit (leaving git status empty), get_worktree_diff_summary still detects changes against base commit."""
-        task_id = "manual-commit-task"
-        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+        session_id = "manual-commit-task"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id)
 
         # Subagent manually creates file and commits
         manual_file = os.path.join(wt_path, "manual.txt")
@@ -103,8 +103,8 @@ class TestSubagentWorktreeManager(unittest.TestCase):
 
     def test_worktree_branch_git_merge_integration(self):
         """Full end-to-end verification: create worktree, write files, remove worktree, git merge branch."""
-        task_id = "e2e-merge-task"
-        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, task_id)
+        session_id = "e2e-merge-task"
+        wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id)
 
         # Subagent creates new file and edits existing file inside worktree
         new_file = os.path.join(wt_path, "feature.py")

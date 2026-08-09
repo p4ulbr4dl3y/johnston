@@ -26,9 +26,9 @@ class ManageSubagentTool(BaseTool):
                         "enum": ["list", "status", "kill", "send_message"],
                         "description": "Action type"
                     },
-                    "task_id": {
+                    "session_id": {
                         "type": "string",
-                        "description": "Target subagent task_id or description"
+                        "description": "Target subagent session_id or description"
                     },
                     "message": {
                         "type": "string",
@@ -52,7 +52,7 @@ class ManageSubagentTool(BaseTool):
     async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
         ctx = self._ensure_context(app)
         action = (args.get("action") or "").strip().lower()
-        task_id = (args.get("task_id") or "").strip()
+        session_id = (args.get("session_id") or "").strip()
         message = (args.get("message") or "").strip()
 
         store = self._get_store(ctx.app)
@@ -82,12 +82,12 @@ class ManageSubagentTool(BaseTool):
                     )
             return "\n".join(lines)
 
-        if not task_id:
-            return "ERR: 'task_id' required for '" + action + "'"
+        if not session_id:
+            return "ERR: 'session_id' required for '" + action + "'"
 
-        session = store.find_session_by_description_or_id(task_id, parent_id=curr_session_id)
+        session = store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
         if not session:
-            return f"ERR: session '{task_id}' not found"
+            return f"ERR: session '{session_id}' not found"
 
         if action == "status":
             lines = [
@@ -201,7 +201,7 @@ class ManageSubagentTool(BaseTool):
                         cleanup_fn=_cleanup_followup,
                         error_prefix="Subagent message error",
                         notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>",
-                        task_id=session.id,
+                        session_id=session.id,
                         truncate_result=False,
                     )
                 )
