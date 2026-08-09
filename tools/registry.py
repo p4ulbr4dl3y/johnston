@@ -31,243 +31,7 @@ TOOL_CLASSES = [
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLASSES}
 
-ALIAS_MAP: Dict[str, str] = {
-    "write": "create",
-    "write_file": "create",
-    "create_file": "create",
-    "save_file": "create",
-    "write_to_file": "create",
-    "touch": "create",
-    "read_file": "read",
-    "view_file": "read",
-    "cat": "read",
-    "read_file_content": "read",
-    "edit_file": "edit",
-    "replace_file_content": "edit",
-    "multi_replace_file_content": "edit",
-    "update_file": "edit",
-    "modify_file": "edit",
-    "str_replace_editor": "edit",
-    "replace": "edit",
-    "multi_replace": "edit",
-    "patch": "edit",
-    "apply_patch": "edit",
-    "subagent": "invoke_subagent",
-    "spawn_subagent": "invoke_subagent",
-    "run_subagent": "invoke_subagent",
-    "delegate": "invoke_subagent",
-    "spawn": "invoke_subagent",
-    "run_agent": "invoke_subagent",
-    "call_mcp_tool": "call_mcp",
-    "mcp": "call_mcp",
-    "execute_mcp": "call_mcp",
-    "terminal": "shell",
-    "exec": "shell",
-    "run_command": "shell",
-    "bash": "shell",
-    "cmd": "shell",
-    "run": "shell",
-    "ask": "ask_user",
-    "ask_question": "ask_user",
-    "plan": "update_plan",
-    "set_plan": "update_plan",
-    "fetch": "web_fetch",
-    "fetch_url": "web_fetch",
-    "browse": "web_fetch",
-    "get": "web_fetch",
-    "curl": "web_fetch",
-    "subagents": "manage_subagent",
-    "kill_subagent": "manage_subagent",
-    "shells": "manage_shell",
-    "processes": "manage_shell",
-    "manage_processes": "manage_shell",
-    "bg_processes": "manage_shell",
-}
-
-
-PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
-    "shell": {
-        "cmd": "command",
-        "script": "command",
-        "command_line": "command",
-        "exec": "command",
-        "time_limit": "timeout",
-        "max_seconds": "timeout",
-        "timeout_seconds": "timeout",
-        "background": "run_in_background",
-        "async": "run_in_background",
-        "is_async": "run_in_background",
-        "bg": "run_in_background",
-        "skip_confirmation": "skip_confirm",
-    },
-    "read": {
-        "file_path": "path",
-        "filepath": "path",
-        "file": "path",
-        "filename": "path",
-        "target_file": "path",
-        "uri": "path",
-        "url": "path",
-        "start": "start_line",
-        "startLine": "start_line",
-        "from_line": "start_line",
-        "line_start": "start_line",
-        "end": "end_line",
-        "endLine": "end_line",
-        "to_line": "end_line",
-        "line_end": "end_line",
-        "last_line": "end_line",
-        "offset": "content_offset",
-        "contentOffset": "content_offset",
-        "detail_level": "detail",
-        "image_detail": "detail",
-    },
-    "create": {
-        "path": "target_file",
-        "file_path": "target_file",
-        "filepath": "target_file",
-        "file": "target_file",
-        "filename": "target_file",
-        "destination": "target_file",
-        "content": "code",
-        "text": "code",
-        "contents": "code",
-        "file_content": "code",
-        "file_contents": "code",
-        "body": "code",
-        "data": "code",
-        "summary": "description",
-        "desc": "description",
-        "reason": "description",
-    },
-    "edit": {
-        "path": "target_file",
-        "target_file": "target_file",
-        "TargetFile": "target_file",
-        "file_path": "target_file",
-        "filepath": "target_file",
-        "file": "target_file",
-        "filename": "target_file",
-        "target_content": "old_str",
-        "TargetContent": "old_str",
-        "old_str": "old_str",
-        "old_content": "old_str",
-        "old_string": "old_str",
-        "search": "old_str",
-        "oldStr": "old_str",
-        "old": "old_str",
-        "replacement_content": "new_str",
-        "ReplacementContent": "new_str",
-        "new_str": "new_str",
-        "new_content": "new_str",
-        "new_string": "new_str",
-        "replace": "new_str",
-        "newStr": "new_str",
-        "new": "new_str",
-        "start_line": "start_line",
-        "StartLine": "start_line",
-        "start": "start_line",
-        "end_line": "end_line",
-        "EndLine": "end_line",
-        "end": "end_line",
-        "allow_multiple": "allow_multiple",
-        "multiple": "allow_multiple",
-        "desc": "description",
-        "prompt": "instruction",
-        "replacement_chunks": "edits",
-        "ReplacementChunks": "edits",
-        "chunks": "edits",
-        "changes": "edits",
-        "replacements": "edits",
-    },
-    "multi_edit": {
-        "path": "target_file",
-        "target_file": "target_file",
-        "TargetFile": "target_file",
-        "file_path": "target_file",
-        "filepath": "target_file",
-        "file": "target_file",
-        "replacement_chunks": "edits",
-        "ReplacementChunks": "edits",
-        "chunks": "edits",
-        "changes": "edits",
-        "replacements": "edits",
-        "start_line": "start_line",
-        "end_line": "end_line",
-        "allow_multiple": "allow_multiple",
-    },
-    "web_fetch": {
-        "uri": "url",
-        "link": "url",
-        "path": "url",
-        "address": "url",
-        "page_url": "url",
-        "as_raw": "raw",
-    },
-    "ask_user": {
-        "question_list": "questions",
-        "all_questions": "questions",
-        "qs": "questions",
-    },
-    "update_plan": {
-        "steps": "plan",
-        "tasks": "plan",
-        "items": "plan",
-        "todo": "plan",
-        "note": "explanation",
-    },
-    "invoke_subagent": {
-        "type": "subagent_type",
-        "subagent": "subagent_type",
-        "name": "subagent_type",
-        "agent_type": "subagent_type",
-        "agent": "subagent_type",
-        "role": "subagent_type",
-        "instructions": "prompt",
-        "task": "prompt",
-        "goal": "prompt",
-        "message": "prompt",
-        "mode": "workspace",
-        "task_id": "session_id",
-        "taskId": "session_id",
-        "subagent_id": "session_id",
-        "id": "session_id",
-    },
-    "manage_subagent": {
-        "cmd": "action",
-        "command": "action",
-        "task_id": "session_id",
-        "taskId": "session_id",
-        "subagent_id": "session_id",
-        "id": "session_id",
-        "ids": "session_id",
-        "subagent_ids": "session_id",
-        "msg": "message",
-        "async": "background",
-        "run_async": "background",
-        "show_all": "all",
-    },
-    "manage_shell": {
-        "cmd": "action",
-        "command": "action",
-        "id": "task_id",
-        "taskId": "task_id",
-        "text": "input",
-        "stdin": "input",
-        "data": "input",
-        "message": "input",
-    },
-    "call_mcp": {
-        "server_name": "server",
-        "mcp_server": "server",
-        "tool_name": "tool",
-        "mcp_tool": "tool",
-        "args": "arguments",
-        "params": "arguments",
-        "parameters": "arguments",
-        "input": "arguments",
-    },
-}
+from tools.aliases import ALIAS_MAP, PARAM_ALIAS_MAP  # noqa: E402  (re-export for downstream imports)
 
 
 def normalize_tool_name(name: str) -> str:
@@ -348,6 +112,52 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
 def get_default_tools() -> list[Dict[str, Any]]:
     return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
 
+async def prompt_permission_confirmation(
+    app_obj: Any,
+    screen_name: str,
+    args: Dict[str, Any],
+    reason: str,
+    perm_name: str | None = None,
+) -> bool:
+    """Shows the PermissionConfirmScreen and applies session overrides for confirmed tools.
+
+    Returns True if the user granted access ('allow' or 'always_allow'), False otherwise.
+    Handles the 'always_allow' result by setting the corresponding session override(s).
+    Supports both `push_screen_wait` (async) and `push_screen` + callback (sync-style) hosts.
+    """
+    from core.permission_manager import PermissionManager
+    from widgets.screens.permission_confirm import PermissionConfirmScreen
+    pm = PermissionManager.get_instance()
+    screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
+
+    result = None
+    if hasattr(app_obj, "push_screen_wait"):
+        try:
+            result = await app_obj.push_screen_wait(screen)
+        except TypeError:
+            # Host only exposes push_screen (e.g. MagicMock in tests)
+            result = None
+
+    if result is None:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def on_dismiss(r: Any) -> None:
+            if not future.done():
+                future.set_result(r)
+
+        app_obj.push_screen(screen, callback=on_dismiss)
+        result = await future
+
+    if result == "always_allow":
+        if perm_name:
+            pm.set_session_override(perm_name, "allow")
+        if perm_name == "shell":
+            pm.set_session_override("shell_guard", "allow")
+    return result in ("allow", "always_allow")
+
+
 async def check_and_confirm_permission(
     target_perm_name: str,
     display_name: str,
@@ -376,15 +186,11 @@ async def check_and_confirm_permission(
         return format_tool_error("denied", name=display_name, detail="by permission policy")
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
-            from widgets.screens.permission_confirm import PermissionConfirmScreen
             screen_name = confirm_tool_name or target_perm_name
-            screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
-            res = await app_obj.push_screen_wait(screen)
-            if res == "always_allow":
-                pm.set_session_override(target_perm_name, "allow")
-                if target_perm_name == "shell":
-                    pm.set_session_override("shell_guard", "allow")
-            elif res != "allow":
+            confirmed = await prompt_permission_confirmation(
+                app_obj, screen_name, args, reason, perm_name=target_perm_name
+            )
+            if not confirmed:
                 return format_tool_error("denied", name=display_name, detail="by user")
         else:
             return format_tool_error("denied", name=display_name, detail=f"requires user confirmation ({reason})")

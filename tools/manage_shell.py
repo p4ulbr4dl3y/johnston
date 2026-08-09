@@ -22,8 +22,8 @@ class ManageShellTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        ctx = self._ensure_context(ctx)
         action = args.get("action", "list").lower()
         task_id = args.get("task_id", "").strip()
 

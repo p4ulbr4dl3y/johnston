@@ -114,7 +114,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     async def test_send_message_no_message(self):
         tool = ManageSubagentTool()
         self._mk_subagent("sub-sm1")
-        res = await tool.execute({"action": "send_message", "session_id": "sub-sm1"}, app=MagicMock())
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm1"}, ctx=MagicMock())
         self.assertIn("ERR: params 'message': required", res)
 
     async def test_send_message_no_session_id(self):
@@ -135,7 +135,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = None
-        res = await tool.execute({"action": "send_message", "session_id": "sub-sm2", "message": "hi"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm2", "message": "hi"}, ctx=mock_app)
         self.assertIn("ERR: context 'sub-sm2': no active agent", res)
 
     async def test_send_message_sync_success(self):
@@ -177,7 +177,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.sm = self.store
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
-        res = await tool.execute({"action": "send_message", "session_id": "sub-sm3", "message": "hello"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-sm3", "message": "hello"}, ctx=mock_app)
         self.assertIn("<task_result>", res)
         self.assertIn("Subagent reply text", res)
         self.assertIsNotNone(sess.agent)
@@ -229,7 +229,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
 
-        res = await tool.execute({"action": "send_message", "session_id": "sub-bg", "message": "hello bg"}, app=mock_app)
+        res = await tool.execute({"action": "send_message", "session_id": "sub-bg", "message": "hello bg"}, ctx=mock_app)
         self.assertIn("message sent to sub-bg", res)
 
     async def test_status_and_kill_missing_session_id(self):

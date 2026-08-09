@@ -57,8 +57,8 @@ class AskUserTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        ctx = self._ensure_context(ctx)
         questions_list = args.get("questions")
 
         # Fallback: a single question passed as {question|question_text, options/choices}.

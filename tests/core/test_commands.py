@@ -326,6 +326,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
             def create_active_agent(self):
                 return MockAgent(mode="action")
 
+            def recreate_active_agent(self, app, provider_key=None):
+                if provider_key:
+                    self.set_active_provider_key(provider_key)
+                app.agent = MockAgent(mode=app.mode)
+                app.agent.app = app
+
         app = MockApp(agent=MockAgent(mode="explore"))
         app.mode = "explore"
         app.pm = MockPM()
@@ -373,6 +379,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
             def create_active_agent(self):
                 return MockAgent(mode="action")
+
+            def recreate_active_agent(self, app, provider_key=None):
+                if provider_key:
+                    self.set_active_provider_key(provider_key)
+                app.agent = MockAgent(mode=app.mode)
+                app.agent.app = app
 
         app = MockApp(agent=MockAgent(mode="explore"))
         app.mode = "explore"

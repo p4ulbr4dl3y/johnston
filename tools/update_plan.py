@@ -35,8 +35,8 @@ class UpdatePlanTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        ctx = self._ensure_context(ctx)
         raw_plan = args.get("plan")
         explanation = str(args.get("explanation") or "").strip()
 

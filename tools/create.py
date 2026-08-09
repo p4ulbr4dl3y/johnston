@@ -24,8 +24,8 @@ class CreateTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
-        ctx = self._ensure_context(app)
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        ctx = self._ensure_context(ctx)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
         if os.path.isdir(path):
             return format_tool_error("file", name=path, detail="is a directory")

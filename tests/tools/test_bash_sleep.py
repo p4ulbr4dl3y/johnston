@@ -20,7 +20,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "sleep 0.05"}, app=mock_app)
+        res = await tool.execute({"command": "sleep 0.05"}, ctx=mock_app)
         self.assertIn("slept 0.05s", res)
 
     async def test_sleep_chain(self):
@@ -28,7 +28,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "sleep 0.05 && echo 'done'"}, app=mock_app)
+        res = await tool.execute({"command": "sleep 0.05 && echo 'done'"}, ctx=mock_app)
         self.assertIn("done", res)
 
     async def test_empty_output_command(self):
@@ -36,7 +36,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "true"}, app=mock_app)
+        res = await tool.execute({"command": "true"}, ctx=mock_app)
         self.assertIn("(no output)", res)
 
 if __name__ == "__main__":

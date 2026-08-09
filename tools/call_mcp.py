@@ -24,7 +24,7 @@ class CallMCPTool(BaseTool):
         }
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         server = args.get("server")
         tool = args.get("tool")
         arguments = args.get("arguments") or {}
@@ -34,7 +34,7 @@ class CallMCPTool(BaseTool):
 
         from core.role_registry import RoleRegistry, role_tool_error
 
-        app_obj = getattr(app, "app", app)
+        app_obj = getattr(ctx, "app", ctx)
         mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
         role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
         for target in (f"{server}.{tool}", tool, "call_mcp"):

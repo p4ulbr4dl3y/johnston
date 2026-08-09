@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 from core.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
+from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 from core.git_utils import run_git
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
@@ -251,11 +252,7 @@ class PromptBuilder:
             clean_name = t_name.lower()
             resolved = normalize_tool_name(clean_name)
             if self.is_subagent:
-                subagent_forbidden = {
-                    "invoke_subagent", "subagent", "manage_subagent",
-                    "manage_shell", "manage_subagent", "ask_user"
-                }
-                if clean_name in subagent_forbidden or resolved in subagent_forbidden:
+                if clean_name in SUBAGENT_EXCLUDED_TOOLS or resolved in SUBAGENT_EXCLUDED_TOOLS:
                     return False
 
             return clean_name not in disallowed and resolved not in disallowed

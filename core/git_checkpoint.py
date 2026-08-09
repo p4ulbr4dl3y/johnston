@@ -498,8 +498,6 @@ class GitCheckpointManager:
 
         return results
 
-        return results
-
     @classmethod
     def delete_session_checkpoints(
         cls,

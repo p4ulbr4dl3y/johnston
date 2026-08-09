@@ -45,10 +45,10 @@ class ShellTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], app: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
         args = normalize_tool_args("shell", args)
-        ctx = self._ensure_context(app)
+        ctx = self._ensure_context(ctx)
         cmd = args.get("command", "").strip()
 
         raw_timeout = args.get("timeout", 120)
@@ -81,27 +81,10 @@ class ShellTool(BaseTool):
 
         if sg_enabled and not is_safe and not skip_confirm and session_override != "allow" and ctx.app:
             try:
-                from widgets.screens.permission_confirm import PermissionConfirmScreen
-
-                screen = PermissionConfirmScreen(
-                    tool_name="shell",
-                    args={"command": cmd},
-                    reason=reason,
+                from tools.registry import prompt_permission_confirmation
+                confirmed = await prompt_permission_confirmation(
+                    ctx.app, "shell", {"command": cmd}, reason, perm_name="shell"
                 )
-                loop = asyncio.get_running_loop()
-                future = loop.create_future()
-
-                def on_dismiss(result: Any) -> None:
-                    if not future.done():
-                        if result == "always_allow":
-                            pm.set_session_override("shell", "allow")
-                            pm.set_session_override("shell_guard", "allow")
-                            future.set_result(True)
-                        else:
-                            future.set_result(result == "allow")
-
-                ctx.app.push_screen(screen, callback=on_dismiss)
-                confirmed = await future
                 if not confirmed:
                     return format_tool_error("denied", name="shell", detail="by user")
             except Exception as e:

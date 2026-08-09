@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 from core.models_catalog import catalog
 from core.skill_manager import SkillManager
@@ -68,26 +68,6 @@ class NewCommand(BaseCommand):
         app.refresh_status_footer()
 
 
-def _recreate_agent(app: Any, provider_key: Optional[str] = None) -> None:
-    if hasattr(getattr(app, "pm", None), "recreate_active_agent"):
-        app.pm.recreate_active_agent(app, provider_key=provider_key)
-    else:
-        old_history = list(getattr(app.agent, "history", [])) if getattr(app, "agent", None) else []
-        current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "act"))
-        if provider_key and hasattr(app.pm, "set_active_provider_key"):
-            app.pm.set_active_provider_key(provider_key)
-        if hasattr(app.pm, "create_active_agent"):
-            app.agent = app.pm.create_active_agent()
-        if getattr(app, "agent", None):
-            if old_history:
-                app.agent.history = old_history
-            app.agent.mode = current_mode
-            app.agent.app = app
-        app.mode = current_mode
-        if hasattr(app, "refresh_status_footer"):
-            app.refresh_status_footer()
-
-
 class ProvidersCommand(BaseCommand):
     name = "/providers"
     aliases = ["/connect", "/provider"]
@@ -120,7 +100,7 @@ class ProvidersCommand(BaseCommand):
                         if entered_key:
                             app.pm.set_provider_api_key(selected_key, entered_key)
                             app.pm.set_provider_disabled(selected_key, False)
-                        _recreate_agent(app, provider_key=selected_key)
+                        app.pm.recreate_active_agent(app, provider_key=selected_key)
                         if entered_key:
                             asyncio.create_task(ModelsCommand().execute(app))
                         else:
@@ -174,7 +154,7 @@ class ModelsCommand(BaseCommand):
                     selected_model = item_val
 
                 if selected_prov != app.pm.get_active_provider_key():
-                    _recreate_agent(app, provider_key=selected_prov)
+                    app.pm.recreate_active_agent(app, provider_key=selected_prov)
 
                 if hasattr(app.agent, "model"):
                     app.agent.model = selected_model
@@ -208,7 +188,7 @@ class ThinkingEffortCommand(BaseCommand):
 
             if hasattr(app.pm, "set_provider_thinking_effort"):
                 app.pm.set_provider_thinking_effort(provider_key, model_name, effort)
-            _recreate_agent(app)
+            app.pm.recreate_active_agent(app)
             app.query_one("#message-input", ChatInput).focus()
 
         app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)

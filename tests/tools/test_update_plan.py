@@ -62,7 +62,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
                 "explanation": "App update test",
                 "plan": [{"step": "Step 1", "status": "in_progress"}],
             },
-            app=app,
+            ctx=app,
         )
         self.assertIn("plan updated (0/1 completed)", res)
         self.assertTrue(app.updated)
@@ -78,7 +78,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         tool = UpdatePlanTool()
         res = await tool.execute(
             {"plan": [{"step": "Step 1", "status": "completed"}]},
-            app=app,
+            ctx=app,
         )
         self.assertIn("plan updated (1/1 completed)", res)
 
