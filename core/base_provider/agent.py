@@ -249,13 +249,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     mq = getattr(app, "message_queue", None)
                     if mq:
                         sid = getattr(app, "current_session_id", None)
-                        while mq:
-                            item = mq.pop(0)
+                        # Iterate over a snapshot so foreign-session items are left
+                        # in place (no infinite loop) while own items are consumed.
+                        for item in list(mq):
                             item_sid = item[3] if len(item) > 3 else None
                             if item_sid is not None and sid is not None and item_sid != sid:
-                                # Different session: keep for that session, don't drop.
-                                mq.append(item)
                                 continue
+                            mq.remove(item)
                             messages.append({"role": "user", "content": item[0]})
                             yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
 
