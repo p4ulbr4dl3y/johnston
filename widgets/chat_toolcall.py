@@ -431,9 +431,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         def __contains__(self, item):
             if not isinstance(item, str):
                 return False
-            from tools.registry import ALIAS_MAP, REGISTRY
+            from tools.registry import REGISTRY, normalize_tool_name
             lower = item.lower()
-            canonical = ALIAS_MAP.get(lower, lower)
+            canonical = normalize_tool_name(lower)
             if canonical in REGISTRY or canonical in ("get_mcp_schema", "call_mcp", "update_plan"):
                 return True
             return super().__contains__(item) or super().__contains__(lower)

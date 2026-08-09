@@ -231,7 +231,7 @@ class PromptBuilder:
     def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
         from core.role_registry import RoleRegistry
-        from tools.registry import ALIAS_MAP
+        from tools.registry import normalize_tool_name
 
         mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_cached_tools()
@@ -249,7 +249,7 @@ class PromptBuilder:
             if not t_name:
                 return True
             clean_name = t_name.lower()
-            resolved = ALIAS_MAP.get(clean_name, clean_name)
+            resolved = normalize_tool_name(clean_name)
             if self.is_subagent:
                 subagent_forbidden = {
                     "invoke_subagent", "subagent", "manage_subagent",
