@@ -192,7 +192,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
                 app.message_queue.append(("Queued with att", False, [fake_att]))
                 app.generate_ai_response("Initial prompt")
-                await pilot.pause(0.5)
+                await pilot.pause(1.0)
 
                 self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
                 self.assertEqual(ran_attachments[1], [fake_att])
