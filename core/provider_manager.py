@@ -276,6 +276,24 @@ class ProviderManager:
         active_key = self.get_active_provider_key()
         return self.create_agent_for_provider(active_key)
 
+    def recreate_active_agent(self, app: Any, provider_key: Optional[str] = None, history: Optional[List[Any]] = None):
+        """Recreates active agent on app preserving history, mode, and UI status."""
+        old_history = history if history is not None else list(getattr(getattr(app, "agent", None), "history", []))
+        current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "act"))
+        if provider_key:
+            self.set_active_provider_key(provider_key)
+        agent = self.create_active_agent()
+        if agent:
+            if old_history:
+                agent.history = old_history
+            agent.mode = current_mode
+            agent.app = app
+        app.agent = agent
+        app.mode = current_mode
+        if hasattr(app, "refresh_status_footer"):
+            app.refresh_status_footer()
+        return agent
+
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Returns cached list of provider models (TTL = 24h) or performs HTTP request"""
         providers = self.load_providers()

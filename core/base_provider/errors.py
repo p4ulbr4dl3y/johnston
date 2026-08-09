@@ -4,6 +4,8 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from core.adapters.base import extract_image_payload
+
 
 def format_api_error(err: Exception) -> str:
     """Formats API exceptions into a clean, unified Markdown string.
@@ -187,7 +189,14 @@ class ErrorHandlingMixin:
         return any(kw in err_str for kw in vision_keywords)
 
     def _sanitize_vision_error_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        sanitized: List[Dict[str, Any]] = []
+        """
+        Sanitizes system history when non-vision model handles previous image context.
+        Prevents API errors by replacing raw image tool payloads with clear refusal text.
+        """
+        if not messages:
+            return messages
+
+        sanitized = []
         for msg in messages:
             if not isinstance(msg, dict):
                 sanitized.append(msg)
@@ -204,10 +213,11 @@ class ErrorHandlingMixin:
             if role == "tool":
                 is_img = False
                 img_path = "image"
-                if isinstance(content, dict) and content.get("type") == "image":
+                parsed_img = extract_image_payload(content)
+                if parsed_img:
                     is_img = True
-                    img_path = content.get("path", "image")
-                elif isinstance(content, str) and ('"type": "image"' in content or "[Image file:" in content):
+                    img_path = parsed_img.get("path", "image")
+                elif isinstance(content, str) and ("\"type\": \"image\"" in content or "[Image file:" in content):
                     is_img = True
                     path_match = re.search(r"['\"]path['\"]\s*:\s*['\"]([^'\"]+)['\"]", content)
                     if path_match:
