@@ -4,7 +4,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import BaseApiAdapter
+from core.adapters.base import BaseApiAdapter, extract_image_payload, parse_tool_call_args
 from core.thinking_effort import build_gemini_thinking_config
 
 
@@ -38,20 +38,8 @@ class GeminiAdapter(BaseApiAdapter):
                         parts.append({"inlineData": {"mimeType": mime_type, "data": b64_data}})
         if role == "model":
             for tc in msg.get("tool_calls") or []:
-                if not isinstance(tc, dict):
-                    continue
-                fn = tc.get("function", {})
-                if not isinstance(fn, dict):
-                    fn = {}
-                raw_args = fn.get("arguments", "{}")
-                if isinstance(raw_args, str):
-                    try:
-                        args_obj = json.loads(raw_args) if raw_args.strip() else {}
-                    except Exception:
-                        args_obj = {}
-                else:
-                    args_obj = raw_args or {}
-                parts.append({"functionCall": {"name": fn.get("name", ""), "args": args_obj}})
+                fn_name, args_obj = parse_tool_call_args(tc)
+                parts.append({"functionCall": {"name": fn_name, "args": args_obj}})
         return parts or [{"text": ""}]
 
     def _to_gemini(
@@ -76,16 +64,7 @@ class GeminiAdapter(BaseApiAdapter):
             if role == "tool":
                 name = msg.get("name", "tool")
                 tcontent = msg.get("content", "")
-                parsed_img = None
-                if isinstance(tcontent, dict) and tcontent.get("type") == "image":
-                    parsed_img = tcontent
-                elif isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
-                    try:
-                        data = json.loads(tcontent)
-                        if isinstance(data, dict) and data.get("type") == "image":
-                            parsed_img = data
-                    except Exception:
-                        pass
+                parsed_img = extract_image_payload(tcontent)
 
                 if parsed_img and parsed_img.get("base64"):
                     summary_text = parsed_img.get("summary", "[Image content]")

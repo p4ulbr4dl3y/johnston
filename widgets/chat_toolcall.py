@@ -3,7 +3,6 @@ import json
 import os
 import re
 from typing import Any
-from urllib.parse import urlparse
 
 import pygments
 from rich.console import Group
@@ -18,81 +17,21 @@ from core.config import IMAGE_EXTENSIONS
 from widgets.chat_diff import format_edit_diff
 from widgets.chat_markdown import (
     CODE_THEME,
-    TOKEN_COLORS,
     TransparentSyntax,
     safe_update_markdown,
     to_snake_case,
 )
+from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
 
 
 class FormattingMixin:
     """Pure formatting helpers for tool output display"""
 
     def _guess_lexer(self, path_str: str) -> str:
-        if not path_str:
-            return "text"
-        clean_path = urlparse(path_str).path if path_str.startswith(("http://", "https://")) else path_str
-        ext = os.path.splitext(clean_path)[1].lower().lstrip(".")
-        mapping = {
-            "py": "python",
-            "js": "javascript",
-            "jsx": "jsx",
-            "ts": "typescript",
-            "tsx": "tsx",
-            "html": "html",
-            "css": "css",
-            "scss": "scss",
-            "json": "json",
-            "yaml": "yaml",
-            "yml": "yaml",
-            "md": "markdown",
-            "sh": "bash",
-            "bash": "bash",
-            "zsh": "bash",
-            "rs": "rust",
-            "go": "go",
-            "c": "c",
-            "cpp": "cpp",
-            "h": "c",
-            "hpp": "cpp",
-            "sql": "sql",
-            "toml": "toml",
-            "ini": "ini",
-            "dockerfile": "dockerfile",
-            "xml": "xml"
-        }
-        return mapping.get(ext, ext or "text")
+        return guess_lexer_name(path_str)
 
     def _lex_block_to_line_texts(self, code_lines: list[str], lexer: Any) -> list[Text]:
-        if not code_lines:
-            return []
-        if not lexer:
-            return [Text(line) for line in code_lines]
-
-        full_code = "\n".join(code_lines)
-        try:
-            tokens = pygments.lex(full_code, lexer)
-            line_texts = [Text()]
-            for tok_type, val in tokens:
-                parts = val.split("\n")
-                for idx, part in enumerate(parts):
-                    if idx > 0:
-                        line_texts.append(Text())
-                    if part:
-                        style = None
-                        curr = tok_type
-                        while curr:
-                            if curr in TOKEN_COLORS:
-                                style = TOKEN_COLORS[curr]
-                                break
-                            curr = curr.parent
-                        line_texts[-1].append(part, style=style)
-
-            while len(line_texts) < len(code_lines):
-                line_texts.append(Text())
-            return line_texts[:len(code_lines)]
-        except Exception:
-            return [Text(line) for line in code_lines]
+        return lex_block_to_line_texts(code_lines, lexer, lex_fn=pygments.lex)
 
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()

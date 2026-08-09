@@ -4,7 +4,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import BaseApiAdapter
+from core.adapters.base import BaseApiAdapter, parse_tool_call_args
 from core.thinking_effort import build_ollama_thinking_payload
 
 
@@ -27,20 +27,8 @@ class OllamaAdapter(BaseApiAdapter):
                 if tcs:
                     norm = []
                     for tc in tcs:
-                        if not isinstance(tc, dict):
-                            continue
-                        fn = tc.get("function", {})
-                        if not isinstance(fn, dict):
-                            fn = {}
-                        raw_args = fn.get("arguments", "{}")
-                        if isinstance(raw_args, str):
-                            try:
-                                args_obj = json.loads(raw_args) if raw_args.strip() else {}
-                            except Exception:
-                                args_obj = {}
-                        else:
-                            args_obj = raw_args or {}
-                        norm.append({"function": {"name": fn.get("name", ""), "arguments": args_obj}})
+                        fn_name, args_obj = parse_tool_call_args(tc)
+                        norm.append({"function": {"name": fn_name, "arguments": args_obj}})
                     if norm:
                         item["tool_calls"] = norm
             out.append(item)

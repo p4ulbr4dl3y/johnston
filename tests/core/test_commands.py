@@ -474,6 +474,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
     async def test_tasks_command_filters_by_session_id(self):
         from unittest.mock import MagicMock
+
         from core.background_task import BackgroundTask
         from core.commands import TasksCommand
 
