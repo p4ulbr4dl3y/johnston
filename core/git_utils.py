@@ -2,6 +2,7 @@
 Git Utilities for Johnston.
 Provides unified git command execution with timeout handling and process safety.
 """
+
 import subprocess
 from typing import List, Optional
 

@@ -24,4 +24,3 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
             current,
             show_search=False,
         )
-

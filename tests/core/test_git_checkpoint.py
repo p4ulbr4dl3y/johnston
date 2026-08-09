@@ -17,7 +17,9 @@ class TestGitCheckpointManager(unittest.TestCase):
     def _init_git_repo(self) -> str:
         subprocess.run(["git", "init"], cwd=self.tmp_dir, capture_output=True, check=True)
         subprocess.run(["git", "config", "user.name", "TestUser"], cwd=self.tmp_dir, capture_output=True, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.tmp_dir, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=self.tmp_dir, capture_output=True, check=True
+        )
 
         initial_file = os.path.join(self.tmp_dir, "initial.txt")
         with open(initial_file, "w") as f:

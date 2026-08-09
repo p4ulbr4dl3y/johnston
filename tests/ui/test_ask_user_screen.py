@@ -25,6 +25,7 @@ class DummyHostApp(App[None]):
     def on_mount(self) -> None:
         def callback(res=None):
             self.dismiss_result = res
+
         self.push_screen(self.screen_to_test, callback=callback)
 
 
@@ -48,17 +49,20 @@ class TestWriteInInput(unittest.IsolatedAsyncioTestCase):
 
     async def test_clear_selection_exception_fallback(self):
         from textual.widgets._input import Selection as RealSelection
+
         inp = WriteInInput()
         app = DummyWidgetApp(inp)
         async with app.run_test():
             inp.value = "test"
             call_count = 0
+
             def mock_selection(*args, **kwargs):
                 nonlocal call_count
                 call_count += 1
                 if call_count == 2:
                     raise Exception("Selection failed")
                 return RealSelection(*args, **kwargs)
+
             mock_selection.cursor = RealSelection.cursor
             with patch("textual.widgets._input.Selection", mock_selection):
                 inp._clear_selection()
@@ -180,10 +184,7 @@ class TestConfirmScreenUnit(unittest.TestCase):
 
 class TestAskUserWizardScreenUnit(unittest.TestCase):
     def test_wizard_screen_basic(self):
-        questions = [
-            {"question_text": "Q1", "options": ["A", "B"]},
-            {"question_text": "Q2", "options": []}
-        ]
+        questions = [{"question_text": "Q1", "options": ["A", "B"]}, {"question_text": "Q2", "options": []}]
         ws = AskUserWizardScreen(questions)
         ws._mount_time = 0.0
 
@@ -243,10 +244,7 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.dismiss_result, "cancelled")
 
     async def test_wizard_screen_pilot_navigation_and_cancel(self):
-        questions = [
-            {"question_text": "Q1", "options": ["A", "B"]},
-            {"question_text": "Q2", "options": ["X", "Y"]}
-        ]
+        questions = [{"question_text": "Q1", "options": ["A", "B"]}, {"question_text": "Q2", "options": ["X", "Y"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 

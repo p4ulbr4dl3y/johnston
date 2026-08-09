@@ -20,6 +20,7 @@ def _truncate_subagent_result(text: str, session_id: str = "") -> str:
     import uuid
 
     from core.config import LOGS_DIR
+
     log_name = f"{session_id or 'subagent'}-{uuid.uuid4().hex[:4]}.log"
     log_path = os.path.join(LOGS_DIR, log_name)
     try:
@@ -50,19 +51,23 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "Task prompt with relative paths, boundaries, output format"},
+                    "prompt": {
+                        "type": "string",
+                        "description": "Task prompt with relative paths, boundaries, output format",
+                    },
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "type": {"type": "string", "description": "Subagent type: worker or explorer"},
                     "workspace": {"type": "string", "description": "Workspace: inherit or branch"},
-                    "task_id": {"type": "string", "description": "Task ID (auto-generated if omitted)"}
+                    "task_id": {"type": "string", "description": "Task ID (auto-generated if omitted)"},
                 },
-                "required": ["prompt", "description"]
-            }
-        }
+                "required": ["prompt", "description"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
+
         args = normalize_tool_args("invoke_subagent", args)
         ctx = self._ensure_context(ctx)
         prompt = args.get("prompt", "").strip()
@@ -87,7 +92,9 @@ class InvokeSubagentTool(BaseTool):
             store = SessionStore.get_instance()
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
-        active_sessions = store.get_subagents_for_parent(parent_session_id) if parent_session_id else store.list(kind="subagent")
+        active_sessions = (
+            store.get_subagents_for_parent(parent_session_id) if parent_session_id else store.list(kind="subagent")
+        )
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
             return format_tool_error(
@@ -106,6 +113,7 @@ class InvokeSubagentTool(BaseTool):
 
         if workspace_mode in ("branch", "share"):
             from core.subagent_worktree import SubagentWorktreeManager
+
             wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, session_id)
             if wt_path:
                 subagent.project_dir = wt_path
@@ -126,6 +134,7 @@ class InvokeSubagentTool(BaseTool):
 
         # Apply role definition: system prompt, model, and tool filtering
         from core.subagent_stream import apply_subagent_role
+
         apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
 
         from core.subagent_stream import run_subagent_stream_bg
@@ -138,7 +147,10 @@ class InvokeSubagentTool(BaseTool):
             )
 
         from tools.base import format_background_notification
-        notification_hdr = format_background_notification("Background subagent", description, session_id, "{result_text}")
+
+        notification_hdr = format_background_notification(
+            "Background subagent", description, session_id, "{result_text}"
+        )
         notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.)"
 
         bg_task = asyncio.create_task(

@@ -26,12 +26,14 @@ class TestToolSchemas(unittest.TestCase):
 
     def test_shell_schema_documents_background_and_params(self):
         from tools.shell import ShellTool
+
         props = ShellTool.schema["function"]["parameters"]["properties"]
         self.assertNotIn("skip_confirm", props)
         self.assertNotIn("no_background", props)
 
     def test_manage_shell_action_has_enum_and_required(self):
         from tools.manage_shell import ManageShellTool
+
         params = ManageShellTool.schema["function"]["parameters"]
         self.assertEqual(
             params["properties"]["action"]["enum"],
@@ -41,6 +43,7 @@ class TestToolSchemas(unittest.TestCase):
 
     def test_subagent_schema_has_task_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
+
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("task_id", props)
         self.assertNotIn("session_id", props)
@@ -48,6 +51,7 @@ class TestToolSchemas(unittest.TestCase):
 
     def test_manage_subagent_schema_has_task_id(self):
         from tools.manage_subagent import ManageSubagentTool
+
         props = ManageSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("task_id", props)
         self.assertNotIn("session_id", props)

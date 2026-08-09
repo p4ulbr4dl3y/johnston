@@ -8,14 +8,9 @@ from widgets.screens.providers import ApiKeyInputScreen
 
 
 class TestModalSearchShiftTab(unittest.TestCase):
-
     def test_base_selection_screen_blocks_shift_tab_when_search_enabled(self):
         screen = BaseSelectionScreen(
-            title="Test",
-            options=["Opt1", "Opt2"],
-            items=["item1", "item2"],
-            default_value="item1",
-            show_search=True
+            title="Test", options=["Opt1", "Opt2"], items=["item1", "item2"], default_value="item1", show_search=True
         )
 
         for key_name in ("shift+tab", "backtab", "shift_tab"):
@@ -30,11 +25,7 @@ class TestModalSearchShiftTab(unittest.TestCase):
 
     def test_base_selection_screen_allows_other_keys(self):
         screen = BaseSelectionScreen(
-            title="Test",
-            options=["Opt1", "Opt2"],
-            items=["item1", "item2"],
-            default_value="item1",
-            show_search=True
+            title="Test", options=["Opt1", "Opt2"], items=["item1", "item2"], default_value="item1", show_search=True
         )
 
         event = Key(key="a", character="a")

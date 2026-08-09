@@ -17,16 +17,20 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
     def test_system_prompt_uses_cached_tools_without_sync_refresh(self):
         manager = self._manager_without_init()
-        manager.load_servers = MagicMock(return_value=[
-            {"name": "docs", "mode": "lazy", "command": "docs-server"},
-        ])
-        manager.clients["docs"] = MagicMock(tools=[
-            {
-                "name": "search",
-                "description": "Search docs",
-                "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}},
-            }
-        ])
+        manager.load_servers = MagicMock(
+            return_value=[
+                {"name": "docs", "mode": "lazy", "command": "docs-server"},
+            ]
+        )
+        manager.clients["docs"] = MagicMock(
+            tools=[
+                {
+                    "name": "search",
+                    "description": "Search docs",
+                    "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}},
+                }
+            ]
+        )
         manager.get_active_tools = MagicMock(side_effect=AssertionError("sync MCP refresh is forbidden"))
 
         snippet = manager.get_system_prompt_snippet()

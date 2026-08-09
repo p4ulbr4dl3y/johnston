@@ -35,7 +35,9 @@ class PermissionsScreen(BaseModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self._get_header_md(), id="permissions-header-md", classes="modal-markdown modal-markdown-centered")
+            yield Markdown(
+                self._get_header_md(), id="permissions-header-md", classes="modal-markdown modal-markdown-centered"
+            )
             yield Input(placeholder="Search permissions...", id="modal-search-input")
             yield OptionList(id="permissions-option-list")
             yield Label("enter: toggle • tab / ←/→: switch tab • esc: close", id="modal-hint")
@@ -63,13 +65,15 @@ class PermissionsScreen(BaseModalScreen[None]):
             }
             for grp in ["read", "write", "net", "exec"]:
                 act = perms.get("groups", {}).get(grp, "ask")
-                items.append({
-                    "type": "group",
-                    "name": grp,
-                    "label": grp.capitalize(),
-                    "desc": group_descriptions.get(grp, ""),
-                    "action": act,
-                })
+                items.append(
+                    {
+                        "type": "group",
+                        "name": grp,
+                        "label": grp.capitalize(),
+                        "desc": group_descriptions.get(grp, ""),
+                        "action": act,
+                    }
+                )
 
         elif self.active_tab == 1:
             tool_labels = {
@@ -90,53 +94,63 @@ class PermissionsScreen(BaseModalScreen[None]):
                 for t in sorted(tool_set):
                     act = tools_cfg.get(t) or perms.get("groups", {}).get(grp, "ask")
                     is_override = t in tools_cfg
-                    items.append({
-                        "type": "tool",
-                        "name": t,
-                        "group": grp,
-                        "label": tool_labels.get(t, t.capitalize()),
-                        "desc": "",
-                        "action": act,
-                        "is_override": is_override,
-                    })
+                    items.append(
+                        {
+                            "type": "tool",
+                            "name": t,
+                            "group": grp,
+                            "label": tool_labels.get(t, t.capitalize()),
+                            "desc": "",
+                            "action": act,
+                            "is_override": is_override,
+                        }
+                    )
                     if t == "shell":
                         sg_cfg = perms.get("shell_guard", {})
                         sg_enabled = sg_cfg.get("enabled", True)
-                        items.append({
-                            "type": "shell_guard",
-                            "name": "shell_guard",
-                            "group": "exec",
-                            "label": "ShellGuard",
-                            "desc": "",
-                            "action": "allow" if sg_enabled else "deny",
-                            "is_override": "enabled" in sg_cfg,
-                        })
+                        items.append(
+                            {
+                                "type": "shell_guard",
+                                "name": "shell_guard",
+                                "group": "exec",
+                                "label": "ShellGuard",
+                                "desc": "",
+                                "action": "allow" if sg_enabled else "deny",
+                                "is_override": "enabled" in sg_cfg,
+                            }
+                        )
 
         else:
             # Scope Tab
-            items.append({
-                "type": "scope",
-                "name": "global",
-                "label": "Global Configuration",
-                "desc": "",
-                "action": "active" if not self.use_project_scope else "on",
-            })
+            items.append(
+                {
+                    "type": "scope",
+                    "name": "global",
+                    "label": "Global Configuration",
+                    "desc": "",
+                    "action": "active" if not self.use_project_scope else "on",
+                }
+            )
             if self.project_dir:
-                items.append({
-                    "type": "scope",
-                    "name": "project",
-                    "label": "Project Configuration",
-                    "desc": "",
-                    "action": "active" if self.use_project_scope else "on",
-                })
+                items.append(
+                    {
+                        "type": "scope",
+                        "name": "project",
+                        "label": "Project Configuration",
+                        "desc": "",
+                        "action": "active" if self.use_project_scope else "on",
+                    }
+                )
             else:
-                items.append({
-                    "type": "scope",
-                    "name": "project",
-                    "label": "Project Configuration",
-                    "desc": "",
-                    "action": "off",
-                })
+                items.append(
+                    {
+                        "type": "scope",
+                        "name": "project",
+                        "label": "Project Configuration",
+                        "desc": "",
+                        "action": "off",
+                    }
+                )
 
         return items
 
@@ -151,10 +165,7 @@ class PermissionsScreen(BaseModalScreen[None]):
             self.filtered_items = list(raw_items)
         else:
             self.filtered_items = [
-                it for it in raw_items
-                if q in it["name"].lower()
-                or q in it["label"].lower()
-                or q in it["desc"].lower()
+                it for it in raw_items if q in it["name"].lower() or q in it["label"].lower() or q in it["desc"].lower()
             ]
 
         if not self.filtered_items:
@@ -163,7 +174,11 @@ class PermissionsScreen(BaseModalScreen[None]):
 
         for it in self.filtered_items:
             if it["type"] == "scope":
-                status = status_tag("ACTIVE") if it["action"] == "active" else (status_tag("ON") if it["action"] == "on" else status_tag("N/A"))
+                status = (
+                    status_tag("ACTIVE")
+                    if it["action"] == "active"
+                    else (status_tag("ON") if it["action"] == "on" else status_tag("N/A"))
+                )
                 desc = f" — {it['desc']}" if it.get("desc") else ""
                 opt_list.add_option(f"{status} {it['label']}{desc}")
             elif it["type"] == "shell_guard":

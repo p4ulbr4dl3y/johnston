@@ -8,9 +8,7 @@ from typing import Any, Dict, Tuple
 from core.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
 
-DOC_EXTENSIONS = {
-    ".pdf", ".docx", ".pptx", ".xlsx", ".epub"
-}
+DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 _DOC_CACHE: Dict[str, Tuple[float, float, str]] = {}  # key: path, val: (mtime, timestamp, md_text)
@@ -56,6 +54,7 @@ def convert_doc_to_markdown_sync(path: str) -> str:
     # 1. Try Python API
     try:
         from markitdown import MarkItDown
+
         md = MarkItDown()
         result = md.convert(path)
         if result and getattr(result, "text_content", None) is not None:
@@ -76,8 +75,7 @@ def convert_doc_to_markdown_sync(path: str) -> str:
         return result_text
 
     raise RuntimeError(
-        f"Unable to convert '{path}' with markitdown. "
-        "Ensure 'markitdown' Python package or CLI is installed."
+        f"Unable to convert '{path}' with markitdown. Ensure 'markitdown' Python package or CLI is installed."
     )
 
 
@@ -139,15 +137,18 @@ def process_image_file_sync(path: str, detail: str | None = None) -> str:
 
             summary = f"[Image file: '{path}' ({w}x{h} px, format: {target_format}, size: {file_kb:.1f} KB)]"
 
-            return json.dumps({
-                "type": "image",
-                "path": path,
-                "dimensions": [w, h],
-                "media_type": media_type,
-                "base64": b64_str,
-                "detail": detail or "high",
-                "summary": summary,
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "type": "image",
+                    "path": path,
+                    "dimensions": [w, h],
+                    "media_type": media_type,
+                    "base64": b64_str,
+                    "detail": detail or "high",
+                    "summary": summary,
+                },
+                ensure_ascii=False,
+            )
     except Exception as e:
         raise RuntimeError(f"Unable to process image file '{path}': {e}")
 
@@ -167,20 +168,22 @@ class ReadTool(BaseTool):
                     "end": {"type": "integer", "description": "End line (inclusive)"},
                     "offset": {"type": "integer", "description": "Byte offset"},
                     "detail": {"type": "string", "description": "Image detail: high (default), low, original"},
-                    "raw": {"type": "boolean", "description": "Return raw response for URL"}
+                    "raw": {"type": "boolean", "description": "Return raw response for URL"},
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
+
         args = normalize_tool_args("read", args)
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
         if raw_path.startswith("http://") or raw_path.startswith("https://"):
             from tools.web_fetch import WebFetchTool
+
             return await WebFetchTool().execute({"url": raw_path, "raw": bool(args.get("raw", False))}, ctx=ctx)
         path = resolve_path(raw_path, cwd=ctx.cwd)
         if not os.path.exists(path):
@@ -214,20 +217,21 @@ class ReadTool(BaseTool):
                 formatted = dirs + files
                 if len(formatted) > MAX_DIR_ENTRIES:
                     shown = formatted[:MAX_DIR_ENTRIES]
-                    content = "\n".join(shown) + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
+                    content = (
+                        "\n".join(shown)
+                        + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
+                    )
                 else:
                     content = "\n".join(formatted) if formatted else "(empty directory)"
 
-                return (
-                    f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
-                )
+                return f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
             except Exception as e:
                 return format_tool_error("listing", detail=str(e), name=path)
 
         try:
             file_size = os.path.getsize(path)
             if file_size > MAX_FILE_SIZE:
-                return format_tool_error("file", detail=f"exceeds {MAX_FILE_SIZE // (1024*1024)}MB", name=path)
+                return format_tool_error("file", detail=f"exceeds {MAX_FILE_SIZE // (1024 * 1024)}MB", name=path)
         except OSError as e:
             return format_tool_error("check", detail=str(e), name=path)
 

@@ -44,6 +44,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     ):
         if tools is None:
             from tools.registry import get_default_tools
+
             tools = get_default_tools()
         self.api_key = api_key
         self.model = model
@@ -112,7 +113,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             "context_used": ctx_used,
             "context": self.context_window,
             "context_limit": self.context_limit,
-            "cost_usd": getattr(self, "cost_usd", 0.0)
+            "cost_usd": getattr(self, "cost_usd", 0.0),
         }
 
     def _accumulate_usage(
@@ -135,7 +136,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             # Cached input is discounted differently per provider:
             # Anthropic ~90% off (0.1x), OpenAI-compatible ~50% off (0.5x).
             cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
-            cost = (uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp)
+            cost = uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp
 
             self.tokens_input += in_tok
             self.tokens_output += out_tok
@@ -147,13 +148,16 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             self.tokens_input += prompt_tokens_est
             self.tokens_output += output_tokens_est
             self.last_context_tokens = prompt_tokens_est
-            self.total_tokens += (prompt_tokens_est + output_tokens_est)
-            self.cost_usd += (prompt_tokens_est * p_prompt + output_tokens_est * p_comp)
+            self.total_tokens += prompt_tokens_est + output_tokens_est
+            self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
 
     @staticmethod
-    async def _process_attachment_image(att_path: str, error_prefix: str = "Error processing attachment image") -> Optional[Dict[str, Any]]:
+    async def _process_attachment_image(
+        att_path: str, error_prefix: str = "Error processing attachment image"
+    ) -> Optional[Dict[str, Any]]:
         try:
             from tools.read import process_image_file_sync
+
             img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
             img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
             if isinstance(img_dict, dict) and img_dict.get("base64"):
@@ -162,10 +166,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 detail_val = img_dict.get("detail", "high")
                 return {
                     "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{media_type};base64,{b64_data}",
-                        "detail": detail_val
-                    }
+                    "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val},
                 }
         except Exception as e:
             logger.warning("%s: %s", error_prefix, e)
@@ -186,10 +187,14 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 return True
         return False
 
-    async def stream_steps(self, user_text: str, attachments: Optional[List[Any]] = None) -> AsyncGenerator[Tuple[str, str, str], None]:
+    async def stream_steps(
+        self, user_text: str, attachments: Optional[List[Any]] = None
+    ) -> AsyncGenerator[Tuple[str, str, str], None]:
         agent_mode = getattr(self, "mode", "act")
         allow_task = getattr(self, "allow_task", True)
-        m_name = catalog.get_model_display_name(getattr(self, "provider_key", ""), getattr(self, "model", "")) or getattr(self, "model", "")
+        m_name = catalog.get_model_display_name(
+            getattr(self, "provider_key", ""), getattr(self, "model", "")
+        ) or getattr(self, "model", "")
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             from core.mcp_manager import get_mcp_manager
 
@@ -198,9 +203,19 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             except Exception:
                 pass
         is_subagent = getattr(self, "is_subagent", False)
-        builder = PromptBuilder(self.system_prompt, self.tools, mode=agent_mode, allow_task=allow_task, model_name=m_name, cwd=getattr(self, "cwd", None), is_subagent=is_subagent)
+        builder = PromptBuilder(
+            self.system_prompt,
+            self.tools,
+            mode=agent_mode,
+            allow_task=allow_task,
+            model_name=m_name,
+            cwd=getattr(self, "cwd", None),
+            is_subagent=is_subagent,
+        )
         sys_prompt = builder.build_system_prompt()
-        all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+        all_tools = builder.build_tools(
+            provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
+        )
         self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 
         # Automatic context compaction when total context (system prompt + tools + history)
@@ -230,16 +245,34 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 img_item = await self._process_attachment_image(att_path)
                 if img_item:
                     user_content.append(img_item)
-            messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_content}]
+            messages = (
+                [{"role": "system", "content": sys_prompt}]
+                + sanitized_history
+                + [{"role": "user", "content": user_content}]
+            )
         else:
-            messages = [{"role": "system", "content": sys_prompt}] + sanitized_history + [{"role": "user", "content": user_text}]
+            messages = (
+                [{"role": "system", "content": sys_prompt}]
+                + sanitized_history
+                + [{"role": "user", "content": user_text}]
+            )
 
         try:
             while True:
                 current_mode = getattr(self, "mode", "act")
-                builder = PromptBuilder(self.system_prompt, self.tools, mode=current_mode, allow_task=allow_task, model_name=m_name, cwd=getattr(self, "cwd", None), is_subagent=is_subagent)
+                builder = PromptBuilder(
+                    self.system_prompt,
+                    self.tools,
+                    mode=current_mode,
+                    allow_task=allow_task,
+                    model_name=m_name,
+                    cwd=getattr(self, "cwd", None),
+                    is_subagent=is_subagent,
+                )
                 sys_prompt = builder.build_system_prompt()
-                all_tools = builder.build_tools(provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", ""))
+                all_tools = builder.build_tools(
+                    provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
+                )
                 self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
                 if messages and messages[0].get("role") == "system":
                     messages[0]["content"] = sys_prompt
@@ -288,16 +321,17 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     try:
                         if getattr(self, "api_type", "openai") != "openai":
                             from core.adapters import get_adapter
+
                             adapter = get_adapter(self.api_type)
                             async for tag, payload in adapter.stream_chat(
                                 self.base_url,
                                 self.api_key,
                                 self.model,
-                                    messages,
-                                    all_tools if all_tools else None,
-                                    max_tokens=getattr(self, "max_tokens", 4096),
-                                    thinking_effort=getattr(self, "thinking_effort", None),
-                                ):
+                                messages,
+                                all_tools if all_tools else None,
+                                max_tokens=getattr(self, "max_tokens", 4096),
+                                thinking_effort=getattr(self, "thinking_effort", None),
+                            ):
                                 if tag == "adapter_text":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
@@ -321,6 +355,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     step_usage = payload
                         else:
                             from core.adapters import format_messages_for_openai
+
                             formatted_messages = format_messages_for_openai(messages)
                             create_kwargs = {
                                 "model": self.model,
@@ -335,17 +370,18 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                             try:
                                 response = await self.client.chat.completions.create(
-                                    **create_kwargs,
-                                    stream_options={"include_usage": True}
+                                    **create_kwargs, stream_options={"include_usage": True}
                                 )
                             except Exception as create_err:
                                 c_err_str = str(create_err).lower()
-                                if "stream_options" in c_err_str or "extra" in c_err_str or isinstance(create_err, TypeError):
+                                if (
+                                    "stream_options" in c_err_str
+                                    or "extra" in c_err_str
+                                    or isinstance(create_err, TypeError)
+                                ):
                                     if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
                                         create_kwargs.pop("reasoning_effort", None)
-                                    response = await self.client.chat.completions.create(
-                                        **create_kwargs
-                                    )
+                                    response = await self.client.chat.completions.create(**create_kwargs)
                                 else:
                                     raise create_err
 
@@ -357,14 +393,26 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 except StopAsyncIteration:
                                     break
                                 except asyncio.TimeoutError:
-                                    raise RuntimeError(f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s.")
+                                    raise RuntimeError(
+                                        f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
+                                    )
 
                                 if getattr(chunk, "usage", None):
                                     step_usage = parse_usage(chunk.usage)
 
-                                choices = getattr(chunk, "choices", None) if not isinstance(chunk, dict) else chunk.get("choices")
-                                if not choices and (hasattr(chunk, "data") or (isinstance(chunk, dict) and "data" in chunk)):
-                                    d = getattr(chunk, "data", None) if not isinstance(chunk, dict) else chunk.get("data")
+                                choices = (
+                                    getattr(chunk, "choices", None)
+                                    if not isinstance(chunk, dict)
+                                    else chunk.get("choices")
+                                )
+                                if not choices and (
+                                    hasattr(chunk, "data") or (isinstance(chunk, dict) and "data" in chunk)
+                                ):
+                                    d = (
+                                        getattr(chunk, "data", None)
+                                        if not isinstance(chunk, dict)
+                                        else chunk.get("data")
+                                    )
                                     choices = d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
                                 if not choices:
                                     continue
@@ -414,34 +462,55 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         circuit_breaker.record_success(pkey)
                         break
                     except asyncio.CancelledError:
-                        output_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
-                        self._accumulate_usage(step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_est)
+                        output_est = (
+                            estimate_tokens(full_assistant_text)
+                            + estimate_tokens(active_thought)
+                            + estimate_tokens(tool_calls_dict)
+                        )
+                        self._accumulate_usage(
+                            step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_est
+                        )
                         raise
                     except Exception as api_err:
                         if self._is_vision_error(api_err):
                             sanitized = self._sanitize_vision_error_messages(messages)
                             if len(sanitized) != len(messages) or any(s != m for s, m in zip(sanitized, messages)):
                                 messages = sanitized
-                                yield ("thinking", "Model does not support vision; converted image tool result to hint.", "")
+                                yield (
+                                    "thinking",
+                                    "Model does not support vision; converted image tool result to hint.",
+                                    "",
+                                )
                                 continue
 
                         is_retryable = self._is_retryable_error(api_err)
                         if is_retryable and attempt < max_retries:
                             import random
+
                             delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
                             jitter = random.uniform(0, 0.5 * delay)
                             actual_delay = delay + jitter
                             if full_assistant_text:
                                 yield ("bot_delta", "", "")
-                            yield ("thinking", f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...", "")
+                            yield (
+                                "thinking",
+                                f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...",
+                                "",
+                            )
                             await asyncio.sleep(actual_delay)
                             continue
 
                         circuit_breaker.record_failure(pkey)
                         raise api_err
 
-                output_tokens_est = estimate_tokens(full_assistant_text) + estimate_tokens(active_thought) + estimate_tokens(tool_calls_dict)
-                self._accumulate_usage(step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_tokens_est)
+                output_tokens_est = (
+                    estimate_tokens(full_assistant_text)
+                    + estimate_tokens(active_thought)
+                    + estimate_tokens(tool_calls_dict)
+                )
+                self._accumulate_usage(
+                    step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_tokens_est
+                )
 
                 if thinking_started:
                     dt = time.time() - thinking_t0
@@ -479,13 +548,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         {
                             "id": tc["id"],
                             "type": "function",
-                            "function": {
-                                "name": tc["name"],
-                                "arguments": tc["arguments"]
-                            }
+                            "function": {"name": tc["name"], "arguments": tc["arguments"]},
                         }
                         for tc in ordered_calls
-                    ]
+                    ],
                 }
                 messages.append(assistant_tool_msg)
 
@@ -497,20 +563,19 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     try:
                         args = json.loads(raw_args) if raw_args.strip() else {}
                     except Exception as json_err:
-                        tool_result = format_tool_error("invalid", detail=f"JSON arguments: {json_err}. Raw: {raw_args}", name=t_name)
+                        tool_result = format_tool_error(
+                            "invalid", detail=f"JSON arguments: {json_err}. Raw: {raw_args}", name=t_name
+                        )
                         yield ("tool", t_name, t_name, {})
                         yield ("tool_result", tool_result, "")
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": t_id,
-                            "content": tool_result
-                        })
+                        messages.append({"role": "tool", "tool_call_id": t_id, "content": tool_result})
                         continue
 
                     target = extract_tool_display(t_name, args)
                     yield ("tool", t_name, target, args)
 
                     from core.role_registry import RoleRegistry
+
                     current_mode = getattr(self, "mode", "act").lower()
                     role_def = RoleRegistry.get_instance().get_role(current_mode)
 
@@ -528,7 +593,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             tool_result = format_tool_error("execute", detail=str(e), name=t_name)
 
                     display_result = tool_result
-                    if isinstance(tool_result, str) and (tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]):
+                    if isinstance(tool_result, str) and (
+                        tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]
+                    ):
                         try:
                             parsed_img = json.loads(tool_result)
                             if isinstance(parsed_img, dict) and parsed_img.get("type") == "image":
@@ -546,12 +613,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     elif tool_result is None:
                         content_str = ""
 
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": t_id,
-                        "content": content_str
-                    })
-
+                    messages.append({"role": "tool", "tool_call_id": t_id, "content": content_str})
 
                 self.history = messages[1:]
                 messages, compacted_in_loop = (

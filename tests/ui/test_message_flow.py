@@ -43,9 +43,7 @@ class TestMessageFlowPaste(unittest.IsolatedAsyncioTestCase):
 
         app = JohnstonApp()
         async with app.run_test():
-            with patch.object(
-                app, "query_one", side_effect=Exception("boom")
-            ):
+            with patch.object(app, "query_one", side_effect=Exception("boom")):
                 await app.on_paste(events.Paste("hello"))  # must not raise
 
 
@@ -54,7 +52,9 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch(
+                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+            ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
                 app.trigger_ai_response = MagicMock()
@@ -65,7 +65,9 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch(
+                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+            ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
                 app.trigger_ai_response = MagicMock()
@@ -76,7 +78,9 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch(
+                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+            ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = True
                 app._queue_message_ui = MagicMock()
@@ -87,7 +91,9 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.notify = MagicMock()
-            with patch("core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock) as mock_h:
+            with patch(
+                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+            ) as mock_h:
                 mock_h.side_effect = Exception("boom")
                 await app._exec_slash_command("/help")
             app.notify.assert_called_once()
@@ -197,9 +203,7 @@ class TestTriggerAiResponse(unittest.IsolatedAsyncioTestCase):
             app.is_generating = True
             app._queue_message_ui = MagicMock()
             app.trigger_ai_response("hello")
-            app._queue_message_ui.assert_called_once_with(
-                "hello", show_in_ui=False, attachments=None
-            )
+            app._queue_message_ui.assert_called_once_with("hello", show_in_ui=False, attachments=None)
 
     async def test_trigger_starts_generation(self):
         app = JohnstonApp()
@@ -218,9 +222,7 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.1)
             app.pm.is_provider_connected = MagicMock(return_value=False)
             app.pm.get_active_provider_key = MagicMock(return_value="openai")
-            with patch(
-                "core.commands.ProvidersCommand", return_value=MagicMock()
-            ) as mock_cls:
+            with patch("widgets.commands.ProvidersCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
                 await pilot.pause(0.5)
@@ -235,9 +237,7 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             app.pm.get_active_provider_key = MagicMock(return_value="openai")
             app.agent = MagicMock()
             app.agent.model = ""
-            with patch(
-                "core.commands.ModelsCommand", return_value=MagicMock()
-            ) as mock_cls:
+            with patch("widgets.commands.ModelsCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
                 await pilot.pause(0.5)

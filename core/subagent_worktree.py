@@ -74,10 +74,13 @@ class SubagentWorktreeManager:
                 run_git(["add", "-A"], cwd=wt_path, timeout=10)
                 run_git(
                     [
-                        "-c", "user.name=Johnston Subagent",
-                        "-c", "user.email=subagent@johnston.local",
+                        "-c",
+                        "user.name=Johnston Subagent",
+                        "-c",
+                        "user.email=subagent@johnston.local",
                         "commit",
-                        "-m", f"subagent: automatic save for {branch_name}",
+                        "-m",
+                        f"subagent: automatic save for {branch_name}",
                     ],
                     cwd=wt_path,
                     timeout=10,

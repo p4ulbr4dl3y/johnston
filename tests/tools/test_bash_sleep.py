@@ -39,6 +39,6 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"command": "true"}, ctx=mock_app)
         self.assertIn("(no output)", res)
 
+
 if __name__ == "__main__":
     unittest.main()
-

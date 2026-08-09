@@ -118,6 +118,13 @@ PRESET_LINTERS: Dict[str, Dict[str, Any]] = {
 
 # Output noise prefixes that should never reach the chat (progress lines etc.)
 NOISE_PREFIXES = (
-    "Building ", "Downloading ", "× Failed", "└─>", "Call to ",
-    "[stderr]", "Audited ", "Checked ", "No fixes applied",
+    "Building ",
+    "Downloading ",
+    "× Failed",
+    "└─>",
+    "Call to ",
+    "[stderr]",
+    "Audited ",
+    "Checked ",
+    "No fixes applied",
 )

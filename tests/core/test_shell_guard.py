@@ -40,7 +40,7 @@ class TestShellGuard(unittest.TestCase):
             "echo $(rm -rf /)",
             "echo `rm -rf /`",
             "echo /tmp/x | xargs rm -rf",
-            "sh -c \"rm -rf /\"",
+            'sh -c "rm -rf /"',
             "bash -c 'rm -rf /'",
             "python -c \"import shutil; shutil.rmtree('/tmp')\"",
             "find . -delete",

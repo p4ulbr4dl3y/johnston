@@ -37,6 +37,7 @@ class PermissionManager:
 
     def get_group_for_tool(self, tool_name: str) -> Optional[str]:
         from tools.registry import normalize_tool_name
+
         canonical = normalize_tool_name(tool_name or "")
         return self.tool_to_group.get(canonical)
 
@@ -54,6 +55,7 @@ class PermissionManager:
         normalized = self.normalize_action(action)
         if normalized in self.VALID_ACTIONS:
             from tools.registry import normalize_tool_name
+
             canonical = normalize_tool_name(tool_name or "")
             self.session_overrides[canonical] = normalized
 
@@ -82,6 +84,7 @@ class PermissionManager:
         target_name = (target_name or "").strip().lower()
         if target_type == "tool":
             from tools.registry import normalize_tool_name
+
             target_name = normalize_tool_name(target_name)
 
         if target_type == "shell_guard":
@@ -119,7 +122,6 @@ class PermissionManager:
             perms[section][target_name] = action
 
         atomic_write_json(file_path, data)
-
 
     def get_effective_permissions(self, project_dir: Optional[str] = None) -> Dict[str, Any]:
         """Merges global and project permissions on top of DEFAULT_PERMISSIONS."""
@@ -183,6 +185,7 @@ class PermissionManager:
         """
         raw_tool = (tool_name or "").strip().lower()
         from tools.registry import normalize_tool_args, normalize_tool_name
+
         canonical_name = normalize_tool_name(raw_tool)
         norm_args = normalize_tool_args(canonical_name, args or {})
 

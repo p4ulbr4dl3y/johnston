@@ -6,7 +6,6 @@ from widgets.patch import apply_textual_patches
 
 
 class TestPatch(unittest.TestCase):
-
     def test_apply_textual_patches_sets_allow_select_property(self):
         original = Widget.allow_select
         try:
@@ -49,6 +48,7 @@ class TestPatch(unittest.TestCase):
     def test_screen_forward_event_handles_none_container(self):
         from textual.events import Event
         from textual.screen import Screen
+
         apply_textual_patches()
 
         class DummyScreen(Screen):
@@ -79,6 +79,3 @@ class TestPatch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-

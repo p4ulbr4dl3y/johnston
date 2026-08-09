@@ -9,6 +9,7 @@ from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
 
 class DiffRenderable:
     """Custom Rich renderable for diff views to prevent console line wrapping"""
+
     def __init__(self, formatted_lines: list[Text]):
         self.formatted_lines = formatted_lines
         self._text = Text("\n").join(formatted_lines)
@@ -27,8 +28,7 @@ class DiffRenderable:
                 line_copy.pad_right(pad_count)
                 new_len = len(line_copy.plain)
                 line_copy._spans = [
-                    Span(s.start, new_len, s.style) if s.end == old_len else s
-                    for s in line_copy._spans
+                    Span(s.start, new_len, s.style) if s.end == old_len else s for s in line_copy._spans
                 ]
             yield from console.render(line_copy, new_opts)
 
@@ -43,7 +43,9 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     if "[Linter Feedback]:" in diff_text:
         diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
 
-    diff_text = re.sub(r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE).strip()
+    diff_text = re.sub(
+        r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE
+    ).strip()
 
     lexer_name = guess_lexer_name(file_path)
     try:
@@ -81,17 +83,36 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
 
     full_sample = "\n".join(old_code_lines + new_code_lines)
     if lexer_name in ("html", "htm", "xhtml", "php", "vue", "svelte"):
-        has_html_tags = bool(re.search(
-            r'</?(?:div|p|a|span|form|button|input|h[1-6]|section|header|footer|ul|li|ol|img|script|style|label|svg|path|body|html|head|main|nav|aside|table|tr|td|th)\b|<!--',
-            full_sample,
-            re.IGNORECASE
-        ))
+        has_html_tags = bool(
+            re.search(
+                r"</?(?:div|p|a|span|form|button|input|h[1-6]|section|header|footer|ul|li|ol|img|script|style|label|svg|path|body|html|head|main|nav|aside|table|tr|td|th)\b|<!--",
+                full_sample,
+                re.IGNORECASE,
+            )
+        )
         if not has_html_tags:
-            has_script_open = bool(re.search(r'<script[\s>]', full_sample, re.IGNORECASE))
-            has_style_open = bool(re.search(r'<style[\s>]', full_sample, re.IGNORECASE))
+            has_script_open = bool(re.search(r"<script[\s>]", full_sample, re.IGNORECASE))
+            has_style_open = bool(re.search(r"<style[\s>]", full_sample, re.IGNORECASE))
 
-            has_js = any(w in full_sample for w in ("function", "let", "const", "var", "if", "return", "=>", "document", "window", "console", "addEventListener", "preventDefault", "classList"))
-            has_css = ("{" in full_sample and ":" in full_sample and ";" in full_sample)
+            has_js = any(
+                w in full_sample
+                for w in (
+                    "function",
+                    "let",
+                    "const",
+                    "var",
+                    "if",
+                    "return",
+                    "=>",
+                    "document",
+                    "window",
+                    "console",
+                    "addEventListener",
+                    "preventDefault",
+                    "classList",
+                )
+            )
+            has_css = "{" in full_sample and ":" in full_sample and ";" in full_sample
 
             if has_js and not has_script_open:
                 try:

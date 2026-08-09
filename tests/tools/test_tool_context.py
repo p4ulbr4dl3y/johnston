@@ -8,9 +8,11 @@ class MockAgent:
     def __init__(self):
         self.mode = "action"
 
+
 class MockProviderManager:
     def create_active_agent(self):
         return MockAgent()
+
 
 class MockApp:
     def __init__(self):
@@ -25,6 +27,7 @@ class MockApp:
 
     def refresh_status_footer(self):
         self.status_refreshed = True
+
 
 class TestToolContext(unittest.TestCase):
     def test_context_delegates_to_app(self):
@@ -55,15 +58,18 @@ class TestToolContext(unittest.TestCase):
         ctx.add_background_task("task_new")
         self.assertEqual(app.background_tasks, [running, "task_new"])
 
+
 class TestToolContextAdvanced(unittest.TestCase):
     def test_trigger_ai_response_with_method(self):
         class RespApp:
             def __init__(self):
                 self.called_with = None
                 self.show_in_ui = None
+
             def trigger_ai_response(self, prompt, show_in_ui=True):
                 self.called_with = prompt
                 self.show_in_ui = show_in_ui
+
         app = RespApp()
         ctx = ToolContext(app)
         ctx.trigger_ai_response("test prompt")
@@ -76,8 +82,10 @@ class TestToolContextAdvanced(unittest.TestCase):
                 self.is_generating = True
                 self.message_queue = []
                 self.gen_called = False
+
             def generate_ai_response(self, prompt, show_in_ui=True):
                 self.gen_called = True
+
         app = GenApp()
         ctx = ToolContext(app)
         ctx.trigger_ai_response("queued prompt")
@@ -90,8 +98,10 @@ class TestToolContextAdvanced(unittest.TestCase):
                 self.is_generating = False
                 self.message_queue = []
                 self.gen_args = None
+
             def generate_ai_response(self, prompt, show_in_ui=True):
                 self.gen_args = (prompt, show_in_ui)
+
         app = GenApp()
         ctx = ToolContext(app)
         ctx.trigger_ai_response("direct prompt")
@@ -110,6 +120,7 @@ class TestToolContextAdvanced(unittest.TestCase):
     def test_create_agent_no_pm(self):
         class NoPmApp:
             pass
+
         ctx = ToolContext(NoPmApp())
         self.assertIsNone(ctx.create_agent())
 

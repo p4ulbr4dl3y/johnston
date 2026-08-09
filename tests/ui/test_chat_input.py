@@ -154,9 +154,12 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app = DummyChatApp(ci)
         async with app.run_test():
             mock_img = Image.new("L", (50, 50))
-            with patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)), \
-                 patch("os.makedirs"), patch("os.path.getsize", return_value=512), \
-                 patch.object(Image.Image, "save") as mock_save:
+            with (
+                patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+                patch("os.makedirs"),
+                patch("os.path.getsize", return_value=512),
+                patch.object(Image.Image, "save") as mock_save,
+            ):
                 res = await ci.try_paste_clipboard_image()
                 self.assertTrue(res)
                 mock_save.assert_called_once()
@@ -224,8 +227,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_history_persistence(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_history_file = os.path.join(tmpdir, "prompt_history.json")
-            with patch("core.config.PROMPT_HISTORY_FILE", tmp_history_file), \
-                 patch("core.config.CONFIG_DIR", tmpdir):
+            with patch("core.config.PROMPT_HISTORY_FILE", tmp_history_file), patch("core.config.CONFIG_DIR", tmpdir):
                 ci = ChatInput()
                 self.assertEqual(ci.prompt_history, [])
 

@@ -6,7 +6,6 @@ from tools.manage_shell import ManageShellTool
 
 
 class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
-
     def _make_app(self, tasks=None):
         mock_app = MagicMock()
         mock_app.background_tasks = tasks if tasks is not None else []

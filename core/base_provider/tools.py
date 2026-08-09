@@ -6,6 +6,7 @@ class ToolMixin:
 
     def _canonical_tool_name(self, tool_name: str) -> str:
         from tools.registry import normalize_tool_name
+
         return normalize_tool_name(tool_name or "")
 
     def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:

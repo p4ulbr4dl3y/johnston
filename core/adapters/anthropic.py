@@ -45,9 +45,7 @@ class AnthropicAdapter(BaseApiAdapter):
     """
 
     @staticmethod
-    def _to_anthropic_messages(
-        messages: List[Dict[str, Any]]
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    def _to_anthropic_messages(messages: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
         system_prompt = ""
         final: List[Dict[str, Any]] = []
         pending_tools: List[Dict[str, Any]] = []
@@ -69,31 +67,35 @@ class AnthropicAdapter(BaseApiAdapter):
 
                 if img_info:
                     summary_text, media_type, b64_data, _ = img_info
-                    pending_tools.append({
-                        "type": "tool_result",
-                        "tool_use_id": tc_id,
-                        "content": [
-                            {"type": "text", "text": summary_text},
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": media_type,
-                                    "data": b64_data,
+                    pending_tools.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tc_id,
+                            "content": [
+                                {"type": "text", "text": summary_text},
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": media_type,
+                                        "data": b64_data,
+                                    },
                                 },
-                            },
-                        ],
-                    })
+                            ],
+                        }
+                    )
                     continue
 
                 tcontent = msg.get("content", "")
                 if not isinstance(tcontent, str):
                     tcontent = json.dumps(tcontent, ensure_ascii=False)
-                pending_tools.append({
-                    "type": "tool_result",
-                    "tool_use_id": tc_id,
-                    "content": tcontent,
-                })
+                pending_tools.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tc_id,
+                        "content": tcontent,
+                    }
+                )
                 continue
 
             _flush_tools()
@@ -115,12 +117,14 @@ class AnthropicAdapter(BaseApiAdapter):
                             blocks.append({"type": "text", "text": part.get("text", "")})
                 for tc in msg.get("tool_calls") or []:
                     fn_name, args_obj = parse_tool_call_args(tc)
-                    blocks.append({
-                        "type": "tool_use",
-                        "id": tc.get("id") or f"call_{uuid.uuid4().hex[:8]}",
-                        "name": fn_name,
-                        "input": args_obj,
-                    })
+                    blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.get("id") or f"call_{uuid.uuid4().hex[:8]}",
+                            "name": fn_name,
+                            "input": args_obj,
+                        }
+                    )
                 final.append({"role": "assistant", "content": blocks or [{"type": "text", "text": ""}]})
 
         _flush_tools()
@@ -165,11 +169,13 @@ class AnthropicAdapter(BaseApiAdapter):
                 fn_name = fn.get("name", "")
                 if not fn_name:
                     continue
-                converted_tools.append({
-                    "name": fn_name,
-                    "description": fn.get("description", ""),
-                    "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-                })
+                converted_tools.append(
+                    {
+                        "name": fn_name,
+                        "description": fn.get("description", ""),
+                        "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+                    }
+                )
             if converted_tools:
                 sorted_tools = sort_keys_recursive(converted_tools)
                 sorted_tools[-1]["cache_control"] = {"type": "ephemeral"}
@@ -223,11 +229,14 @@ class AnthropicAdapter(BaseApiAdapter):
                         idx = evt.get("index")
                         if idx in tool_blocks:
                             tb = tool_blocks.pop(idx)
-                            yield ("adapter_tool_call", {
-                                "id": tb["id"] or f"call_{uuid.uuid4().hex[:8]}",
-                                "name": tb["name"],
-                                "arguments": tb["args_buf"] or "{}",
-                            })
+                            yield (
+                                "adapter_tool_call",
+                                {
+                                    "id": tb["id"] or f"call_{uuid.uuid4().hex[:8]}",
+                                    "name": tb["name"],
+                                    "arguments": tb["args_buf"] or "{}",
+                                },
+                            )
                     elif etype == "message_delta":
                         u = evt.get("usage") or {}
                         if u.get("output_tokens") is not None:

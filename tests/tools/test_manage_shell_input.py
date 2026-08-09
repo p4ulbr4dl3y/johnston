@@ -25,7 +25,9 @@ class TestManageShellInput(unittest.IsolatedAsyncioTestCase):
         ctx = ToolContext(mock_app)
         mock_app.tool_context = ctx
 
-        res = await tool.execute({"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, ctx=mock_app)
+        res = await tool.execute(
+            {"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, ctx=mock_app
+        )
         self.assertIn("OK: input sent to task_interactive", res)
         mock_stdin.write.assert_called_once_with(b"John Doe\n")
 

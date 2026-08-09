@@ -98,6 +98,7 @@ class TestCLI(unittest.TestCase):
     def test_main_version(self):
         with self.assertRaises(SystemExit) as cm:
             from cli import main
+
             main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -106,6 +107,7 @@ class TestCLI(unittest.TestCase):
     def test_main_app_start(self, mock_app_run):
         with self.assertRaises(SystemExit) as cm:
             from cli import main
+
             main()
         self.assertEqual(cm.exception.code, 0)
         self.assertTrue(mock_app_run.called)
@@ -133,9 +135,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [
-                {"name": "srv", "command": "x", "scope": "global", "mode": "eager"}
-            ]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
             mgr.get_active_tools.side_effect = Exception("boom")
             mgr.clients = {}
             mock_get.return_value = mgr
@@ -230,6 +230,7 @@ class TestCLIAdvanced(unittest.TestCase):
         with patch("cli.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
+
                 print_models()
         self.assertIn("Available Johnston Providers & Models:", f.getvalue())
 
@@ -237,13 +238,19 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         pm = MagicMock()
         pm.load_providers.return_value = {
-            "openai": {"name": "OpenAI", "model": "gpt-4o", "models": ["m1", "m2", "m3", "m4", "m5", "m6"], "base_url": "http://x"},
+            "openai": {
+                "name": "OpenAI",
+                "model": "gpt-4o",
+                "models": ["m1", "m2", "m3", "m4", "m5", "m6"],
+                "base_url": "http://x",
+            },
         }
         pm.get_active_provider_key.return_value = "openai"
         pm.get_api_key.return_value = "sk-123"
         with patch("cli.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
+
                 print_models()
         out = f.getvalue()
         self.assertIn("* [openai] OpenAI [key set]", out)
@@ -286,7 +293,14 @@ class TestCLIAdvanced(unittest.TestCase):
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [
-                {"name": "srv", "command": "node", "args": ["a", "b"], "scope": "project", "mode": "eager", "disabled": True}
+                {
+                    "name": "srv",
+                    "command": "node",
+                    "args": ["a", "b"],
+                    "scope": "project",
+                    "mode": "eager",
+                    "disabled": True,
+                }
             ]
             mgr.get_active_tools.return_value = []
             mock_get.return_value = mgr
@@ -300,9 +314,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [
-                {"name": "srv", "scope": "global", "mode": "eager"}
-            ]
+            mgr.load_servers.return_value = [{"name": "srv", "scope": "global", "mode": "eager"}]
             mgr.get_active_tools.return_value = []
             mgr.clients = {}
             mock_get.return_value = mgr
@@ -315,9 +327,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [
-                {"name": "srv", "command": "x", "scope": "global", "mode": "eager"}
-            ]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
             mgr.get_active_tools.return_value = []
             client = MagicMock()
             client.last_error = "process failed"
@@ -331,9 +341,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [
-                {"name": "srv", "command": "x", "scope": "global", "mode": "eager"}
-            ]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
             mgr.get_active_tools.return_value = []
             mgr.clients = {}
             mock_get.return_value = mgr
@@ -355,13 +363,17 @@ class TestCLIAdvanced(unittest.TestCase):
                         print_rules()
         self.assertIn("No rules or project instruction files", f.getvalue())
 
-
     def test_print_roles_with_disallowed_tools(self):
         f = io.StringIO()
         with patch("core.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
             role = MagicMock(
-                read_only=False, source="builtin", disallowed_tools=["rm"], description="Act mode", allowed_tools=[], scope="any"
+                read_only=False,
+                source="builtin",
+                disallowed_tools=["rm"],
+                description="Act mode",
+                allowed_tools=[],
+                scope="any",
             )
             type(role).name = "Act"
             type(role).key = "act"
@@ -505,6 +517,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_models"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -513,6 +526,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_skills"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -521,6 +535,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_mcp"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -529,6 +544,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_roles"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -537,6 +553,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_rules"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -545,6 +562,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_subagents"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -553,6 +571,7 @@ class TestMainFlags(unittest.TestCase):
             with patch("cli.print_linters"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -564,6 +583,7 @@ class TestMainFlags(unittest.TestCase):
                 mock_app.current_session_id = None
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
@@ -579,6 +599,7 @@ class TestMainFlags(unittest.TestCase):
                 with redirect_stdout(f):
                     with self.assertRaises(SystemExit) as cm:
                         from cli import main
+
                         main()
         self.assertEqual(cm.exception.code, 0)
         self.assertIn("johnston --resume sess123", f.getvalue())
@@ -593,11 +614,10 @@ class TestMainFlags(unittest.TestCase):
                 mock_app.sm.get.side_effect = Exception("boom")
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
+
                     main()
         self.assertEqual(cm.exception.code, 0)
 
 
 if __name__ == "__main__":
     unittest.main()
-
-

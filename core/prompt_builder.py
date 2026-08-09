@@ -16,6 +16,7 @@ __all__ = ["DEFAULT_SYSTEM_PROMPT", "SUBAGENT_DEFAULT_SYSTEM_PROMPT", "PromptBui
 _GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
 _GIT_INFO_CACHE_TTL = 30.0
 
+
 def get_git_info(cwd: str = None) -> str:
     """Returns current git branch for a working directory (defaults to os.getcwd()).
 
@@ -69,7 +70,6 @@ def _compute_git_info(cwd: str = None) -> str:
     return ""
 
 
-
 def get_project_instructions_snippet(cwd: str = None) -> str:
     """Reads AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules, or CONVENTIONS.md from a working directory."""
     cwd = os.path.realpath(cwd) if cwd else os.getcwd()
@@ -99,9 +99,8 @@ def get_rules_snippet(mode: str = "act", cwd: str = None) -> str:
     worktree sees its own `.johnston/rules` instead of the parent checkout's.
     """
     from core.rules_manager import RulesManager
+
     return RulesManager.get_instance().get_formatted_rules(mode=mode, project_dir=cwd)
-
-
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
@@ -175,6 +174,7 @@ class PromptBuilder:
         cwd = self.cwd or os.getcwd()
         from core.mcp_manager import get_mcp_manager
         from core.role_registry import RoleRegistry
+
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         skills_snippet = SkillManager().get_system_prompt_snippet()
@@ -190,7 +190,7 @@ class PromptBuilder:
             "## Environment Metadata",
             f"- Working Directory: {cwd}",
             f"- Current Date: {now_str}",
-            f"- Operating System: {os_info}"
+            f"- Operating System: {os_info}",
         ]
         if git_info:
             env_lines.append(f"- Git Context: {git_info}")
@@ -204,7 +204,11 @@ class PromptBuilder:
         # last so the longest possible stable prefix can be prompt-cached.
         sys_prompt = self.base_system_prompt
         if "{model_name}" in sys_prompt:
-            model_label = self.model_name.strip() if self.model_name and self.model_name.strip() else "an expert AI software engineer"
+            model_label = (
+                self.model_name.strip()
+                if self.model_name and self.model_name.strip()
+                else "an expert AI software engineer"
+            )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
@@ -219,6 +223,7 @@ class PromptBuilder:
 
         if not self.is_subagent:
             from core.role_registry import RoleRegistry
+
             mode_def = RoleRegistry.get_instance().get_role(self.mode, project_dir=cwd)
             if mode_def.prompt:
                 sys_prompt += f"\n\n{mode_def.prompt}"
@@ -236,9 +241,7 @@ class PromptBuilder:
 
         mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_cached_tools()
-        clean_mcp_tools = [
-            {"type": t["type"], "function": t["function"]} for t in mcp_tools
-        ]
+        clean_mcp_tools = [{"type": t["type"], "function": t["function"]} for t in mcp_tools]
 
         all_tools = list(self.base_tools) + clean_mcp_tools
 
@@ -259,8 +262,12 @@ class PromptBuilder:
 
         filtered_tools = [t for t in all_tools if _tool_allowed(t)]
 
-        if not self.is_subagent and self.allow_task and not any(
-            t.get("function", {}).get("name") in ("invoke_subagent", "subagent", "Subagent") for t in filtered_tools
+        if (
+            not self.is_subagent
+            and self.allow_task
+            and not any(
+                t.get("function", {}).get("name") in ("invoke_subagent", "subagent", "Subagent") for t in filtered_tools
+            )
         ):
             filtered_tools.append(InvokeSubagentTool.schema)
 
@@ -268,6 +275,7 @@ class PromptBuilder:
 
         def _sort_tool_schema(tool_dict: Dict[str, Any]) -> Dict[str, Any]:
             import copy
+
             t = copy.deepcopy(tool_dict)
             fn = t.get("function", {})
             params = fn.get("parameters", {})

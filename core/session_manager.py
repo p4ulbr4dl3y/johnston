@@ -85,7 +85,13 @@ class AgentSession:
             last["text"] = event.get("text", "")
             if event.get("duration") is not None:
                 last["duration"] = event["duration"]
-        elif etype == "tool" and "result_text" in event and last and last.get("type") == "tool" and "result_text" not in last:
+        elif (
+            etype == "tool"
+            and "result_text" in event
+            and last
+            and last.get("type") == "tool"
+            and "result_text" not in last
+        ):
             last["result_text"] = event["result_text"]
         else:
             self.messages.append(event)
@@ -332,13 +338,15 @@ class SessionStore:
         for sess in self.list(kind="main"):
             if not sess.messages and not sess.agent_history:
                 continue
-            sessions.append({
-                "id": sess.id,
-                "title": sess.description or self._title_from_messages(sess),
-                "created_at": sess.created_at,
-                "updated_at": sess.updated_at,
-                "message_count": self._message_count(sess),
-            })
+            sessions.append(
+                {
+                    "id": sess.id,
+                    "title": sess.description or self._title_from_messages(sess),
+                    "created_at": sess.created_at,
+                    "updated_at": sess.updated_at,
+                    "message_count": self._message_count(sess),
+                }
+            )
         sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
         return sessions
 
@@ -390,6 +398,7 @@ class SessionStore:
         sess = self.get(session_id)
         if sess and sess.kind == "main":
             import shutil
+
             shutil.rmtree(self._subagent_dir(session_id), ignore_errors=True)
             try:
                 os.remove(self._main_path(session_id))
@@ -418,7 +427,7 @@ class SessionStore:
     ) -> Optional[AgentSession]:
         if not identifier:
             return None
-        clean_id = identifier.strip('"\' `')
+        clean_id = identifier.strip("\"' `")
 
         candidates = self.children(parent_id) if parent_id else self.list()
         res = self._search_in_list(candidates, identifier, clean_id)
@@ -432,34 +441,32 @@ class SessionStore:
                 return res
         return None
 
-    def _search_in_list(
-        self, candidates: List[AgentSession], identifier: str, clean_id: str
-    ) -> Optional[AgentSession]:
+    def _search_in_list(self, candidates: List[AgentSession], identifier: str, clean_id: str) -> Optional[AgentSession]:
         for sess in candidates:
             if sess.id == identifier or sess.id == clean_id:
                 return sess
-            clean_desc = sess.description.strip('"\' `')
+            clean_desc = sess.description.strip("\"' `")
             if clean_desc == clean_id:
                 return sess
-            clean_prompt = sess.prompt.strip('"\' `')
+            clean_prompt = sess.prompt.strip("\"' `")
             if clean_prompt == clean_id:
                 return sess
 
         if "..." in clean_id:
             parts = [p.strip() for p in clean_id.split("...") if p.strip()]
             for sess in candidates:
-                clean_desc = sess.description.strip('"\' `')
+                clean_desc = sess.description.strip("\"' `")
                 if parts and all(p in clean_desc for p in parts):
                     return sess
-                clean_prompt = sess.prompt.strip('"\' `')
+                clean_prompt = sess.prompt.strip("\"' `")
                 if parts and all(p in clean_prompt for p in parts):
                     return sess
 
         clean_id_lower = clean_id.lower()
         if len(clean_id_lower) >= 3:
             for sess in candidates:
-                c_desc = sess.description.strip('"\' `').lower()
-                c_prompt = sess.prompt.strip('"\' `').lower()
+                c_desc = sess.description.strip("\"' `").lower()
+                c_prompt = sess.prompt.strip("\"' `").lower()
                 if c_desc and (clean_id_lower in c_desc or c_desc in clean_id_lower):
                     return sess
                 if c_prompt and (clean_id_lower in c_prompt or c_prompt in clean_id_lower):

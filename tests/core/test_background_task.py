@@ -58,7 +58,7 @@ class TestBackgroundTaskFormattedOutput(unittest.TestCase):
             "Receiving objects: 26% (127/485)\r",
             "Receiving objects: 27% (131/485)\r",
             "Receiving objects: 100% (485/485)\n",
-            "Resolving deltas: 100% (17/17)\n"
+            "Resolving deltas: 100% (17/17)\n",
         ]
         res = bg_task.get_formatted_output()
         self.assertEqual(res, "Receiving objects: 100% (485/485)\nResolving deltas: 100% (17/17)\n")
@@ -85,6 +85,7 @@ class TestBackgroundTaskSendInput(unittest.IsolatedAsyncioTestCase):
         t = BackgroundTask("t5", "cmd", None)
         t.is_running = True
         import os
+
         r_fd, w_fd = os.pipe()
         try:
             t.master_fd = w_fd
@@ -160,7 +161,6 @@ class TestBackgroundTaskLifecycle(unittest.IsolatedAsyncioTestCase):
         res = await bg_task.send_input("hello stdin")
         self.assertIn("OK: input sent to task_3", res)
         mock_stdin.write.assert_called_once_with(b"hello stdin\n")
-
 
 
 class TestKillAllBackgroundTasks(unittest.TestCase):

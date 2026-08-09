@@ -60,12 +60,9 @@ class ToolContext:
                     pass
             # Finished output is delivered via the completion callback, so prune
             # done tasks to keep the registry limited to active ones.
-            self.app.background_tasks[:] = [
-                t for t in self.app.background_tasks if getattr(t, "is_running", False)
-            ]
+            self.app.background_tasks[:] = [t for t in self.app.background_tasks if getattr(t, "is_running", False)]
             self.app.background_tasks.append(task)
         self.refresh_status()
-
 
     def create_agent(self) -> Any:
         if self.app and hasattr(self.app, "pm"):

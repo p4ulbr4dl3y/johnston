@@ -52,7 +52,8 @@ class LintersScreen(BaseModalScreen[None]):
             self.filtered_linters = list(self.linters)
         else:
             self.filtered_linters = [
-                lint for lint in self.linters
+                lint
+                for lint in self.linters
                 if q in lint.get("name", "").lower()
                 or q in lint.get("label", "").lower()
                 or any(q in ext.lower() for ext in lint.get("extensions", []))
@@ -134,4 +135,3 @@ class LintersScreen(BaseModalScreen[None]):
             self.refresh_list()
             opt_list = self.query_one("#linters-option-list", OptionList)
             opt_list.highlighted = event.option_index
-

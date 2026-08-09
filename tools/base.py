@@ -70,13 +70,15 @@ def make_unified_diff(
     old_l = old_content if isinstance(old_content, list) else old_content.splitlines()
     new_l = new_content if isinstance(new_content, list) else new_content.splitlines()
 
-    diff_lines = list(difflib.unified_diff(
-        old_l,
-        new_l,
-        fromfile=fromfile,
-        tofile=tofile,
-        lineterm="",
-    ))
+    diff_lines = list(
+        difflib.unified_diff(
+            old_l,
+            new_l,
+            fromfile=fromfile,
+            tofile=tofile,
+            lineterm="",
+        )
+    )
     return "\n".join(diff_lines)
 
 
@@ -87,7 +89,6 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
     if not word or not possibilities:
         return []
     return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
-
 
 
 def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
@@ -110,10 +111,7 @@ def format_background_notification(kind: str, name: str, task_id: str, result: s
     Emitted as a user message when a background shell/subagent finishes:
     `[System Notification] <kind> '<name>' (ID: <task_id>) completed.\n<task_result>\n<result>\n</task_result>`
     """
-    return (
-        f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n"
-        f"<task_result>\n{result}\n</task_result>"
-    )
+    return f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n<task_result>\n{result}\n</task_result>"
 
 
 def truncate_output(
@@ -146,6 +144,7 @@ def truncate_output(
     log_path = None
     if save_log:
         import uuid
+
         name_prefix = f"{tool_name}_" if tool_name else "tool_"
         unique_id = tool_id if tool_id else uuid.uuid4().hex[:8]
         filename = f"{name_prefix}{unique_id}.log"

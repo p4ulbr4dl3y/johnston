@@ -38,6 +38,7 @@ class TransparentSyntax(Syntax):
             else:
                 yield segment
 
+
 CODE_THEME = "one-dark"
 
 
@@ -113,8 +114,6 @@ class CustomMarkdownFence(MarkdownFence):
     def allow_horizontal_scroll(self) -> bool:
         return False
 
-
-
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "code"
         copy_btn = Button("copy", classes="fence-copy-btn")
@@ -134,7 +133,9 @@ class CustomMarkdownFence(MarkdownFence):
                 target_lexer = "text"
 
         theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
-        code_content = TransparentSyntax(self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default")
+        code_content = TransparentSyntax(
+            self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default"
+        )
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
         with Vertical(classes="fence-scroll-box"):
@@ -174,14 +175,16 @@ Markdown.BLOCKS["fence"] = CustomMarkdownFence
 Markdown.BLOCKS["code_block"] = CustomMarkdownFence
 Markdown.BLOCKS["table"] = CustomMarkdownTable
 
+
 def _custom_markdown_parser_factory() -> MarkdownIt:
     md = MarkdownIt("gfm-like", {"linkify": False})
     md.validateLink = lambda url: True
     return md
 
 
-
 _old_markdown_init = Markdown.__init__
+
+
 def _new_markdown_init(self, *args, **kwargs):
     if "parser_factory" not in kwargs or kwargs["parser_factory"] is None:
         kwargs["parser_factory"] = _custom_markdown_parser_factory
@@ -190,10 +193,14 @@ def _new_markdown_init(self, *args, **kwargs):
     self.BLOCKS["code_block"] = CustomMarkdownFence
     self.BLOCKS["table"] = CustomMarkdownTable
     _old_markdown_init(self, *args, **kwargs)
+
+
 Markdown.__init__ = _new_markdown_init
 
 
 _old_markdown_block_get_style = MarkdownBlock._get_style
+
+
 def _new_markdown_block_get_style(self, style):
     if style == ".code_inline":
         return Style(
@@ -201,9 +208,9 @@ def _new_markdown_block_get_style(self, style):
             foreground=Color(255, 255, 255),
         )
     return _old_markdown_block_get_style(self, style)
+
+
 MarkdownBlock._get_style = _new_markdown_block_get_style
-
-
 
 
 def _handle_markdown_task_done(task: asyncio.Task) -> None:
@@ -282,10 +289,12 @@ def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) ->
                 loop = asyncio.get_running_loop()
                 if loop.is_running():
                     task = loop.create_task(res)
+
                     def _done_cb(t: asyncio.Task) -> None:
                         _handle_markdown_task_done(t)
                         if on_done:
                             on_done()
+
                     task.add_done_callback(_done_cb)
                     return
             except RuntimeError:

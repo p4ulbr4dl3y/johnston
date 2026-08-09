@@ -84,7 +84,9 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_fetch_http_error(self):
         with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client_cls.return_value = _make_stream_client(b"", "text/html", status_code=404, url="https://example.com/404")
+            mock_client_cls.return_value = _make_stream_client(
+                b"", "text/html", status_code=404, url="https://example.com/404"
+            )
             tool = WebFetchTool()
             res = await tool.execute({"url": "https://example.com/404"})
 
@@ -117,7 +119,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
     @patch("httpx.AsyncClient")
     async def test_truncation_behavior(self, mock_client_cls):
-        long_body = (b"x" * 10000)
+        long_body = b"x" * 10000
         mock_client = _make_stream_client(long_body, "text/plain")
         mock_client_cls.return_value = mock_client
 
@@ -143,9 +145,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_invalid_content_length_ignored(self, mock_client_cls):
         # A non-numeric Content-Length must be ignored, not crash the fetch.
         body = b"plain body"
-        mock_client_cls.return_value = _make_stream_client(
-            body, "text/plain", url="https://example.com/x"
-        )
+        mock_client_cls.return_value = _make_stream_client(body, "text/plain", url="https://example.com/x")
         mock_client_cls.return_value.stream.return_value.__aenter__.return_value.headers = {
             "content-type": "text/plain",
             "content-length": "garbage",
@@ -247,4 +247,3 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

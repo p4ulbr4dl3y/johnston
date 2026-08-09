@@ -37,9 +37,7 @@ class TestRunGit(unittest.TestCase):
 
     def test_env_and_no_timeout_passthrough(self):
         with patch("core.git_utils.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                args=["git", "log"], returncode=0, stdout="", stderr=""
-            )
+            mock_run.return_value = subprocess.CompletedProcess(args=["git", "log"], returncode=0, stdout="", stderr="")
             run_git(["log"], env={"GIT_CONFIG": "x"})
         kwargs = mock_run.call_args.kwargs
         self.assertEqual(kwargs["env"], {"GIT_CONFIG": "x"})

@@ -27,6 +27,7 @@ class DummyHostApp(App[None]):
     def on_mount(self) -> None:
         def callback(res=None):
             self.dismiss_result = res
+
         self.push_screen(self.screen_to_test, callback=callback)
 
     def refresh_status_footer(self):
@@ -82,10 +83,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_providers_screen_pilot(self):
-        providers = {
-            "opencode": {"key": "opencode", "name": "OpenCode"},
-            "openai": {"key": "openai", "name": "OpenAI"}
-        }
+        providers = {"opencode": {"key": "opencode", "name": "OpenCode"}, "openai": {"key": "openai", "name": "OpenAI"}}
         screen = ProvidersScreen(providers=providers, active_key="opencode", configured_keys={})
         app = DummyHostApp(screen)
 
@@ -171,16 +169,12 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             opt_list = screen.query_one("#tasks-option-list", OptionList)
             with patch.object(app, "push_screen") as mock_push:
-                screen.on_option_list_option_selected(
-                    OptionList.OptionSelected(opt_list, Option("sub task"), 0)
-                )
+                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("sub task"), 0))
                 mock_push.assert_called_once()
                 self.assertIsInstance(mock_push.call_args[0][0], SubagentViewScreen)
 
             with patch.object(app, "push_screen") as mock_push:
-                screen.on_option_list_option_selected(
-                    OptionList.OptionSelected(opt_list, Option("norm task"), 1)
-                )
+                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
                 mock_push.assert_called_once()
                 self.assertIsInstance(mock_push.call_args[0][0], TaskConsoleScreen)
 
@@ -246,7 +240,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         screen._is_mounted = False
         screen.update_tasks_list()
 
-
     async def test_help_screen_pilot(self):
         screen = HelpScreen()
         app = DummyHostApp(screen)
@@ -260,9 +253,10 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_user_wizard_screen_pilot(self):
         from widgets.screens.ask_user import AskUserWizardScreen
+
         questions = [
             {"question_text": "Pick color", "options": ["Red", "Blue"]},
-            {"question_text": "Enter name", "options": []}
+            {"question_text": "Enter name", "options": []},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -293,9 +287,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
         from widgets.screens.ask_user import AskUserWizardScreen
 
-        questions = [
-            {"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}
-        ]
+        questions = [{"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 
@@ -327,7 +319,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         questions = [
             {"question_text": "Enter custom text", "options": []},
-            {"question_text": "Question 2", "options": []}
+            {"question_text": "Question 2", "options": []},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -353,10 +345,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         from widgets.screens.ask_user import AskUserWizardScreen
 
-        questions = [
-            {"question_text": "Q1", "options": ["Opt1"]},
-            {"question_text": "Q2", "options": ["Opt2"]}
-        ]
+        questions = [{"question_text": "Q1", "options": ["Opt1"]}, {"question_text": "Q2", "options": ["Opt2"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 
@@ -381,7 +370,3 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
-

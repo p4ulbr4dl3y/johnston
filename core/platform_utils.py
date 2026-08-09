@@ -23,6 +23,7 @@ def atomic_write_text(path: str, content: str) -> None:
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
     import tempfile
+
     fd, tmp_path = tempfile.mkstemp(prefix=".johnston-", suffix=".tmp", dir=directory, text=True)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -41,6 +42,7 @@ def atomic_write_text(path: str, content: str) -> None:
 
 def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
     import json
+
     content = json.dumps(data, indent=indent, ensure_ascii=False)
     atomic_write_text(path, content)
 
@@ -51,6 +53,7 @@ def read_json(path: str, default: Any = None) -> Any:
         return default
     try:
         import json
+
         with open(path, "r", encoding="utf-8") as f:
             content = f.read().strip()
             if not content:
@@ -263,4 +266,3 @@ def copy_to_os_clipboard(text: str) -> None:
             p.communicate(input=text)
     except Exception:
         pass
-

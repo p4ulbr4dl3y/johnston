@@ -6,7 +6,6 @@ from core.circuit_breaker import CircuitBreaker, circuit_breaker
 
 
 class TestCircuitBreaker(unittest.TestCase):
-
     def setUp(self):
         circuit_breaker._failures.clear()
         circuit_breaker._state.clear()
@@ -68,7 +67,6 @@ class TestCircuitBreaker(unittest.TestCase):
 
 
 class TestAgentCircuitBreakerIntegration(unittest.IsolatedAsyncioTestCase):
-
     async def asyncSetUp(self):
         circuit_breaker._failures.clear()
         circuit_breaker._state.clear()

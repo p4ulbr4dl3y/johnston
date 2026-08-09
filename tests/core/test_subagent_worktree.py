@@ -14,7 +14,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         # Init git repo
         subprocess.run(["git", "init"], cwd=self.repo_dir, capture_output=True, text=True)
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=self.repo_dir, capture_output=True, text=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.repo_dir, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=self.repo_dir, capture_output=True, text=True
+        )
 
         dummy_file = os.path.join(self.repo_dir, "README.md")
         with open(dummy_file, "w", encoding="utf-8") as f:
@@ -44,7 +46,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         with open(wt_file, "a", encoding="utf-8") as f:
             f.write("Worktree edit\n")
 
-        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
+            self.repo_dir, wt_path, branch_name
+        )
         self.assertTrue(has_changes)
         self.assertIn("Worktree edit", diff_summary)
 
@@ -53,7 +57,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         self.assertFalse(os.path.exists(wt_path))
 
         # Check branch exists in repo
-        res = subprocess.run(["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
+        res = subprocess.run(
+            ["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True
+        )
         self.assertIn(branch_name, res.stdout)
 
         # Clean up branch manually for test
@@ -63,7 +69,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         session_id = "test-wt-no-changes"
         wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id)
 
-        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
+            self.repo_dir, wt_path, branch_name
+        )
         self.assertFalse(has_changes)
         self.assertEqual(diff_summary, "")
 
@@ -71,7 +79,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=False)
         self.assertFalse(os.path.exists(wt_path))
 
-        res = subprocess.run(["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True)
+        res = subprocess.run(
+            ["git", "branch", "--list", branch_name], cwd=self.repo_dir, capture_output=True, text=True
+        )
         self.assertNotIn(branch_name, res.stdout)
 
     def test_worktree_manual_commits_by_subagent_detected(self):
@@ -88,7 +98,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         subprocess.run(["git", "commit", "-m", "Subagent manual commit"], cwd=wt_path, capture_output=True, text=True)
 
         # Git status --short is now empty, but branch has commits relative to parent repo base_sha
-        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
+            self.repo_dir, wt_path, branch_name
+        )
         self.assertTrue(has_changes)
         self.assertIn("manual.txt", diff_summary)
         self.assertIn("Manual commit contents", diff_summary)
@@ -116,7 +128,9 @@ class TestSubagentWorktreeManager(unittest.TestCase):
             f.write("Updated README\n")
 
         # Auto-commit and get diff
-        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(self.repo_dir, wt_path, branch_name)
+        diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
+            self.repo_dir, wt_path, branch_name
+        )
         self.assertTrue(has_changes)
         self.assertIn("feature.py", diff_summary)
         self.assertIn("Updated README", diff_summary)
@@ -146,7 +160,9 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
 
         subprocess.run(["git", "init"], cwd=self.repo_dir, capture_output=True, text=True)
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=self.repo_dir, capture_output=True, text=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.repo_dir, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=self.repo_dir, capture_output=True, text=True
+        )
 
         dummy_file = os.path.join(self.repo_dir, "README.md")
         with open(dummy_file, "w", encoding="utf-8") as f:
@@ -170,8 +186,13 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_create_worktree_git_add_failure(self):
         from unittest.mock import patch
 
-        with patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True), \
-             patch("core.subagent_worktree.run_git", return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err")):
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+            patch(
+                "core.subagent_worktree.run_git",
+                return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
+            ),
+        ):
             wt_path, branch_name = SubagentWorktreeManager.create_worktree(self.repo_dir, "subagent-x")
         self.assertIsNone(wt_path)
         self.assertIsNone(branch_name)
@@ -191,13 +212,19 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             self.assertEqual(result, wt_path)
         finally:
             import shutil
+
             shutil.rmtree(wt_path, ignore_errors=True)
 
     def test_attach_worktree_add_failure(self):
         from unittest.mock import patch
 
-        with patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True), \
-             patch("core.subagent_worktree.run_git", return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err")):
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+            patch(
+                "core.subagent_worktree.run_git",
+                return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
+            ),
+        ):
             result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-new", "branch-x")
         self.assertIsNone(result)
 
@@ -209,12 +236,18 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         wt_path = os.path.join(WORKTREES_DIR, "attach-ok")
         os.makedirs(wt_path, exist_ok=True)
         try:
-            with patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True), \
-                 patch("core.subagent_worktree.run_git", return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")):
+            with (
+                patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+                patch(
+                    "core.subagent_worktree.run_git",
+                    return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr=""),
+                ),
+            ):
                 result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-ok", "branch-x")
             self.assertEqual(result, wt_path)
         finally:
             import shutil
+
             shutil.rmtree(wt_path, ignore_errors=True)
 
     def test_get_worktree_diff_summary_missing_path(self):
@@ -234,8 +267,10 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, stdout="abc123", stderr="")
             return subprocess.CompletedProcess(args, 0, stdout="x" * 5000, stderr="")
 
-        with patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True), \
-             patch("core.subagent_worktree.run_git", side_effect=fake_run):
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+            patch("core.subagent_worktree.run_git", side_effect=fake_run),
+        ):
             diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 self.repo_dir, self.repo_dir, "branch-x"
             )
@@ -258,8 +293,10 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
 
         wt_path = os.path.join(self.temp_dir.name, "wt-cleanup")
         os.makedirs(wt_path, exist_ok=True)
-        with patch.object(SubagentWorktreeManager, "is_git_repo", return_value=False), \
-             patch("shutil.rmtree", side_effect=OSError("boom")):
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", return_value=False),
+            patch("shutil.rmtree", side_effect=OSError("boom")),
+        ):
             SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, "branch-x")  # must not raise
         self.assertTrue(os.path.exists(wt_path))
         os.rmdir(wt_path)
@@ -276,11 +313,11 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         wt_path = os.path.join(self.temp_dir.name, "wt-append")
         os.makedirs(wt_path, exist_ok=True)
         acc = [""]
-        with patch.object(SubagentWorktreeManager, "get_worktree_diff_summary", return_value=("Some diff", True)), \
-             patch.object(SubagentWorktreeManager, "cleanup_worktree") as mock_cleanup:
-            wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
-                self.repo_dir, wt_path, "subagent-x", acc
-            )
+        with (
+            patch.object(SubagentWorktreeManager, "get_worktree_diff_summary", return_value=("Some diff", True)),
+            patch.object(SubagentWorktreeManager, "cleanup_worktree") as mock_cleanup,
+        ):
+            wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(self.repo_dir, wt_path, "subagent-x", acc)
         self.assertEqual((wt, branch), (None, None))
         self.assertIn("[Worktree Branch 'subagent-x']", acc[0])
         self.assertIn("Some diff", acc[0])
@@ -292,8 +329,10 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         wt_path = os.path.join(self.temp_dir.name, "wt-append-fu")
         os.makedirs(wt_path, exist_ok=True)
         acc = [""]
-        with patch.object(SubagentWorktreeManager, "get_worktree_diff_summary", return_value=("Fu diff", True)), \
-             patch.object(SubagentWorktreeManager, "cleanup_worktree") as mock_cleanup:
+        with (
+            patch.object(SubagentWorktreeManager, "get_worktree_diff_summary", return_value=("Fu diff", True)),
+            patch.object(SubagentWorktreeManager, "cleanup_worktree") as mock_cleanup,
+        ):
             wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
                 self.repo_dir, wt_path, "subagent-x", acc, is_followup=True
             )
@@ -308,9 +347,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         os.makedirs(wt_path, exist_ok=True)
         acc = [""]
         with patch.object(SubagentWorktreeManager, "get_worktree_diff_summary", return_value=("", False)):
-            wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
-                self.repo_dir, wt_path, "subagent-x", acc
-            )
+            wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(self.repo_dir, wt_path, "subagent-x", acc)
         self.assertEqual((wt, branch), (None, None))
         self.assertEqual(acc[0], "")
 

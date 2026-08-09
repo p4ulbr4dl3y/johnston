@@ -5,7 +5,6 @@ from widgets.command_suggestions import CommandSuggestions
 
 
 class TestFileSuggestions(unittest.TestCase):
-
     def test_file_suggestions_query(self):
         suggestions = CommandSuggestions()
 
@@ -25,7 +24,6 @@ class TestFileSuggestions(unittest.TestCase):
         suggestions.update_query("test@domain.com", "test@domain.com", 15)
         self.assertIsNone(suggestions.mode)
         self.assertFalse(suggestions.display)
-
 
     def test_pasted_file_path_formatting(self):
         chat_input = ChatInput()
@@ -51,7 +49,9 @@ class TestFileSuggestions(unittest.TestCase):
         self.assertEqual(chat_input.format_pasted_file_path("/tmp/my\\ folder/script.py"), "@/tmp/my folder/script.py ")
 
         # Test URL-encoded file scheme drag and drop
-        self.assertEqual(chat_input.format_pasted_file_path("file:///tmp/my%20folder/script.py"), "@/tmp/my folder/script.py ")
+        self.assertEqual(
+            chat_input.format_pasted_file_path("file:///tmp/my%20folder/script.py"), "@/tmp/my folder/script.py "
+        )
 
 
 if __name__ == "__main__":

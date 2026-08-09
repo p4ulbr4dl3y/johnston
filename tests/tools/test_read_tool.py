@@ -78,9 +78,11 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_convert_doc_to_markdown_sync_cli_fallback(self):
         fake_path = "/tmp/cli_doc.docx"
-        with patch("tools.read.get_cached_doc_markdown", return_value=None), \
-             patch("shutil.which", return_value="/usr/local/bin/markitdown"), \
-             patch("subprocess.run") as mock_sub:
+        with (
+            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("shutil.which", return_value="/usr/local/bin/markitdown"),
+            patch("subprocess.run") as mock_sub,
+        ):
             mock_sub.return_value = MagicMock(returncode=0, stdout="# CLI Output")
             # Force python import to fail
             with patch.dict("sys.modules", {"markitdown": None}):
@@ -89,8 +91,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_convert_doc_to_markdown_sync_failure_raises(self):
         fake_path = "/tmp/failed.docx"
-        with patch("tools.read.get_cached_doc_markdown", return_value=None), \
-             patch("shutil.which", return_value=None):
+        with patch("tools.read.get_cached_doc_markdown", return_value=None), patch("shutil.which", return_value=None):
             with patch.dict("sys.modules", {"markitdown": None}):
                 with self.assertRaises(RuntimeError) as ctx:
                     convert_doc_to_markdown_sync(fake_path)

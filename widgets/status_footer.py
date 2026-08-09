@@ -12,6 +12,7 @@ SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇",
 
 class StatusFooter(Static):
     """Two-line status footer below chat"""
+
     can_focus = False
     ALLOW_SELECT = False
 
@@ -103,9 +104,12 @@ class StatusFooter(Static):
             curr_sid = getattr(self.app, "current_session_id", None)
             if curr_sid:
                 bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) == curr_sid]
-            active_bg_tasks = len([t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)])
+            active_bg_tasks = len(
+                [t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)]
+            )
 
             from core.session_manager import SessionStore
+
             store = getattr(self.app, "sm", None) if hasattr(self.app, "sm") else SessionStore.get_instance()
             store.list(kind="subagent")
             sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
@@ -135,7 +139,7 @@ class StatusFooter(Static):
                 "skills_visible": skills_visible,
                 "skills_total": skills_total,
                 "mcp_active": mcp_active,
-                "mcp_total": mcp_total
+                "mcp_total": mcp_total,
             }
             self._last_status_args = kwargs
             self.update_status(**kwargs)
@@ -163,7 +167,7 @@ class StatusFooter(Static):
         skills_visible: int = 0,
         skills_total: int = 0,
         mcp_active: int = 0,
-        mcp_total: int = 0
+        mcp_total: int = 0,
     ) -> None:
         if not directory:
             directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
@@ -185,13 +189,17 @@ class StatusFooter(Static):
         else:
             mode_formatted = mode_str
 
-        width = self.size.width if (self.size and self.size.width > 0) else (self.app.size.width if (self.app and self.app.size) else 80)
+        width = (
+            self.size.width
+            if (self.size and self.size.width > 0)
+            else (self.app.size.width if (self.app and self.app.size) else 80)
+        )
         is_compact = width > 0 and width < 75
 
         if is_compact:
             row1_left_parts = [
                 f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
-                f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]"
+                f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]",
             ]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/{THEME_SECONDARY}]")
@@ -199,6 +207,7 @@ class StatusFooter(Static):
             try:
                 if self.app:
                     from widgets.chat_input import ChatInput
+
                     chat_input = self.app.query_one("#message-input", ChatInput)
                     att_count = len(getattr(chat_input, "clipboard_attachments", []))
             except Exception:
@@ -230,10 +239,7 @@ class StatusFooter(Static):
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
             row2_right = " • ".join(row2_right_parts)
         else:
-            row1_left_parts = [
-                f"[bold {THEME_PRIMARY}]{mode_formatted}[/]",
-                f"[{THEME_SECONDARY}]{dir_text}[/]"
-            ]
+            row1_left_parts = [f"[bold {THEME_PRIMARY}]{mode_formatted}[/]", f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
 
@@ -241,6 +247,7 @@ class StatusFooter(Static):
             try:
                 if self.app:
                     from widgets.chat_input import ChatInput
+
                     chat_input = self.app.query_one("#message-input", ChatInput)
                     att_count = len(getattr(chat_input, "clipboard_attachments", []))
             except Exception:
@@ -253,8 +260,12 @@ class StatusFooter(Static):
             row1_left = "  •  ".join(row1_left_parts)
 
             row1_right_parts = [
-                f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]" if skills_total > 0 else f"Skills: [{THEME_SECONDARY}]0[/]",
-                f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/]" if mcp_total > 0 else f"MCP: [{THEME_SECONDARY}]0[/]"
+                f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]"
+                if skills_total > 0
+                else f"Skills: [{THEME_SECONDARY}]0[/]",
+                f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/]"
+                if mcp_total > 0
+                else f"MCP: [{THEME_SECONDARY}]0[/]",
             ]
             row1_right = "  •  ".join(row1_right_parts)
 
@@ -286,7 +297,9 @@ class StatusFooter(Static):
 
             task_parts = []
             if subagents_active > 0:
-                task_parts.append(f"{subagents_active} agent" if subagents_active == 1 else f"{subagents_active} agents")
+                task_parts.append(
+                    f"{subagents_active} agent" if subagents_active == 1 else f"{subagents_active} agents"
+                )
             if active_bg_tasks > 0:
                 task_parts.append(f"{active_bg_tasks} shell")
             if task_parts:

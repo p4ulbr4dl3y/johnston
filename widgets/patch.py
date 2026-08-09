@@ -4,6 +4,7 @@ from textual.widget import Widget
 
 def apply_textual_patches() -> None:
     """Applies patches to Textual base classes (allow_select for nested widgets and safe selection forwarding)"""
+
     def _new_allow_select(self) -> bool:
         node = self
         while node is not None:
@@ -32,8 +33,8 @@ def apply_textual_patches() -> None:
         from textual.widgets import Markdown
 
         from widgets.chat_view import CustomMarkdownFence
+
         Markdown.BLOCKS["fence"] = CustomMarkdownFence
         Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     except Exception:
         pass
-

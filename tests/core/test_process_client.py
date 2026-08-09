@@ -3,6 +3,7 @@ Unit tests for core.mcp_manager.process_client.MCPProcessClient.
 
 All tests use mocks only; no real subprocesses are spawned.
 """
+
 import asyncio
 import json
 import unittest

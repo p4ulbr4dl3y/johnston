@@ -87,8 +87,12 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
 
     def _mk(self, sid: str, desc: str, prompt: str):
         return self.store.create_subagent(
-            parent_id="sess-main", subagent_id=sid, role="worker",
-            description=desc, prompt=prompt, status="running",
+            parent_id="sess-main",
+            subagent_id=sid,
+            role="worker",
+            description=desc,
+            prompt=prompt,
+            status="running",
         )
 
     async def test_no_loose_fallback_for_unknown_id(self):
@@ -112,5 +116,3 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

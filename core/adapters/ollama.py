@@ -82,11 +82,14 @@ class OllamaAdapter(BaseApiAdapter):
                         fn = tc.get("function", {})
                         if not isinstance(fn, dict):
                             fn = {}
-                        yield ("adapter_tool_call", {
-                            "id": f"call_{uuid.uuid4().hex[:8]}",
-                            "name": fn.get("name", ""),
-                            "arguments": normalize_tool_arguments_str(fn.get("arguments")),
-                        })
+                        yield (
+                            "adapter_tool_call",
+                            {
+                                "id": f"call_{uuid.uuid4().hex[:8]}",
+                                "name": fn.get("name", ""),
+                                "arguments": normalize_tool_arguments_str(fn.get("arguments")),
+                            },
+                        )
                     if evt.get("done"):
                         in_tok = evt.get("prompt_eval_count", 0) or 0
                         out_tok = evt.get("eval_count", 0) or 0

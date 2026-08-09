@@ -6,6 +6,7 @@ from textual.widgets import Static
 
 class WelcomeWidget(Vertical):
     """Centered welcome logo on main screen"""
+
     can_focus = False
     ALLOW_SELECT = False
 

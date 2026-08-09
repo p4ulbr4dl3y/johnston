@@ -10,7 +10,9 @@ from widgets.screens.base_selection import BaseSelectionScreen
 class ProvidersScreen(BaseSelectionScreen[str]):
     """Modal provider selection screen for /providers command with MCP-style [] status tags"""
 
-    def __init__(self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None):
+    def __init__(
+        self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None
+    ):
         self.providers = providers
         self.active_key = active_key
         self.configured_keys = configured_keys
@@ -35,7 +37,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             key = p["key"]
             name = p["name"]
             has_key = bool(self.configured_keys.get(key))
-            is_active = (key == self.active_key)
+            is_active = key == self.active_key
             is_disabled = key in self.disabled_set or p.get("disabled", False)
 
             if is_disabled:
@@ -110,8 +112,6 @@ class ApiKeyInputScreen(BaseModalScreen[str | None]):
             yield Markdown(f"Current API Key: `{masked}`", classes="modal-markdown")
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
             yield Label("enter: save • esc: cancel", id="modal-hint")
-
-
 
     def on_mount(self) -> None:
         self.query_one("#api-key-input", Input).focus()

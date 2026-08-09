@@ -5,7 +5,6 @@ from tools.ask_user import AskUserTool, _is_recommended_option, _sort_recommende
 
 
 class TestRecommendedSorting(unittest.TestCase):
-
     def test_is_recommended_prefix_variants(self):
         for opt in [
             "(Recommended) Fix now",
@@ -42,7 +41,6 @@ class TestRecommendedSorting(unittest.TestCase):
 
 
 class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
-
     async def test_no_app_returns_error(self):
         tool = AskUserTool()
         res = await tool.execute({"questions": [{"question_text": "Test?", "options": ["a"]}]})
@@ -91,7 +89,6 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             ctx=mock_app,
         )
         self.assertIn("Answer: x", res)
-
 
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()
@@ -162,6 +159,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             ctx=mock_app,
         )
         self.assertIn("Yes", res)
+
     async def test_minimized_flow_resumed_by_callback(self):
         tool = AskUserTool()
         mock_app = MagicMock()
@@ -188,5 +186,3 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

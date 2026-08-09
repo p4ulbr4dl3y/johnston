@@ -8,6 +8,7 @@ from tools.shell import ShellTool, _new_task_id
 class TestShellTool(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         from core.permission_manager import PermissionManager
+
         PermissionManager.get_instance().clear_session_overrides()
         self.config_patcher = patch("core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json")
         self.config_patcher.start()
@@ -32,11 +33,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_safety_check_rejected(self):
         mock_app = MagicMock()
-
-        def push_screen_side_effect(screen, callback):
-            callback(False)
-
-        mock_app.push_screen.side_effect = push_screen_side_effect
+        mock_app.confirm_permission = AsyncMock(return_value=False)
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, ctx=mock_app)
@@ -44,11 +41,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_safety_check_confirmed(self):
         mock_app = MagicMock()
-
-        def push_screen_side_effect(screen, callback):
-            callback("allow")
-
-        mock_app.push_screen.side_effect = push_screen_side_effect
+        mock_app.confirm_permission = AsyncMock(return_value=True)
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "echo confirmed"}, ctx=mock_app)
@@ -56,7 +49,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_safety_check_exception(self):
         mock_app = MagicMock()
-        mock_app.push_screen.side_effect = RuntimeError("Screen push failed")
+        mock_app.confirm_permission = AsyncMock(side_effect=RuntimeError("Screen push failed"))
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "rm -rf /"}, ctx=mock_app)
@@ -143,7 +136,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-
             res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, ctx=mock_app)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("running:", res)
@@ -151,7 +143,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_create_windows_process_powershell(self):
         with (
-            patch("tools.shell.shell_executable", return_value="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
+            patch(
+                "tools.shell.shell_executable",
+                return_value="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+            ),
             patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,
         ):
             await self.tool._create_windows_process("Get-Process", {"ENV": "1"})
@@ -177,6 +172,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("asyncio.create_subprocess_shell", new_callable=AsyncMock) as mock_shell,
         ):
             from core.platform_utils import shell_subprocess_kwargs
+
             await self.tool._create_windows_process("echo 1", {"ENV": "1"})
             mock_shell.assert_called_once_with(
                 "echo 1",
@@ -273,7 +269,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}, ctx=mock_app))
             await asyncio.sleep(0.01)
 
@@ -555,7 +550,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.BackgroundTask") as mock_bg_cls,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-
             mock_bg = MagicMock()
             mock_bg.__bool__ = lambda self: False
             mock_bg.background_event = asyncio.Event()
@@ -569,23 +563,17 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_safety_check_always_allow(self):
         from core.permission_manager import PermissionManager
+
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
 
         mock_app = MagicMock()
-
-        def push_screen_side_effect(screen, callback):
-            callback("always_allow")
-
-        mock_app.push_screen.side_effect = push_screen_side_effect
+        mock_app.confirm_permission = AsyncMock(return_value=True)
 
         with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
             res = await self.tool.execute({"command": "echo session_allowed"}, ctx=mock_app)
             self.assertIn("session_allowed", res)
-            self.assertEqual(pm.session_overrides.get("shell"), "allow")
-            self.assertEqual(pm.session_overrides.get("shell_guard"), "allow")
 
 
 if __name__ == "__main__":
     unittest.main()
-

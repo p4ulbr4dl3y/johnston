@@ -16,6 +16,7 @@ class TestLintersManager(unittest.TestCase):
     def tearDown(self):
         os.chdir(self.old_cwd)
         import shutil
+
         shutil.rmtree(self.test_dir)
 
     def _mgr(self, **kw):
@@ -40,12 +41,15 @@ class TestLintersManager(unittest.TestCase):
     def test_custom_config_entries_loaded(self):
         m = self._mgr()
         with open(m.config_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "linters": {
-                    "python": {"enabled": False},
-                    "mycustom": {"cmd": ["my-tool", "{file}"], "extensions": [".mc"]},
-                }
-            }, f)
+            json.dump(
+                {
+                    "linters": {
+                        "python": {"enabled": False},
+                        "mycustom": {"cmd": ["my-tool", "{file}"], "extensions": [".mc"]},
+                    }
+                },
+                f,
+            )
 
         linters = m.load_linters()
         py = next(it for it in linters if it["name"] == "python")
@@ -98,7 +102,8 @@ class TestLintersManager(unittest.TestCase):
         self.assertIn("rust", av)
 
     def test_linters_command_registered(self):
-        from core.commands import COMMAND_REGISTRY
+        from widgets.commands import COMMAND_REGISTRY
+
         self.assertIn("/linters", COMMAND_REGISTRY)
         self.assertIn("/lint", COMMAND_REGISTRY)
 

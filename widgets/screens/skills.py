@@ -12,6 +12,7 @@ from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 class SkillDetailScreen(BaseModalScreen[bool]):
     """Modal screen displaying full details of a skill with option to activate"""
+
     BINDINGS = [
         ("escape", "cancel", "Back"),
         ("enter", "activate", "Activate"),
@@ -60,7 +61,7 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
         self.skills = self.sm.list_skills(include_hidden=True)
         self.options = []
         for s in self.skills:
-            scope_t = status_tag(s['scope'])
+            scope_t = status_tag(s["scope"])
             stat_t = status_tag("HIDDEN" if s.get("hidden") else "VISIBLE")
             self.options.append(f"{scope_t} {stat_t} {s['name']}")
         self.filtered_skills = list(self.skills)
@@ -173,4 +174,3 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
             self.dismiss(self.filtered_skills[event.option_index])
         else:
             self.dismiss(None)
-

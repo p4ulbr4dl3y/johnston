@@ -41,10 +41,12 @@ class LifecycleMixin:
         providers = self.pm.load_providers()
         connected = any(self.pm.is_provider_connected(k, v) for k, v in providers.items())
         if not connected:
-            from core.commands import ProvidersCommand
+            from widgets.commands import ProvidersCommand
+
             await ProvidersCommand().execute(self)
         elif not getattr(getattr(self, "agent", None), "model", ""):
-            from core.commands import ModelsCommand
+            from widgets.commands import ModelsCommand
+
             await ModelsCommand().execute(self)
 
     def on_unmount(self) -> None:
@@ -52,9 +54,11 @@ class LifecycleMixin:
         self.is_app_active = False
 
         from core.background_task import kill_all_background_tasks
+
         kill_all_background_tasks(getattr(self, "background_tasks", []))
         try:
             from core.subagent_stream import cancel_running_subagents
+
             cancel_running_subagents(self.sm)
         except Exception as err:
             logger.debug(f"Subagent cleanup error: {err}")

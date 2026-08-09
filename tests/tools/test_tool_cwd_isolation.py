@@ -170,9 +170,13 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             store = SessionStore(project_path=tmpdir)
             sess = store.create_subagent(
-                parent_id="sess-main", subagent_id="sub-abc",
-                role="worker", description="desc", prompt="prompt",
-                project_dir="/tmp/wt/sub-abc", branch_name="subagent-sub-abc",
+                parent_id="sess-main",
+                subagent_id="sub-abc",
+                role="worker",
+                description="desc",
+                prompt="prompt",
+                project_dir="/tmp/wt/sub-abc",
+                branch_name="subagent-sub-abc",
             )
             data = sess.to_dict()
             self.assertEqual(data["project_dir"], "/tmp/wt/sub-abc")

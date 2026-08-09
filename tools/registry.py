@@ -49,8 +49,7 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
     if not args or not isinstance(args, dict):
         return {}
 
-    clean_name = (tool_name or "").strip().lower()
-    resolved_name = clean_name if clean_name in REGISTRY else ALIAS_MAP.get(clean_name, clean_name)
+    resolved_name = normalize_tool_name(tool_name)
     param_aliases = PARAM_ALIAS_MAP.get(resolved_name, {})
 
     normalized = dict(args)
@@ -112,6 +111,7 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
 def get_default_tools() -> list[Dict[str, Any]]:
     return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
 
+
 async def prompt_permission_confirmation(
     app_obj: Any,
     screen_name: str,
@@ -119,43 +119,17 @@ async def prompt_permission_confirmation(
     reason: str,
     perm_name: str | None = None,
 ) -> bool:
-    """Shows the PermissionConfirmScreen and applies session overrides for confirmed tools.
+    """Prompts the user for tool permission confirmation.
 
     Returns True if the user granted access ('allow' or 'always_allow'), False otherwise.
-    Handles the 'always_allow' result by setting the corresponding session override(s).
-    Supports both `push_screen_wait` (async) and `push_screen` + callback (sync-style) hosts.
+    Delegates to the host app's `confirm_permission` when available (UI hosts), and
+    denies otherwise (headless/CLI mode) so the tools layer stays UI-independent.
     """
-    from core.permission_manager import PermissionManager
-    from widgets.screens.permission_confirm import PermissionConfirmScreen
-    pm = PermissionManager.get_instance()
-    screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
+    confirm = getattr(app_obj, "confirm_permission", None)
+    if callable(confirm):
+        return await confirm(screen_name, args, reason, perm_name)
 
-    result = None
-    if hasattr(app_obj, "push_screen_wait"):
-        try:
-            result = await app_obj.push_screen_wait(screen)
-        except TypeError:
-            # Host only exposes push_screen (e.g. MagicMock in tests)
-            result = None
-
-    if result is None:
-        import asyncio
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_dismiss(r: Any) -> None:
-            if not future.done():
-                future.set_result(r)
-
-        app_obj.push_screen(screen, callback=on_dismiss)
-        result = await future
-
-    if result == "always_allow":
-        if perm_name:
-            pm.set_session_override(perm_name, "allow")
-        if perm_name == "shell":
-            pm.set_session_override("shell_guard", "allow")
-    return result in ("allow", "always_allow")
+    return False
 
 
 async def check_and_confirm_permission(
@@ -170,6 +144,7 @@ async def check_and_confirm_permission(
     Returns None if allowed, or error message string if denied/cancelled.
     """
     from core.permission_manager import PermissionManager
+
     pm = PermissionManager.get_instance()
     if hasattr(context_or_app, "push_screen_wait"):
         app_obj = context_or_app
@@ -200,7 +175,7 @@ async def check_and_confirm_permission(
 async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> str:
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
-    resolved_name = clean_name if clean_name in REGISTRY else ALIAS_MAP.get(clean_name, clean_name)
+    resolved_name = normalize_tool_name(raw_name)
     args = normalize_tool_args(resolved_name, args)
 
     tool_cls = REGISTRY.get(resolved_name)
@@ -218,6 +193,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             return format_tool_error("execute", detail=str(e), name=name)
 
     from core.mcp_manager import get_mcp_manager
+
     mcp_mgr = get_mcp_manager()
 
     # Check if the tool is an active MCP tool
@@ -226,10 +202,13 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
     else:
         active_mcp_tools = mcp_mgr.get_active_tools(mode=None) or []
-    is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(mcp_mgr.get_capabilities_for_exposed_tool(name))
+    is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(
+        mcp_mgr.get_capabilities_for_exposed_tool(name)
+    )
 
     if not is_mcp:
         import difflib
+
         all_candidates = set(REGISTRY.keys()) | set(ALIAS_MAP.keys())
         matches = difflib.get_close_matches(clean_name, sorted(all_candidates), n=2, cutoff=0.4)
         hint = ""
@@ -254,7 +233,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return err
 
     try:
-
         if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
             res_or_coro = mcp_mgr.call_tool_async(name, args)
         else:

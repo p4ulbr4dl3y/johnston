@@ -17,11 +17,11 @@ class CallMCPTool(BaseTool):
                 "properties": {
                     "server": {"type": "string", "description": "MCP server name"},
                     "tool": {"type": "string", "description": "MCP tool name"},
-                    "arguments": {"type": "object", "description": "Tool arguments dict"}
+                    "arguments": {"type": "object", "description": "Tool arguments dict"},
                 },
-                "required": ["server", "tool"]
-            }
-        }
+                "required": ["server", "tool"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
@@ -43,13 +43,16 @@ class CallMCPTool(BaseTool):
                 return policy_err
 
         from core.mcp_manager import get_mcp_manager
+
         mcp_mgr = get_mcp_manager()
 
         def _get_schema_hint() -> str:
             try:
                 schema = mcp_mgr.get_tool_schema(server, tool)
                 if isinstance(schema, dict) and schema:
-                    return f"\n\n[Hint: MCP Tool Schema for '{tool}']:\n{json.dumps(schema, indent=2, ensure_ascii=False)}"
+                    return (
+                        f"\n\n[Hint: MCP Tool Schema for '{tool}']:\n{json.dumps(schema, indent=2, ensure_ascii=False)}"
+                    )
             except Exception:
                 pass
             return ""

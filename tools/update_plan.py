@@ -24,15 +24,19 @@ class UpdatePlanTool(BaseTool):
                             "type": "object",
                             "properties": {
                                 "step": {"type": "string", "description": "Task step text (short)"},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed"], "description": "Step status"}
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["pending", "in_progress", "completed"],
+                                    "description": "Step status",
+                                },
                             },
-                            "required": ["step", "status"]
-                        }
-                    }
+                            "required": ["step", "status"],
+                        },
+                    },
                 },
-                "required": ["plan"]
-            }
-        }
+                "required": ["plan"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
@@ -55,10 +59,7 @@ class UpdatePlanTool(BaseTool):
             if not step_text:
                 continue
 
-            validated_plan.append({
-                "step": step_text,
-                "status": status
-            })
+            validated_plan.append({"step": step_text, "status": status})
 
         if not validated_plan:
             return format_tool_error("params", name="plan", detail="items need 'step'/'status'")

@@ -12,6 +12,7 @@ from widgets.chat_markdown import _handle_markdown_task_done, clean_markdown_for
 
 class EventDivider(Static):
     """Full-width centered divider for session events (compaction, interruption, etc)"""
+
     can_focus = False
     ALLOW_SELECT = False
 
@@ -24,9 +25,9 @@ class EventDivider(Static):
         self.update(Rule(title, style="dim #71717a"))
 
 
-
 class UserMessage(Horizontal):
     """User message"""
+
     can_focus = False
 
     def __init__(self, content: str, markup: bool = False):
@@ -36,6 +37,7 @@ class UserMessage(Horizontal):
 
 class BotMessage(Vertical):
     """AI message with full Markdown rendering"""
+
     can_focus = False
     content = reactive("")
     MAX_INTERACTIVE_MARKDOWN_CHARS = 12000
@@ -181,6 +183,7 @@ class BotMessage(Vertical):
 
 class ThinkingWidget(Vertical):
     """Thinking widget with fast Static text expansion support"""
+
     can_focus = False
     ALLOW_SELECT = False
 

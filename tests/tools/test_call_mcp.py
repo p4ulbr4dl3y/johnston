@@ -5,7 +5,6 @@ from tools.call_mcp import CallMCPTool
 
 
 class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
-
     async def test_missing_server_param(self):
         tool = CallMCPTool()
         res = await tool.execute({"tool": "some_tool"})
@@ -87,4 +86,3 @@ class TestCallMCPTool(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

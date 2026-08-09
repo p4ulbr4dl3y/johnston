@@ -4,6 +4,7 @@ Handles global (~/.johnston/linters.json) and project (.johnston/linters.json) l
 Provides a preset registry of syntax-only linters for popular languages, with
 enable/disable and availability scanning.
 """
+
 import asyncio
 import functools
 import os
@@ -38,6 +39,7 @@ class LintersManager:
 
     def ensure_default_configs(self):
         from core.config_helpers import ensure_json_config
+
         ensure_json_config(self.config_file, {"linters": {}})
 
     # ------------------------------------------------------------------ load
@@ -141,6 +143,7 @@ class LintersManager:
             cfg["linters"][name] = entry
 
             from core.platform_utils import atomic_write_json
+
             atomic_write_json(file_to_update, cfg, indent=2)
             return True
         except Exception:
@@ -230,10 +233,14 @@ def _cache_has_tool(manager: str, package: str) -> bool:
     if manager == "uvx":
         cache = os.environ.get("UV_CACHE_DIR")
         if not cache:
-            cache = os.path.join(
-                os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
-                "uv",
-            ) if is_windows() else os.path.join(os.path.expanduser("~"), ".cache", "uv")
+            cache = (
+                os.path.join(
+                    os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+                    "uv",
+                )
+                if is_windows()
+                else os.path.join(os.path.expanduser("~"), ".cache", "uv")
+            )
         if not os.path.isdir(cache):
             return False
         # ruff/yamllint/taplo install via uvx tool or ephemeral env; look for
@@ -272,9 +279,7 @@ async def _exec_cmd(cmd: List[str]) -> Optional[str]:
     """Runs a command; returns captured output on non-zero exit, None otherwise."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
         )
         try:
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3.0)
@@ -297,8 +302,6 @@ async def _exec_cmd(cmd: List[str]) -> Optional[str]:
 
 def _clean_output(text: str) -> str:
     clean_lines = [
-        line for line in text.splitlines()
-        if not any(line.strip().startswith(prefix) for prefix in NOISE_PREFIXES)
+        line for line in text.splitlines() if not any(line.strip().startswith(prefix) for prefix in NOISE_PREFIXES)
     ]
     return "\n".join(clean_lines).strip()
-

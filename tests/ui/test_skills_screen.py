@@ -68,7 +68,6 @@ class TestSkillDetailScreen(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[PROJECT]", text)
             self.assertIn("A useful skill", text)
 
-
     async def test_action_cancel_dismisses_false(self):
         screen = SkillDetailScreen({"name": "alpha"})
         app = DummyHostApp(screen)
@@ -209,10 +208,12 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
         # query_one raises for the search input inside on_mount; swallowed (lines 89-92)
         with patch.object(SkillManager, "list_skills", return_value=sample_skills()):
             screen = SkillsScreen()
+
             def raising_query_one(selector, expect_type=None):
                 if selector == "#modal-search-input":
                     raise Exception("boom")
                 return original_query_one(selector, expect_type)
+
             original_query_one = screen.query_one
             with patch.object(screen, "query_one", side_effect=raising_query_one):
                 app = DummyHostApp(screen)
@@ -246,18 +247,14 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_option_selected_valid_dismisses_skill(self):
         async for app, screen, pilot in self._run():
             opt_list = screen.query_one("#skills-option-list", OptionList)
-            screen.on_option_list_option_selected(
-                OptionList.OptionSelected(opt_list, Option("reviewer"), 0)
-            )
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("reviewer"), 0))
             await pilot.pause()
             self.assertEqual(app.dismiss_result["name"], "reviewer")
 
     async def test_option_selected_invalid_dismisses_none(self):
         async for app, screen, pilot in self._run():
             opt_list = screen.query_one("#skills-option-list", OptionList)
-            screen.on_option_list_option_selected(
-                OptionList.OptionSelected(opt_list, Option("nope"), 99)
-            )
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("nope"), 99))
             await pilot.pause()
             self.assertIsNone(app.dismiss_result)
 

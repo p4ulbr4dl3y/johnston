@@ -70,11 +70,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
             f.write("def foo():\n    pass\n")
 
         # Use fallback keys old_string / new_string
-        res = await tool.execute({
-            "target_file": file_path,
-            "old_string": "def foo():",
-            "new_string": "def bar():"
-        })
+        res = await tool.execute({"target_file": file_path, "old_string": "def foo():", "new_string": "def bar():"})
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "def bar():\n    pass\n")
@@ -85,13 +81,15 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("a = 1\nb = 2\nc = 3\n")
 
-        res = await tool.execute({
-            "target_file": file_path,
-            "chunks": [
-                {"old_string": "a = 1", "new_string": "a = 10"},
-                {"old_string": "c = 3", "new_string": "c = 30"}
-            ]
-        })
+        res = await tool.execute(
+            {
+                "target_file": file_path,
+                "chunks": [
+                    {"old_string": "a = 1", "new_string": "a = 10"},
+                    {"old_string": "c = 3", "new_string": "c = 30"},
+                ],
+            }
+        )
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "a = 10\nb = 2\nc = 30\n")
@@ -105,20 +103,14 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
     def test_deletion_of_block(self):
         content = "line 1\nline 2\nline 3\n"
         new_content, _ = apply_chunk_replacements(
-            content,
-            [{"target_content": "line 2\n", "replacement_content": ""}],
-            "dummy.py"
+            content, [{"target_content": "line 2\n", "replacement_content": ""}], "dummy.py"
         )
         self.assertEqual(new_content, "line 1\nline 3\n")
 
     def test_multiple_occurrences_raises_error(self):
         content = "dup\ndup\ndup\n"
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
-                content,
-                [{"target_content": "dup", "replacement_content": "unique"}],
-                "dummy.py"
-            )
+            apply_chunk_replacements(content, [{"target_content": "dup", "replacement_content": "unique"}], "dummy.py")
         self.assertIn("matches 3 occurrences", str(ctx.exception))
 
     def test_out_of_bounds_start_line_raises_error(self):
@@ -127,7 +119,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
             apply_chunk_replacements(
                 content,
                 [{"target_content": "line 1", "replacement_content": "X", "start_line": 99, "end_line": 100}],
-                "dummy.py"
+                "dummy.py",
             )
         self.assertIn("exceeds file line count", str(ctx.exception))
 
@@ -137,6 +129,6 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
             apply_chunk_replacements(
                 content,
                 [{"target_content": "def calculate_total_price(item_list):", "replacement_content": "pass"}],
-                "dummy.py"
+                "dummy.py",
             )
         self.assertIn("Nearest matching code", str(ctx.exception))

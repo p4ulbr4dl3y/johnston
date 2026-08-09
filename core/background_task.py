@@ -5,11 +5,11 @@ import re
 from core.platform_utils import terminate_process
 from tools.base import format_tool_error
 
-ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 def strip_ansi(text: str) -> str:
-    return ANSI_ESCAPE.sub('', text)
+    return ANSI_ESCAPE.sub("", text)
 
 
 def process_carriage_returns(text: str) -> str:
@@ -34,10 +34,21 @@ def process_carriage_returns(text: str) -> str:
     return "\n".join(filtered)
 
 
-
 class BackgroundTask:
     """Manages background bash process with real-time line/chunk output reading and input sending"""
-    def __init__(self, task_id: str, command: str, process, widget=None, master_fd: int = None, reader=None, transport=None, session_id: str = None, kind: str = "shell"):
+
+    def __init__(
+        self,
+        task_id: str,
+        command: str,
+        process,
+        widget=None,
+        master_fd: int = None,
+        reader=None,
+        transport=None,
+        session_id: str = None,
+        kind: str = "shell",
+    ):
         self.task_id = task_id
         self.kind = kind
         self.command = command
@@ -73,7 +84,6 @@ class BackgroundTask:
                 pass
             self.master_fd = None
 
-
     def get_formatted_output(self) -> str:
         """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
         if not hasattr(self, "_cached_len"):
@@ -105,7 +115,9 @@ class BackgroundTask:
 
                     self.output.append(text)
                     if self.widget:
-                        func = getattr(self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None))
+                        func = getattr(
+                            self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None)
+                        )
                         if func:
                             try:
                                 if getattr(self.widget, "is_mounted", True):
@@ -128,9 +140,15 @@ class BackgroundTask:
                     except Exception:
                         pass
 
-                if self.is_background and not self.was_killed and on_completed_cb and getattr(app, "is_app_active", True):
+                if (
+                    self.is_background
+                    and not self.was_killed
+                    and on_completed_cb
+                    and getattr(app, "is_app_active", True)
+                ):
                     try:
                         from tools.base import truncate_output
+
                         out_res = self.get_formatted_output()
                         if out_res.strip():
                             out_res = truncate_output(
@@ -177,6 +195,7 @@ class BackgroundTask:
                 if isinstance(pid, int) and pid > 0:
                     try:
                         import signal
+
                         os.killpg(pid, signal.SIGKILL)
                     except Exception:
                         pass

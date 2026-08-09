@@ -7,7 +7,6 @@ from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool,
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -21,6 +20,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_max_concurrent_subagents_limit(self):
         from unittest.mock import MagicMock
+
         tool = InvokeSubagentTool()
         mock_app = MagicMock()
         mock_app.current_session_id = "sess-main"
@@ -33,15 +33,21 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         # Populate store with MAX_CONCURRENT_SUBAGENTS running sessions
         for i in range(MAX_CONCURRENT_SUBAGENTS):
             self.store.create_subagent(
-                parent_id="sess-main", subagent_id=f"task-{i}",
-                role="worker", description=f"Task {i}", prompt="prompt", status="running",
+                parent_id="sess-main",
+                subagent_id=f"task-{i}",
+                role="worker",
+                description=f"Task {i}",
+                prompt="prompt",
+                status="running",
             )
 
         # Attempt to spawn one more
         res = await tool.execute({"prompt": "another task", "description": "Over limit"})
         self.assertIn("ERR: limit: 5 concurrent max", res)
+
     async def test_explore_subagent_tool_filtering(self):
         from unittest.mock import MagicMock
+
         tool = InvokeSubagentTool()
 
         # Mock app context and agent
@@ -76,6 +82,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_subagent_tool_exclusion_of_manage_shell_and_recursion_guards(self):
         from unittest.mock import MagicMock
+
         tool = InvokeSubagentTool()
 
         mock_app = MagicMock()

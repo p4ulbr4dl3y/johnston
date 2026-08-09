@@ -10,6 +10,7 @@ from widgets.screens.base_modal import BaseModalScreen, status_tag
 
 class TaskConsoleScreen(BaseModalScreen[None]):
     """Modal screen for viewing console output of a specific task in real-time"""
+
     BINDINGS = [
         ("escape", "back", "Back to list"),
     ]
@@ -33,6 +34,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
 
     def update_log(self) -> None:
         from core.background_task import process_carriage_returns, strip_ansi
+
         lines = self.bg_task.output
         if len(lines) > self.printed_count:
             for i in range(self.printed_count, len(lines)):
@@ -47,6 +49,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
 
 class TasksListScreen(BaseModalScreen[None]):
     """Modal screen with background tasks list and tabs for All, Agents, and Shell tasks."""
+
     BINDINGS = [
         ("escape", "close", "Close Manager"),
         ("k", "kill_task", "Kill Task"),
@@ -111,19 +114,22 @@ class TasksListScreen(BaseModalScreen[None]):
         for t in bg_tasks:
             task_id = getattr(t, "task_id", "")
             if getattr(t, "is_background", False):
-                items.append({
-                    "id": task_id,
-                    "kind": "shell",
-                    "command": getattr(t, "command", ""),
-                    "is_running": getattr(t, "is_running", False),
-                    "status_str": "RUNNING" if getattr(t, "is_running", False) else "FINISHED",
-                    "raw_obj": t
-                })
+                items.append(
+                    {
+                        "id": task_id,
+                        "kind": "shell",
+                        "command": getattr(t, "command", ""),
+                        "is_running": getattr(t, "is_running", False),
+                        "status_str": "RUNNING" if getattr(t, "is_running", False) else "FINISHED",
+                        "raw_obj": t,
+                    }
+                )
 
         # 2. Gather subagent sessions
         store = getattr(self.app, "sm", None) if hasattr(self, "app") and self.app else None
         if store is None:
             from core.session_manager import SessionStore
+
             store = SessionStore.get_instance()
         store.list(kind="subagent")
         sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
@@ -131,14 +137,16 @@ class TasksListScreen(BaseModalScreen[None]):
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()
             is_run = st_str == "RUNNING"
-            items.append({
-                "id": getattr(s, "id", ""),
-                "kind": "agent",
-                "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", ""),
-                "is_running": is_run,
-                "status_str": st_str,
-                "raw_obj": s
-            })
+            items.append(
+                {
+                    "id": getattr(s, "id", ""),
+                    "kind": "agent",
+                    "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", ""),
+                    "is_running": is_run,
+                    "status_str": st_str,
+                    "raw_obj": s,
+                }
+            )
 
         # Filter by active tab
         if self.active_tab == 1:
@@ -150,7 +158,8 @@ class TasksListScreen(BaseModalScreen[None]):
         q = self.search_query.strip().lower()
         if q:
             items = [
-                item for item in items
+                item
+                for item in items
                 if q in item["command"].lower() or q in item["id"].lower() or q in item["kind"].lower()
             ]
 
@@ -158,7 +167,9 @@ class TasksListScreen(BaseModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal-dialog"):
-            yield Markdown(self._get_header_md(), id="tasks-header-md", classes="modal-markdown modal-markdown-centered")
+            yield Markdown(
+                self._get_header_md(), id="tasks-header-md", classes="modal-markdown modal-markdown-centered"
+            )
             yield OptionList(id="tasks-option-list")
             yield Label("enter: view details • tab / ←/→: switch tab • k: kill • esc: cancel", id="modal-hint")
 
@@ -202,8 +213,8 @@ class TasksListScreen(BaseModalScreen[None]):
             cmd = item["command"]
             if len(cmd) > 35:
                 cmd = cmd[:32] + "..."
-            s_tag = status_tag(item['status_str'])
-            kind_tag = status_tag(item['kind'].capitalize()) if self.active_tab == 0 else ""
+            s_tag = status_tag(item["status_str"])
+            kind_tag = status_tag(item["kind"].capitalize()) if self.active_tab == 0 else ""
             prefix = f"{s_tag} {kind_tag}".strip()
             opt_list.add_option(f"{prefix} {cmd}")
 
@@ -217,6 +228,7 @@ class TasksListScreen(BaseModalScreen[None]):
         is_subagent = item["kind"] == "agent"
         if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen
+
             session_id = getattr(raw, "id", item["id"])
             self.app.push_screen(SubagentViewScreen(session_id))
         else:
@@ -248,6 +260,7 @@ class TasksListScreen(BaseModalScreen[None]):
             else:
                 if getattr(raw, "is_running", False):
                     import inspect
+
                     res = raw.kill()
                     if inspect.isawaitable(res):
                         await res
@@ -256,4 +269,3 @@ class TasksListScreen(BaseModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
-

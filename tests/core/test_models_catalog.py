@@ -98,9 +98,7 @@ class TestModelsCatalog(unittest.TestCase):
 
     def test_get_model_pricing(self):
         catalog = ModelsCatalog()
-        catalog._pricing = {
-            "openai/gpt-4o": {"prompt": 0.0000025, "completion": 0.00001}
-        }
+        catalog._pricing = {"openai/gpt-4o": {"prompt": 0.0000025, "completion": 0.00001}}
         pricing = catalog.get_model_pricing("openrouter", "openai/gpt-4o")
         self.assertEqual(pricing["prompt"], 0.0000025)
         self.assertEqual(pricing["completion"], 0.00001)
@@ -291,7 +289,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
                         "modalities": {"input": ["text"]},
                         "reasoning": True,
                         "open_weights": False,
-                        "cost": {"input": 2.5, "output": 10.0}
+                        "cost": {"input": 2.5, "output": 10.0},
                     }
                 }
             }
@@ -302,7 +300,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
                     "id": "anthropic/claude-3.5-sonnet",
                     "name": "Anthropic: Claude 3.5 Sonnet",
                     "context_length": 200000,
-                    "pricing": {"prompt": "0.000003", "completion": "0.000015"}
+                    "pricing": {"prompt": "0.000003", "completion": "0.000015"},
                 }
             ]
         }

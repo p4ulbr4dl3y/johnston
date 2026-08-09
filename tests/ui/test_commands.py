@@ -1,8 +1,8 @@
 import time
 import unittest
 
-from core.commands import COMMAND_REGISTRY, handle_slash_command
 from widgets.chat_view import ChatView
+from widgets.commands import COMMAND_REGISTRY, handle_slash_command
 
 
 class MockAgent:
@@ -87,7 +87,6 @@ class MockApp:
         if callback:
             callback("Demo finished")
 
-
     def query_one(self, target, default=None):
         if target == ChatView or target == "#chat-view":
             return self.chat_view
@@ -111,7 +110,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.agent.compact_called)
 
     async def test_rewind_command_selected_idx_zero(self):
-        from core.commands import RewindCommand
+        from widgets.commands import RewindCommand
+
         app = MockApp()
         app.agent.history = [{"role": "user", "content": "First message"}]
         app.agent.tokens_input = 4000
@@ -124,18 +124,24 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         rolled_back_target = []
         app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
 
-        mock_input = type("MockInput", (), {
-            "load_text": lambda self, txt: setattr(self, "text", txt),
-            "text": "First message",
-            "move_cursor": lambda self, pos: None,
-            "focus": lambda self: None
-        })()
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: setattr(self, "text", txt),
+                "text": "First message",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
         app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
 
         cmd = RewindCommand()
+
         # Simulate selecting user message at index 0 in on_rewind_selected
         def simulate_on_rewind_selected(screen, callback):
             callback(0)
+
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
 
@@ -151,7 +157,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.status_refreshed)
 
     async def test_rewind_command_partial_history_preserved(self):
-        from core.commands import RewindCommand
+        from widgets.commands import RewindCommand
+
         app = MockApp()
         app.agent.history = [
             {"role": "user", "content": "Msg 0"},
@@ -162,28 +169,34 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         called_truncate = []
         app.agent.truncate_history_to_user_message = lambda idx: (
             called_truncate.append(idx),
-            setattr(app.agent, "history", app.agent.history[:2])
+            setattr(app.agent, "history", app.agent.history[:2]),
         )
         app.chat_view.get_user_messages = lambda: [(0, "Msg 0"), (2, "Msg 1")]
         rolled_back_target = []
         app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
 
-        mock_input = type("MockInput", (), {
-            "load_text": lambda self, txt: setattr(self, "text", txt),
-            "text": "Msg 1",
-            "move_cursor": lambda self, pos: None,
-            "focus": lambda self: None
-        })()
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: setattr(self, "text", txt),
+                "text": "Msg 1",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
         app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
 
         cmd = RewindCommand()
+
         def simulate_on_rewind_selected(screen, callback):
             callback(2)  # child_idx of Msg 1 (seq_idx = 1)
+
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
 
         self.assertEqual(rolled_back_target, [1])  # selected_idx - 1 = 1
-        self.assertEqual(called_truncate, [1])      # seq_idx = 1
+        self.assertEqual(called_truncate, [1])  # seq_idx = 1
         self.assertEqual(len(app.agent.history), 2)
         self.assertEqual(app.agent.history[0]["content"], "Msg 0")
 
@@ -191,9 +204,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app = MockApp()
         handled = await handle_slash_command(app, "/unknowncommand123")
         self.assertFalse(handled)
-
-
-
 
     async def test_compact_command(self):
         class DetailedMockAgent(MockAgent):
@@ -276,22 +286,32 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("User request: analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
-        from core.commands import ModelsCommand
+        from widgets.commands import ModelsCommand
 
         test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
         class MockPM:
-            async def fetch_models_grouped(self): return {"custom": {"name": "Custom", "models": [test_model_name]}}
-            def get_active_provider_key(self): return "custom"
-            def set_provider_model(self, p, m): pass
-            def set_active_provider_key(self, p): pass
-            def create_active_agent(self): return MockAgent()
+            async def fetch_models_grouped(self):
+                return {"custom": {"name": "Custom", "models": [test_model_name]}}
+
+            def get_active_provider_key(self):
+                return "custom"
+
+            def set_provider_model(self, p, m):
+                pass
+
+            def set_active_provider_key(self, p):
+                pass
+
+            def create_active_agent(self):
+                return MockAgent()
 
         app = MockApp()
         app.pm = MockPM()
         cmd = ModelsCommand()
 
         pushed_screens = []
+
         def simulate_push_screen(screen, callback=None):
             pushed_screens.append(screen)
             if callback:
@@ -304,7 +324,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(pushed_screens), 1)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
-        from core.commands import ModelsCommand
+        from widgets.commands import ModelsCommand
 
         class MockPM:
             def __init__(self):
@@ -312,7 +332,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 self.saved = []
 
             async def fetch_models_grouped(self):
-                return {"old": {"name": "Old", "models": ["old-model"]}, "new": {"name": "New", "models": ["new-model"]}}
+                return {
+                    "old": {"name": "Old", "models": ["old-model"]},
+                    "new": {"name": "New", "models": ["new-model"]},
+                }
 
             def get_active_provider_key(self):
                 return self.active_provider
@@ -346,7 +369,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.pm.saved, [("new", "new-model")])
 
     async def test_providers_command_preserves_mode_when_connecting_provider(self):
-        from core.commands import ProvidersCommand
+        from widgets.commands import ProvidersCommand
 
         class MockPM:
             def __init__(self):
@@ -417,6 +440,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
     def test_alias_suggestions_formatting(self):
         from widgets.command_suggestions import get_all_command_suggestions
+
         commands_dict = dict(get_all_command_suggestions())
         self.assertIn("/providers", commands_dict)
         self.assertIn("/connect", commands_dict)
@@ -434,12 +458,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         self.assertIn("handoff", app.ai_prompts[0][0])
 
-
     async def test_new_command_clears_background_tasks(self):
         from unittest.mock import AsyncMock, MagicMock
 
         from core.background_task import BackgroundTask
-        from core.commands import NewCommand
+        from widgets.commands import NewCommand
+
         app = MockApp()
         app.message_queue = MagicMock()
         app.sm = MagicMock()
@@ -457,7 +481,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import MagicMock
 
         from core.background_task import BackgroundTask
-        from core.commands import TasksCommand
+        from widgets.commands import TasksCommand
 
         app = MockApp()
         app.notify = MagicMock()
@@ -489,7 +513,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import MagicMock
 
         from core.background_task import BackgroundTask
-        from core.commands import TasksCommand
+        from widgets.commands import TasksCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -516,6 +540,3 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-

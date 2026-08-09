@@ -3,6 +3,7 @@ AI Model Catalog and Context Limit Manager for Johnston.
 Fetches model context limits, reasoning capabilities, and pricing dynamically
 from models.dev and OpenRouter catalog APIs with local cache fallbacks.
 """
+
 import asyncio
 import logging
 import os
@@ -227,7 +228,9 @@ class ModelsCatalog:
             self._open_weights,
         )
 
-    def _resolve_catalog_key(self, provider_id: str, model_id: str, search_space: Iterable[str] = None, tag: str = "") -> str:
+    def _resolve_catalog_key(
+        self, provider_id: str, model_id: str, search_space: Iterable[str] = None, tag: str = ""
+    ) -> str:
         if not model_id:
             return ""
 
@@ -241,15 +244,25 @@ class ModelsCatalog:
             space_tag = "reasoning"
         elif search_space is self._open_weights:
             space_tag = "open_weights"
-        elif search_space is self._limits or (hasattr(search_space, "__self__") and search_space.__self__ is self._limits):
+        elif search_space is self._limits or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._limits
+        ):
             space_tag = "limits"
-        elif search_space is self._names or (hasattr(search_space, "__self__") and search_space.__self__ is self._names):
+        elif search_space is self._names or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._names
+        ):
             space_tag = "names"
-        elif search_space is self._descriptions or (hasattr(search_space, "__self__") and search_space.__self__ is self._descriptions):
+        elif search_space is self._descriptions or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._descriptions
+        ):
             space_tag = "descriptions"
-        elif search_space is self._pricing or (hasattr(search_space, "__self__") and search_space.__self__ is self._pricing):
+        elif search_space is self._pricing or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._pricing
+        ):
             space_tag = "pricing"
-        elif search_space is self._output_limits or (hasattr(search_space, "__self__") and search_space.__self__ is self._output_limits):
+        elif search_space is self._output_limits or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._output_limits
+        ):
             space_tag = "output_limits"
         else:
             space_obj = getattr(search_space, "__self__", search_space)
@@ -294,9 +307,36 @@ class ModelsCatalog:
         cleaned = re.sub(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)", "", m_base)
         tokens = set(re.findall(r"[a-z0-9]+", cleaned))
         ignored_tokens = {
-            "it", "mlx", "gguf", "quant", "4bit", "8bit", "16bit", "fp16", "fp32", "v1", "v2",
-            "vision", "model", "chat", "instruct", "text", "api", "base", "free", "pro", "flash",
-            "mini", "small", "large", "turbo", "latest", "preview", "non", "dummy", "unknown"
+            "it",
+            "mlx",
+            "gguf",
+            "quant",
+            "4bit",
+            "8bit",
+            "16bit",
+            "fp16",
+            "fp32",
+            "v1",
+            "v2",
+            "vision",
+            "model",
+            "chat",
+            "instruct",
+            "text",
+            "api",
+            "base",
+            "free",
+            "pro",
+            "flash",
+            "mini",
+            "small",
+            "large",
+            "turbo",
+            "latest",
+            "preview",
+            "non",
+            "dummy",
+            "unknown",
         }
         clean_tokens = tokens - ignored_tokens
         query_digits = {t for t in clean_tokens if t.isdigit()}
@@ -341,7 +381,9 @@ class ModelsCatalog:
                 if isinstance(cdata, dict):
                     lims = cdata.get("model_limits", {})
                     if lims:
-                        res_prov = self._resolve_catalog_key(provider_id, model_id, lims, tag=f"prov_{provider_id}_limits")
+                        res_prov = self._resolve_catalog_key(
+                            provider_id, model_id, lims, tag=f"prov_{provider_id}_limits"
+                        )
                         if res_prov and res_prov in lims:
                             return lims[res_prov]
 

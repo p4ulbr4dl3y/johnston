@@ -17,6 +17,7 @@ class ClipboardAttachment:
 
     def __init__(self, path: str, width: int = 0, height: int = 0, size_kb: float = 0.0):
         import time
+
         self.path = path
         self.width = width
         self.height = height
@@ -29,6 +30,7 @@ class ChatInput(TextArea):
 
     class Submitted(Message):
         """Text submission event"""
+
         def __init__(self, value: str, attachments: list = None) -> None:
             super().__init__()
             self.value = value
@@ -55,7 +57,7 @@ class ChatInput(TextArea):
             with open(config.PROMPT_HISTORY_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, list):
-                    return [str(item) for item in data][-self.MAX_PROMPT_HISTORY:]
+                    return [str(item) for item in data][-self.MAX_PROMPT_HISTORY :]
         except Exception:
             pass
         return []
@@ -65,7 +67,7 @@ class ChatInput(TextArea):
         try:
             os.makedirs(config.CONFIG_DIR, exist_ok=True)
             with open(config.PROMPT_HISTORY_FILE, "w", encoding="utf-8") as f:
-                json.dump(self.prompt_history[-self.MAX_PROMPT_HISTORY:], f, ensure_ascii=False, indent=2)
+                json.dump(self.prompt_history[-self.MAX_PROMPT_HISTORY :], f, ensure_ascii=False, indent=2)
         except Exception:
             pass
 
@@ -101,6 +103,7 @@ class ChatInput(TextArea):
         try:
             if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
+
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 row, col = self.cursor_location
                 line_str = self.document.get_line(row)
@@ -157,6 +160,7 @@ class ChatInput(TextArea):
         """Automatically formats pasted file paths as @file"""
         import os
         import urllib.parse
+
         lines = pasted_text.strip().splitlines()
         if not lines:
             return pasted_text
@@ -185,11 +189,7 @@ class ChatInput(TextArea):
                 clean = clean.replace("\\ ", " ")
                 expanded = os.path.expanduser(clean)
                 ext = os.path.splitext(clean)[1].lower()
-                is_explicit_path = (
-                    clean.startswith("/")
-                    or clean.startswith("~/")
-                    or clean.startswith("./")
-                )
+                is_explicit_path = clean.startswith("/") or clean.startswith("~/") or clean.startswith("./")
                 if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
                     line = f"@{clean} "
                     modified = True
@@ -207,6 +207,7 @@ class ChatInput(TextArea):
 
     def clear_clipboard_attachments(self) -> None:
         import os
+
         for att in list(self.clipboard_attachments):
             if os.path.exists(att.path) and "temp_images" in att.path:
                 try:
@@ -252,11 +253,15 @@ class ChatInput(TextArea):
     async def on_paste(self, event: events.Paste) -> None:
         import os
         import urllib.parse
+
         event.prevent_default()
         event.stop()
 
         pasted_text = self.format_pasted_file_path(event.text)
-        if pasted_text.startswith("@") or (pasted_text != event.text and any(line_item.strip().startswith("@") for line_item in pasted_text.splitlines())):
+        if pasted_text.startswith("@") or (
+            pasted_text != event.text
+            and any(line_item.strip().startswith("@") for line_item in pasted_text.splitlines())
+        ):
             self.insert(pasted_text)
             self._on_input_change()
             return
@@ -270,11 +275,9 @@ class ChatInput(TextArea):
         expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
 
         import asyncio
+
         exists = await asyncio.to_thread(os.path.exists, expanded)
-        is_existing_image_path = (
-            exists
-            and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
-        )
+        is_existing_image_path = exists and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
 
         if not is_existing_image_path and not event.text.strip():
             if await self.try_paste_clipboard_image():
@@ -295,7 +298,7 @@ class ChatInput(TextArea):
         if text and (not self.prompt_history or self.prompt_history[-1] != text):
             self.prompt_history.append(text)
             if len(self.prompt_history) > self.MAX_PROMPT_HISTORY:
-                self.prompt_history = self.prompt_history[-self.MAX_PROMPT_HISTORY:]
+                self.prompt_history = self.prompt_history[-self.MAX_PROMPT_HISTORY :]
             self.save_prompt_history()
         self.prompt_history_index = len(self.prompt_history)
         self.prompt_draft = ""
@@ -358,6 +361,7 @@ class ChatInput(TextArea):
         if event.key == "escape":
             try:
                 from widgets.command_suggestions import CommandSuggestions
+
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 if suggestions.display:
                     suggestions.display = False
@@ -379,6 +383,7 @@ class ChatInput(TextArea):
         if event.key == "tab":
             try:
                 from widgets.command_suggestions import CommandSuggestions
+
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
                     if suggestions.mode == "command":
@@ -411,6 +416,7 @@ class ChatInput(TextArea):
         # Handle arrow navigation in suggestions menu
         try:
             from widgets.command_suggestions import CommandSuggestions
+
             suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
             if suggestions.display:
                 if event.key == "up":
@@ -470,6 +476,7 @@ class ChatInput(TextArea):
             # Select suggestion if suggestion menu is open
             try:
                 from widgets.command_suggestions import CommandSuggestions
+
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
                     if suggestions.mode == "command":
@@ -497,6 +504,7 @@ class ChatInput(TextArea):
             # Hide suggestions
             try:
                 from widgets.command_suggestions import CommandSuggestions
+
                 suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
                 suggestions.display = False
             except Exception:

@@ -77,9 +77,11 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         except Exception:
             pass
         from core.platform_utils import copy_to_os_clipboard
+
         copy_to_os_clipboard(text)
 
 
 if __name__ == "__main__":
     from cli import main
+
     main()

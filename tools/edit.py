@@ -47,9 +47,7 @@ def _preserve_quote_style(old_str: str, actual_old_str: str, new_str: str) -> st
     return res
 
 
-def find_actual_target_and_replacement(
-    text: str, target: str, replacement: str
-) -> Tuple[str, str]:
+def find_actual_target_and_replacement(text: str, target: str, replacement: str) -> Tuple[str, str]:
     actual_target = target
     actual_replacement = replacement
 
@@ -78,7 +76,9 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
     first_line_target = target_lines[0]
     file_lines = current_text.splitlines()
 
-    close_lines = difflib.get_close_matches(first_line_target, [line_item.strip() for line_item in file_lines], n=2, cutoff=0.4)
+    close_lines = difflib.get_close_matches(
+        first_line_target, [line_item.strip() for line_item in file_lines], n=2, cutoff=0.4
+    )
     if close_lines:
         target_close = close_lines[0]
         match_line_num = None
@@ -90,8 +90,10 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
         if match_line_num is not None:
             start_snip = max(1, match_line_num - 2)
             end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
-            snippet_lines = file_lines[start_snip - 1:end_snip]
-            snippet_str = "\n".join(f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip))
+            snippet_lines = file_lines[start_snip - 1 : end_snip]
+            snippet_str = "\n".join(
+                f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip)
+            )
             return (
                 f"\n\n[Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
                 f"{snippet_str}\n"
@@ -100,11 +102,7 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
     return ""
 
 
-def apply_chunk_replacements(
-    content: str,
-    raw_chunks: List[Dict[str, Any]],
-    path: str
-) -> Tuple[str, str]:
+def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], path: str) -> Tuple[str, str]:
     if not raw_chunks:
         raise ValueError(format_tool_error("params", "no replacement chunks provided"))
 
@@ -133,17 +131,19 @@ def apply_chunk_replacements(
         e_line_int = try_int(c.get("end_line"))
         allow_mult = bool(c.get("allow_multiple", False))
 
-        parsed_chunks.append({
-            "idx": idx,
-            "target": target,
-            "replacement": replacement,
-            "start_line": s_line_int,
-            "end_line": e_line_int,
-            "allow_multiple": allow_mult
-        })
+        parsed_chunks.append(
+            {
+                "idx": idx,
+                "target": target,
+                "replacement": replacement,
+                "start_line": s_line_int,
+                "end_line": e_line_int,
+                "allow_multiple": allow_mult,
+            }
+        )
 
     # Sort chunks descending by start_line to prevent line-offset drift during multi-chunk replacement
-    parsed_chunks.sort(key=lambda item: (item["start_line"] or 0), reverse=True)
+    parsed_chunks.sort(key=lambda item: item["start_line"] or 0, reverse=True)
 
     # Check for overlapping explicit line ranges among chunks
     ranged_chunks = [c for c in parsed_chunks if c["start_line"] is not None and c["end_line"] is not None]
@@ -194,7 +194,9 @@ def apply_chunk_replacements(
                 actual_replacement = replacement
 
             if count == 0:
-                actual_target_full, actual_replacement_full = find_actual_target_and_replacement(current_text, target, replacement)
+                actual_target_full, actual_replacement_full = find_actual_target_and_replacement(
+                    current_text, target, replacement
+                )
                 full_count = current_text.count(actual_target_full)
 
                 if full_count == 1:
@@ -211,7 +213,9 @@ def apply_chunk_replacements(
                         )
                     )
 
-                target_first_line = actual_target_full.splitlines()[0] if actual_target_full.splitlines() else actual_target_full
+                target_first_line = (
+                    actual_target_full.splitlines()[0] if actual_target_full.splitlines() else actual_target_full
+                )
                 found_line = None
                 for l_no, line_str in enumerate(lines, start=1):
                     if target_first_line in line_str:
@@ -219,7 +223,11 @@ def apply_chunk_replacements(
                         break
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
                 if full_count > 1 and not allow_mult:
-                    loc_msg = f" Target content matches {full_count} occurrences in full file (around line {found_line})." if found_line else ""
+                    loc_msg = (
+                        f" Target content matches {full_count} occurrences in full file (around line {found_line})."
+                        if found_line
+                        else ""
+                    )
                     raise ValueError(
                         format_tool_error(
                             "match",
@@ -246,7 +254,11 @@ def apply_chunk_replacements(
 
             new_sub_text = sub_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
             sub_replacement_lines = new_sub_text.splitlines(keepends=True)
-            if sub_text.endswith(("\n", "\r")) and sub_replacement_lines and not sub_replacement_lines[-1].endswith(("\n", "\r")):
+            if (
+                sub_text.endswith(("\n", "\r"))
+                and sub_replacement_lines
+                and not sub_replacement_lines[-1].endswith(("\n", "\r"))
+            ):
                 eol = "\r\n" if sub_text.endswith("\r\n") else "\n"
                 sub_replacement_lines[-1] += eol
             lines[start_idx:effective_end_idx] = sub_replacement_lines
@@ -258,9 +270,7 @@ def apply_chunk_replacements(
             count = current_text.count(actual_target)
             if count == 0:
                 hint = _generate_fuzzy_match_hint(current_text, target, path)
-                raise ValueError(
-                    format_tool_error("match", f"exact block not found in '{path}'.{hint}")
-                )
+                raise ValueError(format_tool_error("match", f"exact block not found in '{path}'.{hint}"))
             if count > 1 and not allow_mult:
                 raise ValueError(
                     format_tool_error(
@@ -317,15 +327,16 @@ class EditTool(BaseTool):
                     "new_str": {"type": "string", "description": "New code block"},
                     "start": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end": {"type": "integer", "description": "End line (inclusive)"},
-                    "multiple": {"type": "boolean", "description": "Allow multiple matches"}
+                    "multiple": {"type": "boolean", "description": "Allow multiple matches"},
                 },
-                "required": ["path", "old_str", "new_str"]
-            }
-        }
+                "required": ["path", "old_str", "new_str"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
+
         args = normalize_tool_args("edit", args)
         ctx = self._ensure_context(ctx)
         path = args.get("path") or args.get("target_file", "")
@@ -366,21 +377,21 @@ class MultiEditTool(BaseTool):
                                 "new_str": {"type": "string", "description": "New code block"},
                                 "start": {"type": "integer", "description": "Start line (1-indexed)"},
                                 "end": {"type": "integer", "description": "End line (inclusive)"},
-                                "multiple": {"type": "boolean", "description": "Allow multiple matches"}
-                            }
-                        }
-                    }
+                                "multiple": {"type": "boolean", "description": "Allow multiple matches"},
+                            },
+                        },
+                    },
                 },
-                "required": ["path", "edits"]
-            }
-        }
+                "required": ["path", "edits"],
+            },
+        },
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
+
         args = normalize_tool_args("multi_edit", args)
         ctx = self._ensure_context(ctx)
         path = args.get("path") or args.get("target_file", "")
         raw_chunks = args.get("edits") or []
         return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)
-

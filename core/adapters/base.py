@@ -90,12 +90,15 @@ def build_adapter_usage_event(
     p_tok = int(prompt_tokens or 0)
     c_tok = int(completion_tokens or 0)
     t_tok = int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
-    return ("adapter_usage", {
-        "prompt_tokens": p_tok,
-        "completion_tokens": c_tok,
-        "total_tokens": t_tok,
-        "cache_read_tokens": int(cache_read_tokens or 0),
-    })
+    return (
+        "adapter_usage",
+        {
+            "prompt_tokens": p_tok,
+            "completion_tokens": c_tok,
+            "total_tokens": t_tok,
+            "cache_read_tokens": int(cache_read_tokens or 0),
+        },
+    )
 
 
 async def check_httpx_response_status(resp: Any) -> None:
@@ -104,6 +107,7 @@ async def check_httpx_response_status(resp: Any) -> None:
         err_bytes = await resp.aread()
         err_body = err_bytes.decode("utf-8", errors="replace")
         import httpx
+
         raise httpx.HTTPStatusError(
             f"HTTP {resp.status_code}: {err_body}",
             request=resp.request,
@@ -118,6 +122,3 @@ def normalize_tool_arguments_str(raw: Any) -> str:
     if raw is None:
         return "{}"
     return json.dumps(raw, ensure_ascii=False)
-
-
-
