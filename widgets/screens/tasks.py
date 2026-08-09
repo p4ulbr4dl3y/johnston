@@ -124,18 +124,20 @@ class TasksListScreen(BaseModalScreen[None]):
                 })
 
         # 2. Gather subagent sessions
-        from core.subagent_tracker import SubagentTracker
-        st = SubagentTracker.get_instance()
-        st._load_all_sessions()
-        sessions = st.get_sessions_for_session(curr_sid) if curr_sid else list(st.sessions.values())
+        store = getattr(self.app, "sm", None) if hasattr(self, "app") and self.app else None
+        if store is None:
+            from core.session_manager import SessionStore
+            store = SessionStore.get_instance()
+        store.list(kind="subagent")
+        sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()
             is_run = st_str == "RUNNING"
             items.append({
-                "id": getattr(s, "task_id", ""),
+                "id": getattr(s, "id", ""),
                 "kind": "agent",
-                "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "task_id", ""),
+                "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", ""),
                 "is_running": is_run,
                 "status_str": st_str,
                 "raw_obj": s
@@ -223,7 +225,7 @@ class TasksListScreen(BaseModalScreen[None]):
         )
         if is_subagent:
             from widgets.screens.subagent_screen import SubagentViewScreen
-            task_id = getattr(raw, "task_id", item["id"])
+            task_id = getattr(raw, "id", item["id"])
             self.app.push_screen(SubagentViewScreen(task_id))
         else:
             self.app.push_screen(TaskConsoleScreen(raw))

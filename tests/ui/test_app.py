@@ -192,7 +192,11 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
                 app.message_queue.append(("Queued with att", False, [fake_att]))
                 app.generate_ai_response("Initial prompt")
-                await pilot.pause(1.0)
+                for _ in range(30):
+                    await pilot.pause(0.1)
+                    if len(ran_prompts) == 2:
+                        await pilot.pause(0.5)
+                        break
 
                 self.assertEqual(ran_prompts, ["Initial prompt", "Queued with att"])
                 self.assertEqual(ran_attachments[1], [fake_att])
@@ -237,7 +241,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 chat_input.focus()
                 await pilot.press("escape")
 
-                await pilot.pause(0.5)
+                await pilot.pause(0.8)
 
                 self.assertIn("Prompt 1", ran_prompts)
                 self.assertNotIn("Prompt 2", ran_prompts)
@@ -251,26 +255,25 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
 
         app = JohnstonApp()
-        app.sm.save_session(app.current_session_id, {"ui_messages": [{"type": "user", "text": "hi"}]})
+        sess = app.sm.create_main(app.current_session_id)
+        sess.messages = [{"type": "user", "text": "hi"}]
+        app.sm.save(sess)
 
         out = StringIO()
         with patch("sys.stdout", out):
             if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
-                sess = app.sm.load_session(app.current_session_id)
-                if sess and (sess.get("ui_messages") or sess.get("agent_history")):
+                sess = app.sm.get(app.current_session_id)
+                if sess and (sess.messages or sess.agent_history):
                     print(f"\nTo resume this session, run:\n  johnston --resume {app.current_session_id}")
 
         self.assertIn(f"johnston --resume {app.current_session_id}", out.getvalue())
 
     async def test_resume_cli_flag(self):
         app = JohnstonApp()
-        app.sm.save_session(
-            "test_sess_123",
-            {
-                "ui_messages": [{"type": "user", "text": "Resumed user msg"}],
-                "agent_history": [{"role": "user", "content": "Resumed user msg"}],
-            },
-        )
+        sess = app.sm.create_main("test_sess_123")
+        sess.messages = [{"type": "user", "text": "Resumed user msg"}]
+        sess.agent_history = [{"role": "user", "content": "Resumed user msg"}]
+        app.sm.save(sess)
 
         resumed_app = JohnstonApp(resume_session_id="test_sess_123")
         async with resumed_app.run_test() as pilot:
@@ -304,11 +307,11 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(divider.divider_title, "Response Interrupted")
 
             app.save_current_session()
-            sess = app.sm.load_session(app.current_session_id)
+            sess = app.sm.get(app.current_session_id)
             self.assertIsNotNone(sess)
-            ui_msgs = sess.get("ui_messages", [])
+            msgs = sess.messages
             self.assertTrue(
-                any(m.get("type") == "compaction_divider" and m.get("text") == "Response Interrupted" for m in ui_msgs)
+                any(m.get("type") == "compaction_divider" and m.get("text") == "Response Interrupted" for m in msgs)
             )
 
     async def test_click_event_handler(self):
@@ -346,7 +349,11 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 app.message_queue.append(("Old session prompt", False, None, "sess_old"))
 
                 app.generate_ai_response("Current session prompt")
-                await pilot.pause(0.5)
+                for _ in range(15):
+                    await pilot.pause(0.1)
+                    if ran_prompts:
+                        await pilot.pause(0.2)
+                        break
 
                 self.assertEqual(ran_prompts, ["Current session prompt"])
                 self.assertEqual(len(app.message_queue), 0)

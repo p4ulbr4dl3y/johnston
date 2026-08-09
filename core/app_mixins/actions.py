@@ -119,6 +119,6 @@ class ActionsMixin:
     def on_select_changed(self, event: Select.Changed) -> None:
         """Switch agent provider from ~/.johnston config"""
         if event.value and isinstance(event.value, str) and event.value != "none":
-            sess = self.sm.load_session(self.current_session_id)
-            history = sess.get("agent_history", []) if sess else None
+            sess = self.sm.get(self.current_session_id)
+            history = sess.agent_history if sess else None
             self.pm.recreate_active_agent(self, provider_key=event.value, history=history)

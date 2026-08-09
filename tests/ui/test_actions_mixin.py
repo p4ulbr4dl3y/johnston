@@ -406,7 +406,7 @@ class TestActionsSelectChanged(unittest.TestCase):
         obj.pm = MagicMock()
         obj.agent = MagicMock(mode="act", history=[])
         obj.sm = MagicMock()
-        obj.sm.load_session.return_value = {"agent_history": [{"role": "user", "content": "hi"}]}
+        obj.sm.get.return_value = MagicMock(agent_history=[{"role": "user", "content": "hi"}])
         obj.current_session_id = "sess1"
         event = MagicMock()
         event.value = "openai"
@@ -430,7 +430,7 @@ class TestActionsSelectChanged(unittest.TestCase):
         obj.agent = MagicMock(mode="act")
         del obj.agent.history
         obj.sm = MagicMock()
-        obj.sm.load_session.return_value = None
+        obj.sm.get.return_value = None
         obj.current_session_id = "sess1"
         event = MagicMock()
         event.value = "anthropic"

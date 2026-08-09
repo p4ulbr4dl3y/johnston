@@ -4,7 +4,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown
 
-from core.subagent_tracker import SubagentTracker
 from widgets.chat_view import ChatView
 from widgets.screens.base_modal import BaseModalScreen
 
@@ -19,7 +18,7 @@ class SubagentViewScreen(BaseModalScreen[None]):
     def __init__(self, task_id_or_desc: str):
         super().__init__()
         self.task_id_or_desc = task_id_or_desc
-        self.session = SubagentTracker.get_instance().find_session_by_description_or_id(task_id_or_desc)
+        self.session = None
         self.thinking_widget = None
         self.current_tool_widget = None
         self.bot_msg = None
@@ -37,11 +36,15 @@ class SubagentViewScreen(BaseModalScreen[None]):
         chat_view.focus()
         chat_view.clear_welcome()
 
+        store = getattr(self.app, "sm", None) if self.app else None
+        if store is None:
+            from core.session_manager import SessionStore
+            store = SessionStore.get_instance()
+
+        curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+        self.session = store.find_session_by_description_or_id(self.task_id_or_desc, parent_id=curr_session_id)
         if not self.session:
-            curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-            self.session = SubagentTracker.get_instance().find_session_by_description_or_id(
-                self.task_id_or_desc, session_id=curr_session_id
-            )
+            self.session = store.find_session_by_description_or_id(self.task_id_or_desc)
 
         if not self.session:
             async def _no_sess():
@@ -49,8 +52,6 @@ class SubagentViewScreen(BaseModalScreen[None]):
                 bm.content = f"Subagent `{self.task_id_or_desc}` session details not found."
             self.run_worker(_no_sess())
             return
-
-
 
         self.run_worker(self._load_history_session())
 
@@ -66,7 +67,7 @@ class SubagentViewScreen(BaseModalScreen[None]):
         self.bot_msg = None
 
         if self.session:
-            history_events = list(self.session.events)
+            history_events = list(self.session.messages)
             for evt in history_events:
                 await self._render_event(evt, animate=False)
 

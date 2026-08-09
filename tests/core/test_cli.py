@@ -573,7 +573,7 @@ class TestMainFlags(unittest.TestCase):
                 mock_app.run = MagicMock()
                 mock_app.current_session_id = "sess123"
                 mock_app.sm = MagicMock()
-                mock_app.sm.load_session.return_value = {"ui_messages": [{"type": "user", "text": "hi"}]}
+                mock_app.sm.get.return_value = MagicMock(messages=[{"type": "user", "text": "hi"}], agent_history=[])
                 with redirect_stdout(f):
                     with self.assertRaises(SystemExit) as cm:
                         from cli import main
@@ -588,7 +588,7 @@ class TestMainFlags(unittest.TestCase):
                 mock_app.run = MagicMock()
                 mock_app.current_session_id = "sess123"
                 mock_app.sm = MagicMock()
-                mock_app.sm.load_session.side_effect = Exception("boom")
+                mock_app.sm.get.side_effect = Exception("boom")
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
                     main()

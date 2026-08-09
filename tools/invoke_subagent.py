@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from core.background_task import BackgroundSubagent
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.subagent_tracker import SubagentTracker
+from core.session_manager import SessionStore
 from tools.base import BaseTool
 
 MAX_SUBAGENT_RESULT_CHARS = 15000
@@ -14,12 +14,21 @@ MAX_SUBAGENT_RESULT_CHARS = 15000
 def _truncate_subagent_result(text: str, task_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
-    remains available in log_path and via manage_subagent(action='status')."""
+    is saved on truncation and the path is returned in the hint."""
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
-    from core.config import SUBAGENT_LOGS_DIR
-    log_path = os.path.join(SUBAGENT_LOGS_DIR, f"{task_id}.log") if task_id else "log file"
+    import uuid
+
+    from core.config import LOGS_DIR
+    log_name = f"{task_id or 'subagent'}-{uuid.uuid4().hex[:4]}.log"
+    log_path = os.path.join(LOGS_DIR, log_name)
+    try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        log_path = "log file"
     truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
     shown_lines = truncated.count("\n") + (1 if truncated else 0)
     next_line = shown_lines + 1
@@ -75,9 +84,13 @@ class InvokeSubagentTool(BaseTool):
             setattr(ctx.app.current_tool_widget, "subagent_task_id", task_id)
 
         session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
-        tracker = SubagentTracker.get_instance()
+        if ctx.app and getattr(ctx.app, "sm", None):
+            store = ctx.app.sm
+        else:
+            store = SessionStore.get_instance()
+        store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
-        active_sessions = tracker.get_sessions_for_session(session_id)
+        active_sessions = store.get_subagents_for_parent(session_id) if session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
             return (
@@ -102,12 +115,17 @@ class InvokeSubagentTool(BaseTool):
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
 
-        session = tracker.create_session(
-            task_id, description, prompt, subagent_type, background=True, session_id=session_id
+        session = store.create_subagent(
+            parent_id=session_id or "",
+            subagent_id=task_id,
+            role=subagent_type,
+            description=description,
+            prompt=prompt,
+            status="running",
+            project_dir=wt_path or "",
+            branch_name=wt_branch or "",
         )
         session.agent = subagent
-        session.project_dir = wt_path or ""
-        session.branch_name = wt_branch or ""
         session.add_event({"type": "user", "text": prompt})
 
         # Disable nested subagent spawning, background task management, and UI questions for subagents
@@ -168,6 +186,7 @@ class InvokeSubagentTool(BaseTool):
                 prompt,
                 session,
                 ctx,
+                store,
                 cleanup_fn=_cleanup_worktree_and_append_diff,
                 error_prefix="Subagent error",
                 notification_template=f"{notification_hdr}\n<task_result>\n{{result_text}}\n</task_result>\n{notification_ftr}",

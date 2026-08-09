@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from core.role_registry import RoleRegistry
-from core.subagent_tracker import SubagentTracker
+from core.session_manager import SessionStore
 
 
 class TestSubagentRoles(unittest.TestCase):
@@ -76,29 +76,38 @@ class TestSubagentTrackerStrictMatch(unittest.IsolatedAsyncioTestCase):
     would risk killing or inspecting the wrong subagent."""
 
     def setUp(self):
-        self.tracker = SubagentTracker.get_instance()
-        self.tracker.sessions.clear()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.store = SessionStore(project_path=self.temp_dir.name)
+        self._old_instance = SessionStore._instance
+        SessionStore._instance = self.store
 
     def tearDown(self):
-        self.tracker.sessions.clear()
+        SessionStore._instance = self._old_instance
+
+    def _mk(self, sid: str, desc: str, prompt: str):
+        return self.store.create_subagent(
+            parent_id="sess-main", subagent_id=sid, role="worker",
+            description=desc, prompt=prompt, status="running",
+        )
 
     async def test_no_loose_fallback_for_unknown_id(self):
-        self.tracker.create_session("task-1", "Important task", "p1", "worker", False)
-        self.tracker.create_session("task-2", "Other task", "p2", "worker", False)
+        self._mk("task-1", "Important task", "p1")
+        self._mk("task-2", "Other task", "p2")
 
         # A single letter that previously matched via substring must now return None.
-        self.assertIsNone(self.tracker.find_session_by_description_or_id("a"))
+        self.assertIsNone(self.store.find_session_by_description_or_id("a"))
         # A totally unknown id must return None, not the last session.
-        self.assertIsNone(self.tracker.find_session_by_description_or_id("nonexistent-xyz"))
+        self.assertIsNone(self.store.find_session_by_description_or_id("nonexistent-xyz"))
 
     async def test_exact_match_still_works(self):
-        self.tracker.create_session("task-1", "Important task", "p1", "worker", False)
-        res = self.tracker.find_session_by_description_or_id("task-1")
+        self._mk("task-1", "Important task", "p1")
+        res = self.store.find_session_by_description_or_id("task-1")
         self.assertIsNotNone(res)
-        self.assertEqual(res.task_id, "task-1")
-        res = self.tracker.find_session_by_description_or_id("Important task")
+        self.assertEqual(res.id, "task-1")
+        res = self.store.find_session_by_description_or_id("Important task")
         self.assertIsNotNone(res)
-        self.assertEqual(res.task_id, "task-1")
+        self.assertEqual(res.id, "task-1")
 
 
 if __name__ == "__main__":
