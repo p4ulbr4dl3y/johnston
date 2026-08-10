@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import os
 import re
 
 from core.platform_utils import terminate_process
 from tools.base import format_tool_error
+
+logger = logging.getLogger(__name__)
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -163,7 +166,9 @@ class BackgroundTask:
                             out_res = "(no output)"
                         on_completed_cb(self.task_id, self.command, out_res)
                     except Exception:
-                        pass
+                        logger.warning(
+                            "Background task on_completed callback failed for task %s", self.task_id, exc_info=True
+                        )
 
         self.read_task = asyncio.create_task(_read())
         return self.read_task
