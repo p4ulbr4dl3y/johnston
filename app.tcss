@@ -162,6 +162,11 @@ WelcomeWidget {
     color: #ffffff;
 }
 
+/* Subagent view: no hover effect on tool headers */
+#subagent-chat-view .tool-header-expandable:hover {
+    color: #d4d4d8;
+}
+
 .tool-content, .tool-content-md {
     width: auto;
     min-width: 100%;

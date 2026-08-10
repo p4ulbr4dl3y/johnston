@@ -224,7 +224,9 @@ class ParsingMixin:
             )
         ):
             return True
-        if "traceback (most recent call last):" in cleaned or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
+        if self.canonical_tool in ("read", "create", "edit", "multi_edit"):
+            return False
+        if "traceback (most recent call last):" in cleaned[:200] or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
             return True
         return False
 

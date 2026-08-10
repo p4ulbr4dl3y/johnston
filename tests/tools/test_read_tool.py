@@ -213,6 +213,16 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             res_err = await tool.execute({"path": file_path})
             self.assertIn("ERR: file", res_err)
 
+    async def test_read_offset_alias_maps_to_start_line(self):
+        tool = ReadTool()
+        file_path = os.path.join(self.test_dir, "lines.txt")
+        with open(file_path, "w") as f:
+            f.write("line 1\nline 2\nline 3\nline 4\n")
+
+        res = await tool.execute({"path": file_path, "offset": 3})
+        self.assertIn("line 3", res)
+        self.assertNotIn("line 1", res)
+
     @patch("tools.web_fetch.WebFetchTool.execute")
     async def test_read_http_url_delegates_to_web_fetch(self, mock_web_execute):
         mock_web_execute.return_value = "# Web Page Content"
