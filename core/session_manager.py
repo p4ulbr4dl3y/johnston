@@ -100,6 +100,8 @@ class AgentSession:
             self.messages.append(event)
             self.updated_at = _now()
 
+        if not self.listeners:
+            return
         for cb in list(self.listeners):
             try:
                 cb(event)

@@ -1,5 +1,6 @@
 import json
 import uuid
+from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
@@ -14,6 +15,27 @@ from core.adapters.base import (
     sort_keys_recursive,
 )
 from core.thinking_effort import build_anthropic_thinking_payload
+
+# Bounded LRU cache for deterministic tool-schema sorting. `sort_keys_recursive`
+# deep-copies + sorts the whole structure on every stream request; tool schemas
+# are stable across requests, so cache the sorted result keyed by a cheap repr
+# fingerprint of the freshly converted tools (re-computed only when schemas change).
+_SORT_CACHE_MAX = 64
+_sort_cache: "OrderedDict" = OrderedDict()
+
+
+def _get_sorted_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return the deep-sorted copy of a tool list, caching by content fingerprint."""
+    key = repr(tools)
+    cached = _sort_cache.pop(key, None)
+    if cached is not None:
+        _sort_cache[key] = cached  # LRU promote
+        return cached
+    sorted_tools = sort_keys_recursive(tools)
+    _sort_cache[key] = sorted_tools
+    if len(_sort_cache) > _SORT_CACHE_MAX:
+        _sort_cache.popitem(last=False)
+    return sorted_tools
 
 
 def apply_anthropic_rolling_cache(anthropic_msgs: List[Dict[str, Any]]) -> None:
@@ -178,7 +200,11 @@ class AnthropicAdapter(BaseApiAdapter):
                     }
                 )
             if converted_tools:
-                sorted_tools = sort_keys_recursive(converted_tools)
+                sorted_tools = _get_sorted_tools(converted_tools)
+                # Shallow-copy list + dict-copy last element so the cache_control
+                # mutation below never touches the shared cached structure.
+                sorted_tools = list(sorted_tools)
+                sorted_tools[-1] = dict(sorted_tools[-1])
                 sorted_tools[-1]["cache_control"] = {"type": "ephemeral"}
                 payload["tools"] = sorted_tools
 
