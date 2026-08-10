@@ -1,5 +1,6 @@
 import os
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
@@ -246,9 +247,13 @@ class RoleRegistry:
 
     _instance: Optional["RoleRegistry"] = None
 
+    _CACHE_TTL = 2.0  # seconds
+
     def __init__(self):
         self.roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
         self.current_project_dir: Optional[str] = None
+        self._roles_cache_signature: Optional[Tuple] = None
+        self._roles_cache_ts: float = 0.0
 
     @classmethod
     def get_instance(cls) -> "RoleRegistry":
@@ -257,7 +262,6 @@ class RoleRegistry:
         return cls._instance
 
     def load_roles(self, project_dir: Optional[str] = None, include_global: bool = True) -> Dict[str, AgentRole]:
-        roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
         if project_dir is not None:
             self.current_project_dir = project_dir
         p_dir = self.current_project_dir or os.getcwd()
@@ -268,13 +272,51 @@ class RoleRegistry:
 
         dirs.append((os.path.join(p_dir, ".johnston", "roles"), "project"))
 
+        signature = self._roles_signature(dirs)
+        now = time.time()
+        if (
+            signature is not None
+            and signature == self._roles_cache_signature
+            and (now - self._roles_cache_ts) < self._CACHE_TTL
+        ):
+            return self.roles
+
+        roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
         for fpath, source in iter_md_files(dirs):
             role = self._parse_md_role(fpath, source)
             if role:
                 roles[role.key] = role
 
         self.roles = roles
+        self._roles_cache_signature = signature
+        self._roles_cache_ts = now
         return roles
+
+    @staticmethod
+    def _roles_signature(dirs: List[Tuple[str, str]]) -> Optional[Tuple]:
+        """Cheap (path, mtime_ns, size) signature of every role file to detect
+        external changes without re-reading contents. None when no dirs exist."""
+        entries = []
+        for dpath, _source in dirs:
+            if not os.path.isdir(dpath):
+                continue
+            try:
+                for fname in sorted(os.listdir(dpath)):
+                    if not (fname.endswith(".md") or fname.endswith(".markdown")):
+                        continue
+                    fpath = os.path.join(dpath, fname)
+                    if not os.path.isfile(fpath):
+                        continue
+                    st = os.stat(fpath)
+                    entries.append((fpath, st.st_mtime_ns, st.st_size))
+            except OSError:
+                continue
+        return tuple(entries) if entries else None
+
+    def invalidate_cache(self) -> None:
+        """Force the next load_roles/get_role/get_system_prompt_snippet to re-scan from disk."""
+        self._roles_cache_signature = None
+        self._roles_cache_ts = 0.0
 
     def get_role(self, key: str, project_dir: Optional[str] = None) -> AgentRole:
         self.load_roles(project_dir=project_dir)
