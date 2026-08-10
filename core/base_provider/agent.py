@@ -286,13 +286,17 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         sid = getattr(app, "current_session_id", None)
                         # Iterate over a snapshot so foreign-session items are left
                         # in place (no infinite loop) while own items are consumed.
-                        for item in list(mq):
+                        # Single-pass drain: keep foreign-session items in place,
+                        # consume own items. O(n) instead of list()+remove() O(n^2).
+                        kept = []
+                        for item in mq:
                             item_sid = item[3] if len(item) > 3 else None
                             if item_sid is not None and sid is not None and item_sid != sid:
+                                kept.append(item)
                                 continue
-                            mq.remove(item)
                             messages.append({"role": "user", "content": item[0]})
                             yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
+                        mq[:] = kept
 
                 full_assistant_text = ""
                 step_usage = None
@@ -312,9 +316,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 attempt = 0
                 while True:
                     attempt += 1
+                    full_assistant_parts = []
+                    active_thought_parts = []
                     full_assistant_text = ""
                     step_usage = None
                     tool_calls_dict = {}
+                    tool_call_arg_parts: Dict[int, List[str]] = {}
                     active_thought = ""
                     thinking_started = False
                     thinking_t0 = time.time()
@@ -338,7 +345,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                         dt = time.time() - thinking_t0
                                         yield ("thinking_end", f"{dt}", active_thought)
                                         thinking_started = False
-                                    full_assistant_text += payload
+                                    full_assistant_parts.append(payload)
+                                    full_assistant_text = "".join(full_assistant_parts)
                                     yield ("bot_delta", full_assistant_text, "")
                                 elif tag == "adapter_tool_call":
                                     if thinking_started:
@@ -388,81 +396,129 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                             stream_iter = response.__aiter__()
                             chunk_to = getattr(self, "chunk_timeout", 30.0) or 30.0
-                            while True:
+                            # Single producer task pulls chunks off the provider; the
+                            # consumer polls the queue with a watchdog deadline so we
+                            # keep per-chunk timeouts without creating a task per chunk.
+                            from asyncio import Queue, QueueEmpty
+
+                            _chunk_queue: "Queue[Any]" = Queue(maxsize=8)
+                            _DONE = object()
+
+                            async def _produce_chunks():
                                 try:
-                                    chunk = await asyncio.wait_for(stream_iter.__anext__(), timeout=chunk_to)
-                                except StopAsyncIteration:
-                                    break
-                                except asyncio.TimeoutError:
-                                    raise RuntimeError(
-                                        f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
+                                    async for chunk in stream_iter:
+                                        await _chunk_queue.put(chunk)
+                                except asyncio.CancelledError:
+                                    raise
+                                except Exception as exc:
+                                    await _chunk_queue.put(exc)
+                                finally:
+                                    await _chunk_queue.put(_DONE)
+
+                            producer_task = asyncio.ensure_future(_produce_chunks())
+                            _loop = asyncio.get_running_loop()
+                            _last_chunk_at = _loop.time()
+                            try:
+                                while True:
+                                    try:
+                                        item = _chunk_queue.get_nowait()
+                                    except QueueEmpty:
+                                        # Watchdog: poll the queue; if no chunk arrived
+                                        # within chunk_to, cancel the producer and fail.
+                                        await asyncio.sleep(0.05)
+                                        if _loop.time() - _last_chunk_at > chunk_to:
+                                            producer_task.cancel()
+                                            raise RuntimeError(
+                                                f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
+                                            )
+                                        continue
+                                    if item is _DONE:
+                                        break
+                                    if isinstance(item, Exception):
+                                        raise item
+                                    _last_chunk_at = _loop.time()
+                                    chunk = item
+
+                                    if getattr(chunk, "usage", None):
+                                        step_usage = parse_usage(chunk.usage)
+
+                                    chunk_is_dict = isinstance(chunk, dict)
+                                    choices = (
+                                        getattr(chunk, "choices", None)
+                                        if not chunk_is_dict
+                                        else chunk.get("choices")
                                     )
-
-                                if getattr(chunk, "usage", None):
-                                    step_usage = parse_usage(chunk.usage)
-
-                                choices = (
-                                    getattr(chunk, "choices", None)
-                                    if not isinstance(chunk, dict)
-                                    else chunk.get("choices")
-                                )
-                                if not choices and (
-                                    hasattr(chunk, "data") or (isinstance(chunk, dict) and "data" in chunk)
-                                ):
-                                    d = (
-                                        getattr(chunk, "data", None)
-                                        if not isinstance(chunk, dict)
-                                        else chunk.get("data")
+                                    if not choices and (
+                                        hasattr(chunk, "data") or (chunk_is_dict and "data" in chunk)
+                                    ):
+                                        d = (
+                                            getattr(chunk, "data", None)
+                                            if not chunk_is_dict
+                                            else chunk.get("data")
+                                        )
+                                        choices = (
+                                            d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
+                                        )
+                                    if not choices:
+                                        continue
+                                    choice = choices[0]
+                                    delta = choice.delta
+                                    reasoning = (
+                                        getattr(delta, "reasoning_content", None)
+                                        or getattr(delta, "reasoning", None)
+                                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
+                                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
                                     )
-                                    choices = d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
-                                if not choices:
-                                    continue
-                                choice = choices[0]
-                                delta = choice.delta
-                                reasoning = (
-                                    getattr(delta, "reasoning_content", None)
-                                    or getattr(delta, "reasoning", None)
-                                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
-                                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
-                                )
-                                if reasoning:
-                                    if not thinking_started:
-                                        yield ("thinking_start", "Thinking...", "")
-                                        thinking_started = True
-                                        thinking_t0 = time.time()
-                                    active_thought += reasoning
-                                    yield ("thinking_delta", active_thought, "")
+                                    if reasoning:
+                                        if not thinking_started:
+                                            yield ("thinking_start", "Thinking...", "")
+                                            thinking_started = True
+                                            thinking_t0 = time.time()
+                                        active_thought_parts.append(reasoning)
+                                        active_thought = "".join(active_thought_parts)
+                                        yield ("thinking_delta", active_thought, "")
 
-                                delta = choice.delta
-                                if delta.content:
-                                    if thinking_started:
-                                        dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", active_thought)
-                                        thinking_started = False
-                                    full_assistant_text += delta.content
-                                    yield ("bot_delta", full_assistant_text, "")
+                                    if delta.content:
+                                        if thinking_started:
+                                            dt = time.time() - thinking_t0
+                                            yield ("thinking_end", f"{dt}", active_thought)
+                                            thinking_started = False
+                                        full_assistant_parts.append(delta.content)
+                                        full_assistant_text = "".join(full_assistant_parts)
+                                        yield ("bot_delta", full_assistant_text, "")
 
-                                if delta.tool_calls:
-                                    if thinking_started:
-                                        dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", active_thought)
-                                        thinking_started = False
+                                    if delta.tool_calls:
+                                        if thinking_started:
+                                            dt = time.time() - thinking_t0
+                                            yield ("thinking_end", f"{dt}", active_thought)
+                                            thinking_started = False
 
-                                    for tc in delta.tool_calls:
-                                        idx = tc.index
-                                        if idx not in tool_calls_dict:
-                                            tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
-                                        if tc.id:
-                                            tool_calls_dict[idx]["id"] = tc.id
-                                        if tc.function:
-                                            if tc.function.name:
-                                                tool_calls_dict[idx]["name"] = tc.function.name
-                                            if tc.function.arguments:
-                                                tool_calls_dict[idx]["arguments"] += tc.function.arguments
+                                        for tc in delta.tool_calls:
+                                            idx = tc.index
+                                            if idx not in tool_calls_dict:
+                                                tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
+                                            if tc.id:
+                                                tool_calls_dict[idx]["id"] = tc.id
+                                            if tc.function:
+                                                if tc.function.name:
+                                                    tool_calls_dict[idx]["name"] = tc.function.name
+                                                if tc.function.arguments:
+                                                    tool_call_arg_parts.setdefault(idx, []).append(
+                                                        tc.function.arguments
+                                                    )
+                            finally:
+                                if not producer_task.done():
+                                    producer_task.cancel()
+
+                            # Resolve streamed tool-call argument fragments once.
+                            for _idx, _parts in tool_call_arg_parts.items():
+                                tool_calls_dict[_idx]["arguments"] = "".join(_parts)
                         # Stream completed successfully
                         circuit_breaker.record_success(pkey)
                         break
                     except asyncio.CancelledError:
+                        for _idx, _parts in tool_call_arg_parts.items():
+                            tool_calls_dict[_idx]["arguments"] = "".join(_parts)
                         output_est = (
                             estimate_tokens(full_assistant_text)
                             + estimate_tokens(active_thought)
