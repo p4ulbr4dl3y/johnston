@@ -45,12 +45,15 @@ def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
     The temp files are always named ``old``/``new``, so git emits headers like
     ``--- a/<tmp>/old`` and ``+++ b/<tmp>/new``. Those are rewritten to the
     supplied ``fromfile``/``tofile`` labels.
+
+    Drops ``diff --git`` / ``index`` metadata headers, which are token cost
+    for the agent and not needed for rendering.
     """
     out_lines = []
     for line in diff_text.splitlines():
-        if line.startswith("diff --git "):
-            line = f"diff --git {fromfile} {tofile}"
-        elif line.startswith("--- a/") and line.endswith("/old"):
+        if line.startswith("diff --git ") or line.startswith("index "):
+            continue
+        if line.startswith("--- a/") and line.endswith("/old"):
             line = f"--- {fromfile}"
         elif line.startswith("+++ b/") and line.endswith("/new"):
             line = f"+++ {tofile}"
