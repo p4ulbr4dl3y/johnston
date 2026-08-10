@@ -6,6 +6,8 @@ from rich.text import Span, Text
 
 from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
 
+_HUNK_REGEX = re.compile(r"^@@\s+-\s*(\d+)(?:,\d+)?\s+\+\s*(\d+)(?:,\d+)?\s+@@")
+
 
 class DiffRenderable:
     """Custom Rich renderable for diff views to prevent console line wrapping"""
@@ -59,27 +61,40 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     old_code_lines = []
     new_code_lines = []
     in_hunk = False
-    hunk_regex = re.compile(r"^@@\s+-\s*(\d+)(?:,\d+)?\s+\+\s*(\d+)(?:,\d+)?\s+@@")
+    max_num = 1
+    current_old = 0
+    current_new = 0
 
     for line in lines:
-        if line.startswith("--- ") or line.startswith("+++ "):
-            continue
-        if hunk_regex.match(line):
+        hunk_match = _HUNK_REGEX.match(line)
+        if hunk_match:
+            current_old = int(hunk_match.group(1))
+            current_new = int(hunk_match.group(2))
             in_hunk = True
+            continue
+        if line.startswith("--- ") or line.startswith("+++ "):
             continue
         if not in_hunk:
             continue
 
         if line.startswith("-"):
+            max_num = max(max_num, current_old)
+            current_old += 1
             old_code_lines.append(line[1:].expandtabs(4))
         elif line.startswith("+"):
+            max_num = max(max_num, current_new)
+            current_new += 1
             new_code_lines.append(line[1:].expandtabs(4))
         elif line.startswith("\\"):
             continue
         else:
             content = line[1:] if line.startswith(" ") else line
+            max_num = max(max_num, current_old, current_new)
+            current_old += 1
+            current_new += 1
             old_code_lines.append(content.expandtabs(4))
             new_code_lines.append(content.expandtabs(4))
+    max_num_digits = len(str(max_num))
 
     full_sample = "\n".join(old_code_lines + new_code_lines)
     if lexer_name in ("html", "htm", "xhtml", "php", "vue", "svelte"):
@@ -133,34 +148,6 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     old_idx = 0
     new_idx = 0
 
-    max_num = 1
-    temp_old = 0
-    temp_new = 0
-    in_hunk = False
-    for line in lines:
-        if line.startswith("--- ") or line.startswith("+++ "):
-            continue
-        hunk_match = hunk_regex.match(line)
-        if hunk_match:
-            temp_old = int(hunk_match.group(1))
-            temp_new = int(hunk_match.group(2))
-            in_hunk = True
-        elif not in_hunk:
-            continue
-        elif line.startswith("-"):
-            max_num = max(max_num, temp_old)
-            temp_old += 1
-        elif line.startswith("+"):
-            max_num = max(max_num, temp_new)
-            temp_new += 1
-        elif line.startswith("\\"):
-            continue
-        else:
-            max_num = max(max_num, temp_old, temp_new)
-            temp_old += 1
-            temp_new += 1
-    max_num_digits = len(str(max_num))
-
     def append_diff_line(num_str: str, symbol: str, code_text: Text, style_bg: str = None, style_fg: str = None):
         full_line = Text()
         if style_fg:
@@ -180,7 +167,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
         if line.startswith("--- ") or line.startswith("+++ "):
             continue
 
-        hunk_match = hunk_regex.match(line)
+        hunk_match = _HUNK_REGEX.match(line)
         if hunk_match:
             old_line = int(hunk_match.group(1))
             new_line = int(hunk_match.group(2))

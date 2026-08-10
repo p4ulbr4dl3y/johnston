@@ -50,8 +50,18 @@ def build_synthetic_create_diff(file_path: str, content: str) -> str:
 class FormattingMixin:
     """Pure formatting helpers for tool output display"""
 
+    _lexer_cache: dict[str, str] = {}
+
     def _guess_lexer(self, path_str: str) -> str:
-        return guess_lexer_name(path_str)
+        cache = self._lexer_cache
+        cached = cache.get(path_str)
+        if cached is not None:
+            return cached
+        name = guess_lexer_name(path_str)
+        if len(cache) >= 256:
+            cache.clear()
+        cache[path_str] = name
+        return name
 
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()
@@ -224,6 +234,15 @@ class ParsingMixin:
             return True
         if not text:
             return False
+        cache = getattr(self, "_error_cache", None)
+        if cache is None:
+            cache = {}
+            self._error_cache = cache
+        cached = cache.get(text)
+        if cached is not None:
+            return cached
+        if len(cache) >= 64:
+            cache.clear()
         cleaned = text.strip().lower()
         if cleaned.startswith(
             (
@@ -238,12 +257,14 @@ class ParsingMixin:
                 "command failed",
             )
         ):
+            cache[text] = True
             return True
         if self.canonical_tool in ("read", "create", "edit", "multi_edit"):
+            cache[text] = False
             return False
-        if "traceback (most recent call last):" in cleaned[:200] or "error:" in cleaned[:80] or "exception:" in cleaned[:80]:
-            return True
-        return False
+        is_err = "traceback (most recent call last):" in cleaned[:200] or "error:" in cleaned[:80] or "exception:" in cleaned[:80]
+        cache[text] = is_err
+        return is_err
 
     def _get_status_color(self) -> str:
         if self.status == "running":
