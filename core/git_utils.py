@@ -32,16 +32,11 @@ def run_git(
         return subprocess.CompletedProcess(args=["git"] + args, returncode=1, stdout="", stderr=str(e))
 
 
-def _normalize_lines(content: str | list[str]) -> list[str]:
-    """Splits content into lines, dropping a trailing empty line from a bare trailing newline."""
+def _content_to_text(content: str | list[str]) -> str:
+    """Converts content to raw text, preserving a bare trailing newline."""
     if isinstance(content, list):
-        return list(content)
-    if not content:
-        return []
-    lines = content.split("\n")
-    if lines and lines[-1] == "":
-        lines.pop()
-    return lines
+        return "\n".join(content)
+    return content
 
 
 def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
@@ -77,10 +72,10 @@ def make_git_diff(
     """
     fromfile = fromfile or "old"
     tofile = tofile or "new"
-    old_l = _normalize_lines(old_content)
-    new_l = _normalize_lines(new_content)
+    old_text = _content_to_text(old_content)
+    new_text = _content_to_text(new_content)
 
-    if old_l == new_l:
+    if old_text == new_text:
         return ""
 
     try:
@@ -88,9 +83,9 @@ def make_git_diff(
             old_path = os.path.join(tmp, "old")
             new_path = os.path.join(tmp, "new")
             with open(old_path, "w", encoding="utf-8") as f:
-                f.write("".join(line + "\n" for line in old_l))
+                f.write(old_text)
             with open(new_path, "w", encoding="utf-8") as f:
-                f.write("".join(line + "\n" for line in new_l))
+                f.write(new_text)
             res = run_git(
                 [
                     "diff",
@@ -111,6 +106,13 @@ def make_git_diff(
             return _relabel_diff(out, fromfile, tofile)
     except Exception:
         diff_lines = list(
-            difflib.unified_diff(old_l, new_l, fromfile=fromfile, tofile=tofile, lineterm="", n=context)
+            difflib.unified_diff(
+                old_text.splitlines(),
+                new_text.splitlines(),
+                fromfile=fromfile,
+                tofile=tofile,
+                lineterm="",
+                n=context,
+            )
         )
         return "\n".join(diff_lines)
