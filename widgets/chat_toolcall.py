@@ -80,6 +80,21 @@ class FormattingMixin:
 
         return t
 
+    def _format_ask_user_display(self) -> Any:
+        questions = self._parse_ask_user_questions()
+        answers = self._parse_ask_user_answers(questions)
+        t = Text()
+        for i, q in enumerate(questions):
+            if i:
+                t.append("\n")
+            q_text = q.get("question_text", "")
+            ans = answers.get(i, {}).get("answer", "")
+            t.append(f"Q: {q_text}\n", style="bold #ffffff")
+            t.append(f"A: {ans}", style="#a1a1aa" if not ans else None)
+        if not t:
+            t.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
+        return t
+
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         diff_text = self._clean_hints_for_ui(diff_text)
         return format_edit_diff(diff_text, file_path)
@@ -407,7 +422,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         from tools.registry import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
-        if canonical in ("read", "web_fetch", "ask_user", "manage_shell", "manage_subagent", "invoke_subagent"):
+        if canonical == "ask_user":
+            # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
+            return "Answer:" in (self.result_text or "")
+        if canonical in ("read", "web_fetch", "manage_shell", "manage_subagent", "invoke_subagent"):
             return False
         if canonical in self.EXPANDABLE_TOOLS:
             return True
@@ -421,7 +439,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return False
         except Exception:
             pass
-        return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "manage_shell")
+        return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "ask_user")
 
     def __init__(
         self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None
@@ -537,7 +555,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
-            "manage_shell",
             "manage_subagent",
             "ask_user",
         ):
@@ -567,25 +584,75 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def on_click(self, event) -> None:
         if not self.is_clickable_header():
             return
-        if self.canonical_tool in ("invoke_subagent", "manage_shell"):
-            args = self.args if isinstance(self.args, dict) else {}
-            from tools.registry import normalize_tool_args
+        if self.canonical_tool in ("invoke_subagent", "ask_user"):
+            if self.canonical_tool == "invoke_subagent":
+                args = self.args if isinstance(self.args, dict) else {}
+                from tools.registry import normalize_tool_args
 
-            nargs = normalize_tool_args(self.canonical_tool, args)
-            session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
-            identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
-            try:
-                from widgets.screens.subagent_screen import SubagentViewScreen
+                nargs = normalize_tool_args(self.canonical_tool, args)
+                session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
+                identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
+                try:
+                    from widgets.screens.subagent_screen import SubagentViewScreen
 
-                self.app.push_screen(SubagentViewScreen(identifier))
-            except Exception:
-                pass
-            event.stop()
-            return
+                    self.app.push_screen(SubagentViewScreen(identifier))
+                except Exception:
+                    pass
+                event.stop()
+                return
+            if getattr(self.app, "_pending_ask_user", None) is not None:
+                self._resume_ask_user_wizard()
+                event.stop()
+                return
+            # No pending wizard: fall through to inline expand/collapse.
 
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
+
+    def _resume_ask_user_wizard(self) -> None:
+        """Resume a minimized ask_user wizard if present."""
+        pending = getattr(self.app, "_pending_ask_user", None)
+        if callable(pending):
+            pending()
+
+    def _parse_ask_user_questions(self) -> list[dict]:
+        args = self.args if isinstance(self.args, dict) else {}
+        qs = args.get("questions")
+        if not isinstance(qs, list):
+            single = args.get("question") or args.get("question_text")
+            if isinstance(single, str):
+                qs = [
+                    {
+                        "question_text": single,
+                        "options": args.get("options") or args.get("choices"),
+                    }
+                ]
+        out = []
+        if isinstance(qs, list):
+            for q in qs:
+                if not isinstance(q, dict):
+                    continue
+                q_text = q.get("question_text") or q.get("question") or ""
+                opts = q.get("options")
+                if opts is None:
+                    opts = q.get("choices")
+                if q_text and isinstance(opts, list):
+                    out.append({"question_text": str(q_text), "options": [str(o) for o in opts]})
+        return out
+
+    def _parse_ask_user_answers(self, questions: list[dict]) -> dict:
+        answers = {}
+        text = self.result_text or ""
+        if "Answer:" not in text:
+            return answers
+        blocks = re.split(r"\n(?=Question: )", text)
+        for i, q in enumerate(questions):
+            if i >= len(blocks):
+                break
+            m = re.search(r"^Answer:\s*(.*)$", blocks[i], re.MULTILINE)
+            answers[i] = {"answer": m.group(1).strip() if m else "(No response)"}
+        return answers
 
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
@@ -702,6 +769,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     explanation = self.args.get("explanation", "")
                     formatted_plan = self._format_plan_display(plan_items, explanation)
                     self.content_widget.update(formatted_plan)
+            elif self.canonical_tool == "ask_user":
+                self.content_widget.update(self._format_ask_user_display())
             elif self.tool_type in ("web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if raw_text.strip().lower().startswith("error"):

@@ -1305,7 +1305,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_manage_shell_and_expandable(self):
+    def test_on_click_manage_shell_no_longer_clickable(self):
         widget = self._widget("manage_shell", "t", args={"description": "desc"})
         event = MagicMock()
         with (
@@ -1314,7 +1314,43 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         ):
             app_prop.return_value = MagicMock()
             widget.on_click(event)
+        event.stop.assert_not_called()
+
+    def test_on_click_ask_user_resumes_pending(self):
+        widget = self._widget("ask_user", "q", args={"questions": [{"question_text": "Q", "options": ["A"]}]})
+        event = MagicMock()
+        with (
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            setattr(app, "_pending_ask_user", MagicMock())
+            app_prop.return_value = app
+            widget.on_click(event)
+        app._pending_ask_user.assert_called_once()
         event.stop.assert_called_once()
+
+    def test_on_click_ask_user_expands_inline_when_completed(self):
+        widget = self._widget(
+            "ask_user",
+            "q",
+            args={"questions": [{"question_text": "Q1", "options": ["A", "B"]}]},
+            result_text="Question: Q1\nAnswer: A",
+        )
+        event = MagicMock()
+        with (
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            setattr(app, "_pending_ask_user", None)
+            app_prop.return_value = app
+            widget.on_click(event)
+        self.assertTrue(widget.is_expanded)
+        self.assertTrue(widget.is_expandable())
+        event.stop.assert_called_once()
+
+    def test_ask_user_not_expandable_without_answers(self):
+        widget = self._widget("ask_user", "q", args={"questions": [{"question_text": "Q1", "options": ["A"]}]})
+        self.assertFalse(widget.is_expandable())
 
     def test_on_click_exception_is_suppressed(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
