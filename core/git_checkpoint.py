@@ -56,13 +56,27 @@ class GitCheckpointManager:
     ) -> subprocess.CompletedProcess:
         return run_git(args=args, cwd=cwd, env=env, timeout=timeout)
 
+    # Cache of the baseline shadow env (GIT_DIR + GIT_WORK_TREE) keyed by (shadow_dir, cwd).
+    # Built once via a single os.environ.copy() per key; each invocation copies only this
+    # small cached dict instead of the whole process environment.
+    _base_shadow_env_cache: dict[tuple[str, str], dict] = {}
+
+    @classmethod
+    def _base_shadow_env(cls, shadow_dir: str, cwd: str) -> dict:
+        key = (shadow_dir, cwd)
+        env = cls._base_shadow_env_cache.get(key)
+        if env is None:
+            env = os.environ.copy()
+            env["GIT_DIR"] = shadow_dir
+            env["GIT_WORK_TREE"] = cwd
+            cls._base_shadow_env_cache[key] = env
+        return env.copy()
+
     @classmethod
     @contextmanager
     def _shadow_index_env(cls, shadow_dir: str, cwd: str) -> Generator[dict, None, None]:
         tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
-        env = os.environ.copy()
-        env["GIT_DIR"] = shadow_dir
-        env["GIT_WORK_TREE"] = cwd
+        env = cls._base_shadow_env(shadow_dir, cwd)
         env["GIT_INDEX_FILE"] = tmp_index
         try:
             yield env
