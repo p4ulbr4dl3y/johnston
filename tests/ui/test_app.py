@@ -1,3 +1,4 @@
+import threading
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -460,9 +461,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
         app = JohnstonApp()
         checkpoint_calls = []
+        second_checkpoint = threading.Event()
 
         def mock_checkpoint(sid, idx, project_path=None):
             checkpoint_calls.append((sid, idx))
+            if len(checkpoint_calls) >= 2:
+                second_checkpoint.set()
 
         async def queued_event_stream(prompt, attachments=None):
             yield ("queued_user_message", "Mid-turn queued message", None, True)
@@ -478,7 +482,10 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 app.pm.create_active_agent = MagicMock(return_value=agent)
 
                 app.generate_ai_response("Start prompt")
-                await pilot.pause(0.5)
+                for _ in range(50):
+                    if second_checkpoint.is_set():
+                        break
+                    await pilot.pause(0.1)
 
                 self.assertTrue(len(checkpoint_calls) >= 2)
 
