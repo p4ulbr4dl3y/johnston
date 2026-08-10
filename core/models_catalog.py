@@ -76,6 +76,9 @@ class ModelsCatalog:
         self._pricing: Dict[str, Dict[str, float]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
+        # Provider-cache JSON read cache: path -> (mtime, parsed dict). Avoids a
+        # disk read on every get_context_limit miss; invalidated by mtime change.
+        self._prov_cache: Dict[str, tuple] = {}
         self.load_cache()
 
     def load_cache(self) -> bool:
@@ -401,7 +404,16 @@ class ModelsCatalog:
         if provider_id:
             prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
             if os.path.exists(prov_cache):
-                cdata = read_json(prov_cache, {})
+                try:
+                    mtime = os.path.getmtime(prov_cache)
+                except OSError:
+                    mtime = None
+                cached = self._prov_cache.get(prov_cache)
+                if cached is not None and cached[0] == mtime:
+                    cdata = cached[1]
+                else:
+                    cdata = read_json(prov_cache, {})
+                    self._prov_cache[prov_cache] = (mtime, cdata)
                 if isinstance(cdata, dict):
                     lims = cdata.get("model_limits", {})
                     if lims:
