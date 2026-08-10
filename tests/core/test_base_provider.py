@@ -437,6 +437,32 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sanitized[4]["role"], "user")
         self.assertEqual(sanitized[4]["content"], "Next question")
 
+    async def test_sanitize_history_drops_empty_user_content(self):
+        agent = BaseAgent(api_key="test", model="non-vision-model", base_url="http://test", provider_key="opencode")
+        self.addAsyncCleanup(agent.close)
+
+        history = [
+            {"role": "user", "content": "Look at this"},
+            {"role": "assistant", "content": "Done"},
+            {"role": "user", "content": ""},
+            {"role": "user", "content": "   "},
+            {"role": "user", "content": None},
+            {"role": "user", "content": "Valid question"},
+        ]
+
+        sanitized = agent.sanitize_history_for_model(history)
+        # Empty/whitespace/None user messages are dropped to avoid the OpenAI
+        # 400 "user message must have content" error; non-empty messages survive.
+        roles_contents = [(m["role"], m["content"]) for m in sanitized]
+        self.assertEqual(
+            roles_contents,
+            [
+                ("user", "Look at this"),
+                ("assistant", "Done"),
+                ("user", "Valid question"),
+            ],
+        )
+
     def test_default_max_tokens_is_8192(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", system_prompt="t", provider_key="p")
         self.addAsyncCleanup(agent.close)

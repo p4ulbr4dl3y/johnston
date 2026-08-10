@@ -133,6 +133,18 @@ class CompactionMixin:
                         "content": f"[Tool Output ({item.get('name', 'tool')}): {item.get('content', '')}]",
                     }
 
+            if role == "user":
+                raw_content = item.get("content")
+                if isinstance(raw_content, str):
+                    if not raw_content.strip():
+                        # A user message with empty content is invalid on the OpenAI
+                        # wire contract (400 "user message must have content"). Drop it.
+                        i += 1
+                        continue
+                elif raw_content is None:
+                    i += 1
+                    continue
+
             sanitized.append(item)
             i += 1
 
@@ -257,12 +269,12 @@ class CompactionMixin:
                 if text_content:
                     pruned_history.append({"role": "assistant", "content": text_content})
             else:
-                pruned_history.append(
-                    {
-                        "role": role if role in ("user", "system", "assistant") else "user",
-                        "content": content if isinstance(content, str) else str(content),
-                    }
-                )
+                text_content = content if isinstance(content, str) else str(content)
+                role_out = role if role in ("user", "system", "assistant") else "user"
+                if role_out == "user" and not (text_content or "").strip():
+                    # Skip empty user messages (invalid on OpenAI wire contract).
+                    continue
+                pruned_history.append({"role": role_out, "content": text_content})
 
         # Merge consecutive messages with the same role to prevent OpenAI API 400 Bad Request errors
         merged_history = []
