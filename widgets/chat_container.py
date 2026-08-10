@@ -50,8 +50,16 @@ class ChatView(VerticalScroll):
         except Exception:
             pass
 
-    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
+    async def _mount_and_scroll(self, widget, should_scroll: bool = True, animate: bool = True):
         self.clear_welcome()
+        if not self.is_attached:
+            await self._wait_until_attached()
+        await self.mount(widget)
+        if should_scroll:
+            self.call_after_refresh(self.scroll_end, animate=animate)
+        return widget
+
+    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
         if attachments:
             att_count = len(attachments)
             img_s = "s" if att_count > 1 else ""
@@ -60,56 +68,30 @@ class ChatView(VerticalScroll):
             display_text = text
 
         msg = UserMessage(display_text, markup=False)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(msg)
-        if not self._is_loading_session:
-            self.call_after_refresh(self.scroll_end, animate=animate)
-        return msg
+        return await self._mount_and_scroll(msg, should_scroll=not self._is_loading_session, animate=animate)
 
     async def add_bot_message(self, animate: bool = True) -> BotMessage:
-        self.clear_welcome()
         msg = BotMessage()
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(msg)
-        if not self._is_loading_session and (not animate or self.is_at_bottom()):
-            self.call_after_refresh(self.scroll_end, animate=animate)
-        return msg
+        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        return await self._mount_and_scroll(msg, should_scroll=should_scroll, animate=animate)
 
     async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
-        self.clear_welcome()
         widget = ThinkingWidget(thinking_text)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(widget)
-        if not self._is_loading_session and (not animate or self.is_at_bottom()):
-            self.call_after_refresh(self.scroll_end, animate=animate)
-        return widget
+        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     async def add_tool_call(
         self, tool_type: str, target: str, result_text: str = "", args: dict = None, animate: bool = True
     ) -> ToolCallWidget:
-        self.clear_welcome()
-
         is_seq = bool(self.children and isinstance(self.children[-1], ToolCallWidget))
         widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(widget)
-        if not self._is_loading_session and (not animate or self.is_at_bottom()):
-            self.call_after_refresh(self.scroll_end, animate=animate)
-        return widget
+        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     async def add_event_divider(self, text: str = "Session Compacted", animate: bool = True) -> EventDivider:
-        self.clear_welcome()
         widget = EventDivider(text)
-        if not self.is_attached:
-            await self._wait_until_attached()
-        await self.mount(widget)
-        if not self._is_loading_session and (not animate or self.is_at_bottom()):
-            self.call_after_refresh(self.scroll_end, animate=animate)
-        return widget
+        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     def get_user_messages(self) -> list[tuple[int, str]]:
         result = []

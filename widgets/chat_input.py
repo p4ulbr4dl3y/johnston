@@ -1,6 +1,8 @@
+import asyncio
 import json
 import os
 import re
+import urllib.parse
 
 from textual import events
 from textual.message import Message
@@ -155,11 +157,17 @@ class ChatInput(TextArea):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
 
+    def _decode_pasted_path(self, text: str) -> str:
+        """Decode a pasted file path: strip quotes, unquote file:/// URLs, expand user dirs."""
+        text_strip = text.strip().strip("'\"")
+        if text_strip.startswith("file://"):
+            text_strip = urllib.parse.unquote(text_strip[7:])
+        else:
+            text_strip = urllib.parse.unquote(text_strip)
+        return os.path.expanduser(text_strip.replace("\\ ", " "))
+
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
-        import os
-        import urllib.parse
-
         lines = pasted_text.strip().splitlines()
         if not lines:
             return pasted_text
@@ -179,17 +187,10 @@ class ChatInput(TextArea):
                     modified = True
                 new_lines.append(stripped)
             else:
-                clean = stripped.strip("'\"")
-                if clean.startswith("file://"):
-                    clean = urllib.parse.unquote(clean[7:])
-                else:
-                    clean = urllib.parse.unquote(clean)
-
-                clean = clean.replace("\\ ", " ")
-                expanded = os.path.expanduser(clean)
+                clean = self._decode_pasted_path(stripped)
                 ext = os.path.splitext(clean)[1].lower()
                 is_explicit_path = clean.startswith("/") or clean.startswith("~/") or clean.startswith("./")
-                if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(expanded)):
+                if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(clean)):
                     line = f"@{clean} "
                     modified = True
                 new_lines.append(line)
@@ -205,8 +206,6 @@ class ChatInput(TextArea):
             pass
 
     def clear_clipboard_attachments(self) -> None:
-        import os
-
         for att in list(self.clipboard_attachments):
             if os.path.exists(att.path) and "temp_images" in att.path:
                 try:
@@ -218,8 +217,6 @@ class ChatInput(TextArea):
 
     async def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
-        import asyncio
-        import os
         import time
 
         from core.config import TEMP_IMAGES_DIR
@@ -250,9 +247,6 @@ class ChatInput(TextArea):
         return False
 
     async def on_paste(self, event: events.Paste) -> None:
-        import os
-        import urllib.parse
-
         event.prevent_default()
         event.stop()
 
@@ -265,16 +259,7 @@ class ChatInput(TextArea):
             self._on_input_change()
             return
 
-        text_strip = event.text.strip().strip("'\"")
-        if text_strip.startswith("file://"):
-            text_strip = urllib.parse.unquote(text_strip[7:])
-        else:
-            text_strip = urllib.parse.unquote(text_strip)
-
-        expanded = os.path.expanduser(text_strip.replace("\\ ", " "))
-
-        import asyncio
-
+        expanded = self._decode_pasted_path(event.text)
         exists = await asyncio.to_thread(os.path.exists, expanded)
         is_existing_image_path = exists and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
 
