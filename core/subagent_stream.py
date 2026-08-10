@@ -46,7 +46,7 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     elif etype == "tool_result":
         session.add_event({"type": "tool", "result_text": val1})
     elif etype == "bot_delta":
-        text_accumulator[0] = val1
+        text_accumulator[0] = text_accumulator[0] + val1
         session.add_event({"type": "bot", "text": text_accumulator[0]})
     elif etype in ("bot_text", "outro"):
         text_accumulator[0] = val1

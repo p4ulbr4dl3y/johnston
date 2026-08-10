@@ -1151,7 +1151,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         bot_deltas = [e[1] for e in events if e[0] == "bot_delta"]
-        self.assertEqual(bot_deltas, ["from dict data", "from dict datafrom obj data"])
+        self.assertEqual(bot_deltas, ["from dict data", "from obj data"])
         self.assertEqual(events[-1], ("bot_text", "from dict datafrom obj data", ""))
 
     async def test_thinking_end_before_content(self):

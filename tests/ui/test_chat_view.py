@@ -739,7 +739,7 @@ class TestThinkingWidget(unittest.TestCase):
         widget.is_expanded = True
         with patch.object(widget.content_widget, "update") as update_mock:
             widget.update_thinking("expanded thought")
-        update_mock.assert_called_with("expanded thought")
+        update_mock.assert_called_with("new thoughtexpanded thought")
 
         widget.finish_thinking(2.5, "final thought")
         self.assertFalse(widget.is_thinking)
