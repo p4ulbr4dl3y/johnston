@@ -1,6 +1,7 @@
 import fnmatch
 import os
-from typing import List, Optional
+import time
+from typing import List, Optional, Tuple
 
 from core.config import CONFIG_DIR
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
@@ -42,8 +43,12 @@ class RuleDefinition:
 class RulesManager:
     _instance: Optional["RulesManager"] = None
 
+    _CACHE_TTL = 2.0  # seconds
+
     def __init__(self):
         self.rules: List[RuleDefinition] = []
+        self._rules_cache_signature: Optional[tuple] = None
+        self._rules_cache_ts: float = 0.0
 
     @classmethod
     def get_instance(cls) -> "RulesManager":
@@ -52,20 +57,57 @@ class RulesManager:
         return cls._instance
 
     def load_rules(self, project_dir: Optional[str] = None, include_global: bool = True) -> List[RuleDefinition]:
-        rules: List[RuleDefinition] = []
+        p_dir = project_dir or os.getcwd()
         dirs = []
         if include_global:
             dirs.append((os.path.join(CONFIG_DIR, "rules"), "global"))
-        p_dir = project_dir or os.getcwd()
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
 
+        signature = self._rules_signature(dirs)
+        now = time.time()
+        if (
+            signature is not None
+            and signature == self._rules_cache_signature
+            and (now - self._rules_cache_ts) < self._CACHE_TTL
+        ):
+            return list(self.rules)
+
+        rules: List[RuleDefinition] = []
         for fpath, source in iter_md_files(dirs):
             rule = self._parse_rule_file(fpath, source)
             if rule:
                 rules.append(rule)
 
         self.rules = rules
+        self._rules_cache_signature = signature
+        self._rules_cache_ts = now
         return rules
+
+    @staticmethod
+    def _rules_signature(dirs: List[Tuple[str, str]]) -> Optional[Tuple]:
+        """Cheap (relpath, mtime_ns, size) signature of every rule file to detect
+        external changes without re-reading contents. None when dirs are absent."""
+        entries = []
+        for dpath, _source in dirs:
+            if not os.path.isdir(dpath):
+                continue
+            try:
+                for fname in sorted(os.listdir(dpath)):
+                    if not (fname.endswith(".md") or fname.endswith(".markdown")):
+                        continue
+                    fpath = os.path.join(dpath, fname)
+                    if not os.path.isfile(fpath):
+                        continue
+                    st = os.stat(fpath)
+                    entries.append((fpath, st.st_mtime_ns, st.st_size))
+            except OSError:
+                continue
+        return tuple(entries)
+
+    def invalidate_cache(self) -> None:
+        """Force the next load_rules/get_formatted_rules to re-scan from disk."""
+        self._rules_cache_signature = None
+        self._rules_cache_ts = 0.0
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
         try:

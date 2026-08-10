@@ -10,6 +10,7 @@ import functools
 import os
 import shutil
 import tempfile
+import time
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
@@ -35,6 +36,8 @@ class LintersManager:
     def __init__(self, config_file: Optional[str] = None):
         self.config_file = os.path.realpath(config_file or GLOBAL_LINTERS_FILE)
         self._availability: Dict[str, bool] = {}
+        self._availability_ts: float = 0.0
+        self._availability_ttl = 60.0  # seconds
         self.ensure_default_configs()
 
     def ensure_default_configs(self):
@@ -92,7 +95,14 @@ class LintersManager:
         """
         Returns {linter_name: available} for presets, using which() for system
         tools and a fast `--version` probe for uvx/npx-managed tools. Offline-safe.
+
+        Results are cached in-memory for TTL seconds so the expensive os.walk of
+        the uv/npm cache runs at most once per window.
         """
+        now = time.time()
+        if self._availability and (now - self._availability_ts) < self._availability_ttl:
+            return self._availability
+
         self._availability = {}
         for name, preset in PRESET_LINTERS.items():
             inst = preset.get("install")
@@ -109,6 +119,7 @@ class LintersManager:
                 # uvx/npx: prefer cached offline resolution; probing network is
                 # slow, so trust the package cache instead of executing.
                 self._availability[name] = _cache_has_tool(inst, preset.get("package", ""))
+        self._availability_ts = now
         return self._availability
 
     def is_available(self, name: str) -> bool:

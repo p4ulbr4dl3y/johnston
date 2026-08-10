@@ -201,6 +201,11 @@ class SessionStore:
         self.config_file = os.path.join(self.project_dir, "config.json")
 
         self._sessions: Dict[str, AgentSession] = {}
+        # In-memory cache of the parsed disk session tree, keyed by a signature
+        # of (relpath, mtime_ns, size) across all session JSON files. Avoids
+        # re-reading/parsing every JSON on each list()/children() call.
+        self._disk_cache_signature: Optional[int] = None
+        self._disk_cache: Optional[Dict[str, AgentSession]] = None
         self.ensure_dirs()
 
     @classmethod
@@ -305,7 +310,26 @@ class SessionStore:
         return None
 
     def list(self, kind: Optional[str] = None) -> List[AgentSession]:
-        """Load all sessions (main + subagents) for the current project from disk."""
+        """Load all sessions (main + subagents) for the current project from disk.
+
+        Results are cached in-memory and invalidated when the on-disk session tree
+        changes (new/moved/deleted files or content edits) via a cheap directory
+        signature, or explicitly on any local write (save/delete).
+        """
+        sessions = self._load_disk_sessions()
+        for sid, sess in self._sessions.items():
+            if sess.project_key == self.project_key:
+                sessions.setdefault(sid, sess)
+        result = list(sessions.values())
+        if kind:
+            result = [s for s in result if s.kind == kind]
+        return result
+
+    def _load_disk_sessions(self) -> Dict[str, AgentSession]:
+        signature = self._disk_signature()
+        if signature is not None and signature == self._disk_cache_signature and self._disk_cache is not None:
+            return dict(self._disk_cache)
+
         sessions: Dict[str, AgentSession] = {}
         if os.path.isdir(self.sessions_dir):
             for fname in sorted(os.listdir(self.sessions_dir)):
@@ -317,14 +341,36 @@ class SessionStore:
                                 self._load_file(sessions, os.path.join(fpath, sub_name))
                 elif fname.endswith(".json"):
                     self._load_file(sessions, fpath)
-        for sid, sess in self._sessions.items():
-            if sess.project_key == self.project_key:
-                sessions.setdefault(sid, sess)
-        self._sessions = sessions
-        result = list(sessions.values())
-        if kind:
-            result = [s for s in result if s.kind == kind]
-        return result
+        self._disk_cache = sessions
+        self._disk_cache_signature = signature
+        return sessions
+
+    def _disk_signature(self) -> Optional[int]:
+        """Hash of (relpath, mtime_ns, size) for every session JSON on disk,
+        used to detect external changes without re-reading file contents."""
+        if not os.path.isdir(self.sessions_dir):
+            return None
+        acc = 0
+        try:
+            for fname in sorted(os.listdir(self.sessions_dir)):
+                fpath = os.path.join(self.sessions_dir, fname)
+                if os.path.isdir(fpath):
+                    if fname.endswith(".subagents"):
+                        for sub_name in sorted(os.listdir(fpath)):
+                            spath = os.path.join(fpath, sub_name)
+                            if sub_name.endswith(".json") and os.path.isfile(spath):
+                                st = os.stat(spath)
+                                acc ^= hash((spath, st.st_mtime_ns, st.st_size))
+                elif fname.endswith(".json") and os.path.isfile(fpath):
+                    st = os.stat(fpath)
+                    acc ^= hash((fpath, st.st_mtime_ns, st.st_size))
+        except OSError:
+            return None
+        return acc
+
+    def _invalidate_disk_cache(self) -> None:
+        self._disk_cache_signature = None
+        self._disk_cache = None
 
     def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
         try:
@@ -391,6 +437,7 @@ class SessionStore:
                 fpath = self._main_path(sess.id)
             atomic_write_json(fpath, sess.to_dict(), indent=2)
             self._sessions[sess.id] = sess
+            self._invalidate_disk_cache()
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
 
@@ -410,6 +457,7 @@ class SessionStore:
             except OSError:
                 pass
         self._sessions.pop(session_id, None)
+        self._invalidate_disk_cache()
 
     def set_active_session_id(self, session_id: str) -> None:
         cfg = read_json(self.config_file, {})
