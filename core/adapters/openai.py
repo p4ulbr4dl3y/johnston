@@ -1,3 +1,5 @@
+import asyncio
+import atexit
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
@@ -73,6 +75,50 @@ class OpenAIAdapter(BaseApiAdapter):
     adapters.
     """
 
+    def __init__(self) -> None:
+        # Reuse AsyncOpenAI clients across calls instead of creating one per
+        # stream_chat invocation (which previously leaked HTTP connection pools).
+        # Clients are cached per (base_url, api_key) pair so different providers
+        # reached through the adapter branch each get their own client.
+        self._clients: Dict[Tuple[str, str], AsyncOpenAI] = {}
+        atexit.register(self.close)
+
+    def _get_client(self, base_url: str, api_key: str) -> AsyncOpenAI:
+        key = (base_url or "", api_key or "")
+        client = self._clients.get(key)
+        if client is None:
+            client = AsyncOpenAI(api_key=api_key or "sk-placeholder", base_url=base_url or "https://api.openai.com/v1")
+            self._clients[key] = client
+        return client
+
+    def close(self) -> None:
+        """Closes all cached AsyncOpenAI clients to release HTTP connection pools.
+
+        Sync best-effort hook (e.g. registered via ``atexit``). Real cleanup
+        happens through :meth:`aclose`; this runs the async close in a fresh
+        event loop when no loop is currently running.
+        """
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        try:
+            asyncio.run(self._close_all(clients))
+        except Exception:
+            pass
+
+    async def aclose(self) -> None:
+        """Async cleanup that closes all cached AsyncOpenAI clients."""
+        clients, self._clients = self._clients, {}
+        await self._close_all(clients)
+
+    @staticmethod
+    async def _close_all(clients: Dict[Tuple[str, str], AsyncOpenAI]) -> None:
+        for client in clients.values():
+            try:
+                await client.close()
+            except Exception:
+                pass
+
     async def stream_chat(
         self,
         base_url: str,
@@ -83,7 +129,7 @@ class OpenAIAdapter(BaseApiAdapter):
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
-        client = AsyncOpenAI(api_key=api_key or "sk-placeholder", base_url=base_url or "https://api.openai.com/v1")
+        client = self._get_client(base_url, api_key)
         formatted_msgs = format_messages_for_openai(messages)
         kwargs: Dict[str, Any] = {"model": model, "messages": formatted_msgs, "stream": True}
         if tools:
