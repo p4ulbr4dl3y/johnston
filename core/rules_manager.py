@@ -49,6 +49,7 @@ class RulesManager:
         self.rules: List[RuleDefinition] = []
         self._rules_cache_signature: Optional[tuple] = None
         self._rules_cache_ts: float = 0.0
+        self._rules_signature_ts: float = 0.0
 
     @classmethod
     def get_instance(cls) -> "RulesManager":
@@ -63,8 +64,12 @@ class RulesManager:
             dirs.append((os.path.join(CONFIG_DIR, "rules"), "global"))
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
 
-        signature = self._rules_signature(dirs)
         now = time.time()
+        if (now - self._rules_signature_ts) < self._CACHE_TTL:
+            signature = self._rules_cache_signature
+        else:
+            signature = self._rules_signature(dirs)
+            self._rules_signature_ts = now
         if (
             signature is not None
             and signature == self._rules_cache_signature
@@ -108,6 +113,7 @@ class RulesManager:
         """Force the next load_rules/get_formatted_rules to re-scan from disk."""
         self._rules_cache_signature = None
         self._rules_cache_ts = 0.0
+        self._rules_signature_ts = 0.0
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
         try:
