@@ -284,7 +284,7 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
             lines = new_text.splitlines(keepends=True)
 
     new_content = "".join(lines)
-    diff_output = make_unified_diff(content, new_content, fromfile=path + " (old)", tofile=path + " (new)")
+    diff_output = make_unified_diff(content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
     return new_content, diff_output
 
 

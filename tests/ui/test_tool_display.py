@@ -103,7 +103,7 @@ class TestToolDisplay(unittest.TestCase):
             "edit",
             "code.py",
             args={"target_file": "code.py", "target_content": "a", "replacement_content": "b"},
-            result_text="OK: file 'code.py' updated.\n\n--- code.py (old)\n+++ code.py (new)\n@@ -1,1 +1,1 @@\n-a\n+b\n[Linter Feedback]: F841 unused variable\n[Hint: Some system hint]",
+            result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n[Linter Feedback]: F841 unused variable\n[Hint: Some system hint]",
         )
         diff_renderable = widget._format_edit_diff(widget.result_text, "code.py")
         formatted_text = "\n".join(t.plain for t in diff_renderable.formatted_lines)
@@ -125,8 +125,8 @@ class TestToolDisplay(unittest.TestCase):
         from widgets.chat_diff import format_edit_diff
 
         diff_text = (
-            "--- /path/to/prompts.py (old)\n"
-            "+++ /path/to/prompts.py (new)\n"
+            "--- a/prompts.py\n"
+            "+++ b/prompts.py\n"
             "@@ -27,7 +27,7 @@\n"
             "## Core Rules\n"
             "1. Autonomous Operation: You have no UI interaction with the user.\n"

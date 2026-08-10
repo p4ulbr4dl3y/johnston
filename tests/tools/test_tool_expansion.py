@@ -52,8 +52,8 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_edit_tool_toggle_expand_diff(self):
         diff_text = (
-            "--- test.py (old)\n"
-            "+++ test.py (new)\n"
+            "--- a/test.py\n"
+            "+++ b/test.py\n"
             "@@ -7,1 +9,2 @@\n"
             "-def multiply(a, b):\n"
             "+def multiply(a: float, b: float) -> float:\n"
