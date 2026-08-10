@@ -1,5 +1,3 @@
-import shutil
-import tempfile
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,18 +6,10 @@ from tools.context import ToolContext
 
 
 @pytest.fixture
-def temp_workspace():
-    """Pytest fixture providing an isolated temporary directory."""
-    tmp = tempfile.mkdtemp()
-    yield tmp
-    shutil.rmtree(tmp, ignore_errors=True)
-
-
-@pytest.fixture
-def mock_app(temp_workspace):
+def mock_app(tmp_path):
     """Pytest fixture providing a mock JohnstonApp instance."""
     app = MagicMock()
-    app.project_dir = temp_workspace
+    app.project_dir = str(tmp_path)
     app.current_session_id = "pytest-session-id"
     app.mode = "act"
     app.is_app_active = True

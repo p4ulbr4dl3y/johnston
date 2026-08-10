@@ -33,25 +33,13 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         ("backtab", "toggle_mode", "Toggle Mode"),
     ]
 
-    def __init__(
-        self,
-        mode: str | None = None,
-        provider: str | None = None,
-        model: str | None = None,
-        resume_session_id: str | None = None,
-    ):
+    def __init__(self, resume_session_id: str | None = None):
         super().__init__()
         self._disable_tooltips = True
         self.pm = ProviderManager()
-        if provider:
-            self.pm.set_active_provider_key(provider)
         self.sm = SessionStore()
         self.agent = self.pm.create_active_agent()
-        if model and self.agent:
-            self.agent.model = model
-        if mode and self.agent:
-            self.agent.mode = mode
-        self.mode = getattr(self.agent, "mode", mode or "act") if self.agent else (mode or "act")
+        self.mode = getattr(self.agent, "mode", "act") if self.agent else "act"
         if self.agent:
             self.agent.app = self
 
