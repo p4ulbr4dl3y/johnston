@@ -46,6 +46,9 @@ def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
     ``--- a/<tmp>/old`` and ``+++ b/<tmp>/new``. Those are rewritten to the
     supplied ``fromfile``/``tofile`` labels.
 
+    On Windows, temp paths contain ``:`` so git quotes the header paths
+    (``--- "a/C:\\...\\old"``); those quotes are stripped by the relabel.
+
     Drops ``diff --git`` / ``index`` metadata headers, which are token cost
     for the agent and not needed for rendering.
     """
@@ -53,9 +56,10 @@ def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
     for line in diff_text.splitlines():
         if line.startswith("diff --git ") or line.startswith("index "):
             continue
-        if line.startswith("--- a/") and line.endswith("/old"):
+        stripped = line.strip().strip('"')
+        if stripped.startswith("--- a/") and stripped.endswith("/old"):
             line = f"--- {fromfile}"
-        elif line.startswith("+++ b/") and line.endswith("/new"):
+        elif stripped.startswith("+++ b/") and stripped.endswith("/new"):
             line = f"+++ {tofile}"
         out_lines.append(line)
     return "\n".join(out_lines) + ("\n" if diff_text.endswith("\n") else "")

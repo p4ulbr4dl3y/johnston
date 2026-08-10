@@ -4,8 +4,8 @@ from pathlib import Path
 
 try:
     import tomllib
-except ImportError:
-    tomllib = None  # type: ignore
+except ImportError:  # pragma: no cover - Python < 3.11
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from core.config import CONFIG_DIR
 from core.provider_manager import ProviderManager
@@ -17,7 +17,7 @@ def get_version() -> str:
         return version("johnston")
     except PackageNotFoundError:
         pyproject = Path(__file__).parent / "pyproject.toml"
-        if pyproject.exists() and tomllib:
+        if pyproject.exists():
             try:
                 with open(pyproject, "rb") as f:
                     data = tomllib.load(f)
