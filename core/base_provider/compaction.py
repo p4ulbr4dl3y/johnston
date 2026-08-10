@@ -258,6 +258,10 @@ class CompactionMixin:
                 text_content = content if isinstance(content, str) else str(content)
                 if len(text_content) > TOOL_OUTPUT_MAX_CHARS:
                     text_content = text_content[:TOOL_OUTPUT_MAX_CHARS] + "... [tool output truncated]"
+                if not (text_content or "").strip():
+                    # Skip empty tool output (serialized as user on OpenAI wire
+                    # contract, which rejects empty user content with 400).
+                    continue
                 # Tool outputs are serialized as user on OpenAI wire, but no redundant
                 # `[Tool Result]:` wrapper — that label adds tokens with no signal.
                 pruned_history.append({"role": "user", "content": text_content})

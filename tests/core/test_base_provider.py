@@ -140,6 +140,37 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             self.assertIn("## Objective", agent.history[0]["content"])
             self.assertIn("auth.py", agent.history[0]["content"])
 
+    async def test_compact_history_drops_empty_tool_content(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        # A tool message with empty content serializes to a user message with
+        # empty content, which OpenAI/DeepSeek reject with 400. It must be dropped.
+        agent.history = [
+            {"role": "user", "content": "Run the build"},
+            {"role": "assistant", "content": "Running"},
+            {"role": "tool", "content": ""},
+            {"role": "user", "content": "Keep going"},
+            {"role": "assistant", "content": "Done"},
+            {"role": "user", "content": "Final check"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = "## Objective\n- Build\n\n## Next Move\n1. Continue"
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+            self.assertTrue(success)
+            # The empty tool message must not produce an empty user message.
+            self.assertNotIn(
+                {"role": "user", "content": ""},
+                agent.history,
+            )
+
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         self.addAsyncCleanup(agent.close)
