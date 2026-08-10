@@ -1,34 +1,40 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+Johnston: Python terminal AI assistant, Textual UI. Entry: `app.py` (app), `cli.py` (CLI). Logic in `core/`, tools in `tools/`, widgets in `widgets/`. Tests in `tests/` mirror areas (`tests/core/`, `tests/tools/`, `tests/ui/`, `tests/adapters/`). Styling `app.tcss`; install `install.sh`/`install.ps1`.
 
-Johnston is a Python terminal AI assistant built around a Textual UI. Top-level entry points are `app.py` for the application and `cli.py` for command-line startup. Core application logic lives in `core/`, tool implementations in `tools/`, and Textual widgets/screens in `widgets/`. Tests mirror the product areas under `tests/` with subdirectories such as `tests/core/`, `tests/tools/`, `tests/ui/`, and `tests/adapters/`. Styling is in `app.tcss`; install helpers are `install.sh` and `install.ps1`.
+## Build & Test
 
-## Build, Test, and Development Commands
+`uv` for all Python/deps.
 
-Use `uv` for all Python environment and dependency work.
+- `uv run python cli.py` — CLI entry.
+- `uv run python app.py` — app during UI work.
+- `uv run pytest -n auto` — test suite, parallel (all cores).
+- `uv run coverage run -m pytest && uv run coverage report -m` — coverage.
+- `uv run ruff check .` — lint.
+- `uv build` — build artifacts.
 
-- `uv run python cli.py`: run the local CLI entry point.
-- `uv run python app.py`: launch the app module directly during UI work.
-- `uv run pytest`: run the pytest suite configured by `pyproject.toml`.
-- `uv run coverage run -m pytest && uv run coverage report -m`: run tests with coverage.
-- `uv run ruff check .`: lint imports and Python style.
-- `uv build`: build distributable package artifacts.
+Prefix shell commands with `rtk` where practical (`rtk git status`).
 
-When using shell commands in this repository, prefix them with `rtk` where practical, for example `rtk git status` or `rtk pytest`.
+## Style
 
-## Coding Style & Naming Conventions
+Python 3.10+. Ruff: 120-char line, `py310`, checks `E,F,W,I`. snake_case modules/funcs, PascalCase classes. Keep helpers typed, near subsystem. Avoid broad refactors in UI widgets/core managers/tools; scope changes, keep testable.
 
-Target Python 3.10+. Ruff is configured with a 120-character line length, `py310` target, and `E`, `F`, `W`, and `I` checks. Keep modules snake_case, classes PascalCase, and functions/variables snake_case. Prefer typed, focused helpers near the subsystem they support. Avoid broad refactors when changing UI widgets, core managers, or tool implementations; keep behavior changes scoped and testable.
+## Testing
 
-## Testing Guidelines
+Pytest + `pytest-asyncio` (auto). Tests in `tests/`, named `test_*.py`, mirror source area (e.g. `tests/core/test_session_manager.py`). Add regression tests for bug fixes, focused unit tests for new behavior.
 
-Pytest is the test runner, with `pytest-asyncio` enabled in auto mode. Place tests under `tests/` and name files `test_*.py`. Match the source area when possible, such as `tests/core/test_session_manager.py` for `core/session_manager.py`. Add regression tests for bug fixes and focused unit tests for new command, provider, tool, or widget behavior.
+## Commits & PRs
 
-## Commit & Pull Request Guidelines
+Conventional Commits: `type(scope): desc` (`fix(tools): handle empty command output`). PRs: concise summary, tests run, linked issues, screenshots/terminal output for UI changes.
 
-Git history uses Conventional Commit-style messages, for example `config: remove DEFAULT_MAX_STEPS limit` and `refactor: extract CLI entrypoint`. Use `type(scope): description` when a scope helps, such as `fix(tools): handle empty command output`. Pull requests should include a concise summary, tests run, linked issues when relevant, and screenshots or terminal output for user-visible UI changes.
+## Refactoring
 
-## Security & Configuration Tips
+No backward compatibility for refactors/cleanups — break freely, update callers/tests.
 
-Do not commit local secrets, API keys, or generated environment files. Keep provider configuration and credentials outside source control, and prefer documented environment variables or local config files ignored by Git.
+## Reuse Before New Code
+
+Before implementing/refactoring/changing a feature, check for existing project code to reuse — avoid duplication.
+
+## Security
+
+No secrets/API keys/env files in git. Provider config/credentials outside source control; prefer documented env vars or git-ignored local config.
