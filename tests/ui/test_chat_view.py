@@ -596,7 +596,7 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         bot = BotMessage()
         handle = MagicMock()
         bot._stream_update_handle = handle
-        task = asyncio.create_task(asyncio.sleep(60))
+        task = asyncio.Future()
         bot._markdown_render_task = task
         await bot.set_final_content("small content")
         handle.cancel.assert_called_once()
@@ -605,7 +605,7 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
 
     async def test_schedule_markdown_render_reuses_existing_task(self):
         bot = BotMessage()
-        task = asyncio.create_task(asyncio.sleep(60))
+        task = asyncio.Future()
         bot._markdown_render_task = task
         bot._schedule_markdown_render("pending")
         self.assertEqual(bot._pending_markdown_content, "pending")
