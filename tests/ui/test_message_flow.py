@@ -270,6 +270,16 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
         return app
 
+    async def _wait_not_generating(self, pilot, app, deadline=10.0) -> None:
+        """Wait up to `deadline` seconds for generation to finish (replaces fixed sleep)."""
+        loop = asyncio.get_running_loop()
+        end = loop.time() + deadline
+        while loop.time() < end:
+            if not app.is_generating:
+                return
+            await pilot.pause(0.1)
+        self.assertFalse(app.is_generating)
+
     async def test_thinking_events(self):
         async def stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
@@ -336,7 +346,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_generation_exception_notifies(self):
@@ -367,7 +377,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.6)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_save_session_exception_tool_result(self):
@@ -468,7 +478,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_finish_exception(self):
@@ -492,7 +502,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_widget_finish_exception(self):
@@ -520,7 +530,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_interrupted_divider_exception(self):
@@ -546,7 +556,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_widget_existing_finish_exception(self):
@@ -573,7 +583,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_bot_msg_finalize_and_remove_exception(self):
@@ -601,7 +611,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_bot_msg_remove_exception(self):
@@ -630,7 +640,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
                 await pilot.press("escape")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_tool_event_after_bot_text_finalizes(self):
