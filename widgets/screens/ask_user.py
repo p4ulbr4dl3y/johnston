@@ -4,6 +4,17 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from widgets.screens.base_modal import BaseModalScreen
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    OPTIONS_LIST,
+    OPTIONS_LIST_ID,
+    WRITE_IN_INPUT,
+    WRITE_IN_INPUT_ID,
+)
 
 
 class WriteInInput(Input):
@@ -79,10 +90,10 @@ class ConfirmScreen(BaseModalScreen[str]):
         self.summary = summary
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Confirmation Required**", classes="modal-markdown modal-markdown-centered")
-            yield Markdown(self.summary, classes="modal-markdown")
-            yield Label("enter: confirm • ←: back • esc: cancel", id="modal-hint")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("### **Confirmation Required**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield Markdown(self.summary, classes=MODAL_MARKDOWN)
+            yield Label("enter: confirm • ←: back • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         import time
@@ -124,11 +135,11 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         self.options = []
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("", id="wizard-title", classes="modal-markdown")
-            yield OptionList(id="options-list")
-            yield WriteInInput(placeholder="Type response here and press Enter...", id="write-in-input")
-            yield Label("", id="modal-hint")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("", id="wizard-title", classes=MODAL_MARKDOWN)
+            yield OptionList(id=OPTIONS_LIST_ID)
+            yield WriteInInput(placeholder="Type response here and press Enter...", id=WRITE_IN_INPUT_ID)
+            yield Label("", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         import time
@@ -144,20 +155,20 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if self.q_idx < len(self.questions):
             if self.raw_options:
                 try:
-                    self.query_one("#options-list", OptionList).focus()
+                    self.query_one(OPTIONS_LIST, OptionList).focus()
                 except Exception:
                     pass
             else:
                 try:
-                    self.query_one("#write-in-input", Input).focus()
+                    self.query_one(WRITE_IN_INPUT, Input).focus()
                 except Exception:
                     pass
 
     def update_step(self, target_highlight: int | None = None) -> None:
         title_md = self.query_one("#wizard-title", Markdown)
-        opt_list = self.query_one("#options-list", OptionList)
-        input_field = self.query_one("#write-in-input", Input)
-        hint = self.query_one("#modal-hint", Label)
+        opt_list = self.query_one(OPTIONS_LIST, OptionList)
+        input_field = self.query_one(WRITE_IN_INPUT, Input)
+        hint = self.query_one(MODAL_HINT, Label)
 
         if self.q_idx < len(self.questions):
             title_md.remove_class("confirm-summary")
@@ -235,7 +246,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
 
     def focus_write_in_input(self) -> None:
         try:
-            input_field = self.query_one("#write-in-input", Input)
+            input_field = self.query_one(WRITE_IN_INPUT, Input)
             input_field.display = True
             input_field.focus()
         except Exception:
@@ -245,8 +256,8 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if not self.raw_options:
             return
         try:
-            input_field = self.query_one("#write-in-input", Input)
-            opt_list = self.query_one("#options-list", OptionList)
+            input_field = self.query_one(WRITE_IN_INPUT, Input)
+            opt_list = self.query_one(OPTIONS_LIST, OptionList)
             input_field.display = False
             opt_list.highlighted = max(0, len(self.options) - 2)
             opt_list.focus()
@@ -257,7 +268,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if not self.is_mounted or not self.raw_options or self.q_idx >= len(self.questions):
             return
         try:
-            input_field = self.query_one("#write-in-input", Input)
+            input_field = self.query_one(WRITE_IN_INPUT, Input)
             if event.option_index == len(self.options) - 1:
                 self.focus_write_in_input()
             else:
@@ -287,13 +298,13 @@ class AskUserWizardScreen(BaseModalScreen[str]):
     def submit_current_step(self) -> None:
         if self.q_idx < len(self.questions):
             if not self.raw_options:
-                val = self.query_one("#write-in-input", Input).value.strip()
+                val = self.query_one(WRITE_IN_INPUT, Input).value.strip()
                 answer = val
             else:
-                opt_list = self.query_one("#options-list", OptionList)
+                opt_list = self.query_one(OPTIONS_LIST, OptionList)
                 idx = opt_list.highlighted
                 if idx == len(self.options) - 1:
-                    val = self.query_one("#write-in-input", Input).value.strip()
+                    val = self.query_one(WRITE_IN_INPUT, Input).value.strip()
                     answer = val
                 else:
                     answer = self.options[idx] if idx is not None and idx < len(self.options) else ""
@@ -315,7 +326,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if not self.raw_options or self.q_idx >= len(self.questions):
             return
         try:
-            opt_list = self.query_one("#options-list", OptionList)
+            opt_list = self.query_one(OPTIONS_LIST, OptionList)
             if not opt_list.has_focus:
                 return
             idx = opt_list.highlighted

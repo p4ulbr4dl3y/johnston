@@ -3,7 +3,6 @@ import os
 import re
 from typing import Any
 
-import pygments
 from rich.console import Group
 from rich.markup import escape
 from rich.syntax import Syntax
@@ -12,7 +11,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
-from core.config import IMAGE_EXTENSIONS
 from widgets.chat_diff import format_edit_diff
 from widgets.chat_markdown import (
     CODE_THEME,
@@ -20,7 +18,8 @@ from widgets.chat_markdown import (
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
+from widgets.lexer_utils import guess_lexer_name
+from widgets.screens.constants import TOOL_SCROLL_BOX
 
 
 class FormattingMixin:
@@ -28,9 +27,6 @@ class FormattingMixin:
 
     def _guess_lexer(self, path_str: str) -> str:
         return guess_lexer_name(path_str)
-
-    def _lex_block_to_line_texts(self, code_lines: list[str], lexer: Any) -> list[Text]:
-        return lex_block_to_line_texts(code_lines, lexer, lex_fn=pygments.lex)
 
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()
@@ -381,8 +377,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "CallMCP",
     }
 
-    IMAGE_EXTENSIONS = IMAGE_EXTENSIONS
-
     def is_expandable(self) -> bool:
         try:
             if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
@@ -435,7 +429,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
-        self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes="tool-scroll-box")
+        self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes=TOOL_SCROLL_BOX)
 
     def _clean_hints_for_ui(self, text: str) -> str:
         if not text:
@@ -597,9 +591,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
             self.render_content()
-
-    def append_bash_output(self, text: str) -> None:
-        self.append_shell_output(text)
 
     def render_content(self) -> None:
         try:

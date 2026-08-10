@@ -6,8 +6,55 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from widgets.screens.base_modal import BaseModalScreen
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    MODAL_OPTION_LIST_ID,
+    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
+)
 
 T = TypeVar("T")
+
+
+class ModalSearchNavMixin:
+    """Shared up/down navigation from the search Input to the OptionList.
+
+    Used by the linters / MCP / permissions / skills modals which are not
+    ``BaseSelectionScreen`` subclasses but share the same key handling.
+    """
+
+    # Subclasses must set these:
+    search_nav_option_list_id: str = ""
+    search_nav_filtered_attr: str = ""
+
+    def _handle_search_navigation(self, event: events.Key) -> bool:
+        """Handle up/down keys while the search Input has focus.
+
+        Returns True if the event was consumed, False otherwise.
+        """
+        if event.key not in ("down", "up"):
+            return False
+        try:
+            search_input = self.query_one(MODAL_SEARCH_INPUT, Input)
+            if search_input.has_focus:
+                opt_list = self.query_one(f"#{self.search_nav_option_list_id}", OptionList)
+                filtered = getattr(self, self.search_nav_filtered_attr, [])
+                if opt_list.highlighted is None and filtered:
+                    opt_list.highlighted = 0
+                elif opt_list.highlighted is not None:
+                    if event.key == "down":
+                        opt_list.action_cursor_down()
+                    else:
+                        opt_list.action_cursor_up()
+                event.prevent_default()
+                event.stop()
+                return True
+        except Exception:
+            pass
+        return False
 
 
 class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
@@ -22,7 +69,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         show_search: bool = False,
         search_placeholder: str = "Search...",
         hint_text: str = "enter: select • ↑/↓: navigate • esc: cancel",
-        option_list_id: str = "modal-option-list",
+        option_list_id: str = MODAL_OPTION_LIST_ID,
     ):
         super().__init__()
         self.title = title
@@ -37,12 +84,12 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         self.filtered_options = list(options)
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown(self.title, classes="modal-markdown modal-markdown-centered")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             if self.show_search:
-                yield Input(placeholder=self.search_placeholder, id="modal-search-input")
+                yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
             yield OptionList(*self.filtered_options, id=self.option_list_id)
-            yield Label(self.hint_text, id="modal-hint")
+            yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
@@ -61,7 +108,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
                 pass
 
         if self.show_search:
-            self.query_one("#modal-search-input", Input).focus()
+            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         else:
             opt_list.focus()
 
@@ -151,7 +198,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
 
         if self.show_search and event.key in ("down", "up"):
             try:
-                search_input = self.query_one("#modal-search-input", Input)
+                search_input = self.query_one(MODAL_SEARCH_INPUT, Input)
                 if search_input.has_focus:
                     opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
                     if opt_list.highlighted is None:

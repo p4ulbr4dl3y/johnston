@@ -6,6 +6,7 @@ from textual.widgets import Static
 from core.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import catalog, format_context_tokens
 from core.thinking_effort import display_thinking_effort
+from widgets.screens.constants import MESSAGE_INPUT
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -208,7 +209,7 @@ class StatusFooter(Static):
                 if self.app:
                     from widgets.chat_input import ChatInput
 
-                    chat_input = self.app.query_one("#message-input", ChatInput)
+                    chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
                     att_count = len(getattr(chat_input, "clipboard_attachments", []))
             except Exception:
                 pass
@@ -248,7 +249,7 @@ class StatusFooter(Static):
                 if self.app:
                     from widgets.chat_input import ChatInput
 
-                    chat_input = self.app.query_one("#message-input", ChatInput)
+                    chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
                     att_count = len(getattr(chat_input, "clipboard_attachments", []))
             except Exception:
                 pass

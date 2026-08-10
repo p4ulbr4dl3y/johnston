@@ -197,10 +197,6 @@ class ThinkingWidget(Vertical):
         self.header_label = Label("Thinking...", classes="thinking-header")
         self.content_widget = Static("", markup=False, classes="thinking-content")
 
-    @property
-    def md_widget(self) -> Static:
-        return self.content_widget
-
     def compose(self) -> ComposeResult:
         yield self.header_label
         yield self.content_widget

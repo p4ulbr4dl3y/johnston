@@ -310,15 +310,15 @@ class TestToolExpansion(unittest.TestCase):
         tw = ThinkingWidget("Thinking about problem...")
         tw.finish_thinking(2.5, "Detailed thought process...")
         self.assertFalse(tw.is_expanded)
-        self.assertFalse(tw.md_widget.display)
+        self.assertFalse(tw.content_widget.display)
 
         tw.toggle_expanded()
         self.assertTrue(tw.is_expanded)
-        self.assertTrue(tw.md_widget.display)
+        self.assertTrue(tw.content_widget.display)
 
         tw.toggle_expanded()
         self.assertFalse(tw.is_expanded)
-        self.assertFalse(tw.md_widget.display)
+        self.assertFalse(tw.content_widget.display)
 
     def test_format_read_content_strips_nested_line_numbers(self):
         widget = ToolCallWidget(tool_type="read", target="test.log")

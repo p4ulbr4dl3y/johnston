@@ -8,6 +8,7 @@ from textual.widgets import TextArea
 
 from core import config
 from core.config import IMAGE_EXTENSIONS
+from widgets.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
@@ -104,7 +105,7 @@ class ChatInput(TextArea):
             if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
 
-                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 row, col = self.cursor_location
                 line_str = self.document.get_line(row)
                 suggestions.update_query(self.text, line_str, col)
@@ -154,8 +155,6 @@ class ChatInput(TextArea):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
 
-    IMAGE_EXTENSIONS = IMAGE_EXTENSIONS
-
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
         import os
@@ -200,7 +199,7 @@ class ChatInput(TextArea):
     def update_attachment_bar(self) -> None:
         try:
             if self.is_mounted and self.app:
-                footer = self.app.query_one("#status-footer")
+                footer = self.app.query_one(STATUS_FOOTER)
                 footer.refresh_footer()
         except Exception:
             pass
@@ -362,7 +361,7 @@ class ChatInput(TextArea):
             try:
                 from widgets.command_suggestions import CommandSuggestions
 
-                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 if suggestions.display:
                     suggestions.display = False
                     event.prevent_default()
@@ -384,7 +383,7 @@ class ChatInput(TextArea):
             try:
                 from widgets.command_suggestions import CommandSuggestions
 
-                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
                     if suggestions.mode == "command":
                         if suggestions.highlighted < len(suggestions.current_matched):
@@ -417,7 +416,7 @@ class ChatInput(TextArea):
         try:
             from widgets.command_suggestions import CommandSuggestions
 
-            suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+            suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
             if suggestions.display:
                 if event.key == "up":
                     suggestions.action_cursor_up()
@@ -477,7 +476,7 @@ class ChatInput(TextArea):
             try:
                 from widgets.command_suggestions import CommandSuggestions
 
-                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 if suggestions.display and suggestions.highlighted is not None:
                     if suggestions.mode == "command":
                         if suggestions.highlighted < len(suggestions.current_matched):
@@ -505,7 +504,7 @@ class ChatInput(TextArea):
             try:
                 from widgets.command_suggestions import CommandSuggestions
 
-                suggestions = self.app.query_one("#command-suggestions", CommandSuggestions)
+                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 suggestions.display = False
             except Exception:
                 pass

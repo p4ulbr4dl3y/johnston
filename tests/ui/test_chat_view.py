@@ -698,7 +698,6 @@ class TestThinkingWidget(unittest.TestCase):
         widget = self._make_widget()
         self.assertTrue(widget.is_thinking)
         self.assertFalse(widget.is_expanded)
-        self.assertIs(widget.md_widget, widget.content_widget)
         composed = list(widget.compose())
         self.assertEqual(len(composed), 2)
 
@@ -1146,30 +1145,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._guess_lexer("https://x.com/file.go"), "go")
         self.assertEqual(widget._guess_lexer("Makefile"), "text")
 
-    def test_lex_block_to_line_texts(self):
-        widget = ToolCallWidget("shell", "cmd")
-        self.assertEqual(widget._lex_block_to_line_texts([], None), [])
-        self.assertEqual([t.plain for t in widget._lex_block_to_line_texts(["a", "b"], None)], ["a", "b"])
-        from pygments.lexers import get_lexer_by_name
-
-        lexed = widget._lex_block_to_line_texts(["def f():", "    return 1"], get_lexer_by_name("python"))
-        self.assertEqual(len(lexed), 2)
-        bad = widget._lex_block_to_line_texts(["a"], object())
-        self.assertEqual(bad[0].plain, "a")
-
-    def test_lex_block_to_line_texts_pads_and_exception(self):
-        widget = ToolCallWidget("shell", "cmd")
-        multi = widget._lex_block_to_line_texts(["x = 1", "", "y = 2"], None)
-        self.assertEqual(len(multi), 3)
-        with patch("widgets.chat_toolcall.pygments.lex", side_effect=Exception("boom")):
-            fallback = widget._lex_block_to_line_texts(["z"], object())
-        self.assertEqual(fallback[0].plain, "z")
-        from pygments.token import Token
-
-        with patch("widgets.chat_toolcall.pygments.lex", return_value=iter([(Token.Text, "only one line")])):
-            padded = widget._lex_block_to_line_texts(["a", "b", "c"], object())
-        self.assertEqual(len(padded), 3)
-
     def test_format_plan_display(self):
         widget = ToolCallWidget("update_plan", "plan", args={"plan": []})
         widget._format_plan_display(
@@ -1223,7 +1198,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         with patch.object(widget, "render_content") as render_mock:
             widget.append_shell_output("more")
         render_mock.assert_called_once()
-        widget.append_bash_output("extra")
 
     def test_format_code_with_line_numbers(self):
         widget = ToolCallWidget("shell", "cmd")
