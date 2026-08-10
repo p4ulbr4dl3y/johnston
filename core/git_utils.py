@@ -5,6 +5,7 @@ Provides unified git command execution with timeout handling and process safety.
 
 import difflib
 import os
+import re
 import subprocess
 import tempfile
 from typing import List, Optional
@@ -56,10 +57,10 @@ def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
     for line in diff_text.splitlines():
         if line.startswith("diff --git ") or line.startswith("index "):
             continue
-        stripped = line.strip().strip('"')
-        if stripped.startswith("--- a/") and stripped.endswith("/old"):
+        stripped = line.strip().replace('"', "")
+        if re.search(r"^--- a[\\/][^\"']*[\\/]old$", stripped):
             line = f"--- {fromfile}"
-        elif stripped.startswith("+++ b/") and stripped.endswith("/new"):
+        elif re.search(r"^\+\+\+ b[\\/][^\"']*[\\/]new$", stripped):
             line = f"+++ {tofile}"
         out_lines.append(line)
     return "\n".join(out_lines) + ("\n" if diff_text.endswith("\n") else "")
