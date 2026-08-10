@@ -68,5 +68,20 @@ class TestBuildEditDiffText(unittest.TestCase):
         self.assertEqual(build_edit_diff_text({}, "x.py", "edit"), "")
 
 
+class TestLexBlockToLineTexts(unittest.TestCase):
+    def test_preserves_leading_blank_lines(self):
+        from pygments.lexers import get_lexer_by_name
+        from widgets.lexer_utils import lex_block_to_line_texts
+
+        code_lines = ["", "", "def main():", "    pass"]
+        lexer = get_lexer_by_name("python")
+        res = lex_block_to_line_texts(code_lines, lexer)
+        self.assertEqual(len(res), 4)
+        self.assertEqual(res[0].plain, "")
+        self.assertEqual(res[1].plain, "")
+        self.assertEqual(res[2].plain, "def main():")
+        self.assertEqual(res[3].plain, "    pass")
+
+
 if __name__ == "__main__":
     unittest.main()
