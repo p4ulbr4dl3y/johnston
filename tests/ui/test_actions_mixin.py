@@ -258,7 +258,11 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
                 app.on_mouse_up(event)
             app.copy_to_clipboard.assert_called_once_with("hello world")
             self.assertTrue(app.selection_copy_active)
-            await asyncio.sleep(0.1)
+            deadline = asyncio.get_running_loop().time() + 10
+            while asyncio.get_running_loop().time() < deadline:
+                if not app.selection_copy_active:
+                    break
+                await asyncio.sleep(0.1)
             self.assertFalse(app.selection_copy_active)
 
     async def test_on_mouse_up_banner_text(self):

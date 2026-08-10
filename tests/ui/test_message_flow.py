@@ -192,7 +192,11 @@ class TestChatInputSubmitted(unittest.IsolatedAsyncioTestCase):
                 event.value = "/help"
                 event.attachments = []
                 await app.on_chat_input_submitted(event)
-                await asyncio.sleep(0.05)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if mock_h.await_count:
+                        break
+                    await asyncio.sleep(0)
                 mock_h.assert_awaited_once_with(app, "/help")
 
 
@@ -225,7 +229,11 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             with patch("widgets.commands.ProvidersCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if mock_cls.return_value.execute.await_count:
+                        break
+                    await asyncio.sleep(0)
             mock_cls.return_value.execute.assert_awaited_once_with(app)
             self.assertFalse(app.is_generating)
 
@@ -240,7 +248,11 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             with patch("widgets.commands.ModelsCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if mock_cls.return_value.execute.await_count:
+                        break
+                    await asyncio.sleep(0)
             mock_cls.return_value.execute.assert_awaited_once_with(app)
             self.assertFalse(app.is_generating)
 
@@ -435,8 +447,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_partial_append_and_divider(self):
-        import asyncio
-
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "partial", "")
             await asyncio.sleep(5.0)
@@ -447,7 +457,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 app.message_queue.clear()
                 # Trigger cancellation via Escape
@@ -458,7 +472,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_finish_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
@@ -470,7 +483,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
@@ -479,7 +496,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_widget_finish_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
@@ -491,7 +507,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 chat_view = app.query_one(ChatView)
                 chat_view.add_thinking_widget = unittest.mock.AsyncMock(
@@ -504,7 +524,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_interrupted_divider_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "partial", "")
@@ -516,7 +535,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 chat_view = app.query_one(ChatView)
                 chat_view.add_event_divider = unittest.mock.AsyncMock(side_effect=Exception("boom"))
@@ -527,7 +550,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_thinking_widget_existing_finish_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
@@ -539,7 +561,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 # Grab the real thinking widget and make finish_thinking raise
                 for w in app.query("ThinkingWidget"):
@@ -551,7 +577,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_bot_msg_finalize_and_remove_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "partial", "")
@@ -563,7 +588,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 # Patch bot message widgets to raise on finalize/remove
                 for w in app.query("BotMessage"):
@@ -576,7 +605,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_cancellation_bot_msg_remove_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "content", "")
@@ -588,7 +616,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 # Make the bot message content empty and remove raise
                 for w in app.query("BotMessage"):
@@ -664,7 +696,6 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
 
     async def test_token_estimate_exception(self):
-        import asyncio
 
         async def stream(prompt, attachments=None):
             yield ("bot_text", "", "")
@@ -676,7 +707,11 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if app.is_generating:
+                        break
+                    await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
                 with patch("core.token_util.estimate_tokens", side_effect=Exception("boom")):
                     chat_input = app.query_one("#message-input")
