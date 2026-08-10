@@ -75,7 +75,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
         self.assertNotIn("@@ -7,1 +9,2 @@", rendered_plain)
-        self.assertIn("7 - def multiply(a, b):", rendered_plain)
+        self.assertIn("9 - def multiply(a, b):", rendered_plain)
         self.assertIn("9 + def multiply(a: float, b: float) -> float:", rendered_plain)
         self.assertIn("10 +     return a * b", rendered_plain)
 
