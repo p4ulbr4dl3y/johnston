@@ -127,7 +127,7 @@ class TestToolDisplay(unittest.TestCase):
         r = format_edit_diff(diff_text, "main.py")
         lines = [t.plain for t in r.formatted_lines]
         # Line numbers for context, delete, insert should be monotonic (10, 11-, 11+, 12+, 13)
-        num_strs = [l.split()[0] for l in lines]
+        num_strs = [line.split()[0] for line in lines]
         self.assertEqual(num_strs, ["10", "11", "11", "12", "13"])
 
     def test_shell_cleaning_system_noise(self):

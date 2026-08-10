@@ -71,6 +71,7 @@ class TestBuildEditDiffText(unittest.TestCase):
 class TestLexBlockToLineTexts(unittest.TestCase):
     def test_preserves_leading_blank_lines(self):
         from pygments.lexers import get_lexer_by_name
+
         from widgets.lexer_utils import lex_block_to_line_texts
 
         code_lines = ["", "", "def main():", "    pass"]
