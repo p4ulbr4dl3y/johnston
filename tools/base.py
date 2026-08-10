@@ -165,7 +165,13 @@ def truncate_output(
     log_content = text
     is_json = False
     stripped = text.strip()
-    if (stripped.startswith("{") and stripped.endswith("}")) or (stripped.startswith("[") and stripped.endswith("]")):
+    # Only attempt JSON parse when the output looks like JSON and is small enough to
+    # parse cheaply. For huge outputs, skipping the full parse avoids a costly
+    # json.loads/dumps round-trip of the entire string just to label its format.
+    looks_like_json = (stripped.startswith("{") and stripped.endswith("}")) or (
+        stripped.startswith("[") and stripped.endswith("]")
+    )
+    if looks_like_json and len(stripped) <= 1_000_000:
         try:
             parsed = json.loads(stripped)
             if isinstance(parsed, (dict, list)):

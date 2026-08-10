@@ -9,13 +9,24 @@ def format_line_pagination(
     end_line: int | None = None,
     max_chars: int = 32000,
     path: str = "",
+    total_lines: int | None = None,
+    window_start: int | None = None,
 ) -> str:
     """Formats lines with 1-based line numbers and paginates by start_line/end_line range.
 
     Enforces a default max window of 800 lines per call and stops at clean line boundaries
     before exceeding max_chars.
+
+    `total_lines` may be supplied when `lines` is only a window of a larger file (e.g. a
+    partial read) so the ran/pagination header and boundary hints stay accurate.
+    `window_start` is the 1-based line number of `lines[0]` when `lines` does not begin at
+    line 1 (partial read); content is then indexed as `lines[i - window_start]`.
     """
-    total_lines = len(lines)
+    total_lines = total_lines if total_lines is not None else len(lines)
+    window_start = window_start if window_start is not None else 1
+    # When a window is passed, line content still begins at `window_start`, and we can
+    # only format the lines we actually have. Keep the existing 800-line cap too.
+    effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
         return f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
 
@@ -46,16 +57,16 @@ def format_line_pagination(
 
     if end_line is not None:
         end = max(start, min(end_line, total_lines))
-        end = min(end, start + DEFAULT_LINE_WINDOW - 1)
+        end = min(end, start + effective_window - 1)
     else:
-        end = min(total_lines, start + DEFAULT_LINE_WINDOW - 1)
+        end = min(total_lines, start + effective_window - 1)
 
     output = []
     current_len = 0
     actual_end = start - 1
 
     for i in range(start, end + 1):
-        formatted_line = f"{i:5d} | {lines[i - 1]}"
+        formatted_line = f"{i:5d} | {lines[i - window_start]}"
         added_len = len(formatted_line) + (1 if output else 0)
         if current_len + added_len > max_chars:
             if not output:
