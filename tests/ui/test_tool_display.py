@@ -111,6 +111,25 @@ class TestToolDisplay(unittest.TestCase):
         self.assertNotIn("[Linter Feedback]", formatted_text)
         self.assertNotIn("[Hint:", formatted_text)
 
+    def test_format_edit_diff_monotonic_line_numbers(self):
+        from widgets.chat_diff import format_edit_diff
+
+        diff_text = (
+            "--- a/main.py\n"
+            "+++ b/main.py\n"
+            "@@ -10,3 +10,4 @@\n"
+            " line10\n"
+            "-line11\n"
+            "+line11_new\n"
+            "+line12_new\n"
+            " line13\n"
+        )
+        r = format_edit_diff(diff_text, "main.py")
+        lines = [t.plain for t in r.formatted_lines]
+        # Line numbers for context, delete, insert should be monotonic (10, 11-, 11+, 12+, 13)
+        num_strs = [l.split()[0] for l in lines]
+        self.assertEqual(num_strs, ["10", "11", "11", "12", "13"])
+
     def test_shell_cleaning_system_noise(self):
         from widgets.chat_view import ToolCallWidget
 

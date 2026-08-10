@@ -56,6 +56,13 @@ def lex_block_to_line_texts(
     if not lexer:
         return [Text(line) for line in code_lines]
 
+    if hasattr(lexer, "stripnl"):
+        lexer.stripnl = False
+    if hasattr(lexer, "stripall"):
+        lexer.stripall = False
+    if hasattr(lexer, "ensurenl"):
+        lexer.ensurenl = False
+
     full_code = "\n".join(code_lines)
     try:
         tokens = lex_fn(full_code, lexer)
