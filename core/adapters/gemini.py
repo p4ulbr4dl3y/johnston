@@ -10,6 +10,7 @@ from core.adapters.base import (
     check_httpx_response_status,
     extract_image_details,
     normalize_tool_arguments_str,
+    parse_sse_line,
     parse_tool_call_args,
 )
 from core.thinking_effort import build_gemini_thinking_config
@@ -139,14 +140,8 @@ class GeminiAdapter(BaseApiAdapter):
             async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
                 await check_httpx_response_status(resp)
                 async for line in resp.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    line_data = line[5:].strip()
-                    if not line_data:
-                        continue
-                    try:
-                        evt = json.loads(line_data)
-                    except Exception:
+                    evt = parse_sse_line(line)
+                    if evt is None:
                         continue
 
                     for cand in evt.get("candidates") or []:

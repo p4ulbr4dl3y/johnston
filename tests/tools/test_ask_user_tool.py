@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from tools.ask_user import AskUserTool, _is_recommended_option, _sort_recommended_first
 
@@ -61,39 +61,31 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         # A single {question, options} dict is wrapped into a questions list.
         tool = AskUserTool()
         mock_app = MagicMock()
-
-        def mock_push_screen(screen, callback=None):
-            if callback:
-                callback("Question: Pick one\nAnswer: blue")
-
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = AsyncMock(return_value="Question: Pick one\nAnswer: blue")
         res = await tool.execute(
             {"question": "Pick one", "options": ["red", "blue"]},
             ctx=mock_app,
         )
         self.assertIn("Question: Pick one", res)
         self.assertIn("Answer: blue", res)
+        mock_app.ask_user.assert_awaited_once()
 
     async def test_single_question_with_choices_fallback(self):
         # 'choices' is accepted as an alias for 'options' in the single-question form.
         tool = AskUserTool()
         mock_app = MagicMock()
-
-        def mock_push_screen(screen, callback=None):
-            if callback:
-                callback("Question: Choose\nAnswer: x")
-
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = AsyncMock(return_value="Question: Choose\nAnswer: x")
         res = await tool.execute(
             {"question_text": "Choose", "choices": ["x", "y"]},
             ctx=mock_app,
         )
         self.assertIn("Answer: x", res)
+        mock_app.ask_user.assert_awaited_once()
 
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-        mock_app.push_screen.side_effect = RuntimeError("no display available")
+        mock_app.ask_user = AsyncMock(side_effect=RuntimeError("no display available"))
         res = await tool.execute(
             {"questions": [{"question_text": "Pick one", "options": ["red", "blue"]}]},
             ctx=mock_app,
@@ -103,12 +95,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
     async def test_successful_interactive_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-
-        def mock_push_screen(screen, callback=None):
-            if callback:
-                callback("Question: Choose item\nAnswer: Option A")
-
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = AsyncMock(return_value="Question: Choose item\nAnswer: Option A")
         res = await tool.execute(
             {"questions": [{"question_text": "Choose item", "options": ["Option A", "Option B"]}]},
             ctx=mock_app,
@@ -119,12 +106,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
     async def test_cancelled_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-
-        def mock_push_screen(screen, callback=None):
-            if callback:
-                callback("cancelled")
-
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = AsyncMock(return_value="cancelled by user")
         res = await tool.execute(
             {"questions": [{"question_text": "Cancel this?", "options": []}]},
             ctx=mock_app,
@@ -134,12 +116,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_status_cancels(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-
-        def fake_push(screen, callback=None):
-            if callback:
-                callback({"status": "unknown_garbage"})
-
-        mock_app.push_screen.side_effect = fake_push
+        mock_app.ask_user = AsyncMock(return_value="cancelled by user")
         res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=mock_app)
         self.assertIn("cancelled by user", res)
 
@@ -147,13 +124,11 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
 
-        def mock_push_screen(screen, callback=None):
-            opts = screen.questions[0]["options"]
-            self.assertEqual(opts, ["Yes (Recommended)", "Maybe", "No"])
-            if callback:
-                callback("Question: Q\nAnswer: Yes")
+        async def fake_ask_user(questions):
+            self.assertEqual(questions[0]["options"], ["Yes (Recommended)", "Maybe", "No"])
+            return "Question: Q\nAnswer: Yes"
 
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = fake_ask_user
         res = await tool.execute(
             {"questions": [{"question_text": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
             ctx=mock_app,
@@ -164,18 +139,14 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
 
-        def mock_push_screen(screen, callback=None):
+        async def fake_ask_user(questions):
             if not hasattr(mock_app, "_first_call_done"):
                 mock_app._first_call_done = True
-                if callback:
-                    callback({"action": "minimize", "answers": {}, "q_idx": 0})
                 if hasattr(mock_app, "_pending_ask_user") and mock_app._pending_ask_user:
                     mock_app._pending_ask_user()
-            else:
-                if callback:
-                    callback("Question: Choice?\nAnswer: Opt1")
+            return "Question: Choice?\nAnswer: Opt1"
 
-        mock_app.push_screen = mock_push_screen
+        mock_app.ask_user = fake_ask_user
         res = await tool.execute(
             {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
             ctx=mock_app,

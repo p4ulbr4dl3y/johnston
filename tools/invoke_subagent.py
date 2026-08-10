@@ -1,5 +1,4 @@
 import asyncio
-import os
 import uuid
 from typing import Any, Dict
 
@@ -14,21 +13,13 @@ def _truncate_subagent_result(text: str, session_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
     is saved on truncation and the path is returned in the hint."""
+    from tools.base import _write_output_log
+
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
-    import uuid
 
-    from core.config import LOGS_DIR
-
-    log_name = f"{session_id or 'subagent'}-{uuid.uuid4().hex[:4]}.log"
-    log_path = os.path.join(LOGS_DIR, log_name)
-    try:
-        os.makedirs(LOGS_DIR, exist_ok=True)
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(text)
-    except Exception:
-        log_path = "log file"
+    log_path = _write_output_log(text, session_id=session_id or "subagent") or "log file"
     truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
     shown_lines = truncated.count("\n") + (1 if truncated else 0)
     next_line = shown_lines + 1

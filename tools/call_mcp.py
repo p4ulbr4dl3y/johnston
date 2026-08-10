@@ -1,8 +1,13 @@
-import inspect
 import json
 from typing import Any, Dict
 
-from tools.base import BaseTool, format_tool_error, truncate_output
+from tools.base import (
+    BaseTool,
+    call_mcp_tool,
+    check_mcp_role_policy,
+    format_tool_error,
+    truncate_output,
+)
 
 
 class CallMCPTool(BaseTool):
@@ -32,19 +37,13 @@ class CallMCPTool(BaseTool):
         if not server or not tool:
             return format_tool_error("params", name="server.tool", detail="required")
 
-        from core.role_registry import RoleRegistry, role_tool_error
-
-        app_obj = getattr(ctx, "app", ctx)
-        mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
-        role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
-        for target in (f"{server}.{tool}", tool, "call_mcp"):
-            policy_err = role_tool_error(role_def, target)
-            if policy_err:
-                return policy_err
-
         from core.mcp_manager import get_mcp_manager
 
         mcp_mgr = get_mcp_manager()
+
+        policy_err = check_mcp_role_policy(ctx, tool, [f"{server}.{tool}", tool, "call_mcp"])
+        if policy_err:
+            return policy_err
 
         def _get_schema_hint() -> str:
             try:
@@ -58,11 +57,7 @@ class CallMCPTool(BaseTool):
             return ""
 
         try:
-            if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
-                res_or_coro = mcp_mgr.call_tool_async(tool, arguments, target_server=server)
-            else:
-                res_or_coro = mcp_mgr.call_tool(tool, arguments, target_server=server)
-            res = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
+            res = await call_mcp_tool(mcp_mgr, tool, arguments, target_server=server)
             if res is not None:
                 if isinstance(res, str) and (res.startswith("Error") or res.lower().startswith("error")):
                     return res + _get_schema_hint()

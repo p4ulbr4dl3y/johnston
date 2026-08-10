@@ -122,3 +122,21 @@ def normalize_tool_arguments_str(raw: Any) -> str:
     if raw is None:
         return "{}"
     return json.dumps(raw, ensure_ascii=False)
+
+
+def parse_sse_line(line: str) -> Optional[Any]:
+    """Parses a Server-Sent Events line into its JSON payload.
+
+    Expects a line with a ``data:`` prefix (SSE wire format). Returns the parsed
+    JSON object, or None if the line is not a data frame / contains invalid JSON.
+    Handles the ``data: [DONE]`` sentinel transparently (returns None).
+    """
+    if not line or not line.startswith("data:"):
+        return None
+    line_data = line[5:].strip()
+    if not line_data or line_data == "[DONE]":
+        return None
+    try:
+        return json.loads(line_data)
+    except Exception:
+        return None

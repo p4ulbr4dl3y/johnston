@@ -138,10 +138,16 @@ async def check_and_confirm_permission(
     args: Dict[str, Any],
     context_or_app: Any,
     confirm_tool_name: str | None = None,
+    *,
+    action: str | None = None,
+    action_reason: str = "",
 ) -> str | None:
     """
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
     Returns None if allowed, or error message string if denied/cancelled.
+
+    When `action` is provided (e.g. a caller that already evaluated shell_guard/role
+    policy), the PermissionManager check is skipped and the given action is used.
     """
     from core.permission_manager import PermissionManager
 
@@ -155,7 +161,10 @@ async def check_and_confirm_permission(
         or getattr(context_or_app, "project_dir", None)
         or getattr(app_obj, "project_dir", None)
     )
-    action, reason = pm.check_permission(target_perm_name, args, project_dir=project_dir)
+    if action is not None:
+        action, reason = action, action_reason
+    else:
+        action, reason = pm.check_permission(target_perm_name, args, project_dir=project_dir)
 
     if action == "deny":
         return format_tool_error("denied", name=display_name, detail="by permission policy")
@@ -218,13 +227,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
         return format_tool_error("unknown", detail=hint.strip(), name=name)
 
-    from core.role_registry import RoleRegistry, role_tool_error
+    from tools.base import check_mcp_role_policy
 
     ctx_or_app = context or app
-    app_obj = getattr(ctx_or_app, "app", ctx_or_app)
-    mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
-    role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
-    policy_err = role_tool_error(role_def, clean_name) or role_tool_error(role_def, resolved_name)
+    policy_err = check_mcp_role_policy(ctx_or_app, clean_name, [clean_name, resolved_name])
     if policy_err:
         return policy_err
 
@@ -233,11 +239,9 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return err
 
     try:
-        if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
-            res_or_coro = mcp_mgr.call_tool_async(name, args)
-        else:
-            res_or_coro = mcp_mgr.call_tool(name, args)
-        mcp_res = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
+        from tools.base import call_mcp_tool
+
+        mcp_res = await call_mcp_tool(mcp_mgr, name, args)
         if mcp_res is not None:
             return mcp_res
     except Exception as e:

@@ -4,6 +4,7 @@ Stdio JSON-RPC 2.0 client for MCP servers.
 
 import asyncio
 import json
+import logging
 import os
 import select
 import subprocess
@@ -11,6 +12,8 @@ import sys
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class MCPProcessClient:
@@ -36,6 +39,17 @@ class MCPProcessClient:
         self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
 
+    @staticmethod
+    def _parse_line(line_str: str) -> Optional[Dict[str, Any]]:
+        """Parses a single JSON-RPC line into a dict, or None if it is not valid JSON."""
+        if not line_str or not line_str.startswith("{"):
+            return None
+        try:
+            data = json.loads(line_str)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
     def _start_async_reader(self):
         if self._read_task and not self._read_task.done():
             return
@@ -43,7 +57,7 @@ class MCPProcessClient:
             loop = asyncio.get_running_loop()
             self._read_task = loop.create_task(self._async_read_loop())
         except RuntimeError:
-            pass
+            logger.debug("No running loop; skipping async reader for MCP server '%s'", self.name)
 
     async def _async_read_loop(self):
         """Background async loop reading stdio JSON-RPC lines and fulfilling futures by request ID."""
@@ -58,11 +72,8 @@ class MCPProcessClient:
                     if isinstance(line_bytes, bytes)
                     else str(line_bytes).strip()
                 )
-                if not line_str.startswith("{"):
-                    continue
-                try:
-                    data = json.loads(line_str)
-                except Exception:
+                data = self._parse_line(line_str)
+                if data is None:
                     continue
 
                 if "method" in data and "id" not in data:
@@ -70,7 +81,7 @@ class MCPProcessClient:
                         try:
                             await self.fetch_tools_async()
                         except Exception:
-                            pass
+                            logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
                     continue
 
                 res_id = data.get("id")
@@ -82,6 +93,7 @@ class MCPProcessClient:
             except asyncio.CancelledError:
                 break
             except Exception:
+                logger.debug("Error in async read loop for MCP server '%s'", self.name, exc_info=True)
                 await asyncio.sleep(0.05)
 
     def _send_request_sync(
@@ -119,6 +131,7 @@ class MCPProcessClient:
                 self.process.stdin.write(line)
                 self.process.stdin.flush()
         except Exception:
+            logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
             self._pending_futures.pop(current_id, None)
             return None
 
@@ -127,6 +140,7 @@ class MCPProcessClient:
                 return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
             return await fut
         except Exception:
+            logger.debug("MCP request '%s' failed for server '%s'", method, self.name, exc_info=True)
             return None
         finally:
             self._pending_futures.pop(current_id, None)
@@ -209,7 +223,7 @@ class MCPProcessClient:
                 if self.process.stderr:
                     self.process.stderr.close()
             except Exception:
-                pass
+                logger.debug("Error closing MCP server '%s' stdio streams", self.name, exc_info=True)
 
             try:
                 self.process.terminate()
@@ -218,7 +232,7 @@ class MCPProcessClient:
                 try:
                     self.process.kill()
                 except Exception:
-                    pass
+                    logger.debug("Failed to kill MCP server '%s'", self.name, exc_info=True)
             self.process = None
 
     def _send(self, message: Dict[str, Any]) -> None:
@@ -250,27 +264,24 @@ class MCPProcessClient:
             while "\n" in self._buffer:
                 line_str, self._buffer = self._buffer.split("\n", 1)
                 line_str = line_str.strip()
-                if not line_str.startswith("{"):
+                data = self._parse_line(line_str)
+                if data is None:
                     continue
-                try:
-                    data = json.loads(line_str)
-                    if "method" in data and "id" not in data:
-                        if data.get("method") == "notifications/tools/list_changed":
-                            try:
-                                self.fetch_tools()
-                            except Exception:
-                                pass
-                        continue
-
-                    res_id = data.get("id")
-                    if req_id is not None and res_id != req_id:
-                        if res_id is not None:
-                            self._pending_responses[res_id] = data
-                        continue
-
-                    return data
-                except Exception:
+                if "method" in data and "id" not in data:
+                    if data.get("method") == "notifications/tools/list_changed":
+                        try:
+                            self.fetch_tools()
+                        except Exception:
+                            logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
                     continue
+
+                res_id = data.get("id")
+                if req_id is not None and res_id != req_id:
+                    if res_id is not None:
+                        self._pending_responses[res_id] = data
+                    continue
+
+                return data
 
             wait_time = 1.0
             if timeout is not None:
@@ -287,11 +298,13 @@ class MCPProcessClient:
                         return None
                     self._buffer += line_str
                 except Exception:
+                    logger.debug("Error reading from MCP server stdout (win32)", exc_info=True)
                     return None
             else:
                 try:
                     rlist, _, _ = select.select([self.process.stdout], [], [], wait_time)
                 except Exception:
+                    logger.debug("select failed on MCP server stdout", exc_info=True)
                     return None
 
                 if self._stopped:
@@ -308,6 +321,7 @@ class MCPProcessClient:
                 except (OSError, BlockingIOError):
                     continue
                 except Exception:
+                    logger.debug("Unexpected error reading MCP server stdout", exc_info=True)
                     return None
 
         return None
@@ -432,7 +446,7 @@ class MCPProcessClient:
             try:
                 self.fetch_tools()
             except Exception:
-                pass
+                logger.debug("Failed to refresh tools after MCP tool call", exc_info=True)
             return self._parse_tool_response(tool_name, res)
 
     async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
@@ -475,6 +489,6 @@ class MCPProcessClient:
         try:
             await self.fetch_tools_async()
         except Exception:
-            pass
+            logger.debug("Failed to refresh tools after async MCP tool call", exc_info=True)
 
         return self._parse_tool_response(tool_name, res)
