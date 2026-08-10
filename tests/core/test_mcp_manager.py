@@ -389,7 +389,13 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
             client.process.stdin = MagicMock()
 
             task = asyncio.create_task(client.call_tool_async("run_code", {"cell": 1}))
-            await asyncio.sleep(0.01)
+
+            async def _await_pending():
+                while not client._pending_futures:
+                    await asyncio.sleep(0)
+                return True
+
+            await asyncio.wait_for(_await_pending(), timeout=5.0)
 
             self.assertIn(1, client._pending_futures)
             task.cancel()
