@@ -67,22 +67,18 @@ def make_unified_diff(
     fromfile: str = "old",
     tofile: str = "new",
 ) -> str:
-    """Generates unified diff text string from two strings or lists of lines."""
-    import difflib
+    """Generates unified diff text string from two strings or lists of lines.
 
-    old_l = old_content if isinstance(old_content, list) else old_content.splitlines()
-    new_l = new_content if isinstance(new_content, list) else new_content.splitlines()
+    Uses git's patience diff when available, falling back to difflib.
+    """
+    from core.git_utils import make_git_diff
 
-    diff_lines = list(
-        difflib.unified_diff(
-            old_l,
-            new_l,
-            fromfile=fromfile,
-            tofile=tofile,
-            lineterm="",
-        )
+    return make_git_diff(
+        old_content,
+        new_content,
+        fromfile=fromfile,
+        tofile=tofile,
     )
-    return "\n".join(diff_lines)
 
 
 def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: float = 0.4) -> list[str]:

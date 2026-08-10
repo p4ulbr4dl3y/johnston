@@ -3,7 +3,10 @@ Git Utilities for Johnston.
 Provides unified git command execution with timeout handling and process safety.
 """
 
+import difflib
+import os
 import subprocess
+import tempfile
 from typing import List, Optional
 
 
@@ -27,3 +30,87 @@ def run_git(
         return subprocess.CompletedProcess(args=["git"] + args, returncode=124, stdout="", stderr="timeout")
     except Exception as e:
         return subprocess.CompletedProcess(args=["git"] + args, returncode=1, stdout="", stderr=str(e))
+
+
+def _normalize_lines(content: str | list[str]) -> list[str]:
+    """Splits content into lines, dropping a trailing empty line from a bare trailing newline."""
+    if isinstance(content, list):
+        return list(content)
+    if not content:
+        return []
+    lines = content.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _relabel_diff(diff_text: str, fromfile: str, tofile: str) -> str:
+    """Rewrites the temp paths in a `--no-index` diff to the caller's file labels.
+
+    The temp files are always named ``old``/``new``, so git emits headers like
+    ``--- a/<tmp>/old`` and ``+++ b/<tmp>/new``. Those are rewritten to the
+    supplied ``fromfile``/``tofile`` labels.
+    """
+    out_lines = []
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            line = f"diff --git {fromfile} {tofile}"
+        elif line.startswith("--- a/") and line.endswith("/old"):
+            line = f"--- {fromfile}"
+        elif line.startswith("+++ b/") and line.endswith("/new"):
+            line = f"+++ {tofile}"
+        out_lines.append(line)
+    return "\n".join(out_lines) + ("\n" if diff_text.endswith("\n") else "")
+
+
+def make_git_diff(
+    old_content: str | list[str],
+    new_content: str | list[str],
+    fromfile: str = "old",
+    tofile: str = "new",
+    context: int = 3,
+) -> str:
+    """Generates a unified diff using `git diff --no-index` (patience algorithm).
+
+    Falls back to difflib when git is unavailable or produces unusable output.
+    Returns an empty string when the contents are identical.
+    """
+    fromfile = fromfile or "old"
+    tofile = tofile or "new"
+    old_l = _normalize_lines(old_content)
+    new_l = _normalize_lines(new_content)
+
+    if old_l == new_l:
+        return ""
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            old_path = os.path.join(tmp, "old")
+            new_path = os.path.join(tmp, "new")
+            with open(old_path, "w", encoding="utf-8") as f:
+                f.write("".join(line + "\n" for line in old_l))
+            with open(new_path, "w", encoding="utf-8") as f:
+                f.write("".join(line + "\n" for line in new_l))
+            res = run_git(
+                [
+                    "diff",
+                    "--no-index",
+                    "--no-color",
+                    "--patience",
+                    f"--unified={context}",
+                    old_path,
+                    new_path,
+                ]
+            )
+            # --no-index returns 1 when differences exist, 0 when identical.
+            if res.returncode not in (0, 1):
+                raise RuntimeError(f"git diff failed: rc={res.returncode} stderr={res.stderr}")
+            out = res.stdout
+            if not out.strip():
+                return ""
+            return _relabel_diff(out, fromfile, tofile)
+    except Exception:
+        diff_lines = list(
+            difflib.unified_diff(old_l, new_l, fromfile=fromfile, tofile=tofile, lineterm="", n=context)
+        )
+        return "\n".join(diff_lines)
