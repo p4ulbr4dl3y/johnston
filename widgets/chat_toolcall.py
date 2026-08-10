@@ -676,10 +676,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.content_widget.display = False
             self.md_widget.display = False
 
+    _RAW_BASH_LIMIT = 200 * 1024  # 200 KB retained raw buffer
+    _RAW_BASH_TRUNC = "[…[truncated]]\n"
+
     def append_shell_output(self, text: str) -> None:
         if not hasattr(self, "_raw_bash_buffer"):
             self._raw_bash_buffer = ""
         self._raw_bash_buffer += text
+        if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
+            self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
         from core.background_task import process_carriage_returns
 
         cleaned = self._clean_bash_output(self._raw_bash_buffer)

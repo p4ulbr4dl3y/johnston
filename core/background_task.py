@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
+# Cap on retained raw output bytes for a task. Old chunks are dropped from the
+# front (tail preserved) past this limit so `"".join` stays bounded.
+_OUTPUT_BYTE_LIMIT = 200 * 1024  # 200 KB
+_OUTPUT_TRUNCATED_MARKER = "[Output truncated: showing recent output]\n"
+
 
 def strip_ansi(text: str) -> str:
     return ANSI_ESCAPE.sub("", text)
@@ -57,6 +62,8 @@ class BackgroundTask:
         self.command = command
         self.process = process
         self.output = []
+        self._output_size = 0
+        self._output_truncated = False
         self.is_running = True
         self.is_background = False
         self.was_killed = False
@@ -87,13 +94,25 @@ class BackgroundTask:
                 pass
             self.master_fd = None
 
+    def _append_output(self, text: str) -> None:
+        """Append a chunk, dropping old chunks from the front past the cap."""
+        self.output.append(text)
+        self._output_size += len(text)
+        if self._output_size > _OUTPUT_BYTE_LIMIT:
+            self._output_truncated = True
+            while self.output and self._output_size > _OUTPUT_BYTE_LIMIT // 2:
+                self._output_size -= len(self.output.pop(0))
+
     def get_formatted_output(self) -> str:
         """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
         if not hasattr(self, "_cached_len"):
             self._cached_len = -1
             self._cached_formatted = ""
         if len(self.output) != self._cached_len:
-            raw = "".join(self.output)
+            raw = ""
+            if self._output_truncated:
+                raw += _OUTPUT_TRUNCATED_MARKER
+            raw += "".join(self.output)
             self._cached_formatted = process_carriage_returns(strip_ansi(raw))
             self._cached_len = len(self.output)
         return self._cached_formatted
@@ -116,7 +135,7 @@ class BackgroundTask:
                             break
                         text = chunk.decode("utf-8", errors="replace")
 
-                    self.output.append(text)
+                    self._append_output(text)
                     if self.widget:
                         func = getattr(
                             self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None)
