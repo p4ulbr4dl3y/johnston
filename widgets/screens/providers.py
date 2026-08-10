@@ -12,6 +12,7 @@ from widgets.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     MODAL_OPTION_LIST,
     MODAL_SEARCH_INPUT,
+    SHIFT_TAB_KEYS,
 )
 
 
@@ -130,7 +131,7 @@ class ApiKeyInputScreen(BaseModalScreen[str | None]):
         self.dismiss(event.value.strip())
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("shift+tab", "backtab", "shift_tab"):
+        if event.key in SHIFT_TAB_KEYS:
             event.prevent_default()
             event.stop()
             return

@@ -33,6 +33,13 @@ MODAL_MARKDOWN_CENTERED = "modal-markdown-centered"
 TOOL_SCROLL_BOX = "tool-scroll-box"
 MODAL_DIFF_VIEW = "modal-diff-view"
 
+# Tool call widget header classes
+TOOL_HEADER = "tool-header"
+TOOL_HEADER_EXPANDABLE = "tool-header-expandable"
+
+# Shift+Tab key aliases (used to dismiss/escape modal focus)
+SHIFT_TAB_KEYS = ("shift+tab", "backtab", "shift_tab")
+
 # Main app widgets
 STATUS_FOOTER_ID = "status-footer"
 STATUS_FOOTER_SEL = "#status-footer"

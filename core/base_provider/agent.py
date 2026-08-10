@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
+from core.adapters.base import parse_tool_call_args
 from core.base_provider.compaction import CompactionMixin
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin
@@ -561,7 +562,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     raw_args = tc["arguments"]
 
                     try:
-                        args = json.loads(raw_args) if raw_args.strip() else {}
+                        # parse_tool_call_args (shared with adapters) normalizes the
+                        # tool-call payload but silently swallows malformed JSON into {}.
+                        # Validate first so the invalid-arguments error is surfaced.
+                        if raw_args.strip():
+                            json.loads(raw_args)
+                        _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
                     except Exception as json_err:
                         tool_result = format_tool_error(
                             "invalid", detail=f"JSON arguments: {json_err}. Raw: {raw_args}", name=t_name

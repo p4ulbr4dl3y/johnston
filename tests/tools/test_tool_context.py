@@ -16,14 +16,10 @@ class MockProviderManager:
 
 class MockApp:
     def __init__(self):
-        self.notified = []
         self.status_refreshed = False
         self.background_tasks = []
         self.agent = MockAgent()
         self.pm = MockProviderManager()
-
-    def notify(self, msg: str):
-        self.notified.append(msg)
 
     def refresh_status_footer(self):
         self.status_refreshed = True
@@ -34,15 +30,11 @@ class TestToolContext(unittest.TestCase):
         app = MockApp()
         ctx = ToolContext(app)
 
-        ctx.notify("test notification")
-        self.assertEqual(app.notified, ["test notification"])
-
         ctx.add_background_task("task1")
         self.assertIn("task1", ctx.background_tasks)
 
     def test_context_without_app(self):
         ctx = ToolContext(None)
-        ctx.notify("noop")
         ctx.refresh_status()
         self.assertEqual(ctx.background_tasks, [])
         self.assertIsNone(ctx.create_agent())

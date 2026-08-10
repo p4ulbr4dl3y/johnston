@@ -63,11 +63,6 @@ def read_json(path: str, default: Any = None) -> Any:
         return default
 
 
-def write_json(path: str, data: Any, indent: int = 2) -> None:
-    """Atomically writes data to JSON file."""
-    atomic_write_json(path, data, indent=indent)
-
-
 def shell_executable() -> str | None:
     if is_windows():
         for candidate in ("pwsh", "powershell", "cmd"):

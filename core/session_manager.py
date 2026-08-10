@@ -6,7 +6,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from core.config import PROJECTS_DIR
-from core.platform_utils import atomic_write_json, read_json, write_json
+from core.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +414,7 @@ class SessionStore:
     def set_active_session_id(self, session_id: str) -> None:
         cfg = read_json(self.config_file, {})
         cfg["active_session_id"] = session_id
-        write_json(self.config_file, cfg)
+        atomic_write_json(self.config_file, cfg)
 
     def get_active_session_id(self) -> Optional[str]:
         cfg = read_json(self.config_file, {})

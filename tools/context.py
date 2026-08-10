@@ -28,10 +28,6 @@ class ToolContext:
             if os.path.isdir(abs_cwd):
                 self.cwd = abs_cwd
 
-    def notify(self, message: str) -> None:
-        if self.app and hasattr(self.app, "notify"):
-            self.app.notify(message)
-
     def refresh_status(self) -> None:
         if self.app and hasattr(self.app, "refresh_status_footer"):
             self.app.refresh_status_footer()
