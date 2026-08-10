@@ -119,7 +119,7 @@ class TestCLIAdvanced(unittest.TestCase):
         with patch("cli.version", side_effect=PackageNotFoundError("no pkg")):
             with patch("pathlib.Path.exists", return_value=True):
                 with patch("builtins.open", mock_open(read_data='{"project": {"version": "9.9.9"}}')):
-                    with patch("tomllib.load", return_value={"project": {"version": "9.9.9"}}):
+                    with patch("cli.tomllib.load", return_value={"project": {"version": "9.9.9"}}):
                         self.assertEqual(get_version(), "9.9.9")
 
     def test_get_version_pyproject_error_returns_dev(self):
@@ -127,7 +127,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
         with patch("cli.version", side_effect=PackageNotFoundError("no pkg")):
             with patch("pathlib.Path.exists", return_value=True):
-                with patch("tomllib.load", side_effect=Exception("bad tom")):
+                with patch("cli.tomllib.load", side_effect=Exception("bad tom")):
                     self.assertEqual(get_version(), "0.1.0-dev")
 
     def test_print_mcp_tools_scan_exception(self):
