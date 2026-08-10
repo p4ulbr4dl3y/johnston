@@ -71,7 +71,11 @@ class MCPProcessClient:
         loop = asyncio.get_running_loop()
         while not self._stopped and self.process and self.process.stdout:
             try:
-                line_bytes = await asyncio.to_thread(self.process.stdout.readline)
+                # Read directly on the loop. A single buffered readline() is cheap
+                # and avoids switching to a worker thread per JSON-RPC line; the
+                # async reader is the only stdout consumer in this path (the sync
+                # path uses _read_response with select/os.read).
+                line_bytes = self.process.stdout.readline()
                 if not line_bytes:
                     break
                 line_str = (
