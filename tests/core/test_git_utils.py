@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from core.git_utils import run_git
+from core.git_utils import make_git_diff, run_git
 
 
 class TestRunGit(unittest.TestCase):
@@ -37,11 +37,64 @@ class TestRunGit(unittest.TestCase):
 
     def test_env_and_no_timeout_passthrough(self):
         with patch("core.git_utils.subprocess.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(args=["git", "log"], returncode=0, stdout="", stderr="")
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=["git", "log"], returncode=0, stdout="", stderr=""
+            )
             run_git(["log"], env={"GIT_CONFIG": "x"})
         kwargs = mock_run.call_args.kwargs
         self.assertEqual(kwargs["env"], {"GIT_CONFIG": "x"})
         self.assertIsNone(kwargs["timeout"])
+
+
+class TestMakeGitDiff(unittest.TestCase):
+    def test_identical_returns_empty(self):
+        self.assertEqual(make_git_diff("a\nb\n", "a\nb\n"), "")
+
+    def test_both_empty_returns_empty(self):
+        self.assertEqual(make_git_diff("", ""), "")
+
+    def test_single_line_change(self):
+        d = make_git_diff("a", "b", fromfile="old", tofile="new")
+        self.assertIn("--- old\n+++ new", d)
+        self.assertIn("-a", d)
+        self.assertIn("+b", d)
+
+    def test_relabels_to_caller_paths(self):
+        d = make_git_diff("a\nb\n", "a\nc\n", fromfile="a/foo.py", tofile="b/foo.py")
+        self.assertIn("+++ b/foo.py", d)
+        self.assertNotIn("tmp", d)
+
+    def test_list_input(self):
+        d = make_git_diff(["a", "b"], ["a", "c"])
+        self.assertIn("-b", d)
+        self.assertIn("+c", d)
+
+    def test_new_file_add(self):
+        d = make_git_diff("", "x\ny\n", fromfile="old", tofile="new")
+        self.assertIn("@@ -0,0 +1,2 @@", d)
+        self.assertIn("+x", d)
+        self.assertIn("+y", d)
+
+    def test_fallback_when_git_unavailable(self):
+        with patch("core.git_utils.run_git", side_effect=OSError("no git")):
+            d = make_git_diff("a\nb\n", "a\nc\n", fromfile="old", tofile="new")
+        self.assertIn("--- old\n+++ new", d)
+        self.assertIn("-b", d)
+        self.assertIn("+c", d)
+
+    def test_fallback_when_git_errors(self):
+        with patch(
+            "core.git_utils.run_git",
+            return_value=subprocess.CompletedProcess(args=[], returncode=2, stdout="", stderr="boom"),
+        ):
+            d = make_git_diff("a\nb\n", "a\nc\n", fromfile="old", tofile="new")
+        self.assertIn("-b", d)
+        self.assertIn("+c", d)
+
+    def test_identical_does_not_call_git(self):
+        with patch("core.git_utils.run_git") as m:
+            make_git_diff("a\n", "a\n")
+        m.assert_not_called()
 
 
 if __name__ == "__main__":

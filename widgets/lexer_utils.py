@@ -88,28 +88,38 @@ def generate_chunk_unified_diff(
     file_path: str = "file",
     start_line: int = 1,
 ) -> list[str]:
-    """Generates unified diff lines for a single chunk, adjusting @@ line numbers."""
-    import difflib
+    """Generates unified diff lines for a single chunk, adjusting @@ line numbers.
+
+    Uses git's patience diff when available, falling back to difflib.
+    """
     import re
 
     if not old_content and not new_content:
         return []
 
-    d_lines = list(
-        difflib.unified_diff(
-            old_content.splitlines(),
-            new_content.splitlines(),
-            fromfile=file_path or "file",
-            tofile=file_path or "file",
-            lineterm="",
-        )
+    from core.git_utils import make_git_diff
+
+    diff_text = make_git_diff(
+        old_content,
+        new_content,
+        fromfile=file_path or "file",
+        tofile=file_path or "file",
     )
-    if d_lines and len(d_lines) > 2 and d_lines[2].startswith("@@"):
-        h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", d_lines[2])
-        if h_m:
-            old_cnt = h_m.group(2) or "1"
-            new_cnt = h_m.group(4) or "1"
-            d_lines[2] = f"@@ -{start_line},{old_cnt} +{start_line},{new_cnt} @@"
+    # Drop the `diff --git` / `index` metadata lines git adds, keep hunk/body.
+    d_lines = [
+        line
+        for line in (diff_text.splitlines() if diff_text else [])
+        if not line.startswith(("diff --git ", "index "))
+    ]
+
+    for i, line in enumerate(d_lines):
+        if line.startswith("@@"):
+            h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
+            if h_m:
+                old_cnt = h_m.group(2) or "1"
+                new_cnt = h_m.group(4) or "1"
+                d_lines[i] = f"@@ -{start_line},{old_cnt} +{start_line},{new_cnt} @@"
+            break
     return d_lines
 
 
