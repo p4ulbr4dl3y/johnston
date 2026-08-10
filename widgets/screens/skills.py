@@ -8,6 +8,15 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from core.config import CONFIG_DIR
 from core.skill_manager import SkillManager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
+from widgets.screens.base_selection import ModalSearchNavMixin
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
+)
 
 
 class SkillDetailScreen(BaseModalScreen[bool]):
@@ -27,10 +36,10 @@ class SkillDetailScreen(BaseModalScreen[bool]):
         header_md = f"### **Skill: {self.skill['name']}** (`{status_tag(scope_str)}`)"
         desc = self.skill.get("description", "").strip() or "No description provided."
 
-        with Vertical(id="modal-dialog"):
-            yield Markdown(header_md, classes="modal-markdown modal-markdown-centered")
-            yield Markdown(desc, classes="modal-markdown")
-            yield Label("enter: activate • esc: cancel", id="modal-hint")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown(header_md, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield Markdown(desc, classes=MODAL_MARKDOWN)
+            yield Label("enter: activate • esc: cancel", id=MODAL_HINT_ID)
 
     def action_cancel(self) -> None:
         self.dismiss(False)
@@ -39,8 +48,11 @@ class SkillDetailScreen(BaseModalScreen[bool]):
         self.dismiss(True)
 
 
-class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
+class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]]):
     """Modal screen for listing available skills (global and project) as one-liners"""
+
+    search_nav_option_list_id = "skills-option-list"
+    search_nav_filtered_attr = "filtered_skills"
 
     BINDINGS = [
         ("escape", "cancel", "Cancel"),
@@ -68,16 +80,16 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
         self.filtered_options = list(self.options)
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Available Skills**", classes="modal-markdown modal-markdown-centered")
-            yield Input(placeholder="Search skills...", id="modal-search-input")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield Input(placeholder="Search skills...", id=MODAL_SEARCH_INPUT_ID)
             yield OptionList(id="skills-option-list")
-            yield Label("enter: activate • tab: toggle status • esc: cancel", id="modal-hint")
+            yield Label("enter: activate • tab: toggle status • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
         try:
-            self.query_one("#modal-search-input", Input).focus()
+            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
             pass
 
@@ -119,12 +131,12 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
             pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             self.search_query = event.value
             self._apply_filter()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             try:
                 opt_list = self.query_one("#skills-option-list", OptionList)
                 idx = opt_list.highlighted
@@ -136,22 +148,7 @@ class SkillsScreen(BaseModalScreen[Optional[Dict[str, Any]]]):
             self.dismiss(None)
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("down", "up"):
-            try:
-                search_input = self.query_one("#modal-search-input", Input)
-                if search_input.has_focus:
-                    opt_list = self.query_one("#skills-option-list", OptionList)
-                    if opt_list.highlighted is None and self.filtered_skills:
-                        opt_list.highlighted = 0
-                    elif opt_list.highlighted is not None:
-                        if event.key == "down":
-                            opt_list.action_cursor_down()
-                        else:
-                            opt_list.action_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-            except Exception:
-                pass
+        self._handle_search_navigation(event)
 
     def action_toggle_hidden(self) -> None:
         try:

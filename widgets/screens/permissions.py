@@ -8,10 +8,22 @@ from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.permission_manager import PermissionManager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
+from widgets.screens.base_selection import ModalSearchNavMixin
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
+)
 
 
-class PermissionsScreen(BaseModalScreen[None]):
+class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     """Tabbed Modal screen for managing tool permissions (Groups, Tools, Scope)."""
+
+    search_nav_option_list_id = "permissions-option-list"
+    search_nav_filtered_attr = "filtered_items"
 
     BINDINGS = [
         ("escape", "cancel", "Close"),
@@ -34,18 +46,18 @@ class PermissionsScreen(BaseModalScreen[None]):
         return f"### **Manage Tool Permissions**\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1} &nbsp;&nbsp;&nbsp;&nbsp; {t2}"
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
+        with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(
-                self._get_header_md(), id="permissions-header-md", classes="modal-markdown modal-markdown-centered"
+                self._get_header_md(), id="permissions-header-md", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
-            yield Input(placeholder="Search permissions...", id="modal-search-input")
+            yield Input(placeholder="Search permissions...", id=MODAL_SEARCH_INPUT_ID)
             yield OptionList(id="permissions-option-list")
-            yield Label("enter: toggle • tab / ←/→: switch tab • esc: close", id="modal-hint")
+            yield Label("enter: toggle • tab / ←/→: switch tab • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
         try:
-            self.query_one("#modal-search-input", Input).focus()
+            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
             pass
 
@@ -238,12 +250,12 @@ class PermissionsScreen(BaseModalScreen[None]):
             opt_list.highlighted = idx
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             self.search_query = event.value
             self.refresh_list()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             opt_list = self.query_one("#permissions-option-list", OptionList)
             idx = opt_list.highlighted
             if idx is not None:
@@ -272,21 +284,7 @@ class PermissionsScreen(BaseModalScreen[None]):
             return
 
         if key in ("down", "up"):
-            try:
-                search_input = self.query_one("#modal-search-input", Input)
-                if search_input.has_focus:
-                    opt_list = self.query_one("#permissions-option-list", OptionList)
-                    if opt_list.highlighted is None and self.filtered_items:
-                        opt_list.highlighted = 0
-                    elif opt_list.highlighted is not None:
-                        if key == "down":
-                            opt_list.action_cursor_down()
-                        else:
-                            opt_list.action_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-            except Exception:
-                pass
+            self._handle_search_navigation(event)
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):

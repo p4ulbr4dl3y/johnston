@@ -5,6 +5,14 @@ from textual.widgets import Input, Label, Markdown, OptionList
 
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import BaseSelectionScreen
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    MODAL_OPTION_LIST,
+    MODAL_SEARCH_INPUT,
+)
 
 
 class ProvidersScreen(BaseSelectionScreen[str]):
@@ -59,7 +67,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
     ]
 
     def action_toggle_disabled(self) -> None:
-        opt_list = self.query_one("#modal-option-list", OptionList)
+        opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         idx = opt_list.highlighted
         if idx is None and self.filtered_items:
             idx = 0
@@ -78,7 +86,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
                 options, items = self._build_options()
                 self.raw_options = options
                 self.raw_items = items
-                search_input = self.query_one("#modal-search-input", Input)
+                search_input = self.query_one(MODAL_SEARCH_INPUT, Input)
                 self.on_input_changed(Input.Changed(search_input, search_input.value))
                 if self.filtered_items:
                     opt_list.highlighted = min(idx, len(self.filtered_items) - 1)
@@ -107,11 +115,13 @@ class ApiKeyInputScreen(BaseModalScreen[str | None]):
         else:
             masked = self.current_key if self.current_key else "not set"
 
-        with Vertical(id="modal-dialog"):
-            yield Markdown(f"### **Connect {self.provider_name}**", classes="modal-markdown modal-markdown-centered")
-            yield Markdown(f"Current API Key: `{masked}`", classes="modal-markdown")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown(
+                f"### **Connect {self.provider_name}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
+            )
+            yield Markdown(f"Current API Key: `{masked}`", classes=MODAL_MARKDOWN)
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
-            yield Label("enter: save • esc: cancel", id="modal-hint")
+            yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.query_one("#api-key-input", Input).focus()

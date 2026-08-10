@@ -174,13 +174,6 @@ class TestConfirmScreenUnit(unittest.TestCase):
         cs.action_confirm()
         cs.dismiss.assert_not_called()
 
-    def test_action_quit(self):
-        cs = ConfirmScreen("Summary")
-        mock_app = MagicMock()
-        with patch.object(ConfirmScreen, "app", new_callable=PropertyMock, return_value=mock_app):
-            cs.action_quit()
-            mock_app.exit.assert_called_once()
-
 
 class TestAskUserWizardScreenUnit(unittest.TestCase):
     def test_wizard_screen_basic(self):

@@ -5,10 +5,22 @@ from textual.widgets import Input, Label, Markdown, OptionList
 
 from core.linters_manager import get_linters_manager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
+from widgets.screens.base_selection import ModalSearchNavMixin
+from widgets.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
+)
 
 
-class LintersScreen(BaseModalScreen[None]):
+class LintersScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     """Modal screen for managing linters: enable/disable."""
+
+    search_nav_option_list_id = "linters-option-list"
+    search_nav_filtered_attr = "filtered_linters"
 
     BINDINGS = [
         ("escape", "cancel", "Close"),
@@ -22,16 +34,16 @@ class LintersScreen(BaseModalScreen[None]):
         self.search_query = ""
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Manage Linters**", classes="modal-markdown modal-markdown-centered")
-            yield Input(placeholder="Search linters...", id="modal-search-input")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("### **Manage Linters**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield Input(placeholder="Search linters...", id=MODAL_SEARCH_INPUT_ID)
             yield OptionList(id="linters-option-list")
-            yield Label("enter: toggle • esc: cancel", id="modal-hint")
+            yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
         try:
-            self.query_one("#modal-search-input", Input).focus()
+            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
             pass
 
@@ -83,12 +95,12 @@ class LintersScreen(BaseModalScreen[None]):
             opt_list.highlighted = 0
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             self.search_query = event.value
             self.refresh_list()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "modal-search-input":
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
             opt_list = self.query_one("#linters-option-list", OptionList)
             idx = opt_list.highlighted
             if idx is not None and 0 <= idx < len(self.filtered_linters):
@@ -102,22 +114,7 @@ class LintersScreen(BaseModalScreen[None]):
                 opt_list.highlighted = idx
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("down", "up"):
-            try:
-                search_input = self.query_one("#modal-search-input", Input)
-                if search_input.has_focus:
-                    opt_list = self.query_one("#linters-option-list", OptionList)
-                    if opt_list.highlighted is None and self.filtered_linters:
-                        opt_list.highlighted = 0
-                    elif opt_list.highlighted is not None:
-                        if event.key == "down":
-                            opt_list.action_cursor_down()
-                        else:
-                            opt_list.action_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-            except Exception:
-                pass
+        self._handle_search_navigation(event)
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):

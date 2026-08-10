@@ -6,6 +6,7 @@ from textual.widgets import Label, Markdown
 
 from widgets.chat_view import ChatView
 from widgets.screens.base_modal import BaseModalScreen
+from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
 
 
 class SubagentViewScreen(BaseModalScreen[None]):
@@ -26,10 +27,10 @@ class SubagentViewScreen(BaseModalScreen[None]):
         self.queue_task = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Subagent Details**", classes="modal-markdown modal-markdown-centered")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("### **Subagent Details**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield Label("esc: cancel", id="modal-hint")
+            yield Label("esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)

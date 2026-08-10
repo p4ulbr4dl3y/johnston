@@ -6,6 +6,7 @@ from textual.widgets import Label, Markdown, OptionList, RichLog
 
 from core.defaults.config import THEME_MUTED
 from widgets.screens.base_modal import BaseModalScreen, status_tag
+from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
 
 
 class TaskConsoleScreen(BaseModalScreen[None]):
@@ -21,10 +22,10 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.printed_count = 0
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown("### **Console Output**", classes="modal-markdown modal-markdown-centered")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown("### **Console Output**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield RichLog(id="console-log", highlight=False, markup=False)
-            yield Label("esc: cancel", id="modal-hint")
+            yield Label("esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -166,12 +167,12 @@ class TasksListScreen(BaseModalScreen[None]):
         return sorted(items, key=lambda item: not item["is_running"])
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
+        with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(
-                self._get_header_md(), id="tasks-header-md", classes="modal-markdown modal-markdown-centered"
+                self._get_header_md(), id="tasks-header-md", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
             yield OptionList(id="tasks-option-list")
-            yield Label("enter: view details • tab / ←/→: switch tab • k: kill • esc: cancel", id="modal-hint")
+            yield Label("enter: view details • tab / ←/→: switch tab • k: kill • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._last_signatures = None

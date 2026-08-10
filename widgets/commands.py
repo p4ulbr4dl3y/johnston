@@ -18,6 +18,7 @@ from widgets.modal_screens import (
     TasksListScreen,
     ThinkingEffortScreen,
 )
+from widgets.screens.constants import MESSAGE_INPUT
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class ProvidersCommand(BaseCommand):
 
             def on_provider_selected(selected_key: str | None) -> None:
                 if not selected_key:
-                    app.query_one("#message-input", ChatInput).focus()
+                    app.query_one(MESSAGE_INPUT, ChatInput).focus()
                     return
 
                 p_info = provs.get(selected_key, {})
@@ -163,7 +164,7 @@ class ModelsCommand(BaseCommand):
                     app.agent.model = selected_model
                 app.pm.set_provider_model(selected_prov, selected_model)
                 app.refresh_status_footer()
-            app.query_one("#message-input", ChatInput).focus()
+            app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
         app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
 
@@ -186,13 +187,13 @@ class ThinkingEffortCommand(BaseCommand):
 
         def on_effort_selected(effort: str):
             if not effort:
-                app.query_one("#message-input", ChatInput).focus()
+                app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
             if hasattr(app.pm, "set_provider_thinking_effort"):
                 app.pm.set_provider_thinking_effort(provider_key, model_name, effort)
             app.pm.recreate_active_agent(app)
-            app.query_one("#message-input", ChatInput).focus()
+            app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
         app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)
 
@@ -301,11 +302,11 @@ class RewindCommand(BaseCommand):
                     app.save_current_session()
 
                 # Load text into input field
-                chat_input = app.query_one("#message-input")
+                chat_input = app.query_one(MESSAGE_INPUT)
                 chat_input.load_text(msg_text)
                 lines = chat_input.text.split("\n")
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
-            app.query_one("#message-input").focus()
+            app.query_one(MESSAGE_INPUT).focus()
 
         app.push_screen(
             RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected
@@ -326,7 +327,7 @@ class ResumeCommand(BaseCommand):
         def on_resume_selected(selected_sid: str) -> None:
             if selected_sid:
                 app.load_session_ui(selected_sid)
-            app.query_one("#message-input", ChatInput).focus()
+            app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
         app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
 
@@ -370,7 +371,7 @@ class SkillsCommand(BaseCommand):
             return
 
         def on_skill_selected(selected_skill: dict | None) -> None:
-            chat_input = app.query_one("#message-input", ChatInput)
+            chat_input = app.query_one(MESSAGE_INPUT, ChatInput)
             if selected_skill:
                 s_name = selected_skill["name"]
                 chat_input.load_text(f"/{s_name} ")
