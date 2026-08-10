@@ -42,15 +42,26 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
     async def test_concurrent_async_refreshes_are_coalesced(self):
         manager = self._manager_without_init()
 
+        release = asyncio.Event()
+
         async def slow_refresh(mode="eager"):
-            await asyncio.sleep(0.02)
+            await release.wait()
             return [{"type": "function", "function": {"name": "search"}}]
 
         manager.get_active_tools_async = AsyncMock(side_effect=slow_refresh)
-        results = await asyncio.gather(
-            manager.ensure_tools_ready_async(),
-            manager.ensure_tools_ready_async(),
-        )
+
+        async def _gather():
+            return await asyncio.gather(
+                manager.ensure_tools_ready_async(),
+                manager.ensure_tools_ready_async(),
+            )
+
+        gather_task = asyncio.create_task(_gather())
+        # Cooperative yield so the first caller starts its refresh and the second
+        # caller joins the shared in-flight refresh task before we release it.
+        await asyncio.sleep(0)
+        release.set()
+        results = await gather_task
 
         self.assertEqual(results[0], results[1])
         manager.get_active_tools_async.assert_awaited_once_with(mode="eager")

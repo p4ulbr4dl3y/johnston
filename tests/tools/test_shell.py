@@ -269,8 +269,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}, ctx=mock_app))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
 
             # Trigger backgrounding via move_to_background on registered task
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
@@ -389,7 +391,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_p = MagicMock()
         mock_p.stdout = None
 
+        wait_invoked = asyncio.Event()
+
         def _mock_wait():
+            wait_invoked.set()
             return asyncio.Future()  # never resolves
 
         mock_p.wait = _mock_wait
@@ -400,7 +405,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             exec_task = asyncio.create_task(self.tool.execute({"command": "run_long_task"}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(wait_invoked.wait(), timeout=5.0)
             exec_task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await exec_task
@@ -420,8 +425,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x"}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
@@ -445,8 +452,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
@@ -469,8 +478,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f x", "timeout": 1}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
@@ -527,8 +538,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
             exec_task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await exec_task
@@ -555,8 +568,10 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             mock_bg.background_event = asyncio.Event()
             mock_bg_cls.return_value = mock_bg
 
+            registration = asyncio.Event()
+            mock_ctx.add_background_task.side_effect = lambda t: registration.set()
             exec_task = asyncio.create_task(self.tool.execute({"command": "tail -f log.txt"}))
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(registration.wait(), timeout=5.0)
             exec_task.cancel()
             with self.assertRaises(asyncio.CancelledError):
                 await exec_task
