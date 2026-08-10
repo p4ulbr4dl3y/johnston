@@ -1,3 +1,6 @@
+import time
+from typing import Optional
+
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
@@ -65,6 +68,11 @@ class TasksListScreen(BaseModalScreen[None]):
         self.active_tab = default_tab  # 0: All, 1: Agents, 2: Shell
         self.search_query = ""
         self.filtered_tasks = []
+        # Cache of the last _get_filtered_tasks() result to avoid re-reading the
+        # session store / disk on every 0.5s ticker invocation.
+        self._cached_tasks: list = []
+        self._tasks_cache_ts: Optional[float] = None
+        self._tasks_cache_ttl: float = 0.5
 
     def _get_header_md(self) -> str:
         t0 = "**[ All ]**" if self.active_tab == 0 else "**All**"
@@ -99,9 +107,22 @@ class TasksListScreen(BaseModalScreen[None]):
         except Exception:
             pass
         self._last_signatures = None
+        self._invalidate_tasks_cache()
         self.update_tasks_list()
 
+    def _invalidate_tasks_cache(self) -> None:
+        """Drop the cached filtered-tasks snapshot so the next read re-reads the store."""
+        self._tasks_cache_ts = None
+
     def _get_filtered_tasks(self) -> list:
+        now = time.monotonic()
+        if (
+            self._tasks_cache_ts is not None
+            and now - self._tasks_cache_ts < self._tasks_cache_ttl
+            and self._cached_tasks is not None
+        ):
+            return self._cached_tasks
+
         items = []
 
         # 1. Gather shell background tasks
@@ -164,7 +185,10 @@ class TasksListScreen(BaseModalScreen[None]):
                 if q in item["command"].lower() or q in item["id"].lower() or q in item["kind"].lower()
             ]
 
-        return sorted(items, key=lambda item: not item["is_running"])
+        result = sorted(items, key=lambda item: not item["is_running"])
+        self._cached_tasks = result
+        self._tasks_cache_ts = time.monotonic()
+        return result
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -266,6 +290,7 @@ class TasksListScreen(BaseModalScreen[None]):
                     if inspect.isawaitable(res):
                         await res
             self._last_signatures = None
+            self._invalidate_tasks_cache()
             self.update_tasks_list()
 
     def action_close(self) -> None:
