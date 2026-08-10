@@ -474,7 +474,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                             yield ("thinking_start", "Thinking...", "")
                                             thinking_started = True
                                             thinking_t0 = time.time()
-                                        active_thought_parts.append(reasoning)
+                                        active_thought_parts.append(str(reasoning))
                                         active_thought = "".join(active_thought_parts)
                                         yield ("thinking_delta", active_thought, "")
 
