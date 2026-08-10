@@ -92,6 +92,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 "read": "Read",
                 "create": "Create",
                 "edit": "Edit",
+                "multi_edit": "MultiEdit",
                 "shell": "Shell",
                 "ask_user": "AskUser",
                 "call_mcp": "CallMCP",
