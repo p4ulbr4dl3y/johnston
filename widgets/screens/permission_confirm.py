@@ -7,6 +7,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, Static
 
+from widgets.chat_toolcall import build_synthetic_create_diff
 from widgets.chat_view import ToolScrollBox, format_edit_diff
 
 
@@ -54,14 +55,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 or self.args.get("code")
                 or ""
             )
-            new_lines = content.splitlines() if content else []
-            cnt = len(new_lines) or 1
-            d_lines = [
-                f"--- a/{target_path or 'file'}",
-                f"+++ b/{target_path or 'file'}",
-                f"@@ -1,{cnt} +1,{cnt} @@",
-            ] + [f"+{line_str}" for line_str in new_lines]
-            return "\n".join(d_lines)
+            return build_synthetic_create_diff(target_path, content)
 
         # Generate diff for Edit tools
         if self.tool_name in ("edit", "replace_file_content", "multi_replace_file_content", "multi_edit"):

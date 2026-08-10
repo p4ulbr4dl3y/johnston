@@ -22,6 +22,31 @@ from widgets.lexer_utils import guess_lexer_name
 from widgets.screens.constants import TOOL_SCROLL_BOX
 
 
+def _strip_hints_and_background(text: str) -> str:
+    """Strip [Hint:…] and [Background Task:…] markers from tool output."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
+    cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
+    cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", cleaned)
+    cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
+    cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
+    cleaned = re.sub(r"Use (manage_shell|ManageShell) to inspect[^\n]*", "", cleaned)
+    return cleaned.strip()
+
+
+def build_synthetic_create_diff(file_path: str, content: str) -> str:
+    """Build a synthetic ``--- a/… / +++ b/… / @@ -1,N +1,N @@`` diff for create/write tools."""
+    new_lines = content.splitlines() if content else []
+    cnt = len(new_lines) or 1
+    d_lines = [
+        f"--- a/{file_path or 'file'}",
+        f"+++ b/{file_path or 'file'}",
+        f"@@ -1,{cnt} +1,{cnt} @@",
+    ] + [f"+{line_str}" for line_str in new_lines]
+    return "\n".join(d_lines)
+
+
 class FormattingMixin:
     """Pure formatting helpers for tool output display"""
 
@@ -95,13 +120,7 @@ class FormattingMixin:
         return "\n".join(fixed)
 
     def _clean_bash_output(self, text: str) -> str:
-        if not text:
-            return ""
-        cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", text)
-        cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
-        cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
-        cleaned = re.sub(r"Use (manage_shell|ManageShell) to inspect[^\n]*", "", cleaned)
-        return cleaned.strip()
+        return _strip_hints_and_background(text)
 
     def _format_code_with_line_numbers(self, code: str) -> str:
         lines = code.splitlines()
@@ -432,11 +451,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes=TOOL_SCROLL_BOX)
 
     def _clean_hints_for_ui(self, text: str) -> str:
-        if not text:
-            return ""
-        cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
-        cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
-        return cleaned.strip()
+        return _strip_hints_and_background(text)
 
     def _clean_markup_text(self, text: str) -> str:
         if not text:
@@ -619,14 +634,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             or self.args.get("code_content")
                             or ""
                         )
-                        new_lines = content.splitlines() if content else []
-                        cnt = len(new_lines) or 1
-                        d_lines = [
-                            f"--- a/{file_path or 'file'}",
-                            f"+++ b/{file_path or 'file'}",
-                            f"@@ -1,{cnt} +1,{cnt} @@",
-                        ] + [f"+{line_str}" for line_str in new_lines]
-                        diff_text = "\n".join(d_lines)
+                        diff_text = build_synthetic_create_diff(file_path, content)
 
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
                     self.content_widget.update(formatted_diff)
