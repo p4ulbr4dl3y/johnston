@@ -27,18 +27,25 @@ class CreateTool(BaseTool):
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         ctx = self._ensure_context(ctx)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
-        if os.path.isdir(path):
+
+        def _probe():
+            """Run sync filesystem checks off the event loop, returning (existed, old_content)."""
+            if os.path.isdir(path):
+                return (False, "isdir")
+            existed = os.path.isfile(path)
+            old = ""
+            if existed:
+                try:
+                    old = read_file_text(path)
+                except Exception:
+                    old = ""
+            return (existed, old)
+
+        file_existed, old_content = await asyncio.to_thread(_probe)
+        if not file_existed and old_content == "isdir":
             return format_tool_error("file", name=path, detail="is a directory")
 
         content = (args.get("content") or "").rstrip("\r\n")
-
-        file_existed = os.path.isfile(path)
-        old_content = ""
-        if file_existed:
-            try:
-                old_content = read_file_text(path)
-            except Exception:
-                old_content = ""
 
         try:
             await asyncio.to_thread(write_file_text, path, content)

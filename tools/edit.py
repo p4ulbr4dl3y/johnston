@@ -290,10 +290,18 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
 
 async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> str:
     path = resolve_path(path_arg, cwd=cwd)
-    if not path or not os.path.exists(path):
-        return format_tool_error("file", name=path, detail="not found")
-    if os.path.isdir(path):
-        return format_tool_error("file", name=path, detail="is a directory")
+
+    def _validate() -> str | None:
+        """Sync existence/type checks run off the event loop. Returns an error string or None."""
+        if not path or not os.path.exists(path):
+            return format_tool_error("file", name=path, detail="not found")
+        if os.path.isdir(path):
+            return format_tool_error("file", name=path, detail="is a directory")
+        return None
+
+    validate_err = await asyncio.to_thread(_validate)
+    if validate_err:
+        return validate_err
 
     def _do_edit():
         content = read_file_text(path)

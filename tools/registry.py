@@ -34,6 +34,24 @@ REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLA
 from tools.aliases import ALIAS_MAP, PARAM_ALIAS_MAP  # noqa: E402  (re-export for downstream imports)
 
 
+def _build_close_match_candidates() -> list[str]:
+    """Sorted list of all tool/alias names used for fuzzy-matching unknown tools."""
+    return sorted(set(REGISTRY.keys()) | set(ALIAS_MAP.keys()))
+
+
+# Precomputed candidate list for fuzzy tool-name suggestions. Rebuilt lazily if the
+# registry changes after import (e.g. dynamic tool registration in tests).
+_CLOSE_MATCH_CANDIDATES: list[str] = _build_close_match_candidates()
+
+
+def _close_match_candidates() -> list[str]:
+    """Return the cached candidate list, invalidating it if REGISTRY/ALIAS_MAP grew."""
+    if len(_CLOSE_MATCH_CANDIDATES) == len(REGISTRY) + len(ALIAS_MAP):
+        return _CLOSE_MATCH_CANDIDATES
+    _CLOSE_MATCH_CANDIDATES[:] = _build_close_match_candidates()
+    return _CLOSE_MATCH_CANDIDATES
+
+
 def normalize_tool_name(name: str) -> str:
     """Normalizes a tool name or alias to its canonical name using ALIAS_MAP."""
     if not name:
@@ -218,8 +236,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if not is_mcp:
         import difflib
 
-        all_candidates = set(REGISTRY.keys()) | set(ALIAS_MAP.keys())
-        matches = difflib.get_close_matches(clean_name, sorted(all_candidates), n=2, cutoff=0.4)
+        matches = difflib.get_close_matches(clean_name, _close_match_candidates(), n=2, cutoff=0.4)
         hint = ""
         if matches:
             resolved_target = ALIAS_MAP.get(matches[0], matches[0])
