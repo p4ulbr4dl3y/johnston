@@ -4,6 +4,7 @@ Handles global skills (~/.johnston/skills/) and project-level skills (<cwd>/.joh
 Supports YAML frontmatter parsing from SKILL.md and *.md files.
 """
 
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,8 @@ from core.defaults.skills.handoff_skill import DEFAULT_HANDOFF_SKILL_CONTENT
 from core.defaults.skills.init_skill import DEFAULT_INIT_SKILL_CONTENT
 from core.defaults.skills.johnston_guide import JOHNSTON_GUIDE_FILES
 from core.frontmatter import parse_frontmatter
+
+logger = logging.getLogger(__name__)
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
@@ -42,7 +45,7 @@ class SkillManager:
                 try:
                     atomic_write_text(target_path, file_content.strip())
                 except Exception:
-                    pass
+                    logger.warning("Failed to write guide skill file: %s", target_path, exc_info=True)
 
         # 2. Single-file skills (init, handoff)
         single_skills = [
@@ -70,7 +73,7 @@ class SkillManager:
                     os.makedirs(skill_dir, exist_ok=True)
                     atomic_write_text(skill_file, skill_content.strip())
                 except Exception:
-                    pass
+                    logger.warning("Failed to write skill file: %s", skill_file, exc_info=True)
 
     def list_skills(
         self,

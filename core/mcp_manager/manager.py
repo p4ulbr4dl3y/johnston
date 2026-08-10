@@ -52,7 +52,7 @@ class MCPManager:
             try:
                 client.stop()
             except Exception:
-                pass
+                logger.warning("Failed to stop MCP client", exc_info=True)
         self.clients.clear()
 
     def ensure_default_configs(self):
@@ -81,7 +81,7 @@ class MCPManager:
                         v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
-                pass
+                logger.warning("Failed to load global MCP servers config", exc_info=True)
 
         # 2. Load project (only if distinct from global_file)
         real_global = os.path.realpath(self.global_file)
@@ -97,7 +97,7 @@ class MCPManager:
                         v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
-                pass
+                logger.warning("Failed to load project MCP servers config", exc_info=True)
 
         return list(servers.values())
 
@@ -255,7 +255,7 @@ class MCPManager:
                 try:
                     client.fetch_tools()
                 except Exception:
-                    pass
+                    logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
                 formatted = self._format_tool_schema(t, name, s_mode, seen_names)
@@ -303,7 +303,7 @@ class MCPManager:
                 try:
                     await client.fetch_tools_async()
                 except Exception:
-                    pass
+                    logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
                 formatted = self._format_tool_schema(t, name, s_mode, seen_names)

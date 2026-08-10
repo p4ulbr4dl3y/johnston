@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import time
 import uuid
@@ -6,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from core.config import PROJECTS_DIR
 from core.platform_utils import atomic_write_json, read_json, write_json
+
+logger = logging.getLogger(__name__)
 
 MAIN_STATUS_ACTIVE = "active"
 SUBAGENT_STATUS_RUNNING = "running"
@@ -101,7 +104,7 @@ class AgentSession:
             try:
                 cb(event)
             except Exception:
-                pass
+                logger.warning("Session listener callback failed", exc_info=True)
 
     def add_listener(self, cb: Any) -> None:
         if cb not in self.listeners:
@@ -287,7 +290,7 @@ class SessionStore:
                     self._sessions[sess.id] = sess
                     return sess
             except Exception:
-                pass
+                logger.warning("Failed to load session from disk: %s", fpath, exc_info=True)
         return None
 
     def _subagent_path_from_scan(self, subagent_id: str) -> Optional[str]:
@@ -330,7 +333,7 @@ class SessionStore:
                 sess = AgentSession.from_dict(data)
                 sessions[sess.id] = sess
         except Exception:
-            pass
+            logger.warning("Failed to load session file: %s", fpath, exc_info=True)
 
     def list_main_sessions(self) -> List[Dict[str, Any]]:
         """Return NON-EMPTY main sessions sorted by updated time (for /resume UI)."""
@@ -377,9 +380,6 @@ class SessionStore:
     def get_subagents_for_parent(self, parent_id: str) -> List[AgentSession]:
         return self.children(parent_id)
 
-    def get_active_subagent_count(self, parent_id: str) -> int:
-        return len([s for s in self.children(parent_id) if s.status == SUBAGENT_STATUS_RUNNING])
-
     # -- save/delete -------------------------------------------------------
 
     def save(self, sess: AgentSession) -> None:
@@ -392,7 +392,7 @@ class SessionStore:
             atomic_write_json(fpath, sess.to_dict(), indent=2)
             self._sessions[sess.id] = sess
         except Exception:
-            pass
+            logger.exception("Failed to save session %s", sess.id)
 
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)

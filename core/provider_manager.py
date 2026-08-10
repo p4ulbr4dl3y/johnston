@@ -67,7 +67,7 @@ class ProviderManager:
                 self._save_providers_json(DEFAULT_JSON_PROVIDERS)
                 self.invalidate_cache()
             except Exception:
-                pass
+                logger.warning("Failed to save default providers JSON", exc_info=True)
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         providers = dict(DEFAULT_JSON_PROVIDERS)
@@ -82,7 +82,7 @@ class ProviderManager:
                         merged.update(v)
                         providers[k] = merged
             except Exception:
-                pass
+                logger.warning("Failed to merge JSON providers", exc_info=True)
         return providers
 
     def get_disabled_providers(self) -> List[str]:
