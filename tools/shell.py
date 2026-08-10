@@ -94,17 +94,19 @@ class ShellTool(BaseTool):
         sg_enabled = effective_perms.get("shell_guard", {}).get("enabled", True)
         session_override = pm.session_overrides.get("shell") or pm.session_overrides.get("shell_guard")
 
-        if sg_enabled and not is_safe and not skip_confirm and session_override != "allow" and ctx.app:
-            try:
-                from tools.registry import prompt_permission_confirmation
+        if sg_enabled and not is_safe and not skip_confirm and session_override != "allow":
+            from tools.registry import check_and_confirm_permission
 
-                confirmed = await prompt_permission_confirmation(
-                    ctx.app, "shell", {"command": cmd}, reason, perm_name="shell"
+            try:
+                # shell_guard already evaluated the command as unsafe; reuse the unified
+                # permission prompt helper (handles app prompt, session overrides, headless).
+                err = await check_and_confirm_permission(
+                    "shell", "shell", {"command": cmd}, ctx, action="ask", action_reason=reason
                 )
-                if not confirmed:
-                    return format_tool_error("denied", name="shell", detail="by user")
             except Exception as e:
                 return format_tool_error("permission", detail=str(e), name="shell")
+            if err:
+                return err
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None

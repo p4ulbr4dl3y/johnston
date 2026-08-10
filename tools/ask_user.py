@@ -90,55 +90,16 @@ class AskUserTool(BaseTool):
         if not validated_questions:
             return format_tool_error("params", name="questions", detail="missing or invalid")
 
-        if ctx.app and hasattr(ctx.app, "push_screen"):
-            try:
-                from widgets.screens.ask_user import AskUserWizardScreen
-
-                loop = asyncio.get_running_loop()
-                future = loop.create_future()
-
-                def _show_wizard(questions, answers=None, q_idx=0):
-                    screen = AskUserWizardScreen(questions, answers=answers, q_idx=q_idx)
-
-                    def on_dismiss(result):
-                        if isinstance(result, dict) and result.get("action") == "minimize":
-                            saved_answers = result.get("answers", {})
-                            saved_q_idx = result.get("q_idx", 0)
-                            setattr(
-                                ctx.app,
-                                "_pending_ask_user",
-                                lambda: _show_wizard(questions, saved_answers, saved_q_idx),
-                            )
-                            if hasattr(ctx.app, "notify"):
-                                try:
-                                    ctx.app.notify("Questions minimized: type /questions to resume", severity="info")
-                                except Exception:
-                                    pass
-                        else:
-                            if hasattr(ctx.app, "_pending_ask_user"):
-                                setattr(ctx.app, "_pending_ask_user", None)
-                            if not future.done():
-                                future.set_result(result)
-
-                    ctx.app.push_screen(screen, callback=on_dismiss)
-
-                _show_wizard(validated_questions)
-
-                try:
-                    res = await future
-                finally:
-                    if hasattr(ctx.app, "_pending_ask_user") and future.done():
-                        setattr(ctx.app, "_pending_ask_user", None)
-
-                if isinstance(res, str) and res.strip() and res != "cancelled":
-                    return res
-                return "cancelled by user"
-            except asyncio.CancelledError:
-                if hasattr(ctx.app, "_pending_ask_user"):
-                    setattr(ctx.app, "_pending_ask_user", None)
-                return "cancelled by user"
-            except Exception as e:
-                if hasattr(ctx.app, "_pending_ask_user"):
-                    setattr(ctx.app, "_pending_ask_user", None)
-                return format_tool_error("prompt", detail=str(e))
-        return format_tool_error("context", name="app", detail="unavailable")
+        ask_user_fn = getattr(ctx.app, "ask_user", None) if ctx.app else None
+        if not callable(ask_user_fn):
+            return format_tool_error("context", name="app", detail="unavailable")
+        try:
+            return await ask_user_fn(validated_questions)
+        except asyncio.CancelledError:
+            if hasattr(ctx.app, "_pending_ask_user"):
+                setattr(ctx.app, "_pending_ask_user", None)
+            return "cancelled by user"
+        except Exception as e:
+            if hasattr(ctx.app, "_pending_ask_user"):
+                setattr(ctx.app, "_pending_ask_user", None)
+            return format_tool_error("prompt", detail=str(e))

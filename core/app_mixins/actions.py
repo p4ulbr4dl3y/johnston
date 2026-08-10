@@ -166,3 +166,51 @@ class ActionsMixin:
             if perm_name == "shell":
                 pm.set_session_override("shell_guard", "allow")
         return result in ("allow", "always_allow")
+
+    async def ask_user(self, questions: list[Dict[str, Any]]) -> str:
+        """Shows the AskUserWizardScreen and returns the user's answer.
+
+        Owned by the app layer so the tools layer stays independent of Textual widgets.
+        Returns the selected answer string, or "cancelled by user" on cancel/error.
+        """
+        from widgets.screens.ask_user import AskUserWizardScreen
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def _show_wizard(question_list, answers=None, q_idx=0):
+            screen = AskUserWizardScreen(question_list, answers=answers, q_idx=q_idx)
+
+            def on_dismiss(result):
+                if isinstance(result, dict) and result.get("action") == "minimize":
+                    saved_answers = result.get("answers", {})
+                    saved_q_idx = result.get("q_idx", 0)
+                    setattr(
+                        self,
+                        "_pending_ask_user",
+                        lambda: _show_wizard(question_list, saved_answers, saved_q_idx),
+                    )
+                    if hasattr(self, "notify"):
+                        try:
+                            self.notify("Questions minimized: type /questions to resume", severity="info")
+                        except Exception:
+                            pass
+                else:
+                    if hasattr(self, "_pending_ask_user"):
+                        setattr(self, "_pending_ask_user", None)
+                    if not future.done():
+                        future.set_result(result)
+
+            self.push_screen(screen, callback=on_dismiss)
+
+        _show_wizard(questions)
+
+        try:
+            res = await future
+        finally:
+            if hasattr(self, "_pending_ask_user") and future.done():
+                setattr(self, "_pending_ask_user", None)
+
+        if isinstance(res, str) and res.strip() and res != "cancelled":
+            return res
+        return "cancelled by user"

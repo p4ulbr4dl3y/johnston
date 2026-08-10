@@ -9,6 +9,7 @@ from core.adapters.base import (
     build_adapter_usage_event,
     check_httpx_response_status,
     extract_image_details,
+    parse_sse_line,
     parse_tool_call_args,
     sort_keys_recursive,
 )
@@ -192,16 +193,8 @@ class AnthropicAdapter(BaseApiAdapter):
             async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
                 await check_httpx_response_status(resp)
                 async for line in resp.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    line_data = line[5:].strip()
-                    if not line_data:
-                        continue
-                    if line_data == "[DONE]":
-                        break
-                    try:
-                        evt = json.loads(line_data)
-                    except Exception:
+                    evt = parse_sse_line(line)
+                    if evt is None:
                         continue
 
                     etype = evt.get("type")
