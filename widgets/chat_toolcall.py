@@ -646,12 +646,23 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         text = self.result_text or ""
         if "Answer:" not in text:
             return answers
-        blocks = re.split(r"\n(?=Question: )", text)
-        for i, q in enumerate(questions):
-            if i >= len(blocks):
-                break
-            m = re.search(r"^Answer:\s*(.*)$", blocks[i], re.MULTILINE)
-            answers[i] = {"answer": m.group(1).strip() if m else "(No response)"}
+        # Answers come from the wizard summary as sequential "Question:" / "Answer:" lines.
+        # Parse line-by-line so answers containing "Question:" don't break pairing.
+        q_pairs = re.findall(r"^Question:\s*(.*?)\nAnswer:\s*(.*)$", text, re.MULTILINE)
+        if not q_pairs:
+            return answers
+        used = set()
+        for q_text, ans in q_pairs:
+            for i, q in enumerate(questions):
+                if i in used:
+                    continue
+                if (q.get("question_text") or "").strip() == q_text.strip():
+                    answers[i] = {"answer": ans.strip()}
+                    used.add(i)
+                    break
+        for i in range(len(questions)):
+            if i not in answers:
+                answers[i] = {"answer": "(No response)"}
         return answers
 
     def toggle_expanded(self) -> None:
