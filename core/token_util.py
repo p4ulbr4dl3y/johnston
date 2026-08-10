@@ -3,7 +3,6 @@ Token estimation and usage calculation utilities
 """
 
 import json
-import re
 from typing import Any, Dict
 
 CHARS_PER_TOKEN = 4
@@ -18,9 +17,19 @@ _TOKEN_COST_CYRILLIC = 0.5  # ~2 chars/token
 _TOKEN_COST_CJK = 0.7  # ~1.4 chars/token
 _TOKEN_COST_OTHER = 0.5  # other non-ASCII (latin-extended, emoji, etc.)
 
-_RE_ASCII = re.compile(r"[\x00-\x7F]")
-_RE_CYRILLIC = re.compile(r"[\u0400-\u04FF]")
-_RE_CJK = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
+# Character class ranges (single-pass classification replaces 3 regex passes).
+# ASCII: same as str.isascii().
+# Cyrillic: U+0400–U+04FF.
+# CJK: Unicode CJK Unified (U+4E00–U+9FFF), Hiragana/Katakana (U+3040–U+30FF),
+#      Hangul syllables (U+AC00–U+D7AF).
+_CJK_START = 0x4E00
+_CJK_END = 0x9FFF
+_CJK_KANA_START = 0x3040
+_CJK_KANA_END = 0x30FF
+_CJK_HANGUL_START = 0xAC00
+_CJK_HANGUL_END = 0xD7AF
+_CYRILLIC_START = 0x0400
+_CYRILLIC_END = 0x04FF
 
 
 def _estimate_text_tokens(text: str) -> int:
@@ -30,10 +39,24 @@ def _estimate_text_tokens(text: str) -> int:
     if text.isascii():
         return max(0, round(len(text) / CHARS_PER_TOKEN))
 
-    ascii_n = sum(1 for _ in _RE_ASCII.finditer(text))
-    cyrillic_n = sum(1 for _ in _RE_CYRILLIC.finditer(text))
-    cjk_n = sum(1 for _ in _RE_CJK.finditer(text))
-    other_n = len(text) - ascii_n - cyrillic_n - cjk_n
+    ascii_n = 0
+    cyrillic_n = 0
+    cjk_n = 0
+    other_n = 0
+    for ch in text:
+        cp = ord(ch)
+        if cp < 0x80:
+            ascii_n += 1
+        elif _CYRILLIC_START <= cp <= _CYRILLIC_END:
+            cyrillic_n += 1
+        elif (
+            (_CJK_START <= cp <= _CJK_END)
+            or (_CJK_KANA_START <= cp <= _CJK_KANA_END)
+            or (_CJK_HANGUL_START <= cp <= _CJK_HANGUL_END)
+        ):
+            cjk_n += 1
+        else:
+            other_n += 1
 
     cost = (
         ascii_n * _TOKEN_COST_ASCII

@@ -6,6 +6,7 @@ Supports YAML frontmatter parsing from SKILL.md and *.md files.
 
 import logging
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
@@ -24,10 +25,15 @@ PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
 class SkillManager:
     _dirs_ensured: bool = False
 
+    _CACHE_TTL = 2.0  # seconds
+
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
         self.global_dir = GLOBAL_SKILLS_DIR
         self.project_dir_skills = os.path.join(self.project_dir, PROJECT_SKILLS_DIR_NAME)
+        self._scan_signature: Optional[tuple] = None
+        self._scan_cache: Optional[List[Dict[str, Any]]] = None
+        self._scan_ts: float = 0.0
         if not SkillManager._dirs_ensured:
             self.ensure_dirs()
             SkillManager._dirs_ensured = True
@@ -83,7 +89,53 @@ class SkillManager:
         """
         Discovers skills in global and project directories.
         Project skills override global skills with the same name.
+
+        Full scans are cached in-memory and invalidated when the on-disk skill
+        trees change (via a cheap directory signature) or after a short TTL.
         """
+        now = time.time()
+        if (
+            self._scan_cache is not None
+            and (now - self._scan_ts) < self._CACHE_TTL
+            and (self._scan_signature == self._compute_scan_signature())
+        ):
+            skills = self._scan_cache
+        else:
+            skills = self._scan_skills()
+            self._scan_cache = skills
+            self._scan_signature = self._compute_scan_signature()
+            self._scan_ts = now
+
+        result = []
+        for s in skills:
+            if for_system_prompt and s.get("hidden"):
+                continue
+            if not include_hidden and s.get("hidden"):
+                continue
+            result.append(s)
+        return result
+
+    def _compute_scan_signature(self) -> Optional[tuple]:
+        """Cheap signature of (path, mtime_ns, size) for every SKILL.md under
+        both global and project trees, detecting external changes without
+        re-reading contents."""
+        entries = []
+        for dir_path in (self.global_dir, self.project_dir_skills):
+            if not os.path.isdir(dir_path):
+                continue
+            try:
+                for root, dirs, files in os.walk(dir_path):
+                    dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+                    for f in files:
+                        if f == "SKILL.md":
+                            fpath = os.path.join(root, f)
+                            st = os.stat(fpath)
+                            entries.append((fpath, st.st_mtime_ns, st.st_size))
+            except OSError:
+                continue
+        return tuple(entries)
+
+    def _scan_skills(self) -> List[Dict[str, Any]]:
         skills_map: Dict[str, Dict[str, Any]] = {}
         real_global = os.path.realpath(self.global_dir)
         real_project = os.path.realpath(self.project_dir_skills)
@@ -146,14 +198,13 @@ class SkillManager:
                 }
 
         skills = list(skills_map.values())
-        result = []
-        for s in skills:
-            if for_system_prompt and s.get("hidden"):
-                continue
-            if not include_hidden and s.get("hidden"):
-                continue
-            result.append(s)
-        return result
+        return skills
+
+    def invalidate_cache(self) -> None:
+        """Force the next list_skills/get_skill to re-scan both skill trees."""
+        self._scan_signature = None
+        self._scan_cache = None
+        self._scan_ts = 0.0
 
     def get_skill(self, name: str, include_hidden: bool = True) -> Optional[Dict[str, Any]]:
         skills = self.list_skills(include_hidden=include_hidden)
@@ -210,6 +261,7 @@ class SkillManager:
             from core.platform_utils import atomic_write_text
 
             atomic_write_text(filepath, new_content)
+            self.invalidate_cache()
 
             return new_hidden
         except Exception:

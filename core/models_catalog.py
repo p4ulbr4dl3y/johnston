@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import time
+from collections import OrderedDict
 from typing import Dict, Iterable, List, Set
 
 import httpx
@@ -24,6 +25,28 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_catalog_cache.json")
 CACHE_TTL = 86400  # 24 hours
+
+# Precompiled regexes (avoids recompilation on every _resolve_catalog_key call).
+_RE_FUZZY_STRIP = re.compile(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)")
+_RE_TOKEN_SPLIT = re.compile(r"[a-z0-9]+")
+
+# Upper bound on the in-memory model-match cache to prevent unbounded growth.
+_MATCH_CACHE_MAX = 1000
+
+
+def _get_match(cache: "OrderedDict", key: tuple):
+    """Fetch a (key)->value match from an LRU cache without storing misses."""
+    if key in cache:
+        cache.move_to_end(key)
+        return cache[key]
+    return None
+
+
+def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > _MATCH_CACHE_MAX:
+        cache.popitem(last=False)
 
 
 def format_context_tokens(tokens: int) -> str:
@@ -51,7 +74,7 @@ class ModelsCatalog:
         self._names: Dict[str, str] = {}
         self._descriptions: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
-        self._match_cache: Dict[str, str] = {}
+        self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
         self.load_cache()
 
@@ -269,18 +292,19 @@ class ModelsCatalog:
             space_tag = id(space_obj) if space_obj is not None else id(self._limits)
 
         cache_key = (provider_id, model_id, space_tag, len(space_keys))
-        if cache_key in self._match_cache:
-            return self._match_cache[cache_key]
+        cached = _get_match(self._match_cache, cache_key)
+        if cached is not None:
+            return cached
 
         # Stage 1: Exact match
         if model_id in space_keys:
-            self._match_cache[cache_key] = model_id
+            _set_match(self._match_cache, cache_key, model_id)
             return model_id
 
         # Stage 2: Scoped match
         scoped_id = f"{provider_id}/{model_id}" if provider_id else ""
         if scoped_id and scoped_id in space_keys:
-            self._match_cache[cache_key] = scoped_id
+            _set_match(self._match_cache, cache_key, scoped_id)
             return scoped_id
 
         # Stage 3: Base slug match (O(1) dictionary lookup)
@@ -300,12 +324,12 @@ class ModelsCatalog:
         slug_map = self._slug_maps[slug_key][1]
         if m_base in slug_map:
             match = slug_map[m_base]
-            self._match_cache[cache_key] = match
+            _set_match(self._match_cache, cache_key, match)
             return match
 
         # Stage 4: Fuzzy & Substring Token Match (for local HF/MLX/GGUF models)
-        cleaned = re.sub(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)", "", m_base)
-        tokens = set(re.findall(r"[a-z0-9]+", cleaned))
+        cleaned = _RE_FUZZY_STRIP.sub("", m_base)
+        tokens = set(_RE_TOKEN_SPLIT.findall(cleaned))
         ignored_tokens = {
             "it",
             "mlx",
@@ -346,7 +370,7 @@ class ModelsCatalog:
             best_score = 0
             for k in space_keys:
                 k_base = k.split("/")[-1].split(":")[0].lower()
-                k_tokens = set(re.findall(r"[a-z0-9]+", k_base)) - ignored_tokens
+                k_tokens = set(_RE_TOKEN_SPLIT.findall(k_base)) - ignored_tokens
                 k_digits = {t for t in k_tokens if t.isdigit()}
 
                 # If digit version tokens conflict (e.g. gemma-4 vs gemma-2), skip candidate
@@ -360,10 +384,10 @@ class ModelsCatalog:
                         best_score = score
                         best_match = k
             if best_match:
-                self._match_cache[cache_key] = best_match
+                _set_match(self._match_cache, cache_key, best_match)
                 return best_match
 
-        self._match_cache[cache_key] = ""
+        _set_match(self._match_cache, cache_key, "")
         return ""
 
     def get_context_limit(self, provider_id: str, model_id: str) -> int:
