@@ -45,6 +45,7 @@ class MCPProcessClient:
         self._pending_responses: Dict[int, Dict[str, Any]] = {}
         self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
+        self._reader_thread: Optional[threading.Thread] = None
 
     @staticmethod
     def _parse_line(line_str: str) -> Optional[Dict[str, Any]]:
@@ -66,47 +67,94 @@ class MCPProcessClient:
         except RuntimeError:
             logger.debug("No running loop; skipping async reader for MCP server '%s'", self.name)
 
-    async def _async_read_loop(self):
-        """Background async loop reading stdio JSON-RPC lines and fulfilling futures by request ID."""
-        loop = asyncio.get_running_loop()
-        while not self._stopped and self.process and self.process.stdout:
+    def _reader_thread_target(self):
+        """Long-lived daemon thread that blocks on process stdout and hands lines to the event loop.
+
+        All blocking I/O happens here (off the event loop). Each line is shipped to
+        the running loop via ``loop.call_soon_threadsafe`` so JSON-RPC parsing and
+        future fulfillment stay on the loop. The thread exits as soon as the process
+        hits EOF, the client is stopped, or the stdout stream is gone/closed.
+        """
+        loop = self._reader_loop
+        stdout = None
+        if self.process:
+            stdout = getattr(self.process, "stdout", None)
+        if loop is None or stdout is None:
+            return
+        while not self._stopped:
             try:
-                line_bytes = await asyncio.to_thread(self.process.stdout.readline)
-                if not line_bytes:
-                    break
-                line_str = (
-                    line_bytes.decode("utf-8", errors="replace").strip()
-                    if isinstance(line_bytes, bytes)
-                    else str(line_bytes).strip()
-                )
-                data = self._parse_line(line_str)
-                if data is None:
-                    continue
+                line = stdout.readline()
+            except Exception:
+                logger.debug("Reader thread error for MCP server '%s'", self.name, exc_info=True)
+                break
+            if not line:
+                break
+            try:
+                loop.call_soon_threadsafe(self._queue.put_nowait, line)
+            except RuntimeError:
+                # Loop is closed; nothing more to deliver.
+                break
+        # Signal EOF/termination to the consuming loop so it can exit too.
+        try:
+            loop.call_soon_threadsafe(self._queue.put_nowait, None)
+        except RuntimeError:
+            pass
 
-                if "method" in data and "id" not in data:
-                    if data.get("method") == "notifications/tools/list_changed":
-                        try:
-                            await self.fetch_tools_async()
-                        except Exception:
-                            logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
-                    continue
+    def _spawn_reader_thread(self, loop) -> None:
+        if self._reader_thread and self._reader_thread.is_alive():
+            return
+        self._reader_loop = loop
+        self._reader_thread = threading.Thread(
+            target=self._reader_thread_target, name=f"mcp-reader-{self.name}", daemon=True
+        )
+        self._reader_thread.start()
 
-                res_id = data.get("id")
-                if res_id is not None:
-                    fut = self._pending_futures.pop(res_id, None)
-                    if fut and not fut.done():
-                        loop.call_soon_threadsafe(fut.set_result, data)
-                    # Cache the response for the sync _read_response path. Bound the
-                    # cache so long-running async sessions don't leak entries that
-                    # were already consumed by their matching future.
-                    if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
-                        self._pending_responses.pop(next(iter(self._pending_responses)), None)
-                    self._pending_responses[res_id] = data
+    async def _async_read_loop(self):
+        """Background async loop reading stdio JSON-RPC lines and fulfilling futures by request ID.
+
+        Blocking ``readline`` runs in one long-lived daemon thread (see
+        :meth:`_reader_thread_target`); this coroutine only consumes a queue and does
+        all JSON-RPC parsing/future fulfillment on the event loop.
+        """
+        loop = asyncio.get_running_loop()
+        self._queue: asyncio.Queue = asyncio.Queue()
+        self._spawn_reader_thread(loop)
+        while not self._stopped:
+            try:
+                line_bytes = await self._queue.get()
             except asyncio.CancelledError:
                 break
-            except Exception:
-                logger.debug("Error in async read loop for MCP server '%s'", self.name, exc_info=True)
-                await asyncio.sleep(0.05)
+            if line_bytes is None:
+                # Reader thread signaled EOF/termination.
+                break
+            line_str = (
+                line_bytes.decode("utf-8", errors="replace").strip()
+                if isinstance(line_bytes, bytes)
+                else str(line_bytes).strip()
+            )
+            data = self._parse_line(line_str)
+            if data is None:
+                continue
+
+            if "method" in data and "id" not in data:
+                if data.get("method") == "notifications/tools/list_changed":
+                    try:
+                        await self.fetch_tools_async()
+                    except Exception:
+                        logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
+                continue
+
+            res_id = data.get("id")
+            if res_id is not None:
+                fut = self._pending_futures.pop(res_id, None)
+                if fut and not fut.done():
+                    fut.set_result(data)
+                # Cache the response for the sync _read_response path. Bound the
+                # cache so long-running async sessions don't leak entries that
+                # were already consumed by their matching future.
+                if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
+                    self._pending_responses.pop(next(iter(self._pending_responses)), None)
+                self._pending_responses[res_id] = data
 
     def _send_request_sync(
         self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
