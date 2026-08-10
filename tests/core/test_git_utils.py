@@ -96,6 +96,19 @@ class TestMakeGitDiff(unittest.TestCase):
             make_git_diff("a\n", "a\n")
         m.assert_not_called()
 
+    def test_trailing_newline_added_detected(self):
+        d = make_git_diff("a\nb", "a\nb\n", fromfile="old", tofile="new")
+        self.assertNotEqual(d, "")
+        self.assertIn("+b\n", d)
+
+    def test_trailing_newline_removed_detected(self):
+        d = make_git_diff("a\nb\n", "a\nb", fromfile="old", tofile="new")
+        self.assertNotEqual(d, "")
+        self.assertIn("-b\n", d)
+
+    def test_trailing_newline_equal_returns_empty(self):
+        self.assertEqual(make_git_diff("a\nb\n", "a\nb\n"), "")
+
 
 if __name__ == "__main__":
     unittest.main()
