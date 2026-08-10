@@ -43,6 +43,9 @@ class MCPManager:
         self.clients: Dict[str, MCPProcessClient] = {}
         self._tools_refresh_time = 0.0
         self._tools_refresh_task: Optional[asyncio.Task] = None
+        self._servers_cache_signature: Optional[Tuple] = None
+        self._servers_cache: List[Dict[str, Any]] = []
+        self._tools_fetch_time: Dict[str, float] = {}  # server name -> last fetch_tools monotonic time
         self.ensure_default_configs()
         atexit.register(self.stop_all)
 
@@ -60,13 +63,40 @@ class MCPManager:
 
         ensure_json_config(self.global_file, {"mcpServers": {}})
 
+    def _servers_signature(self) -> Tuple:
+        """Returns (path, mtime_ns, size) for both config files to detect changes."""
+        sig = []
+        for path in (self.global_file, self.project_file):
+            try:
+                st = os.stat(path)
+                sig.append((path, st.st_mtime_ns, st.st_size))
+            except OSError:
+                sig.append((path, None, None))
+        return tuple(sig)
+
+    def _tools_fetch_stale(self, server_name: str, ttl: float = 5.0) -> bool:
+        """True if this server's cached tools list is stale, based on last fetch time."""
+        last = self._tools_fetch_time.get(server_name)
+        if last is None:
+            return True
+        return (time.monotonic() - last) >= ttl
+
     def load_servers(self) -> List[Dict[str, Any]]:
         """
         Loads global and project MCP servers.
         Project servers override global servers with the same key.
+
+        Results are cached by config file mtime/size so repeated calls (e.g. per
+        tool call) do not re-read and re-parse JSON on every invocation. Cache is
+        invalidated automatically when either config file changes, preserving
+        hot-reload.
         """
         curr_proj_dir = os.path.realpath(self.project_dir or os.getcwd())
         self.project_file = os.path.join(curr_proj_dir, PROJECT_MCP_FILE)
+        signature = self._servers_signature()
+        if signature == self._servers_cache_signature:
+            return list(self._servers_cache)
+
         servers: Dict[str, Dict[str, Any]] = {}
 
         # 1. Load global
@@ -99,7 +129,9 @@ class MCPManager:
             except Exception:
                 logger.warning("Failed to load project MCP servers config", exc_info=True)
 
-        return list(servers.values())
+        self._servers_cache = list(servers.values())
+        self._servers_cache_signature = signature
+        return list(self._servers_cache)
 
     def _update_server_config(self, name: str, key_updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Helper to read-modify-write MCP server config files atomically."""
@@ -252,10 +284,12 @@ class MCPManager:
             else:
                 if s_mode == "lazy" and mode not in ("lazy", "all"):
                     continue
-                try:
-                    client.fetch_tools()
-                except Exception:
-                    logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
+                if self._tools_fetch_stale(name):
+                    try:
+                        client.fetch_tools()
+                        self._tools_fetch_time[name] = time.monotonic()
+                    except Exception:
+                        logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
                 formatted = self._format_tool_schema(t, name, s_mode, seen_names)
@@ -300,10 +334,12 @@ class MCPManager:
             else:
                 if s_mode == "lazy" and mode not in ("lazy", "all"):
                     continue
-                try:
-                    await client.fetch_tools_async()
-                except Exception:
-                    logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
+                if self._tools_fetch_stale(name):
+                    try:
+                        await client.fetch_tools_async()
+                        self._tools_fetch_time[name] = time.monotonic()
+                    except Exception:
+                        logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
                 formatted = self._format_tool_schema(t, name, s_mode, seen_names)
