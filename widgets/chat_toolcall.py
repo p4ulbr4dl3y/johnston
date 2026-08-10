@@ -21,6 +21,8 @@ from widgets.chat_markdown import (
 from widgets.lexer_utils import guess_lexer_name
 from widgets.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 
+_MISSING = object()
+
 
 def _strip_hints_and_background(text: str) -> str:
     """Strip [Hint:…] and [Background Task:…] markers from tool output."""
@@ -163,7 +165,23 @@ class FormattingMixin:
 class ParsingMixin:
     """Status / JSON / MCP-args parsing helpers"""
 
+    _JSON_PARSE_CACHE_LIMIT = 64
+
     def _try_parse_json(self, text: str) -> Any:
+        cache = getattr(self, "_json_parse_cache", None)
+        if cache is None:
+            cache = {}
+            self._json_parse_cache = cache
+        cached = cache.get(text, _MISSING)
+        if cached is not _MISSING:
+            return cached
+        parsed = self._parse_json(text)
+        if len(cache) >= self._JSON_PARSE_CACHE_LIMIT:
+            cache.clear()
+        cache[text] = parsed
+        return parsed
+
+    def _parse_json(self, text: str) -> Any:
         try:
             return json.loads(text)
         except Exception:
