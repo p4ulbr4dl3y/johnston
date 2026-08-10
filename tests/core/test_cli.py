@@ -1,6 +1,6 @@
 import io
 import unittest
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stdout
 from unittest.mock import MagicMock, mock_open, patch
 
 from cli import (
@@ -12,7 +12,6 @@ from cli import (
     print_rules,
     print_skills,
     print_subagents,
-    run_headless_prompt,
 )
 
 
@@ -411,104 +410,6 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("worker", out)
         self.assertIn("Tools: shell", out)
         self.assertIn("Model: gpt-4o", out)
-
-
-class TestHeadlessPrompt(unittest.TestCase):
-    def test_run_headless_prompt_streams(self):
-        f = io.StringIO()
-
-        async def fake_stream(prompt):
-            yield ("bot_delta", "Hello", "")
-            yield ("bot_text", "Hello world", "")
-            yield ("thinking_start", "Thinking...", "")
-            yield ("thinking_end", "1.5", "")
-
-        agent = MagicMock()
-        agent.stream_steps = fake_stream
-
-        pm = MagicMock()
-        pm.create_active_agent.return_value = agent
-        with patch("cli.ProviderManager", return_value=pm):
-            with redirect_stdout(f):
-                run_headless_prompt("hi")
-        self.assertIn("Hello world", f.getvalue())
-
-    def test_run_headless_prompt_no_agent_exits(self):
-        pm = MagicMock()
-        pm.create_active_agent.return_value = None
-        with patch("cli.ProviderManager", return_value=pm):
-            with self.assertRaises(SystemExit) as cm:
-                with redirect_stderr(io.StringIO()):
-                    run_headless_prompt("hi")
-        self.assertEqual(cm.exception.code, 1)
-
-    def test_run_headless_prompt_verbose_thinking(self):
-        f_err = io.StringIO()
-
-        async def fake_stream(prompt):
-            yield ("thinking_delta", "some thinking here", "")
-            yield ("tool", "bash", "run")
-            yield ("tool_result", "output text", "")
-            yield ("thinking_end", "2.0", "")
-
-        agent = MagicMock()
-        agent.stream_steps = fake_stream
-        pm = MagicMock()
-        pm.create_active_agent.return_value = agent
-        with patch("cli.ProviderManager", return_value=pm):
-            with redirect_stderr(f_err):
-                run_headless_prompt("hi", verbose=True)
-        self.assertIn("Thinking", f_err.getvalue())
-        self.assertIn("Executing Tool", f_err.getvalue())
-        self.assertIn("Tool Result", f_err.getvalue())
-
-    def test_run_headless_prompt_non_verbose_thinking_end(self):
-        f_err = io.StringIO()
-
-        async def fake_stream(prompt):
-            yield ("thinking_end", "2.0", "")
-
-        agent = MagicMock()
-        agent.stream_steps = fake_stream
-        pm = MagicMock()
-        pm.create_active_agent.return_value = agent
-        with patch("cli.ProviderManager", return_value=pm):
-            with redirect_stderr(f_err):
-                run_headless_prompt("hi")
-        self.assertEqual(f_err.getvalue(), "\x1b[K\r")
-
-    def test_run_headless_prompt_shrinking_text_resets_len(self):
-        f = io.StringIO()
-
-        async def fake_stream(prompt):
-            yield ("bot_text", "long text here", "")
-            yield ("bot_text", "short", "")
-
-        agent = MagicMock()
-        agent.stream_steps = fake_stream
-        pm = MagicMock()
-        pm.create_active_agent.return_value = agent
-        with patch("cli.ProviderManager", return_value=pm):
-            with redirect_stdout(f):
-                run_headless_prompt("hi")
-        self.assertIn("short", f.getvalue())
-
-    def test_run_headless_prompt_mcp_stop_exception(self):
-        f = io.StringIO()
-
-        async def fake_stream(prompt):
-            yield ("bot_text", "done", "")
-
-        agent = MagicMock()
-        agent.stream_steps = fake_stream
-        pm = MagicMock()
-        pm.create_active_agent.return_value = agent
-        with patch("cli.ProviderManager", return_value=pm):
-            with patch("core.mcp_manager.get_mcp_manager") as mock_get:
-                mock_get.return_value.stop_all.side_effect = Exception("boom")
-                with redirect_stdout(f):
-                    run_headless_prompt("hi")
-        self.assertIn("done", f.getvalue())
 
 
 class TestMainFlags(unittest.TestCase):

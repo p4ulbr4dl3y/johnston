@@ -195,11 +195,6 @@ class TestActionsPointer(unittest.IsolatedAsyncioTestCase):
 
 
 class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
-    async def _make_app(self):
-        app = JohnstonApp()
-        async with app.run_test():
-            yield app
-
     async def test_on_mouse_up_no_down_pos(self):
 
         app = JohnstonApp()
