@@ -188,7 +188,7 @@ class MessageFlowMixin:
                     if val1.strip():
                         if bot_msg is None:
                             bot_msg = await chat_view.add_bot_message()
-                        bot_msg.set_stream_content(val1)
+                        bot_msg.append_stream_content(val1)
                 elif event_type in ("bot_text", "outro"):
                     if val1.strip():
                         if bot_msg is None:

@@ -347,7 +347,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                         thinking_started = False
                                     full_assistant_parts.append(payload)
                                     full_assistant_text = "".join(full_assistant_parts)
-                                    yield ("bot_delta", full_assistant_text, "")
+                                    yield ("bot_delta", payload, "")
                                 elif tag == "adapter_tool_call":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
@@ -399,7 +399,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             # Single producer task pulls chunks off the provider; the
                             # consumer polls the queue with a watchdog deadline so we
                             # keep per-chunk timeouts without creating a task per chunk.
-                            from asyncio import Queue, QueueEmpty
+                            from asyncio import Queue
 
                             _chunk_queue: "Queue[Any]" = Queue(maxsize=8)
                             _DONE = object()
@@ -416,27 +416,21 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     await _chunk_queue.put(_DONE)
 
                             producer_task = asyncio.ensure_future(_produce_chunks())
-                            _loop = asyncio.get_running_loop()
-                            _last_chunk_at = _loop.time()
                             try:
                                 while True:
                                     try:
-                                        item = _chunk_queue.get_nowait()
-                                    except QueueEmpty:
-                                        # Watchdog: poll the queue; if no chunk arrived
-                                        # within chunk_to, cancel the producer and fail.
-                                        await asyncio.sleep(0.05)
-                                        if _loop.time() - _last_chunk_at > chunk_to:
-                                            producer_task.cancel()
-                                            raise RuntimeError(
-                                                f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
-                                            )
-                                        continue
+                                        item = await asyncio.wait_for(
+                                            _chunk_queue.get(), timeout=chunk_to
+                                        )
+                                    except asyncio.TimeoutError:
+                                        producer_task.cancel()
+                                        raise RuntimeError(
+                                            f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
+                                        )
                                     if item is _DONE:
                                         break
                                     if isinstance(item, Exception):
                                         raise item
-                                    _last_chunk_at = _loop.time()
                                     chunk = item
 
                                     if getattr(chunk, "usage", None):
@@ -476,7 +470,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                             thinking_t0 = time.time()
                                         active_thought_parts.append(str(reasoning))
                                         active_thought = "".join(active_thought_parts)
-                                        yield ("thinking_delta", active_thought, "")
+                                        yield ("thinking_delta", str(reasoning), "")
 
                                     if delta.content:
                                         if thinking_started:
@@ -485,7 +479,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                             thinking_started = False
                                         full_assistant_parts.append(delta.content)
                                         full_assistant_text = "".join(full_assistant_parts)
-                                        yield ("bot_delta", full_assistant_text, "")
+                                        yield ("bot_delta", delta.content, "")
 
                                     if delta.tool_calls:
                                         if thinking_started:

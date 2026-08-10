@@ -69,8 +69,16 @@ class BotMessage(Vertical):
         else:
             self._schedule_markdown_render(new_content)
 
+    def append_stream_content(self, content: str) -> None:
+        """Append a streaming delta to the message text."""
+        if not self._streaming:
+            self._streaming = True
+            self.stream_widget.display = True
+            self.md_widget.display = False
+        self.content = self.content + content
+
     def set_stream_content(self, content: str) -> None:
-        """Update streaming text without rebuilding the Markdown widget tree."""
+        """Replace the streaming text with full content (no Markdown rebuild)."""
         if not self._streaming:
             self._streaming = True
             self.stream_widget.display = True
@@ -210,7 +218,7 @@ class ThinkingWidget(Vertical):
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
-            self.thinking_text = content
+            self.thinking_text = self.thinking_text + content
             if self.is_expanded:
                 self.content_widget.update(self.thinking_text)
 
