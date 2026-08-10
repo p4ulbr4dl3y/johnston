@@ -101,9 +101,9 @@ class SkillManager:
         ):
             skills = self._scan_cache
         else:
-            skills = self._scan_skills()
+            skills, signature = self._scan_skills()
             self._scan_cache = skills
-            self._scan_signature = self._compute_scan_signature()
+            self._scan_signature = signature
             self._scan_ts = now
 
         result = []
@@ -115,6 +115,11 @@ class SkillManager:
             result.append(s)
         return result
 
+    @staticmethod
+    def _filter_scan_dirs(dirs: List[str]) -> None:
+        """In-place filter of os.walk dirs to skip ignored and dot-directories."""
+        dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+
     def _compute_scan_signature(self) -> Optional[tuple]:
         """Cheap signature of (path, mtime_ns, size) for every SKILL.md under
         both global and project trees, detecting external changes without
@@ -125,7 +130,7 @@ class SkillManager:
                 continue
             try:
                 for root, dirs, files in os.walk(dir_path):
-                    dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+                    self._filter_scan_dirs(dirs)
                     for f in files:
                         if f == "SKILL.md":
                             fpath = os.path.join(root, f)
@@ -135,23 +140,36 @@ class SkillManager:
                 continue
         return tuple(entries)
 
-    def _scan_skills(self) -> List[Dict[str, Any]]:
+    def _scan_skills(self) -> tuple:
+        """Scans both skill trees in a single walk, returning (skills, signature).
+
+        The signature is computed from the same walk that discovers skills, so a
+        cache miss costs exactly one full tree traversal instead of two or three.
+        """
         skills_map: Dict[str, Dict[str, Any]] = {}
+        signature_entries: List[tuple] = []
         real_global = os.path.realpath(self.global_dir)
         real_project = os.path.realpath(self.project_dir_skills)
 
         for scope, dir_path in [("global", self.global_dir), ("project", self.project_dir_skills)]:
             if scope == "project" and real_project == real_global:
                 continue
-            if not os.path.exists(dir_path):
+            if not os.path.isdir(dir_path):
                 continue
 
             md_files = []
-            for root, dirs, files in os.walk(dir_path):
-                dirs[:] = [d for d in dirs if d not in DEFAULT_IGNORE_DIRS and not d.startswith(".")]
+            walker = os.walk(dir_path)
+            for root, dirs, files in walker:
+                self._filter_scan_dirs(dirs)
                 for f in files:
+                    fpath = os.path.join(root, f)
                     if f == "SKILL.md":
-                        md_files.append(os.path.join(root, f))
+                        md_files.append(fpath)
+                        try:
+                            st = os.stat(fpath)
+                            signature_entries.append((fpath, st.st_mtime_ns, st.st_size))
+                        except OSError:
+                            pass
 
             for filepath in sorted(md_files):
                 try:
@@ -198,7 +216,7 @@ class SkillManager:
                 }
 
         skills = list(skills_map.values())
-        return skills
+        return skills, tuple(signature_entries)
 
     def invalidate_cache(self) -> None:
         """Force the next list_skills/get_skill to re-scan both skill trees."""
