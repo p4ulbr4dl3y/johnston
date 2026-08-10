@@ -121,8 +121,18 @@ class ShellTool(BaseTool):
                 return format_tool_error("background", name="shell")
 
             output_chunks = []
+            output_size = 0
+            output_truncated = False
+            _SUBAGENT_OUTPUT_LIMIT = 2 * 1024 * 1024  # 2 MB cap (mirrors web_fetch)
+
+            def _flush_raw() -> str:
+                raw_all = "".join(output_chunks)
+                if output_truncated:
+                    raw_all = "[Output truncated: showing recent output]\n" + raw_all
+                return raw_all
 
             async def _read_stream(stream):
+                nonlocal output_size, output_truncated
                 if not stream:
                     return
                 while True:
@@ -130,7 +140,14 @@ class ShellTool(BaseTool):
                         chunk = await stream.read(1024)
                         if not chunk:
                             break
-                        output_chunks.append(chunk.decode("utf-8", errors="replace"))
+                        text = chunk.decode("utf-8", errors="replace")
+                        output_chunks.append(text)
+                        output_size += len(text)
+                        if output_size > _SUBAGENT_OUTPUT_LIMIT:
+                            output_truncated = True
+                            # Drop old chunks from the front, keeping the tail.
+                            while output_chunks and output_size > _SUBAGENT_OUTPUT_LIMIT // 2:
+                                output_size -= len(output_chunks.pop(0))
                     except Exception:
                         break
 
@@ -142,7 +159,7 @@ class ShellTool(BaseTool):
                         await asyncio.wait_for(read_task, timeout=2.0)
                     except asyncio.TimeoutError:
                         pass
-                res = process_carriage_returns(strip_ansi("".join(output_chunks)))
+                res = process_carriage_returns(strip_ansi(_flush_raw()))
                 if not res.strip():
                     return "(no output)"
                 return _truncate_output(res)
@@ -153,7 +170,7 @@ class ShellTool(BaseTool):
                         await asyncio.wait_for(read_task, timeout=1.0)
                     except Exception:
                         pass
-                raw_out = process_carriage_returns(strip_ansi("".join(output_chunks)))
+                raw_out = process_carriage_returns(strip_ansi(_flush_raw()))
                 partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
                 return format_tool_error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
             except asyncio.CancelledError:
