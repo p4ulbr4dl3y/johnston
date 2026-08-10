@@ -1,3 +1,4 @@
+import re
 from typing import Generic, TypeVar
 
 from textual import events
@@ -18,6 +19,8 @@ from widgets.screens.constants import (
 )
 
 T = TypeVar("T")
+
+_NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 class ModalSearchNavMixin:
@@ -83,6 +86,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         self.option_list_id = option_list_id
         self.filtered_items = list(items)
         self.filtered_options = list(options)
+        self._norm_targets: dict[int, str] = {}
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -119,8 +123,6 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             self.filtered_items = list(self.raw_items)
             self.filtered_options = list(self.raw_options)
         else:
-            import re
-
             tokens = query_raw.split()
             filtered_options = []
             filtered_items = []
@@ -129,7 +131,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             current_header_item = None
             current_section_matches = []
 
-            for opt, item in zip(self.raw_options, self.raw_items):
+            for idx, (opt, item) in enumerate(zip(self.raw_options, self.raw_items)):
                 if item is None:
                     opt_str = str(opt.prompt if hasattr(opt, "prompt") else opt).strip()
                     if not opt_str:
@@ -147,7 +149,12 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
                 else:
                     opt_text = opt.prompt if hasattr(opt, "prompt") else str(opt)
                     raw_target = f"{item} {opt_text}".lower()
-                    norm_target = re.sub(r"[^a-z0-9]+", " ", raw_target)
+                    norm_target = self._norm_targets.get(idx)
+                    if norm_target is None:
+                        norm_target = _NORMALIZE_RE.sub(" ", raw_target)
+                        if len(self._norm_targets) >= 512:
+                            self._norm_targets.clear()
+                        self._norm_targets[idx] = norm_target
                     target_str = f"{raw_target} {norm_target}"
 
                     if all(t in target_str for t in tokens):

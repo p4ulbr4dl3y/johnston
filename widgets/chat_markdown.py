@@ -41,6 +41,13 @@ class TransparentSyntax(Syntax):
 
 CODE_THEME = "one-dark"
 
+_RE_ITALIC_COLON = re.compile(r"(?<!\*)\*([^*:]+):\*(?!\*)")
+_RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
+_RE_BLOCKQUOTE_BULLET = re.compile(r"^(\s*>\s*)[-*]\s+")
+_RE_LIST_PREFIX = re.compile(r"^(\s*(?:[-*]|\d+\.))\s+(.*)")
+_RE_EXCESS_INDENT = re.compile(r"^(\s+)([-*]|\d+\.)\s+(.*)")
+_RE_EXCESS_NEWLINES = re.compile(r"\n{3,}")
+
 
 def to_snake_case(name: str) -> str:
     if not name:
@@ -249,11 +256,11 @@ def clean_markdown_for_rendering(text: str) -> str:
             cleaned.append(line)
             continue
 
-        line = re.sub(r"(?<!\*)\*([^*:]+):\*(?!\*)", r"**\1:**", line)
-        line = re.sub(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+", r"\1* ", line)
-        line = re.sub(r"^(\s*>\s*)[-*]\s+", r"\1", line)
+        line = _RE_ITALIC_COLON.sub(r"**\1:**", line)
+        line = _RE_DOUBLE_BULLET.sub(r"\1* ", line)
+        line = _RE_BLOCKQUOTE_BULLET.sub(r"\1", line)
 
-        m_list = re.match(r"^(\s*(?:[-*]|\d+\.))\s+(.*)", line)
+        m_list = _RE_LIST_PREFIX.match(line)
         if m_list:
             prefix, body = m_list.groups()
             if body.count("*") == 1:
@@ -262,7 +269,7 @@ def clean_markdown_for_rendering(text: str) -> str:
         elif line.count("*") == 1:
             line = line.replace("*", "")
 
-        m = re.match(r"^(\s+)([-*]|\d+\.)\s+(.*)", line)
+        m = _RE_EXCESS_INDENT.match(line)
         if m:
             indent, marker, content = m.groups()
             new_indent_len = min(len(indent), 8)
@@ -274,7 +281,7 @@ def clean_markdown_for_rendering(text: str) -> str:
         cleaned.append("```")
 
     result = "\n".join(cleaned)
-    return re.sub(r"\n{3,}", "\n\n", result)
+    return _RE_EXCESS_NEWLINES.sub("\n\n", result)
 
 
 def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) -> None:

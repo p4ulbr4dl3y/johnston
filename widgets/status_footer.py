@@ -22,6 +22,8 @@ class StatusFooter(Static):
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
+        self._resize_timer = None
+        self._last_resize_size = None
 
     def set_generating(self, generating: bool) -> None:
         if self.is_generating == generating:
@@ -318,4 +320,15 @@ class StatusFooter(Static):
         self.update(grid)
 
     def on_resize(self, event) -> None:
-        self.on_mount()
+        size = getattr(event, "size", None)
+        if size is not None and size == self._last_resize_size:
+            return
+        self._last_resize_size = size
+        if self._resize_timer is not None:
+            self._resize_timer.stop()
+            self._resize_timer = None
+        self._resize_timer = self.set_timer(0.15, self._debounced_refresh)
+
+    def _debounced_refresh(self) -> None:
+        self._resize_timer = None
+        self.refresh_footer()
