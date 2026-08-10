@@ -70,16 +70,16 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
         if not in_hunk:
             continue
 
-        if line == "":
-            line = " "
-
         if line.startswith("-"):
             old_code_lines.append(line[1:].expandtabs(4))
         elif line.startswith("+"):
             new_code_lines.append(line[1:].expandtabs(4))
-        elif line.startswith(" "):
-            old_code_lines.append(line[1:].expandtabs(4))
-            new_code_lines.append(line[1:].expandtabs(4))
+        elif line.startswith("\\"):
+            continue
+        else:
+            content = line[1:] if line.startswith(" ") else line
+            old_code_lines.append(content.expandtabs(4))
+            new_code_lines.append(content.expandtabs(4))
 
     full_sample = "\n".join(old_code_lines + new_code_lines)
     if lexer_name in ("html", "htm", "xhtml", "php", "vue", "svelte"):
@@ -136,18 +136,26 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     max_num = 1
     temp_old = 0
     temp_new = 0
+    in_hunk = False
     for line in lines:
+        if line.startswith("--- ") or line.startswith("+++ "):
+            continue
         hunk_match = hunk_regex.match(line)
         if hunk_match:
             temp_old = int(hunk_match.group(1))
             temp_new = int(hunk_match.group(2))
+            in_hunk = True
+        elif not in_hunk:
+            continue
         elif line.startswith("-"):
             max_num = max(max_num, temp_old)
             temp_old += 1
         elif line.startswith("+"):
             max_num = max(max_num, temp_new)
             temp_new += 1
-        elif line.startswith(" "):
+        elif line.startswith("\\"):
+            continue
+        else:
             max_num = max(max_num, temp_old, temp_new)
             temp_old += 1
             temp_new += 1
@@ -167,6 +175,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             full_line.stylize(style_bg)
         formatted_lines.append(full_line)
 
+    in_hunk = False
     for line in lines:
         if line.startswith("--- ") or line.startswith("+++ "):
             continue
@@ -185,9 +194,6 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
                 formatted_lines.append(Text(line, style="dim"))
             continue
 
-        if line == "":
-            line = " "
-
         if line.startswith("-"):
             num_str = str(old_line).rjust(max_num_digits)
             code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
@@ -200,18 +206,16 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             new_idx += 1
             append_diff_line(num_str, "+", code_text, style_bg="on #12261e", style_fg="#3fb950")
             new_line += 1
-        elif line.startswith(" "):
+        elif line.startswith("\\"):
+            formatted_lines.append(Text(line, style="dim", overflow="crop"))
+        else:
             num_str = str(new_line).rjust(max_num_digits)
-            code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
+            content = line[1:] if line.startswith(" ") else line
+            code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(content.expandtabs(4))
             old_idx += 1
             new_idx += 1
             append_diff_line(num_str, " ", code_text, style_bg=None, style_fg=None)
             old_line += 1
             new_line += 1
-        elif line.startswith("\\"):
-            formatted_lines.append(Text(line, style="dim", overflow="crop"))
-        else:
-            formatted_lines.append(Text(line, style="dim", overflow="crop"))
-            in_hunk = False
 
     return DiffRenderable(formatted_lines)

@@ -121,5 +121,26 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(cleaned, "real output")
 
 
+    def test_format_edit_diff_unspaced_context_lines(self):
+        from widgets.chat_diff import format_edit_diff
+
+        diff_text = (
+            "--- /path/to/prompts.py (old)\n"
+            "+++ /path/to/prompts.py (new)\n"
+            "@@ -27,7 +27,7 @@\n"
+            "## Core Rules\n"
+            "1. Autonomous Operation: You have no UI interaction with the user.\n"
+            "-2. Relative Paths: Always use relative file paths.\n"
+            "+2. Relative Paths: Use relative paths.\n"
+            "3. Research First: Read and inspect relevant files.\n"
+        )
+        res = format_edit_diff(diff_text, "prompts.py")
+        plain_lines = [line_item.plain for line_item in res.formatted_lines]
+        # Verify line 29 (-) and line 29 (+) match the modified line symbol
+        self.assertTrue(any("29 -" in line_item for line_item in plain_lines))
+        self.assertTrue(any("29 +" in line_item for line_item in plain_lines))
+
+
 if __name__ == "__main__":
     unittest.main()
+
