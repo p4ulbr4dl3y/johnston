@@ -260,24 +260,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         try:
             while True:
-                current_mode = getattr(self, "mode", "act")
-                builder = PromptBuilder(
-                    self.system_prompt,
-                    self.tools,
-                    mode=current_mode,
-                    allow_task=allow_task,
-                    model_name=m_name,
-                    cwd=getattr(self, "cwd", None),
-                    is_subagent=is_subagent,
-                )
-                sys_prompt = builder.build_system_prompt()
-                all_tools = builder.build_tools(
-                    provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
-                )
-                self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
-                if messages and messages[0].get("role") == "system":
-                    messages[0]["content"] = sys_prompt
-
                 # Drain queued user messages between agent steps (main app only).
                 app = getattr(self, "app", None)
                 if app is not None and not getattr(self, "is_subagent", False):
