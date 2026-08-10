@@ -1,5 +1,80 @@
 # Changelog
 
+## [0.21.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.20.0...johnston-v0.21.0) (2026-08-10)
+
+
+### Features
+
+* **modes:** add Orchestrator execution mode ([6d6610d](https://github.com/p4ulbr4dl3y/johnston/commit/6d6610d549fe6f4152bfcaef3ec5487a4969fd77))
+* refine Orchestrate mode delegation guidance ([28ba59c](https://github.com/p4ulbr4dl3y/johnston/commit/28ba59cb14e245c730c5e7e22f9b298dbd64a9a0))
+* **tools:** expand argument aliases and accept single-question asks ([f6ba818](https://github.com/p4ulbr4dl3y/johnston/commit/f6ba8186f9cc968e9b0ac54cfbbbda3129528909))
+* **tools:** format subagent truncation hint with read tool start_line ([d43f3aa](https://github.com/p4ulbr4dl3y/johnston/commit/d43f3aae82666fe0fda6cf58d83ca035ef7fbbc1))
+* **tools:** include full log file path in subagent truncation notice ([c16298c](https://github.com/p4ulbr4dl3y/johnston/commit/c16298cea7f0f4c445c1516af87c0e2d2acfd242))
+* **ui:** add modal questions minimize with Tab and resume via /questions ([b664222](https://github.com/p4ulbr4dl3y/johnston/commit/b664222e880d8256ac2b7f71d8832a4023aaed57))
+* **ui:** implement inline question bar for /demo command ([ecc7bb7](https://github.com/p4ulbr4dl3y/johnston/commit/ecc7bb7ea1945c99f1befc9c36ac74fc6c6a0705))
+* **ui:** make ask_user tool expandable inline and resumable via modal ([d40a118](https://github.com/p4ulbr4dl3y/johnston/commit/d40a118e014ab909ea5965e6eacca23ca22ec218))
+* **ui:** unify background tasks and subagents into single TasksListScreen ([0afae3e](https://github.com/p4ulbr4dl3y/johnston/commit/0afae3e529f902a8eaa25e9931ab6c7445c9b2e5))
+
+
+### Bug Fixes
+
+* **adapters:** reuse AsyncOpenAI client and close on exit ([c326b6c](https://github.com/p4ulbr4dl3y/johnston/commit/c326b6cb96be872d32172f6872cd300101a7b8bb))
+* **agent:** coerce reasoning to str before join in streaming loop ([878b747](https://github.com/p4ulbr4dl3y/johnston/commit/878b74729cf5aa93c5e6850cde1067fd016e5de2))
+* **agent:** emit compaction divider on in-loop compaction ([255af8f](https://github.com/p4ulbr4dl3y/johnston/commit/255af8f72c0d8be8ebb520aee28ee1a8bfbdd481))
+* **ci:** make tests pass on Python 3.10 and Windows ([e0632cd](https://github.com/p4ulbr4dl3y/johnston/commit/e0632cdcc786adf951e03f455eeea41d1f720a5c))
+* **cli:** patch cli.tomllib in tests for Python 3.10 compat ([1950a29](https://github.com/p4ulbr4dl3y/johnston/commit/1950a2971f827b228ccb488d7701c35f369a7349))
+* **compaction:** drop empty tool output that serializes to empty user message ([aee2e44](https://github.com/p4ulbr4dl3y/johnston/commit/aee2e44105b88c171186d8f194386f72a5bb8797))
+* **compaction:** drop empty user messages to fix 400 user message must have content ([208b6d6](https://github.com/p4ulbr4dl3y/johnston/commit/208b6d6bf3b6f5c55ea9c297aab23613f3254c31))
+* **core:** count agent loop steps in session message_count ([5663a15](https://github.com/p4ulbr4dl3y/johnston/commit/5663a1557b1c7e0de5f5f123010bbda3e33d148b))
+* **core:** use tail truncation for background shell task output ([4542b4e](https://github.com/p4ulbr4dl3y/johnston/commit/4542b4ebf777174fc7daaa57c67cf4d5df6b0b85))
+* **git_utils:** handle backslash paths and inner quotes in Windows diff headers ([89324c2](https://github.com/p4ulbr4dl3y/johnston/commit/89324c2e3161754d000c4eec18e2fecf08961124))
+* **mcp:** revert to to_thread readline to avoid event-loop deadlock on cancel ([fd4758e](https://github.com/p4ulbr4dl3y/johnston/commit/fd4758e7d3de02a72f42e8c4ee53201fc2970af4))
+* **mcp:** use single reader thread to avoid per-line thread spawn ([87d2fa3](https://github.com/p4ulbr4dl3y/johnston/commit/87d2fa3eae240aefba978aab97f660d16d609e17))
+* **permissions:** map multi_edit to write group ([47f8910](https://github.com/p4ulbr4dl3y/johnston/commit/47f89101448bcc535f0c20815ad9cb8e89f33d31))
+* **queue:** consume own-session messages via snapshot drain to avoid infinite loop ([0f469e0](https://github.com/p4ulbr4dl3y/johnston/commit/0f469e030bc581c59c29af281673e454ab2ec8b4))
+* **queue:** drain queued messages between agent steps and guard end-of-turn race ([8417415](https://github.com/p4ulbr4dl3y/johnston/commit/8417415a81937c7ff8784c2c30e93dc32283edb5))
+* **skills:** restrict skill discovery to SKILL.md and root markdown files ([b9f5fcd](https://github.com/p4ulbr4dl3y/johnston/commit/b9f5fcdbce324bcdb3eaefc5ae4e5a446f9da319))
+* **tests:** ruff lint errors in UI tests ([71ed976](https://github.com/p4ulbr4dl3y/johnston/commit/71ed9767caca453526662128a4e1ed062849097b))
+* **tools:** alias read offset to start_line and ignore tracebacks in file contents ([b273a96](https://github.com/p4ulbr4dl3y/johnston/commit/b273a968486ca8a6e1b76869a06618d94c48b88b))
+* **tools:** clarify read tool description for targeted line ranges ([eb4a5f5](https://github.com/p4ulbr4dl3y/johnston/commit/eb4a5f5c3e9ddc17698add2fd39a0a656b55e963))
+* **tools:** detect trailing newline changes in git diff ([8f7c1dd](https://github.com/p4ulbr4dl3y/johnston/commit/8f7c1ddcd57cc1de02b5e4d5f5ce67591ba30a20))
+* **tools:** expand tool aliases and restore multi_edit routing ([ce5a15b](https://github.com/p4ulbr4dl3y/johnston/commit/ce5a15b584ff6113da2cdf26d0df82b2f8f35b64))
+* **ui:** disable tool header hover effect and clicks in subagent screen ([1bca132](https://github.com/p4ulbr4dl3y/johnston/commit/1bca1327c0362c016a768fe5e3b815177801f2a9))
+* **ui:** filter status footer subagents strictly by session_id ([50050ca](https://github.com/p4ulbr4dl3y/johnston/commit/50050ca867b30ee747d05284e58cfddf8867b1b4))
+* **ui:** handle diff context lines without leading space ([817d99b](https://github.com/p4ulbr4dl3y/johnston/commit/817d99b82413be4507268eea70f9cf3e95b4dc56))
+* **ui:** improve subagent type detection and prevent duplicate cancellation events ([239da78](https://github.com/p4ulbr4dl3y/johnston/commit/239da78d976211c94e80ef43a85eb128bd8cff89))
+* **ui:** preserve leading blank lines and monotonic line numbers in diffs ([3bc2b26](https://github.com/p4ulbr4dl3y/johnston/commit/3bc2b26f49e0f0cc3ba0884f75625fabfdab8998))
+* **ui:** process queued messages sequentially and enable OS clipboard copy on text selection ([29238ab](https://github.com/p4ulbr4dl3y/johnston/commit/29238abcc766b8a010fa54e00636e2a71f98228e))
+* **ui:** refine task details routing for mock subagent tasks ([02de02c](https://github.com/p4ulbr4dl3y/johnston/commit/02de02c11398a51e8910dbe6bec927b0d0f07903))
+* **ui:** robust ask_user answer parsing for edge cases ([e56a5bb](https://github.com/p4ulbr4dl3y/johnston/commit/e56a5bb08d97187648c4296b07a83c72b417cd9f))
+* **ui:** unify subagent chat modal event rendering and code block styling ([4481c17](https://github.com/p4ulbr4dl3y/johnston/commit/4481c17025b9794f9acd251dfb8fd28ee042e7a1))
+
+
+### Performance Improvements
+
+* **agent:** optimize streaming loop, join-buffers, single watchdog task ([d883a84](https://github.com/p4ulbr4dl3y/johnston/commit/d883a847421dbb0b2d91c7fe35bc722f98a86e77))
+* **agent:** switch stream to delta-yield contract, blocking queue wait ([d8226a0](https://github.com/p4ulbr4dl3y/johnston/commit/d8226a09141d1607ae2a28b55ad4a8d39f983fc6))
+* **background_task:** use deque for output buffer truncation ([75a7900](https://github.com/p4ulbr4dl3y/johnston/commit/75a7900c879268e93a9ccfb385112c575d64537f))
+* **base_provider:** hoist prompt/tool build out of stream loop ([3ff6354](https://github.com/p4ulbr4dl3y/johnston/commit/3ff6354173b9362d18981ae20a115333446f91c2))
+* cache tool sort, skip empty listener copies, cache provider-cache reads ([dc0883e](https://github.com/p4ulbr4dl3y/johnston/commit/dc0883e3561831225f0679e7834e5778b76d459d))
+* **chat_toolcall:** cache _try_parse_json results per text ([ca07f63](https://github.com/p4ulbr4dl3y/johnston/commit/ca07f638d9bcc92fdb392997c7675a2cf11ea208))
+* **core:** add disk-aware caching to hot read paths ([ef3d606](https://github.com/p4ulbr4dl3y/johnston/commit/ef3d606d8968956a533f407db3ce187ab0928dad))
+* **core:** cache baseline shadow env in git_checkpoint ([775b4ce](https://github.com/p4ulbr4dl3y/johnston/commit/775b4ceb475056773254653cde94b3a2d797bf16))
+* **core:** single os.walk for skill scan and signature on cache miss ([9a7b371](https://github.com/p4ulbr4dl3y/johnston/commit/9a7b3717864402fd378a969462128b28824ba50e))
+* **mcp:** bound pending responses cache and add write/config caching ([554842b](https://github.com/p4ulbr4dl3y/johnston/commit/554842b820906a2ff33705b45b685c3831c2b147))
+* **mcp:** read async stdout directly instead of to_thread per line ([7d0c78e](https://github.com/p4ulbr4dl3y/johnston/commit/7d0c78e521ca65d115e56ac8d501e28b7bd0d2e2))
+* **roles:** cache role loading with mtime/size signature ([6b5384a](https://github.com/p4ulbr4dl3y/johnston/commit/6b5384a456fcdf0763c910d8c95cc6eeb6b302c7))
+* **rules:** TTL-cache rules signature computation ([af0e838](https://github.com/p4ulbr4dl3y/johnston/commit/af0e83872b9175f57f1c43df11371d12105d24fe))
+* **shell:** cap unbounded shell output buffers ([7479290](https://github.com/p4ulbr4dl3y/johnston/commit/747929041f4844c41deee3a129f9fa96ad1ec3c5))
+* **tasks:** cache filtered tasks within tick and invalidate on mutations ([84bac02](https://github.com/p4ulbr4dl3y/johnston/commit/84bac022ffba8cef1bd8d4bc5752b1ea9b9d77a8))
+* **tools:** avoid sync I/O on event loop and eliminate full-file copies ([92f4a5f](https://github.com/p4ulbr4dl3y/johnston/commit/92f4a5f3124b3b354d40571251e52b0ddfc4131e))
+* **ui:** reduce render-path regex & I/O overhead in widgets ([922316d](https://github.com/p4ulbr4dl3y/johnston/commit/922316d6bbefd4f3d65eeec1bf3df8fa7d3fdda1))
+
+
+### Reverts
+
+* **rules:** drop signature TTL-gate that broke rule-change detection ([90977e4](https://github.com/p4ulbr4dl3y/johnston/commit/90977e4f68079630525939fd041d96d9c6aebcfc))
+
 ## [0.20.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.19.0...johnston-v0.20.0) (2026-08-07)
 
 
