@@ -47,7 +47,7 @@ class ShellTool(BaseTool):
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Terminal command to run (executed relative to project root)",
+                        "description": "Terminal command to run (resolved relative to current working directory, cwd)",
                     },
                     "timeout": {"type": "integer", "description": "Timeout in seconds (default 120, max 600)"},
                     "background": {"type": "boolean", "description": "Run command in background immediately"},
