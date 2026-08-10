@@ -165,9 +165,14 @@ class ReadTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "File path"},
-                    "start": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end": {"type": "integer", "description": "End line (inclusive)"},
-                    "offset": {"type": "integer", "description": "Byte offset"},
+                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                    "start": {"type": "integer", "description": "Alias for start_line"},
+                    "end": {"type": "integer", "description": "Alias for end_line"},
+                    "content_offset": {
+                        "type": "integer",
+                        "description": "Byte offset (only for single-line or huge binary/log files)",
+                    },
                     "detail": {"type": "string", "description": "Image detail: high (default), low, original"},
                     "raw": {"type": "boolean", "description": "Return raw response for URL"},
                 },
