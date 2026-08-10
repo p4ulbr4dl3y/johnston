@@ -19,8 +19,14 @@ logger = logging.getLogger(__name__)
 class MCPProcessClient:
     """Stdio JSON-RPC 2.0 client for MCP servers with Async Multiplexing support."""
 
+    # Upper bound on cached responses kept for the sync read path. The async path
+    # resolves futures directly and only caches responses so that sync
+    # _read_response calls can still pick them up; without a cap this dict grows
+    # unboundedly for long-running async-only sessions.
+    MAX_PENDING_RESPONSES = 256
+
     def __init__(
-        self, name: str, command: str | List[str], cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
+        self, name: str, command: str | List[str], cwd: Optional[str] = None, env: Optional[Dict[str, Any]] = None
     ):
         self.name = name
         if isinstance(command, str):
@@ -35,6 +41,7 @@ class MCPProcessClient:
         self._stopped = False
         self._buffer = ""
         self._lock = threading.RLock()
+        self._write_lock = threading.Lock()
         self._pending_responses: Dict[int, Dict[str, Any]] = {}
         self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
@@ -89,6 +96,11 @@ class MCPProcessClient:
                     fut = self._pending_futures.pop(res_id, None)
                     if fut and not fut.done():
                         loop.call_soon_threadsafe(fut.set_result, data)
+                    # Cache the response for the sync _read_response path. Bound the
+                    # cache so long-running async sessions don't leak entries that
+                    # were already consumed by their matching future.
+                    if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
+                        self._pending_responses.pop(next(iter(self._pending_responses)), None)
                     self._pending_responses[res_id] = data
             except asyncio.CancelledError:
                 break
@@ -128,8 +140,9 @@ class MCPProcessClient:
         line = json.dumps(req, ensure_ascii=False) + "\n"
         try:
             if self.process and self.process.stdin:
-                self.process.stdin.write(line)
-                self.process.stdin.flush()
+                with self._write_lock:
+                    self.process.stdin.write(line)
+                    self.process.stdin.flush()
         except Exception:
             logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
             self._pending_futures.pop(current_id, None)
@@ -239,8 +252,9 @@ class MCPProcessClient:
         if not self.process or not self.process.stdin:
             return
         line = json.dumps(message, ensure_ascii=False) + "\n"
-        self.process.stdin.write(line)
-        self.process.stdin.flush()
+        with self._write_lock:
+            self.process.stdin.write(line)
+            self.process.stdin.flush()
 
     def _read_response(self, req_id: Optional[int] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout or self._stopped:
@@ -468,8 +482,9 @@ class MCPProcessClient:
         line = json.dumps(req, ensure_ascii=False) + "\n"
         try:
             if self.process and self.process.stdin:
-                self.process.stdin.write(line)
-                self.process.stdin.flush()
+                with self._write_lock:
+                    self.process.stdin.write(line)
+                    self.process.stdin.flush()
         except Exception as e:
             self._pending_futures.pop(current_id, None)
             return f"Error writing to MCP server '{self.name}': {e}"
