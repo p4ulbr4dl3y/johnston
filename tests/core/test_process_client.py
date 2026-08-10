@@ -435,7 +435,10 @@ class TestReadResponse(unittest.TestCase):
         client = MCPProcessClient("t", "echo")
         client.process = MagicMock()
         client.process.stdout = MagicMock()
-        with patch("select.select", side_effect=OSError("select failed")):
+        with (
+            patch("core.mcp_manager.process_client.sys.platform", "linux"),
+            patch("select.select", side_effect=OSError("select failed")),
+        ):
             res = client._read_response(req_id=1, timeout=0.1)
         self.assertIsNone(res)
 
@@ -459,10 +462,13 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
         data_line = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode() + b"\n"
-        with patch("core.mcp_manager.process_client.time.time", side_effect=[100.0, 100.0, 100.1]):
-            with patch("select.select", side_effect=[([], [], []), ([client.process.stdout], [], [])]):
-                with patch("os.read", return_value=data_line):
-                    res = client._read_response(req_id=1, timeout=5.0)
+        with (
+            patch("core.mcp_manager.process_client.sys.platform", "linux"),
+            patch("core.mcp_manager.process_client.time.time", side_effect=[100.0, 100.0, 100.1]),
+            patch("select.select", side_effect=[([], [], []), ([client.process.stdout], [], [])]),
+            patch("os.read", return_value=data_line),
+        ):
+            res = client._read_response(req_id=1, timeout=5.0)
         self.assertEqual(res["id"], 1)
 
     def test_read_response_os_read_eof(self):
@@ -470,9 +476,12 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
-        with patch("select.select", return_value=([client.process.stdout], [], [])):
-            with patch("os.read", return_value=b""):
-                res = client._read_response(req_id=1, timeout=0.1)
+        with (
+            patch("core.mcp_manager.process_client.sys.platform", "linux"),
+            patch("select.select", return_value=([client.process.stdout], [], [])),
+            patch("os.read", return_value=b""),
+        ):
+            res = client._read_response(req_id=1, timeout=0.1)
         self.assertIsNone(res)
 
     def test_read_response_os_read_blocking_error_continues(self):
@@ -481,9 +490,12 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
         data_line = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode() + b"\n"
-        with patch("select.select", return_value=([client.process.stdout], [], [])):
-            with patch("os.read", side_effect=[BlockingIOError(11, "again"), data_line]):
-                res = client._read_response(req_id=1, timeout=0.1)
+        with (
+            patch("core.mcp_manager.process_client.sys.platform", "linux"),
+            patch("select.select", return_value=([client.process.stdout], [], [])),
+            patch("os.read", side_effect=[BlockingIOError(11, "again"), data_line]),
+        ):
+            res = client._read_response(req_id=1, timeout=0.1)
         self.assertEqual(res["id"], 1)
 
     def test_read_response_os_read_other_error(self):
@@ -491,9 +503,12 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
-        with patch("select.select", return_value=([client.process.stdout], [], [])):
-            with patch("os.read", side_effect=ValueError("weird")):
-                res = client._read_response(req_id=1, timeout=0.1)
+        with (
+            patch("core.mcp_manager.process_client.sys.platform", "linux"),
+            patch("select.select", return_value=([client.process.stdout], [], [])),
+            patch("os.read", side_effect=ValueError("weird")),
+        ):
+            res = client._read_response(req_id=1, timeout=0.1)
         self.assertIsNone(res)
 
     def test_read_response_win32_readline(self):

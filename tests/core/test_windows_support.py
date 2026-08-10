@@ -312,7 +312,7 @@ class TestTerminateProcess(unittest.TestCase):
         process.wait = AsyncMock()
         with (
             patch("core.platform_utils.is_windows", return_value=False),
-            patch("core.platform_utils.os.killpg") as killpg,
+            patch("core.platform_utils.os.killpg", create=True) as killpg,
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         killpg.assert_called_once_with(4242, signal.SIGTERM)
@@ -332,7 +332,7 @@ class TestTerminateProcess(unittest.TestCase):
         process.wait = AsyncMock()
         with (
             patch("core.platform_utils.is_windows", return_value=False),
-            patch("core.platform_utils.os.killpg", side_effect=OSError("no such process")),
+            patch("core.platform_utils.os.killpg", create=True, side_effect=OSError("no such process")),
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.terminate.assert_called_once()
@@ -350,7 +350,7 @@ class TestTerminateProcess(unittest.TestCase):
         process.wait = AsyncMock(side_effect=asyncio.TimeoutError)
         with (
             patch("core.platform_utils.is_windows", return_value=False),
-            patch("core.platform_utils.os.killpg"),
+            patch("core.platform_utils.os.killpg", create=True),
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.kill.assert_called_once()
