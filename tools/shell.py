@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import re
 import time
+from collections import deque
 from typing import Any, Dict
 
 from core.background_task import BackgroundTask, process_carriage_returns, strip_ansi
@@ -120,7 +121,7 @@ class ShellTool(BaseTool):
                 await terminate_process(p)
                 return format_tool_error("background", name="shell")
 
-            output_chunks = []
+            output_chunks = deque()
             output_size = 0
             output_truncated = False
             _SUBAGENT_OUTPUT_LIMIT = 2 * 1024 * 1024  # 2 MB cap (mirrors web_fetch)
@@ -147,7 +148,7 @@ class ShellTool(BaseTool):
                             output_truncated = True
                             # Drop old chunks from the front, keeping the tail.
                             while output_chunks and output_size > _SUBAGENT_OUTPUT_LIMIT // 2:
-                                output_size -= len(output_chunks.pop(0))
+                                output_size -= len(output_chunks.popleft())
                     except Exception:
                         break
 

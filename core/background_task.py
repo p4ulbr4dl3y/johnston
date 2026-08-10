@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+from collections import deque
 
 from core.platform_utils import terminate_process
 from tools.base import format_tool_error
@@ -61,7 +62,7 @@ class BackgroundTask:
         self.kind = kind
         self.command = command
         self.process = process
-        self.output = []
+        self.output = deque()
         self._output_size = 0
         self._output_truncated = False
         self.is_running = True
@@ -101,7 +102,7 @@ class BackgroundTask:
         if self._output_size > _OUTPUT_BYTE_LIMIT:
             self._output_truncated = True
             while self.output and self._output_size > _OUTPUT_BYTE_LIMIT // 2:
-                self._output_size -= len(self.output.pop(0))
+                self._output_size -= len(self.output.popleft())
 
     def get_formatted_output(self) -> str:
         """Returns full output with ANSI escape codes stripped and carriage returns collapsed"""
