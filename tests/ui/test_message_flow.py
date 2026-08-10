@@ -345,6 +345,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
+                app.save_current_session_async = unittest.mock.AsyncMock()
                 app.generate_ai_response("Prompt")
                 await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
@@ -376,6 +377,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
+                app.save_current_session_async = unittest.mock.AsyncMock()
                 app.generate_ai_response("Prompt")
                 await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
