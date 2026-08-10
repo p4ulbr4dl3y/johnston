@@ -19,7 +19,7 @@ from widgets.chat_markdown import (
     to_snake_case,
 )
 from widgets.lexer_utils import guess_lexer_name
-from widgets.screens.constants import TOOL_SCROLL_BOX
+from widgets.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 
 
 def _strip_hints_and_background(text: str) -> str:
@@ -444,7 +444,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.status = "error" if self._check_is_error(result_text) else "done"
 
         is_clickable = self.is_clickable_header()
-        header_cls = "tool-header tool-header-expandable" if is_clickable else "tool-header"
+        header_cls = f"{TOOL_HEADER} {TOOL_HEADER_EXPANDABLE}" if is_clickable else TOOL_HEADER
         self.header_label = Label("", classes=header_cls)
         self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
@@ -488,8 +488,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         if not self.is_clickable_header():
             self.is_expanded = False
-            self.header_label.remove_class("tool-header-expandable")
-            self.header_label.add_class("tool-header")
+            self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.add_class(TOOL_HEADER)
             self.content_widget.display = False
             self.md_widget.display = False
         self.render_header()

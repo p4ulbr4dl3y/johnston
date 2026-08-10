@@ -12,6 +12,7 @@ from widgets.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     OPTIONS_LIST,
     OPTIONS_LIST_ID,
+    SHIFT_TAB_KEYS,
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
@@ -364,7 +365,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         self.app.exit()
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("shift+tab", "backtab", "shift_tab"):
+        if event.key in SHIFT_TAB_KEYS:
             event.prevent_default()
             event.stop()
             return

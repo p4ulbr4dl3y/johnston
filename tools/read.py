@@ -7,6 +7,7 @@ from typing import Any, Dict, Tuple
 
 from core.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
+from tools.utils import DEFAULT_LINE_WINDOW
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
 
@@ -155,7 +156,7 @@ def process_image_file_sync(path: str, detail: str | None = None) -> str:
 
 class ReadTool(BaseTool):
     name = "read"
-    description = "Read files (max 800 lines). Auto-converts PDF/DOCX to Markdown, supports images."
+    description = f"Read files (max {DEFAULT_LINE_WINDOW} lines). Auto-converts PDF/DOCX to Markdown, supports images."
     schema = {
         "type": "function",
         "function": {

@@ -14,6 +14,7 @@ from widgets.screens.constants import (
     MODAL_OPTION_LIST_ID,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
+    SHIFT_TAB_KEYS,
 )
 
 T = TypeVar("T")
@@ -191,7 +192,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         self.dismiss(self.default_value)
 
     def _on_key(self, event: events.Key) -> None:
-        if self.show_search and event.key in ("shift+tab", "backtab", "shift_tab"):
+        if self.show_search and event.key in SHIFT_TAB_KEYS:
             event.prevent_default()
             event.stop()
             return
