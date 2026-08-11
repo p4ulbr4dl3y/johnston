@@ -1,9 +1,27 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, FrozenSet, Optional, Tuple
 
 from core.config import CONFIG_FILE
 from core.defaults.config import DEFAULT_PERMISSIONS
 from core.platform_utils import atomic_write_json, read_json
 from core.shell_guard import analyze_shell_command
+
+# Canonical names of builtin tools (kept out of tools/registry import to avoid
+# a circular import: tools.registry imports tools.* which import core.*).
+BUILTIN_TOOL_NAMES: FrozenSet[str] = frozenset(
+    {
+        "read",
+        "create",
+        "edit",
+        "multi_edit",
+        "shell",
+        "ask_user",
+        "update_plan",
+        "manage_shell",
+        "invoke_subagent",
+        "manage_subagent",
+        "web_fetch",
+    }
+)
 
 
 class PermissionManager:
@@ -80,9 +98,7 @@ class PermissionManager:
         perms = data["permissions"]
 
         if target_type == "shell_guard":
-            if "shell_guard" not in perms or not isinstance(perms["shell_guard"], dict):
-                perms["shell_guard"] = {}
-            perms["shell_guard"]["enabled"] = action in ("allow", "true", "enabled")
+            perms["shell_guard"] = action in ("allow", "true", "enabled")
         else:
             if "tools" not in perms or not isinstance(perms["tools"], dict):
                 perms["tools"] = {}
@@ -96,7 +112,7 @@ class PermissionManager:
         merged = {
             "default": DEFAULT_PERMISSIONS.get("default", "ask"),
             "tools": dict(DEFAULT_PERMISSIONS.get("tools", {})),
-            "shell_guard": dict(DEFAULT_PERMISSIONS.get("shell_guard", {})),
+            "shell_guard": DEFAULT_PERMISSIONS.get("shell_guard", True),
         }
 
         # 2. Global config (~/.johnston/config.json)
@@ -115,8 +131,8 @@ class PermissionManager:
             for t, act in override["tools"].items():
                 if isinstance(act, str):
                     base["tools"][t.lower()] = self.normalize_action(act)
-        if "shell_guard" in override and isinstance(override["shell_guard"], dict):
-            base["shell_guard"].update(override["shell_guard"])
+        if "shell_guard" in override and isinstance(override["shell_guard"], bool):
+            base["shell_guard"] = override["shell_guard"]
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         """
@@ -142,8 +158,8 @@ class PermissionManager:
                 or (args or {}).get("CommandLine")
                 or ""
             )
-            sg_cfg = effective_perms.get("shell_guard", {})
-            if sg_cfg.get("enabled", True) and self.session_overrides.get("shell_guard") != "allow":
+            sg_enabled = effective_perms.get("shell_guard", True)
+            if sg_enabled and self.session_overrides.get("shell_guard") != "allow":
                 is_safe, reason = analyze_shell_command(command)
                 if not is_safe:
                     return "deny", f"Shell Guard flagged unsafe command: {reason}"
@@ -157,7 +173,16 @@ class PermissionManager:
         if canonical_name in tools_cfg:
             return tools_cfg[canonical_name], f"Explicit tool permission for '{canonical_name}'"
 
-        # 4. Fallback to default
+        # 4. MCP tools (not in the builtin registry) default to 'allow' so that
+        #    connected servers work out of the box; explicit config still applies.
+        if canonical_name not in BUILTIN_TOOL_NAMES:
+            # Fail-closed: a broken raw 'default' config must never silently allow.
+            raw_default = self._load_json_config(CONFIG_FILE).get("permissions", {}).get("default")
+            if raw_default is not None and raw_default not in self.VALID_ACTIONS:
+                return "ask", f"Invalid default configured; MCP tool '{canonical_name}' fails closed"
+            return "allow", f"MCP tool default for '{canonical_name}'"
+
+        # 5. Fallback to default
         default_action = effective_perms.get("default", "ask")
         # Fail-closed: any unexpected value becomes 'ask' (user confirmation), never silent 'allow'.
         return self.normalize_action(default_action), f"Default permission fallback for '{canonical_name}'"

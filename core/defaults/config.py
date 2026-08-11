@@ -32,9 +32,12 @@ DEFAULT_IGNORE_DIRS = {
 
 # Permissions Defaults
 DEFAULT_PERMISSIONS = {
-    "default": "ask",
-    "tools": {},
-    "shell_guard": {
-        "enabled": True,
+    "default": "allow",
+    "tools": {
+        "create": "ask",
+        "edit": "ask",
+        "multi_edit": "ask",
+        "shell": "ask",
     },
+    "shell_guard": True,
 }

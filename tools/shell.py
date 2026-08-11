@@ -92,7 +92,7 @@ class ShellTool(BaseTool):
 
         pm = PermissionManager.get_instance()
         effective_perms = pm.get_effective_permissions()
-        sg_enabled = effective_perms.get("shell_guard", {}).get("enabled", True)
+        sg_enabled = effective_perms.get("shell_guard", True)
         session_override = pm.session_overrides.get("shell") or pm.session_overrides.get("shell_guard")
 
         if sg_enabled and not is_safe and not skip_confirm and session_override != "allow":

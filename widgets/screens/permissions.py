@@ -25,11 +25,11 @@ _SELECTABLE_TYPES = ("tool", "shell_guard")
 
 
 class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
-    """Modal screen for managing per-tool permissions (allow, ask, deny) and ShellGuard.
+    """Modal screen for managing per-tool permissions (allow, ask, deny) and Shell Guard.
 
     Builtin tools are grouped under a "Builtin" section, MCP tools under their
     server sections (rendered from cache first, refreshed in the background), and
-    ShellGuard is a standalone binary toggle at the end of the list.
+    Shell Guard is a standalone binary toggle at the top of the list.
     """
 
     search_nav_option_list_id = "permissions-option-list"
@@ -123,8 +123,22 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         default_act = perms.get("default", "ask")
         items: List[Dict[str, Any]] = []
 
+        # --- Shell Guard: standalone binary toggle (no group), at the top ---
+        sg_enabled = perms.get("shell_guard", True)
+        items.append(
+            {
+                "type": "shell_guard",
+                "name": "shell_guard",
+                "label": "Shell Guard",
+                "desc": "",
+                "action": "allow" if sg_enabled else "deny",
+                "is_override": "shell_guard" in perms,
+            }
+        )
+
         # --- Builtin tools section ---
-        items.append(self._header_item("builtin", "🔧 Builtin"))
+        items.append(self._separator_item())
+        items.append(self._header_item("builtin", "Builtin"))
         for t in sorted(REGISTRY):
             act = tools_cfg.get(t) or default_act
             items.append(self._tool_item(t, act, tools_cfg))
@@ -150,21 +164,6 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                         continue
                     act = tools_cfg.get(exposed) or default_act
                     items.append(self._tool_item(exposed, act, tools_cfg, desc=fn.get("description", "") or ""))
-
-        # --- ShellGuard: standalone binary toggle (no group) ---
-        items.append(self._separator_item())
-        sg_cfg = perms.get("shell_guard", {})
-        sg_enabled = sg_cfg.get("enabled", True)
-        items.append(
-            {
-                "type": "shell_guard",
-                "name": "shell_guard",
-                "label": "ShellGuard",
-                "desc": "",
-                "action": "allow" if sg_enabled else "deny",
-                "is_override": "enabled" in sg_cfg,
-            }
-        )
 
         return items
 
@@ -207,7 +206,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             else:
                 act = it["action"].upper()
                 status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
-                opt_list.add_option(f"{status} {it['label']}")
+                opt_list.add_option(f"   {status} {it['label']}")
 
         if reset_highlight:
             opt_list.highlighted = self._first_selectable_index()
@@ -232,7 +231,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             # Group headers / separators are not toggleable.
             return
         if target["type"] == "shell_guard":
-            # ShellGuard is a binary toggle: allow (enabled) <-> deny (disabled). 'ask' has no meaning here.
+            # Shell Guard is a binary toggle: allow (enabled) <-> deny (disabled). 'ask' has no meaning here.
             next_act = "deny" if target["action"] == "allow" else "allow"
         else:
             next_act = self._cycle_action(target["action"])
