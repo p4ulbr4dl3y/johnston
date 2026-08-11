@@ -57,13 +57,10 @@ class StatusFooter(Static):
             from core.mcp_manager import get_mcp_manager
 
             mm = get_mcp_manager()
-            loading = any(
-                not s.get("disabled", False)
-                and (s.get("command"))
-                and mm.clients.get(s.get("name")) is None
-                for s in mm.load_servers()
-            )
-            if loading:
+            is_loading = mm.is_loading()
+            was_loading = getattr(self, "_mcp_was_loading", False)
+            if is_loading or was_loading:
+                self._mcp_was_loading = is_loading
                 self.refresh_footer()
         except Exception:
             pass

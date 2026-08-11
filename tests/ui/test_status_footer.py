@@ -232,3 +232,24 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         # No servers configured -> empty
         self.assertEqual(footer._mcp_footer_text(0, 0), "")
 
+    async def test_poll_mcp_refresh_triggers_on_loading(self):
+        footer = StatusFooter()
+        mgr = MagicMock()
+        mgr.is_loading.return_value = True
+        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+            with patch.object(footer, "refresh_footer") as mock_rf:
+                footer._poll_mcp_refresh()
+                mock_rf.assert_called_once()
+                self.assertTrue(getattr(footer, "_mcp_was_loading", False))
+
+                mgr.is_loading.return_value = False
+                mock_rf.reset_mock()
+                footer._poll_mcp_refresh()
+                mock_rf.assert_called_once()  # final cleanup call
+                self.assertFalse(getattr(footer, "_mcp_was_loading", False))
+
+                mock_rf.reset_mock()
+                footer._poll_mcp_refresh()
+                mock_rf.assert_not_called()  # idle
+
+

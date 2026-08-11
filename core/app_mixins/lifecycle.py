@@ -30,8 +30,11 @@ class LifecycleMixin:
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):
             self.load_session_ui(self.resume_session_id)
+        from core.mcp_manager import get_mcp_manager
+
         self.refresh_status_footer()
         asyncio.create_task(catalog.refresh())
+        asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
         asyncio.create_task(self._check_initial_setup())
 
     async def _check_initial_setup(self) -> None:

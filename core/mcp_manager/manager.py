@@ -322,10 +322,15 @@ class MCPManager:
             if created:
                 try:
                     ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
-                except (asyncio.TimeoutError, Exception):
+                except (asyncio.TimeoutError, Exception) as exc:
+                    client.last_error = str(exc)
+                    self.clients[name] = client
                     _cleanup_if_created()
                     return []
                 if not ok:
+                    if not getattr(client, "last_error", None):
+                        client.last_error = "Failed to start"
+                    self.clients[name] = client
                     _cleanup_if_created()
                     return []
                 self.clients[name] = client
@@ -410,6 +415,10 @@ class MCPManager:
             task.add_done_callback(_on_done)
 
         return self.get_cached_tools()
+
+    def is_loading(self) -> bool:
+        """True if background MCP server initialization or tool loading is currently in progress."""
+        return self._tools_refresh_task is not None and not self._tools_refresh_task.done()
 
     def get_tool_capabilities(self, server_name: str, tool_name: str) -> List[str]:
         """Returns configured capabilities for an MCP tool.
