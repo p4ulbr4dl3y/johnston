@@ -10,6 +10,9 @@ from core.prompt_builder import PromptBuilder
 class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
     def _manager_without_init(self) -> MCPManager:
         manager = MCPManager.__new__(MCPManager)
+        manager.project_dir = "/"
+        manager.project_file = "/.johnston/mcp.json"
+        manager.global_file = "/tmp/mcp.json"
         manager.clients = {}
         manager._tools_refresh_time = 0.0
         manager._tools_refresh_task = None
@@ -42,6 +45,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
     async def test_concurrent_async_refreshes_are_coalesced(self):
         manager = self._manager_without_init()
+        manager.get_cached_tools = MagicMock(return_value=[])
 
         release = asyncio.Event()
 
@@ -64,20 +68,45 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         release.set()
         results = await gather_task
 
-        self.assertEqual(results[0], results[1])
-        manager.get_active_tools_async.assert_awaited_once_with()
+        # Both callers share one in-flight warmup and return the same cached view
+        # instead of each spawning their own refresh.
+        self.assertEqual(list(results), [[], []])
+        manager.get_active_tools_async.assert_awaited_once()
 
-    async def test_recent_refresh_uses_memory_cache(self):
+    async def test_recent_inflight_refresh_uses_memory_cache(self):
         manager = self._manager_without_init()
         manager._tools_refresh_time = time.monotonic()
         manager.get_cached_tools = MagicMock(return_value=[{"type": "function"}])
         manager.get_active_tools_async = AsyncMock()
 
+        # A warmup task already in flight within the freshness window: return the
+        # cached tools and never spawn a second refresh.
+        in_flight = asyncio.create_task(asyncio.sleep(10))
+        manager._tools_refresh_task = in_flight
+
+        try:
+            tools = await manager.ensure_tools_ready_async()
+            self.assertEqual(tools, [{"type": "function"}])
+            manager.get_active_tools_async.assert_not_awaited()
+        finally:
+            in_flight.cancel()
+
+    async def test_no_inflight_refresh_spawns_background_without_blocking(self):
+        manager = self._manager_without_init()
+        manager.get_cached_tools = MagicMock(return_value=[])
+        manager.get_active_tools_async = AsyncMock(return_value=[{"type": "function", "function": {"name": "search"}}])
+
+        # No task in flight: spawn a background warmup and return cached (empty)
+        # immediately instead of blocking on the cold start.
         tools = await manager.ensure_tools_ready_async()
 
-        self.assertEqual(tools, [{"type": "function"}])
-        manager.get_active_tools_async.assert_not_awaited()
+        # Give the spawned background task a chance to actually run so the
+        # assertion below sees the awaited call.
+        await asyncio.sleep(0)
 
+        self.assertEqual(tools, [])
+        manager.get_active_tools_async.assert_awaited_once()
+        self.assertIsInstance(manager._tools_refresh_task, asyncio.Task)
     def test_prompt_builder_never_calls_sync_mcp_discovery(self):
         manager = MagicMock()
         manager.get_system_prompt_snippet.return_value = ""

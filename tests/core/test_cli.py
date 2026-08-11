@@ -59,7 +59,7 @@ class TestCLI(unittest.TestCase):
     @patch("core.mcp_manager.MCPManager.get_active_tools")
     def test_print_mcp_with_tools(self, mock_tools, mock_load):
         mock_load.return_value = [
-            {"name": "my_server", "command": "node server.js", "scope": "project", "mode": "eager", "disabled": False}
+            {"name": "my_server", "command": "node server.js", "scope": "project", "disabled": False}
         ]
         mock_tools.return_value = [
             {"_mcp_server": "my_server", "_mcp_tool_name": "tool_a"},
@@ -134,7 +134,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.side_effect = Exception("boom")
             mgr.clients = {}
             mock_get.return_value = mgr
@@ -296,7 +296,6 @@ class TestCLIAdvanced(unittest.TestCase):
                     "command": "node",
                     "args": ["a", "b"],
                     "scope": "project",
-                    "mode": "eager",
                     "disabled": True,
                 }
             ]
@@ -305,14 +304,14 @@ class TestCLIAdvanced(unittest.TestCase):
             with redirect_stdout(f):
                 print_mcp()
         out = f.getvalue()
-        self.assertIn("srv [project] [eager] [disabled]", out)
+        self.assertIn("srv [project] [disabled]", out)
         self.assertIn("Command: node a b", out)
 
     def test_print_mcp_no_cmd_no_url(self):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [{"name": "srv", "scope": "global", "mode": "eager"}]
+            mgr.load_servers.return_value = [{"name": "srv", "scope": "global"}]
             mgr.get_active_tools.return_value = []
             mgr.clients = {}
             mock_get.return_value = mgr
@@ -325,7 +324,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
             client = MagicMock()
             client.last_error = "process failed"
@@ -339,7 +338,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.mcp_manager.get_mcp_manager") as mock_get:
             mgr = MagicMock()
-            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global", "mode": "eager"}]
+            mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
             mgr.clients = {}
             mock_get.return_value = mgr

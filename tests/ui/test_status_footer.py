@@ -176,7 +176,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 footer.refresh_footer()
                 await pilot.pause()
             self.assertEqual(footer._last_status_args["mcp_active"], 1)
-            self.assertEqual(footer._last_status_args["mcp_total"], 4)
+            self.assertEqual(footer._last_status_args["mcp_total"], 2)
 
     async def test_update_status_fallback_branches(self):
         app = FooterTestApp()
@@ -221,3 +221,14 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 footer.update_status(
                     provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="gpt-4o"
                 )
+
+    async def test_mcp_footer_text_loading_counter(self):
+        footer = StatusFooter()
+        # Partial load -> active/total counter
+        self.assertEqual(footer._mcp_footer_text(0, 2), "MCP: [#f4f4f5]0/2[/#f4f4f5]")
+        self.assertEqual(footer._mcp_footer_text(1, 2), "MCP: [#f4f4f5]1/2[/#f4f4f5]")
+        # Fully loaded -> plain count
+        self.assertEqual(footer._mcp_footer_text(2, 2), "MCP: [#f4f4f5]2/2[/#f4f4f5]")
+        # No servers configured -> empty
+        self.assertEqual(footer._mcp_footer_text(0, 0), "")
+

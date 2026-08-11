@@ -124,8 +124,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_refresh_list_filter_with_prev_highlight(self):
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "mode": "eager", "scope": "global"},
-            {"name": "beta", "command": "py", "disabled": False, "mode": "eager", "scope": "global"},
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "beta", "command": "py", "disabled": False, "scope": "global"},
         ]
         mgr = MagicMock()
         mgr.load_servers.return_value = servers
@@ -193,7 +193,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_on_input_changed(self):
         mgr = MagicMock()
         mgr.load_servers.return_value = [
-            {"name": "srv", "command": "py", "disabled": False, "mode": "eager", "scope": "global"}
+            {"name": "srv", "command": "py", "disabled": False, "scope": "global"}
         ]
         screen = self._make_screen(mgr)
         async with CoverageHostApp(screen).run_test() as pilot:

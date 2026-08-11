@@ -121,7 +121,7 @@ class TestMCPManager(unittest.TestCase):
                 return f"executed {self.name}:{tool_name}"
 
         c1 = DummyClient("serverA", [{"name": "search", "description": "search desc"}])
-        c2 = DummyClient("serverB", [{"name": "lazy_tool", "description": "lazy desc"}])
+        c2 = DummyClient("serverB", [{"name": "search_tool", "description": "search desc"}])
         mm.clients = {"serverA": c1, "serverB": c2}
 
         mm.load_servers = lambda: [
@@ -136,11 +136,11 @@ class TestMCPManager(unittest.TestCase):
         self.assertIn("## MCP Tools", snippet)
         self.assertIn("### serverA", snippet)
         self.assertIn("- `search`: search desc", snippet)
-        self.assertIn("- `lazy_tool`: lazy desc", snippet)
+        self.assertIn("- `search_tool`: search desc", snippet)
 
         # Call tool explicitly via call_tool
-        res = mm.call_tool("lazy_tool", {}, target_server="serverB")
-        self.assertEqual(res, "executed serverB:lazy_tool")
+        res = mm.call_tool("search_tool", {}, target_server="serverB")
+        self.assertEqual(res, "executed serverB:search_tool")
 
 
 class TestMCPManagerRegression(unittest.TestCase):
