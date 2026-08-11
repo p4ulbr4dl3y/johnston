@@ -12,7 +12,7 @@ COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
 * `/compact` — Compact session conversation history
 * `/tasks` — View and manage background tasks
 * `/skills` — Browse and activate available skills
-* `/mcp` — Manage MCP servers (eager / lazy)
+* `/mcp` — Manage MCP servers
 * `/rewind` — Rollback chat history to a selected message
 * `/resume` — Switch and resume saved session dialogs
 * `/help` — Open this help screen"""

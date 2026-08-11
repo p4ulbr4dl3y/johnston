@@ -45,7 +45,7 @@ class TestCLI(unittest.TestCase):
     @patch("core.mcp_manager.MCPManager.load_servers")
     def test_print_mcp_url_error(self, mock_load):
         mock_load.return_value = [
-            {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global", "mode": "lazy", "disabled": False}
+            {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global", "disabled": False}
         ]
         f = io.StringIO()
         with redirect_stdout(f):

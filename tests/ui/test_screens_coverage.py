@@ -66,13 +66,13 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_refresh_list_all_statuses(self):
         servers = [
-            {"name": "disc", "command": "x", "disabled": True, "mode": "eager", "scope": "global"},
-            {"name": "tsrv", "command": "py", "disabled": False, "mode": "lazy", "scope": "global"},
-            {"name": "urlsrv", "url": "http://host", "disabled": False, "mode": "eager", "scope": "global"},
-            {"name": "sfail", "command": "x", "disabled": False, "mode": "eager", "scope": "global"},
-            {"name": "tmo", "command": "x", "disabled": False, "mode": "eager", "scope": "global"},
-            {"name": "ambi", "command": "x", "url": "http://u", "disabled": False, "mode": "eager", "scope": "global"},
-            {"name": "nocmd", "disabled": False, "mode": "eager", "scope": "global"},
+            {"name": "disc", "command": "x", "disabled": True, "scope": "global"},
+            {"name": "tsrv", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "urlsrv", "url": "http://host", "disabled": False, "scope": "global"},
+            {"name": "sfail", "command": "x", "disabled": False, "scope": "global"},
+            {"name": "tmo", "command": "x", "disabled": False, "scope": "global"},
+            {"name": "ambi", "command": "x", "url": "http://u", "disabled": False, "scope": "global"},
+            {"name": "nocmd", "disabled": False, "scope": "global"},
         ]
         client_with_tools = MagicMock()
         client_with_tools.tools = [{"name": "t1"}, {"name": "t2"}]
@@ -233,32 +233,6 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             event.input.id = "modal-search-input"
             screen.on_input_submitted(event)
             mgr.toggle_server.assert_called_once_with("srv")
-
-    async def test_action_toggle_mode(self):
-        mgr = MagicMock()
-        mgr.load_servers.return_value = []
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
-            await pilot.pause()
-            screen.filtered_servers = [{"name": "srv", "disabled": False}]
-            opt_list = MagicMock()
-            opt_list.highlighted = 0
-            screen.query_one = MagicMock(return_value=opt_list)
-            screen.action_toggle_mode()
-            mgr.toggle_mode.assert_called_once_with("srv")
-            self.assertEqual(opt_list.highlighted, 0)
-
-    async def test_action_toggle_mode_no_highlight(self):
-        mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
-            await pilot.pause()
-            screen.filtered_servers = [{"name": "srv"}]
-            opt_list = MagicMock()
-            opt_list.highlighted = None
-            screen.query_one = MagicMock(return_value=opt_list)
-            screen.action_toggle_mode()
-            mgr.toggle_mode.assert_not_called()
 
     async def test_on_option_selected(self):
         mgr = MagicMock()

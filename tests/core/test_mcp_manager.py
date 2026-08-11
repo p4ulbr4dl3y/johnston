@@ -106,7 +106,7 @@ class TestMCPManager(unittest.TestCase):
         res2 = mm.call_tool("serverB__search", {})
         self.assertEqual(res2, "result from serverB:search")
 
-    def test_eager_and_lazy_mcp_servers(self):
+    def test_all_mcp_servers_are_active(self):
         mm = MCPManager(project_dir=self.test_dir)
 
         class DummyClient:
@@ -120,36 +120,26 @@ class TestMCPManager(unittest.TestCase):
             def call_tool(self, tool_name, args, **kwargs):
                 return f"executed {self.name}:{tool_name}"
 
-        c1 = DummyClient("eagerServer", [{"name": "eager_tool", "description": "eager desc"}])
-        c2 = DummyClient("lazyServer", [{"name": "lazy_tool", "description": "lazy desc"}])
-        mm.clients = {"eagerServer": c1, "lazyServer": c2}
+        c1 = DummyClient("serverA", [{"name": "search", "description": "search desc"}])
+        c2 = DummyClient("serverB", [{"name": "lazy_tool", "description": "lazy desc"}])
+        mm.clients = {"serverA": c1, "serverB": c2}
 
         mm.load_servers = lambda: [
-            {"name": "eagerServer", "command": "python", "disabled": False, "mode": "eager"},
-            {"name": "lazyServer", "command": "python", "disabled": False, "mode": "lazy"},
+            {"name": "serverA", "command": "python", "disabled": False},
+            {"name": "serverB", "command": "python", "disabled": False},
         ]
 
-        eager_tools = mm.get_active_tools(mode="eager")
-        self.assertEqual(len(eager_tools), 1)
-        self.assertEqual(eager_tools[0]["function"]["name"], "eager_tool")
-
-        lazy_tools = mm.get_active_tools(mode="lazy")
-        self.assertEqual(len(lazy_tools), 1)
-        self.assertEqual(lazy_tools[0]["function"]["name"], "lazy_tool")
-
-        all_tools = mm.get_active_tools(mode="all")
+        all_tools = mm.get_active_tools()
         self.assertEqual(len(all_tools), 2)
 
         snippet = mm.get_system_prompt_snippet()
-        self.assertIn("## MCP Servers", snippet)
-        self.assertIn("### lazyServer (Lazy)", snippet)
-        self.assertIn("- lazy_tool — lazy desc", snippet)
-        self.assertIn("Available Eager MCP tools", snippet)
-        self.assertIn("eager_tool", snippet)
+        self.assertIn("## MCP Tools", snippet)
+        self.assertIn("search (from serverA)", snippet)
+        self.assertIn("lazy_tool (from serverB)", snippet)
 
-        # Call lazy tool explicitly via call_tool
-        res = mm.call_tool("lazy_tool", {}, target_server="lazyServer")
-        self.assertEqual(res, "executed lazyServer:lazy_tool")
+        # Call tool explicitly via call_tool
+        res = mm.call_tool("lazy_tool", {}, target_server="serverB")
+        self.assertEqual(res, "executed serverB:lazy_tool")
 
 
 class TestMCPManagerRegression(unittest.TestCase):
@@ -171,11 +161,11 @@ class TestMCPManagerRegression(unittest.TestCase):
         mm = MCPManager(project_dir=self.test_dir)
         mm.clients = {"enabled": DummyClient("enabled"), "disabled": DummyClient("disabled")}
         mm.load_servers = lambda: [
-            {"name": "enabled", "command": "python", "disabled": False, "mode": "eager"},
-            {"name": "disabled", "command": "python", "disabled": True, "mode": "eager"},
+            {"name": "enabled", "command": "python", "disabled": False},
+            {"name": "disabled", "command": "python", "disabled": True},
         ]
 
-        names = [t["function"]["name"] for t in mm.get_active_tools(mode="all")]
+        names = [t["function"]["name"] for t in mm.get_active_tools()]
 
         self.assertEqual(names, ["search"])
         self.assertEqual(mm.call_tool("search", {"q": "x"}), "enabled:search:{'q': 'x'}:None")
@@ -237,22 +227,6 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
             res = client._read_response(req_id=1, timeout=0.1)
             mock_fetch.assert_called_once()
             self.assertEqual(res, {"jsonrpc": "2.0", "id": 1, "result": {}})
-
-    def test_toggle_mode(self):
-        mm = MCPManager(project_dir=self.test_dir)
-        mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
-        with open(mm.global_file, "w", encoding="utf-8") as f:
-            json.dump({"mcpServers": {"test-server": {"command": "python", "mode": "eager"}}}, f)
-
-        res_mode = mm.toggle_mode("test-server")
-        self.assertEqual(res_mode, "lazy")
-
-        res_mode2 = mm.toggle_mode("test-server")
-        self.assertEqual(res_mode2, "eager")
-
-        # Non-existent server
-        res_none = mm.toggle_mode("nonexistent")
-        self.assertEqual(res_none, "eager")
 
     def test_client_start_initialize_and_call_tool(self):
         from unittest.mock import MagicMock
@@ -352,26 +326,6 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         client.start = lambda: False
         res = client.call_tool("foo", {})
         self.assertIn("is not running", res)
-
-    def test_lazy_prompt_snippet_with_parameter_signatures(self):
-        mm = MCPManager(project_dir=self.test_dir)
-        mock_tool = {
-            "type": "function",
-            "function": {
-                "name": "open_url",
-                "description": "Open a web URL",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"url": {"type": "string"}, "timeout": {"type": "integer"}},
-                },
-            },
-            "_mcp_server": "browser",
-            "_mcp_tool_name": "open_url",
-        }
-        mm.get_cached_tools = lambda mode=None: [mock_tool] if mode == "lazy" else []
-        snippet = mm.get_system_prompt_snippet()
-        self.assertIn("## MCP Servers", snippet)
-        self.assertIn("- open_url(url, timeout) — Open a web URL", snippet)
 
 
 class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
