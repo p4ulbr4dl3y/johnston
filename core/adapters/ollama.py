@@ -75,7 +75,10 @@ class OllamaAdapter(BaseApiAdapter):
                     msg_obj = evt.get("message") or {}
                     content = msg_obj.get("content", "")
                     if content:
-                        yield ("adapter_text", content)
+                        if msg_obj.get("thinking"):
+                            yield ("adapter_thought", content)
+                        else:
+                            yield ("adapter_text", content)
                     for tc in msg_obj.get("tool_calls") or []:
                         if not isinstance(tc, dict):
                             continue

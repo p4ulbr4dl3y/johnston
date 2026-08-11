@@ -6,7 +6,7 @@ query_one / event objects, matching the mocking style in tests/ui/test_screens_p
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App
 from textual.events import Key
@@ -154,6 +154,10 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             return opt_list
 
         screen.query_one = MagicMock(side_effect=fake_qo)
+        # Patch _warmup_tools to an AsyncMock so the on_mount create_task call
+        # schedules a mock coroutine instead of a real one (avoids an unraised
+        # "coroutine never awaited" warning when the test finishes).
+        screen._warmup_tools = AsyncMock()
         with patch("widgets.screens.mcp.asyncio.create_task", return_value=MagicMock()):
             screen.on_mount()
 

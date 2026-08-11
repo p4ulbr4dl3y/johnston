@@ -151,6 +151,9 @@ class GeminiAdapter(BaseApiAdapter):
                                 continue
                             if p.get("text"):
                                 yield ("adapter_text", p["text"])
+                            elif p.get("thought"):
+                                t = p["thought"]
+                                yield ("adapter_thought", t if isinstance(t, str) else json.dumps(t, ensure_ascii=False))
                             elif "functionCall" in p:
                                 fc = p.get("functionCall") or {}
                                 yield (

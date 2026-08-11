@@ -687,6 +687,88 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
 
+    async def test_bot_delta_preserves_whitespace_chunks(self):
+        """Whitespace-only deltas must not be dropped (would glue words together)."""
+        calls = []
+
+        async def stream(prompt, attachments=None):
+            yield ("bot_delta", "hello", "")
+            yield ("bot_delta", " ", "")
+            yield ("bot_delta", "world", "")
+
+        def setup(app):
+            chat_view = app.query_one(ChatView)
+            orig = chat_view.add_bot_message
+
+            async def wrapped_add():
+                msg = await orig()
+                msg.append_stream_content = lambda c: calls.append(c)
+                return msg
+
+            chat_view.add_bot_message = wrapped_add
+
+        await self._run(stream, setup=setup)
+        self.assertEqual("".join(calls), "hello world")
+
+    async def test_bot_delta_whitespace_only_does_not_create_message(self):
+        """A whitespace-only leading delta must not mount an empty bot message."""
+        created = []
+
+        async def stream(prompt, attachments=None):
+            yield ("bot_delta", "   ", "")
+            yield ("bot_delta", "text", "")
+
+        def setup(app):
+            chat_view = app.query_one(ChatView)
+            orig = chat_view.add_bot_message
+
+            async def wrapped_add():
+                msg = await orig()
+                created.append(msg)
+                return msg
+
+            chat_view.add_bot_message = wrapped_add
+
+        await self._run(stream, setup=setup)
+        self.assertEqual(len(created), 1)
+
+    async def test_bot_reset_clears_partial_stream(self):
+        """bot_reset must clear partial streamed text so a retry starts blank."""
+        reset_calls = []
+        appended = []
+
+        async def stream(prompt, attachments=None):
+            yield ("bot_delta", "partial text", "")
+            yield ("bot_reset", "", "")
+            yield ("bot_delta", "fresh", "")
+            yield ("bot_text", "fresh", "")
+
+        def setup(app):
+            chat_view = app.query_one(ChatView)
+            orig = chat_view.add_bot_message
+
+            async def wrapped_add():
+                msg = await orig()
+                msg.reset_stream = unittest.mock.AsyncMock(side_effect=lambda: reset_calls.append(1))
+                msg.append_stream_content = lambda c: appended.append(c)
+                return msg
+
+            chat_view.add_bot_message = wrapped_add
+
+        await self._run(stream, setup=setup)
+        self.assertEqual(len(reset_calls), 1)
+        self.assertEqual("".join(appended), "partial textfresh")
+
+    async def test_bot_reset_without_bot_msg_is_noop(self):
+        """bot_reset with no bot message must not raise."""
+
+        async def stream(prompt, attachments=None):
+            yield ("bot_reset", "", "")
+            yield ("bot_text", "ok", "")
+
+        app = await self._run(stream)
+        self.assertFalse(app.is_generating)
+
     async def test_compaction_save_exception(self):
         async def stream(prompt, attachments=None):
             yield ("event_divider", "Compacted", "")

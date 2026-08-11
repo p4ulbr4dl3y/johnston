@@ -53,6 +53,7 @@ class BotMessage(Vertical):
         self._suppress_content_watch = False
         self._pending_markdown_content: str | None = None
         self._markdown_render_task: asyncio.Task | None = None
+        self._render_failed = False
 
     def compose(self) -> ComposeResult:
         yield self.stream_widget
@@ -85,6 +86,33 @@ class BotMessage(Vertical):
             self.md_widget.display = False
         self.content = content
 
+    async def reset_stream(self) -> None:
+        """Clear partial streamed text on retry so the new attempt starts blank."""
+        self._streaming = False
+        self._suppress_content_watch = True
+        try:
+            self.content = ""
+        finally:
+            self._suppress_content_watch = False
+        if self._stream_update_handle is not None:
+            self._stream_update_handle.cancel()
+            self._stream_update_handle = None
+        self._stream_update_scheduled = False
+        task = self._markdown_render_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self._pending_markdown_content = None
+        try:
+            self.stream_widget.update("")
+        except Exception:
+            pass
+        self.stream_widget.display = False
+        self.md_widget.display = False
+
     def _schedule_stream_update(self) -> None:
         if self._stream_update_scheduled:
             return
@@ -99,8 +127,11 @@ class BotMessage(Vertical):
         self._stream_update_handle = None
         if not self.is_attached:
             return
-        self.stream_widget.update(self.content)
-        self._scroll_if_needed()
+        try:
+            self.stream_widget.update(self.content)
+            self._scroll_if_needed()
+        except Exception:
+            pass
 
     async def set_final_content(self, content: str) -> None:
         """Render final Markdown once and wait until its widget tree is mounted."""
@@ -132,10 +163,17 @@ class BotMessage(Vertical):
             self.md_widget.display = False
             self._scroll_if_needed()
             return
+        self._render_failed = False
         await self._render_markdown(content)
         self._streaming = False
-        self.stream_widget.display = False
-        self.md_widget.display = True
+        if self._render_failed:
+            self._render_failed = False
+            self.stream_widget.update(clean_markdown_for_rendering(content))
+            self.stream_widget.display = True
+            self.md_widget.display = False
+        else:
+            self.stream_widget.display = False
+            self.md_widget.display = True
         self._scroll_if_needed()
 
     async def finalize_stream(self, content: str | None = None) -> None:
@@ -161,6 +199,7 @@ class BotMessage(Vertical):
 
     async def _render_markdown(self, content: str) -> None:
         if not self.md_widget.is_attached:
+            self._render_failed = True
             return
         cleaned = clean_markdown_for_rendering(content)
         try:
@@ -168,7 +207,7 @@ class BotMessage(Vertical):
         except asyncio.CancelledError:
             raise
         except Exception:
-            pass
+            self._render_failed = True
 
     def _scroll_if_needed(self) -> None:
         try:

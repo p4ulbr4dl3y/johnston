@@ -46,7 +46,6 @@ _RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
 _RE_BLOCKQUOTE_BULLET = re.compile(r"^(\s*>\s*)[-*]\s+")
 _RE_LIST_PREFIX = re.compile(r"^(\s*(?:[-*]|\d+\.))\s+(.*)")
 _RE_EXCESS_INDENT = re.compile(r"^(\s+)([-*]|\d+\.)\s+(.*)")
-_RE_EXCESS_NEWLINES = re.compile(r"\n{3,}")
 
 
 def to_snake_case(name: str) -> str:
@@ -245,6 +244,7 @@ def clean_markdown_for_rendering(text: str) -> str:
     lines = text.splitlines()
 
     in_code = False
+    blank_run = 0
     cleaned = []
     for line in lines:
         if line.strip().startswith("```"):
@@ -263,11 +263,7 @@ def clean_markdown_for_rendering(text: str) -> str:
         m_list = _RE_LIST_PREFIX.match(line)
         if m_list:
             prefix, body = m_list.groups()
-            if body.count("*") == 1:
-                body = body.replace("*", "")
             line = f"{prefix} {body}"
-        elif line.count("*") == 1:
-            line = line.replace("*", "")
 
         m = _RE_EXCESS_INDENT.match(line)
         if m:
@@ -275,13 +271,20 @@ def clean_markdown_for_rendering(text: str) -> str:
             new_indent_len = min(len(indent), 8)
             line = (" " * new_indent_len) + marker + " " + content
 
+        if not line.strip():
+            blank_run += 1
+            if blank_run > 1:
+                continue
+        else:
+            blank_run = 0
+
         cleaned.append(line)
 
     if in_code:
         cleaned.append("```")
 
     result = "\n".join(cleaned)
-    return _RE_EXCESS_NEWLINES.sub("\n\n", result)
+    return result.rstrip("\n")
 
 
 def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) -> None:
@@ -305,7 +308,12 @@ def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) ->
                     task.add_done_callback(_done_cb)
                     return
             except RuntimeError:
-                pass
+                # No running loop: close the created coroutine so it isn't left
+                # un-awaited (avoids a "coroutine never awaited" RuntimeWarning).
+                try:
+                    res.close()
+                except Exception:
+                    pass
         if on_done:
             on_done()
     except Exception:
