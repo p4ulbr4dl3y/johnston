@@ -96,7 +96,6 @@ class TestMCPScreen(unittest.TestCase):
 
         keys = [b[0] for b in MCPScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("tab", keys)
 
 
 class TestProvidersScreen(unittest.TestCase):

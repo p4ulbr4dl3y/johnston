@@ -88,7 +88,7 @@ def print_mcp():
 
     tools_by_server = {}
     try:
-        active_tools = mgr.get_active_tools(mode="all")
+        active_tools = mgr.get_active_tools()
         for t in active_tools:
             s_name = t.get("_mcp_server")
             t_name = t.get("_mcp_tool_name")

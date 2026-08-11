@@ -19,7 +19,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         manager = self._manager_without_init()
         manager.load_servers = MagicMock(
             return_value=[
-                {"name": "docs", "mode": "lazy", "command": "docs-server"},
+                {"name": "docs", "command": "docs-server"},
             ]
         )
         manager.clients["docs"] = MagicMock(
@@ -35,8 +35,8 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
         snippet = manager.get_system_prompt_snippet()
 
-        self.assertIn("docs (Lazy)", snippet)
-        self.assertIn("search(query)", snippet)
+        self.assertIn("search (from docs)", snippet)
+        self.assertIn("## MCP Tools", snippet)
         manager.get_active_tools.assert_not_called()
 
     async def test_concurrent_async_refreshes_are_coalesced(self):
@@ -44,7 +44,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
         release = asyncio.Event()
 
-        async def slow_refresh(mode="eager"):
+        async def slow_refresh():
             await release.wait()
             return [{"type": "function", "function": {"name": "search"}}]
 
@@ -64,7 +64,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         results = await gather_task
 
         self.assertEqual(results[0], results[1])
-        manager.get_active_tools_async.assert_awaited_once_with(mode="eager")
+        manager.get_active_tools_async.assert_awaited_once_with()
 
     async def test_recent_refresh_uses_memory_cache(self):
         manager = self._manager_without_init()

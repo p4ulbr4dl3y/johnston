@@ -21,14 +21,13 @@ from widgets.screens.constants import (
 
 
 class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
-    """Modal screen for enabling/disabling and toggling Eager/Lazy modes of MCP servers"""
+    """Modal screen for enabling/disabling MCP servers"""
 
     search_nav_option_list_id = "mcp-option-list"
     search_nav_filtered_attr = "filtered_servers"
 
     BINDINGS = [
         ("escape", "cancel", "Close"),
-        ("tab", "toggle_mode", "Toggle Eager/Lazy"),
     ]
 
     def __init__(self):
@@ -44,7 +43,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield Markdown("### **Manage MCP Servers**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search MCP servers...", id=MODAL_SEARCH_INPUT_ID)
             yield OptionList(id="mcp-option-list")
-            yield Label("enter: toggle • tab: mode • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -65,7 +64,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     async def _warmup_tools(self) -> None:
         try:
-            await asyncio.to_thread(self.mm.get_active_tools, "all")
+            await asyncio.to_thread(self.mm.get_active_tools)
             if getattr(self, "is_mounted", True):
                 self.refresh_list()
         except Exception:
@@ -111,11 +110,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         for s in self.filtered_servers:
             disabled = s.get("disabled", False)
             scope_tag = status_tag(s["scope"])
-            mode_tag = status_tag(s.get("mode", "eager"))
             name = s["name"]
 
             if disabled:
-                opt_list.add_option(f"{status_tag('OFF')} {scope_tag} {mode_tag} {name}")
+                opt_list.add_option(f"{status_tag('OFF')} {scope_tag} {name}")
                 continue
 
             tool_cnt = tools_per_server.get(name, 0)
@@ -124,21 +122,21 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             if tool_cnt > 0:
                 tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
-                opt_list.add_option(f"{status_tag('ON')} {scope_tag} {mode_tag} {name} — {tool_info}")
+                opt_list.add_option(f"{status_tag('ON')} {scope_tag} {name} — {tool_info}")
             elif url and not cmd:
-                opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — URL unsupported")
+                opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — URL unsupported")
             else:
                 client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
                 err = getattr(client, "last_error", None) if client else None
                 if err and "Process start failed" in err:
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Start failed")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Start failed")
                 elif err and "timeout" in err.lower():
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Timeout")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Timeout")
                 elif err:
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {mode_tag} {name} — Error")
+                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Error")
                 else:
                     stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
-                    opt_list.add_option(f"{stag} {scope_tag} {mode_tag} {name}")
+                    opt_list.add_option(f"{stag} {scope_tag} {name}")
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
             opt_list.highlighted = prev_highlighted
@@ -169,18 +167,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         if hasattr(self.app, "refresh_status_footer"):
             self.app.refresh_status_footer()
         self.dismiss(None)
-
-    def action_toggle_mode(self) -> None:
-        opt_list = self.query_one("#mcp-option-list", OptionList)
-        highlighted = opt_list.highlighted
-        if highlighted is not None and 0 <= highlighted < len(self.filtered_servers):
-            target = self.filtered_servers[highlighted]
-            s_name = target["name"]
-            self.mm.toggle_mode(s_name)
-            if hasattr(self.app, "refresh_status_footer"):
-                self.app.refresh_status_footer()
-            self.refresh_list()
-            opt_list.highlighted = highlighted
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_servers):

@@ -12,7 +12,7 @@ from tools.base import (
 
 class CallMCPTool(BaseTool):
     name = "call_mcp"
-    description = "Execute a lazy-loaded MCP tool by server, tool name, and arguments."
+    description = "Execute an MCP tool by server, tool name, and arguments."
     schema = {
         "type": "function",
         "function": {

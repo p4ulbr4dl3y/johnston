@@ -51,7 +51,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
                 {"name": "srv1", "command": "python", "disabled": False, "mode": "eager", "scope": "global"}
             ]
             mock_mgr.toggle_server.return_value = False
-            mock_mgr.toggle_mode.return_value = "lazy"
             mock_get_mgr.return_value = mock_mgr
 
             screen = MCPScreen()
@@ -61,10 +60,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 # Toggle disabled state
                 await pilot.press("enter")
-                await pilot.pause()
-
-                # Toggle eager/lazy mode
-                await pilot.press("m")
                 await pilot.pause()
 
                 # Close

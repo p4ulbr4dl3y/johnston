@@ -71,8 +71,7 @@ MCP_MD = """# MCP (Model Context Protocol) Server Configuration Reference
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
       "env": {},
-      "disabled": false,
-      "mode": "eager"
+      "disabled": false
     }
   }
 }

@@ -225,10 +225,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     # Check if the tool is an active MCP tool
     if hasattr(mcp_mgr, "get_active_tools_async") and not type(mcp_mgr).__name__.endswith("Mock"):
-        res_or_coro = mcp_mgr.get_active_tools_async(mode=None)
+        res_or_coro = mcp_mgr.get_active_tools_async()
         active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
     else:
-        active_mcp_tools = mcp_mgr.get_active_tools(mode=None) or []
+        active_mcp_tools = mcp_mgr.get_active_tools() or []
     is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(
         mcp_mgr.get_capabilities_for_exposed_tool(name)
     )

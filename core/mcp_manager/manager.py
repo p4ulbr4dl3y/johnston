@@ -108,7 +108,6 @@ class MCPManager:
                         v_copy = dict(v)
                         v_copy["name"] = k
                         v_copy["scope"] = "global"
-                        v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
                 logger.warning("Failed to load global MCP servers config", exc_info=True)
@@ -124,7 +123,6 @@ class MCPManager:
                         v_copy = dict(v)
                         v_copy["name"] = k
                         v_copy["scope"] = "project"
-                        v_copy["mode"] = v.get("mode", "eager")
                         servers[k] = v_copy
             except Exception:
                 logger.warning("Failed to load project MCP servers config", exc_info=True)
@@ -163,7 +161,6 @@ class MCPManager:
                     "args": target.get("args"),
                     "env": target.get("env"),
                     "url": target.get("url"),
-                    "mode": target.get("mode", "eager"),
                     "disabled": target.get("disabled", False),
                 }
                 server_dict.update(key_updates)
@@ -222,40 +219,14 @@ class MCPManager:
 
         return not new_disabled
 
-    def toggle_mode(self, name: str) -> str:
-        """
-        Toggles mode between 'eager' and 'lazy' for server by name.
-        Saves updated mode to appropriate config file.
-        Returns new mode string ('eager' or 'lazy').
-        """
-        servers = self.load_servers()
-        target = next((s for s in servers if s["name"] == name), None)
-        if not target:
-            return "eager"
-
-        curr_mode = target.get("mode", "eager")
-        new_mode = "lazy" if curr_mode == "eager" else "eager"
-
-        if self._update_server_config(name, {"mode": new_mode}) is None:
-            return "eager"
-
-        return new_mode
-
-    def get_active_tools(self, mode: Optional[str] = "eager") -> List[Dict[str, Any]]:
-        """
-        Connects to enabled MCP servers and returns their tools in OpenAI function format.
-        mode can be "eager" (default), "lazy", or "all" (or None for all).
-        """
+    def get_active_tools(self) -> List[Dict[str, Any]]:
+        """Connects to enabled MCP servers and returns their tools in OpenAI function format."""
         tools: List[Dict[str, Any]] = []
         servers = self.load_servers()
         seen_names: Dict[str, str] = {}  # tool_name -> server_name
 
         for s in servers:
             if s.get("disabled", False):
-                continue
-
-            s_mode = s.get("mode", "eager")
-            if mode and mode != "all" and s_mode != mode:
                 continue
 
             name = s["name"]
@@ -271,16 +242,12 @@ class MCPManager:
 
             client = self.clients.get(name)
             if not client:
-                if s_mode == "lazy" and mode not in ("lazy", "all"):
-                    continue
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
                 if client.start():
                     self.clients[name] = client
                 else:
                     continue
             else:
-                if s_mode == "lazy" and mode not in ("lazy", "all"):
-                    continue
                 if self._tools_fetch_stale(name):
                     try:
                         client.fetch_tools()
@@ -295,17 +262,13 @@ class MCPManager:
 
         return tools
 
-    async def get_active_tools_async(self, mode: Optional[str] = "eager") -> List[Dict[str, Any]]:
+    async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         tools: List[Dict[str, Any]] = []
         servers = self.load_servers()
         seen_names: Dict[str, str] = {}
 
         for s in servers:
             if s.get("disabled", False):
-                continue
-
-            s_mode = s.get("mode", "eager")
-            if mode and mode != "all" and s_mode != mode:
                 continue
 
             name = s["name"]
@@ -321,16 +284,12 @@ class MCPManager:
 
             client = self.clients.get(name)
             if not client:
-                if s_mode == "lazy" and mode not in ("lazy", "all"):
-                    continue
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
                 if await client.start_async():
                     self.clients[name] = client
                 else:
                     continue
             else:
-                if s_mode == "lazy" and mode not in ("lazy", "all"):
-                    continue
                 if self._tools_fetch_stale(name):
                     try:
                         await client.fetch_tools_async()
@@ -345,16 +304,13 @@ class MCPManager:
 
         return tools
 
-    def get_cached_tools(self, mode: Optional[str] = "eager") -> List[Dict[str, Any]]:
+    def get_cached_tools(self) -> List[Dict[str, Any]]:
         """Return already discovered tools without starting processes or performing I/O."""
         tools: List[Dict[str, Any]] = []
         seen_names: Dict[str, str] = {}
 
         for server in self.load_servers():
             if server.get("disabled", False):
-                continue
-            server_mode = server.get("mode", "eager")
-            if mode and mode != "all" and server_mode != mode:
                 continue
 
             server_name = server.get("name", "")
@@ -373,14 +329,11 @@ class MCPManager:
         """Refresh MCP schemas asynchronously, coalescing concurrent callers."""
         now = time.monotonic()
         if now - self._tools_refresh_time < max_age:
-            return self.get_cached_tools(mode="all")
+            return self.get_cached_tools()
 
         task = self._tools_refresh_task
         if task is None or task.done():
-            # Only warm up eager servers here. Lazy servers stay unstarted
-            # until an explicit call_mcp; auto-starting them spawns subprocess
-            # reader threads that block interpreter shutdown in headless mode.
-            task = asyncio.create_task(self.get_active_tools_async(mode="eager"))
+            task = asyncio.create_task(self.get_active_tools_async())
             self._tools_refresh_task = task
 
         try:
@@ -463,7 +416,7 @@ class MCPManager:
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name, namespaced server_name__tool_name, or explicit target_server.
         """
-        active_tools = self.get_active_tools(mode="all")
+        active_tools = self.get_active_tools()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
             return client.call_tool(o_name, arguments, timeout=timeout)
@@ -476,7 +429,7 @@ class MCPManager:
         target_server: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> Optional[str]:
-        active_tools = await self.get_active_tools_async(mode="all")
+        active_tools = await self.get_active_tools_async()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
             return await client.call_tool_async(o_name, arguments, timeout=timeout)
@@ -486,7 +439,7 @@ class MCPManager:
         """
         Returns the raw parameters inputSchema dict for a specific tool on an MCP server.
         """
-        active_tools = self.get_active_tools(mode="all")
+        active_tools = self.get_active_tools()
         for t in active_tools:
             s_name = t.get("_mcp_server")
             o_name = t.get("_mcp_tool_name")
@@ -498,48 +451,16 @@ class MCPManager:
         return None
 
     def get_system_prompt_snippet(self) -> str:
-        """
-        Returns a prompt snippet summarizing currently enabled MCP servers.
-        Formats lazy MCP servers under <mcp_servers> block and eager tools if present.
-        """
-        eager_tools = self.get_cached_tools(mode="eager")
-        lazy_tools = self.get_cached_tools(mode="lazy")
-
-        if not eager_tools and not lazy_tools:
+        """Returns a prompt snippet summarizing currently enabled MCP tools."""
+        eager_tools = self.get_cached_tools()
+        if not eager_tools:
             return ""
 
-        sections = []
+        eager_lines = ["## MCP Tools", "Available MCP tools in system context:"]
+        for t in eager_tools:
+            fn = t.get("function", {})
+            desc = fn.get("description", "")
+            desc_str = f" — {desc}" if desc else ""
+            eager_lines.append(f"- {fn.get('name')} (from {t.get('_mcp_server')}){desc_str}")
 
-        if lazy_tools:
-            lazy_by_server: Dict[str, List[Dict[str, Any]]] = {}
-            for t in lazy_tools:
-                s_name = t["_mcp_server"]
-                lazy_by_server.setdefault(s_name, []).append(t)
-
-            lazy_lines = [
-                "## MCP Servers",
-                "The following MCP servers are loaded lazily. Use `call_mcp` (server, tool, arguments) to execute.",
-            ]
-            for s_name, t_list in lazy_by_server.items():
-                lazy_lines.append(f"\n### {s_name} (Lazy)")
-                for t in t_list:
-                    fn = t.get("function", {})
-                    name = fn.get("name", "")
-                    desc = fn.get("description", "")
-                    desc_str = f" — {desc}" if desc else ""
-                    params = fn.get("parameters", {}).get("properties", {})
-                    param_names = ", ".join(params.keys()) if params else ""
-                    sig = f"{name}({param_names})" if param_names else name
-                    lazy_lines.append(f"- {sig}{desc_str}")
-            sections.append("\n".join(lazy_lines))
-
-        if eager_tools:
-            eager_lines = ["## Eager MCP Tools", "Available Eager MCP tools in system context:"]
-            for t in eager_tools:
-                fn = t.get("function", {})
-                desc = fn.get("description", "")
-                desc_str = f" — {desc}" if desc else ""
-                eager_lines.append(f"- {fn.get('name')} (from {t.get('_mcp_server')}){desc_str}")
-            sections.append("\n".join(eager_lines))
-
-        return "\n\n".join(sections)
+        return "\n".join(eager_lines)
