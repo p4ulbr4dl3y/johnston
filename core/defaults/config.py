@@ -33,12 +33,6 @@ DEFAULT_IGNORE_DIRS = {
 # Permissions Defaults
 DEFAULT_PERMISSIONS = {
     "default": "ask",
-    "groups": {
-        "read": "allow",
-        "write": "allow",
-        "net": "ask",
-        "exec": "ask",
-    },
     "tools": {},
     "shell_guard": {
         "enabled": True,

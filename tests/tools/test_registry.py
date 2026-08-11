@@ -131,6 +131,9 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res, "MULTI_EDIT_OK")
 
     async def test_execute_tool_execution_exception(self):
+        from core.permission_manager import PermissionManager
+
+        PermissionManager.get_instance().set_session_override("read", "allow")
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
             res = await execute_tool("read", {"path": "foo.txt"})
             self.assertIn("ERR: execute 'read': Execute failed", res)

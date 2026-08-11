@@ -11,6 +11,3 @@ LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 WORKTREES_DIR = os.path.join(CONFIG_DIR, "worktrees")
 PROMPT_HISTORY_FILE = os.path.join(CONFIG_DIR, "prompt_history.json")
-
-# Permissions Defaults (path to project-level permissions file)
-PROJECT_PERMISSIONS_FILE = ".johnston/permissions.json"

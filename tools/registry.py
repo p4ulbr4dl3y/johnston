@@ -172,15 +172,10 @@ async def check_and_confirm_permission(
         app_obj = context_or_app
     else:
         app_obj = getattr(context_or_app, "app", context_or_app)
-    project_dir = (
-        getattr(context_or_app, "cwd", None)
-        or getattr(context_or_app, "project_dir", None)
-        or getattr(app_obj, "project_dir", None)
-    )
     if action is not None:
         action, reason = action, action_reason
     else:
-        action, reason = pm.check_permission(target_perm_name, args, project_dir=project_dir)
+        action, reason = pm.check_permission(target_perm_name, args)
 
     if action == "deny":
         return format_tool_error("denied", name=display_name, detail="by permission policy")

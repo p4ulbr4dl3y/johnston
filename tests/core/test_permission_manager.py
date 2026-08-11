@@ -18,19 +18,19 @@ class TestPermissionManager(unittest.TestCase):
         self.config_patcher.stop()
 
     def test_default_permissions(self):
-        # Read group -> allow by default
+        # No groups anymore: read falls back to default 'ask'
         action, _ = self.pm.check_permission("read")
-        self.assertEqual(action, "allow")
+        self.assertEqual(action, "ask")
 
-        # Write group -> allow by default
+        # No groups anymore: create falls back to default 'ask'
         action, _ = self.pm.check_permission("create")
-        self.assertEqual(action, "allow")
+        self.assertEqual(action, "ask")
 
-        # Exec group -> ask by default
+        # shell falls back to default 'ask'
         action, _ = self.pm.check_permission("shell", {"command": "ls"})
         self.assertEqual(action, "ask")
 
-        # Net group -> ask by default
+        # web_fetch falls back to default 'ask'
         action, _ = self.pm.check_permission("web_fetch")
         self.assertEqual(action, "ask")
 
@@ -51,71 +51,60 @@ class TestPermissionManager(unittest.TestCase):
         action_after, _ = self.pm.check_permission("web_fetch")
         self.assertEqual(action_after, "allow")
 
-    def test_project_permissions_override(self):
+    def test_global_tool_permissions_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            proj_dir = os.path.join(tmpdir, ".johnston")
-            os.makedirs(proj_dir, exist_ok=True)
-            perm_file = os.path.join(proj_dir, "permissions.json")
-
-            with open(perm_file, "w", encoding="utf-8") as f:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump(
                     {
                         "permissions": {
-                            "groups": {"exec": "allow"},
-                            "tools": {"web_fetch": "deny"},
+                            "default": "ask",
+                            "tools": {"shell": "allow", "web_fetch": "deny"},
                         }
                     },
                     f,
                 )
 
-            # exec group should now be allow for safe command
-            action_exec, _ = self.pm.check_permission("shell", {"command": "echo hi"}, project_dir=tmpdir)
-            self.assertEqual(action_exec, "allow")
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                # Explicit tool permission -> allow for safe command
+                action_exec, _ = self.pm.check_permission("shell", {"command": "echo hi"})
+                self.assertEqual(action_exec, "allow")
 
-            # web_fetch tool override should be deny
-            action_net, _ = self.pm.check_permission("web_fetch", project_dir=tmpdir)
-            self.assertEqual(action_net, "deny")
+                # Explicit tool permission -> deny
+                action_net, _ = self.pm.check_permission("web_fetch")
+                self.assertEqual(action_net, "deny")
 
     def test_fail_closed_on_invalid_action_values(self):
         # Tool-level junk action must NOT silently allow.
         with tempfile.TemporaryDirectory() as tmpdir:
-            proj_dir = os.path.join(tmpdir, ".johnston")
-            os.makedirs(proj_dir, exist_ok=True)
-            perm_file = os.path.join(proj_dir, "permissions.json")
-            with open(perm_file, "w", encoding="utf-8") as f:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"shell": "BOGUS"}}}, f)
-            action, _ = self.pm.check_permission("shell", {"command": "echo hi"}, project_dir=tmpdir)
-            self.assertEqual(action, "ask", "invalid action value must fail closed to 'ask', not 'allow'")
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                action, _ = self.pm.check_permission("shell", {"command": "echo hi"})
+                self.assertEqual(action, "ask", "invalid action value must fail closed to 'ask', not 'allow'")
 
         # Whitespace around a valid action is tolerated (normalized), not silently treated as junk.
         with tempfile.TemporaryDirectory() as tmpdir:
-            proj_dir = os.path.join(tmpdir, ".johnston")
-            os.makedirs(proj_dir, exist_ok=True)
-            perm_file = os.path.join(proj_dir, "permissions.json")
-            with open(perm_file, "w", encoding="utf-8") as f:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": " allow "}}}, f)
-            action, _ = self.pm.check_permission("web_fetch", project_dir=tmpdir)
-            self.assertEqual(action, "allow")
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                action, _ = self.pm.check_permission("web_fetch")
+                self.assertEqual(action, "allow")
 
-        # Group-level junk action
+        # Default junk action (tool not covered by any explicit setting -> falls back to default)
         with tempfile.TemporaryDirectory() as tmpdir:
-            proj_dir = os.path.join(tmpdir, ".johnston")
-            os.makedirs(proj_dir, exist_ok=True)
-            perm_file = os.path.join(proj_dir, "permissions.json")
-            with open(perm_file, "w", encoding="utf-8") as f:
-                json.dump({"permissions": {"groups": {"exec": "BOGUS"}}}, f)
-            action, _ = self.pm.check_permission("shell", {"command": "echo hi"}, project_dir=tmpdir)
-            self.assertEqual(action, "ask")
-
-        # Default junk action (tool not covered by any group -> falls back to default)
-        with tempfile.TemporaryDirectory() as tmpdir:
-            proj_dir = os.path.join(tmpdir, ".johnston")
-            os.makedirs(proj_dir, exist_ok=True)
-            perm_file = os.path.join(proj_dir, "permissions.json")
-            with open(perm_file, "w", encoding="utf-8") as f:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"default": "WHATEVER"}}, f)
-            action, _ = self.pm.check_permission("no_such_tool_xyz", project_dir=tmpdir)
-            self.assertEqual(action, "ask")
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                action, _ = self.pm.check_permission("no_such_tool_xyz")
+                self.assertEqual(action, "ask")
+
+        # Unknown tool with no config -> default 'ask'
+        action, _ = self.pm.check_permission("no_such_tool_xyz")
+        self.assertEqual(action, "ask")
 
     def test_session_override_invalid_action_ignored(self):
         self.pm.set_session_override("web_fetch", "bogus")
@@ -132,7 +121,24 @@ class TestPermissionManager(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.pm.update_permission("not_a_type", "web_fetch", "allow")
         with self.assertRaises(ValueError):
+            self.pm.update_permission("group", "read", "allow")
+        with self.assertRaises(ValueError):
             self.pm.update_permission("shell_guard", "shell_guard", "maybe")
+
+    def test_update_permission_writes_global_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.pm.update_permission("tool", "web_fetch", "deny")
+                self.pm.update_permission("shell_guard", "shell_guard", "deny")
+
+                # Tool permission persisted globally
+                action, _ = self.pm.check_permission("web_fetch")
+                self.assertEqual(action, "deny")
+
+                # ShellGuard disabled -> unsafe command is no longer auto-denied (falls to 'ask')
+                action, _ = self.pm.check_permission("shell", {"command": "rm -rf /"})
+                self.assertEqual(action, "ask")
 
     def test_normalize_action(self):
         self.assertEqual(self.pm.normalize_action("  ALLOW "), "allow")
