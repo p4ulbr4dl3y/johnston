@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 from core.defaults.linters import NOISE_PREFIXES, PRESET_LINTERS
-from core.platform_utils import is_windows, read_json
+from core.platform_utils import decode_output, is_windows, read_json
 
 GLOBAL_LINTERS_FILE = os.path.join(CONFIG_DIR, "linters.json")
 
@@ -295,7 +295,7 @@ async def _exec_cmd(cmd: List[str]) -> Optional[str]:
         try:
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3.0)
             if proc.returncode != 0 and stdout:
-                return stdout.decode("utf-8", errors="replace").strip()
+                return decode_output(stdout).strip()
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()

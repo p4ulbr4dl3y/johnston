@@ -1,4 +1,6 @@
+import asyncio
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -7,6 +9,24 @@ from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
+
+
+async def _ruff_runnable(timeout: float = 10.0) -> bool:
+    """True if `uvx ruff --version` succeeds (ruff installed or installable)."""
+    if not shutil.which("uvx"):
+        return False
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "uvx",
+            "ruff",
+            "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=timeout)
+        return proc.returncode == 0
+    except Exception:
+        return False
 
 
 class MockAgent:
@@ -220,6 +240,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(linter_cfg, "w", encoding="utf-8") as f:
             f.write('{"linters": {"python": {"enabled": true}}}')
         manager = LintersManager(config_file=linter_cfg)
+
+        # The python preset runs `uvx ruff`; skip on machines where ruff is not
+        # actually runnable (cold uvx cache / no network) instead of failing.
+        if not await _ruff_runnable():
+            self.skipTest("ruff (via uvx) not runnable on this machine; skipping linter integration test")
 
         syntax_path = os.path.join(self.test_dir, "syntax.py")
         with open(syntax_path, "w", encoding="utf-8") as f:
