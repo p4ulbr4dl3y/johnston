@@ -241,6 +241,10 @@ class AnthropicAdapter(BaseApiAdapter):
                             txt = delta.get("text", "")
                             if txt:
                                 yield ("adapter_text", txt)
+                        elif dtype == "thinking_delta":
+                            thought = delta.get("thinking", "")
+                            if thought:
+                                yield ("adapter_thought", thought)
                         elif dtype == "input_json_delta":
                             if idx in tool_blocks:
                                 tool_blocks[idx]["args_buf"] += delta.get("partial_json", "")

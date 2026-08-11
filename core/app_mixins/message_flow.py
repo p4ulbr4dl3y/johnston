@@ -185,10 +185,20 @@ class MessageFlowMixin:
                         await chat_view.add_user_message(q_msg, attachments=q_atts)
                     await self._create_git_checkpoint_async(chat_view)
                 elif event_type == "bot_delta":
-                    if val1.strip():
+                    if val1:
                         if bot_msg is None:
+                            if not val1.strip():
+                                continue
                             bot_msg = await chat_view.add_bot_message()
                         bot_msg.append_stream_content(val1)
+                elif event_type == "bot_reset":
+                    # A retry is restarting the reply from scratch: drop the partial
+                    # text streamed so far so it doesn't duplicate the new attempt.
+                    if bot_msg is not None:
+                        try:
+                            await bot_msg.reset_stream()
+                        except Exception:
+                            pass
                 elif event_type in ("bot_text", "outro"):
                     if val1.strip():
                         if bot_msg is None:

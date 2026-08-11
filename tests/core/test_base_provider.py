@@ -744,6 +744,68 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         bot_texts = [e for e in events if e[0] == "bot_text"]
         self.assertIn("File read complete", bot_texts[-1][1])
 
+    async def test_duplicate_tool_calls_are_all_executed(self):
+        """Identical tool calls (same name+args) must all run, not be dropped by dedup."""
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")
+        self.addAsyncCleanup(agent.close)
+
+        def make_tool_call(idx, id_, args):
+            tc = unittest.mock.MagicMock()
+            tc.index = idx
+            tc.id = id_
+            tc.function.name = "read"
+            tc.function.arguments = args
+            return tc
+
+        def make_chunk(tool_calls, content=None):
+            delta = unittest.mock.MagicMock()
+            delta.reasoning_content = None
+            delta.reasoning = None
+            delta.model_extra = None
+            delta.content = content
+            delta.tool_calls = tool_calls
+            chunk = unittest.mock.MagicMock(spec=["choices"])
+            chunk.choices = [unittest.mock.MagicMock(delta=delta)]
+            return chunk
+
+        # Two identical tool calls in one assistant turn.
+        tool_chunks = [
+            make_chunk([make_tool_call(0, "tc_1", '{"path": "a.txt"}')]),
+            make_chunk([make_tool_call(1, "tc_2", '{"path": "a.txt"}')]),
+        ]
+        text_chunk = make_chunk(None, content="done")
+
+        async def aiter_for(chunks):
+            for c in chunks:
+                yield c
+
+        resp_tools = unittest.mock.MagicMock()
+        resp_tools.__aiter__ = lambda *a, **k: aiter_for(tool_chunks)
+        resp_text = unittest.mock.MagicMock()
+        resp_text.__aiter__ = lambda *a, **k: aiter_for([text_chunk])
+
+        mock_responses = [resp_tools, resp_text]
+
+        async def mock_create(*args, **kwargs):
+            return mock_responses.pop(0)
+
+        executed = []
+
+        async def fake_execute(name, args, app=None):
+            executed.append((name, dict(args)))
+            return "result"
+
+        with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
+            with unittest.mock.patch("core.base_provider.agent.execute_tool", side_effect=fake_execute):
+                events = []
+                async for evt in agent.stream_steps("read twice"):
+                    events.append(evt)
+
+        tool_evts = [e for e in events if e[0] == "tool"]
+        self.assertEqual(len(tool_evts), 2)
+        self.assertEqual(len(executed), 2)
+        self.assertEqual(executed, [("read", {"path": "a.txt"}), ("read", {"path": "a.txt"})])
+
     def test_vision_error_sanitization_and_hint(self):
         agent = BaseAgent(api_key="t", model="non-vision-model", base_url="http://t", provider_key="tprov")
         self.addAsyncCleanup(agent.close)
@@ -1289,7 +1351,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             async for evt in agent.stream_steps("test"):
                 events.append(evt)
 
-        self.assertIn(("bot_delta", "", ""), events)
+        self.assertIn(("bot_reset", "", ""), events)
         retry_notices = [e for e in events if e[0] == "thinking" and "[Retry 1/2]" in e[1]]
         self.assertEqual(len(retry_notices), 1)
         self.assertEqual(events[-1], ("bot_text", "done", ""))

@@ -416,6 +416,23 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
 
+    async def test_stream_thinking_delta(self):
+        lines = [
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"let me"}}',
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" think"}}',
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
+            'data: {"type":"message_stop"}',
+        ]
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e
+                async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        thoughts = "".join(e[1] for e in events if e[0] == "adapter_thought")
+        self.assertEqual(thoughts, "let me think")
+        texts = "".join(e[1] for e in events if e[0] == "adapter_text")
+        self.assertEqual(texts, "Hello")
+
 
 class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
     async def test_stream_text_and_usage(self):
@@ -443,6 +460,30 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
+
+    async def test_stream_thinking(self):
+        lines = [
+            'data: {"candidates":[{"content":{"parts":[{"thought":"hmm"},{"text":"Hello"}]}}]}',
+            'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
+        ]
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        thoughts = "".join(e[1] for e in events if e[0] == "adapter_thought")
+        self.assertEqual(thoughts, "hmm")
+        texts = "".join(e[1] for e in events if e[0] == "adapter_text")
+        self.assertEqual(texts, "Hello")
+
+    async def test_stream_thinking_non_str_serialized(self):
+        lines = ['data: {"candidates":[{"content":{"parts":[{"thought":{"inner":"deep"}}]}}]}']
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        thoughts = [e[1] for e in events if e[0] == "adapter_thought"]
+        self.assertEqual(len(thoughts), 1)
+        self.assertIn("deep", thoughts[0])
 
 
 class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
@@ -473,6 +514,21 @@ class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
+
+    async def test_stream_thinking_content(self):
+        lines = [
+            '{"message":{"content":"secret thoughts","thinking":true},"done":false}',
+            '{"message":{"content":"Hello"},"done":false}',
+            '{"done":true,"prompt_eval_count":5,"eval_count":0}',
+        ]
+        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        thoughts = "".join(e[1] for e in events if e[0] == "adapter_thought")
+        self.assertEqual(thoughts, "secret thoughts")
+        texts = "".join(e[1] for e in events if e[0] == "adapter_text")
+        self.assertEqual(texts, "Hello")
 
 
 class TestAdapterMessageEdgeCases(unittest.TestCase):

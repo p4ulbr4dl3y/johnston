@@ -330,6 +330,14 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     full_assistant_parts.append(payload)
                                     full_assistant_text = "".join(full_assistant_parts)
                                     yield ("bot_delta", payload, "")
+                                elif tag == "adapter_thought":
+                                    if not thinking_started:
+                                        yield ("thinking_start", "Thinking...", "")
+                                        thinking_started = True
+                                        thinking_t0 = time.time()
+                                    active_thought_parts.append(payload)
+                                    active_thought = "".join(active_thought_parts)
+                                    yield ("thinking_delta", payload, "")
                                 elif tag == "adapter_tool_call":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
@@ -524,7 +532,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             jitter = random.uniform(0, 0.5 * delay)
                             actual_delay = delay + jitter
                             if full_assistant_text:
-                                yield ("bot_delta", "", "")
+                                # Signal the UI to drop the partially-streamed text so the
+                                # retried attempt starts from a blank reply (no duplication).
+                                yield ("bot_reset", "", "")
                             yield (
                                 "thinking",
                                 f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...",
@@ -563,16 +573,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 # order usually matches, but delta tool_calls can arrive out of order on
                 # some providers, so sort explicitly by the tool-call index key.
                 ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
-
-                # Deduplicate identical tool calls streamed by proxy/noisy providers
-                unique_calls = []
-                seen_signatures = set()
-                for tc in ordered_calls:
-                    sig = (tc["name"], tc["arguments"].strip())
-                    if sig not in seen_signatures:
-                        seen_signatures.add(sig)
-                        unique_calls.append(tc)
-                ordered_calls = unique_calls
 
                 assistant_tool_msg = {
                     "role": "assistant",

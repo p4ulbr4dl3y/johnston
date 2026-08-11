@@ -114,7 +114,21 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
         self.assertIn("   * Double bullet item", cleaned)
         self.assertIn(" * **Drafting:** label", cleaned)
         self.assertIn("     > Blockquote bullet", cleaned)
-        self.assertIn(" * Text: Wait, unpaired star", cleaned)
+        # Single asterisks in prose are preserved (not stripped as "unpaired italic").
+        self.assertIn(" * Text: *Wait, unpaired star", cleaned)
+
+    def test_clean_markdown_preserves_single_asterisks(self):
+        cases = [
+            "def f(*args): return x",
+            "2 * 3 = 6",
+            "from x import *",
+            "value = a * b",
+            "Filename: *.py",
+            "`rm *.py`",
+            "5*5=25",
+        ]
+        for raw in cases:
+            self.assertEqual(clean_markdown_for_rendering(raw), raw)
 
     def test_tool_call_widget_extracts_mcp_info(self):
         # Case 1: Standard lowercase keys
@@ -338,36 +352,44 @@ class TestMarkdownHelpers(unittest.TestCase):
             safe_update_markdown(md3, "content", on_done=lambda: calls2.append(1))
         self.assertEqual(calls2, [1])
 
-    async def test_safe_update_markdown_awaitable_path(self):
+    def test_safe_update_markdown_awaitable_path(self):
         from textual.widgets import Markdown
 
-        md = Markdown("")
+        async def _run():
+            md = Markdown("")
 
-        async def completed_coro():
-            return None
+            async def completed_coro():
+                return None
 
-        md.update = MagicMock(return_value=completed_coro())
-        calls = []
-        with patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True):
-            safe_update_markdown(md, "content", on_done=lambda: calls.append(1))
-            await asyncio.sleep(0.01)
+            md.update = MagicMock(return_value=completed_coro())
+            calls = []
+            with patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True):
+                safe_update_markdown(md, "content", on_done=lambda: calls.append(1))
+                await asyncio.sleep(0.01)
+            return calls
+
+        calls = asyncio.run(_run())
         self.assertEqual(calls, [1])
 
-    async def test_safe_update_markdown_no_running_loop(self):
+    def test_safe_update_markdown_no_running_loop(self):
         from textual.widgets import Markdown
 
-        md = Markdown("")
+        async def _run():
+            md = Markdown("")
 
-        async def completed_coro():
-            return None
+            async def completed_coro():
+                return None
 
-        md.update = MagicMock(return_value=completed_coro())
-        calls = []
-        with (
-            patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True),
-            patch("asyncio.get_running_loop", side_effect=RuntimeError),
-        ):
-            safe_update_markdown(md, "content", on_done=lambda: calls.append(1))
+            md.update = MagicMock(return_value=completed_coro())
+            calls = []
+            with (
+                patch.object(type(md), "is_attached", new_callable=PropertyMock, return_value=True),
+                patch("asyncio.get_running_loop", side_effect=RuntimeError),
+            ):
+                safe_update_markdown(md, "content", on_done=lambda: calls.append(1))
+            return calls
+
+        calls = asyncio.run(_run())
         self.assertEqual(calls, [1])
 
     def test_markdown_block_inline_code_style(self):
@@ -399,7 +421,21 @@ class TestCleanMarkdownExtended(unittest.TestCase):
         raw = "\t- item\nplain *star\n"
         cleaned = clean_markdown_for_rendering(raw)
         self.assertIn("    - item", cleaned)
-        self.assertIn("plain star", cleaned)
+        # Single asterisk in prose is preserved.
+        self.assertIn("plain *star", cleaned)
+
+    def test_clean_markdown_preserves_blank_lines_in_code_fence(self):
+        raw = "```python\ndef f():\n\n\n    return x\n```\n\n- real list"
+        cleaned = clean_markdown_for_rendering(raw)
+        # Blank lines inside the fence stay intact; the single blank line before the list stays.
+        self.assertIn("def f():\n\n\n    return x\n```", cleaned)
+        self.assertIn("- real list", cleaned)
+
+    def test_clean_markdown_collapses_excess_blank_lines_outside_fence(self):
+        raw = "para one\n\n\n\npara two"
+        cleaned = clean_markdown_for_rendering(raw)
+        self.assertNotIn("\n\n\n", cleaned)
+        self.assertEqual(cleaned, "para one\n\npara two")
 
 
 class TestEventDivider(unittest.TestCase):
@@ -670,6 +706,22 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         bot.on_unmount()
         handle.cancel.assert_called_once()
         task.cancel.assert_called_once()
+
+    async def test_reset_stream_clears_content_and_cancels_handles(self):
+        bot = BotMessage()
+        bot.content = "partial"
+        handle = MagicMock()
+        bot._stream_update_handle = handle
+        task = asyncio.Future()
+        bot._markdown_render_task = task
+        await bot.reset_stream()
+        self.assertEqual(bot.content, "")
+        handle.cancel.assert_called_once()
+        self.assertTrue(task.cancelled())
+        self.assertIsNone(bot._pending_markdown_content)
+        self.assertFalse(bot.stream_widget.display)
+        self.assertFalse(bot.md_widget.display)
+        self.assertFalse(bot._streaming)
 
     async def test_watch_content_streaming_schedules_update(self):
         bot = BotMessage()
