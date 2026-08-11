@@ -68,15 +68,11 @@ def print_skills():
     if not skills:
         print(f"  No skills found ({CONFIG_DIR}/skills/ or .johnston/skills/)")
         return
-    for idx, s in enumerate(skills):
+    for s in skills:
         scope = f"[{s.get('scope', 'global')}]"
         hidden = " [hidden]" if s.get("hidden") else ""
         name = s.get("name", "unnamed")
         print(f"  * {name} {scope}{hidden}")
-        if s.get("path"):
-            print(f"    Path: {s.get('path')}")
-            if idx < len(skills) - 1:
-                print()
 
 
 def print_mcp():
