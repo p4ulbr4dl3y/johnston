@@ -285,45 +285,78 @@ class MCPManager:
 
         return tools
 
+    async def _load_server_tools_async(
+        self, server: Dict[str, Any], seen_names: Dict[str, str], timeout: float = 15.0
+    ) -> List[Dict[str, Any]]:
+        """Start (or refresh) a single MCP server and return its formatted tools.
+
+        Isolated per server with a short deadline so one slow/broken server can
+        never block the others: any failure yields an empty list for that server
+        only. If a freshly-created client cannot become ready in time it is torn
+        down so no orphaned subprocess leaks.
+        """
+        name = server["name"]
+        cmd = server.get("command")
+        if not cmd:
+            return []
+
+        args = server.get("args") or []
+        env = server.get("env")
+        cwd = server.get("cwd")
+        full_cmd = [cmd] + args if isinstance(cmd, str) else list(cmd) + args
+
+        client = self.clients.get(name)
+        created = False
+        if client is None:
+            client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+            created = True
+
+        def _cleanup_if_created() -> None:
+            if created and self.clients.get(name) is not client:
+                try:
+                    client.stop()
+                except Exception:
+                    logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
+
+        try:
+            if created:
+                try:
+                    ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
+                except (asyncio.TimeoutError, Exception):
+                    _cleanup_if_created()
+                    return []
+                if not ok:
+                    _cleanup_if_created()
+                    return []
+                self.clients[name] = client
+            elif self._tools_fetch_stale(name):
+                try:
+                    await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
+                    self._tools_fetch_time[name] = time.monotonic()
+                except (asyncio.TimeoutError, Exception):
+                    logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
+
+            tools = []
+            for t in client.tools:
+                formatted = self._format_tool_schema(t, name, seen_names)
+                if formatted:
+                    tools.append(formatted)
+            return tools
+        except Exception:
+            logger.warning("MCP server %s failed to load tools", name, exc_info=True)
+            return []
+
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         tools: List[Dict[str, Any]] = []
         servers = self.load_servers()
         seen_names: Dict[str, str] = {}
 
-        for s in servers:
-            if s.get("disabled", False):
-                continue
-
-            name = s["name"]
-            cmd = s.get("command")
-            args = s.get("args") or []
-            env = s.get("env")
-            cwd = s.get("cwd")
-
-            if not cmd:
-                continue
-
-            full_cmd = [cmd] + args if isinstance(cmd, str) else list(cmd) + args
-
-            client = self.clients.get(name)
-            if not client:
-                client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
-                if await client.start_async():
-                    self.clients[name] = client
-                else:
-                    continue
-            else:
-                if self._tools_fetch_stale(name):
-                    try:
-                        await client.fetch_tools_async()
-                        self._tools_fetch_time[name] = time.monotonic()
-                    except Exception:
-                        logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
-
-            for t in client.tools:
-                formatted = self._format_tool_schema(t, name, seen_names)
-                if formatted:
-                    tools.append(formatted)
+        eligible = [s for s in servers if not s.get("disabled", False) and s.get("command")]
+        # Start every server concurrently with an isolated per-server deadline so
+        # a slow/cold (npx/uvx) or broken server cannot stall the others.
+        results = await asyncio.gather(*(self._load_server_tools_async(s, seen_names) for s in eligible))
+        for server_tools in results:
+            tools.extend(server_tools)
 
         return tools
 
@@ -349,23 +382,34 @@ class MCPManager:
         return tools
 
     async def ensure_tools_ready_async(self, max_age: float = 30.0) -> List[Dict[str, Any]]:
-        """Refresh MCP schemas asynchronously, coalescing concurrent callers."""
+        """Ensure MCP tools are being warmed up, coalescing concurrent callers.
+
+        Never blocks the caller waiting for a cold (npx/uvx) server to start: it
+        kicks off (or reuses) a background warmup task and returns the tools
+        already cached from a previous run, so a later turn picks the freshly
+        loaded tools up. A first call with an empty cache therefore returns []
+        immediately while warmup proceeds in the background.
+        """
         now = time.monotonic()
-        if now - self._tools_refresh_time < max_age:
+        task = self._tools_refresh_task
+
+        if task is not None and not task.done() and (now - self._tools_refresh_time) < max_age:
+            # A warmup is already in flight and its results are still fresh:
+            # return what we have; the build_x caller snapshots cached tools.
             return self.get_cached_tools()
 
-        task = self._tools_refresh_task
         if task is None or task.done():
             task = asyncio.create_task(self.get_active_tools_async())
             self._tools_refresh_task = task
 
-        try:
-            tools = await task
-            self._tools_refresh_time = time.monotonic()
-            return tools
-        finally:
-            if self._tools_refresh_task is task and task.done():
-                self._tools_refresh_task = None
+            def _on_done(done: asyncio.Task) -> None:
+                self._tools_refresh_time = time.monotonic()
+                if self._tools_refresh_task is done:
+                    self._tools_refresh_task = None
+
+            task.add_done_callback(_on_done)
+
+        return self.get_cached_tools()
 
     def get_tool_capabilities(self, server_name: str, tool_name: str) -> List[str]:
         """Returns configured capabilities for an MCP tool.
@@ -475,20 +519,20 @@ class MCPManager:
 
     def get_system_prompt_snippet(self) -> str:
         """Returns a prompt snippet summarizing currently enabled MCP tools grouped by server."""
-        eager_tools = self.get_cached_tools()
-        if not eager_tools:
+        cached_tools = self.get_cached_tools()
+        if not cached_tools:
             return ""
 
         by_server: Dict[str, List[str]] = {}
-        for t in eager_tools:
+        for t in cached_tools:
             fn = t.get("function", {})
             server = t.get("_mcp_server", "")
             desc = f": {fn.get('description')}" if fn.get("description") else ""
             by_server.setdefault(server, []).append(f"- `{fn.get('name')}`{desc}")
 
-        eager_lines = ["## MCP Tools", "Available MCP tools grouped by server:"]
+        lines = ["## MCP Tools", "Available MCP tools grouped by server:"]
         for server in sorted(by_server):
-            eager_lines.append(f"\n### {server}")
-            eager_lines.extend(by_server[server])
+            lines.append(f"\n### {server}")
+            lines.extend(by_server[server])
 
-        return "\n".join(eager_lines)
+        return "\n".join(lines)

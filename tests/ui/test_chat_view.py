@@ -1262,7 +1262,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget3 = self._widget("update_plan", "plan", args={"plan": "nope"})
         widget3.render_header()
 
-    def test_render_header_system_tools_and_eager(self):
+    def test_render_header_system_tools(self):
         widget = self._widget("read", "f.py", args={"path": "f.py"})
         widget.render_header()
         self.assertIn("Read", str(widget.header_label.render()))

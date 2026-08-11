@@ -101,7 +101,6 @@ def print_mcp():
         disabled = s.get("disabled", False)
         status = "[disabled]" if disabled else "[active]"
         scope = f"[{s.get('scope', 'global')}]"
-        mode = f"[{s.get('mode', 'eager')}]"
         name = s.get("name")
 
         cmd = s.get("command")
@@ -114,7 +113,7 @@ def print_mcp():
         else:
             cmd_str = "Command: (none)"
 
-        print(f"  * {name} {scope} {mode} {status}")
+        print(f"  * {name} {scope} {status}")
         print(f"    {cmd_str}")
 
         if disabled:

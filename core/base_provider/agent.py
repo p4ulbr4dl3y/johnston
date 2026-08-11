@@ -196,11 +196,18 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         m_name = catalog.get_model_display_name(
             getattr(self, "provider_key", ""), getattr(self, "model", "")
         ) or getattr(self, "model", "")
+        # Kick off MCP tool warmup in the background WITHOUT blocking the first
+        # user turn and WITHOUT cancelling it when that turn wins the race.
+        # `ensure_tools_ready_async` coalesces concurrent callers and returns
+        # already-cached tools when the warmup task is still running; the prompt
+        # builder snapshots whatever MCP tools are ready at build time and the
+        # still-running warmup fills the cache so a later turn picks the rest up.
+        # A slow server (npx/uvx cold start) never stalls the send path.
         if not os.environ.get("PYTEST_CURRENT_TEST"):
             from core.mcp_manager import get_mcp_manager
 
             try:
-                await asyncio.wait_for(get_mcp_manager().ensure_tools_ready_async(max_age=60.0), timeout=0.5)
+                await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)
             except Exception:
                 pass
         is_subagent = getattr(self, "is_subagent", False)

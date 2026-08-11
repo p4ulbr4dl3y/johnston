@@ -36,34 +36,17 @@ Configure Model Context Protocol (MCP) servers to extend Johnston's toolset.
 - **Project location:** `.johnston/mcp.json`
 - **CLI Management:** `johnston --mcp`
 
-### Tool Loading Modes: `eager` vs `lazy`
-
-Each MCP server operates in one of two tool loading modes:
-
-1. **`eager` (Default):**
-   - Tools are registered as native LLM functions using their raw tool name; on name collision between servers, the name is prefixed as `<server_name>__<tool_name>`.
-   - Complete JSON schemas are passed in every prompt.
-   - Ideal for frequently used, lightweight servers.
-
-2. **`lazy`:**
-   - Tools are **not** loaded as full JSON schemas into context.
-   - Johnston injects a lightweight summary block (`## MCP Servers`) listing available servers and tools.
-   - The LLM invokes tools on demand using the universal `call_mcp` wrapper.
-   - Ideal for large MCP servers (e.g. documentation, search toolkits) to minimize token consumption.
-
 ### File Format Example
 ```json
 {
   "mcpServers": {
     "git": {
       "command": "uvx",
-      "args": ["mcp-server-git"],
-      "mode": "eager"
+      "args": ["mcp-server-git"]
     },
     "big-toolkit": {
       "command": "node",
       "args": ["/path/to/server.js"],
-      "mode": "lazy",
       "env": {
         "API_KEY": "secret_key_here"
       },

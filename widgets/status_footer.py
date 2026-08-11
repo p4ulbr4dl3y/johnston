@@ -48,6 +48,25 @@ class StatusFooter(Static):
 
     def on_mount(self) -> None:
         self.refresh_footer()
+        # While MCP servers are still warming up, poll so the footer spinner and
+        # loaded-server count stay current even when not generating.
+        self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
+
+    def _poll_mcp_refresh(self) -> None:
+        try:
+            from core.mcp_manager import get_mcp_manager
+
+            mm = get_mcp_manager()
+            loading = any(
+                not s.get("disabled", False)
+                and (s.get("command"))
+                and mm.clients.get(s.get("name")) is None
+                for s in mm.load_servers()
+            )
+            if loading:
+                self.refresh_footer()
+        except Exception:
+            pass
 
     def refresh_footer(self) -> None:
         try:
@@ -88,9 +107,14 @@ class StatusFooter(Static):
                 self._mcp_cache_time = now
             mcp_servers = self._cached_mcp_servers
 
-            mcp_total = len(mcp_servers)
             mcp_mgr = get_mcp_manager()
-            mcp_active = 0
+            # Count only servers that are actually loading (enabled, stdio
+            # command) and of those, only the ones that finished loading: a
+            # running client that discovered tools and has no error. Pending or
+            # errored servers don't count, so while loading the footer flips to
+            # the spinner.
+            mcp_total = 0
+            mcp_tooled = 0
             for s in mcp_servers:
                 if s.get("disabled", False):
                     continue
@@ -99,10 +123,16 @@ class StatusFooter(Static):
                 url = s.get("url")
                 if url and not cmd:
                     continue
+                mcp_total += 1
                 client = mcp_mgr.clients.get(s_name) if hasattr(mcp_mgr, "clients") else None
-                if client and getattr(client, "last_error", None):
+                if client is None:
                     continue
-                mcp_active += 1
+                if getattr(client, "last_error", None):
+                    continue
+                if not getattr(client, "tools", None):
+                    continue
+                mcp_tooled += 1
+            mcp_active = mcp_tooled
             bg_tasks = getattr(self.app, "background_tasks", [])
             curr_sid = getattr(self.app, "current_session_id", None)
             if curr_sid:
@@ -148,6 +178,13 @@ class StatusFooter(Static):
             self.update_status(**kwargs)
         except Exception:
             self.update_status(provider_key="default")
+
+    def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
+        """MCP indicator: show the actually-loaded server count as 'N/M' while
+        loading and 'M/M' once all are ready."""
+        if mcp_total <= 0:
+            return ""
+        return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
 
     def update_status(
         self,
@@ -218,7 +255,7 @@ class StatusFooter(Static):
             if att_count > 0:
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count}att[/{THEME_SECONDARY}]")
             row1_left = " • ".join(row1_left_parts)
-            row1_right = f"[{THEME_SECONDARY}]MCP:{mcp_active}[/{THEME_SECONDARY}]" if mcp_total > 0 else ""
+            row1_right = self._mcp_footer_text(mcp_active, mcp_total)
 
             if is_connected and bool(model_name):
                 ctx_val = context_used
@@ -266,9 +303,7 @@ class StatusFooter(Static):
                 f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]"
                 if skills_total > 0
                 else f"Skills: [{THEME_SECONDARY}]0[/]",
-                f"MCP: [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/]"
-                if mcp_total > 0
-                else f"MCP: [{THEME_SECONDARY}]0[/]",
+                self._mcp_footer_text(mcp_active, mcp_total, prefix="MCP:"),
             ]
             row1_right = "  •  ".join(row1_right_parts)
 

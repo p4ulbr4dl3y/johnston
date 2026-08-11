@@ -48,7 +48,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         with patch("widgets.screens.mcp.get_mcp_manager") as mock_get_mgr:
             mock_mgr = MagicMock()
             mock_mgr.load_servers.return_value = [
-                {"name": "srv1", "command": "python", "disabled": False, "mode": "eager", "scope": "global"}
+                {"name": "srv1", "command": "python", "disabled": False, "scope": "global"}
             ]
             mock_mgr.toggle_server.return_value = False
             mock_get_mgr.return_value = mock_mgr
