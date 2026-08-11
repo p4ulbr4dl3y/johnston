@@ -161,7 +161,7 @@ def print_linters():
         name = lint.get("name", "unnamed")
         label = lint.get("label") or name
         scope = f"[{lint.get('scope', 'preset')}]"
-        enabled = lint.get("enabled", True)
+        enabled = lint.get("enabled", False)
         available = availability.get(name, False)
         status = "[enabled]" if enabled else "[disabled]"
         avail = "[available]" if available else "[unavailable]"

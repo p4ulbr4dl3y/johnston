@@ -129,6 +129,21 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertIn("real error", _clean_output(text))
         self.assertNotIn("Downloading", _clean_output(text))
 
+    def test_presets_disabled_by_default(self):
+        lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
+        for lint in lm.load_linters():
+            self.assertFalse(
+                bool(lint.get("enabled")), f"preset '{lint.get('name')}' should be disabled by default"
+            )
+
+    def test_preset_enabled_via_config(self):
+        cfg = os.path.join(self.temp_dir.name, "linters.json")
+        with open(cfg, "w", encoding="utf-8") as f:
+            f.write('{"linters": {"python": {"enabled": true}}}')
+        lm = LintersManager(config_file=cfg)
+        python = next(lint for lint in lm.load_linters() if lint.get("name") == "python")
+        self.assertTrue(python.get("enabled"))
+
     def test_cached_which(self):
         from core.linters_manager import _cached_which
 
