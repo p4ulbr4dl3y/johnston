@@ -177,9 +177,7 @@ class MCPManager:
 
         return target
 
-    def _format_tool_schema(
-        self, tool: Dict[str, Any], server_name: str, server_mode: str, seen_names: Dict[str, str]
-    ) -> Optional[Dict[str, Any]]:
+    def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
         """Formats tool dict to OpenAI function format and handles name collisions across servers."""
         t_name = tool.get("name")
         if not t_name:
@@ -200,7 +198,6 @@ class MCPManager:
             },
             "_mcp_server": server_name,
             "_mcp_tool_name": t_name,
-            "_mcp_mode": server_mode,
         }
 
     def toggle_server(self, name: str) -> bool:
@@ -292,7 +289,7 @@ class MCPManager:
                         logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
-                formatted = self._format_tool_schema(t, name, s_mode, seen_names)
+                formatted = self._format_tool_schema(t, name, seen_names)
                 if formatted:
                     tools.append(formatted)
 
@@ -342,7 +339,7 @@ class MCPManager:
                         logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
             for t in client.tools:
-                formatted = self._format_tool_schema(t, name, s_mode, seen_names)
+                formatted = self._format_tool_schema(t, name, seen_names)
                 if formatted:
                     tools.append(formatted)
 
@@ -366,7 +363,7 @@ class MCPManager:
                 continue
 
             for tool in client.tools:
-                formatted = self._format_tool_schema(tool, server_name, server_mode, seen_names)
+                formatted = self._format_tool_schema(tool, server_name, seen_names)
                 if formatted:
                     tools.append(formatted)
 

@@ -22,8 +22,6 @@ class AgentRole:
         read_only: bool = False,
         disallowed_tools: Optional[List[str]] = None,
         allowed_tools: Optional[List[str]] = None,
-        allowed_shell_commands: Optional[List[str]] = None,
-        workspace_allowlist: Optional[List[str]] = None,
         model: str = "",
         scope: str = "any",
         source: str = "builtin",
@@ -35,8 +33,6 @@ class AgentRole:
         self.read_only = read_only
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
-        self.allowed_shell_commands = [c.strip() for c in (allowed_shell_commands or [])]
-        self.workspace_allowlist = [p.strip() for p in (workspace_allowlist or [])]
         self.model = model
         self.scope = (scope or "any").lower().strip()
         self.source = source
@@ -400,8 +396,6 @@ class RoleRegistry:
                 read_only=read_only_val,
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
-                allowed_shell_commands=parse_csv_list(meta.get("allowed_shell_commands")),
-                workspace_allowlist=parse_csv_list(meta.get("workspace_allowlist")),
                 model=model,
                 scope=scope,
                 source=source,
