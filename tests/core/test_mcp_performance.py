@@ -35,7 +35,8 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
         snippet = manager.get_system_prompt_snippet()
 
-        self.assertIn("search (from docs)", snippet)
+        self.assertIn("### docs", snippet)
+        self.assertIn("- `search`", snippet)
         self.assertIn("## MCP Tools", snippet)
         manager.get_active_tools.assert_not_called()
 
