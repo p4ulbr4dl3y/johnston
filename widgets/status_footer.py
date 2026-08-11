@@ -177,10 +177,9 @@ class StatusFooter(Static):
             self.update_status(provider_key="default")
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
-        """MCP indicator: show the actually-loaded server count as 'N/M' while
-        loading and 'M/M' once all are ready."""
+        """MCP indicator: show loaded server count as 'N/M' when configured, or '0' when no servers enabled."""
         if mcp_total <= 0:
-            return ""
+            return f"{prefix} [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
         return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
 
     def update_status(
