@@ -59,6 +59,9 @@ class TestToolSchemas(unittest.TestCase):
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_resolves_file_aliases(self):
+        from core.permission_manager import PermissionManager
+
+        PermissionManager.get_instance().set_session_override("read", "allow")
         fd, path = tempfile.mkstemp(dir=os.getcwd())
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:

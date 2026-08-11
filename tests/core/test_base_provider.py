@@ -18,6 +18,11 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         pm.set_session_override("shell", "allow")
         pm.set_session_override("manage_shell", "allow")
         pm.set_session_override("invoke_subagent", "allow")
+        # Grant the file tools that used to be 'allow' via the removed read/write groups.
+        pm.set_session_override("read", "allow")
+        pm.set_session_override("create", "allow")
+        pm.set_session_override("edit", "allow")
+        pm.set_session_override("multi_edit", "allow")
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()

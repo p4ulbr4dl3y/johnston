@@ -187,8 +187,9 @@ TOOLS_MD = """# Johnston Tools Reference
 - Common aliases: `write_file` → `create`, `replace_file_content` → `edit`, `terminal`/`bash` → `shell`, `fetch` → `web_fetch`.
 
 ## Permissions
-- Global permissions stored in `~/.johnston/config.json` (`permissions` section); project overrides in `.johnston/permissions.json`.
-- Shell command guard validates safety of commands run via `shell` tool.
+- Global per-tool permissions stored in `~/.johnston/config.json` (`permissions.tools` section): `allow`, `ask`, or `deny` per tool, plus `permissions.default`.
+- Shell command guard (`permissions.shell_guard`) validates safety of commands run via `shell` tool.
+- Session "always allow" overrides can be granted per tool during a session.
 """
 
 JOHNSTON_GUIDE_FILES = {

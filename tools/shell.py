@@ -91,8 +91,7 @@ class ShellTool(BaseTool):
         from core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
-        project_dir = getattr(ctx, "cwd", None) or getattr(getattr(ctx, "app", None), "project_dir", None)
-        effective_perms = pm.get_effective_permissions(project_dir)
+        effective_perms = pm.get_effective_permissions()
         sg_enabled = effective_perms.get("shell_guard", {}).get("enabled", True)
         session_override = pm.session_overrides.get("shell") or pm.session_overrides.get("shell_guard")
 

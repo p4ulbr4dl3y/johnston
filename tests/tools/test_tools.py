@@ -54,11 +54,17 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         os.chdir(self.test_dir)
         from core.permission_manager import PermissionManager
 
-        PermissionManager.get_instance().set_session_override("shell", "allow")
+        pm = PermissionManager.get_instance()
+        # Grant the tools that used to be 'allow' via the removed read/write groups.
+        pm.set_session_override("shell", "allow")
+        pm.set_session_override("read", "allow")
+        pm.set_session_override("create", "allow")
+        pm.set_session_override("edit", "allow")
+        pm.set_session_override("multi_edit", "allow")
 
     async def test_create_allows_johnston_config(self):
         tool = CreateTool()
-        target = os.path.join(self.test_dir, ".johnston", "permissions.json")
+        target = os.path.join(self.test_dir, ".johnston", "config.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
         self.assertIn("file", res)
         self.assertTrue(os.path.exists(target))
