@@ -265,18 +265,17 @@ class TestCLIAdvanced(unittest.TestCase):
                 print_skills()
         self.assertIn("No skills found", f.getvalue())
 
-    def test_print_skills_with_path(self):
+    def test_print_skills_with_hidden(self):
         f = io.StringIO()
         with patch("core.skill_manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = [
-                {"name": "a", "scope": "global", "hidden": True, "path": "/tmp/a.md"},
+                {"name": "a", "scope": "global", "hidden": True},
                 {"name": "b", "scope": "project"},
             ]
             with redirect_stdout(f):
                 print_skills()
         out = f.getvalue()
         self.assertIn("a [global] [hidden]", out)
-        self.assertIn("Path: /tmp/a.md", out)
         self.assertIn("b [project]", out)
 
     def test_print_mcp_empty(self):
