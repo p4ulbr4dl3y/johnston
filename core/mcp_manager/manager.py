@@ -32,6 +32,11 @@ def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
         if _mcp_manager_instance.project_dir != real_p:
             _mcp_manager_instance.project_dir = real_p
             _mcp_manager_instance.project_file = os.path.join(real_p, PROJECT_MCP_FILE)
+            # The project switched: MCP processes launched with the old cwd are
+            # no longer valid and would keep running with a stale working
+            # directory. Stop them and drop cached tools so they are restarted
+            # against the new project when next needed.
+            _mcp_manager_instance._reset_clients_for_project()
     return _mcp_manager_instance
 
 
@@ -57,6 +62,24 @@ class MCPManager:
             except Exception:
                 logger.warning("Failed to stop MCP client", exc_info=True)
         self.clients.clear()
+
+    def _reset_clients_for_project(self):
+        """Stops and drops clients whose cwd belongs to a now-inactive project.
+
+        Called when the manager's project_dir changes so stale MCP subprocesses
+        (started with the previous project as their working directory) don't keep
+        running. Also invalidates cached server/tool state so they are re-derived
+        from the new project's config.
+        """
+        for client in list(self.clients.values()):
+            try:
+                client.stop()
+            except Exception:
+                logger.warning("Failed to stop MCP client on project switch", exc_info=True)
+        self.clients.clear()
+        self._servers_cache_signature = None
+        self._servers_cache = []
+        self._tools_fetch_time.clear()
 
     def ensure_default_configs(self):
         from core.config_helpers import ensure_json_config
@@ -451,16 +474,21 @@ class MCPManager:
         return None
 
     def get_system_prompt_snippet(self) -> str:
-        """Returns a prompt snippet summarizing currently enabled MCP tools."""
+        """Returns a prompt snippet summarizing currently enabled MCP tools grouped by server."""
         eager_tools = self.get_cached_tools()
         if not eager_tools:
             return ""
 
-        eager_lines = ["## MCP Tools", "Available MCP tools in system context:"]
+        by_server: Dict[str, List[str]] = {}
         for t in eager_tools:
             fn = t.get("function", {})
-            desc = fn.get("description", "")
-            desc_str = f" — {desc}" if desc else ""
-            eager_lines.append(f"- {fn.get('name')} (from {t.get('_mcp_server')}){desc_str}")
+            server = t.get("_mcp_server", "")
+            desc = f": {fn.get('description')}" if fn.get("description") else ""
+            by_server.setdefault(server, []).append(f"- `{fn.get('name')}`{desc}")
+
+        eager_lines = ["## MCP Tools", "Available MCP tools grouped by server:"]
+        for server in sorted(by_server):
+            eager_lines.append(f"\n### {server}")
+            eager_lines.extend(by_server[server])
 
         return "\n".join(eager_lines)

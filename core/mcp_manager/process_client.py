@@ -46,6 +46,13 @@ class MCPProcessClient:
         self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
         self._reader_thread: Optional[threading.Thread] = None
+        # Guards the async request critical section (id generation, future
+        # registration and stdin write) so concurrent callers never pick a
+        # duplicate req_id or leave an unregistered future behind.
+        self._call_lock = asyncio.Lock()
+        # Monotonic timestamp of the last successful tools/list fetch, used to
+        # rate-limit the per-call post-call refresh (avoids a duplicate fetch).
+        self._tools_fetch_time = 0.0
 
     @staticmethod
     def _parse_line(line_str: str) -> Optional[Dict[str, Any]]:
@@ -170,31 +177,32 @@ class MCPProcessClient:
     async def _send_request_async(
         self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
     ) -> Optional[Dict[str, Any]]:
-        self._start_async_reader()
-        self.req_id += 1
-        current_id = self.req_id
-        req = {"jsonrpc": "2.0", "id": current_id, "method": method}
-        if params is not None:
-            req["params"] = params
-
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             return self._send_request_sync(method, params=params, timeout=timeout)
 
-        fut = loop.create_future()
-        self._pending_futures[current_id] = fut
+        self._start_async_reader()
+        async with self._call_lock:
+            self.req_id += 1
+            current_id = self.req_id
+            req = {"jsonrpc": "2.0", "id": current_id, "method": method}
+            if params is not None:
+                req["params"] = params
 
-        line = json.dumps(req, ensure_ascii=False) + "\n"
-        try:
-            if self.process and self.process.stdin:
-                with self._write_lock:
-                    self.process.stdin.write(line)
-                    self.process.stdin.flush()
-        except Exception:
-            logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
-            self._pending_futures.pop(current_id, None)
-            return None
+            fut = loop.create_future()
+            self._pending_futures[current_id] = fut
+
+            line = json.dumps(req, ensure_ascii=False) + "\n"
+            try:
+                if self.process and self.process.stdin:
+                    with self._write_lock:
+                        self.process.stdin.write(line)
+                        self.process.stdin.flush()
+            except Exception:
+                logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
+                self._pending_futures.pop(current_id, None)
+                return None
 
         try:
             if timeout is not None:
@@ -295,6 +303,22 @@ class MCPProcessClient:
                 except Exception:
                     logger.debug("Failed to kill MCP server '%s'", self.name, exc_info=True)
             self.process = None
+
+        self._join_reader_thread()
+
+    def _join_reader_thread(self, timeout: float = 1.0) -> None:
+        """Wait for the background reader thread to finish so we don't leak it.
+
+        The thread exits on EOF/termination once the process is gone or the
+        stdout stream is closed; we only bound the join so stop() never hangs.
+        """
+        thread = self._reader_thread
+        if thread is None:
+            return
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            logger.debug("Reader thread for MCP server '%s' did not exit in time", self.name)
+        self._reader_thread = None
 
     def _send(self, message: Dict[str, Any]) -> None:
         if not self.process or not self.process.stdin:
@@ -449,13 +473,19 @@ class MCPProcessClient:
             res = self._read_response(req_id=current_id, timeout=5.0)
             if res and "result" in res:
                 self.tools = res["result"].get("tools", [])
+                self._tools_fetch_time = time.monotonic()
             return self.tools
 
     async def fetch_tools_async(self) -> List[Dict[str, Any]]:
         res = await self._send_request_async("tools/list", timeout=5.0)
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
+            self._tools_fetch_time = time.monotonic()
         return self.tools
+
+    def _tools_fetch_stale(self, ttl: float = 5.0) -> bool:
+        """True if the cached tools list is stale (based on last fetch time)."""
+        return (time.monotonic() - self._tools_fetch_time) >= ttl
 
     def _build_call_payload(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         """Helper to create JSON-RPC tool call payload with incremented request id."""
@@ -505,10 +535,11 @@ class MCPProcessClient:
             current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=timeout)
-            try:
-                self.fetch_tools()
-            except Exception:
-                logger.debug("Failed to refresh tools after MCP tool call", exc_info=True)
+            if self._tools_fetch_stale():
+                try:
+                    self.fetch_tools()
+                except Exception:
+                    logger.debug("Failed to refresh tools after MCP tool call", exc_info=True)
             return self._parse_tool_response(tool_name, res)
 
     async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
@@ -522,20 +553,21 @@ class MCPProcessClient:
                 return f"Error: MCP server '{self.name}' process is not running"
 
         self._start_async_reader()
-        current_id, req = self._build_call_payload(tool_name, arguments)
+        async with self._call_lock:
+            current_id, req = self._build_call_payload(tool_name, arguments)
 
-        fut = loop.create_future()
-        self._pending_futures[current_id] = fut
+            fut = loop.create_future()
+            self._pending_futures[current_id] = fut
 
-        line = json.dumps(req, ensure_ascii=False) + "\n"
-        try:
-            if self.process and self.process.stdin:
-                with self._write_lock:
-                    self.process.stdin.write(line)
-                    self.process.stdin.flush()
-        except Exception as e:
-            self._pending_futures.pop(current_id, None)
-            return f"Error writing to MCP server '{self.name}': {e}"
+            line = json.dumps(req, ensure_ascii=False) + "\n"
+            try:
+                if self.process and self.process.stdin:
+                    with self._write_lock:
+                        self.process.stdin.write(line)
+                        self.process.stdin.flush()
+            except Exception as e:
+                self._pending_futures.pop(current_id, None)
+                return f"Error writing to MCP server '{self.name}': {e}"
 
         try:
             if timeout is not None:
@@ -549,9 +581,14 @@ class MCPProcessClient:
             self._pending_futures.pop(current_id, None)
             raise
 
-        try:
-            await self.fetch_tools_async()
-        except Exception:
-            logger.debug("Failed to refresh tools after async MCP tool call", exc_info=True)
+        # Refresh tools only if the list may have changed since the last fetch
+        # (e.g. a server reporting new tools). Without this rate limit every call
+        # would trigger a redundant tools/list right after get_active_tools_async
+        # already fetched it.
+        if self._tools_fetch_stale():
+            try:
+                await self.fetch_tools_async()
+            except Exception:
+                logger.debug("Failed to refresh tools after async MCP tool call", exc_info=True)
 
         return self._parse_tool_response(tool_name, res)
