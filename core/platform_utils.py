@@ -1,4 +1,5 @@
 import asyncio
+import locale
 import os
 import shutil
 import signal
@@ -78,6 +79,50 @@ def shell_subprocess_kwargs() -> dict[str, Any]:
         creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         return {"creationflags": creationflags} if creationflags else {}
     return {"start_new_session": True}
+
+
+def decode_output(data: bytes) -> str:
+    """Best-effort decode of subprocess output bytes.
+
+    Tries UTF-8 first (modern CLI tools). When the bytes are clearly not
+    UTF-8 — e.g. OEM/ANSI console output from cmd.exe or Windows PowerShell
+    on a non-UTF-8 locale — falls back to the Windows OEM code page and the
+    OS locale encoding. Never raises.
+    """
+    if not data:
+        return ""
+    text = data.decode("utf-8", errors="replace")
+    # A couple of U+FFFD are normal (multi-byte char split at a chunk
+    # boundary); a high ratio means the stream is genuinely not UTF-8.
+    if "\ufffd" not in text or text.count("\ufffd") / max(len(text), 1) < 0.05:
+        return text
+    for enc in _output_fallback_encodings():
+        try:
+            return data.decode(enc, errors="replace")
+        except LookupError:
+            continue
+    return text
+
+
+def _output_fallback_encodings() -> list[str]:
+    encodings: list[str] = []
+    if is_windows():
+        try:
+            import ctypes
+
+            oem_cp = ctypes.windll.kernel32.GetOEMCP()
+            if oem_cp:
+                encodings.append(f"cp{oem_cp}")
+        except Exception:
+            pass
+    try:
+        pref = locale.getpreferredencoding(False)
+        if pref:
+            encodings.append(pref)
+    except Exception:
+        pass
+    encodings.append("utf-8")
+    return encodings
 
 
 def shell_env() -> dict[str, str]:

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -115,7 +116,8 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("normal_timeout_output", res)
 
     async def test_normal_execution_empty_output(self):
-        res = await self.tool.execute({"command": "true"})
+        # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
+        res = await self.tool.execute({"command": "true" if os.name != "nt" else "cd ."})
         self.assertEqual(res, "(no output)")
 
     async def test_command_timeout_moved_to_background(self):

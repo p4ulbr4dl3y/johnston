@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -36,7 +37,8 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "true"}, ctx=mock_app)
+        # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
+        res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."}, ctx=mock_app)
         self.assertIn("(no output)", res)
 
 

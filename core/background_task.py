@@ -4,7 +4,7 @@ import os
 import re
 from collections import deque
 
-from core.platform_utils import terminate_process
+from core.platform_utils import decode_output, terminate_process
 from tools.base import format_tool_error
 
 logger = logging.getLogger(__name__)
@@ -129,12 +129,12 @@ class BackgroundTask:
                             break
                         if not chunk:
                             break
-                        text = chunk.decode("utf-8", errors="replace")
+                        text = decode_output(chunk)
                     else:
                         chunk = await self.process.stdout.read(1024)
                         if not chunk:
                             break
-                        text = chunk.decode("utf-8", errors="replace")
+                        text = decode_output(chunk)
 
                     self._append_output(text)
                     if self.widget:

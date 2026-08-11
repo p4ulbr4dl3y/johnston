@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -98,11 +99,11 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertIn("... (5 more lines)", result)
 
     async def test_exec_cmd_nonzero_exit(self):
-        output = await _exec_cmd(["python3", "-c", "import sys; print('some error'); sys.exit(1)"])
+        output = await _exec_cmd([sys.executable, "-c", "import sys; print('some error'); sys.exit(1)"])
         self.assertEqual(output, "some error")
 
     async def test_exec_cmd_zero_exit(self):
-        output = await _exec_cmd(["python3", "-c", "print('normal output')"])
+        output = await _exec_cmd([sys.executable, "-c", "print('normal output')"])
         self.assertIsNone(output)
 
     @patch("asyncio.wait_for", side_effect=asyncio.TimeoutError)

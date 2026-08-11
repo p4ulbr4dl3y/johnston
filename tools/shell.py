@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from core.background_task import BackgroundTask, process_carriage_returns, strip_ansi
 from core.platform_utils import (
+    decode_output,
     is_windows,
     shell_env,
     shell_executable,
@@ -141,7 +142,7 @@ class ShellTool(BaseTool):
                         chunk = await stream.read(1024)
                         if not chunk:
                             break
-                        text = chunk.decode("utf-8", errors="replace")
+                        text = decode_output(chunk)
                         output_chunks.append(text)
                         output_size += len(text)
                         if output_size > _SUBAGENT_OUTPUT_LIMIT:
