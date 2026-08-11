@@ -17,7 +17,7 @@ __all__ = [
     "truncate_output",
     "format_tool_error",
     "format_background_notification",
-    "call_mcp_tool",
+    "execute_mcp_tool",
     "check_mcp_role_policy",
     "BaseTool",
 ]
@@ -241,7 +241,7 @@ def check_mcp_role_policy(ctx_or_app: Any, tool_name: str, targets: List[str]) -
     return None
 
 
-async def call_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
+async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
     """Invokes an MCP tool, preferring the async API when available.
 
     Mirrors the historical dispatch: managers whose type name ends with "Mock" or

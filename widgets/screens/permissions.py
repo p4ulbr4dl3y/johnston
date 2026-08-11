@@ -95,7 +95,6 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 "multi_edit": "MultiEdit",
                 "shell": "Shell",
                 "ask_user": "AskUser",
-                "call_mcp": "CallMCP",
                 "manage_shell": "ManageShell",
                 "invoke_subagent": "InvokeSubagent",
                 "manage_subagent": "ManageSubagent",

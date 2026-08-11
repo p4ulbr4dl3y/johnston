@@ -130,26 +130,7 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
         for raw in cases:
             self.assertEqual(clean_markdown_for_rendering(raw), raw)
 
-    def test_tool_call_widget_extracts_mcp_info(self):
-        # Case 1: Standard lowercase keys
-        item = ToolCallWidget("call_mcp", "", "", args={"server": "colab", "tool": "add_cell", "arguments": {"x": 1}})
-        tool, server, args = item._extract_mcp_call_info()
-        self.assertEqual((tool, server, args), ("add_cell", "colab", {"x": 1}))
-
-        # Case 2: PascalCase keys (ToolName / ServerName / Arguments)
-        item2 = ToolCallWidget(
-            "call_mcp", "", "", args={"ServerName": "colab-mcp", "ToolName": "run_cell", "Arguments": {"y": 2}}
-        )
-        tool2, server2, args2 = item2._extract_mcp_call_info()
-        self.assertEqual((tool2, server2, args2), ("run_cell", "colab-mcp", {"y": 2}))
-
-        # Case 3: Missing tool name key, top-level arguments
-        item3 = ToolCallWidget("call_mcp", "", "", args={"server": "colab", "code": "print(1)"})
-        tool3, server3, args3 = item3._extract_mcp_call_info()
-        self.assertEqual((tool3, server3, args3), ("call_mcp", "colab", {"code": "print(1)"}))
-
     def test_to_snake_case(self):
-        self.assertEqual(to_snake_case("CallMCPTool"), "call_mcp_tool")
         self.assertEqual(to_snake_case("openColabBrowser"), "open_colab_browser")
         self.assertEqual(to_snake_case("OpenColabBrowser"), "open_colab_browser")
         self.assertEqual(to_snake_case("search_issues"), "search_issues")
@@ -1067,7 +1048,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertTrue(ToolCallWidget("shell", "cmd").is_expandable())
         self.assertTrue(ToolCallWidget("create", "f.py").is_expandable())
         self.assertTrue(ToolCallWidget("custom_tool", "x").is_expandable())
-        self.assertFalse(ToolCallWidget("get_mcp_schema", "server").is_expandable())
 
     def test_is_expandable_subagent_screen(self):
         class SubagentViewScreen:
@@ -1124,7 +1104,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_markup_text(None), "")
 
     def test_format_json_result(self):
-        widget = ToolCallWidget("call_mcp", "")
+        widget = ToolCallWidget("read", "")
         self.assertIsNone(widget._format_json_result(""))
         self.assertIsNone(widget._format_json_result("   "))
         result = widget._format_json_result('{"x": 1}')
@@ -1282,18 +1262,6 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget3 = self._widget("update_plan", "plan", args={"plan": "nope"})
         widget3.render_header()
 
-    def test_render_header_call_mcp(self):
-        widget = self._widget("call_mcp", "", args={"server": "colab", "tool": "add_cell", "arguments": {"x": 1}})
-        widget.render_header()
-        self.assertIn("add_cell", str(widget.header_label.render()))
-        self.assertIn("{x: 1}", str(widget.header_label.render()))
-
-        widget2 = self._widget("call_mcp", "", args={})
-        widget2.render_header()
-
-        widget3 = self._widget("call_mcp", "server", args={"server": "srv"})
-        widget3.render_header()
-
     def test_render_header_system_tools_and_eager(self):
         widget = self._widget("read", "f.py", args={"path": "f.py"})
         widget.render_header()
@@ -1316,16 +1284,6 @@ class TestToolCallWidgetRendering(unittest.TestCase):
 
         widget7 = self._widget("mcp_search", "", args={"query": "x"})
         widget7.render_header()
-
-    def test_render_header_get_mcp_schema(self):
-        widget = self._widget("get_mcp_schema", "srv", args={"server": "srv", "tool": "tool"})
-        widget.render_header()
-
-    def test_render_header_get_mcp_schema_via_call_mcp(self):
-        widget = self._widget("call_mcp", "srv", args={"tool": "t", "server": "srv", "arguments": {}})
-        widget.tool_type = "get_mcp_schema"
-        widget.canonical_tool = "call_mcp"
-        widget.render_header()
 
     def test_set_result_shell_background(self):
         widget = self._widget("shell", "cmd")
@@ -1651,11 +1609,6 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             with patch("builtins.open", side_effect=Exception("boom")):
                 w.render_content()
 
-    def test_render_content_get_mcp_schema_exception(self):
-        w = self._widget("get_mcp_schema", '{"server": "s"}', args={"server": "srv", "tool": "tool"})
-        with patch("widgets.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
-            w.render_content()
-
     def test_render_content_read_branches(self):
         w = self._widget("read", "Error: cannot read", args={"path": "f.py"})
         w.render_content()
@@ -1716,21 +1669,6 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])
         ):
             w4.render_content()
-
-    def test_render_content_get_mcp_schema(self):
-        w = self._widget("get_mcp_schema", '{"server": "s"}', args={"server": "srv", "tool": "tool"})
-        w.render_content()
-
-    def test_render_content_call_mcp(self):
-        w = self._widget("call_mcp", '{"ok": true}', args={"server": "s"})
-        w.render_content()
-        self.assertTrue(w.content_widget.display)
-
-        w2 = self._widget("call_mcp", "plain result", args={"server": "s"})
-        w2.render_content()
-
-        w3 = self._widget("call_mcp_tool", "", args={})
-        w3.render_content()
 
     def test_render_content_other_tools(self):
         w = self._widget("some_tool", '{"data": [1, 2]}')

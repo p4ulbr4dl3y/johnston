@@ -3,7 +3,6 @@ from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, format_tool_error
-from tools.call_mcp import CallMCPTool
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.invoke_subagent import InvokeSubagentTool
@@ -21,7 +20,6 @@ TOOL_CLASSES = [
     MultiEditTool,
     ShellTool,
     AskUserTool,
-    CallMCPTool,
     ManageShellTool,
     InvokeSubagentTool,
     ManageSubagentTool,
@@ -251,14 +249,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if policy_err:
         return policy_err
 
-    err = await check_and_confirm_permission("call_mcp", name, args, ctx_or_app, confirm_tool_name=f"mcp:{name}")
-    if err:
-        return err
-
     try:
-        from tools.base import call_mcp_tool
+        from tools.base import execute_mcp_tool
 
-        mcp_res = await call_mcp_tool(mcp_mgr, name, args)
+        mcp_res = await execute_mcp_tool(mcp_mgr, name, args)
         if mcp_res is not None:
             return mcp_res
     except Exception as e:

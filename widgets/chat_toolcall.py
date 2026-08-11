@@ -292,45 +292,6 @@ class ParsingMixin:
         else:
             return "#98c379"
 
-    def _extract_mcp_call_info(self) -> tuple[str, str, dict]:
-        args = self.args if isinstance(self.args, dict) else {}
-        tool_name = (
-            args.get("tool")
-            or args.get("Tool")
-            or args.get("tool_name")
-            or args.get("ToolName")
-            or args.get("name")
-            or args.get("Name")
-            or "call_mcp"
-        )
-        server = args.get("server") or args.get("Server") or args.get("server_name") or args.get("ServerName") or ""
-        mcp_args = None
-        for k in ("arguments", "Arguments", "args", "Args"):
-            if k in args and isinstance(args[k], dict):
-                mcp_args = args[k]
-                break
-
-        if mcp_args is None:
-            meta_keys = {
-                "tool",
-                "Tool",
-                "tool_name",
-                "ToolName",
-                "name",
-                "Name",
-                "server",
-                "Server",
-                "server_name",
-                "ServerName",
-                "arguments",
-                "Arguments",
-                "args",
-                "Args",
-            }
-            mcp_args = {k: v for k, v in args.items() if k not in meta_keys}
-
-        return str(tool_name), str(server), mcp_args
-
     def _format_compact_dict(self, d: dict) -> str:
         if not isinstance(d, dict) or not d:
             return ""
@@ -381,7 +342,6 @@ class _DisplayNamesDict(dict):
         "manage_subagent": "ManageSubagent",
         "web_fetch": "WebFetch",
         "update_plan": "UpdatePlan",
-        "call_mcp": "CallMCP",
     }
 
     def get(self, key, default=None):
@@ -410,7 +370,7 @@ class _SystemToolsSet(set):
 
         lower = item.lower()
         canonical = normalize_tool_name(lower)
-        if canonical in REGISTRY or canonical in ("get_mcp_schema", "call_mcp", "update_plan"):
+        if canonical in REGISTRY:
             return True
         return super().__contains__(item) or super().__contains__(lower)
 
@@ -440,16 +400,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "replace",
         "multi_replace",
         "write_to_file",
-        "call_mcp_tool",
-        "call_mcp",
         "Create",
         "Edit",
         "MultiEdit",
         "Shell",
         "Bash",
         "Plan",
-        "CallMCPTool",
-        "CallMCP",
     }
 
     def is_expandable(self) -> bool:
@@ -578,20 +534,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     )
                     target_str = f"[{completed}/{total} completed]"
             self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
-        elif self.canonical_tool == "call_mcp" and self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
-            tool_name = self.args.get("tool") or self.target
-            tool_name_snake = to_snake_case(str(tool_name))
-            compact = self._format_compact_dict(self.args if isinstance(self.args, dict) else {})
-            escaped_compact = escape(compact) if compact else "{}"
-            self.header_label.update(f"[{c}]⚙ [bold]get_mcp_schema[/bold][/{c}]({escaped_compact})")
-        elif self.canonical_tool == "call_mcp":
-            tool_name, server, mcp_args = self._extract_mcp_call_info()
-            tool_name_snake = to_snake_case(str(tool_name))
-            compact = self._format_compact_dict(mcp_args)
-            if not compact:
-                compact = f'{{server: "{server}"}}' if server else "{}"
-            escaped_compact = escape(compact)
-            self.header_label.update(f"[{c}]⚙ [bold]{tool_name_snake}[/bold][/{c}]({escaped_compact})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
@@ -929,27 +871,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     else:
                         output_text = "(No output)"
                 self.content_widget.update(self._clean_markup_text(output_text))
-            elif self.tool_type.lower() in ("get_mcp_schema", "getmcpschema"):
-                server = self.args.get("server", "")
-                tool = self.args.get("tool", "")
-                display_parts = [f"Server: {server}", f"Tool: {tool}"]
-                if self.result_text:
-                    display_parts.append(f"\nSchema:\n{self.result_text.strip()}")
-                full_display = "\n".join(display_parts)
-                try:
-                    syntax = TransparentSyntax(
-                        full_display, "json", theme=CODE_THEME, word_wrap=False, background_color="default"
-                    )
-                    self.content_widget.update(syntax)
-                except Exception:
-                    self.content_widget.update(self._clean_markup_text(full_display))
-            elif self.tool_type in ("call_mcp", "CallMCP", "call_mcp_tool", "CallMCPTool"):
-                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
-                syntax = self._format_json_result(clean_res)
-                if syntax:
-                    self.content_widget.update(syntax)
-                else:
-                    self.content_widget.update(self._clean_markup_text(clean_res))
             else:
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
                 syntax = self._format_json_result(clean_res)

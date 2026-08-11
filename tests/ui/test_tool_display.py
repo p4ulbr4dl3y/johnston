@@ -34,10 +34,6 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("manage_shell", {"action": "status", "task_id": "shell_123"})
         self.assertEqual(res, "status shell_123")
 
-    def test_get_mcp_schema_tool_target(self):
-        res = extract_tool_display("get_mcp_schema", {"server": "colab", "tool": "search"})
-        self.assertEqual(res, "search")
-
     def test_unknown_tool_fallback(self):
         self.assertEqual(extract_tool_display("unknown_tool", {}), "unknown_tool")
 
