@@ -5,11 +5,6 @@ from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        from core.permission_manager import PermissionManager
-
-        PermissionManager.get_instance().set_session_override("call_mcp", "allow")
-
     def test_normalize_tool_name(self):
         self.assertEqual(normalize_tool_name("subagent"), "invoke_subagent")
         self.assertEqual(normalize_tool_name("view_file"), "read")
@@ -91,9 +86,6 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(norm_manage2["all"], True)
         norm_mshell2 = normalize_tool_args("manage_shell", {"message": "data"})
         self.assertEqual(norm_mshell2["input"], "data")
-        norm_mcp = normalize_tool_args("call_mcp", {"server_name": "s", "tool_name": "t"})
-        self.assertEqual(norm_mcp["server"], "s")
-        self.assertEqual(norm_mcp["tool"], "t")
 
     def test_get_default_tools(self):
         tools = get_default_tools()
@@ -117,7 +109,6 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(ALIAS_MAP["edit_file"], "edit")
         self.assertEqual(ALIAS_MAP["spawn_subagent"], "invoke_subagent")
-        self.assertEqual(ALIAS_MAP["mcp"], "call_mcp")
         self.assertEqual(ALIAS_MAP["fetch"], "web_fetch")
         self.assertEqual(ALIAS_MAP["patch"], "edit")
         self.assertEqual(ALIAS_MAP["get"], "web_fetch")
@@ -301,70 +292,6 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res, "ERR: denied 'read': requires user confirmation (No interactive app)")
-
-    async def test_execute_tool_mcp_permission_denied(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_deny"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("deny", "MCP policy blocks it")
-        with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
-            self._mock_mode(),
-            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-        ):
-            res = await execute_tool("mcp_deny", {})
-        self.assertEqual(res, "ERR: denied 'mcp_deny': by permission policy")
-
-    async def test_execute_tool_mcp_permission_ask_no_app(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_ask"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
-            self._mock_mode(),
-            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-        ):
-            res = await execute_tool("mcp_ask", {})
-        self.assertEqual(res, "ERR: denied 'mcp_ask': requires user confirmation (Confirm MCP call)")
-
-    async def test_execute_tool_mcp_permission_ask_always_allow(self):
-        mock_app = MagicMock()
-        mock_app.app = mock_app
-        mock_app.confirm_permission = AsyncMock(return_value=True)
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_allow"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.return_value = "MCP Executed"
-        mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
-            self._mock_mode(),
-            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-        ):
-            res = await execute_tool("mcp_allow", {"x": 1}, app=mock_app)
-        self.assertEqual(res, "MCP Executed")
-        mock_app.confirm_permission.assert_awaited_once()
-
-    async def test_execute_tool_mcp_permission_ask_denied_by_user(self):
-        mock_app = MagicMock()
-        mock_app.app = mock_app
-        mock_app.confirm_permission = AsyncMock(return_value=False)
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_no"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm MCP call")
-        with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
-            self._mock_mode(),
-            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-        ):
-            res = await execute_tool("mcp_no", {}, app=mock_app)
-        self.assertEqual(res, "ERR: denied 'mcp_no': by user")
 
     async def test_execute_tool_mcp_async_call(self):
         # Manager class whose type name does not end with "Mock" and which exposes

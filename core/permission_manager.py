@@ -13,7 +13,7 @@ class PermissionManager:
     GROUPS = {
         "read": {"read", "ask_user", "update_plan", "manage_shell", "manage_subagent"},
         "write": {"create", "edit", "multi_edit"},
-        "net": {"web_fetch", "call_mcp"},
+        "net": {"web_fetch"},
         "exec": {"shell", "invoke_subagent"},
     }
 
