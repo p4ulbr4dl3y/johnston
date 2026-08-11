@@ -244,6 +244,19 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if policy_err:
         return policy_err
 
+    # Determine the exposed MCP tool name (namespaced as "server__tool" on name
+    # collisions) so permissions are stored and checked under that name.
+    exposed_name = clean_name
+    for t in active_mcp_tools:
+        fn_name = t.get("function", {}).get("name")
+        if fn_name in (name, clean_name, resolved_name):
+            exposed_name = fn_name
+            break
+
+    perm_err = await check_and_confirm_permission(exposed_name, name, args, ctx_or_app)
+    if perm_err:
+        return perm_err
+
     try:
         from tools.base import execute_mcp_tool
 
