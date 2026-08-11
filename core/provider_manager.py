@@ -111,7 +111,6 @@ class ProviderManager:
             providers[pkey] = {
                 "key": pkey,
                 "name": pdata.get("name", pkey),
-                "description": pdata.get("description", ""),
                 "base_url": pdata.get("base_url", ""),
                 "model": pdata.get("model", ""),
                 "models": pdata.get("models", []),
@@ -127,7 +126,6 @@ class ProviderManager:
                 "retry_backoff": pdata.get("retry_backoff", 2.0),
                 "max_retry_delay": pdata.get("max_retry_delay", 10.0),
                 "disabled": pkey in disabled_set,
-                "source": "json",
             }
 
         return providers

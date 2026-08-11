@@ -4,9 +4,6 @@ from typing import Dict
 
 DEFAULT_SUBAGENT_ROLES: Dict[str, dict] = {
     "explorer": {
-        "name": "explorer",
-        "subagent_type": "explorer",
-        "description": "Fast code exploration subagent",
         "system_prompt": (
             "## Subagent Type: EXPLORER\n\n"
             "### Role & Purpose\n"
@@ -17,12 +14,8 @@ DEFAULT_SUBAGENT_ROLES: Dict[str, dict] = {
             "3. Search Strategy: Use broad search (grep/find) first, then inspect targeted files. Use parallel calls for multiple file reads.\n"
             "4. Response Only: Report findings purely via final text response."
         ),
-        "source": "builtin",
     },
     "worker": {
-        "name": "worker",
-        "subagent_type": "worker",
-        "description": "General multi-step execution subagent",
         "system_prompt": (
             "## Subagent Type: WORKER\n\n"
             "### Role & Purpose\n"
@@ -32,6 +25,5 @@ DEFAULT_SUBAGENT_ROLES: Dict[str, dict] = {
             "2. Verification: Run linters or tests after edits to verify changes before completing.\n"
             "3. Clean State: Ensure working tree is clean and code builds cleanly upon task finish."
         ),
-        "source": "builtin",
     },
 }

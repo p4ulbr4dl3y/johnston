@@ -179,12 +179,11 @@ class SkillManager:
                     continue
 
                 fm, body = parse_frontmatter(raw_content)
-                rel_dir = os.path.dirname(filepath)
 
                 name = fm.get("name")
                 if not name:
                     if os.path.basename(filepath) == "SKILL.md":
-                        name = os.path.basename(rel_dir)
+                        name = os.path.basename(os.path.dirname(filepath))
                     else:
                         name = os.path.splitext(os.path.basename(filepath))[0]
 
@@ -209,7 +208,6 @@ class SkillManager:
                     "name": name,
                     "description": desc,
                     "location": filepath,
-                    "directory": rel_dir,
                     "content": body.strip(),
                     "scope": scope,
                     "hidden": is_hidden,
