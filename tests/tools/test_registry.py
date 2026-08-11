@@ -5,6 +5,17 @@ from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        # MCP tools now go through the permission check (default 'ask'). Existing
+        # MCP-path tests exercise dispatch/role logic, not permissions, so allow
+        # their tools for the session.
+        from core.permission_manager import PermissionManager
+
+        pm = PermissionManager.get_instance()
+        pm.clear_session_overrides()
+        for name in ("mcp_tool_test", "exposed_mcp_tool", "faulty_mcp", "none_mcp", "async_mcp"):
+            pm.set_session_override(name, "allow")
+
     def test_normalize_tool_name(self):
         self.assertEqual(normalize_tool_name("subagent"), "invoke_subagent")
         self.assertEqual(normalize_tool_name("view_file"), "read")
@@ -312,6 +323,61 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with patch("core.mcp_manager.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
             res = await execute_tool("async_mcp", {"q": 1})
         self.assertEqual(res, "async mcp output")
+
+    async def test_execute_tool_mcp_permission_denied(self):
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_deny_tool"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            self._mock_mode(),
+        ):
+            res = await execute_tool("mcp_deny_tool", {"arg": "val"})
+        self.assertEqual(res, "ERR: denied 'mcp_deny_tool': by permission policy")
+        mock_pm.check_permission.assert_called_once_with("mcp_deny_tool", {"arg": "val"})
+        mock_mcp_mgr.call_tool.assert_not_called()
+
+    async def test_execute_tool_mcp_permission_allow(self):
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_allow_tool"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr.call_tool.return_value = "MCP ALLOWED OUTPUT"
+
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("allow", "")
+
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            self._mock_mode(),
+        ):
+            res = await execute_tool("mcp_allow_tool", {"arg": "val"})
+        self.assertEqual(res, "MCP ALLOWED OUTPUT")
+        mock_mcp_mgr.call_tool.assert_called_once_with("mcp_allow_tool", {"arg": "val"})
+
+    async def test_execute_tool_mcp_permission_uses_exposed_name(self):
+        # Collision-style exposed name ("server__tool"): the permission must be
+        # checked under the exposed name, not the raw caller name.
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "gh__search"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+
+        with (
+            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            self._mock_mode(),
+        ):
+            res = await execute_tool("gh__search", {"q": "x"})
+        self.assertEqual(res, "ERR: denied 'gh__search': by permission policy")
+        mock_pm.check_permission.assert_called_once_with("gh__search", {"q": "x"})
 
 
 if __name__ == "__main__":
