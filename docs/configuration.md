@@ -77,7 +77,7 @@ Each MCP server operates in one of two tool loading modes:
 
 ## 3. Linter Configuration (`linters.json`)
 
-Johnston runs fast, **syntax-only** linters after `create`/`edit` tool writes to catch broken code early. Linters are managed interactively with the `/linters` modal (or `/lint`) and stored in config.
+Johnston can run fast, **syntax-only** linters after `create`/`edit` tool writes to catch broken code early. Presets are **disabled by default** (opt-in) so nothing is imposed on the user; enable them interactively with the `/linters` modal (or `/lint`) and they are stored in config.
 
 - **Global location:** `~/.johnston/linters.json`
 - **CLI Management:** `johnston --linters`
@@ -97,7 +97,7 @@ Johnston runs fast, **syntax-only** linters after `create`/`edit` tool writes to
 | `yaml` | `.yaml .yml` | uvx | `uvx yamllint --no-warnings` |
 | `toml` | `.toml` | uvx | `uvx taplo check` |
 
-Presets are **syntax-only**: they detect parse errors and fatal issues, not style. System tools (rustc, gcc, ruby, php, jq) are detected via `which`; uvx/npx-managed tools are detected from the local tool cache. Only available linters run automatically — missing ones are skipped silently. uvx/npx fetch the tool on first run, no manual install step needed.
+Presets are **syntax-only**: they detect parse errors and fatal issues, not style. System tools (rustc, gcc, ruby, php, jq) are detected via `which`; uvx/npx-managed tools are detected from the local tool cache. Only **enabled and available** linters run — missing ones are skipped silently. uvx/npx fetch the tool on first run, no manual install step needed.
 
 ### File Format Example
 

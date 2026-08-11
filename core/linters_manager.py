@@ -70,7 +70,7 @@ class LintersManager:
             entry = dict(preset)
             entry["name"] = p_name
             entry["scope"] = "preset"
-            entry["enabled"] = True
+            entry["enabled"] = False  # opt-in: presets stay off until explicitly enabled
             entry["custom"] = False
             if p_name in merged:
                 entry.update(merged[p_name])

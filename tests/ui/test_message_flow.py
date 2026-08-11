@@ -479,6 +479,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 # Trigger cancellation via Escape
                 chat_input = app.query_one("#message-input")
                 chat_input.focus()
+                await pilot.pause(0.1)
                 await pilot.press("escape")
                 await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)

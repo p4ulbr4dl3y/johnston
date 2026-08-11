@@ -34,7 +34,7 @@ class TestLintersManager(unittest.TestCase):
         for preset in PRESET_LINTERS:
             self.assertIn(preset, names)
         p = next(it for it in linters if it["name"] == "python")
-        self.assertTrue(p["enabled"])
+        self.assertFalse(p["enabled"], "presets must be disabled (opt-in) by default")
         self.assertEqual(p["scope"], "preset")
         self.assertIn(".py", p["extensions"])
 
@@ -79,6 +79,8 @@ class TestLintersManager(unittest.TestCase):
 
     def test_get_for_extension_filters_enabled_available(self):
         m = self._mgr()
+        with open(m.config_file, "w", encoding="utf-8") as f:
+            json.dump({"linters": {"python": {"enabled": True}, "rust": {"enabled": True}}}, f)
         with patch.object(m, "is_available", side_effect=lambda n: n in ("python", "rust")):
             py = m.get_for_extension(".py")
             self.assertEqual([it["name"] for it in py], ["python"])
