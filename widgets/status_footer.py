@@ -113,14 +113,14 @@ class StatusFooter(Static):
             mcp_total = 0
             mcp_tooled = 0
             for s in mcp_servers:
-                if s.get("disabled", False):
-                    continue
                 s_name = s.get("name")
                 cmd = s.get("command")
                 url = s.get("url")
                 if url and not cmd:
                     continue
                 mcp_total += 1
+                if s.get("disabled", False):
+                    continue
                 client = mcp_mgr.clients.get(s_name) if hasattr(mcp_mgr, "clients") else None
                 if client is None:
                     continue
@@ -177,9 +177,7 @@ class StatusFooter(Static):
             self.update_status(provider_key="default")
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
-        """MCP indicator: show loaded server count as 'N/M' when configured, or '0' when no servers enabled."""
-        if mcp_total <= 0:
-            return f"{prefix} [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
+        """MCP indicator: show active/total count as 'N/M'."""
         return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
 
     def update_status(
