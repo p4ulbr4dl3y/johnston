@@ -32,30 +32,6 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         res = await self.tool.execute({"command": "sleep 0.001 && echo after_sleep"})
         self.assertIn("after_sleep", res)
 
-    async def test_shell_safety_check_rejected(self):
-        mock_app = MagicMock()
-        mock_app.confirm_permission = AsyncMock(return_value=False)
-
-        with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
-            res = await self.tool.execute({"command": "rm -rf /"}, ctx=mock_app)
-            self.assertEqual(res, "ERR: denied 'shell': by user")
-
-    async def test_shell_safety_check_confirmed(self):
-        mock_app = MagicMock()
-        mock_app.confirm_permission = AsyncMock(return_value=True)
-
-        with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
-            res = await self.tool.execute({"command": "echo confirmed"}, ctx=mock_app)
-            self.assertIn("confirmed", res)
-
-    async def test_shell_safety_check_exception(self):
-        mock_app = MagicMock()
-        mock_app.confirm_permission = AsyncMock(side_effect=RuntimeError("Screen push failed"))
-
-        with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
-            res = await self.tool.execute({"command": "rm -rf /"}, ctx=mock_app)
-            self.assertIn("ERR: permission 'shell': Screen push failed", res)
-
     async def test_standard_pipe_execution(self):
         res = await self.tool.execute({"command": "echo std_pipe_test"})
         self.assertIn("std_pipe_test", res)
@@ -578,18 +554,19 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await exec_task
 
-    async def test_shell_safety_check_always_allow(self):
+    async def test_session_override_allow_shell(self):
         from core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
+        pm.set_session_override("shell", "allow")
 
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)
 
-        with patch("core.shell_guard.analyze_shell_command", return_value=(False, "Destructive command")):
-            res = await self.tool.execute({"command": "echo session_allowed"}, ctx=mock_app)
-            self.assertIn("session_allowed", res)
+        res = await self.tool.execute({"command": "echo session_allowed"}, ctx=mock_app)
+        self.assertIn("session_allowed", res)
+        pm.clear_session_overrides()
 
 
 if __name__ == "__main__":

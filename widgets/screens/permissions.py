@@ -21,15 +21,14 @@ from widgets.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
 )
 
-_SELECTABLE_TYPES = ("tool", "shell_guard")
+_SELECTABLE_TYPES = ("tool",)
 
 
 class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
-    """Modal screen for managing per-tool permissions (allow, ask, deny) and Shell Guard.
+    """Modal screen for managing per-tool permissions (allow, ask, deny).
 
     Builtin tools are grouped under a "Builtin" section, MCP tools under their
-    server sections (rendered from cache first, refreshed in the background), and
-    Shell Guard is a standalone binary toggle at the top of the list.
+    server sections (rendered from cache first, refreshed in the background).
     """
 
     search_nav_option_list_id = "permissions-option-list"
@@ -123,19 +122,6 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         default_act = perms.get("default", "ask")
         items: List[Dict[str, Any]] = []
 
-        # --- Shell Guard: standalone binary toggle (no group), at the top ---
-        sg_enabled = perms.get("shell_guard", True)
-        items.append(
-            {
-                "type": "shell_guard",
-                "name": "shell_guard",
-                "label": "Shell Guard",
-                "desc": "",
-                "action": "allow" if sg_enabled else "deny",
-                "is_override": "shell_guard" in perms,
-            }
-        )
-
         # --- Builtin tools section ---
         items.append(self._separator_item())
         items.append(self._header_item("builtin", "Builtin"))
@@ -200,9 +186,6 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 opt_list.add_option(Option(it["label"], disabled=True))
             elif it["type"] == "separator":
                 opt_list.add_option(Option("", disabled=True))
-            elif it["type"] == "shell_guard":
-                status = status_tag("ON" if it["action"] == "allow" else "OFF")
-                opt_list.add_option(f"{status} {it['label']}")
             else:
                 act = it["action"].upper()
                 status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
@@ -230,11 +213,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         if target["type"] not in _SELECTABLE_TYPES:
             # Group headers / separators are not toggleable.
             return
-        if target["type"] == "shell_guard":
-            # Shell Guard is a binary toggle: allow (enabled) <-> deny (disabled). 'ask' has no meaning here.
-            next_act = "deny" if target["action"] == "allow" else "allow"
-        else:
-            next_act = self._cycle_action(target["action"])
+        next_act = self._cycle_action(target["action"])
         self.pm.update_permission(target["type"], target["name"], next_act)
         self.refresh_list()
         new_idx = next(

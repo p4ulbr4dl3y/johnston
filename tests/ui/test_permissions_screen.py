@@ -69,11 +69,10 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
 
-            # Filter items by 'shell': finds the shell tool and Shell Guard
+            # Filter items by 'shell': finds the shell tool
             await pilot.press("s", "h", "e", "l", "l")
             await pilot.pause()
             self.assertTrue(any(it["name"] == "shell" for it in screen.filtered_items))
-            self.assertTrue(any(it["name"] == "shell_guard" for it in screen.filtered_items))
 
             # Cycle action for highlighted item (enter key)
             await pilot.press("enter")
@@ -82,18 +81,6 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Close screen
             await pilot.press("escape")
             await pilot.pause()
-
-    async def test_shell_guard_toggle(self):
-        screen = PermissionsScreen()
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            await pilot.pause()
-
-            items = screen._get_items()
-            sg_item = next((it for it in items if it["name"] == "shell_guard"), None)
-            self.assertIsNotNone(sg_item)
-            self.assertEqual(sg_item["label"], "Shell Guard")
 
     async def test_action_quit_app(self):
         screen = PermissionsScreen()
@@ -127,18 +114,6 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(screen._cycle_action("ask"), "deny")
         self.assertEqual(screen._cycle_action("deny"), "allow")
 
-    async def test_shell_guard_toggle_off(self):
-        screen = PermissionsScreen()
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            screen.refresh_list()
-            sg_idx = next(i for i, it in enumerate(screen.filtered_items) if it["type"] == "shell_guard")
-            before = screen.filtered_items[sg_idx]["action"]
-            screen.toggle_selected_permission(sg_idx)
-            self.assertNotEqual(screen.filtered_items[sg_idx]["action"], before)
-
     async def test_on_option_list_option_selected(self):
         screen = PermissionsScreen()
         app = DummyHostApp(screen)
@@ -146,7 +121,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
             screen.refresh_list()
-            sel_idx = next(i for i, it in enumerate(screen.filtered_items) if it["type"] in ("tool", "shell_guard"))
+            sel_idx = next(i for i, it in enumerate(screen.filtered_items) if it["type"] == "tool")
             event = MagicMock()
             event.option_index = sel_idx
             before = screen.filtered_items[sel_idx]["action"]
@@ -161,7 +136,6 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.pm.get_effective_permissions.return_value = {
                 "default": "ask",
                 "tools": {"read": "deny", "create": "allow", "web_fetch": "ask"},
-                "shell_guard": True,
             }
             opt_list = MagicMock()
             opt_list.highlighted = None
@@ -171,7 +145,6 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[DENY] read", joined)
             self.assertIn("[ALLOW] create", joined)
             self.assertIn("[ASK] web_fetch", joined)
-            self.assertIn("[ON] Shell Guard", joined)
             self.assertIn("Builtin", joined)
 
     def _setup_key_harness(self, screen, highlighted=None, filtered=None, focus=True):
@@ -245,7 +218,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     # --- New grouped-layout / MCP tests ---
 
-    async def test_sections_builtin_mcp_and_shell_guard_standalone(self):
+    async def test_sections_builtin_and_mcp(self):
         mgr = _make_mcp_mock(
             cached=[
                 _mcp_tool("alpha_tool", "alpha", description="alpha desc"),
@@ -267,12 +240,6 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.assertIn("alpha_tool", tool_names)
         self.assertIn("beta_tool", tool_names)
 
-        sg = next(it for it in items if it["type"] == "shell_guard")
-        self.assertEqual(sg["name"], "shell_guard")
-        self.assertEqual(sg["label"], "Shell Guard")
-        # Shell Guard is standalone: it must be the first item, outside any group
-        self.assertEqual(items[0]["type"], "shell_guard")
-
     async def test_search_hides_group_headers(self):
         mgr = _make_mcp_mock(cached=[_mcp_tool("alpha_tool", "alpha", description="alpha desc")])
         with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
@@ -283,7 +250,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
                 screen.refresh_list()
 
         self.assertTrue(screen.filtered_items)
-        self.assertTrue(all(it["type"] in ("tool", "shell_guard") for it in screen.filtered_items))
+        self.assertTrue(all(it["type"] == "tool" for it in screen.filtered_items))
         self.assertIn("alpha_tool", [it["name"] for it in screen.filtered_items])
 
     async def test_toggle_mcp_tool_uses_exposed_name(self):

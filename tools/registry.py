@@ -162,7 +162,7 @@ async def check_and_confirm_permission(
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
     Returns None if allowed, or error message string if denied/cancelled.
 
-    When `action` is provided (e.g. a caller that already evaluated shell_guard/role
+    When `action` is provided (e.g. a caller that already evaluated role
     policy), the PermissionManager check is skipped and the given action is used.
     """
     from core.permission_manager import PermissionManager
