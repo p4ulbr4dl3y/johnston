@@ -48,9 +48,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def on_mount(self) -> None:
         self.refresh_list()
-        opt_list = self.query_one("#mcp-option-list", OptionList)
-        if self.filtered_servers:
-            opt_list.highlighted = 0
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
@@ -127,16 +124,15 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
             server = self.filtered_servers[prev_highlighted]
-            if server is None:
-                opt_list.highlighted = None
-            else:
+            if server is not None:
                 opt_list.highlighted = prev_highlighted
-        elif opt_list.highlighted is None:
-            # First selectable (non-header) row
-            for i, s in enumerate(self.filtered_servers):
-                if s is not None:
-                    opt_list.highlighted = i
-                    break
+                return
+
+        # First selectable (non-header) row — like SkillsScreen does
+        for i, s in enumerate(self.filtered_servers):
+            if s is not None:
+                opt_list.highlighted = i
+                break
 
     def _add_server_row(self, opt_list: OptionList, s: Dict[str, Any], tools_per_server: Dict[str, int]) -> None:
         disabled = s.get("disabled", False)
