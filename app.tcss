@@ -389,6 +389,13 @@ OptionList > .option-list--option-blur-highlighted {
     color: #09090b;
 }
 
+TextArea > .text-area--matching-bracket,
+#message-input > .text-area--matching-bracket {
+    background: transparent;
+    text-style: none;
+}
+
+
 /* Suppress hover tooltips globally */
 Tooltip {
     display: none !important;

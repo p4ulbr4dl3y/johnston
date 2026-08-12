@@ -58,6 +58,14 @@ class WriteInInput(Input):
                     event.prevent_default()
                     return
 
+        elif key in ("down", "key_down"):
+            if self.screen and getattr(self.screen, "raw_options", None):
+                if hasattr(self.screen, "focus_first_option"):
+                    getattr(self.screen, "focus_first_option")()
+                    event.stop()
+                    event.prevent_default()
+                    return
+
         elif key in ("left", "key_left"):
             if cursor == 0:
                 if self.screen and hasattr(self.screen, "action_go_back"):
@@ -264,6 +272,19 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             opt_list.focus()
         except Exception:
             pass
+
+    def focus_first_option(self) -> None:
+        if not self.raw_options:
+            return
+        try:
+            input_field = self.query_one(WRITE_IN_INPUT, Input)
+            opt_list = self.query_one(OPTIONS_LIST, OptionList)
+            input_field.display = False
+            opt_list.highlighted = 0
+            opt_list.focus()
+        except Exception:
+            pass
+
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         if not self.is_mounted or not self.raw_options or self.q_idx >= len(self.questions):
