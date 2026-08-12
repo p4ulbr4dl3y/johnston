@@ -1133,7 +1133,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget.status = "error"
         self.assertEqual(widget._get_status_color(), "#e06c75")
         widget.status = "cancelled"
-        self.assertEqual(widget._get_status_color(), "#f9a825")
+        self.assertEqual(widget._get_status_color(), "#e06c75")
         widget.status = "done"
         self.assertEqual(widget._get_status_color(), "#98c379")
 

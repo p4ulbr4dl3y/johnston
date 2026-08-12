@@ -290,7 +290,7 @@ class ParsingMixin:
         elif self.status == "error":
             return "#e06c75"
         elif self.status == "cancelled":
-            return "#f9a825"
+            return "#e06c75"
         else:
             return "#98c379"
 
