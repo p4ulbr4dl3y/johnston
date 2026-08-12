@@ -163,13 +163,16 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             opt_list = screen.query_one("#tasks-option-list", OptionList)
+            screen.update_tasks_list()
             with patch.object(app, "push_screen") as mock_push:
-                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("sub task"), 0))
+                # index 1 = sub task (running, first selectable after Running header)
+                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("sub task"), 1))
                 mock_push.assert_called_once()
                 self.assertIsInstance(mock_push.call_args[0][0], SubagentViewScreen)
 
             with patch.object(app, "push_screen") as mock_push:
-                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
+                # index 4 = norm task (Running@0,sub@1,Completed@3, norm@4)
+                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 4))
                 mock_push.assert_called_once()
                 self.assertIsInstance(mock_push.call_args[0][0], TaskConsoleScreen)
 
@@ -204,16 +207,24 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             async with app.run_test() as pilot:
                 await pilot.pause()
+                screen.update_tasks_list()
 
+                # Two running shell tasks -> one Running group: [None, task_sub, task_normal]
                 # Kill first task (async kill, background)
                 mock_opt_list = MagicMock()
-                mock_opt_list.highlighted = 0
+                mock_opt_list.highlighted = 1
                 with patch.object(screen, "query_one", return_value=mock_opt_list):
                     await screen.action_kill_task()
                 self.assertFalse(task_sub.is_running)
 
                 # Kill second task
-                mock_opt_list.highlighted = 1
+                mock_opt_list.highlighted = 2
+                with patch.object(screen, "query_one", return_value=mock_opt_list):
+                    await screen.action_kill_task()
+                mock_tc.trigger_ai_response.assert_not_called()
+
+                # Kill header row -> noop
+                mock_opt_list.highlighted = 0
                 with patch.object(screen, "query_one", return_value=mock_opt_list):
                     await screen.action_kill_task()
                 mock_tc.trigger_ai_response.assert_not_called()
