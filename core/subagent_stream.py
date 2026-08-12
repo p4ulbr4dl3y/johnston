@@ -195,6 +195,18 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
         subagent._merged_cost_usd = cur_cost
 
 
+def _safe_save(store: Any, session: AgentSession) -> None:
+    """Persist a session without letting a storage OSError escape the background task.
+
+    A failed save must not mark the whole subagent run as errored or blow up the
+    task; it is logged and swallowed.
+    """
+    try:
+        store.save(session)
+    except Exception:
+        pass
+
+
 async def run_subagent_stream_bg(
     subagent: Any,
     prompt_or_message: str,
@@ -213,15 +225,15 @@ async def run_subagent_stream_bg(
         async for step in subagent.stream_steps(prompt_or_message):
             record_subagent_step(step, session, acc)
         session.finish(STATUS_COMPLETED)
-        store.save(session)
+        _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
         session.finish(STATUS_CANCELLED, "Cancelled by user")
-        store.save(session)
+        _safe_save(store, session)
     except Exception as err:
         acc[0] = f"[{error_prefix}: {err}]"
         session.finish(STATUS_ERROR, str(err))
-        store.save(session)
+        _safe_save(store, session)
     finally:
         if cleanup_fn:
             try:

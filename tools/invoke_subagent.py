@@ -110,10 +110,21 @@ class InvokeSubagentTool(BaseTool):
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
 
+        # Apply role definition: system prompt, model, and tool filtering. Do this
+        # BEFORE creating the session so session.role captures the canonically
+        # applied role (apply_subagent_role falls back to 'worker' for empty,
+        # unknown, or main-only roles), not the raw caller-supplied subagent_type.
+        from core.subagent_stream import apply_subagent_role
+
+        applied_role = apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
+        canonical_role = getattr(subagent, "role", None) or (getattr(applied_role, "key", None) or subagent_type or "worker")
+        if not canonical_role:
+            canonical_role = "worker"
+
         session = store.create_subagent(
             parent_id=parent_session_id or "",
             subagent_id=session_id,
-            role=subagent_type,
+            role=canonical_role,
             description=description,
             prompt=prompt,
             status="running",
@@ -122,11 +133,6 @@ class InvokeSubagentTool(BaseTool):
         )
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
-
-        # Apply role definition: system prompt, model, and tool filtering
-        from core.subagent_stream import apply_subagent_role
-
-        apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
 
         from core.subagent_stream import run_subagent_stream_bg
         from core.subagent_worktree import SubagentWorktreeManager
