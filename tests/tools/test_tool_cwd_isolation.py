@@ -154,9 +154,9 @@ class TestGetRulesSnippetCwd(unittest.TestCase):
             os.makedirs(proj_rules)
             with open(os.path.join(proj_rules, "r.md"), "w", encoding="utf-8") as f:
                 f.write("---\nname: wt-rule\n---\nWT-specific rule.\n")
-            snippet = get_rules_snippet(mode="action", cwd=wt)
+            snippet = get_rules_snippet(role="action", cwd=wt)
             self.assertIn("WT-specific rule", snippet)
-            self.assertNotIn("WT-specific rule", get_rules_snippet(mode="action", cwd=main))
+            self.assertNotIn("WT-specific rule", get_rules_snippet(role="action", cwd=main))
 
 
 class TestSubagentBranchContextPersistence(unittest.TestCase):

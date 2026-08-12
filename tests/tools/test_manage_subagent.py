@@ -172,7 +172,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
                     {"function": {"name": "ask_user"}},
                     {"function": {"name": "shell"}},
                 ]
-                self.mode = ""
+                self.role = ""
                 self.system_prompt = ""
                 self.allow_task = True
                 self.model = ""
@@ -195,7 +195,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sess.status, "completed")
         # Role is reapplied on follow-up so behavior matches the original spawn
         self.assertFalse(sess.agent.allow_task)
-        self.assertEqual(sess.agent.mode, "worker")
+        self.assertEqual(sess.agent.role, "worker")
         tool_names = [t["function"]["name"] for t in sess.agent.tools]
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)

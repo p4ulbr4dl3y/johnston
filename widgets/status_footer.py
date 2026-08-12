@@ -147,7 +147,7 @@ class StatusFooter(Static):
             subagents_active = len([s for s in sessions if getattr(s, "status", "") == "running"])
             subagents_total = len(sessions)
 
-            agent_mode = getattr(agent, "mode", "worker")
+            agent_role = getattr(agent, "role", "worker")
 
             kwargs = {
                 "provider_key": pkey,
@@ -155,7 +155,7 @@ class StatusFooter(Static):
                 "is_connected": is_connected,
                 "model_name": model_name,
                 "clean_model": clean_model,
-                "agent_mode": agent_mode,
+                "agent_role": agent_role,
                 "directory": os.path.basename(os.path.realpath(os.getcwd())),
                 "active_bg_tasks": active_bg_tasks,
                 "subagents_active": subagents_active,
@@ -187,7 +187,7 @@ class StatusFooter(Static):
         is_connected: bool | None = None,
         model_name: str = "",
         clean_model: str | None = None,
-        agent_mode: str = "action",
+        agent_role: str = "action",
         directory: str = "",
         active_bg_tasks: int = 0,
         subagents_active: int = 0,
@@ -216,12 +216,12 @@ class StatusFooter(Static):
             clean_model = catalog.get_model_display_name(provider_key, model_name)
             if not clean_model:
                 clean_model = "[Select model: /models]"
-        mode_str = agent_mode.capitalize()
+        role_str = agent_role.capitalize()
         if self.is_generating:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
-            mode_formatted = f"{frame} {mode_str}"
+            role_formatted = f"{frame} {role_str}"
         else:
-            mode_formatted = mode_str
+            role_formatted = role_str
 
         width = (
             self.size.width
@@ -232,7 +232,7 @@ class StatusFooter(Static):
 
         if is_compact:
             row1_left_parts = [
-                f"[bold {THEME_PRIMARY}]{mode_formatted}[/bold {THEME_PRIMARY}]",
+                f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]",
                 f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]",
             ]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
@@ -273,7 +273,7 @@ class StatusFooter(Static):
                 row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
             row2_right = " • ".join(row2_right_parts)
         else:
-            row1_left_parts = [f"[bold {THEME_PRIMARY}]{mode_formatted}[/]", f"[{THEME_SECONDARY}]{dir_text}[/]"]
+            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]", f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
 

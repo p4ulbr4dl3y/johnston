@@ -58,7 +58,7 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
 def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
     """Applies a role definition to a subagent agent.
 
-    Sets mode, system prompt, model, and filters tools according to the role
+    Sets role, system prompt, model, and filters tools according to the role
     (excluded delegation/UI tools, read-only/allowed/disallowed lists, and the
     hardened shell description). Shared by invoke_subagent spawn and
     manage_subagent follow-ups so role behavior survives process restarts.
@@ -72,7 +72,7 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
     registry.load_roles(project_dir=project_dir)
     definition = registry.get_role(role_key)
 
-    subagent.mode = definition.key
+    subagent.role = definition.key
     subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
     if definition.model:
         subagent.model = definition.model

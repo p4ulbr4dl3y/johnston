@@ -393,8 +393,8 @@ class ChatInput(TextArea):
         if event.key in ("shift+tab", "backtab", "shift_tab"):
             event.prevent_default()
             event.stop()
-            if hasattr(self.app, "action_toggle_mode"):
-                self.app.action_toggle_mode()
+            if hasattr(self.app, "action_toggle_role"):
+                self.app.action_toggle_role()
             return
 
         # Handle arrow navigation in suggestions menu

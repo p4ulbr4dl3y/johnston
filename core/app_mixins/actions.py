@@ -11,19 +11,19 @@ from widgets.chat_view import ChatView, WelcomeWidget
 class ActionsMixin:
     """Actions and pointer/selection event handlers for JohnstonApp."""
 
-    def action_toggle_mode(self) -> None:
-        """Toggle agent mode across all registered roles (builtin, global, project)"""
+    def action_toggle_role(self) -> None:
+        """Toggle agent role across all registered roles (builtin, global, project)"""
         if not hasattr(self, "agent") or not self.agent:
             return
         from core.role_registry import RoleRegistry
 
         roles_dict = RoleRegistry.get_instance().list_roles(scope="main_only")
-        available_modes = list(roles_dict.keys())
-        curr = getattr(self.agent, "mode", "worker").lower()
-        next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
-        new_mode = available_modes[next_idx]
-        self.agent.mode = new_mode
-        self.mode = new_mode
+        available_roles = list(roles_dict.keys())
+        curr = getattr(self.agent, "role", "worker").lower()
+        next_idx = (available_roles.index(curr) + 1) % len(available_roles) if curr in available_roles else 0
+        new_role = available_roles[next_idx]
+        self.agent.role = new_role
+        self.role = new_role
         self.refresh_status_footer()
 
     def action_toggle_expand(self) -> None:

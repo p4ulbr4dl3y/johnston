@@ -8,13 +8,13 @@ from core.rules_manager import RuleDefinition, RulesManager
 class TestRulesManager(unittest.TestCase):
     def test_rule_mode_and_glob_matching(self):
         rule_all = RuleDefinition("rule1", "Content 1")
-        self.assertTrue(rule_all.is_active_for_mode("worker"))
-        self.assertTrue(rule_all.is_active_for_mode("explorer"))
+        self.assertTrue(rule_all.is_active_for_roles("worker"))
+        self.assertTrue(rule_all.is_active_for_roles("explorer"))
         self.assertTrue(rule_all.is_active_for_files(["main.py"]))
 
-        rule_action = RuleDefinition("rule2", "Content 2", modes=["worker"], globs=["*.py"])
-        self.assertTrue(rule_action.is_active_for_mode("worker"))
-        self.assertFalse(rule_action.is_active_for_mode("explorer"))
+        rule_action = RuleDefinition("rule2", "Content 2", roles=["worker"], globs=["*.py"])
+        self.assertTrue(rule_action.is_active_for_roles("worker"))
+        self.assertFalse(rule_action.is_active_for_roles("explorer"))
         self.assertTrue(rule_action.is_active_for_files(["app/main.py"]))
         self.assertFalse(rule_action.is_active_for_files(["README.md"]))
 
@@ -27,7 +27,7 @@ class TestRulesManager(unittest.TestCase):
                 f.write("""---
 name: python_uv
 description: Use uv package manager
-mode: worker, explorer
+role: worker, explorer
 globs: "*.py"
 ---
 Always run uv instead of pip.""")
@@ -38,11 +38,11 @@ Always run uv instead of pip.""")
 
             rule = rules[0]
             self.assertEqual(rule.name, "python_uv")
-            self.assertEqual(rule.modes, ["worker", "explorer"])
+            self.assertEqual(rule.roles, ["worker", "explorer"])
             self.assertEqual(rule.globs, ["*.py"])
             self.assertIn("Always run uv instead of pip.", rule.content)
 
-            formatted = rm.get_formatted_rules(mode="worker", changed_files=["main.py"], project_dir=tmpdir)
+            formatted = rm.get_formatted_rules(role="worker", changed_files=["main.py"], project_dir=tmpdir)
             self.assertIn("### Rule: python_uv", formatted)
             self.assertIn("Always run uv instead of pip.", formatted)
 

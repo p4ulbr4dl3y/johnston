@@ -18,18 +18,18 @@ def _bare_mixin() -> ActionsMixin:
     return obj
 
 
-class TestActionsMode(unittest.IsolatedAsyncioTestCase):
-    async def test_action_toggle_mode_cycles(self):
+class TestActionsRole(unittest.IsolatedAsyncioTestCase):
+    async def test_action_toggle_role_cycles(self):
         app = JohnstonApp()
         async with app.run_test():
-            self.assertEqual(app.agent.mode, "worker")
-            app.action_toggle_mode()
-            self.assertNotEqual(app.agent.mode, "worker")
+            self.assertEqual(app.agent.role, "worker")
+            app.action_toggle_role()
+            self.assertNotEqual(app.agent.role, "worker")
 
-    async def test_action_toggle_mode_no_agent(self):
+    async def test_action_toggle_role_no_agent(self):
         obj = _bare_mixin()
         # No `agent` attribute -> early return
-        obj.action_toggle_mode()
+        obj.action_toggle_role()
 
     async def test_action_toggle_expand(self):
         app = JohnstonApp()
@@ -399,9 +399,9 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
 class TestActionsSelectChanged(unittest.TestCase):
     def test_on_select_changed(self):
         obj = MagicMock()
-        obj.mode = "worker"
+        obj.role = "worker"
         obj.pm = MagicMock()
-        obj.agent = MagicMock(mode="worker", history=[])
+        obj.agent = MagicMock(role="worker", history=[])
         obj.sm = MagicMock()
         obj.sm.get.return_value = MagicMock(agent_history=[{"role": "user", "content": "hi"}])
         obj.current_session_id = "sess1"
@@ -414,7 +414,7 @@ class TestActionsSelectChanged(unittest.TestCase):
 
     def test_on_select_changed_none_value(self):
         obj = MagicMock()
-        obj.mode = "worker"
+        obj.role = "worker"
         obj.pm = MagicMock()
         obj.agent = MagicMock()
         event = MagicMock()
@@ -424,9 +424,9 @@ class TestActionsSelectChanged(unittest.TestCase):
 
     def test_on_select_changed_no_history(self):
         obj = MagicMock()
-        obj.mode = "worker"
+        obj.role = "worker"
         obj.pm = MagicMock()
-        obj.agent = MagicMock(mode="worker")
+        obj.agent = MagicMock(role="worker")
         del obj.agent.history
         obj.sm = MagicMock()
         obj.sm.get.return_value = None

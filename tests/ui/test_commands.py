@@ -6,8 +6,8 @@ from widgets.commands import COMMAND_REGISTRY, handle_slash_command
 
 
 class MockAgent:
-    def __init__(self, mode="action"):
-        self.mode = mode
+    def __init__(self, role="action"):
+        self.role = role
         self.compact_called = False
         self.history = []
         self.tokens_input = 0
@@ -61,7 +61,7 @@ class MockBotMessage:
 class MockApp:
     def __init__(self, agent=None):
         self.agent = agent or MockAgent()
-        self.mode = self.agent.mode
+        self.role = self.agent.role
         self.notified = []
         self.status_refreshed = False
         self.ai_prompts = []
@@ -347,16 +347,16 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 self.saved.append((provider, model))
 
             def create_active_agent(self):
-                return MockAgent(mode="action")
+                return MockAgent(role="action")
 
             def recreate_active_agent(self, app, provider_key=None):
                 if provider_key:
                     self.set_active_provider_key(provider_key)
-                app.agent = MockAgent(mode=app.mode)
+                app.agent = MockAgent(role=app.role)
                 app.agent.app = app
 
-        app = MockApp(agent=MockAgent(mode="explorer"))
-        app.mode = "explorer"
+        app = MockApp(agent=MockAgent(role="explorer"))
+        app.role = "explorer"
         app.pm = MockPM()
         app.query_one = lambda target, default=None: type("Input", (), {"focus": lambda self: None})()
         app.push_screen = lambda screen, callback=None: callback(("new", "new-model")) if callback else None
@@ -364,11 +364,11 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await ModelsCommand().execute(app)
 
         self.assertEqual(app.pm.active_provider, "new")
-        self.assertEqual(app.agent.mode, "explorer")
-        self.assertEqual(app.mode, "explorer")
+        self.assertEqual(app.agent.role, "explorer")
+        self.assertEqual(app.role, "explorer")
         self.assertEqual(app.pm.saved, [("new", "new-model")])
 
-    async def test_providers_command_preserves_mode_when_connecting_provider(self):
+    async def test_providers_command_preserves_role_when_connecting_provider(self):
         from widgets.commands import ProvidersCommand
 
         class MockPM:
@@ -401,16 +401,16 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 self.active_provider = provider
 
             def create_active_agent(self):
-                return MockAgent(mode="action")
+                return MockAgent(role="action")
 
             def recreate_active_agent(self, app, provider_key=None):
                 if provider_key:
                     self.set_active_provider_key(provider_key)
-                app.agent = MockAgent(mode=app.mode)
+                app.agent = MockAgent(role=app.role)
                 app.agent.app = app
 
-        app = MockApp(agent=MockAgent(mode="explorer"))
-        app.mode = "explorer"
+        app = MockApp(agent=MockAgent(role="explorer"))
+        app.role = "explorer"
         app.pm = MockPM()
 
         seen_provider_screen = False
@@ -430,8 +430,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(app.pm.active_provider, "new")
         self.assertEqual(app.pm.saved_key, ("new", "secret"))
-        self.assertEqual(app.agent.mode, "explorer")
-        self.assertEqual(app.mode, "explorer")
+        self.assertEqual(app.agent.role, "explorer")
+        self.assertEqual(app.role, "explorer")
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)

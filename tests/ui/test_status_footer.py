@@ -45,7 +45,7 @@ class FooterTestApp(App):
 
         self.agent = MagicMock()
         self.agent.model = "gpt-4o"
-        self.agent.mode = "action"
+        self.agent.role = "action"
         self.agent.get_metrics.return_value = {
             "context_used": 15000,
             "total_tokens": 50000,
