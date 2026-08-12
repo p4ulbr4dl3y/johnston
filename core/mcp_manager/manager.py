@@ -527,7 +527,12 @@ class MCPManager:
         return None
 
     def get_system_prompt_snippet(self) -> str:
-        """Returns a prompt snippet summarizing currently enabled MCP tools grouped by server."""
+        """Returns a prompt snippet listing enabled MCP tools grouped by server.
+
+        Kept minimal: full tool schemas (names, descriptions, parameters) are
+        already provided to the model via the function-call declaration. This
+        snippet only carries the server->tools grouping that the schema lacks.
+        """
         cached_tools = self.get_cached_tools()
         if not cached_tools:
             return ""
@@ -536,12 +541,14 @@ class MCPManager:
         for t in cached_tools:
             fn = t.get("function", {})
             server = t.get("_mcp_server", "")
-            desc = f": {fn.get('description')}" if fn.get("description") else ""
-            by_server.setdefault(server, []).append(f"- `{fn.get('name')}`{desc}")
+            name = fn.get("name")
+            if not name:
+                continue
+            by_server.setdefault(server, []).append(name)
 
-        lines = ["## MCP Tools", "Available MCP tools grouped by server:"]
+        lines = ["## MCP Tools"]
         for server in sorted(by_server):
-            lines.append(f"\n### {server}")
-            lines.extend(by_server[server])
+            names = ", ".join(sorted(by_server[server]))
+            lines.append(f"- {server}: {names}")
 
         return "\n".join(lines)
