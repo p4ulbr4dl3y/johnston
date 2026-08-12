@@ -8,6 +8,19 @@ from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 from tools.base import format_tool_error
 
+# Legacy scope aliases -> canonical names. Kept indefinitely so existing role
+# files (and persisted sessions) keep working after the rename.
+_SCOPE_ALIASES = {
+    "main_only": "main",
+    "subagent_only": "subagent",
+}
+
+
+def normalize_role_scope(scope: str) -> str:
+    """Normalize a role scope value to its canonical short name."""
+    clean = (scope or "any").lower().strip()
+    return _SCOPE_ALIASES.get(clean, clean)
+
 
 class AgentRole:
     """Unified definition for agent execution roles and modes."""
@@ -33,7 +46,7 @@ class AgentRole:
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
         self.model = model
-        self.scope = (scope or "any").lower().strip()
+        self.scope = normalize_role_scope(scope)
         self.source = source
 
     @property
@@ -204,7 +217,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "subagents to break silently.\n"
             "4. For work you do directly rather than delegate, follow the execution rules of the `worker` role."
         ),
-        scope="main_only",
+        scope="main",
         source="builtin",
     ),
 }
@@ -296,14 +309,14 @@ class RoleRegistry:
     def list_roles(self, scope: Optional[str] = None) -> Dict[str, AgentRole]:
         if not scope:
             return self.roles
-        clean_scope = scope.lower().strip()
+        clean_scope = normalize_role_scope(scope)
         return {k: v for k, v in self.roles.items() if v.scope in ("any", clean_scope)}
 
     def reload(self, project_dir: Optional[str] = None) -> None:
         self.load_roles(project_dir=project_dir)
 
     def list_subagent_roles(self) -> Dict[str, AgentRole]:
-        return {k: v for k, v in self.roles.items() if v.scope in ("any", "subagent_only")}
+        return {k: v for k, v in self.roles.items() if v.scope in ("any", "subagent")}
 
     def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
         self.load_roles(project_dir=project_dir)

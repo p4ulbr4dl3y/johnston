@@ -72,6 +72,11 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
     registry.load_roles(project_dir=project_dir)
     definition = registry.get_role(role_key)
 
+    # A main-only role must never be used as a subagent type. Fall back to
+    # worker so the spawn still produces a usable agent instead of failing.
+    if definition.scope == "main":
+        definition = registry.get_role("worker")
+
     subagent.role = definition.key
     subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
     if definition.model:
