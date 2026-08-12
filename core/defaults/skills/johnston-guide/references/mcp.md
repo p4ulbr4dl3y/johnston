@@ -18,5 +18,9 @@
 }
 ```
 
+## Transport
+- **stdio** (via `command` + `args`) is the only executed transport.
+- An optional `url` field is preserved in config, but HTTP/SSE URL transport is NOT yet executed — such servers are skipped.
+
 ## Verification
 - Run `johnston --mcp` via shell tool to verify server registration and readiness.
