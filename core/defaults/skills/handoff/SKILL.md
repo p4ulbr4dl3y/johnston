@@ -1,6 +1,4 @@
-"""Default handoff skill definition."""
-
-DEFAULT_HANDOFF_SKILL_CONTENT = """---
+---
 name: handoff
 description: Session Continuation Handoff Note. Summarizes current session state, modified files, completed steps, and next actions for seamless continuation.
 ---
@@ -15,4 +13,3 @@ Generate a clean handoff summary for continuing work in a future session.
 3. **Files Modified**: Bullet list of modified files.
 4. **Current Status**: Pass/fail state, open issues.
 5. **Next Steps**: Exact actions for the next agent session.
-"""

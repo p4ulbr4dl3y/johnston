@@ -11,9 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 from core.defaults.config import DEFAULT_IGNORE_DIRS
-from core.defaults.skills.handoff_skill import DEFAULT_HANDOFF_SKILL_CONTENT
-from core.defaults.skills.init_skill import DEFAULT_INIT_SKILL_CONTENT
-from core.defaults.skills.johnston_guide import JOHNSTON_GUIDE_FILES
+from core.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
 from core.frontmatter import parse_frontmatter
 
 logger = logging.getLogger(__name__)
@@ -42,44 +40,25 @@ class SkillManager:
         os.makedirs(self.global_dir, exist_ok=True)
         from core.platform_utils import atomic_write_text
 
-        # 1. Provision johnston-guide with references/
-        guide_dir = os.path.join(self.global_dir, "johnston-guide")
-        for rel_path, file_content in JOHNSTON_GUIDE_FILES.items():
-            target_path = os.path.join(guide_dir, rel_path)
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            if not os.path.exists(target_path):
-                try:
-                    atomic_write_text(target_path, file_content.strip())
-                except Exception:
-                    logger.warning("Failed to write guide skill file: %s", target_path, exc_info=True)
+        # Provision bundled default skills (init, handoff, johnston-guide) into
+        # the user's global skills dir. Each skill is a directory with SKILL.md
+        # and optional extra files. Existing files are left untouched so users
+        # can edit/remove their local copies.
+        for name in list_bundled_skills():
+            self._provision_skill(get_bundled_skill(name), atomic_write_text)
 
-        # 2. Single-file skills (init, handoff)
-        single_skills = [
-            ("init", DEFAULT_INIT_SKILL_CONTENT, "Repository Initialization"),
-            ("handoff", DEFAULT_HANDOFF_SKILL_CONTENT, "Session Continuation Handoff Note"),
-        ]
-
-        for skill_name, skill_content, check_marker in single_skills:
-            skill_dir = os.path.join(self.global_dir, skill_name)
-            skill_file = os.path.join(skill_dir, "SKILL.md")
-            should_write = False
-            if not os.path.exists(skill_file):
-                should_write = True
-            else:
-                try:
-                    with open(skill_file, "r", encoding="utf-8") as f:
-                        content = f.read()
-                    if check_marker and check_marker not in content:
-                        should_write = True
-                except Exception:
-                    should_write = True
-
-            if should_write:
-                try:
-                    os.makedirs(skill_dir, exist_ok=True)
-                    atomic_write_text(skill_file, skill_content.strip())
-                except Exception:
-                    logger.warning("Failed to write skill file: %s", skill_file, exc_info=True)
+    def _provision_skill(self, skill: BundledSkill, write_func):
+        """Write a bundled skill's files into the global skills dir if missing."""
+        skill_dir = os.path.join(self.global_dir, skill.name)
+        for rel_path, content in skill.files.items():
+            target_path = os.path.join(skill_dir, rel_path)
+            if os.path.exists(target_path):
+                continue
+            try:
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                write_func(target_path, content)
+            except Exception:
+                logger.warning("Failed to write skill file: %s", target_path, exc_info=True)
 
     def list_skills(
         self,
