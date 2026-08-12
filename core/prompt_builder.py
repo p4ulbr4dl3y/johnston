@@ -103,28 +103,6 @@ def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     return RulesManager.get_instance().get_formatted_rules(role=role, project_dir=cwd)
 
 
-_SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
-_SYSTEM_PROMPT_CACHE_TTL = 30.0
-_INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md")
-
-
-def _instruction_mtimes(cwd: str) -> Tuple:
-    """Cheap signature of project-instruction files for cache invalidation.
-
-    Uses only os.path.getmtime (no subprocess), so checking the cache key is far
-    cheaper than rebuilding the prompt (which runs git + reads the files).
-    """
-    sig = []
-    for name in _INSTRUCTION_FILES:
-        p = os.path.join(cwd, name)
-        try:
-            if os.path.isfile(p):
-                sig.append((name, os.path.getmtime(p)))
-        except OSError:
-            pass
-    return tuple(sig)
-
-
 class PromptBuilder:
     """Builds composite system prompt and tool definitions accounting for MCP, Skills, and agent role (worker/explorer/orchestrator)"""
 
@@ -147,28 +125,7 @@ class PromptBuilder:
         self.is_subagent = is_subagent
 
     def build_system_prompt(self) -> str:
-        # Cache the fully-built prompt so that across the many tool-call steps of
-        # a single agent turn the system prompt string is byte-identical. That
-        # stability is what lets provider prompt caching (OpenAI/OpenRouter
-        # automatic prefix cache, Anthropic cache_control) hit on steps 2..N and
-        # avoid re-billing the ~2-4k token static overhead every step.
-        cwd = self.cwd or os.getcwd()
-        cache_key = (
-            self.base_system_prompt,
-            self.role,
-            self.allow_task,
-            self.model_name,
-            cwd,
-            self.is_subagent,
-            _instruction_mtimes(cwd),
-        )
-        now = time.time()
-        cached = _SYSTEM_PROMPT_CACHE.get(cache_key)
-        if cached is not None and now < cached[0]:
-            return cached[1]
-        sys_prompt = self._build_system_prompt_uncached()
-        _SYSTEM_PROMPT_CACHE[cache_key] = (now + _SYSTEM_PROMPT_CACHE_TTL, sys_prompt)
-        return sys_prompt
+        return self._build_system_prompt_uncached()
 
     def _build_system_prompt_uncached(self) -> str:
         cwd = self.cwd or os.getcwd()
