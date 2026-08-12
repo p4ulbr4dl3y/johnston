@@ -160,7 +160,7 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("AGENTS.md [project instruction]", out)
         self.assertIn("bytes)", out)
 
-    def test_print_rules_with_roles_and_globs(self):
+    def test_print_rules_with_roles(self):
         import pathlib
         import tempfile
 
@@ -172,7 +172,6 @@ class TestCLIAdvanced(unittest.TestCase):
                     rule.name = "R1"
                     rule.source = "project"
                     rule.roles = ["worker", "explorer"]
-                    rule.globs = ["*.py"]
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = [rule]
                     mock_cls.get_instance.return_value = rules_mgr
@@ -181,7 +180,6 @@ class TestCLIAdvanced(unittest.TestCase):
         out = f.getvalue()
         self.assertIn("R1 [rule] [project]", out)
         self.assertIn("Roles: worker, explorer", out)
-        self.assertIn("Globs: *.py", out)
 
     def test_print_linters_empty(self):
         f = io.StringIO()

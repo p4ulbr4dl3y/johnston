@@ -192,7 +192,7 @@ def print_rules():
 
     rules = RulesManager.get_instance().load_rules()
     for r in rules:
-        items.append(("rule", r.name, r.source, r.roles, r.globs))
+        items.append(("rule", r.name, r.source, r.roles))
 
     if not items:
         print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .johnston/rules/).")
@@ -204,13 +204,11 @@ def print_rules():
             print(f"  * {name} [project instruction]")
             print(f"    Path: {filepath} ({size} bytes)")
         else:
-            _, r_name, r_source, r_roles, r_globs = item
+            _, r_name, r_source, r_roles = item
             scope = f"[{r_source}]"
             print(f"  * {r_name} [rule] {scope}")
             if r_roles:
                 print(f"    Roles: {', '.join(r_roles)}")
-            if r_globs:
-                print(f"    Globs: {', '.join(r_globs)}")
         if idx < len(items) - 1:
             print()
 
