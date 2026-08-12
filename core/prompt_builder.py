@@ -159,7 +159,7 @@ class PromptBuilder:
 
         # Stable prefix first (cacheable across turns); volatile env metadata
         # last so the longest possible stable prefix can be prompt-cached.
-        sys_prompt = self.base_system_prompt
+        sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
         if "{model_name}" in sys_prompt:
             model_label = (
                 self.model_name.strip()
@@ -242,7 +242,10 @@ class PromptBuilder:
                     params["properties"] = dict(sorted(props.items()))
                 req = params.get("required")
                 if isinstance(req, list):
-                    params["required"] = sorted(req)
+                    try:
+                        params["required"] = sorted(req)
+                    except TypeError:
+                        params["required"] = req
             return t
 
         sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]

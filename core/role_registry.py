@@ -18,7 +18,7 @@ _SCOPE_ALIASES = {
 
 def normalize_role_scope(scope: str) -> str:
     """Normalize a role scope value to its canonical short name."""
-    clean = (scope or "any").lower().strip()
+    clean = (scope or "").strip().lower() or "any"
     return _SCOPE_ALIASES.get(clean, clean)
 
 
