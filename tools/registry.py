@@ -51,13 +51,24 @@ def _close_match_candidates() -> list[str]:
 
 
 def normalize_tool_name(name: str) -> str:
-    """Normalizes a tool name or alias to its canonical name using ALIAS_MAP."""
+    """Normalizes a tool name or alias to its canonical name using ALIAS_MAP.
+
+    Resolves alias chains recursively (guard against cycles) and maps empty/None
+    alias values back to the requested name instead of returning a dead value.
+    """
     if not name:
         return ""
     clean = name.strip().lower()
-    if clean in REGISTRY:
-        return clean
-    return ALIAS_MAP.get(clean, clean)
+    seen: set[str] = set()
+    while clean not in REGISTRY and clean in ALIAS_MAP:
+        if clean in seen:
+            break
+        seen.add(clean)
+        target = ALIAS_MAP.get(clean)
+        if not isinstance(target, str) or not target.strip():
+            break
+        clean = target.strip().lower()
+    return clean
 
 
 def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:

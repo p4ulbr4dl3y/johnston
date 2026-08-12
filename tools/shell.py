@@ -64,7 +64,7 @@ class ShellTool(BaseTool):
 
         args = normalize_tool_args("shell", args)
         ctx = self._ensure_context(ctx)
-        cmd = args.get("command", "").strip()
+        cmd = (args.get("command") or "").strip()
 
         raw_timeout = args.get("timeout", 120)
         try:
