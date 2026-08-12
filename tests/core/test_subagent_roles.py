@@ -30,6 +30,7 @@ name: reviewer
 description: Code reviewer subagent
 tools: read, grep, glob
 model: deepseek-v4-flash
+provider: clinepass
 ---
 You are a senior code reviewer subagent. Analyze diffs carefully.""")
 
@@ -68,7 +69,9 @@ You run tests and report coverage.""")
             self.assertIn("### Builtin", snippet)
             self.assertIn("- `explorer`: Read-only Q&A, codebase research, and planning role.", snippet)
             self.assertIn("### Project (`.johnston/roles/<name>.md`)", snippet)
-            self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
+            self.assertIn(
+                "- `reviewer`: Code reviewer subagent (Tools: read, grep, glob) (provider: clinepass)", snippet
+            )
 
 
 class TestSubagentApplyRole(unittest.TestCase):
@@ -95,9 +98,50 @@ class TestSubagentApplyRole(unittest.TestCase):
             self.assertEqual(agent.role, "worker")
 
 
+class TestSubagentApplyProvider(unittest.TestCase):
+    def test_apply_provider_config_rebinds_in_place(self):
+        """_apply_provider_config must swap provider fields onto the existing
+        subagent object while preserving identity plumbing."""
+        import types
+
+        from core.subagent_stream import _apply_provider_config
+
+        class _FakeRebuilt:
+            def __init__(self):
+                self.provider_key = "clinepass"
+                self.base_url = "https://api.cline.bot/api/v1"
+                self.api_key = "sk-x"
+                self.api_type = "openai"
+                self.client = object()
+
+        fake_pm = types.SimpleNamespace(
+            create_agent_for_provider=lambda pk: _FakeRebuilt(),
+        )
+
+        class _FakeAgent:
+            pass
+
+        agent = _FakeAgent()
+        agent.app = "APP"
+        agent.is_subagent = True
+        agent.tools = ["t1"]
+        agent.provider_key = "openai"
+        agent.base_url = "old"
+
+        import unittest.mock as mock
+
+        with mock.patch("core.provider_manager.ProviderManager", return_value=fake_pm):
+            _apply_provider_config(agent, "clinepass")
+
+        self.assertEqual(agent.provider_key, "clinepass")
+        self.assertEqual(agent.base_url, "https://api.cline.bot/api/v1")
+        self.assertEqual(agent.api_type, "openai")
+        self.assertEqual(agent.app, "APP")
+        self.assertEqual(agent.is_subagent, True)
+        self.assertEqual(agent.tools, ["t1"])
+
+
 class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
-    """A vague/non-matching identifier must NOT fall back to the last session — that
-    would risk killing or inspecting the wrong subagent."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()

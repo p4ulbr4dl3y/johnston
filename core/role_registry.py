@@ -35,6 +35,7 @@ class AgentRole:
         disallowed_tools: Optional[List[str]] = None,
         allowed_tools: Optional[List[str]] = None,
         model: str = "",
+        provider: str = "",
         scope: str = "any",
         source: str = "builtin",
     ):
@@ -46,6 +47,7 @@ class AgentRole:
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
         self.model = model
+        self.provider = (provider or "").strip().lower()
         self.scope = normalize_role_scope(scope)
         self.source = source
 
@@ -330,8 +332,9 @@ class RoleRegistry:
 
         for role in subagent_roles.values():
             tools_info = f" (Tools: {', '.join(role.allowed_tools)})" if role.allowed_tools else ""
+            prov_info = f" (provider: {role.provider})" if role.provider else ""
             desc = f": {role.description}" if role.description else ""
-            line = f"- `{role.key}`{desc}{tools_info}"
+            line = f"- `{role.key}`{desc}{tools_info}{prov_info}"
             if role.source == "builtin":
                 builtins.append(line)
             elif role.source == "global":
@@ -368,6 +371,7 @@ class RoleRegistry:
             desc = meta.get("description", "")
             read_only_val = str(meta.get("read_only", "false")).lower() in ("true", "1", "yes")
             model = meta.get("model", "")
+            provider = meta.get("provider", "")
             scope = meta.get("scope", "any")
 
             disallowed_tools = parse_csv_list(meta.get("disallowed_tools"))
@@ -382,6 +386,7 @@ class RoleRegistry:
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
                 model=model,
+                provider=provider,
                 scope=scope,
                 source=source,
             )
