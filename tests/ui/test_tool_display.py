@@ -34,6 +34,14 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("manage_shell", {"action": "status", "task_id": "shell_123"})
         self.assertEqual(res, "status shell_123")
 
+    def test_manage_shell_send_input_human_like(self):
+        res = extract_tool_display("manage_shell", {"action": "send_input", "task_id": "shell_123"})
+        self.assertEqual(res, "send input to shell_123")
+
+    def test_manage_subagent_send_message_human_like(self):
+        res = extract_tool_display("manage_subagent", {"action": "send_message", "task_id": "sub_123"})
+        self.assertEqual(res, "send message to sub_123")
+
     def test_unknown_tool_fallback(self):
         self.assertEqual(extract_tool_display("unknown_tool", {}), "unknown_tool")
 
