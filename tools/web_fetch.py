@@ -1,4 +1,7 @@
+import ipaddress
 import os
+import re
+import socket
 import tempfile
 import threading
 from typing import Any, Dict
@@ -15,6 +18,45 @@ DEFAULT_USER_AGENT = (
 )
 
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+
+
+def _is_private_host(url: str) -> bool:
+    """True if URL resolves to a private/loopback/link-local address (SSRF guard)."""
+    try:
+        host = httpx.URL(url).host
+    except Exception:
+        return False
+    if not host:
+        return False
+    # Literal IPv6/IPv4 fast path
+    try:
+        addr = ipaddress.ip_address(host.split("%")[0])
+        return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
+    except ValueError:
+        pass
+    # Hostname: resolve; block any private/loopback result.
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        # Unresolvable host: cannot classify as private. Let httpx surface the real
+        # connection error rather than (falsely) blocking offline/sandboxed resolvers.
+        return False
+    for info in infos:
+        try:
+            addr = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return True
+    return False
+
+
+_SCRIPT_TAG_RE = re.compile(r"<\s*/?\s*script\b[^>]*>", re.IGNORECASE)
+
+
+def _sanitize_web_content(text: str) -> str:
+    """Strip <script>-style tags from fetched content to avoid script passthrough."""
+    return _SCRIPT_TAG_RE.sub("", text)
 
 
 def _convert_content_to_md_sync(
@@ -56,12 +98,15 @@ class WebFetchTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        url = args.get("url", "").strip()
+        url = (args.get("url") or "").strip()
         if not url:
             return format_tool_error("params", name="url", detail="required")
 
         if not (url.startswith("http://") or url.startswith("https://")):
             return format_tool_error("scheme", name=url, detail="must be http(s)")
+
+        if _is_private_host(url):
+            return format_tool_error("blocked", name=url, detail="private/loopback address is not allowed")
 
         raw_mode = bool(args.get("raw", False))
 
@@ -71,8 +116,14 @@ class WebFetchTool(BaseTool):
             "Accept-Language": "en-US,en;q=0.5",
         }
 
+        async def _guard_request(req: "httpx.Request") -> None:
+            if _is_private_host(str(req.url)):
+                raise httpx.RequestError("private/loopback redirect target is not allowed", request=req)
+
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=20.0) as client:
+            async with httpx.AsyncClient(
+                follow_redirects=True, timeout=20.0, event_hooks={"request": [_guard_request]}
+            ) as client:
                 async with client.stream("GET", url, headers=headers) as response:
                     response.raise_for_status()
                     content_type = response.headers.get("content-type", "").lower()
@@ -106,7 +157,7 @@ class WebFetchTool(BaseTool):
             return format_tool_error("fetch", detail=str(e), name=url)
 
         if raw_mode:
-            text_content = content_bytes.decode("utf-8", errors="replace")
+            text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
         else:
             if "application/pdf" in content_type or url.lower().endswith(".pdf"):
                 suffix = ".pdf"
@@ -123,12 +174,13 @@ class WebFetchTool(BaseTool):
                 suffix = ".html"
 
             if "json" in content_type or "text/plain" in content_type:
-                text_content = content_bytes.decode("utf-8", errors="replace")
+                text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
             else:
                 try:
                     text_content = await run_cancellable(_convert_content_to_md_sync, content_bytes, suffix)
+                    text_content = _sanitize_web_content(text_content)
                 except Exception:
-                    text_content = content_bytes.decode("utf-8", errors="replace")
+                    text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
 
         return truncate_output(
             text_content,

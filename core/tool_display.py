@@ -1,15 +1,31 @@
 import re
 from typing import Any, Dict
 
+# Argument keys whose values must never appear in the display label (secrets).
+_SECRET_KEYS = {"api_key", "apikey", "token", "password", "passwd", "secret", "client_secret", "auth"}
+
+# Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
+# style tags, so escape them (and backslashes) for the chat tool chip.
+_ESCAPE_RE = re.compile(r"([\[\]\\])")
+
+
+def _escape_markup(target: str) -> str:
+    """Escape markup-significant characters for safe display in the tool chip."""
+    return _ESCAPE_RE.sub(r"\\\1", target)
+
+
+def _is_secret_key(key: str) -> bool:
+    return key.strip().lower() in _SECRET_KEYS
+
 
 def _truncate(target: str, max_len: int = 60) -> str:
     """Collapse whitespace and clip a display label to a UI-friendly length."""
     if not isinstance(target, str):
-        return str(target) if target else ""
+        return _escape_markup(str(target)) if target else ""
     target = re.sub(r"\s+", " ", target).strip()
     if len(target) > max_len:
-        return target[:25] + "..." + target[-32:]
-    return target
+        target = target[:25] + "..." + target[-32:]
+    return _escape_markup(target)
 
 
 def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
@@ -89,9 +105,18 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
                 return _truncate(txt)
 
     # Last resort: first non-empty string value, then first numeric value
-    str_vals = [str(v) for v in args.values() if isinstance(v, str) and v]
+    # (skipping secret keys so api_key/token/password never leak into the chip).
+    str_vals = [
+        str(v)
+        for k, v in args.items()
+        if isinstance(v, str) and v and not _is_secret_key(k)
+    ]
     if not str_vals:
-        str_vals = [str(v) for v in args.values() if isinstance(v, (int, float)) and v]
+        str_vals = [
+            str(v)
+            for k, v in args.items()
+            if isinstance(v, (int, float)) and v and not _is_secret_key(k)
+        ]
     if str_vals:
         return _truncate(str_vals[0])
 

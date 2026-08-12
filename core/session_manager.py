@@ -21,6 +21,26 @@ def _now() -> float:
     return time.time()
 
 
+def _coerce_int(val: Any) -> int:
+    """Coerce a persisted token count to int, tolerating None/invalid types."""
+    if val is None or isinstance(val, bool):
+        return 0
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _coerce_float(val: Any) -> float:
+    """Coerce a persisted cost value to float, tolerating None/invalid types."""
+    if val is None or isinstance(val, bool):
+        return 0.0
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 class AgentSession:
     """Unified session model for main chat sessions and subagent task sessions.
 
@@ -160,18 +180,18 @@ class AgentSession:
             role=data.get("role", "worker"),
             status=data.get("status", MAIN_STATUS_ACTIVE),
             project_key=data.get("project_key", ""),
-            description=data.get("description", ""),
-            prompt=data.get("prompt", ""),
+            description=data.get("description") or "",
+            prompt=data.get("prompt") or "",
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )
         sess.messages = data.get("messages", [])
         sess.agent_history = data.get("agent_history", [])
-        sess.tokens_input = data.get("tokens_input", 0) or 0
-        sess.tokens_output = data.get("tokens_output", 0) or 0
-        sess.total_tokens = data.get("total_tokens", 0) or 0
-        sess.cost_usd = data.get("cost_usd", 0.0) or 0.0
-        sess.last_context_tokens = data.get("last_context_tokens", 0) or 0
+        sess.tokens_input = _coerce_int(data.get("tokens_input"))
+        sess.tokens_output = _coerce_int(data.get("tokens_output"))
+        sess.total_tokens = _coerce_int(data.get("total_tokens"))
+        sess.cost_usd = _coerce_float(data.get("cost_usd"))
+        sess.last_context_tokens = _coerce_int(data.get("last_context_tokens"))
         sess.project_dir = data.get("project_dir", "")
         sess.branch_name = data.get("branch_name", "")
         return sess
