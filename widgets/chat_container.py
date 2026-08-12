@@ -67,7 +67,7 @@ class ChatView(VerticalScroll):
         else:
             display_text = text
 
-        msg = UserMessage(display_text, markup=False)
+        msg = UserMessage(display_text or "", markup=False)
         return await self._mount_and_scroll(msg, should_scroll=not self._is_loading_session, animate=animate)
 
     async def add_bot_message(self, animate: bool = True) -> BotMessage:

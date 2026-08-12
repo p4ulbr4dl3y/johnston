@@ -518,6 +518,8 @@ for cls in COMMAND_CLASSES:
 
 async def handle_slash_command(app, command_text: str) -> bool:
     """Executes command if registered or skill found. Returns True if handled."""
+    if not command_text:
+        return False
     words = command_text.strip().split()
     if not words:
         return False
