@@ -250,6 +250,11 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
 
                 mock_rf.reset_mock()
                 footer._poll_mcp_refresh()
-                mock_rf.assert_not_called()  # idle
+                mock_rf.assert_called_once()  # first idle detects count change (None -> 0)
+                self.assertEqual(footer._mcp_last_active, 0)
+
+                mock_rf.reset_mock()
+                footer._poll_mcp_refresh()
+                mock_rf.assert_not_called()  # idle, count unchanged
 
 

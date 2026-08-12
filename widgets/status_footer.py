@@ -48,8 +48,9 @@ class StatusFooter(Static):
 
     def on_mount(self) -> None:
         self.refresh_footer()
-        # While MCP servers are still warming up, poll so the footer spinner and
-        # loaded-server count stay current even when not generating.
+        # While MCP servers are still warming up (or their tool counts change),
+        # poll so the footer spinner and loaded-server count stay current even
+        # when not generating.
         self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
 
     def _poll_mcp_refresh(self) -> None:
@@ -62,8 +63,45 @@ class StatusFooter(Static):
             if is_loading or was_loading:
                 self._mcp_was_loading = is_loading
                 self.refresh_footer()
+                return
+            # Not loading: keep the loaded-server count live so the footer
+            # reflects MCP servers that finished warming up after the window
+            # above (or drifted since). `refresh_footer` caches mcp servers for
+            # 5s, but the client/tool state is read fresh each call, so this is
+            # cheap enough at a 1s cadence.
+            active = self._mcp_active_count()
+            if active != getattr(self, "_mcp_last_active", None):
+                self._mcp_last_active = active
+                self.refresh_footer()
         except Exception:
             pass
+
+    def _mcp_active_count(self) -> int:
+        """Current number of enabled MCP servers that finished loading tools."""
+        try:
+            from core.mcp_manager import get_mcp_manager
+
+            mm = get_mcp_manager()
+            count = 0
+            for s in mm.load_servers():
+                s_name = s.get("name")
+                cmd = s.get("command")
+                url = s.get("url")
+                if url and not cmd:
+                    continue
+                if s.get("disabled", False):
+                    continue
+                client = mm.clients.get(s_name) if hasattr(mm, "clients") else None
+                if client is None:
+                    continue
+                if getattr(client, "last_error", None):
+                    continue
+                if not getattr(client, "tools", None):
+                    continue
+                count += 1
+            return count
+        except Exception:
+            return None
 
     def refresh_footer(self) -> None:
         try:
