@@ -45,7 +45,11 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
                     _flush()
                     k, v = sline.split(":", 1)
                     current_key = k.strip().lower()
-                    v_str = v.strip().strip('"').strip("'")
+                    # Strip inline '#' comments from inline values (not block scalars).
+                    v_str = v.strip()
+                    if not v_str.startswith(">") and not v_str.startswith("|"):
+                        v_str = v_str.split("#", 1)[0]
+                    v_str = v_str.strip().strip('"').strip("'")
                     current_val_lines = [v_str] if v_str else []
                 elif current_key and (line.startswith(" ") or line.startswith("\t")):
                     current_val_lines.append(sline)
@@ -60,7 +64,7 @@ def parse_csv_list(raw_val: Any) -> List[str]:
     if not raw_val:
         return []
     if isinstance(raw_val, list):
-        return [str(v).strip() for v in raw_val if str(v).strip()]
+        return [v.strip() for v in raw_val if v is not None and str(v).strip()]
     cleaned = str(raw_val).strip("[]")
     return [v.strip() for v in cleaned.split(",") if v.strip()]
 
