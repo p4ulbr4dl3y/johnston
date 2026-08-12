@@ -1,6 +1,4 @@
-"""Default init skill definition."""
-
-DEFAULT_INIT_SKILL_CONTENT = """---
+---
 name: init
 description: Repository Initialization Assistant. Scans project structure, identifies stack, and creates clean AGENTS.md guidelines.
 ---
@@ -23,4 +21,3 @@ You are assisting with initializing `AGENTS.md` guidelines for this repository.
      - Tech Stack & Commands
      - Code Style & Conventions
      - Testing Guidelines
-"""
