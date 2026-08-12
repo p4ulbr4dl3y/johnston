@@ -112,6 +112,37 @@ class PermissionConfirmScreen(ModalScreen[str]):
                 action_desc = (
                     f"Agent wants to `{act}` task `{t_id}`" if t_id else "Agent wants to manage background tasks"
                 )
+        elif self.tool_name in ("manage_subagent",):
+            act = (nargs.get("action") or "manage").lower()
+            s_id = nargs.get("task_id") or nargs.get("session_id") or ""
+
+            if act == "kill":
+                action_desc = (
+                    f"Agent wants to cancel subagent `{s_id}`" if s_id else "Agent wants to cancel a subagent"
+                )
+            elif act == "status":
+                action_desc = (
+                    f"Agent wants to check status of subagent `{s_id}`" if s_id else "Agent wants to check subagent status"
+                )
+            elif act == "list":
+                action_desc = "Agent wants to list subagents"
+            elif act == "send_message":
+                target_str = f" to subagent `{s_id}`" if s_id else ""
+                action_desc = f"Agent wants to send a message{target_str}:"
+            else:
+                action_desc = (
+                    f"Agent wants to `{act}` subagent `{s_id}`" if s_id else "Agent wants to manage subagents"
+                )
+        elif self.tool_name == "update_plan":
+            action_desc = "Agent wants to update the plan"
+        elif self.tool_name == "ask_user":
+            qs = nargs.get("questions") or []
+            if isinstance(qs, list) and len(qs) > 1:
+                action_desc = f"Agent wants to ask {len(qs)} questions:"
+            elif isinstance(qs, list) and len(qs) == 1:
+                action_desc = "Agent wants to ask 1 question:"
+            else:
+                action_desc = "Agent wants to ask a question:"
         elif self.tool_name in ("shell", "run_command", "bash"):
             action_desc = "Agent wants to run shell command:"
         else:
