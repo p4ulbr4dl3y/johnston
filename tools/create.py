@@ -45,7 +45,10 @@ class CreateTool(BaseTool):
         if not file_existed and old_content == "isdir":
             return format_tool_error("file", name=path, detail="is a directory")
 
-        content = (args.get("content") or "").rstrip("\r\n")
+        content = (args.get("content") or "")
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
+        content = content.rstrip("\r\n")
 
         try:
             await run_cancellable(write_file_text, path, content)
