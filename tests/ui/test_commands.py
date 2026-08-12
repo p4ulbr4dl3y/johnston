@@ -272,7 +272,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertFalse(show_in_ui)
-        self.assertIn('<SKILL name="init">', prompt)
+        self.assertIn('<SKILL path=', prompt)
 
     async def test_multiple_skills_command(self):
         app = MockApp()
@@ -281,8 +281,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertFalse(show_in_ui)
-        self.assertIn('<SKILL name="init">', prompt)
-        self.assertIn('<SKILL name="handoff">', prompt)
+        self.assertIn('<SKILL path=', prompt)
+        self.assertIn('<SKILL path=', prompt)
         self.assertIn("User request: analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
