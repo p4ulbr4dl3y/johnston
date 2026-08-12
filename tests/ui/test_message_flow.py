@@ -720,6 +720,34 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause(0.5)
         self.assertFalse(app.is_generating)
 
+    async def test_cancellation_marks_current_tool_cancelled(self):
+        # A tool call is emitted, then the stream hangs. Esc interrupts the
+        # generation; the in-flight tool widget must be marked cancelled (not
+        # left stuck in "running").
+        async def stream(prompt, attachments=None):
+            yield ("tool", "bash", "run", {"cmd": "tail -f log"})
+            await asyncio.sleep(30.0)
+
+        app = JohnstonApp()
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                _configure_connected(app, stream)
+                app.generate_ai_response("Prompt")
+                deadline = asyncio.get_running_loop().time() + 10
+                while asyncio.get_running_loop().time() < deadline:
+                    if getattr(app, "current_tool_widget", None) is not None:
+                        break
+                    await pilot.pause(0.1)
+                self.assertIsNotNone(getattr(app, "current_tool_widget", None))
+                self.assertEqual(app.current_tool_widget.status, "running")
+                chat_input = app.query_one("#message-input")
+                chat_input.focus()
+                await pilot.press("escape")
+                await self._wait_not_generating(pilot, app)
+        self.assertEqual(app.current_tool_widget.status, "cancelled")
+        self.assertIn("interrupted or cancelled", app.current_tool_widget.result_text)
+
     async def test_bot_delta_existing_bot_msg(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "start", "")

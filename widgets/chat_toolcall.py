@@ -289,6 +289,8 @@ class ParsingMixin:
             return "#e5c07b"
         elif self.status == "error":
             return "#e06c75"
+        elif self.status == "cancelled":
+            return "#f9a825"
         else:
             return "#98c379"
 
@@ -510,6 +512,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
         if self.is_expanded:
             self.render_content()
+
+    def mark_cancelled(self) -> None:
+        """Mark an interrupted tool call as cancelled (not error, not running).
+
+        Called from the message-flow cancel path when a tool was killed before
+        emitting a ``tool_result``. The tool stays in a distinct visual state so
+        the user can tell it was interrupted rather than still running or failed.
+        """
+        if self.status != "running":
+            return
+        self.status = "cancelled"
+        self.result_text = "[Tool call interrupted or cancelled]"
+        self.render_header()
 
     DISPLAY_NAMES = _DisplayNamesDict()
     SYSTEM_TOOLS = _SystemToolsSet()
