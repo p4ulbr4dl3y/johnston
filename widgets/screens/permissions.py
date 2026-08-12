@@ -123,7 +123,6 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         items: List[Dict[str, Any]] = []
 
         # --- Builtin tools section ---
-        items.append(self._separator_item())
         items.append(self._header_item("builtin", "Builtin"))
         for t in sorted(REGISTRY):
             act = tools_cfg.get(t) or default_act
