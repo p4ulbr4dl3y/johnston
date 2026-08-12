@@ -399,7 +399,9 @@ class ModelsCatalog:
 
         resolved = self._resolve_catalog_key(provider_id, model_id, self._limits, tag="limits")
         if resolved and resolved in self._limits:
-            return self._limits[resolved]
+            val = self._limits[resolved]
+            if isinstance(val, int) and not isinstance(val, bool):
+                return val
 
         if provider_id:
             prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
@@ -421,7 +423,9 @@ class ModelsCatalog:
                             provider_id, model_id, lims, tag=f"prov_{provider_id}_limits"
                         )
                         if res_prov and res_prov in lims:
-                            return lims[res_prov]
+                            val = lims[res_prov]
+                            if isinstance(val, int) and not isinstance(val, bool):
+                                return val
 
         return DEFAULT_CONTEXT_LIMIT
 

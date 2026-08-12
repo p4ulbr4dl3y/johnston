@@ -317,6 +317,14 @@ class MCPManager:
                     client.stop()
                 except Exception:
                     logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
+            elif created and not self.clients.get(name):
+                # Freshly created client that failed to become ready was (accidentally)
+                # cached before cleanup; make sure it doesn't stay cached as a live orphan.
+                try:
+                    client.stop()
+                except Exception:
+                    logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
+                self.clients.pop(name, None)
 
         try:
             if created:
@@ -324,13 +332,13 @@ class MCPManager:
                     ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
                 except (asyncio.TimeoutError, Exception) as exc:
                     client.last_error = str(exc)
-                    self.clients[name] = client
+                    self.clients.pop(name, None)
                     _cleanup_if_created()
                     return []
                 if not ok:
                     if not getattr(client, "last_error", None):
                         client.last_error = "Failed to start"
-                    self.clients[name] = client
+                    self.clients.pop(name, None)
                     _cleanup_if_created()
                     return []
                 self.clients[name] = client

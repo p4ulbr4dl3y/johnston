@@ -580,6 +580,10 @@ class MCPProcessClient:
         except asyncio.CancelledError:
             self._pending_futures.pop(current_id, None)
             raise
+        except RuntimeError as e:
+            # Server stopped while we awaited; surface gracefully instead of crashing.
+            self._pending_futures.pop(current_id, None)
+            return f"Error: {e}"
 
         # Refresh tools only if the list may have changed since the last fetch
         # (e.g. a server reporting new tools). Without this rate limit every call
