@@ -2,6 +2,7 @@ import re
 from typing import Generic, TypeVar
 
 from textual import events
+from textual._widget_navigation import find_first_enabled, find_last_enabled
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
@@ -21,6 +22,31 @@ from widgets.screens.constants import (
 T = TypeVar("T")
 
 _NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
+
+
+class HeaderWrapOptionList(OptionList):
+    """OptionList that keeps the first group's header in view on wrap-around.
+
+    When the highlight wraps from the last enabled option to the first, the
+    list is scrolled so the very first row (a disabled section header such as
+    "Global") stays visible above the highlighted first skill.
+    """
+
+    def action_cursor_down(self) -> None:
+        last = find_last_enabled(self.options)
+        if self.highlighted is not None and last is not None and self.highlighted == last:
+            super().action_cursor_down()
+            self.scroll_home(animate=False)
+            return
+        super().action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        first = find_first_enabled(self.options)
+        if self.highlighted is not None and first is not None and self.highlighted == first:
+            super().action_cursor_up()
+            self.scroll_end(animate=False)
+            return
+        super().action_cursor_up()
 
 
 class ModalSearchNavMixin:
@@ -93,7 +119,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
-            yield OptionList(*self.filtered_options, id=self.option_list_id)
+            yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:

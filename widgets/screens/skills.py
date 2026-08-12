@@ -9,7 +9,7 @@ from textual.widgets.option_list import Option
 from core.config import CONFIG_DIR
 from core.skill_manager import SkillManager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
-from widgets.screens.base_selection import ModalSearchNavMixin
+from widgets.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
@@ -83,7 +83,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search skills...", id=MODAL_SEARCH_INPUT_ID)
-            yield OptionList(id="skills-option-list")
+            yield HeaderWrapOptionList(id="skills-option-list")
             yield Label("enter: activate • tab: toggle status • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:

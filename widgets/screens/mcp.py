@@ -10,7 +10,7 @@ from textual.widgets.option_list import Option
 from core.config import CONFIG_DIR
 from core.mcp_manager import get_mcp_manager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
-from widgets.screens.base_selection import ModalSearchNavMixin
+from widgets.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
@@ -43,7 +43,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown("### **Manage MCP Servers**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search MCP servers...", id=MODAL_SEARCH_INPUT_ID)
-            yield OptionList(id="mcp-option-list")
+            yield HeaderWrapOptionList(id="mcp-option-list")
             yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:

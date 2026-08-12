@@ -192,8 +192,10 @@ class TestSkillScreens(unittest.TestCase):
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 2)
-        self.assertIn("GLOBAL", s.options[0])
-        self.assertIn("PROJECT", s.options[1])
+        self.assertIn("skill-a", s.options[0])
+        self.assertIn("VISIBLE", s.options[0])
+        self.assertIn("skill-b", s.options[1])
+        self.assertIn("VISIBLE", s.options[1])
 
     @patch("widgets.screens.skills.SkillManager")
     def test_list_init_no_skills(self, mock_sm_cls):
