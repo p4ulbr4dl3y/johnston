@@ -53,6 +53,9 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
         act = nargs.get("action") or ""
         tid = nargs.get("task_id") or ""
         if act and tid:
+            if act in ("send_input", "send_message"):
+                verb = "send message to" if act == "send_message" else "send input to"
+                return _truncate(f"{verb} {tid}")
             return _truncate(f"{act} {tid}")
         if tid:
             return _truncate(tid)
