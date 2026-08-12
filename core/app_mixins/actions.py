@@ -17,7 +17,7 @@ class ActionsMixin:
             return
         from core.role_registry import RoleRegistry
 
-        roles_dict = RoleRegistry.get_instance().list_roles(scope="main_only")
+        roles_dict = RoleRegistry.get_instance().list_roles(scope="main")
         available_roles = list(roles_dict.keys())
         curr = getattr(self.agent, "role", "worker").lower()
         next_idx = (available_roles.index(curr) + 1) % len(available_roles) if curr in available_roles else 0

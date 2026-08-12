@@ -71,6 +71,30 @@ You run tests and report coverage.""")
             self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
 
 
+class TestSubagentApplyRole(unittest.TestCase):
+    def test_main_scope_role_falls_back_to_worker(self):
+        """A main-only role must never run as a subagent; apply_subagent_role
+        must substitute the worker definition instead of using it verbatim."""
+        import tempfile
+
+        from core.role_registry import RoleRegistry
+        from core.subagent_stream import apply_subagent_role
+
+        registry = RoleRegistry.get_instance()
+        definition = registry.get_role("orchestrator")
+        self.assertEqual(definition.scope, "main")
+
+        class _FakeAgent:
+            pass
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            agent = _FakeAgent()
+            agent.tools = []
+            apply_subagent_role(agent, "orchestrator", project_dir=tmpdir)
+            # The subagent must end up bound to the worker role, not orchestrator.
+            self.assertEqual(agent.role, "worker")
+
+
 class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
     """A vague/non-matching identifier must NOT fall back to the last session — that
     would risk killing or inspecting the wrong subagent."""

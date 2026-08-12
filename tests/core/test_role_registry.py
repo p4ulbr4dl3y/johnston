@@ -2,7 +2,12 @@ import os
 import tempfile
 import unittest
 
-from core.role_registry import AgentRole, RoleRegistry, role_tool_error
+from core.role_registry import (
+    AgentRole,
+    RoleRegistry,
+    normalize_role_scope,
+    role_tool_error,
+)
 
 
 class TestRoleRegistry(unittest.TestCase):
@@ -17,7 +22,10 @@ class TestRoleRegistry(unittest.TestCase):
         self.assertFalse(roles["worker"].read_only)
         self.assertTrue(roles["explorer"].read_only)
         self.assertEqual(roles["orchestrator"].name, "Orchestrator")
-        self.assertEqual(roles["orchestrator"].scope, "main_only")
+        self.assertEqual(roles["orchestrator"].scope, "main")
+        self.assertEqual(normalize_role_scope("main_only"), "main")
+        self.assertEqual(normalize_role_scope("subagent_only"), "subagent")
+        self.assertEqual(normalize_role_scope("any"), "any")
 
     def test_custom_role_parsing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -48,7 +56,7 @@ You are a senior code reviewer role.""")
             self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.model, "deepseek-chat")
-            self.assertEqual(rev.scope, "subagent_only")
+            self.assertEqual(rev.scope, "subagent")
             self.assertIn("senior code reviewer role", rev.prompt)
             self.assertEqual(rev.system_prompt, rev.prompt)  # Alias check
 
@@ -100,7 +108,7 @@ You run tests and report coverage.""")
 
     def test_scope_filtering(self):
         reg = RoleRegistry.get_instance()
-        main_roles = reg.list_roles(scope="main_only")
+        main_roles = reg.list_roles(scope="main")
         self.assertIn("orchestrator", main_roles)
 
         subagent_roles = reg.list_subagent_roles()
