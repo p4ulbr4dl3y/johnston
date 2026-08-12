@@ -1,4 +1,3 @@
-import asyncio
 import difflib
 import os
 from typing import Any, Dict, List, Tuple
@@ -13,6 +12,7 @@ from tools.base import (
     try_int,
     write_file_text,
 )
+from tools.cancel import run_cancellable
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -299,7 +299,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
             return format_tool_error("file", name=path, detail="is a directory")
         return None
 
-    validate_err = await asyncio.to_thread(_validate)
+    validate_err = await run_cancellable(_validate)
     if validate_err:
         return validate_err
 
@@ -310,7 +310,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
         return diff
 
     try:
-        diff_output = await asyncio.to_thread(_do_edit)
+        diff_output = await run_cancellable(_do_edit)
     except ValueError as ve:
         return str(ve)
     except Exception as e:

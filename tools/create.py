@@ -1,9 +1,9 @@
-import asyncio
 import os
 from typing import Any, Dict
 
 from core.linters_manager import get_linters_manager
 from tools.base import BaseTool, format_tool_error, make_unified_diff, read_file_text, resolve_path, write_file_text
+from tools.cancel import run_cancellable
 
 
 class CreateTool(BaseTool):
@@ -41,14 +41,14 @@ class CreateTool(BaseTool):
                     old = ""
             return (existed, old)
 
-        file_existed, old_content = await asyncio.to_thread(_probe)
+        file_existed, old_content = await run_cancellable(_probe)
         if not file_existed and old_content == "isdir":
             return format_tool_error("file", name=path, detail="is a directory")
 
         content = (args.get("content") or "").rstrip("\r\n")
 
         try:
-            await asyncio.to_thread(write_file_text, path, content)
+            await run_cancellable(write_file_text, path, content)
             linter_output = await get_linters_manager().run_for(path)
 
             if file_existed:
