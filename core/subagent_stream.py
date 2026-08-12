@@ -20,6 +20,8 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     """
     import math
 
+    if not step:
+        return
     etype = step[0]
     val1 = step[1] if len(step) > 1 else ""
     val2 = step[2] if len(step) > 2 else ""
@@ -222,7 +224,10 @@ async def run_subagent_stream_bg(
         store.save(session)
     finally:
         if cleanup_fn:
-            cleanup_fn(acc)
+            try:
+                cleanup_fn(acc)
+            except Exception:
+                pass
         merge_subagent_metrics(subagent, ctx)
         ctx.refresh_status()
 
