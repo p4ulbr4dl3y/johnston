@@ -188,7 +188,7 @@ class LintersManager:
 
     async def run_for(self, path: str) -> str:
         """Runs enabled & available linters for the file extension; returns warning string if errors found."""
-        if not os.path.exists(path):
+        if not isinstance(path, (str, os.PathLike)) or not os.path.exists(path):
             return ""
 
         lint_list = self.get_for_extension(os.path.splitext(path)[1].lower())
@@ -296,6 +296,8 @@ async def _exec_cmd(cmd: List[str]) -> Optional[str]:
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3.0)
             if proc.returncode != 0 and stdout:
                 return decode_output(stdout).strip()
+            if proc.returncode != 0:
+                return f"[linter exited with code {proc.returncode}]"
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()
