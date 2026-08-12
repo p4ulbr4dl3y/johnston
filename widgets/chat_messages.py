@@ -133,6 +133,11 @@ class BotMessage(Vertical):
         except Exception:
             pass
 
+    def flush_pending_stream(self) -> None:
+        """Immediately render any still-pending debounced stream content."""
+        if self._stream_update_scheduled:
+            self._flush_stream_update()
+
     async def set_final_content(self, content: str) -> None:
         """Render final Markdown once and wait until its widget tree is mounted."""
         self._suppress_content_watch = True

@@ -704,6 +704,14 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
 
+    async def test_tool_event_flushes_pending_stream(self):
+        async def stream(prompt, attachments=None):
+            yield ("bot_delta", "text before tool", "")
+            yield ("tool", "bash", "run", {"cmd": "ls"})
+
+        app = await self._run(stream)
+        self.assertFalse(app.is_generating)
+
     async def test_tool_event_after_empty_content_bot_msg(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "content", "")

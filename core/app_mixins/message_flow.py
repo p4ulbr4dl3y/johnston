@@ -203,6 +203,9 @@ class MessageFlowMixin:
                         if not bot_msg.content.strip():
                             bot_msg.remove()
                         else:
+                            # Flush any pending debounced stream render so the last
+                            # character is drawn before finalizing to the tool call.
+                            bot_msg.flush_pending_stream()
                             await bot_msg.finalize_stream()
                     bot_msg = None
                     targs = val3 if isinstance(val3, dict) else {}
@@ -225,9 +228,9 @@ class MessageFlowMixin:
                 elif event_type == "bot_delta":
                     if val1:
                         if bot_msg is None:
-                            if not val1.strip():
-                                continue
                             bot_msg = await chat_view.add_bot_message()
+                        # Stream whitespace deltas too (e.g. a trailing newline right
+                        # before a tool call) so the final character isn't dropped.
                         bot_msg.append_stream_content(val1)
                 elif event_type == "bot_reset":
                     # A retry is restarting the reply from scratch: drop the partial
