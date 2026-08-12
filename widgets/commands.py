@@ -582,7 +582,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
                     content = body.strip()
                 except Exception:
                     content = ""
-            skill_blocks.append(f'<SKILL name="{s["name"]}">\n{content}\n</SKILL>')
+            skill_blocks.append(f'<SKILL path="{s.get("location", "")}">\n{content}\n</SKILL>')
 
         skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()
