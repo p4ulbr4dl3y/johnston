@@ -98,6 +98,26 @@ class TestWriteInInput(unittest.IsolatedAsyncioTestCase):
                 event.stop.assert_called_once()
                 event.prevent_default.assert_called_once()
 
+    async def test_on_key_down_with_options(self):
+        inp = WriteInInput()
+        app = DummyWidgetApp(inp)
+        async with app.run_test():
+            inp.value = "test"
+            mock_screen = MagicMock()
+            mock_screen.raw_options = ["opt1", "opt2"]
+            mock_screen.focus_first_option = MagicMock()
+
+            event = Key("down", "down")
+            event.stop = MagicMock()
+            event.prevent_default = MagicMock()
+
+            with patch.object(WriteInInput, "screen", new_callable=PropertyMock, return_value=mock_screen):
+                await inp._on_key(event)
+                mock_screen.focus_first_option.assert_called_once()
+                event.stop.assert_called_once()
+                event.prevent_default.assert_called_once()
+
+
     async def test_on_key_up_without_options(self):
         inp = WriteInInput()
         app = DummyWidgetApp(inp)
@@ -185,6 +205,8 @@ class TestAskUserWizardScreenUnit(unittest.TestCase):
         ws.query_one = MagicMock(side_effect=Exception("query fail"))
         ws.focus_write_in_input()
         ws.focus_options_list()
+        ws.focus_first_option()
+
 
         # _on_key shift+tab
         event_tab = Key("shift+tab", "shift+tab")
