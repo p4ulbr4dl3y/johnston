@@ -5,6 +5,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets.option_list import Option
 
 from core.config import CONFIG_DIR
 from core.mcp_manager import get_mcp_manager
@@ -82,21 +83,16 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             return
 
         q = self.search_query.strip().lower()
-        if not q:
-            self.filtered_servers = list(self.servers)
-        else:
-            self.filtered_servers = [
-                s
-                for s in self.servers
-                if q in s.get("name", "").lower()
+
+        def _matches(s: Dict[str, Any]) -> bool:
+            if not q:
+                return True
+            return (
+                q in s.get("name", "").lower()
                 or q in s.get("scope", "").lower()
                 or q in s.get("command", "").lower()
                 or q in s.get("url", "").lower()
-            ]
-
-        if not self.filtered_servers:
-            opt_list.add_option("*No matching MCP servers found*")
-            return
+            )
 
         tools_per_server: Dict[str, int] = {}
         try:
@@ -107,41 +103,70 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         except Exception:
             pass
 
-        for s in self.filtered_servers:
-            disabled = s.get("disabled", False)
-            scope_tag = status_tag(s["scope"])
-            name = s["name"]
-
-            if disabled:
-                opt_list.add_option(f"{status_tag('OFF')} {scope_tag} {name}")
+        # self.filtered_servers grows in lockstep with option rows: a Group header
+        # is represented by None, a real server by its dict (like BaseSelectionScreen).
+        self.filtered_servers = []
+        first_group = True
+        for scope in ("global", "project"):
+            group = [s for s in self.servers if s.get("scope") == scope and _matches(s)]
+            if not group:
                 continue
+            if not first_group:
+                opt_list.add_option(Option("", disabled=True))
+                self.filtered_servers.append(None)
+            first_group = False
+            opt_list.add_option(Option(scope.capitalize(), disabled=True))
+            self.filtered_servers.append(None)
+            for s in group:
+                self._add_server_row(opt_list, s, tools_per_server)
+                self.filtered_servers.append(s)
 
-            tool_cnt = tools_per_server.get(name, 0)
-            url = s.get("url")
-            cmd = s.get("command")
-
-            if tool_cnt > 0:
-                tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
-                opt_list.add_option(f"{status_tag('ON')} {scope_tag} {name} — {tool_info}")
-            elif url and not cmd:
-                opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — URL unsupported")
-            else:
-                client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
-                err = getattr(client, "last_error", None) if client else None
-                if err and "Process start failed" in err:
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Start failed")
-                elif err and "timeout" in err.lower():
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Timeout")
-                elif err:
-                    opt_list.add_option(f"{status_tag('ERR')} {scope_tag} {name} — Error")
-                else:
-                    stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
-                    opt_list.add_option(f"{stag} {scope_tag} {name}")
+        if not self.filtered_servers:
+            opt_list.add_option("*No matching MCP servers found*")
+            return
 
         if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
-            opt_list.highlighted = prev_highlighted
-        elif self.filtered_servers and opt_list.highlighted is None:
-            opt_list.highlighted = 0
+            server = self.filtered_servers[prev_highlighted]
+            if server is None:
+                opt_list.highlighted = None
+            else:
+                opt_list.highlighted = prev_highlighted
+        elif opt_list.highlighted is None:
+            # First selectable (non-header) row
+            for i, s in enumerate(self.filtered_servers):
+                if s is not None:
+                    opt_list.highlighted = i
+                    break
+
+    def _add_server_row(self, opt_list: OptionList, s: Dict[str, Any], tools_per_server: Dict[str, int]) -> None:
+        disabled = s.get("disabled", False)
+        name = s["name"]
+
+        if disabled:
+            opt_list.add_option(f"   {status_tag('OFF')} {name}")
+            return
+
+        tool_cnt = tools_per_server.get(name, 0)
+        url = s.get("url")
+        cmd = s.get("command")
+
+        if tool_cnt > 0:
+            tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
+            opt_list.add_option(f"   {status_tag('ON')} {name} — {tool_info}")
+        elif url and not cmd:
+            opt_list.add_option(f"   {status_tag('ERR')} {name} — URL unsupported")
+        else:
+            client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
+            err = getattr(client, "last_error", None) if client else None
+            if err and "Process start failed" in err:
+                opt_list.add_option(f"   {status_tag('ERR')} {name} — Start failed")
+            elif err and "timeout" in err.lower():
+                opt_list.add_option(f"   {status_tag('ERR')} {name} — Timeout")
+            elif err:
+                opt_list.add_option(f"   {status_tag('ERR')} {name} — Error")
+            else:
+                stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
+                opt_list.add_option(f"   {stag} {name}")
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:
@@ -154,6 +179,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             idx = opt_list.highlighted
             if idx is not None and 0 <= idx < len(self.filtered_servers):
                 target = self.filtered_servers[idx]
+                if target is None:
+                    return
                 s_name = target["name"]
                 self.mm.toggle_server(s_name)
                 self.refresh_list()
@@ -171,6 +198,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_servers):
             target = self.filtered_servers[event.option_index]
+            if target is None:
+                return
             s_name = target["name"]
             self.mm.toggle_server(s_name)
             self.refresh_list()

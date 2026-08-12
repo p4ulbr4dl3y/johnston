@@ -107,7 +107,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Start failed", joined)
             self.assertIn("Timeout", joined)
             self.assertIn("[ON]", joined)
-            self.assertEqual(opt_list.highlighted, 0)
+            # first selectable row is index 1 (GLOBAL header is index 0)
+            self.assertEqual(opt_list.highlighted, 1)
 
     async def test_refresh_list_no_servers(self):
         mgr = MagicMock()
@@ -138,7 +139,10 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.query_one = MagicMock(return_value=opt_list)
             screen.search_query = "alpha"
             screen.refresh_list()
-            self.assertEqual(len(screen.filtered_servers), 1)
+            # GLOBAL header (None) + alpha
+            self.assertEqual(len(screen.filtered_servers), 2)
+            self.assertIsNone(screen.filtered_servers[0])
+            self.assertEqual(screen.filtered_servers[1]["name"], "alpha")
             self.assertEqual(opt_list.highlighted, 1)
 
     async def test_on_mount_focus_exception(self):
