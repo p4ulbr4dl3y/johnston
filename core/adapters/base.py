@@ -29,7 +29,12 @@ class BaseApiAdapter:
 def sort_keys_recursive(obj: Any) -> Any:
     """Recursively sorts dictionary keys to guarantee deterministic JSON serialization (stableStringify)."""
     if isinstance(obj, dict):
-        return {k: sort_keys_recursive(v) for k, v in sorted(obj.items())}
+        # JSON object keys are strings, but real inputs may carry mixed types.
+        # Sort by (type, value) so non-comparable keys don't raise TypeError.
+        return {
+            k: sort_keys_recursive(v)
+            for k, v in sorted(obj.items(), key=lambda item: (type(item[0]).__name__, str(item[0])))
+        }
     elif isinstance(obj, list):
         return [sort_keys_recursive(elem) for elem in obj]
     return obj
@@ -80,6 +85,19 @@ def extract_image_details(tcontent: Any) -> Optional[Tuple[str, str, str, str]]:
     return None
 
 
+def _safe_int(val: Any) -> int:
+    """Coerce a token count to int, tolerating NaN/Inf/None/non-numeric input."""
+    if val is None or isinstance(val, bool):
+        return 0
+    try:
+        f = float(val)
+    except (ValueError, TypeError):
+        return 0
+    if f != f or f in (float("inf"), float("-inf")):  # NaN / ±Inf
+        return 0
+    return int(f)
+
+
 def build_adapter_usage_event(
     prompt_tokens: Any = 0,
     completion_tokens: Any = 0,
@@ -87,9 +105,9 @@ def build_adapter_usage_event(
     cache_read_tokens: Any = 0,
 ) -> Tuple[str, Dict[str, Any]]:
     """Formats standard ('adapter_usage', dict) tuple for provider adapters."""
-    p_tok = int(prompt_tokens or 0)
-    c_tok = int(completion_tokens or 0)
-    t_tok = int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
+    p_tok = _safe_int(prompt_tokens)
+    c_tok = _safe_int(completion_tokens)
+    t_tok = _safe_int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
     return (
         "adapter_usage",
         {

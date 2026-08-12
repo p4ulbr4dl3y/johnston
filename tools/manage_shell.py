@@ -25,7 +25,7 @@ class ManageShellTool(BaseTool):
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         ctx = self._ensure_context(ctx)
         action = args.get("action", "list").lower()
-        task_id = args.get("task_id", "").strip()
+        task_id = (args.get("task_id") or "").strip()
 
         tasks = ctx.background_tasks
         if not tasks and not ctx.app:
