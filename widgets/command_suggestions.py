@@ -92,6 +92,11 @@ class CommandSuggestions(OptionList):
                     dirs.clear()
                     continue
                 dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
+                for d in dirs:
+                    rel_path = d if rel_dir == "." else os.path.join(rel_dir, d)
+                    files_list.append(rel_path.replace("\\", "/") + "/")
+                    if len(files_list) >= max_files:
+                        break
                 for f in files:
                     if f.startswith(".") or f.endswith(".pyc"):
                         continue
@@ -157,7 +162,8 @@ class CommandSuggestions(OptionList):
                     for f in files:
                         if not query_lower or query_lower in f.lower():
                             matched_files.append(f)
-                            formatted_line = f"{f:<46} File"
+                            kind = "Dir" if f.endswith("/") else "File"
+                            formatted_line = f"{f:<46} {kind}"
                             self.add_option(formatted_line)
                             if len(matched_files) >= 50:
                                 break

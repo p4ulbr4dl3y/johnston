@@ -14,6 +14,7 @@ class TestFileSuggestions(unittest.TestCase):
         self.assertTrue(len(res) > 0)
         self.assertTrue(suggestions.display)
         self.assertIn("app.py", res)
+        self.assertTrue(any(f.endswith("/") for f in res), "Directories should be included with trailing slash")
 
         # 2. Filtering by file name (e.g. '@app')
         res_app = suggestions.update_query("Check @app", "Check @app", 10)
