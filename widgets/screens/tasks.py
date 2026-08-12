@@ -6,9 +6,11 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
+from textual.widgets.option_list import Option
 
 from core.defaults.config import THEME_MUTED
-from widgets.screens.base_modal import BaseModalScreen, status_tag
+from widgets.screens.base_modal import BaseModalScreen
+from widgets.screens.base_selection import HeaderWrapOptionList
 from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
 
 
@@ -195,7 +197,7 @@ class TasksListScreen(BaseModalScreen[None]):
             yield Markdown(
                 self._get_header_md(), id="tasks-header-md", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
-            yield OptionList(id="tasks-option-list")
+            yield HeaderWrapOptionList(id="tasks-option-list")
             yield Label("enter: view details • tab / ←/→: switch tab • k: kill • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
@@ -232,21 +234,44 @@ class TasksListScreen(BaseModalScreen[None]):
         opt_list.clear_options()
         if not tasks:
             opt_list.add_option(Text("No background tasks found.", style=THEME_MUTED))
+            self.filtered_tasks = []
             return
 
-        for item in tasks:
-            cmd = item["command"]
-            if len(cmd) > 35:
-                cmd = cmd[:32] + "..."
-            s_tag = status_tag(item["status_str"])
-            kind_tag = status_tag(item["kind"].capitalize()) if self.active_tab == 0 else ""
-            prefix = f"{s_tag} {kind_tag}".strip()
-            opt_list.add_option(f"{prefix} {cmd}")
+        # Build display rows in lockstep with self.filtered_tasks: a None marks a
+        # group header (Running / Completed), a dict marks a real task.
+        self.filtered_tasks = []
+        with_kind_prefix = self.active_tab == 0
+        first_group = True
+        for status_key, group in (("running", [t for t in tasks if t["is_running"]]),
+                                  ("completed", [t for t in tasks if not t["is_running"]])):
+            if not group:
+                continue
+            if not first_group:
+                opt_list.add_option(Option("", disabled=True))
+                self.filtered_tasks.append(None)
+            first_group = False
+            opt_list.add_option(Option(status_key.capitalize(), disabled=True))
+            self.filtered_tasks.append(None)
+            for item in group:
+                opt_list.add_option(self._format_task_row(item, with_kind_prefix))
+                self.filtered_tasks.append(item)
 
-        if current_highlighted is not None and current_highlighted < len(tasks):
-            opt_list.highlighted = current_highlighted
+        if current_highlighted is not None and 0 <= current_highlighted < len(self.filtered_tasks):
+            highlighted_item = self.filtered_tasks[current_highlighted]
+            opt_list.highlighted = current_highlighted if highlighted_item is not None else 0
         else:
-            opt_list.highlighted = 0
+            # First selectable (non-header) row
+            for i, it in enumerate(self.filtered_tasks):
+                if it is not None:
+                    opt_list.highlighted = i
+                    break
+
+    def _format_task_row(self, item: dict, with_kind_prefix: bool) -> str:
+        cmd = item["command"]
+        if len(cmd) > 35:
+            cmd = cmd[:32] + "..."
+        kind_prefix = ("Agent" if item["kind"] == "agent" else "Shell") + ": " if with_kind_prefix else ""
+        return f"   {kind_prefix}{cmd}".rstrip()
 
     def _open_task_details(self, item: dict) -> None:
         raw = item["raw_obj"]
@@ -260,16 +285,18 @@ class TasksListScreen(BaseModalScreen[None]):
             self.app.push_screen(TaskConsoleScreen(raw))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        tasks = self._get_filtered_tasks()
-        if event.option_index is not None and event.option_index < len(tasks):
-            self._open_task_details(tasks[event.option_index])
+        if 0 <= event.option_index < len(self.filtered_tasks):
+            item = self.filtered_tasks[event.option_index]
+            if item is not None:
+                self._open_task_details(item)
 
     async def action_kill_task(self) -> None:
         opt_list = self._get_option_list()
         idx = opt_list.highlighted
-        tasks = self._get_filtered_tasks()
-        if idx is not None and idx < len(tasks):
-            item = tasks[idx]
+        if idx is not None and 0 <= idx < len(self.filtered_tasks):
+            item = self.filtered_tasks[idx]
+            if item is None:
+                return
             raw = item["raw_obj"]
             is_subagent = item["kind"] == "agent"
             if is_subagent:
