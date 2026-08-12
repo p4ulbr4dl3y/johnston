@@ -484,6 +484,47 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
+    async def test_cancellation_during_add_user_message_not_stuck(self):
+        """If Esc lands while the user message is being mounted (before the stream
+        loop), is_generating must be released so later input starts a fresh
+        generation instead of being queued against a dead one."""
+        app = JohnstonApp()
+        ran = []
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+
+                async def stream(prompt, attachments=None):
+                    ran.append(prompt)
+                    yield ("bot_text", f"reply to {prompt}", "")
+
+                _configure_connected(app, stream)
+                chat_view = app.query_one(ChatView)
+                calls = {"n": 0}
+
+                async def cancelled_add_user_message(*args, **kwargs):
+                    calls["n"] += 1
+                    if calls["n"] == 1:
+                        await asyncio.sleep(0.01)
+                        raise asyncio.CancelledError
+                    return await ChatView.add_user_message(chat_view, *args, **kwargs)
+
+                chat_view.add_user_message = cancelled_add_user_message
+                app.generate_ai_response("Prompt 1")
+                # A queued message that could otherwise get stuck behind a dead
+                # generation must be drained once the cancellation resets the flag.
+                app._queue_message_ui("Prompt 2", show_in_ui=True)
+                await self._wait_not_generating(pilot, app)
+                self.assertFalse(app.is_generating)
+                # Drained message spawns a fresh exclusive worker; give it a beat.
+                deadline = asyncio.get_running_loop().time() + 2.0
+                while asyncio.get_running_loop().time() < deadline:
+                    if not app.message_queue and "Prompt 2" in ran:
+                        break
+                    await pilot.pause(0.1)
+        self.assertEqual(len(app.message_queue), 0)
+        self.assertIn("Prompt 2", ran)
+
     async def test_cancellation_thinking_finish_exception(self):
 
         async def stream(prompt, attachments=None):

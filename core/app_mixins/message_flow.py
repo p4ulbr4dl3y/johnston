@@ -119,14 +119,52 @@ class MessageFlowMixin:
         self.is_generating = True
         chat_view = self.query_one(ChatView)
 
-        if show_in_ui:
-            await chat_view.add_user_message(user_text, attachments=attachments)
+        try:
 
-        bot_msg = None
+            if show_in_ui:
+                await chat_view.add_user_message(user_text, attachments=attachments)
 
-        await self._create_git_checkpoint_async(chat_view)
+            bot_msg = None
 
-        full_prompt = user_text
+            await self._create_git_checkpoint_async(chat_view)
+
+            full_prompt = user_text
+        except asyncio.CancelledError:
+            # Cancellation can arrive while the user message / checkpoint work
+            # above is awaiting (before the main stream loop). It must not leave
+            # is_generating stuck True with a dead generation that never drains
+            # the message queue, so run the same cleanup as the finally below.
+            try:
+                footer = self.query_one("#status-footer", StatusFooter)
+                footer.set_generating(False)
+            except Exception:
+                pass
+            try:
+                if getattr(self, "is_app_active", True):
+                    await self.save_current_session_async(force=True)
+            except Exception:
+                pass
+            self.is_generating = False
+            if getattr(self, "is_app_active", True):
+                next_item = self._pop_queued_for_current_session()
+                if next_item is not None:
+                    asyncio.create_task(self._process_queued_message(next_item[0], next_item[1], next_item[2]))
+            return
+        except Exception as e:
+            try:
+                footer = self.query_one("#status-footer", StatusFooter)
+                footer.set_generating(False)
+            except Exception:
+                pass
+            try:
+                if getattr(self, "is_app_active", True):
+                    await self.save_current_session_async(force=True)
+            except Exception:
+                pass
+            self.is_generating = False
+            if getattr(self, "is_app_active", True):
+                self.notify(f"Generation failed: {e}", severity="error")
+            return
 
         thinking_widget = None
         current_tool_widget = None
