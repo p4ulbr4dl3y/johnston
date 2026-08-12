@@ -1,4 +1,3 @@
-import fnmatch
 import os
 import time
 from typing import List, Optional, Tuple
@@ -13,31 +12,17 @@ class RuleDefinition:
         name: str,
         content: str,
         roles: Optional[List[str]] = None,
-        globs: Optional[List[str]] = None,
         source: str = "global",
     ):
         self.name = name
         self.content = content
         self.roles = [r.lower().strip() for r in (roles or [])]
-        self.globs = [g.strip() for g in (globs or [])]
         self.source = source
 
     def is_active_for_roles(self, role: str) -> bool:
         if not self.roles:
             return True
         return role.lower().strip() in self.roles
-
-    def is_active_for_files(self, changed_files: List[str]) -> bool:
-        if not self.globs:
-            return True
-        if not changed_files:
-            return True
-        for filepath in changed_files:
-            fname = os.path.basename(filepath)
-            for glob_pat in self.globs:
-                if fnmatch.fnmatch(fname, glob_pat) or fnmatch.fnmatch(filepath, glob_pat):
-                    return True
-        return False
 
 
 class RulesManager:
@@ -122,22 +107,19 @@ class RulesManager:
 
             name = meta.get("name") or base_name
             modes_raw = meta.get("role") or meta.get("roles") or meta.get("mode") or meta.get("modes") or ""
-            globs_raw = meta.get("globs") or meta.get("glob") or ""
-
             roles = parse_csv_list(modes_raw)
-            globs = parse_csv_list(globs_raw)
 
-            return RuleDefinition(name=name, content=content, roles=roles, globs=globs, source=source)
+            return RuleDefinition(name=name, content=content, roles=roles, source=source)
         except Exception:
             return None
 
     def get_formatted_rules(
-        self, role: str = "worker", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
+        self, role: str = "worker", project_dir: Optional[str] = None
     ) -> str:
         rules = self.load_rules(project_dir=project_dir)
         matching = []
         for r in rules:
-            if r.is_active_for_roles(role) and r.is_active_for_files(changed_files or []):
+            if r.is_active_for_roles(role):
                 matching.append(f"### Rule: {r.name}\n{r.content}")
 
         return "\n\n".join(matching)
