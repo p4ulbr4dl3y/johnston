@@ -66,7 +66,7 @@ You run tests and report coverage.""")
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
             self.assertIn("## Subagents (use as `type` in `invoke_subagent`)", snippet)
             self.assertIn("### Builtin", snippet)
-            self.assertIn("- `explorer`: Read-only Q&A, codebase research, and planning role. Applies to the primary agent and to research subagents.", snippet)
+            self.assertIn("- `explorer`: Read-only Q&A, codebase research, and planning role.", snippet)
             self.assertIn("### Project (`.johnston/roles/<name>.md`)", snippet)
             self.assertIn("- `reviewer`: Code reviewer subagent (Tools: read, grep, glob)", snippet)
 

@@ -99,7 +99,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
     "worker": AgentRole(
         key="worker",
         name="Worker",
-        description="Execution mode: full write, edit, shell, and task tool access. Applies to the primary agent and to execution subagents.",
+        description="Execution mode: full write, edit, shell, and task tool access.",
         read_only=False,
         prompt=(
             "## Execution Mode: WORKER\n\n"
@@ -119,7 +119,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
     "explorer": AgentRole(
         key="explorer",
         name="Explorer",
-        description="Read-only Q&A, codebase research, and planning role. Applies to the primary agent and to research subagents.",
+        description="Read-only Q&A, codebase research, and planning role.",
         read_only=True,
         prompt=(
             "## Execution Mode: EXPLORER\n\n"
