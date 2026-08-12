@@ -311,6 +311,8 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
 
     try:
         diff_output = await run_cancellable(_do_edit)
+    except (UnicodeDecodeError, UnicodeEncodeError) as ue:
+        return format_tool_error("file", detail=str(ue), name=path)
     except ValueError as ve:
         return str(ve)
     except Exception as e:

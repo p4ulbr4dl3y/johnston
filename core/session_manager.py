@@ -228,13 +228,16 @@ class SessionStore:
     # -- paths -------------------------------------------------------------
 
     def _main_path(self, session_id: str) -> str:
-        return os.path.join(self.sessions_dir, f"{session_id}.json")
+        safe_id = os.path.basename(session_id or "")
+        return os.path.join(self.sessions_dir, f"{safe_id}.json")
 
     def _subagent_dir(self, parent_id: str) -> str:
-        return os.path.join(self.sessions_dir, f"{parent_id}.subagents")
+        safe_parent = os.path.basename(parent_id or "")
+        return os.path.join(self.sessions_dir, f"{safe_parent}.subagents")
 
     def _subagent_path(self, parent_id: str, subagent_id: str) -> str:
-        return os.path.join(self._subagent_dir(parent_id), f"{subagent_id}.json")
+        safe_sub = os.path.basename(subagent_id or "")
+        return os.path.join(self._subagent_dir(parent_id), f"{safe_sub}.json")
 
     # -- CRUD --------------------------------------------------------------
 

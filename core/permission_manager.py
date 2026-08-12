@@ -132,6 +132,9 @@ class PermissionManager:
         from tools.registry import normalize_tool_name
 
         canonical_name = normalize_tool_name(raw_tool)
+        # Fail-closed: an empty/absent tool name must never grant execution.
+        if not canonical_name:
+            return "deny", "No tool name given"
 
         effective_perms = self.get_effective_permissions()
 
@@ -148,9 +151,14 @@ class PermissionManager:
         #    connected servers work out of the box; explicit config still applies.
         if canonical_name not in BUILTIN_TOOL_NAMES:
             # Fail-closed: a broken raw 'default' config must never silently allow.
-            raw_default = self._load_json_config(CONFIG_FILE).get("permissions", {}).get("default")
-            if raw_default is not None and raw_default not in self.VALID_ACTIONS:
-                return "ask", f"Invalid default configured; MCP tool '{canonical_name}' fails closed"
+            global_cfg = self._load_json_config(CONFIG_FILE)
+            perms_cfg = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
+            raw_default = perms_cfg.get("default")
+            if raw_default is not None:
+                norm_default = self.normalize_action(raw_default)
+                if norm_default in self.VALID_ACTIONS:
+                    return norm_default, f"MCP tool '{canonical_name}' applies configured default '{norm_default}'"
+                return "deny", f"Invalid default configured; MCP tool '{canonical_name}' fails closed"
             return "allow", f"MCP tool default for '{canonical_name}'"
 
         # 4. Fallback to default

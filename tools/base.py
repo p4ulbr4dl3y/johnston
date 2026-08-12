@@ -34,8 +34,12 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
 
 
 def write_file_text(path: str, content: str) -> None:
-    """Ensures parent directory exists and atomically writes text to file."""
-    atomic_write_text(path, content)
+    """Ensures parent directory exists and atomically writes text to file.
+
+    Resolves symlinks first so writes target the real inode (never clobbering
+    the link itself); atomic_write_text refuses read-only/other overrides.
+    """
+    atomic_write_text(os.path.realpath(path), content)
 
 
 def read_file_text(path: str) -> str:

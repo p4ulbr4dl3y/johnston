@@ -23,6 +23,12 @@ def johnston_config_dir() -> Path:
 def atomic_write_text(path: str, content: str) -> None:
     directory = os.path.dirname(path) or "."
     os.makedirs(directory, exist_ok=True)
+    # Refuse to clobber a symlink (would replace the link, silently corrupting the
+    # target) or a read-only file. os.replace would bypass both protections.
+    if os.path.islink(path):
+        raise PermissionError(f"refusing to overwrite symbolic link: {path}")
+    if os.path.exists(path) and not os.access(path, os.W_OK):
+        raise PermissionError(f"destination is not writable: {path}")
     import tempfile
 
     fd, tmp_path = tempfile.mkstemp(prefix=".johnston-", suffix=".tmp", dir=directory, text=True)

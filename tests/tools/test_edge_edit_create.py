@@ -1,0 +1,369 @@
+"""Edge-case tests for tools/edit.py and tools/create.py.
+
+Goal is to find bugs (data loss, traversal, crashes on valid input).
+Uses .txt extension everywhere to avoid the linter manager adding noise.
+"""
+import os
+import stat
+import tempfile
+import unittest
+
+from tools.create import CreateTool
+from tools.edit import EditTool, apply_chunk_replacements
+
+
+class _Base(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.old_cwd = os.getcwd()
+        os.chdir(self.tmp)
+
+    def tearDown(self):
+        os.chdir(self.old_cwd)
+        import shutil
+
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def write(self, path, data, encoding="utf-8"):
+        full = os.path.join(self.tmp, path)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding=encoding) as f:
+            f.write(data)
+        return full
+
+    def read(self, path, encoding="utf-8"):
+        with open(os.path.join(self.tmp, path), "r", encoding=encoding) as f:
+            return f.read()
+
+
+# ---------------------------------------------------------------------------
+# edit: apply_chunk_replacements (pure function edge cases)
+# ---------------------------------------------------------------------------
+class TestApplyChunks(_Base):
+    def test_empty_chunks_list_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            apply_chunk_replacements("abc\n", [], "dummy.txt")
+        self.assertIn("no replacement chunks", str(ctx.exception))
+
+    def test_chunk_without_old_str_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            apply_chunk_replacements("abc\n", [{"new_str": "x"}], "dummy.txt")
+        self.assertIn("missing 'old_str'", str(ctx.exception))
+
+    def test_chunk_without_new_str_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            apply_chunk_replacements("abc\n", [{"old_str": "abc"}], "dummy.txt")
+        self.assertIn("missing 'new_str'", str(ctx.exception))
+
+    def test_multiple_allow_multiple_replaces_all(self):
+        new, _ = apply_chunk_replacements(
+            "dup\ndup\ndup\n", [{"old_str": "dup", "new_str": "X", "allow_multiple": True}], "d.txt"
+        )
+        self.assertEqual(new, "X\nX\nX\n")
+
+    def test_multiple_false_fails(self):
+        with self.assertRaises(ValueError):
+            apply_chunk_replacements("dup\ndup\n", [{"old_str": "dup", "new_str": "X"}], "d.txt")
+
+    def test_inverted_start_end_does_not_crash(self):
+        # start > end. Should not crash; exact behavior is unspecified but must not raise unexpected errors.
+        try:
+            new, _ = apply_chunk_replacements(
+                "a\nb\nc\nd\n", [{"old_str": "c", "new_str": "C", "start_line": 4, "end_line": 2}], "d.txt"
+            )
+        except ValueError:
+            # no crash is the requirement (a ValueError is acceptable for "not a clean match")
+            return
+        self.assertIn("C", new)
+
+    def test_string_line_numbers_coerced(self):
+        new, _ = apply_chunk_replacements(
+            "a\nb\n", [{"old_str": "b", "new_str": "B", "start_line": "2", "end_line": "2"}], "d.txt"
+        )
+        self.assertIn("B", new)
+
+    def test_negative_start_line_does_not_crash(self):
+        try:
+            apply_chunk_replacements(
+                "a\nb\nc\n", [{"old_str": "b", "new_str": "B", "start_line": -5, "end_line": 2}], "d.txt"
+            )
+        except ValueError:
+            return
+
+    def test_multiline_unicode_target(self):
+        content = "первая строка\nвторая строка\nтретья\n"
+        new, _ = apply_chunk_replacements(
+            content, [{"old_str": "вторая строка\nтретья", "new_str": "СРЕДНЯЯ\nТРЕТЬЯ"}], "d.txt"
+        )
+        self.assertIn("СРЕДНЯЯ", new)
+        self.assertIn("ТРЕТЬЯ", new)
+
+    def test_literal_backslash_newline_not_treated_as_newline(self):
+        # target contains the two chars backslash+n, not an actual newline
+        content = "a\\nb\n"
+        new, _ = apply_chunk_replacements(content, [{"old_str": "a\\nb", "new_str": "averylong"}], "d.txt")
+        self.assertEqual(new, "averylong\n")
+
+    def test_very_long_target(self):
+        token = "x" * 5000
+        content = "start\n" + token + "\nend\n"
+        new, _ = apply_chunk_replacements(content, [{"old_str": token, "new_str": "SHORT"}], "d.txt")
+        self.assertNotIn(token, new)
+        self.assertIn("SHORT", new)
+
+    async def test_surrogate_new_str_via_tool_returns_err(self):
+        # A lone surrogate cannot be encoded to UTF-8. Tool-level should return a
+        # graceful error, not crash or write garbage.
+        tool = EditTool()
+        p = os.path.join(self.tmp, "surr.txt")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("abc\n")
+        res = await tool.execute({"path": p, "old_str": "abc", "new_str": "\ud800abc"})
+        self.assertIn("ERR:", res)
+        # Original content must be unchanged (atomic write must not have fired).
+        self.assertEqual(open(p, encoding="utf-8").read(), "abc\n")
+
+
+# ---------------------------------------------------------------------------
+# edit: tool-level file / path edge cases
+# ---------------------------------------------------------------------------
+class TestEditToolFiles(_Base):
+    async def test_edit_nonexistent_returns_err(self):
+        tool = EditTool()
+        res = await tool.execute({"path": "missing.txt", "old_str": "a", "new_str": "b"})
+        self.assertIn("ERR:", res)
+        self.assertIn("not found", res)
+
+    async def test_edit_empty_old_str_returns_err(self):
+        tool = EditTool()
+        p = self.write("f.txt", "hello\n")
+        res = await tool.execute({"path": p, "old_str": "", "new_str": "x"})
+        self.assertIn("ERR:", res)
+        self.assertIn("cannot be empty", res)
+
+    async def test_edit_missing_new_str_is_delete(self):
+        tool = EditTool()
+        p = self.write("f.txt", "line1\nTOK\nline3\n")
+        res = await tool.execute({"path": p, "old_str": "TOK"})
+        self.assertIn("TOK", res)  # diff shows removal
+        self.assertEqual(self.read("f.txt"), "line1\nline3\n")
+
+    async def test_edit_binary_file_missing_err_prefix(self):
+        # BUG: binary file triggers UnicodeDecodeError == ValueError, caught at
+        # edit.py:314 `except ValueError as ve: return str(ve)` -> raw message
+        # is returned WITHOUT the "ERR: " prefix, breaking error convention.
+        tool = EditTool()
+        full = os.path.join(self.tmp, "bin.bin")
+        with open(full, "wb") as f:
+            f.write(b"\xff\xfe\x80\x81\x00\x01")
+        res = await tool.execute({"path": full, "old_str": "abc", "new_str": "def"})
+        self.assertIn("ERR:", res)  # RED: currently returns raw decode error w/o prefix
+
+    async def test_edit_readonly_file_clobbers(self):
+        # BUG: editing a write-protected (0444) file succeeds and clobbers it.
+        # atomic_write_text (core/platform_utils.py:34 os.replace) replaces the
+        # file inode regardless of file perms, silently writing a protected file.
+        tool = EditTool()
+        p = self.write("ro.txt", "keepme\nold\n")
+        os.chmod(p, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 0444 read-only
+        try:
+            res = await tool.execute({"path": p, "old_str": "old", "new_str": "new"})
+        finally:
+            os.chmod(p, stat.S_IRUSR | stat.S_IWUSR)
+        # RED: current code reports success and rewrites the read-only file.
+        self.assertIn("ERR:", res)
+
+    async def test_edit_symlink_breaks_link_not_target(self):
+        # BUG: when given an absolute symlink path, edit does NOT write the
+        # symlink's target — resolve_path (tools/base.py:32) turns an absolute
+        # path into a plain abspath (no realpath), then atomic_write_text's
+        # os.replace replaces the symlink inode itself with a regular file,
+        # destroying the symlink and leaving the target unchanged.
+        tool = EditTool()
+        target = self.write("real.txt", "hello world\n")
+        link = os.path.join(self.tmp, "link.txt")
+        os.symlink(target, link)
+        res = await tool.execute({"path": link, "old_str": "world", "new_str": "there"})
+        self.assertNotIn("ERR:", res)
+        # RED: target is left untouched (symlink replaced instead of followed).
+        self.assertEqual(self.read("real.txt"), "hello there\n")
+
+    async def test_edit_directory_returns_err(self):
+        tool = EditTool()
+        os.makedirs(os.path.join(self.tmp, "adir"), exist_ok=True)
+        res = await tool.execute({"path": os.path.join(self.tmp, "adir"), "old_str": "a", "new_str": "b"})
+        self.assertIn("is a directory", res)
+
+    async def test_edit_none_path_returns_err(self):
+        tool = EditTool()
+        res = await tool.execute({"path": None, "old_str": "a", "new_str": "b"})
+        self.assertIn("ERR:", res)
+
+    async def test_edit_missing_path_returns_err(self):
+        tool = EditTool()
+        res = await tool.execute({"old_str": "a", "new_str": "b"})
+        self.assertIn("ERR:", res)
+
+    async def test_edit_relative_path(self):
+        tool = EditTool()
+        self.write("rel.txt", "alpha\n")
+        res = await tool.execute({"path": "rel.txt", "old_str": "alpha", "new_str": "beta"})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(self.read("rel.txt"), "beta\n")
+
+    async def test_edit_traversal_outside_works(self):
+        # External files are allowed by design (see test_tools.py "External file outside workspace").
+        tool = EditTool()
+        outside = os.path.join(os.path.dirname(self.tmp), "outside_target.txt")
+        with open(outside, "w", encoding="utf-8") as f:
+            f.write("outside\n")
+        try:
+            res = await tool.execute({"path": outside, "old_str": "outside", "new_str": "inside"})
+            self.assertNotIn("ERR:", res)
+            with open(outside, "r", encoding="utf-8") as f:
+                self.assertEqual(f.read(), "inside\n")
+        finally:
+            if os.path.exists(outside):
+                os.remove(outside)
+
+    async def test_edit_unicode_cyrillic_path(self):
+        tool = EditTool()
+        p = self.write("файл пробел \"кавычки\".txt", "data\n")
+        res = await tool.execute({"path": p, "old_str": "data", "new_str": "данные"})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(self.read('файл пробел "кавычки".txt'), "данные\n")
+
+    async def test_edit_start_end_alias_keys(self):
+        # schema advertises start/end; after normalize they map to start_line/end_line
+        tool = EditTool()
+        p = self.write("s.txt", "a\nb\nb\nc\n")
+        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(self.read("s.txt"), "a\nb\nB\nc\n")
+
+    async def test_edit_empty_file_target_not_found(self):
+        tool = EditTool()
+        p = self.write("empty.txt", "")
+        res = await tool.execute({"path": p, "old_str": "x", "new_str": "y"})
+        self.assertIn("ERR:", res)
+
+    async def test_edit_permutation_preserves_curly_straight(self):
+        # old_str straight quotes, file has curly -> should preserve curly style
+        tool = EditTool()
+        p = self.write("q.txt", 'msg = "hello"\n')
+        res = await tool.execute({"path": p, "old_str": 'msg = "hello"', "new_str": 'msg = "world"'})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(self.read("q.txt"), 'msg = "world"\n')
+
+
+# ---------------------------------------------------------------------------
+# create: path / content edge cases
+# ---------------------------------------------------------------------------
+class TestCreateTool(_Base):
+    async def test_create_none_content_writes_empty(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "c.txt")
+        res = await tool.execute({"path": p, "content": None})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(open(p, encoding="utf-8").read(), "")
+
+    async def test_create_missing_content_writes_empty(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "c2.txt")
+        res = await tool.execute({"path": p})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(open(p, encoding="utf-8").read(), "")
+
+    async def test_create_path_none_returns_err(self):
+        tool = CreateTool()
+        res = await tool.execute({"path": None, "content": "x"})
+        self.assertIn("ERR:", res)
+
+    async def test_create_binary_content_no_crash(self):
+        # Fixed: bytes content no longer raises at create.py:48; decoded safely.
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "c.bin")
+        res = await tool.execute({"path": p, "content": b"\x00\x01binary"})
+        self.assertIn("created", res)
+
+    async def test_create_parent_path_is_file_returns_err(self):
+        tool = CreateTool()
+        os.makedirs(os.path.join(self.tmp, "p"), exist_ok=True)
+        with open(os.path.join(self.tmp, "p", "blocker"), "w", encoding="utf-8") as f:
+            f.write("i am a file, not a dir")
+        target = os.path.join(self.tmp, "p", "blocker", "child.txt")
+        res = await tool.execute({"path": target, "content": "x"})
+        self.assertIn("ERR:", res)
+        # The blocker file must NOT be clobbered.
+        self.assertEqual(open(os.path.join(self.tmp, "p", "blocker"), encoding="utf-8").read(), "i am a file, not a dir")
+
+    async def test_create_no_write_permission_returns_err(self):
+        tool = CreateTool()
+        ro_dir = os.path.join(self.tmp, "ro")
+        os.makedirs(ro_dir, exist_ok=True)
+        os.chmod(ro_dir, stat.S_IRUSR | stat.S_IXUSR)  # read+exec only, no write
+        try:
+            target = os.path.join(ro_dir, "x.txt")
+            res = await tool.execute({"path": target, "content": "x"})
+            self.assertIn("ERR:", res)
+        finally:
+            os.chmod(ro_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+
+    async def test_create_unicode_cyrillic_path(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "папка", "файл — имя.txt")
+        res = await tool.execute({"path": p, "content": "привет"})
+        self.assertNotIn("ERR:", res)
+        self.assertTrue(os.path.exists(p))
+        self.assertEqual(open(p, encoding="utf-8").read(), "привет")
+
+    async def test_create_huge_content(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "big.txt")
+        content = "x" * 200_000
+        res = await tool.execute({"path": p, "content": content})
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(len(open(p, encoding="utf-8").read()), 200_000)
+
+    async def test_create_trailing_newlines_stripped(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "nl.txt")
+        await tool.execute({"path": p, "content": "a\n\n\n"})
+        self.assertEqual(open(p, encoding="utf-8").read(), "a")
+
+    async def test_create_overwrites_existing_file_and_returns_diff(self):
+        tool = CreateTool()
+        p = self.write("ov.txt", "original\n")
+        res = await tool.execute({"path": p, "content": "replaced\n"})
+        self.assertNotIn("ERR:", res)
+        self.assertIn("updated", res)
+        # create strips trailing \r\n (tools/create.py:48), so no trailing newline preserved
+        self.assertEqual(self.read("ov.txt"), "replaced")
+
+    async def test_create_readonly_file_overwrite_bypasses_perm(self):
+        # BUG: overwriting a read-only (0444) file succeeds via create.
+        # atomic_write_text (core/platform_utils.py:34) os.replace new inode over
+        # the old one, bypassing the target file's write permission — no error.
+        tool = CreateTool()
+        p = self.write("rov.txt", "old\n")
+        os.chmod(p, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+        try:
+            res = await tool.execute({"path": p, "content": "new\n"})
+            # RED: current code reports success and overwrites the read-only file.
+            self.assertIn("ERR:", res)
+        finally:
+            os.chmod(p, stat.S_IRUSR | stat.S_IWUSR)
+
+    async def test_create_ignores_alias_keys(self):
+        # create.py does NOT call normalize_tool_args (unlike edit/multi_edit), so
+        # alias keys like target_file / code are not mapped. Documenting behavior.
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "alias.txt")
+        res = await tool.execute({"target_file": p, "code": "hello"})
+        # If aliases were honored the file would exist; currently resolve_path(None) -> cwd dir.
+        self.assertIn("ERR:", res)
+        self.assertFalse(os.path.exists(p))
+
+
+if __name__ == "__main__":
+    unittest.main()
