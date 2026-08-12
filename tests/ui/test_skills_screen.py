@@ -123,24 +123,28 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
         async for app, screen, pilot in self._run():
             opt_list = screen.query_one("#skills-option-list", OptionList)
             prompts = [str(o.prompt) for o in opt_list._options]
-            self.assertEqual(len(prompts), 2)
-            self.assertTrue(any("GLOBAL" in p and "VISIBLE" in p and "reviewer" in p for p in prompts))
-            self.assertTrue(any("PROJECT" in p and "HIDDEN" in p and "test-runner" in p for p in prompts))
+            # Global header + reviewer, Project header + test-runner
+            self.assertGreaterEqual(len(prompts), 4)
+            self.assertTrue(any(p.strip() == "Global" for p in prompts))
+            self.assertTrue(any(p.strip() == "Project" for p in prompts))
+            self.assertTrue(any("VISIBLE" in p and "reviewer" in p for p in prompts))
+            self.assertTrue(any("HIDDEN" in p and "test-runner" in p for p in prompts))
             await pilot.press("escape")
             await pilot.pause()
             self.assertIsNone(app.dismiss_result)
 
     async def test_filter_match(self):
         async for app, screen, pilot in self._run("r", "e", "v"):
-            self.assertEqual(len(screen.filtered_skills), 1)
-            self.assertEqual(screen.filtered_skills[0]["name"], "reviewer")
+            skills = [s for s in screen.filtered_skills if s is not None]
+            self.assertEqual(len(skills), 1)
+            self.assertEqual(skills[0]["name"], "reviewer")
             opt_list = screen.query_one("#skills-option-list", OptionList)
-            self.assertEqual(len(opt_list._options), 1)
-            self.assertEqual(opt_list.highlighted, 0)
+            # First selectable row gets highlighted
+            self.assertEqual(opt_list.highlighted, 1)
 
     async def test_filter_no_match(self):
         async for app, screen, pilot in self._run("z", "z", "z"):
-            self.assertEqual(len(screen.filtered_skills), 0)
+            self.assertEqual(len([s for s in screen.filtered_skills if s is not None]), 0)
             opt_list = screen.query_one("#skills-option-list", OptionList)
             self.assertIn("No matching skills", str(opt_list._options[0].prompt))
 
@@ -148,12 +152,13 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
         # "suite" only in test-runner description, "pro" only in test-runner scope (project)
         for query in ("suite", "pro"):
             async for app, screen, pilot in self._run(*list(query)):
-                self.assertEqual(len(screen.filtered_skills), 1)
-                self.assertEqual(screen.filtered_skills[0]["name"], "test-runner")
+                skills = [s for s in screen.filtered_skills if s is not None]
+                self.assertEqual(len(skills), 1)
+                self.assertEqual(skills[0]["name"], "test-runner")
 
     async def test_on_input_submitted_highlighted_valid_dismisses_skill(self):
         async for app, screen, pilot in self._run():
-            self.assertEqual(screen.query_one("#skills-option-list", OptionList).highlighted, 0)
+            self.assertEqual(screen.query_one("#skills-option-list", OptionList).highlighted, 1)
             await pilot.press("enter")
             await pilot.pause()
             self.assertIsNotNone(app.dismiss_result)
@@ -178,20 +183,20 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
             opt_list = screen.query_one("#skills-option-list", OptionList)
             search_input = screen.query_one("#modal-search-input", Input)
             self.assertTrue(search_input.has_focus)
-            # highlighted starts at 0 (set by _apply_filter)
-            self.assertEqual(opt_list.highlighted, 0)
-            # Down moves cursor forward
+            # highlighted starts at 1 (first selectable row, GLOBAL header is 0)
+            self.assertEqual(opt_list.highlighted, 1)
+            # Down moves cursor to next selectable (skips disabled headers)
+            await pilot.press("down")
+            await pilot.pause()
+            self.assertEqual(opt_list.highlighted, 4)
+            # Down wraps around to first selectable
             await pilot.press("down")
             await pilot.pause()
             self.assertEqual(opt_list.highlighted, 1)
-            # Down wraps around
-            await pilot.press("down")
-            await pilot.pause()
-            self.assertEqual(opt_list.highlighted, 0)
-            # Up moves cursor backwards
+            # Up moves cursor backwards (skips disabled headers)
             await pilot.press("up")
             await pilot.pause()
-            self.assertEqual(opt_list.highlighted, 1)
+            self.assertEqual(opt_list.highlighted, 4)
 
     async def test_key_navigation_from_none_highlight(self):
         async for app, screen, pilot in self._run():
@@ -228,9 +233,17 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
         with patch.object(SkillManager, "toggle_hidden", return_value=True) as mock_toggle:
             async for app, screen, pilot in self._run():
                 opt_list = screen.query_one("#skills-option-list", OptionList)
-                self.assertEqual(opt_list.highlighted, 0)
+                self.assertEqual(opt_list.highlighted, 1)
                 screen.action_toggle_hidden()
                 mock_toggle.assert_called_once_with("reviewer")
+
+    async def test_toggle_hidden_on_header_noop(self):
+        async for app, screen, pilot in self._run():
+            opt_list = screen.query_one("#skills-option-list", OptionList)
+            opt_list.highlighted = 0
+            with patch.object(SkillManager, "toggle_hidden") as mock_toggle:
+                screen.action_toggle_hidden()
+                mock_toggle.assert_not_called()
 
     async def test_toggle_hidden_exception(self):
         async for app, screen, pilot in self._run():
@@ -245,9 +258,16 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
     async def test_option_selected_valid_dismisses_skill(self):
         async for app, screen, pilot in self._run():
             opt_list = screen.query_one("#skills-option-list", OptionList)
-            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("reviewer"), 0))
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("reviewer"), 1))
             await pilot.pause()
             self.assertEqual(app.dismiss_result["name"], "reviewer")
+
+    async def test_option_selected_header_noop(self):
+        async for app, screen, pilot in self._run():
+            opt_list = screen.query_one("#skills-option-list", OptionList)
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("GLOBAL"), 0))
+            await pilot.pause()
+            self.assertIsNone(app.dismiss_result)
 
     async def test_option_selected_invalid_dismisses_none(self):
         async for app, screen, pilot in self._run():

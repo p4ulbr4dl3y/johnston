@@ -4,6 +4,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets.option_list import Option
 
 from core.config import CONFIG_DIR
 from core.skill_manager import SkillManager
@@ -73,9 +74,8 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         self.skills = self.sm.list_skills(include_hidden=True)
         self.options = []
         for s in self.skills:
-            scope_t = status_tag(s["scope"])
             stat_t = status_tag("HIDDEN" if s.get("hidden") else "VISIBLE")
-            self.options.append(f"{scope_t} {stat_t} {s['name']}")
+            self.options.append(f"   {stat_t} {s['name']}")
         self.filtered_skills = list(self.skills)
         self.filtered_options = list(self.options)
 
@@ -100,33 +100,46 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def _apply_filter(self) -> None:
         q = self.search_query.strip().lower()
-        if not q:
-            self.filtered_skills = list(self.skills)
-            self.filtered_options = list(self.options)
-        else:
-            self.filtered_skills = []
-            self.filtered_options = []
+
+        # Build grouped (global/project) filtered entries: None marks a header
+        # row, a Dict marks a real skill (mirrors BaseSelectionScreen sectioning).
+        self.filtered_skills = []
+        self.filtered_options = []
+        first_group = True
+        for scope in ("global", "project"):
+            group = []
             for s, opt in zip(self.skills, self.options):
-                name = s.get("name", "").lower()
-                desc = s.get("description", "").lower()
-                scope = s.get("scope", "").lower()
-                if q in name or q in desc or q in scope:
-                    self.filtered_skills.append(s)
-                    self.filtered_options.append(opt)
+                if s.get("scope") != scope:
+                    continue
+                if not q or q in s.get("name", "").lower() or q in s.get("description", "").lower() or q in scope:
+                    group.append((s, opt))
+            if not group:
+                continue
+            if not first_group:
+                self.filtered_skills.append(None)
+                self.filtered_options.append(Option("", disabled=True))
+            first_group = False
+            self.filtered_skills.append(None)
+            self.filtered_options.append(Option(scope.capitalize(), disabled=True))
+            for s, opt in group:
+                self.filtered_skills.append(s)
+                self.filtered_options.append(opt)
 
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()
-            if not self.filtered_skills:
-                if not self.skills:
-                    opt_list.add_option(f"*No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/*")
-                else:
-                    opt_list.add_option("*No matching skills found*")
+            if not self.skills:
+                opt_list.add_option(f"*No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/*")
                 return
-            for opt in self.filtered_options:
-                opt_list.add_option(opt)
-            if self.filtered_skills:
-                opt_list.highlighted = 0
+            if not any(s is not None for s in self.filtered_skills):
+                opt_list.add_option("*No matching skills found*")
+                return
+            opt_list.add_options(self.filtered_options)
+            # First selectable row
+            for i, s in enumerate(self.filtered_skills):
+                if s is not None:
+                    opt_list.highlighted = i
+                    break
         except Exception:
             pass
 
@@ -140,8 +153,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             try:
                 opt_list = self.query_one("#skills-option-list", OptionList)
                 idx = opt_list.highlighted
-                if idx is not None and 0 <= idx < len(self.filtered_skills):
-                    self.dismiss(self.filtered_skills[idx])
+                target = self.filtered_skills[idx] if idx is not None and 0 <= idx < len(self.filtered_skills) else None
+                if target is not None:
+                    self.dismiss(target)
                     return
             except Exception:
                 pass
@@ -154,12 +168,13 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             highlighted = opt_list.highlighted
-            if highlighted is not None and 0 <= highlighted < len(self.filtered_skills):
-                target = self.filtered_skills[highlighted]
-                s_name = target["name"]
-                self.sm.toggle_hidden(s_name)
-                self.refresh_list()
-                opt_list.highlighted = highlighted
+            target = self.filtered_skills[highlighted] if highlighted is not None and 0 <= highlighted < len(self.filtered_skills) else None
+            if target is None:
+                return
+            s_name = target["name"]
+            self.sm.toggle_hidden(s_name)
+            self.refresh_list()
+            opt_list.highlighted = highlighted
         except Exception:
             pass
 
@@ -168,6 +183,8 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_skills):
-            self.dismiss(self.filtered_skills[event.option_index])
-        else:
-            self.dismiss(None)
+            target = self.filtered_skills[event.option_index]
+            if target is not None:
+                self.dismiss(target)
+                return
+        self.dismiss(None)
