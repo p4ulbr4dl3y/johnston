@@ -288,6 +288,15 @@ class MessageFlowMixin:
                 except Exception:
                     pass
 
+                # The current tool may have been killed mid-execution (before a
+                # tool_result event). Mark its widget as cancelled so it doesn't
+                # stay visually stuck in "running".
+                if getattr(self, "current_tool_widget", None) is not None:
+                    try:
+                        self.current_tool_widget.mark_cancelled()
+                    except Exception:
+                        pass
+
             else:
                 if getattr(self, "is_app_active", True):
                     try:

@@ -1132,8 +1132,33 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._get_status_color(), "#e5c07b")
         widget.status = "error"
         self.assertEqual(widget._get_status_color(), "#e06c75")
+        widget.status = "cancelled"
+        self.assertEqual(widget._get_status_color(), "#f9a825")
         widget.status = "done"
         self.assertEqual(widget._get_status_color(), "#98c379")
+
+    def test_mark_cancelled_only_running(self):
+        widget = ToolCallWidget("shell", "cmd")
+        self.assertEqual(widget.status, "running")
+        widget.mark_cancelled()
+        self.assertEqual(widget.status, "cancelled")
+        self.assertIn("interrupted or cancelled", widget.result_text)
+
+    def test_mark_cancelled_noop_when_not_running(self):
+        widget = ToolCallWidget("shell", "cmd")
+        widget.set_result("done output")
+        self.assertEqual(widget.status, "done")
+        widget.mark_cancelled()
+        # A completed tool must not be flipped to cancelled retroactively.
+        self.assertEqual(widget.status, "done")
+        self.assertEqual(widget.result_text, "done output")
+
+    def test_mark_cancelled_noop_when_error(self):
+        widget = ToolCallWidget("shell", "cmd")
+        widget.set_result("Error: boom", is_error=True)
+        self.assertEqual(widget.status, "error")
+        widget.mark_cancelled()
+        self.assertEqual(widget.status, "error")
 
     def test_format_compact_dict(self):
         widget = ToolCallWidget("shell", "cmd")
