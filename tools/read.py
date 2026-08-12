@@ -1,13 +1,14 @@
-import asyncio
 import os
 import shutil
 import subprocess
+import threading
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 from core.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
+from tools.cancel import run_cancellable
 from tools.utils import DEFAULT_LINE_WINDOW
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
@@ -45,11 +46,21 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
         _DOC_CACHE.popitem(last=False)
 
 
-def convert_doc_to_markdown_sync(path: str) -> str:
+def convert_doc_to_markdown_sync(path: str, cancel_event: threading.Event | None = None) -> str:
     """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
     cached = get_cached_doc_markdown(path)
     if cached is not None:
         return cached
+
+    def _interrupted() -> bool:
+        return bool(cancel_event and cancel_event.is_set())
+
+    # On cancellation the awaiting coroutine is already gone, so any exception we
+    # raise here would be "never retrieved" by asyncio. Return an empty string
+    # instead and let the caller's formatting layer decide. This keeps the worker
+    # side-effect-free and warning-free.
+    if _interrupted():
+        return ""
 
     result_text = None
 
@@ -65,13 +76,26 @@ def convert_doc_to_markdown_sync(path: str) -> str:
         pass
 
     # 2. Try CLI fallback
-    if result_text is None:
+    if result_text is None and not _interrupted():
         cli_path = shutil.which("markitdown")
         if cli_path:
-            res = subprocess.run([cli_path, path], capture_output=True, text=True, timeout=30)
-            if res.returncode == 0 and res.stdout:
-                result_text = res.stdout
+            proc = subprocess.Popen(
+                [cli_path, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            try:
+                # Poll communicate() in short slices so a cancellation that lands
+                # mid-conversion can kill the subprocess promptly instead of
+                # leaving it to run up to the full 30s window.
+                stdout, _ = _communicate_cancellable(proc, _interrupted, timeout=30)
+                if proc.returncode == 0 and stdout:
+                    result_text = stdout
+            except Exception:
+                if proc.poll() is None:
+                    proc.kill()
+                raise
 
+    if _interrupted():
+        return ""
     if result_text is not None:
         set_cached_doc_markdown(path, result_text)
         return result_text
@@ -81,8 +105,47 @@ def convert_doc_to_markdown_sync(path: str) -> str:
     )
 
 
-def process_image_file_sync(path: str, detail: str | None = None) -> str:
+def _communicate_cancellable(
+    proc: subprocess.Popen, interrupted: "Callable[[], bool]", timeout: float
+) -> "tuple[str, str]":
+    """Run ``proc.communicate`` in slices, killing the process if ``interrupted``.
+
+    ``subprocess.Popen.communicate`` is blocking and cannot be interrupted by a
+    plain ``threading.Event``. By slicing the wait into small increments we can
+    reap the process as soon as cancellation is signalled, closing the pipe it
+    holds instead of letting it linger.
+    """
+    import time as _time
+
+    deadline = _time.monotonic() + timeout
+    while True:
+        if interrupted():
+            if proc.poll() is None:
+                proc.kill()
+            return proc.communicate()
+        remain = deadline - _time.monotonic()
+        if remain <= 0:
+            if proc.poll() is None:
+                proc.kill()
+            return proc.communicate()
+        try:
+            return proc.communicate(timeout=min(0.25, remain))
+        except subprocess.TimeoutExpired:
+            continue
+
+
+def process_image_file_sync(path: str, detail: str | None = None, cancel_event: threading.Event | None = None) -> str:
     """Synchronous worker to load, validate, resize, and convert image files to Base64 JSON."""
+
+    def _interrupted() -> bool:
+        return bool(cancel_event and cancel_event.is_set())
+
+    # If cancellation already fired the worker should bail silently (see
+    # convert_doc_to_markdown_sync): the awaiting coroutine is gone, so an
+    # exception here would only log "Future exception was never retrieved".
+    if _interrupted():
+        return ""
+
     import base64
     import io
     import json
@@ -120,6 +183,9 @@ def process_image_file_sync(path: str, detail: str | None = None) -> str:
                 img = img.convert("RGB") if img.mode != "RGB" else img
                 target_format = "JPEG"
                 media_type = "image/jpeg"
+
+            if _interrupted():
+                return ""
 
             if max(w, h) > max_dim:
                 ratio = max_dim / float(max(w, h))
@@ -254,7 +320,7 @@ class ReadTool(BaseTool):
         if ext in IMAGE_EXTENSIONS:
             try:
                 detail_arg = args.get("detail")
-                image_json = await asyncio.to_thread(process_image_file_sync, path, detail_arg)
+                image_json = await run_cancellable(process_image_file_sync, path, detail_arg)
                 return image_json
             except Exception as e:
                 return format_tool_error("image", detail=str(e), name=path)
@@ -262,7 +328,7 @@ class ReadTool(BaseTool):
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
             try:
-                md_text = await asyncio.to_thread(convert_doc_to_markdown_sync, path)
+                md_text = await run_cancellable(convert_doc_to_markdown_sync, path)
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
             except Exception as e:
                 return format_tool_error("doc", detail=str(e), name=path)
@@ -316,7 +382,7 @@ class ReadTool(BaseTool):
                             return [line.rstrip(b"\r\n").decode("utf-8", errors="replace") for line in tail_lines], total
                     return ([line.rstrip("\r\n") for line in tail_lines], total)
 
-                lines = await asyncio.to_thread(_read_file_lines, path, content_offset, start_line_int, end_line_int)
+                lines = await run_cancellable(_read_file_lines, path, content_offset, start_line_int, end_line_int)
             except Exception as e:
                 return format_tool_error("file", detail=str(e), name=path)
 

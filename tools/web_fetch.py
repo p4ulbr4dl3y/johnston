@@ -1,11 +1,12 @@
-import asyncio
 import os
 import tempfile
+import threading
 from typing import Any, Dict
 
 import httpx
 
 from tools.base import BaseTool, format_tool_error, truncate_output
+from tools.cancel import run_cancellable
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -16,7 +17,9 @@ DEFAULT_USER_AGENT = (
 MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 
-def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> str:
+def _convert_content_to_md_sync(
+    content_bytes: bytes, suffix: str = ".html", cancel_event: threading.Event | None = None
+) -> str:
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(content_bytes)
         tmp_path = tmp.name
@@ -24,7 +27,7 @@ def _convert_content_to_md_sync(content_bytes: bytes, suffix: str = ".html") -> 
     try:
         from tools.read import convert_doc_to_markdown_sync
 
-        return convert_doc_to_markdown_sync(tmp_path)
+        return convert_doc_to_markdown_sync(tmp_path, cancel_event=cancel_event)
     finally:
         if os.path.exists(tmp_path):
             try:
@@ -123,7 +126,7 @@ class WebFetchTool(BaseTool):
                 text_content = content_bytes.decode("utf-8", errors="replace")
             else:
                 try:
-                    text_content = await asyncio.to_thread(_convert_content_to_md_sync, content_bytes, suffix)
+                    text_content = await run_cancellable(_convert_content_to_md_sync, content_bytes, suffix)
                 except Exception:
                     text_content = content_bytes.decode("utf-8", errors="replace")
 
