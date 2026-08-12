@@ -66,7 +66,10 @@ def format_line_pagination(
     actual_end = start - 1
 
     for i in range(start, end + 1):
-        formatted_line = f"{i:5d} | {lines[i - window_start]}"
+        idx = i - window_start
+        if idx < 0 or idx >= len(lines):
+            break
+        formatted_line = f"{i:5d} | {lines[idx]}"
         added_len = len(formatted_line) + (1 if output else 0)
         if current_len + added_len > max_chars:
             if not output:

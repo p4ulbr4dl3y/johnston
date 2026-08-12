@@ -365,7 +365,8 @@ class ReadTool(BaseTool):
                         if s_line is not None and s_line > 1:
                             # Skip to the requested first line without buffering the whole file.
                             for _ in range(s_line - 1):
-                                f.readline()
+                                if not f.readline():
+                                    break
                         tail_lines = []
                         if e_line is not None:
                             # Read only up to the requested end line.
