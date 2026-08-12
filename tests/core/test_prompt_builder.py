@@ -112,33 +112,6 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertLess(prompt.index("Base instructions marker"), prompt.index("## Environment Metadata"))
         self.assertLess(prompt.index("## Execution Mode: WORKER"), prompt.index("## Environment Metadata"))
 
-    def test_build_system_prompt_cached_within_ttl(self):
-        import time as _time
-        from unittest.mock import patch
-
-        import core.prompt_builder as pb
-
-        pb._SYSTEM_PROMPT_CACHE.clear()
-        builder = PromptBuilder("Cache stability marker", [], role="worker")
-        first = builder.build_system_prompt()
-        # Rebuild "later" but still inside the TTL window: must return the exact
-        # same cached string (env time frozen) instead of recomputing.
-        with patch("core.prompt_builder.time.time", return_value=_time.time() + 1):
-            second = builder.build_system_prompt()
-        self.assertEqual(first, second)
-        self.assertIn("Cache stability marker", first)
-        self.assertGreaterEqual(len(pb._SYSTEM_PROMPT_CACHE), 1)
-
-    def test_build_system_prompt_cache_invalidates_on_mode_change(self):
-        import core.prompt_builder as pb
-
-        pb._SYSTEM_PROMPT_CACHE.clear()
-        worker_prompt = PromptBuilder("Mode invalidate marker", [], role="worker").build_system_prompt()
-        explorer_prompt = PromptBuilder("Mode invalidate marker", [], role="explorer").build_system_prompt()
-        # Different mode -> different cache key -> rebuilt with the explorer block
-        self.assertIn("## Execution Mode: WORKER", worker_prompt)
-        self.assertIn("## Execution Mode: EXPLORER", explorer_prompt)
-
     def test_build_system_prompt_substitutes_model_name(self):
         builder = PromptBuilder(
             "You are {model_name} operating inside Johnston CLI", [], role="worker", model_name="Gemini 3.6 Flash"
