@@ -63,6 +63,14 @@ def lex_block_to_line_texts(
     if hasattr(lexer, "ensurenl"):
         lexer.ensurenl = False
 
+    # Normalize code_lines so elements with embedded newlines do not collide:
+    # an embedded "\n" inside a single element would otherwise be split by the
+    # lexer into extra lines that get sliced away below, silently losing content.
+    expanded: list[str] = []
+    for line in code_lines:
+        expanded.extend(line.split("\n"))
+    code_lines = expanded
+
     full_code = "\n".join(code_lines)
     try:
         tokens = lex_fn(full_code, lexer)

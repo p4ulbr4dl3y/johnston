@@ -79,6 +79,8 @@ class ChatInput(TextArea):
         self.update_height()
 
     def load_text(self, text: str) -> None:
+        if text is None:
+            text = ""
         if not text:
             self.pasted_texts.clear()
         super().load_text(text)
@@ -168,6 +170,8 @@ class ChatInput(TextArea):
 
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
+        if pasted_text is None:
+            return None
         lines = pasted_text.strip().splitlines()
         if not lines:
             return pasted_text
@@ -279,7 +283,7 @@ class ChatInput(TextArea):
 
     def add_to_history(self, text: str) -> None:
         """Save submitted message to query history"""
-        if text and (not self.prompt_history or self.prompt_history[-1] != text):
+        if text and text.strip() and (not self.prompt_history or self.prompt_history[-1] != text):
             self.prompt_history.append(text)
             if len(self.prompt_history) > self.MAX_PROMPT_HISTORY:
                 self.prompt_history = self.prompt_history[-self.MAX_PROMPT_HISTORY :]

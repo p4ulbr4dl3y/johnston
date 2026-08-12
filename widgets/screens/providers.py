@@ -42,9 +42,11 @@ class ProvidersScreen(BaseSelectionScreen[str]):
     def _build_options(self):
         options = []
         items = []
-        for p in self.providers.values():
-            key = p["key"]
-            name = p["name"]
+        for pkey, p in self.providers.items():
+            if not isinstance(p, dict):
+                continue
+            key = p.get("key") or pkey
+            name = p.get("name") or pkey
             has_key = bool(self.configured_keys.get(key))
             is_active = key == self.active_key
             is_disabled = key in self.disabled_set or p.get("disabled", False)

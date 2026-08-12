@@ -85,7 +85,7 @@ class CustomMarkdownTableContent(MarkdownTableContent):
                         classes=f"row{row_index} cell",
                     )
                 )
-        self.last_row = row_index
+            self.last_row = row_index
         await self.mount_all(new_cells)
 
     def on_mount(self) -> None:

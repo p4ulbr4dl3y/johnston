@@ -108,7 +108,7 @@ class CommandSuggestions(OptionList):
                     break
         except Exception:
             pass
-        self._cached_files = sorted(files_list)
+        self._cached_files = sorted(set(files_list))
         self._cache_time = now
         return self._cached_files
 
@@ -159,7 +159,11 @@ class CommandSuggestions(OptionList):
                     query_lower = query_part.lower()
                     files = self.get_workspace_files()
                     matched_files = []
+                    seen: set[str] = set()
                     for f in files:
+                        if f in seen:
+                            continue
+                        seen.add(f)
                         if not query_lower or query_lower in f.lower():
                             matched_files.append(f)
                             kind = "Dir" if f.endswith("/") else "File"

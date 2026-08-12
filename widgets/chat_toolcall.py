@@ -312,7 +312,7 @@ class ParsingMixin:
                     v_clean = v_clean[:32] + "..."
                 v_str = f'"{v_clean}"'
             else:
-                v_str = json.dumps(v, ensure_ascii=False)
+                v_str = json.dumps(v, ensure_ascii=False, default=str)
                 if len(v_str) > 35:
                     v_str = v_str[:32] + "..."
 
@@ -441,7 +441,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def __init__(
         self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None
     ):
-        classes = f"tool-call tool-{tool_type.lower()}"
+        classes = f"tool-call tool-{(tool_type or '').lower()}"
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
@@ -487,7 +487,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
 
     def set_result(self, result_text: str, is_error: bool = False) -> None:
-        cleaned = result_text.strip()
+        cleaned = (result_text or "").strip()
         if self.tool_type in ("shell", "Shell", "bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
                 self.status = "running"
@@ -568,7 +568,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             # Eager MCP tool or custom external tool
             mcp_args = self.args if isinstance(self.args, dict) else {}
             compact = self._format_compact_dict(mcp_args)
-            is_mcp = self.tool_type.startswith("mcp_") or getattr(self, "is_mcp", False)
+            is_mcp = (self.tool_type or "").startswith("mcp_") or getattr(self, "is_mcp", False)
             if compact or is_mcp:
                 tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
                 escaped_compact = escape(compact)

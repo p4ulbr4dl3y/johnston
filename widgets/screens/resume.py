@@ -17,7 +17,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             step_str = "step" if count == 1 else "steps"
             options.append(f"{escaped_title} [dim]{escape(f'[{count} {step_str}]')}[/dim]")
 
-        items = [s["id"] for s in sessions]
+        items = [str(s.get("id")) for s in sessions]
         default_val = items[0] if items else ""
         super().__init__(
             title="### **Select Session to Resume**",
