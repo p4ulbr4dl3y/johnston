@@ -11,14 +11,14 @@ def mock_app(tmp_path):
     app = MagicMock()
     app.project_dir = str(tmp_path)
     app.current_session_id = "pytest-session-id"
-    app.mode = "act"
+    app.mode = "worker"
     app.is_app_active = True
     app.tool_context = ToolContext(app)
     app.notify = MagicMock()
     app.refresh_status_footer = MagicMock()
 
     agent = MagicMock()
-    agent.mode = "act"
+    agent.mode = "worker"
     agent.model = "deepseek-v4-flash"
     agent.provider_key = "openai"
     agent.stream_steps = AsyncMock()

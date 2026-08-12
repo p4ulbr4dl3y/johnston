@@ -204,7 +204,7 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
         class Agent:
             def __init__(self):
                 self.model = "m1"
-                self.mode = "explore"
+                self.mode = "explorer"
                 self.history = [{"role": "user", "content": "hi"}]
 
         class PM:
@@ -240,7 +240,7 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
         class App:
             def __init__(self):
                 self.agent = Agent()
-                self.mode = "explore"
+                self.mode = "explorer"
                 self.pm = PM()
                 self.input = Input()
                 self.refreshed = False
@@ -263,8 +263,8 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
         await ThinkingEffortCommand().execute(app)
 
         self.assertEqual(app.pm.saved, ("p1", "m1", "high"))
-        self.assertEqual(app.agent.mode, "explore")
-        self.assertEqual(app.mode, "explore")
+        self.assertEqual(app.agent.mode, "explorer")
+        self.assertEqual(app.mode, "explorer")
         self.assertEqual(app.agent.history, [{"role": "user", "content": "hi"}])
         self.assertTrue(app.refreshed)
         self.assertTrue(app.input.focused)

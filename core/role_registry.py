@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.defaults.subagents import DEFAULT_SUBAGENT_ROLES
 from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 from tools.base import format_tool_error
@@ -97,70 +96,44 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
 
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
-    "act": AgentRole(
-        key="act",
-        name="Act",
-        description="Full execution and implementation role",
-        read_only=False,
-        prompt=(
-            "## Execution Mode: ACT\n\n"
-            "### Overview\n"
-            "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
-            "### Action Rules\n"
-            "1. Precision Edits: Use `edit` for single edits and `multi_edit` for multiple non-adjacent edits.\n"
-            "2. Verification: Run tests or linters after editing to verify code changes.\n"
-            "3. Minimal Complexity (YAGNI): Don't add features/refactorings beyond what was asked. Three similar lines of code is better than a premature abstraction.\n"
-            "4. No Unsolicited Commits: Never execute git commits unless explicitly asked."
-        ),
-        scope="any",
-        source="builtin",
-    ),
     "worker": AgentRole(
         key="worker",
-        name="worker",
-        description="General multi-step execution subagent",
+        name="Worker",
+        description="Execution mode: full write, edit, shell, and task tool access. Applies to the primary agent and to execution subagents.",
         read_only=False,
-        prompt=DEFAULT_SUBAGENT_ROLES["worker"]["system_prompt"],
-        scope="subagent_only",
-        source="builtin",
-    ),
-    "explore": AgentRole(
-        key="explore",
-        name="Explore",
-        description="Read-only Q&A, codebase research, and planning role",
-        read_only=True,
         prompt=(
-            "## Execution Mode: EXPLORE\n\n"
-            "### Overview\n"
-            "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning.\n\n"
-            "### Critical Constraints\n"
-            "1. Code modification tools (`create`, `edit`, `multi_edit`) are DISABLED.\n"
-            "2. You are STRICTLY PROHIBITED from running state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, redirection operators '>', '>>').\n"
-            "3. Use shell ONLY for read-only inspection (ls/find/dir, grep/rg/select-string, git status, git log, git diff, cat/type).\n"
-            "4. NEVER call the `ask_user` tool to ask the user if they want to switch out of read-only mode or start implementation. Output your plan/response as normal markdown text in chat, and instruct the user to exit read-only mode (via Shift+Tab) when ready.\n"
-            "5. If the user asks to modify code, apply changes, or proceed with implementation while in read-only mode, NEVER claim you are applying changes. Immediately inform the user you are in read-only mode and tell them how to exit it (via Shift+Tab).\n\n"
-            "### Response Guidelines\n"
-            "1. Q&A / Explanation: Answer questions directly, clearly, and concisely without forcing an implementation plan.\n"
-            "2. Planning Request: Outline Goal, Architectural Trade-offs, Critical Files (3-5 key files), and Execution Steps, then suggest exiting read-only mode (via Shift+Tab) when ready to implement.\n"
-            "3. Edit / Implementation Request: State clearly that you are in read-only mode and tell the user how to exit it (via Shift+Tab)."
+            "## Execution Mode: WORKER\n\n"
+            "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
+            "### Action Rules\n"
+            "1. Read Before Edit: Always read file contents before modifying.\n"
+            "2. Precision Edits: Use `edit` for single edits and `multi_edit` for multiple non-adjacent edits.\n"
+            "3. Minimal Comments: Do not add unnecessary comments unless requested.\n"
+            "4. Task Planning: For multi-step work, use `update_plan` and mark steps completed promptly.\n"
+            "5. Verification: Run tests or linters after editing to verify changes.\n"
+            "6. Scope Discipline (YAGNI): Don't add features or refactorings beyond what was asked; three similar lines are better than a premature abstraction.\n"
+            "7. No Unsolicited Commits: Never execute git commits unless explicitly asked."
         ),
-        disallowed_tools=[
-            "create",
-            "edit",
-            "multi_edit",
-            "write_to_file",
-            "replace_file_content",
-            "multi_replace_file_content",
-        ],
         scope="any",
         source="builtin",
     ),
     "explorer": AgentRole(
         key="explorer",
-        name="explorer",
-        description="Fast code exploration subagent",
+        name="Explorer",
+        description="Read-only Q&A, codebase research, and planning role. Applies to the primary agent and to research subagents.",
         read_only=True,
-        prompt=DEFAULT_SUBAGENT_ROLES["explorer"]["system_prompt"],
+        prompt=(
+            "## Execution Mode: EXPLORER\n\n"
+            "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning. You cannot modify code.\n\n"
+            "### Constraints\n"
+            "1. Modification tools (`create`, `edit`, `multi_edit`, write tools) are DISABLED.\n"
+            "2. Never run state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, `>` / `>>` redirects).\n"
+            "3. Use shell only for read-only inspection (`ls`/`find`/`dir`, `grep`/`rg`, `git status`/`log`/`diff`, `cat`/`type`).\n"
+            "4. Broad search first (`grep`/`find`), then inspect targeted files. Prefer parallel reads for multiple files.\n\n"
+            "### Response\n"
+            "1. Q&A / Explanation: answer directly, clearly, concisely — no forced plan.\n"
+            "2. Planning request: give Goal, Trade-offs, Key Files (3-5), Execution Steps.\n"
+            "3. If asked to make changes: state you are in read-only mode and cannot apply them."
+        ),
         disallowed_tools=[
             "create",
             "edit",
@@ -169,16 +142,16 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "replace_file_content",
             "multi_replace_file_content",
         ],
-        scope="subagent_only",
+        scope="any",
         source="builtin",
     ),
-    "orchestrate": AgentRole(
-        key="orchestrate",
-        name="Orchestrate",
-        description="Orchestrator role: plan and delegate bounded subtasks",
+    "orchestrator": AgentRole(
+        key="orchestrator",
+        name="Orchestrator",
+        description="Orchestrator role (primary agent only): plan and delegate bounded subtasks",
         read_only=False,
         prompt=(
-            "## Execution Mode: ORCHESTRATE\n\n"
+            "## Execution Mode: ORCHESTRATOR\n\n"
             "### Overview\n"
             "You are an orchestrator: you plan, delegate bounded subtasks to subagents, "
             "coordinate them, and integrate their results. You retain full tool access and "
@@ -229,8 +202,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "special attention to regression in the shared harness (async workers, mocking "
             "read-only properties, UI event handlers) — that is the most expensive place for "
             "subagents to break silently.\n"
-            "4. Keep direct edits precise: use `edit` for single edits and `multi_edit` for "
-            "multiple non-adjacent edits. Never commit unless explicitly asked."
+            "4. For work you do directly rather than delegate, follow the execution rules of the `worker` role."
         ),
         scope="main_only",
         source="builtin",
@@ -319,7 +291,7 @@ class RoleRegistry:
         key_lower = (key or "").lower().strip()
         if key_lower in self.roles:
             return self.roles[key_lower]
-        return self.roles.get("act") or self.roles.get("worker") or BUILTIN_ROLES["act"]
+        return self.roles.get("worker") or BUILTIN_ROLES["worker"]
 
     def list_roles(self, scope: Optional[str] = None) -> Dict[str, AgentRole]:
         if not scope:

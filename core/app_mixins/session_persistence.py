@@ -104,7 +104,7 @@ class SessionPersistenceMixin:
                 builder = PromptBuilder(
                     self.agent.system_prompt,
                     self.agent.tools,
-                    mode=getattr(self.agent, "mode", "act"),
+                    mode=getattr(self.agent, "mode", "worker"),
                     is_subagent=is_subagent,
                 )
                 sys_prompt = builder.build_system_prompt()

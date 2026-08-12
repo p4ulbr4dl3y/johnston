@@ -132,7 +132,7 @@ class RulesManager:
             return None
 
     def get_formatted_rules(
-        self, mode: str = "act", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
+        self, mode: str = "worker", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
     ) -> str:
         rules = self.load_rules(project_dir=project_dir)
         matching = []

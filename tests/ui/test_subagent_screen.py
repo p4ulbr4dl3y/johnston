@@ -68,7 +68,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(found_by_desc, sess)
 
     def test_session_events(self):
-        sess = self._mk("task-456", "subagent task", "prompt text", role="explore")
+        sess = self._mk("task-456", "subagent task", "prompt text", role="explorer")
         events_received = []
 
         def listener(evt):
@@ -83,7 +83,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(sess.status, "completed")
 
     def test_bot_cumulative_text_handling(self):
-        sess = self._mk("task-delta", "delta subagent", "prompt", role="explore")
+        sess = self._mk("task-delta", "delta subagent", "prompt", role="explorer")
         sess.add_event({"type": "bot", "text": "Hello"})
         sess.add_event({"type": "bot", "text": "Hello world"})
         self.assertEqual(len(sess.messages), 1)
@@ -134,7 +134,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertFalse(screen.ALLOW_SELECT)
 
     def test_session_persistence(self):
-        sess = self._mk("task-persist", "Persistent Agent", "save to disk", role="explore")
+        sess = self._mk("task-persist", "Persistent Agent", "save to disk", role="explorer")
         sess.add_event({"type": "bot", "text": "persisted output", "final": True})
         self.store.save(sess)
 
@@ -146,7 +146,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertTrue(any(m.get("text") == "persisted output" for m in reloaded.messages))
 
     def test_find_session_truncated_description(self):
-        sess = self._mk("task-trunc", "Explore test setup and verify runner", "full prompt text", role="explore")
+        sess = self._mk("task-trunc", "Explore test setup and verify runner", "full prompt text", role="explorer")
         found = self.store.find_session_by_description_or_id('"Explore test setup...runner"')
         self.assertEqual(found, sess)
 

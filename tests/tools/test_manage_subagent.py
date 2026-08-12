@@ -41,7 +41,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         res_empty = await tool.execute({"action": "list"})
         self.assertIn("Available Subagent Roles", res_empty)
 
-        self._mk_subagent("sub-1", "Search files", "find python files", role="explore")
+        self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
         res_list = await tool.execute({"action": "list"})
         self.assertIn("sub-1", res_list)
         self.assertIn("Search files", res_list)
@@ -202,7 +202,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("invoke_subagent", tool_names)
         self.assertNotIn("manage_shell", tool_names)
         self.assertNotIn("ask_user", tool_names)
-        self.assertIn("Subagent Type: WORKER", sess.agent.system_prompt)
+        self.assertIn("## Execution Mode: WORKER", sess.agent.system_prompt)
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()

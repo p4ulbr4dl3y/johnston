@@ -131,7 +131,7 @@ RULES_MD = """# Rules & Directives Reference
 ```markdown
 ---
 name: python_style
-mode: act, explore
+mode: worker, explorer
 globs: "*.py"
 ---
 Rule instructions here...

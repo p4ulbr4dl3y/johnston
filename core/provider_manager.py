@@ -251,7 +251,7 @@ class ProviderManager:
     def recreate_active_agent(self, app: Any, provider_key: Optional[str] = None, history: Optional[List[Any]] = None):
         """Recreates active agent on app preserving history, mode, and UI status."""
         old_history = history if history is not None else list(getattr(getattr(app, "agent", None), "history", []))
-        current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "act"))
+        current_mode = getattr(app, "mode", getattr(getattr(app, "agent", None), "mode", "worker"))
         if provider_key:
             self.set_active_provider_key(provider_key)
         agent = self.create_active_agent()

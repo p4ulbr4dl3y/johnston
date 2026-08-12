@@ -33,7 +33,7 @@ class AgentSession:
         session_id: str,
         kind: str = "main",
         parent_id: Optional[str] = None,
-        role: str = "act",
+        role: str = "worker",
         status: str = MAIN_STATUS_ACTIVE,
         project_key: str = "",
         description: str = "",
@@ -157,7 +157,7 @@ class AgentSession:
             session_id=data.get("id", ""),
             kind=data.get("kind", "main"),
             parent_id=data.get("parent_id"),
-            role=data.get("role", "act"),
+            role=data.get("role", "worker"),
             status=data.get("status", MAIN_STATUS_ACTIVE),
             project_key=data.get("project_key", ""),
             description=data.get("description", ""),
@@ -238,7 +238,7 @@ class SessionStore:
 
     # -- CRUD --------------------------------------------------------------
 
-    def create_main(self, session_id: Optional[str] = None, role: str = "act") -> AgentSession:
+    def create_main(self, session_id: Optional[str] = None, role: str = "worker") -> AgentSession:
         sess = AgentSession(
             session_id=session_id or self.generate_session_id(),
             kind="main",

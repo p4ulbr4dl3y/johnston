@@ -39,7 +39,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.pm = ProviderManager()
         self.sm = SessionStore()
         self.agent = self.pm.create_active_agent()
-        self.mode = getattr(self.agent, "mode", "act") if self.agent else "act"
+        self.mode = getattr(self.agent, "mode", "worker") if self.agent else "worker"
         if self.agent:
             self.agent.app = self
 

@@ -77,7 +77,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
-        self.mode = "act"
+        self.mode = "worker"
 
     async def close(self):
         if hasattr(self, "client") and self.client:
@@ -191,7 +191,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     async def stream_steps(
         self, user_text: str, attachments: Optional[List[Any]] = None
     ) -> AsyncGenerator[Tuple[str, str, str], None]:
-        agent_mode = getattr(self, "mode", "act")
+        agent_mode = getattr(self, "mode", "worker")
         allow_task = getattr(self, "allow_task", True)
         m_name = catalog.get_model_display_name(
             getattr(self, "provider_key", ""), getattr(self, "model", "")
@@ -621,7 +621,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                     from core.role_registry import RoleRegistry
 
-                    current_mode = getattr(self, "mode", "act").lower()
+                    current_mode = getattr(self, "mode", "worker").lower()
                     role_def = RoleRegistry.get_instance().get_role(current_mode)
 
                     policy_err = self._tool_policy_error(t_name, args, role_def)
