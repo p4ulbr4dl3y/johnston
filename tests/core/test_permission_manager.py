@@ -32,7 +32,7 @@ class TestPermissionManager(unittest.TestCase):
         action, _ = self.pm.check_permission("multi_edit")
         self.assertEqual(action, "ask")
 
-        # Builtin shell explicitly defaults to 'ask' (plus shell_guard)
+        # Builtin shell explicitly defaults to 'ask'
         action, _ = self.pm.check_permission("shell", {"command": "ls"})
         self.assertEqual(action, "ask")
 
@@ -56,15 +56,6 @@ class TestPermissionManager(unittest.TestCase):
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
                 action, _ = self.pm.check_permission("gh__search")
                 self.assertEqual(action, "deny")
-
-    def test_shell_guard_overrides_allow(self):
-        # Set session override for shell to allow
-        self.pm.set_session_override("shell", "allow")
-
-        # Unsafe command should still be flagged by shell_guard -> deny
-        action, reason = self.pm.check_permission("shell", {"command": "rm -rf /"})
-        self.assertEqual(action, "deny")
-        self.assertIn("Shell Guard", reason)
 
     def test_session_override(self):
         action_before, _ = self.pm.check_permission("web_fetch")
@@ -150,23 +141,16 @@ class TestPermissionManager(unittest.TestCase):
             self.pm.update_permission("not_a_type", "web_fetch", "allow")
         with self.assertRaises(ValueError):
             self.pm.update_permission("group", "read", "allow")
-        with self.assertRaises(ValueError):
-            self.pm.update_permission("shell_guard", "shell_guard", "maybe")
 
     def test_update_permission_writes_global_config(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg_file = os.path.join(tmpdir, "config.json")
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.update_permission("tool", "web_fetch", "deny")
-                self.pm.update_permission("shell_guard", "shell_guard", "deny")
 
                 # Tool permission persisted globally
                 action, _ = self.pm.check_permission("web_fetch")
                 self.assertEqual(action, "deny")
-
-                # ShellGuard disabled -> unsafe command is no longer auto-denied (falls to 'ask')
-                action, _ = self.pm.check_permission("shell", {"command": "rm -rf /"})
-                self.assertEqual(action, "ask")
 
     def test_normalize_action(self):
         self.assertEqual(self.pm.normalize_action("  ALLOW "), "allow")

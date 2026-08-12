@@ -453,7 +453,7 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
                 result = await app.confirm_permission("shell", {"command": "ls"}, "Destructive", "shell")
             self.assertTrue(result)
             self.assertEqual(pm.session_overrides.get("shell"), "allow")
-            self.assertEqual(pm.session_overrides.get("shell_guard"), "allow")
+            self.assertNotIn("shell_guard", pm.session_overrides)
             pm.clear_session_overrides()
 
     async def test_confirm_permission_denied(self):

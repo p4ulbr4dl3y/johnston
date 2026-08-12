@@ -39,5 +39,4 @@ DEFAULT_PERMISSIONS = {
         "multi_edit": "ask",
         "shell": "ask",
     },
-    "shell_guard": True,
 }

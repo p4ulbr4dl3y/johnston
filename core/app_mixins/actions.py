@@ -163,8 +163,6 @@ class ActionsMixin:
         if result == "always_allow":
             if perm_name:
                 pm.set_session_override(perm_name, "allow")
-            if perm_name == "shell":
-                pm.set_session_override("shell_guard", "allow")
         return result in ("allow", "always_allow")
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:

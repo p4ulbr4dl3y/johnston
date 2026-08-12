@@ -7,5 +7,4 @@
 
 ## Permissions
 - Global per-tool permissions stored in `~/.johnston/config.json` (`permissions.tools` section): `allow`, `ask`, or `deny` per tool, plus `permissions.default`.
-- Shell command guard (`permissions.shell_guard`) validates safety of commands run via `shell` tool.
 - Session "always allow" overrides can be granted per tool during a session.

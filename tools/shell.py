@@ -83,32 +83,6 @@ class ShellTool(BaseTool):
                 return f"slept {sec}s"
             cmd = remainder
 
-        skip_confirm = bool(args.get("skip_confirm", False))
-        from core.shell_guard import analyze_shell_command
-
-        is_safe, reason = analyze_shell_command(cmd)
-
-        from core.permission_manager import PermissionManager
-
-        pm = PermissionManager.get_instance()
-        effective_perms = pm.get_effective_permissions()
-        sg_enabled = effective_perms.get("shell_guard", True)
-        session_override = pm.session_overrides.get("shell") or pm.session_overrides.get("shell_guard")
-
-        if sg_enabled and not is_safe and not skip_confirm and session_override != "allow":
-            from tools.registry import check_and_confirm_permission
-
-            try:
-                # shell_guard already evaluated the command as unsafe; reuse the unified
-                # permission prompt helper (handles app prompt, session overrides, headless).
-                err = await check_and_confirm_permission(
-                    "shell", "shell", {"command": cmd}, ctx, action="ask", action_reason=reason
-                )
-            except Exception as e:
-                return format_tool_error("permission", detail=str(e), name="shell")
-            if err:
-                return err
-
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         p = await self._create_std_process(cmd, env, cwd=proc_cwd)
