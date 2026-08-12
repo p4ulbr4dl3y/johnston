@@ -39,7 +39,7 @@ def _collect_files(base) -> Dict[str, str]:
     """Recursively collect {rel_path: content} under a Traversable dir."""
     files: Dict[str, str] = {}
     for entry in base.iterdir():
-        if entry.name.endswith(".pyc"):
+        if entry.name.endswith(".pyc") or entry.name.startswith("."):
             continue
         rel_path = entry.name
         if entry.is_dir():
