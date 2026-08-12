@@ -47,7 +47,7 @@ class InvokeSubagentTool(BaseTool):
                         "description": "Task prompt with relative paths, boundaries, output format",
                     },
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
-                    "type": {"type": "string", "description": "Subagent type: worker or explorer"},
+                    "type": {"type": "string", "description": "Subagent type"},
                     "workspace": {"type": "string", "description": "Workspace: inherit or branch"},
                     "task_id": {"type": "string", "description": "Task ID (auto-generated if omitted)"},
                 },
