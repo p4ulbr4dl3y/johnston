@@ -40,7 +40,8 @@ description: Code reviewer role
 read_only: true
 tools: read, grep, glob
 model: deepseek-chat
-scope: subagent_only
+provider: clinepass
+scope: subagent
 ---
 You are a senior code reviewer role.""")
 
@@ -56,6 +57,7 @@ You are a senior code reviewer role.""")
             self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.model, "deepseek-chat")
+            self.assertEqual(rev.provider, "clinepass")
             self.assertEqual(rev.scope, "subagent")
             self.assertIn("senior code reviewer role", rev.prompt)
             self.assertEqual(rev.system_prompt, rev.prompt)  # Alias check

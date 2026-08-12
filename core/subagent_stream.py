@@ -55,6 +55,33 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
 
 
+def _apply_provider_config(subagent: Any, provider_key: str) -> None:
+    """Rebind an existing subagent agent to a different provider in place.
+
+    Builds a fresh agent for the target provider and copies its configuration
+    (including the HTTP client bound to that provider's base_url/api_key) onto
+    the existing subagent object, preserving caller-attached identity fields.
+    Keeps the same object so session.agent and surrounding code stay valid.
+    """
+    from core.provider_manager import ProviderManager
+
+    pm = ProviderManager()
+    rebuilt = pm.create_agent_for_provider(provider_key)
+    if rebuilt is None:
+        return
+
+    # Preserve identity plumbing attached by the caller.
+    preserved = {
+        name: getattr(subagent, name)
+        for name in ("app", "is_subagent", "history", "tools", "project_dir", "cwd")
+        if hasattr(subagent, name)
+    }
+    # Replace the whole state (client, provider_key, base_url, api_key, ...).
+    subagent.__dict__.update(rebuilt.__dict__)
+    for name, value in preserved.items():
+        setattr(subagent, name, value)
+
+
 def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
     """Applies a role definition to a subagent agent.
 
@@ -76,6 +103,20 @@ def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str]
     # worker so the spawn still produces a usable agent instead of failing.
     if definition.scope == "main":
         definition = registry.get_role("worker")
+
+    # If the role pins a provider, switch the subagent to it. Otherwise inherit
+    # the active provider from the parent (the default subagent).
+    if definition.provider:
+        from core.provider_manager import ProviderManager
+
+        pm = ProviderManager()
+        pm.load_providers()
+        if not pm.is_provider_connected(definition.provider):
+            raise ValueError(
+                f"provider '{definition.provider}' for role '{definition.key}' is not connected"
+            )
+        if getattr(subagent, "provider_key", "") != definition.provider:
+            _apply_provider_config(subagent, definition.provider)
 
     subagent.role = definition.key
     subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"

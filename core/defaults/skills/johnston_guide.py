@@ -95,6 +95,7 @@ description: Code reviewer subagent
 scope: subagent
 tools: read, grep, glob
 model: deepseek-v4-flash
+provider: clinepass
 ---
 
 System prompt instructions for the role...
@@ -115,6 +116,7 @@ Legacy spellings `main_only` / `subagent_only` are still accepted and normalized
 - `disallowed_tools`: Comma-separated list of blocked tool names.
 - `read_only`: Boolean flag blocking state-changing operations.
 - `model`: Specific LLM model override (subagents).
+- `provider`: Specific provider override (subagents). Defaults to parent's active provider.
 
 ## Tool Isolation & Worktree Modes
 Subagents can be invoked via `invoke_subagent` tool with:
