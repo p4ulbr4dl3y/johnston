@@ -355,8 +355,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 app.agent = MockAgent(mode=app.mode)
                 app.agent.app = app
 
-        app = MockApp(agent=MockAgent(mode="explore"))
-        app.mode = "explore"
+        app = MockApp(agent=MockAgent(mode="explorer"))
+        app.mode = "explorer"
         app.pm = MockPM()
         app.query_one = lambda target, default=None: type("Input", (), {"focus": lambda self: None})()
         app.push_screen = lambda screen, callback=None: callback(("new", "new-model")) if callback else None
@@ -364,8 +364,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await ModelsCommand().execute(app)
 
         self.assertEqual(app.pm.active_provider, "new")
-        self.assertEqual(app.agent.mode, "explore")
-        self.assertEqual(app.mode, "explore")
+        self.assertEqual(app.agent.mode, "explorer")
+        self.assertEqual(app.mode, "explorer")
         self.assertEqual(app.pm.saved, [("new", "new-model")])
 
     async def test_providers_command_preserves_mode_when_connecting_provider(self):
@@ -409,8 +409,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
                 app.agent = MockAgent(mode=app.mode)
                 app.agent.app = app
 
-        app = MockApp(agent=MockAgent(mode="explore"))
-        app.mode = "explore"
+        app = MockApp(agent=MockAgent(mode="explorer"))
+        app.mode = "explorer"
         app.pm = MockPM()
 
         seen_provider_screen = False
@@ -430,8 +430,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(app.pm.active_provider, "new")
         self.assertEqual(app.pm.saved_key, ("new", "secret"))
-        self.assertEqual(app.agent.mode, "explore")
-        self.assertEqual(app.mode, "explore")
+        self.assertEqual(app.agent.mode, "explorer")
+        self.assertEqual(app.mode, "explorer")
 
     def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)

@@ -171,7 +171,7 @@ class TestCLIAdvanced(unittest.TestCase):
                     rule = MagicMock()
                     rule.name = "R1"
                     rule.source = "project"
-                    rule.modes = ["act", "explore"]
+                    rule.modes = ["worker", "explorer"]
                     rule.globs = ["*.py"]
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = [rule]
@@ -180,7 +180,7 @@ class TestCLIAdvanced(unittest.TestCase):
                         print_rules()
         out = f.getvalue()
         self.assertIn("R1 [rule] [project]", out)
-        self.assertIn("Modes: act, explore", out)
+        self.assertIn("Modes: worker, explorer", out)
         self.assertIn("Globs: *.py", out)
 
     def test_print_linters_empty(self):
@@ -368,18 +368,18 @@ class TestCLIAdvanced(unittest.TestCase):
                 read_only=False,
                 source="builtin",
                 disallowed_tools=["rm"],
-                description="Act mode",
+                description="Worker mode",
                 allowed_tools=[],
                 scope="any",
             )
-            type(role).name = "Act"
-            type(role).key = "act"
-            role_mgr.load_roles.return_value = {"act": role}
+            type(role).name = "Worker"
+            type(role).key = "worker"
+            role_mgr.load_roles.return_value = {"worker": role}
             mock_cls.get_instance.return_value = role_mgr
             with redirect_stdout(f):
                 print_roles()
         out = f.getvalue()
-        self.assertIn("Act (act)", out)
+        self.assertIn("Worker (worker)", out)
         self.assertIn("Disallowed tools: rm", out)
 
     def test_print_subagents_empty(self):

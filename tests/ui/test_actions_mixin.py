@@ -22,9 +22,9 @@ class TestActionsMode(unittest.IsolatedAsyncioTestCase):
     async def test_action_toggle_mode_cycles(self):
         app = JohnstonApp()
         async with app.run_test():
-            self.assertEqual(app.agent.mode, "act")
+            self.assertEqual(app.agent.mode, "worker")
             app.action_toggle_mode()
-            self.assertNotEqual(app.agent.mode, "act")
+            self.assertNotEqual(app.agent.mode, "worker")
 
     async def test_action_toggle_mode_no_agent(self):
         obj = _bare_mixin()
@@ -399,9 +399,9 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
 class TestActionsSelectChanged(unittest.TestCase):
     def test_on_select_changed(self):
         obj = MagicMock()
-        obj.mode = "act"
+        obj.mode = "worker"
         obj.pm = MagicMock()
-        obj.agent = MagicMock(mode="act", history=[])
+        obj.agent = MagicMock(mode="worker", history=[])
         obj.sm = MagicMock()
         obj.sm.get.return_value = MagicMock(agent_history=[{"role": "user", "content": "hi"}])
         obj.current_session_id = "sess1"
@@ -414,7 +414,7 @@ class TestActionsSelectChanged(unittest.TestCase):
 
     def test_on_select_changed_none_value(self):
         obj = MagicMock()
-        obj.mode = "act"
+        obj.mode = "worker"
         obj.pm = MagicMock()
         obj.agent = MagicMock()
         event = MagicMock()
@@ -424,9 +424,9 @@ class TestActionsSelectChanged(unittest.TestCase):
 
     def test_on_select_changed_no_history(self):
         obj = MagicMock()
-        obj.mode = "act"
+        obj.mode = "worker"
         obj.pm = MagicMock()
-        obj.agent = MagicMock(mode="act")
+        obj.agent = MagicMock(mode="worker")
         del obj.agent.history
         obj.sm = MagicMock()
         obj.sm.get.return_value = None

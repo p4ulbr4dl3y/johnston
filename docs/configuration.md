@@ -117,11 +117,9 @@ Roles unify agent execution modes and subagent definitions into a single markdow
 - `main_only`: usable only as main agent execution mode (not a subagent).
 
 ### Built-in Roles
-- `act`: Full execution and implementation role (`any`).
-- `explore`: Read-only Q&A, codebase research, and planning role (`any`).
-- `orchestrate`: Orchestrator role that plans and delegates subtasks (`main_only`).
-- `worker`: General multi-step execution subagent (`subagent_only`).
-- `explorer`: Fast code exploration subagent (`subagent_only`).
+- `worker`: Execution role — full write, edit, shell, and task tool access. Available as main-agent mode and `subagent_type` (`any`).
+- `explorer`: Read-only Q&A, codebase research, and planning role. Available as main-agent mode and `subagent_type` (`any`).
+- `orchestrator`: Orchestrator role that plans and delegates subtasks (`main_only`).
 
 ### Markdown Format Example (`reviewer.md`)
 ```markdown
@@ -161,7 +159,7 @@ Inject system prompt rules globally or per-project. Rules can be conditionally t
 ```markdown
 ---
 name: python_style
-modes: [act, explore]
+modes: [worker, explorer]
 globs: ["*.py", "src/**/*.py"]
 description: Python PEP 8 & Ruff guidelines
 ---
@@ -172,7 +170,7 @@ description: Python PEP 8 & Ruff guidelines
 ```
 
 ### Frontmatter Filtering Rules
-- `modes` / `mode`: List of execution modes (`act`, `explore`, or custom modes) where rule applies. If omitted, applies to all modes.
+- `modes` / `mode`: List of execution modes (`worker`, `explorer`, or custom modes) where rule applies. If omitted, applies to all modes.
 - `globs` / `glob`: File pattern matchers (e.g. `["*.py"]`). Rule activates when user edits or touches matching files.
 
 ---

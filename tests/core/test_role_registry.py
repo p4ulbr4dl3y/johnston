@@ -10,17 +10,14 @@ class TestRoleRegistry(unittest.TestCase):
         reg = RoleRegistry.get_instance()
         roles = reg.load_roles(include_global=False)
 
-        self.assertIn("act", roles)
-        self.assertIn("explore", roles)
-        self.assertIn("orchestrate", roles)
         self.assertIn("worker", roles)
         self.assertIn("explorer", roles)
+        self.assertIn("orchestrator", roles)
 
-        self.assertFalse(roles["act"].read_only)
-        self.assertTrue(roles["explore"].read_only)
+        self.assertFalse(roles["worker"].read_only)
         self.assertTrue(roles["explorer"].read_only)
-        self.assertEqual(roles["orchestrate"].name, "Orchestrate")
-        self.assertEqual(roles["orchestrate"].scope, "main_only")
+        self.assertEqual(roles["orchestrator"].name, "Orchestrator")
+        self.assertEqual(roles["orchestrator"].scope, "main_only")
 
     def test_custom_role_parsing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -104,12 +101,12 @@ You run tests and report coverage.""")
     def test_scope_filtering(self):
         reg = RoleRegistry.get_instance()
         main_roles = reg.list_roles(scope="main_only")
-        self.assertIn("orchestrate", main_roles)
+        self.assertIn("orchestrator", main_roles)
 
         subagent_roles = reg.list_subagent_roles()
         self.assertIn("worker", subagent_roles)
         self.assertIn("explorer", subagent_roles)
-        self.assertNotIn("orchestrate", subagent_roles)
+        self.assertNotIn("orchestrator", subagent_roles)
 
     def test_custom_md_role_with_list_disallowed_tools(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -136,20 +133,20 @@ Architect prompt content""")
 
     def test_role_tool_error_read_only_enforced(self):
         reg = RoleRegistry.get_instance()
-        explore = reg.get_role("explore")
+        explorer = reg.get_role("explorer")
 
         # disallowed_tools still enforced
-        self.assertIsNotNone(role_tool_error(explore, "create"))
-        self.assertIsNotNone(role_tool_error(explore, "write_to_file"))
+        self.assertIsNotNone(role_tool_error(explorer, "create"))
+        self.assertIsNotNone(role_tool_error(explorer, "write_to_file"))
         # read_only blocks write tools even without explicit disallow
-        self.assertIsNotNone(role_tool_error(explore, "edit"))
-        self.assertIsNotNone(role_tool_error(explore, "multi_edit"))
+        self.assertIsNotNone(role_tool_error(explorer, "edit"))
+        self.assertIsNotNone(role_tool_error(explorer, "multi_edit"))
         # read tools allowed in read-only mode
-        self.assertIsNone(role_tool_error(explore, "read"))
-        self.assertIsNone(role_tool_error(explore, "shell"))
-        # act mode allows everything
-        act = reg.get_role("act")
-        self.assertIsNone(role_tool_error(act, "create"))
+        self.assertIsNone(role_tool_error(explorer, "read"))
+        self.assertIsNone(role_tool_error(explorer, "shell"))
+        # worker mode allows everything
+        worker = reg.get_role("worker")
+        self.assertIsNone(role_tool_error(worker, "create"))
 
     def test_role_tool_error_custom_read_only_without_disallowed(self):
         ro_mode = AgentRole(key="ro", name="RO", read_only=True)

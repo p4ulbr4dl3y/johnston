@@ -19,7 +19,7 @@ class ActionsMixin:
 
         roles_dict = RoleRegistry.get_instance().list_roles(scope="main_only")
         available_modes = list(roles_dict.keys())
-        curr = getattr(self.agent, "mode", "act").lower()
+        curr = getattr(self.agent, "mode", "worker").lower()
         next_idx = (available_modes.index(curr) + 1) % len(available_modes) if curr in available_modes else 0
         new_mode = available_modes[next_idx]
         self.agent.mode = new_mode

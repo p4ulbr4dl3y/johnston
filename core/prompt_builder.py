@@ -92,7 +92,7 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     return "\n\n".join(found_snippets)
 
 
-def get_rules_snippet(mode: str = "act", cwd: str = None) -> str:
+def get_rules_snippet(mode: str = "worker", cwd: str = None) -> str:
     """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager.
 
     cwd selects the project rules directory so a subagent working in an isolated
@@ -132,7 +132,7 @@ class PromptBuilder:
         self,
         base_system_prompt: str,
         base_tools: List[Dict[str, Any]],
-        mode: str = "act",
+        mode: str = "worker",
         allow_task: bool = True,
         model_name: str = "",
         cwd: str = None,

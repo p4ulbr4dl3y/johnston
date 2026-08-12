@@ -183,7 +183,7 @@ class CompactionMixin:
         if len(self.history) <= 4:
             return False, "History is too short to compact (<= 4 messages)"
 
-        agent_mode = getattr(self, "mode", "act")
+        agent_mode = getattr(self, "mode", "worker")
         allow_task = getattr(self, "allow_task", True)
         m_name = catalog.get_model_display_name(
             getattr(self, "provider_key", ""), getattr(self, "model", "")

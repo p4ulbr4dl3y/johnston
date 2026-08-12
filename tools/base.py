@@ -232,7 +232,7 @@ def check_mcp_role_policy(ctx_or_app: Any, tool_name: str, targets: List[str]) -
     from core.role_registry import RoleRegistry, role_tool_error
 
     app_obj = getattr(ctx_or_app, "app", ctx_or_app)
-    mode = getattr(app_obj, "mode", "act") if app_obj is not None else "act"
+    mode = getattr(app_obj, "mode", "worker") if app_obj is not None else "worker"
     role_def = RoleRegistry.get_instance().get_role(str(mode).lower())
     for target in targets:
         policy_err = role_tool_error(role_def, target)

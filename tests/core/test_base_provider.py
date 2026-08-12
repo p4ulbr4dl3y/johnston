@@ -944,10 +944,10 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
 
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
-        role_def = AgentRole("explore", "Explore", read_only=True, disallowed_tools=["write_file", "create", "edit"])
+        role_def = AgentRole("explorer", "Explorer", read_only=True, disallowed_tools=["write_file", "create", "edit"])
         err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, role_def)
         self.assertIsNotNone(err)
-        self.assertIn("disabled in Explore role", err)
+        self.assertIn("disabled in Explorer role", err)
 
     async def test_disallowed_tools_blocks_aliases(self):
         from core.role_registry import AgentRole

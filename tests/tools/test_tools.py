@@ -30,12 +30,12 @@ async def _ruff_runnable(timeout: float = 10.0) -> bool:
 
 
 class MockAgent:
-    def __init__(self, mode="explore"):
+    def __init__(self, mode="explorer"):
         self.mode = mode
 
 
 class MockApp:
-    def __init__(self, mode="explore"):
+    def __init__(self, mode="explorer"):
         self.agent = MockAgent(mode=mode)
         self.notified = []
 
