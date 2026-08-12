@@ -12,20 +12,20 @@ class RuleDefinition:
         self,
         name: str,
         content: str,
-        modes: Optional[List[str]] = None,
+        roles: Optional[List[str]] = None,
         globs: Optional[List[str]] = None,
         source: str = "global",
     ):
         self.name = name
         self.content = content
-        self.modes = [m.lower().strip() for m in (modes or [])]
+        self.roles = [r.lower().strip() for r in (roles or [])]
         self.globs = [g.strip() for g in (globs or [])]
         self.source = source
 
-    def is_active_for_mode(self, mode: str) -> bool:
-        if not self.modes:
+    def is_active_for_roles(self, role: str) -> bool:
+        if not self.roles:
             return True
-        return mode.lower().strip() in self.modes
+        return role.lower().strip() in self.roles
 
     def is_active_for_files(self, changed_files: List[str]) -> bool:
         if not self.globs:
@@ -121,23 +121,23 @@ class RulesManager:
             content = content.strip()
 
             name = meta.get("name") or base_name
-            modes_raw = meta.get("mode") or meta.get("modes") or ""
+            modes_raw = meta.get("role") or meta.get("roles") or meta.get("mode") or meta.get("modes") or ""
             globs_raw = meta.get("globs") or meta.get("glob") or ""
 
-            modes = parse_csv_list(modes_raw)
+            roles = parse_csv_list(modes_raw)
             globs = parse_csv_list(globs_raw)
 
-            return RuleDefinition(name=name, content=content, modes=modes, globs=globs, source=source)
+            return RuleDefinition(name=name, content=content, roles=roles, globs=globs, source=source)
         except Exception:
             return None
 
     def get_formatted_rules(
-        self, mode: str = "worker", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
+        self, role: str = "worker", changed_files: Optional[List[str]] = None, project_dir: Optional[str] = None
     ) -> str:
         rules = self.load_rules(project_dir=project_dir)
         matching = []
         for r in rules:
-            if r.is_active_for_mode(mode) and r.is_active_for_files(changed_files or []):
+            if r.is_active_for_roles(role) and r.is_active_for_files(changed_files or []):
                 matching.append(f"### Rule: {r.name}\n{r.content}")
 
         return "\n\n".join(matching)

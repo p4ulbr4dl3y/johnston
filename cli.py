@@ -192,7 +192,7 @@ def print_rules():
 
     rules = RulesManager.get_instance().load_rules()
     for r in rules:
-        items.append(("rule", r.name, r.source, r.modes, r.globs))
+        items.append(("rule", r.name, r.source, r.roles, r.globs))
 
     if not items:
         print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .johnston/rules/).")
@@ -204,11 +204,11 @@ def print_rules():
             print(f"  * {name} [project instruction]")
             print(f"    Path: {filepath} ({size} bytes)")
         else:
-            _, r_name, r_source, r_modes, r_globs = item
+            _, r_name, r_source, r_roles, r_globs = item
             scope = f"[{r_source}]"
             print(f"  * {r_name} [rule] {scope}")
-            if r_modes:
-                print(f"    Modes: {', '.join(r_modes)}")
+            if r_roles:
+                print(f"    Roles: {', '.join(r_roles)}")
             if r_globs:
                 print(f"    Globs: {', '.join(r_globs)}")
         if idx < len(items) - 1:
@@ -269,7 +269,7 @@ def main():
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
-    parser.add_argument("--roles", action="store_true", help="List available agent roles (modes + subagents)")
+    parser.add_argument("--roles", action="store_true", help="List available agent roles (main + subagents)")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent roles and sessions")
     parser.add_argument("--linters", action="store_true", help="List configured linters")

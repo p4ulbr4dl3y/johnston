@@ -20,7 +20,7 @@ class DummyChatApp(App[None]):
     def compose(self) -> ComposeResult:
         yield self.chat_input
 
-    def action_toggle_mode(self):
+    def action_toggle_role(self):
         self.mode_toggled = True
 
     def on_chat_input_submitted(self, message: ChatInput.Submitted):

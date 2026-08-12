@@ -29,8 +29,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         ("ctrl+q", "quit", "Exit"),
         ("ctrl+b", "background_all", "Background All"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
-        ("shift+tab", "toggle_mode", "Toggle Mode"),
-        ("backtab", "toggle_mode", "Toggle Mode"),
+        ("shift+tab", "toggle_role", "Toggle Role"),
+        ("backtab", "toggle_role", "Toggle Role"),
     ]
 
     def __init__(self, resume_session_id: str | None = None):
@@ -39,7 +39,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.pm = ProviderManager()
         self.sm = SessionStore()
         self.agent = self.pm.create_active_agent()
-        self.mode = getattr(self.agent, "mode", "worker") if self.agent else "worker"
+        self.role = getattr(self.agent, "role", "worker") if self.agent else "worker"
         if self.agent:
             self.agent.app = self
 

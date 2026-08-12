@@ -183,7 +183,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             mock_app = MagicMock()
-            mock_app.mode = "plan"
+            mock_app.role = "plan"
             res = await execute_tool("mcp_tool_test", {"arg": "val"}, app=mock_app)
             self.assertIn("ERR: tool 'mcp_tool_test' disabled in plan role", res)
 

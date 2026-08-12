@@ -23,7 +23,7 @@ When performing specific configuration tasks, inspect ONLY the relevant referenc
    - Unified role definitions for execution modes and subagents (`~/.johnston/roles/` or `.johnston/roles/`, `johnston --roles`).
 
 4. **Rules & Project Guidelines**: [references/rules.md](file://references/rules.md)
-   - Global rules (`~/.johnston/rules/`), project rules (`.johnston/rules/`), mode filtering, and `AGENTS.md` integration (`johnston --rules`).
+   - Global rules (`~/.johnston/rules/`), project rules (`.johnston/rules/`), role filtering, and `AGENTS.md` integration (`johnston --rules`).
 
 5. **LLM Providers & Keys**: [references/providers.md](file://references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
@@ -101,9 +101,9 @@ System prompt instructions for the role...
 ```
 
 ## Scope
-- `any` (default): available as both execution mode and subagent type.
+- `any` (default): available as both execution role and subagent type.
 - `subagent_only`: usable only as `type` in `invoke_subagent`.
-- `main_only`: usable only as main agent execution mode (not a subagent).
+- `main_only`: usable only as main agent execution role (not a subagent).
 
 ## Frontmatter Fields
 - `name`: Role identifier (defaults to filename).
@@ -131,7 +131,7 @@ RULES_MD = """# Rules & Directives Reference
 ```markdown
 ---
 name: python_style
-mode: worker, explorer
+role: worker, explorer
 globs: "*.py"
 ---
 Rule instructions here...

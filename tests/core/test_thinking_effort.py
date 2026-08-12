@@ -198,13 +198,13 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
 
 
 class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
-    async def test_command_saves_effort_and_preserves_mode(self):
+    async def test_command_saves_effort_and_preserves_role(self):
         from widgets.commands import ThinkingEffortCommand
 
         class Agent:
             def __init__(self):
                 self.model = "m1"
-                self.mode = "explorer"
+                self.role = "explorer"
                 self.history = [{"role": "user", "content": "hi"}]
 
         class PM:
@@ -228,7 +228,7 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
 
             def recreate_active_agent(self, app, provider_key=None):
                 app.agent = Agent()
-                app.agent.mode = app.mode
+                app.agent.role = app.role
                 app.refresh_status_footer()
 
         class Input:
@@ -240,7 +240,7 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
         class App:
             def __init__(self):
                 self.agent = Agent()
-                self.mode = "explorer"
+                self.role = "explorer"
                 self.pm = PM()
                 self.input = Input()
                 self.refreshed = False
@@ -263,8 +263,8 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
         await ThinkingEffortCommand().execute(app)
 
         self.assertEqual(app.pm.saved, ("p1", "m1", "high"))
-        self.assertEqual(app.agent.mode, "explorer")
-        self.assertEqual(app.mode, "explorer")
+        self.assertEqual(app.agent.role, "explorer")
+        self.assertEqual(app.role, "explorer")
         self.assertEqual(app.agent.history, [{"role": "user", "content": "hi"}])
         self.assertTrue(app.refreshed)
         self.assertTrue(app.input.focused)

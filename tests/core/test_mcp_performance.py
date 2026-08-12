@@ -113,7 +113,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         manager.get_active_tools.side_effect = AssertionError("sync MCP discovery is forbidden")
 
         with patch("core.mcp_manager.get_mcp_manager", return_value=manager):
-            builder = PromptBuilder("system", [], mode="action")
+            builder = PromptBuilder("system", [], role="action")
             builder.build_system_prompt()
             builder.build_tools()
 

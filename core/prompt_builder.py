@@ -92,7 +92,7 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     return "\n\n".join(found_snippets)
 
 
-def get_rules_snippet(mode: str = "worker", cwd: str = None) -> str:
+def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager.
 
     cwd selects the project rules directory so a subagent working in an isolated
@@ -100,7 +100,7 @@ def get_rules_snippet(mode: str = "worker", cwd: str = None) -> str:
     """
     from core.rules_manager import RulesManager
 
-    return RulesManager.get_instance().get_formatted_rules(mode=mode, project_dir=cwd)
+    return RulesManager.get_instance().get_formatted_rules(role=role, project_dir=cwd)
 
 
 _SYSTEM_PROMPT_CACHE: Dict[tuple, Tuple[float, str]] = {}
@@ -126,13 +126,13 @@ def _instruction_mtimes(cwd: str) -> Tuple:
 
 
 class PromptBuilder:
-    """Builds composite system prompt and tool definitions accounting for MCP, Skills, and mode (Action/Explore)"""
+    """Builds composite system prompt and tool definitions accounting for MCP, Skills, and agent role (worker/explorer/orchestrator)"""
 
     def __init__(
         self,
         base_system_prompt: str,
         base_tools: List[Dict[str, Any]],
-        mode: str = "worker",
+        role: str = "worker",
         allow_task: bool = True,
         model_name: str = "",
         cwd: str = None,
@@ -140,7 +140,7 @@ class PromptBuilder:
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
-        self.mode = mode
+        self.role = role
         self.allow_task = allow_task
         self.model_name = model_name
         self.cwd = os.path.realpath(cwd) if cwd else None
@@ -155,7 +155,7 @@ class PromptBuilder:
         cwd = self.cwd or os.getcwd()
         cache_key = (
             self.base_system_prompt,
-            self.mode,
+            self.role,
             self.allow_task,
             self.model_name,
             cwd,
@@ -198,7 +198,7 @@ class PromptBuilder:
         env_block = "\n".join(env_lines)
 
         project_snippet = get_project_instructions_snippet(self.cwd)
-        rules_snippet = get_rules_snippet(mode=self.mode, cwd=self.cwd)
+        rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
 
         # Stable prefix first (cacheable across turns); volatile env metadata
         # last so the longest possible stable prefix can be prompt-cached.
@@ -224,9 +224,9 @@ class PromptBuilder:
         if not self.is_subagent:
             from core.role_registry import RoleRegistry
 
-            mode_def = RoleRegistry.get_instance().get_role(self.mode, project_dir=cwd)
-            if mode_def.prompt:
-                sys_prompt += f"\n\n{mode_def.prompt}"
+            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=cwd)
+            if role_def.prompt:
+                sys_prompt += f"\n\n{role_def.prompt}"
 
         # Volatile metadata last: time/git change every turn, so keeping them at
         # the tail preserves the stable cached prefix for provider prompt caching.
@@ -245,8 +245,8 @@ class PromptBuilder:
 
         all_tools = list(self.base_tools) + clean_mcp_tools
 
-        mode_def = RoleRegistry.get_instance().get_role(self.mode)
-        disallowed = {t.lower() for t in (getattr(mode_def, "disallowed_tools", []) or [])}
+        role_def = RoleRegistry.get_instance().get_role(self.role)
+        disallowed = {t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])}
 
         def _tool_allowed(tool_item: Dict[str, Any]) -> bool:
             t_name = tool_item.get("function", {}).get("name", "").strip()
