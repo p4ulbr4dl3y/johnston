@@ -95,7 +95,7 @@ class OpenAIAdapter(BaseApiAdapter):
         """Closes all cached AsyncOpenAI clients to release HTTP connection pools.
 
         Sync best-effort hook (e.g. registered via ``atexit``). Real cleanup
-        happens through :meth:`aclose`; this runs the async close in a fresh
+        happens through :meth:`_close_all`; this runs the async close in a fresh
         event loop when no loop is currently running.
         """
         clients, self._clients = self._clients, {}
@@ -105,11 +105,6 @@ class OpenAIAdapter(BaseApiAdapter):
             asyncio.run(self._close_all(clients))
         except Exception:
             pass
-
-    async def aclose(self) -> None:
-        """Async cleanup that closes all cached AsyncOpenAI clients."""
-        clients, self._clients = self._clients, {}
-        await self._close_all(clients)
 
     @staticmethod
     async def _close_all(clients: Dict[Tuple[str, str], AsyncOpenAI]) -> None:

@@ -483,7 +483,7 @@ class MCPProcessClient:
             self._tools_fetch_time = time.monotonic()
         return self.tools
 
-    def _tools_fetch_stale(self, ttl: float = 5.0) -> bool:
+    def is_tools_stale(self, ttl: float = 5.0) -> bool:
         """True if the cached tools list is stale (based on last fetch time)."""
         return (time.monotonic() - self._tools_fetch_time) >= ttl
 
@@ -535,7 +535,7 @@ class MCPProcessClient:
             current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=timeout)
-            if self._tools_fetch_stale():
+            if self.is_tools_stale():
                 try:
                     self.fetch_tools()
                 except Exception:
@@ -589,7 +589,7 @@ class MCPProcessClient:
         # (e.g. a server reporting new tools). Without this rate limit every call
         # would trigger a redundant tools/list right after get_active_tools_async
         # already fetched it.
-        if self._tools_fetch_stale():
+        if self.is_tools_stale():
             try:
                 await self.fetch_tools_async()
             except Exception:
