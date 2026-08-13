@@ -190,7 +190,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
     resolved_name = normalize_tool_name(raw_name)
-    args = normalize_tool_args(resolved_name, args)
 
     tool_cls = REGISTRY.get(resolved_name)
     if tool_cls:

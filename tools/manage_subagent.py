@@ -37,6 +37,9 @@ class ManageSubagentTool(BaseTool):
         return SessionStore.get_instance()
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+
+        args = normalize_tool_args("manage_subagent", args)
         ctx = self._ensure_context(ctx)
         action = (args.get("action") or "").strip().lower()
         session_id = (args.get("session_id") or "").strip()

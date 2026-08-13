@@ -109,7 +109,7 @@ class SessionPersistenceMixin:
                 )
                 sys_prompt = builder.build_system_prompt()
                 all_tools = builder.build_tools(
-                    provider_key=getattr(self.agent, "provider_key", ""), model_id=getattr(self.agent, "model", "")
+                    provider_key=getattr(self.agent, "provider_key", "")
                 )
                 ctx = estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(self.agent.history)
             self.agent.last_context_tokens = ctx

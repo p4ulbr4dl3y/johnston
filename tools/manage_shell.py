@@ -23,6 +23,9 @@ class ManageShellTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+
+        args = normalize_tool_args("manage_shell", args)
         ctx = self._ensure_context(ctx)
         action = args.get("action", "list").lower()
         task_id = (args.get("task_id") or "").strip()

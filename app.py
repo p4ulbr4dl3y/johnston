@@ -6,11 +6,6 @@ from widgets.patch import apply_textual_patches
 
 apply_textual_patches()
 
-
-import logging
-
-logger = logging.getLogger("johnston.app")
-
 from core.app_mixins.actions import ActionsMixin
 from core.app_mixins.lifecycle import LifecycleMixin
 from core.app_mixins.message_flow import MessageFlowMixin

@@ -10,7 +10,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
-from core.defaults.config import DEFAULT_IGNORE_DIRS
+from core.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
 from core.frontmatter import parse_frontmatter
 
