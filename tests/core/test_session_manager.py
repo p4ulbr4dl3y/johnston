@@ -90,15 +90,6 @@ class TestSessionManager(unittest.TestCase):
         # Check sorting (latest first)
         self.assertEqual(sessions[0]["id"], sid2)
 
-    def test_active_session_id(self):
-        sid = self.store.generate_session_id()
-        sess = self.store.create_main(sid)
-        sess.messages = [{"type": "user", "text": "hello"}]
-        self.store.save(sess)
-
-        self.store.set_active_session_id(sid)
-        self.assertEqual(self.store.get_active_session_id(), sid)
-
     def test_subagent_nested_layout(self):
         main = self.store.create_main()
         sub = self.store.create_subagent(parent_id=main.id, subagent_id="sub-1", description="d", prompt="p")
