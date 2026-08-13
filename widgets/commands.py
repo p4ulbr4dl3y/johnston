@@ -14,6 +14,7 @@ from widgets.modal_screens import (
     ModelScreen,
     ResumeScreen,
     RewindScreen,
+    ShellTasksScreen,
     SkillsScreen,
     SubagentsScreen,
     ThinkingEffortScreen,
@@ -350,6 +351,26 @@ class SubagentsCommand(BaseCommand):
         app.push_screen(SubagentsScreen())
 
 
+class ShellTasksCommand(BaseCommand):
+    name = "/shell"
+    aliases = ["/shelltasks"]
+    description = "Manage background shell tasks"
+
+    async def execute(self, app) -> None:
+        all_tasks = getattr(app, "background_tasks", [])
+        curr_sid = getattr(app, "current_session_id", None)
+        if curr_sid:
+            tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
+        else:
+            tasks = list(all_tasks)
+        tasks = [t for t in tasks if getattr(t, "is_background", False)]
+
+        if not tasks:
+            app.notify("No active shell tasks", severity="warning")
+            return
+        app.push_screen(ShellTasksScreen())
+
+
 class SkillsCommand(BaseCommand):
     name = "/skills"
     aliases = ["/skill"]
@@ -492,6 +513,7 @@ COMMAND_CLASSES = [
     RewindCommand,
     ResumeCommand,
     SubagentsCommand,
+    ShellTasksCommand,
     SkillsCommand,
     MCPCommand,
     LintersCommand,
