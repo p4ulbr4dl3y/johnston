@@ -30,7 +30,6 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     def __init__(self, resume_session_id: str | None = None):
         super().__init__()
-        self._disable_tooltips = True
         self.pm = ProviderManager()
         self.sm = SessionStore()
         self.agent = self.pm.create_active_agent()

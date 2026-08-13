@@ -466,7 +466,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.target = target
         self.result_text = result_text
         self.args = args or {}
-        self.icon_name = tool_type
         self.is_expanded = False
         self.status = "running"
         if result_text:

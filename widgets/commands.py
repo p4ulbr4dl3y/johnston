@@ -349,7 +349,6 @@ class TasksCommand(BaseCommand):
         store = getattr(app, "sm", None)
         sessions = []
         if store:
-            store.list(kind="subagent")
             sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
         if not tasks and not sessions:
