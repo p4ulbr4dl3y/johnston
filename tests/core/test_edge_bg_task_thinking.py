@@ -174,7 +174,7 @@ class TestBackgroundTaskStateAndCleanup(unittest.TestCase):
         self.assertEqual(t.is_running, False)
 
     def test_append_output_truncation_keeps_tail(self):
-        big = "x" * (200 * 1024)
+        big = "x" * (300 * 1024)
         t = BackgroundTask("t_trunc", "cmd", None)
         t._append_output(big)
         t._append_output("TAILMARKER")
@@ -182,7 +182,7 @@ class TestBackgroundTaskStateAndCleanup(unittest.TestCase):
         self.assertTrue(t._output_truncated)
         self.assertIn("TAILMARKER", out)
         self.assertIn("Output truncated", out)
-        self.assertLess(len(out), 200 * 1024 + 1000)
+        self.assertLess(len(out), 300 * 1024 + 1000)
 
 
 class TestKillAllEdge(unittest.IsolatedAsyncioTestCase):
