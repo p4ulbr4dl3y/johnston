@@ -191,7 +191,7 @@ class PromptBuilder:
 
         return sys_prompt
 
-    def build_tools(self, provider_key: str = "", model_id: str = "") -> List[Dict[str, Any]]:
+    def build_tools(self, provider_key: str = "") -> List[Dict[str, Any]]:
         from core.mcp_manager import get_mcp_manager
         from core.role_registry import RoleRegistry
         from tools.registry import normalize_tool_name

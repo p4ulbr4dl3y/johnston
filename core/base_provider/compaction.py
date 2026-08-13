@@ -200,7 +200,7 @@ class CompactionMixin:
         )
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(
-            provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
+            provider_key=getattr(self, "provider_key", "")
         )
         sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 

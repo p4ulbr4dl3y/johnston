@@ -519,21 +519,6 @@ class MCPManager:
             return await client.call_tool_async(o_name, arguments, timeout=timeout)
         return None
 
-    def get_tool_schema(self, server_name: str, tool_name: str) -> Optional[Dict[str, Any]]:
-        """
-        Returns the raw parameters inputSchema dict for a specific tool on an MCP server.
-        """
-        active_tools = self.get_active_tools()
-        for t in active_tools:
-            s_name = t.get("_mcp_server")
-            o_name = t.get("_mcp_tool_name")
-            fn = t.get("function", {})
-            exposed_name = fn.get("name")
-
-            if s_name == server_name and (o_name == tool_name or exposed_name == tool_name):
-                return fn.get("parameters")
-        return None
-
     def get_system_prompt_snippet(self) -> str:
         """Returns a prompt snippet listing enabled MCP tools grouped by server.
 
