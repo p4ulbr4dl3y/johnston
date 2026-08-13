@@ -10,7 +10,7 @@ import os
 import re
 import time
 from collections import OrderedDict
-from typing import Dict, Iterable, List, Set
+from typing import Dict, Iterable, List, Optional, Set
 
 import httpx
 
@@ -47,6 +47,24 @@ def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:
     cache.move_to_end(key)
     while len(cache) > _MATCH_CACHE_MAX:
         cache.popitem(last=False)
+
+
+def extract_context_length(model: dict) -> Optional[int]:
+    """Extracts context length from an OpenRouter model dict.
+
+    Consolidates the source fields across OpenRouter API responses
+    (context_length, top_provider.context_length, context_window,
+    max_context_length). Returns int, or None when absent/invalid.
+    """
+    ctx = (
+        model.get("context_length")
+        or (model.get("top_provider", {}) or {}).get("context_length")
+        or model.get("context_window")
+        or model.get("max_context_length")
+    )
+    if ctx and isinstance(ctx, (int, float)):
+        return int(ctx)
+    return None
 
 
 def format_context_tokens(tokens: int) -> str:
@@ -203,14 +221,10 @@ class ModelsCatalog:
                                 model_names.setdefault(m_id, clean_name)
                                 model_names.setdefault(short_id, clean_name)
 
-                            ctx = (
-                                m.get("context_length")
-                                or (m.get("top_provider", {}) or {}).get("context_length")
-                                or m.get("context_window")
-                            )
-                            if ctx and isinstance(ctx, (int, float)):
-                                model_limits.setdefault(m_id, int(ctx))
-                                model_limits.setdefault(short_id, int(ctx))
+                            ctx = extract_context_length(m)
+                            if ctx:
+                                model_limits.setdefault(m_id, ctx)
+                                model_limits.setdefault(short_id, ctx)
 
                             pricing_raw = m.get("pricing") if isinstance(m.get("pricing"), dict) else {}
                             p_prompt = float(pricing_raw.get("prompt") or 0.0)
