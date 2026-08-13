@@ -888,6 +888,16 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("tool-sequential", first.classes)
             self.assertIn("tool-sequential", second.classes)
 
+    async def test_add_tool_call_sequential_flag_ignores_empty_bot_message(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            await chat_view.add_tool_call("shell", "cmd", "out1", animate=False)
+            await chat_view.add_bot_message(animate=False)
+            second = await chat_view.add_tool_call("shell", "cmd2", "out2", animate=False)
+            await pilot.pause()
+            self.assertIn("tool-sequential", second.classes)
+
     async def test_check_welcome_mounts_and_clears(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
