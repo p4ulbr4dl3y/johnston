@@ -5,6 +5,7 @@ real short subprocess, and SubagentTask mapping/kill over a mock AgentSession.
 """
 
 import asyncio
+import sys
 
 import pytest
 
@@ -123,6 +124,72 @@ async def test_shell_task_send_input_missing_stdin_reports_error():
     await task.wait()
     res = await task.send_input("nope")
     assert "not running" in res
+
+
+@pytest.mark.asyncio
+async def test_shell_task_move_to_background_sets_flag_and_event():
+    task = ShellTask(task_id="t4", command="sleep 1", process=None)
+    assert not task.is_background
+    assert not task.background_event.is_set()
+
+    task.move_to_background()
+
+    assert task.is_background is True
+    assert task.background_event.is_set()
+
+
+@pytest.mark.asyncio
+async def test_shell_task_widget_streaming_appends_output():
+    class DummyWidget:
+        def __init__(self):
+            self.received = []
+            self.is_mounted = True
+
+        def append_shell_output(self, text: str) -> None:
+            self.received.append(text)
+
+    widget = DummyWidget()
+    proc = await asyncio.create_subprocess_exec(
+        "echo", "widget hello",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task = ShellTask(task_id="t5", command="echo widget hello", process=proc, widget=widget)
+    task.start_reading()
+    await task.wait()
+
+    assert "widget hello" in "".join(widget.received)
+    # ANSI-free output landed in the buffer too.
+    text = await task.read()
+    assert "widget hello" in text
+
+
+@pytest.mark.asyncio
+async def test_shell_task_widget_streaming_strips_ansi():
+    class DummyWidget:
+        def __init__(self):
+            self.received = []
+            self.is_mounted = True
+
+        def append_shell_output(self, text: str) -> None:
+            self.received.append(text)
+
+    widget = DummyWidget()
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", r"print('\x1b[31mcolored\x1b[0m text')",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task = ShellTask(task_id="t6", command="print ansi", process=proc, widget=widget)
+    task.start_reading()
+    await task.wait()
+
+    assert "colored text" in "".join(widget.received)
+    assert "\x1b" not in "".join(widget.received)
+    # The buffer itself is ANSI-free too.
+    text = await task.read()
+    assert "colored text" in text
+    assert "\x1b" not in text
 
 
 # ---------------------------------------------------------------------------
