@@ -48,7 +48,6 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
     async def test_action_background_all_empty(self):
         app = JohnstonApp()
         async with app.run_test():
-            app.background_tasks = []
             app.notify = MagicMock()
             app.action_background_all()
             app.notify.assert_called_once()
@@ -60,8 +59,9 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
             task = MagicMock()
             task.is_running = True
             task.is_background = False
+            task.kind = "shell"
             task.move_to_background = MagicMock()
-            app.background_tasks = [task]
+            app.task_manager.register(task)
             app.action_background_all()
             task.move_to_background.assert_called_once()
 
@@ -71,8 +71,9 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
             task = MagicMock()
             task.is_running = True
             task.is_background = False
+            task.kind = "shell"
             del task.move_to_background
-            app.background_tasks = [task]
+            app.task_manager.register(task)
             app.action_background_all()
             self.assertTrue(task.is_background)
 

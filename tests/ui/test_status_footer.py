@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.app import App, ComposeResult
 
+from core.tasks.manager import TaskManager
 from widgets.status_footer import StatusFooter
 
 
@@ -15,6 +16,7 @@ class DummyTask:
         session_id: str = "test-session",
         kind: str = "shell",
     ):
+        self.id = task_id
         self.task_id = task_id
         self.kind = kind
         self.is_running = is_running
@@ -64,9 +66,8 @@ class FooterTestApp(App):
             DummySession("completed"),
         ]
 
-        self.background_tasks = [
-            DummyTask("bash-1", is_running=True),
-        ]
+        self.task_manager = TaskManager()
+        self.task_manager.register(DummyTask("bash-1", is_running=True))
 
     def compose(self) -> ComposeResult:
         yield StatusFooter(id="status-footer")

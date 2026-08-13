@@ -12,6 +12,8 @@ from core.app_mixins.message_flow import MessageFlowMixin
 from core.app_mixins.session_persistence import SessionPersistenceMixin
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionStore
+from core.tasks.events import TaskEvents
+from core.tasks.manager import TaskManager
 
 
 class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, App):
@@ -32,6 +34,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         super().__init__()
         self.pm = ProviderManager()
         self.sm = SessionStore()
+        self.task_manager = TaskManager(self)
+        self.task_events = TaskEvents(self, self.sm)
         self.agent = self.pm.create_active_agent()
         self.role = getattr(self.agent, "role", "worker") if self.agent else "worker"
         if self.agent:
@@ -48,7 +52,6 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             self.current_session_id = self.sm.generate_session_id()
 
         self.selection_copy_active = False
-        self.background_tasks = []
         self.message_queue = []
         self.is_generating = False
 

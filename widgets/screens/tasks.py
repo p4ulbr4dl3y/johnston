@@ -38,9 +38,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.set_interval(0.1, self.update_log)
 
     def update_log(self) -> None:
-        from core.background_task import process_carriage_returns, strip_ansi
+        from core.tasks.output import process_carriage_returns, strip_ansi
 
-        lines = self.bg_task.output
+        lines = self.bg_task.output.history if hasattr(self.bg_task.output, "history") else self.bg_task.output
         if len(lines) > self.printed_count:
             for i in range(self.printed_count, len(lines)):
                 raw_line = lines[i].rstrip("\r\n")
@@ -73,7 +73,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
         all_tasks = []
         app = self.app if (hasattr(self, "app") and self.app) else None
         if app is not None:
-            all_tasks = getattr(app, "background_tasks", [])
+            all_tasks = [t for t in getattr(app, "task_manager", []) if getattr(t, "kind", "") == "shell"]
             curr_sid = getattr(app, "current_session_id", None)
             if curr_sid:
                 all_tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]

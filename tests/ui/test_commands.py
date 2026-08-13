@@ -1,6 +1,7 @@
 import time
 import unittest
 
+from core.tasks.manager import TaskManager
 from widgets.chat_view import ChatView
 from widgets.commands import COMMAND_REGISTRY, handle_slash_command
 
@@ -66,6 +67,7 @@ class MockApp:
         self.status_refreshed = False
         self.ai_prompts = []
         self.chat_view = MockChatView()
+        self.task_manager = TaskManager()
 
     def notify(self, msg: str, severity: str = "info"):
         self.notified.append((msg, severity))
@@ -461,7 +463,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_clears_background_tasks(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from core.background_task import BackgroundTask
+        from core.tasks.shell_task import ShellTask
         from widgets.commands import NewCommand
 
         app = MockApp()
@@ -471,11 +473,11 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         mock_chat = MagicMock()
         mock_chat.remove_children = AsyncMock()
         app.query_one = MagicMock(return_value=mock_chat)
-        t1 = BackgroundTask("t1", "echo 1", None, session_id="old-session")
-        app.background_tasks = [t1]
+        t1 = ShellTask("t1", "echo 1", None)
+        app.task_manager.register(t1)
         cmd = NewCommand()
         await cmd.execute(app)
-        self.assertEqual(len(app.background_tasks), 0)
+        self.assertFalse(t1.is_running)
 
     async def test_subagents_command_no_subagents(self):
         from unittest.mock import MagicMock
@@ -521,7 +523,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.current_session_id = "sess-a"
         app.notify = MagicMock()
         app.push_screen = MagicMock()
-        app.background_tasks = []
 
         cmd = ShellTasksCommand()
         await cmd.execute(app)
@@ -531,15 +532,15 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_shell_command_with_tasks(self):
         from unittest.mock import MagicMock
 
-        from core.background_task import BackgroundTask
+        from core.tasks.shell_task import ShellTask
         from widgets.commands import ShellTasksCommand
 
         app = MockApp()
         app.notify = MagicMock()
         app.push_screen = MagicMock()
-        t_bg = BackgroundTask("t-bg", "sleep 100", None, session_id="test_session_id")
+        t_bg = ShellTask("t-bg", "sleep 100", None)
         t_bg.is_background = True
-        app.background_tasks = [t_bg]
+        app.task_manager.register(t_bg)
 
         cmd = ShellTasksCommand()
         await cmd.execute(app)

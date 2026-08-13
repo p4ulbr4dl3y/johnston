@@ -56,10 +56,15 @@ class LifecycleMixin:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
 
-        from core.background_task import kill_all_background_tasks
-
         try:
-            kill_all_background_tasks(getattr(self, "background_tasks", []))
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        try:
+            if loop is not None:
+                loop.create_task(self._kill_all_tasks())
+            else:
+                self._kill_all_tasks_sync()
         except Exception as err:
             logger.debug(f"Background task cleanup error: {err}")
         try:
@@ -80,6 +85,23 @@ class LifecycleMixin:
             get_mcp_manager().stop_all()
         except Exception as err:
             logger.debug(f"MCP cleanup error: {err}")
+
+    async def _kill_all_tasks(self) -> None:
+        try:
+            await self.task_manager.kill_all()
+        except Exception:
+            pass
+
+    def _kill_all_tasks_sync(self) -> None:
+        for task in list(self.task_manager):
+            try:
+                kill = getattr(task, "kill", None)
+                if callable(kill) and asyncio.iscoroutinefunction(kill):
+                    asyncio.create_task(kill())
+                elif callable(kill):
+                    kill()
+            except Exception:
+                pass
 
     def refresh_status_footer(self) -> None:
         """Refresh status bar with directory, provider, model, context, tokens, cost, and subagents"""

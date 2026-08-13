@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from core.tasks.manager import TaskManager
 from tools.shell import ShellTool, _new_task_id
 
 
@@ -79,7 +80,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
-            patch("tools.shell.BackgroundTask") as mock_bg_cls,
+            patch("tools.shell.ShellTask") as mock_bg_cls,
         ):
             mock_task = MagicMock()
             mock_task.background_event = asyncio.Event()
@@ -263,17 +264,17 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_sync_task_cleaned_up_from_background_tasks(self):
         mock_app = MagicMock()
-        mock_app.background_tasks = []
+        mock_app.task_manager = TaskManager()
         mock_ctx = MagicMock()
         mock_ctx.app = mock_app
         mock_ctx.is_subagent = False
-        mock_ctx.add_background_task.side_effect = lambda t: mock_app.background_tasks.append(t)
+        mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
 
         with patch.object(ShellTool, "_ensure_context", return_value=mock_ctx):
             res = await self.tool.execute({"command": "echo test_sync_cleanup"}, ctx=mock_app)
             self.assertIn("test_sync_cleanup", res)
-            # Sync task should be removed from app.background_tasks after finishing
-            self.assertEqual(len(mock_app.background_tasks), 0)
+            # Sync task should be dropped from the manager after finishing
+            self.assertEqual(len([t for t in mock_app.task_manager]), 0)
 
     async def test_invalid_timeout_value_falls_back_to_default(self):
         res = await self.tool.execute({"command": "echo hi", "timeout": "abc"})
@@ -410,7 +411,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
-            registered_bg_task.output = ["y" * 2500]
+            registered_bg_task.output.append("y" * 2500)
             registered_bg_task.move_to_background()
 
             res = await exec_task
@@ -437,7 +438,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
-            registered_bg_task.output = ["short output"]
+            registered_bg_task.output.append("short output")
 
             res = await exec_task
             self.assertIn("[Background Task ID:", res)
@@ -463,7 +464,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(len(mock_ctx.add_background_task.call_args_list), 1)
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
-            registered_bg_task.output = ["z" * 2500]
+            registered_bg_task.output.append("z" * 2500)
 
             res = await exec_task
             self.assertIn("[Background Task ID:", res)
@@ -490,7 +491,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
-            patch("tools.shell.BackgroundTask") as mock_bg_cls,
+            patch("tools.shell.ShellTask") as mock_bg_cls,
         ):
             mock_task = MagicMock()
             mock_task.background_event = asyncio.Event()
@@ -538,7 +539,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
-            patch("tools.shell.BackgroundTask") as mock_bg_cls,
+            patch("tools.shell.ShellTask") as mock_bg_cls,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
             mock_bg = MagicMock()
