@@ -11,7 +11,14 @@ from core.git_utils import run_git
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
 
-__all__ = ["DEFAULT_SYSTEM_PROMPT", "SUBAGENT_DEFAULT_SYSTEM_PROMPT", "PromptBuilder"]
+INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
+
+__all__ = [
+    "DEFAULT_SYSTEM_PROMPT",
+    "SUBAGENT_DEFAULT_SYSTEM_PROMPT",
+    "PromptBuilder",
+    "INSTRUCTION_FILES",
+]
 
 _GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
 _GIT_INFO_CACHE_TTL = 30.0
@@ -71,12 +78,11 @@ def _compute_git_info(cwd: str = None) -> str:
 
 
 def get_project_instructions_snippet(cwd: str = None) -> str:
-    """Reads AGENTS.md, CLAUDE.md, .cursorrules, .windsurfrules, or CONVENTIONS.md from a working directory."""
+    """Reads INSTRUCTION_FILES from a working directory."""
     cwd = os.path.realpath(cwd) if cwd else os.getcwd()
-    candidates = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
     found_snippets = []
 
-    for name in candidates:
+    for name in INSTRUCTION_FILES:
         filepath = os.path.join(cwd, name)
         if os.path.isfile(filepath):
             try:

@@ -24,6 +24,19 @@ def _new_task_id() -> str:
     return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
+def _format_background_task_response(task_id: str, cmd: str, recent_output_str: str = None) -> str:
+    """Formats a background task status response with a manage hint."""
+    if recent_output_str is None:
+        return (
+            f"[Background Task ID: {task_id}] running: '{cmd}'. "
+            f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
+        )
+    return (
+        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
+        f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
+    )
+
+
 def _truncate_output(res: str) -> str:
     return truncate_output(
         res,
@@ -169,10 +182,7 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             task.start_reading(ctx.app, callback)
 
-            return (
-                f"[Background Task ID: {task_id}] running: '{cmd}'. "
-                f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
-            )
+            return _format_background_task_response(task_id, cmd)
 
         ctx.add_background_task(task)
         task.start_reading(ctx.app, callback)
@@ -199,10 +209,7 @@ class ShellTool(BaseTool):
                     recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
                 else:
                     recent_output_str = "\n\nRecent Output: (No output yet)"
-                return (
-                    f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
-                    f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
-                )
+                return _format_background_task_response(task_id, cmd, recent_output_str)
 
             if task.read_task:
                 try:
@@ -222,10 +229,7 @@ class ShellTool(BaseTool):
                 recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
             else:
                 recent_output_str = "\n\nRecent Output: (No output yet)"
-            return (
-                f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
-                f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
-            )
+            return _format_background_task_response(task_id, cmd, recent_output_str)
         except asyncio.CancelledError:
             if "task" in locals() and task:
                 task.kill_sync()
