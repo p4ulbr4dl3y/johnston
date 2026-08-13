@@ -488,10 +488,6 @@ class SessionStore:
         cfg["active_session_id"] = session_id
         atomic_write_json(self.config_file, cfg)
 
-    def get_active_session_id(self) -> Optional[str]:
-        cfg = read_json(self.config_file, {})
-        return cfg.get("active_session_id")
-
     # -- search ---------------------------------------------------------------
 
     def find_session_by_description_or_id(
