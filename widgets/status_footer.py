@@ -17,8 +17,9 @@ class StatusFooter(Static):
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, is_subagent: bool = False, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.is_subagent: bool = is_subagent
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
@@ -190,6 +191,53 @@ class StatusFooter(Static):
         except Exception:
             self.update_status(provider_key="default")
 
+    def _render_subagent(
+        self,
+        role_formatted: str,
+        provider_display: str,
+        clean_model: str,
+        is_connected: bool,
+        model_name: str,
+        context_used: int,
+        total_tokens: int,
+        context_limit: int,
+        context_window: str,
+        cost_usd: float,
+        thinking_effort: str,
+    ) -> None:
+        """Compact footer for the subagent screen: role, provider/model, ctx, tokens, cost."""
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
+
+        row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
+        if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
+            row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
+        grid.add_row("  •  ".join(row1_left_parts), "")
+
+        if is_connected and bool(model_name):
+            pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
+            pct = min(100.0, max(0.0, pct))
+            bar_len = 8
+            filled = int(round((pct / 100) * bar_len))
+            bar_str = "█" * filled + "░" * (bar_len - filled)
+            row2_left = (
+                f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
+                f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
+            )
+            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+            row2_right = (
+                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]  •  "
+                f"[{THEME_SECONDARY}]{cost_str}[/]  •  "
+                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]"
+            )
+        else:
+            row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
+            row2_right = ""
+
+        grid.add_row(row2_left, row2_right)
+        self.update(grid)
+
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
         """MCP indicator: show active/total count as 'N/M'."""
         return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
@@ -236,6 +284,22 @@ class StatusFooter(Static):
             role_formatted = f"{frame} {role_str}"
         else:
             role_formatted = role_str
+
+        if self.is_subagent:
+            self._render_subagent(
+                role_formatted=role_formatted,
+                provider_display=provider_display or provider_key.capitalize(),
+                clean_model=clean_model or "[Select model: /models]",
+                is_connected=is_connected,
+                model_name=model_name,
+                context_used=context_used,
+                total_tokens=total_tokens,
+                context_limit=context_limit,
+                context_window=context_window,
+                cost_usd=cost_usd,
+                thinking_effort=thinking_effort,
+            )
+            return
 
         width = (
             self.size.width
