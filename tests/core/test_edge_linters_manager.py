@@ -8,11 +8,14 @@ These exercise _exec_cmd / run_for / render_cmd directly with harmless
 subprocesses. No system-dangerous commands are ever run.
 """
 
+import asyncio
 import json
 import os
 import tempfile
 import time
 from unittest.mock import patch
+
+import pytest
 
 from core.linters_manager import LintersManager, _exec_cmd
 
@@ -295,3 +298,21 @@ async def test_run_for_empty_lint_list_ok(tmp_path):
     m = _make_manager(tmp_path)
     _write_config(m, {"linters": {}})
     assert await m.run_for(str(tmp_path / "x.ts")) == ""
+
+
+# ------------------------------------------------------- cancellation in _run_one
+
+
+async def test_run_one_cancellation_not_swallowed(tmp_path):
+    """CancelledError inherits BaseException, so _run_one must re-raise it."""
+    m = _make_manager(tmp_path)
+    lint = {"cmd": ["echo", "hi"]}
+
+    async def _raising_cancel(_cmd):
+        raise asyncio.CancelledError()
+
+    with patch.object(m, "render_cmd", return_value=["echo", "hi"]), patch(
+        "core.linters_manager._exec_cmd", side_effect=_raising_cancel
+    ):
+        with pytest.raises(asyncio.CancelledError):
+            await m._run_one(lint, str(tmp_path / "x.py"))

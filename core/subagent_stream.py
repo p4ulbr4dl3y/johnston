@@ -5,6 +5,7 @@ under sessions/<parent_id>.subagents/ via SessionStore.
 """
 
 import asyncio
+import logging
 from typing import Any, Callable, Optional
 
 from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
@@ -195,16 +196,22 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
         subagent._merged_cost_usd = cur_cost
 
 
-def _safe_save(store: Any, session: AgentSession) -> None:
-    """Persist a session without letting a storage OSError escape the background task.
+logger = logging.getLogger(__name__)
 
-    A failed save must not mark the whole subagent run as errored or blow up the
-    task; it is logged and swallowed.
+
+def _safe_save(store: Any, session: AgentSession) -> None:
+    """Persist a session, logging and re-raising on storage failure.
+
+    A silent swallow meant a failed save still marked the subagent COMPLETED,
+    losing the session on disk. Now the failure is fully logged and propagated
+    so callers can flip the status away from success; caller that chooses to
+    contain the error may catch it explicitly.
     """
     try:
         store.save(session)
     except Exception:
-        pass
+        logger.exception("Failed to save subagent session %s", session.id)
+        raise
 
 
 async def run_subagent_stream_bg(
@@ -229,11 +236,19 @@ async def run_subagent_stream_bg(
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
         session.finish(STATUS_CANCELLED, "Cancelled by user")
-        _safe_save(store, session)
+        try:
+            _safe_save(store, session)
+        except Exception as err:
+            acc[0] = f"[{error_prefix}: failed to save cancelled session: {err}]"
     except Exception as err:
+        # Covers stream errors AND a failed post-completion save (propagated by
+        # _safe_save). A failure to persist must not leave a COMPLETED status.
         acc[0] = f"[{error_prefix}: {err}]"
         session.finish(STATUS_ERROR, str(err))
-        _safe_save(store, session)
+        try:
+            _safe_save(store, session)
+        except Exception:
+            pass
     finally:
         if cleanup_fn:
             try:
