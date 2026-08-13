@@ -303,6 +303,15 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             tc = screen.query_one(ToolCallWidget)
             self.assertEqual(tc.tool_type, "shell")
             self.assertEqual(tc.result_text, "file.txt")
+
+            from textual.widgets import Label
+
+            from widgets.status_footer import StatusFooter
+
+            info = screen.query_one("#subagent-info", Label)
+            self.assertIn("Canon Agent", str(info.render()))
+            footer = screen.query_one("#status-footer", StatusFooter)
+            self.assertTrue(footer.is_mounted)
             await pilot.press("escape")
             await pilot.pause()
 
