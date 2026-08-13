@@ -28,8 +28,8 @@ class SubagentViewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
-            yield Label("", id="subagent-info")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
+            yield Label("", id="subagent-info")
             yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
