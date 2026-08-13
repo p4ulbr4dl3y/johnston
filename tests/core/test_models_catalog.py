@@ -216,7 +216,6 @@ class TestModelsCatalog(unittest.TestCase):
     def test_resolve_catalog_key_tag_branches_and_cache(self):
         cat = ModelsCatalog()
         cat._limits = {"google/gemma-4": 262144}
-        cat._output_limits = {"google/gemma-4": 8192}
         cat._names = {"google/gemma-4": "Gemma 4"}
         cat._descriptions = {"google/gemma-4": "desc"}
         cat._pricing = {"google/gemma-4": {"prompt": 0.0, "completion": 0.0}}
@@ -230,13 +229,11 @@ class TestModelsCatalog(unittest.TestCase):
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._names), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._descriptions), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._pricing), "google/gemma-4")
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._output_limits), "google/gemma-4")
         # Bound-view branches (search_space.__self__)
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._limits.keys()), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._names.keys()), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._descriptions.keys()), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._pricing.keys()), "google/gemma-4")
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._output_limits.keys()), "google/gemma-4")
         # Unknown search space falls through to the id() branch
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", {"gemma-4": "custom"}), "gemma-4")
         # Default search space (union of all catalog keys)
@@ -396,7 +393,6 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(limits["openai/gpt-4o"], 128000)
         self.assertEqual(limits["gpt-4o"], 128000)
         self.assertEqual(limits["ctx-only"], 1000)
-        self.assertEqual(cat._output_limits["openai/gpt-4o"], 4096)
         self.assertIn("openai/gpt-4o", cat._reasoning)
         self.assertIn("openai/gpt-4o", cat._open_weights)
         self.assertEqual(cat._names["openai/gpt-4o"], "GPT-4o")

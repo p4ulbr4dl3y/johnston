@@ -58,45 +58,26 @@ class AgentRole:
 
     def is_tool_allowed(self, tool_name: str) -> Optional[str]:
         """Returns an error string if this role disables tool_name, else None."""
-        if not tool_name:
-            return None
-        clean = (tool_name or "").strip().lower()
-        if clean.startswith("functions."):
-            clean = clean.split(".", 1)[1]
-
-        try:
-            from tools.registry import normalize_tool_name
-
-            resolved = normalize_tool_name(clean)
-        except Exception:
-            resolved = clean
-
-        disallowed = [t.lower() for t in self.disallowed_tools]
-        if clean in disallowed or resolved in disallowed:
-            return format_tool_error(f"tool '{clean}' disabled in {self.name} role")
-
-        if self.read_only and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
-            return format_tool_error(f"tool '{clean}' disabled in read-only {self.name} role")
-
-        if self.allowed_tools:
-            allowed = [t.lower() for t in self.allowed_tools]
-            if clean not in allowed and resolved not in allowed:
-                return format_tool_error(f"tool '{clean}' not in allowed tools list for {self.name} role")
-
-        return None
+        _, reason = _tool_policy_result(self, tool_name)
+        return reason
 
 
-# Helper function to validate tool call against role or mode object
-def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
-    if not role_def:
-        return None
-    if isinstance(role_def, AgentRole):
-        return role_def.is_tool_allowed(tool_name)
+# Single source of truth for role/mode tool-policy checks. Used by
+# AgentRole.is_tool_allowed and role_tool_error so both honor disallowed,
+# read_only, and allowed_tools consistently.
+def _tool_policy_result(role_def: Any, tool_name: str) -> Tuple[bool, Optional[str]]:
+    """Evaluate a tool call against a role or mode object.
 
-    disallowed = [t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
+    Returns (allowed, reason). reason is None when allowed. Works with both
+    AgentRole instances and duck-typed mode objects exposing disallowed_tools,
+    read_only, allowed_tools, and name attributes.
+    """
+    if not tool_name:
+        return True, None
     clean = (tool_name or "").strip().lower()
     if clean.startswith("functions."):
         clean = clean.split(".", 1)[1]
+
     try:
         from tools.registry import normalize_tool_name
 
@@ -104,11 +85,27 @@ def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
     except Exception:
         resolved = clean
 
+    name = getattr(role_def, "name", "Role")
+    disallowed = [t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
     if clean in disallowed or resolved in disallowed:
-        return format_tool_error(f"tool '{clean}' disabled in {getattr(role_def, 'name', 'Role')} role")
+        return False, format_tool_error(f"tool '{clean}' disabled in {name} role")
+
     if getattr(role_def, "read_only", False) and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
-        return format_tool_error(f"tool '{clean}' disabled in read-only {getattr(role_def, 'name', 'Role')} role")
-    return None
+        return False, format_tool_error(f"tool '{clean}' disabled in read-only {name} role")
+
+    allowed = [t.lower() for t in (getattr(role_def, "allowed_tools", []) or [])]
+    if allowed and clean not in allowed and resolved not in allowed:
+        return False, format_tool_error(f"tool '{clean}' not in allowed tools list for {name} role")
+
+    return True, None
+
+
+# Helper function to validate tool call against role or mode object
+def role_tool_error(role_def: Any, tool_name: str) -> Optional[str]:
+    if not role_def:
+        return None
+    _, reason = _tool_policy_result(role_def, tool_name)
+    return reason
 
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
