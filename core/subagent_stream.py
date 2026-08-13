@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
-from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, AgentSession
+from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING, AgentSession
 
 
 def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
@@ -151,22 +151,22 @@ def _safe_save(store: Any, session: AgentSession) -> None:
         raise
 
 
-async def run_subagent_stream_bg(
+async def _run_single_subagent_message(
     subagent: Any,
-    prompt_or_message: str,
+    message: str,
     session: AgentSession,
     ctx: Any,
     store: Any,
-    cleanup_fn: Optional[Callable[[list], None]] = None,
     error_prefix: str = "Subagent error",
-    notification_template: str = "",
-    session_id: Optional[str] = None,
-    truncate_result: bool = False,
 ) -> str:
-    """Executes a subagent step stream in background with error handling, session finish, cleanup, and UI notifications."""
+    """Runs a single subagent message stream, recording steps and finishing the session.
+
+    Returns the accumulated text and handles success/cancel/error transitions,
+    persisting the session in each terminal state.
+    """
     acc = [""]
     try:
-        async for step in subagent.stream_steps(prompt_or_message):
+        async for step in subagent.stream_steps(message):
             record_subagent_step(step, session, acc)
         session.finish(STATUS_COMPLETED)
         _safe_save(store, session)
@@ -186,6 +186,44 @@ async def run_subagent_stream_bg(
             _safe_save(store, session)
         except Exception:
             pass
+    return acc[0]
+
+
+async def run_subagent_stream_bg(
+    subagent: Any,
+    prompt_or_message: str,
+    session: AgentSession,
+    ctx: Any,
+    store: Any,
+    cleanup_fn: Optional[Callable[[list], None]] = None,
+    error_prefix: str = "Subagent error",
+    notification_template: str = "",
+    session_id: Optional[str] = None,
+    truncate_result: bool = False,
+) -> str:
+    """Executes a subagent step stream in background with error handling, session finish, cleanup, and UI notifications.
+
+    Mirrors the main agent's message-queue semantic: a follow-up message sent
+    while the subagent is busy is queued on `session.pending_messages` and
+    drained here after the current message finishes, so the subagent keeps
+    processing until its queue is empty. The session stays `running` while the
+    queue is non-empty and only finishes `completed` once drained.
+    """
+    acc = [""]
+    try:
+        message = prompt_or_message
+        while True:
+            acc[0] = await _run_single_subagent_message(
+                subagent, message, session, ctx, store, error_prefix=error_prefix
+            )
+
+            # Drain follow-up messages queued while the previous message ran.
+            if session.pending_messages:
+                message = session.pending_messages.pop(0)
+                session.status = SUBAGENT_STATUS_RUNNING
+                session.add_event({"type": "status_change", "status": SUBAGENT_STATUS_RUNNING})
+                continue
+            break
     finally:
         if cleanup_fn:
             try:

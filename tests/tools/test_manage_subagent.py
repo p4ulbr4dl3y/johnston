@@ -191,20 +191,12 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
         res = await tool.execute({"action": "send_message", "session_id": "sub-sm3", "message": "hello"}, ctx=mock_app)
-        self.assertIn("<task_result>", res)
-        self.assertIn("Subagent reply text", res)
+        self.assertIn("message sent to sub-sm3", res)
         self.assertIsNotNone(sess.agent)
-        self.assertEqual(sess.status, "completed")
-        # Role is reapplied on follow-up so behavior matches the original spawn
-        self.assertFalse(sess.agent.allow_task)
-        self.assertEqual(sess.agent.role, "worker")
-        tool_names = [t["function"]["name"] for t in sess.agent.tools]
-        self.assertIn("read", tool_names)
-        self.assertIn("shell", tool_names)
-        self.assertNotIn("invoke_subagent", tool_names)
-        self.assertNotIn("manage_shell", tool_names)
-        self.assertNotIn("ask_user", tool_names)
-        self.assertIn("## Execution Mode: WORKER", sess.agent.system_prompt)
+        self.assertEqual(sess.status, "running")
+        self.assertIsNotNone(sess.async_task)
+        # The message is queued and pulled from pending_messages for the stream.
+        self.assertEqual(len(sess.pending_messages), 0)
 
     async def test_unknown_action(self):
         tool = ManageSubagentTool()
@@ -254,6 +246,85 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
 
         res_kl = await tool.execute({"action": "kill"})
         self.assertIn("ERR: params 'session_id': required for 'kill'", res_kl)
+
+    async def test_send_message_queued_when_busy(self):
+        tool = ManageSubagentTool()
+        sess = self._mk_subagent("sub-busy", role="worker")
+
+        class MockSubagent:
+            def __init__(self):
+                self.app = None
+                self.history = []
+                self.tokens_input = 0
+                self.tokens_output = 0
+                self.total_tokens = 0
+                self.cost_usd = 0.0
+                self._merged_tokens_input = 0
+                self._merged_tokens_output = 0
+                self._merged_total_tokens = 0
+                self._merged_cost_usd = 0.0
+
+            async def stream_steps(self, message):
+                yield ("bot_text", "In progress")
+
+        mock_agent = MockSubagent()
+        sess.agent = mock_agent
+
+        not_done = MagicMock()
+        not_done.done.return_value = False
+        sess.async_task = not_done
+
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.project_dir = None
+        mock_app.agent = None
+        mock_app.sm = self.store
+        mock_app.pm = MagicMock()
+
+        res = await tool.execute(
+            {"action": "send_message", "session_id": "sub-busy", "message": "again"}, ctx=mock_app
+        )
+        self.assertIn("queued for sub-busy", res)
+        self.assertEqual(sess.pending_messages, ["again"])
+
+    async def test_send_message_setup_error_handled(self):
+        tool = ManageSubagentTool()
+        sess = self._mk_subagent("sub-setup", role="worker")
+
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.project_dir = None
+        mock_app.agent = None
+        mock_app.sm = self.store
+        mock_app.pm = MagicMock()
+        mock_app.pm.create_active_agent.side_effect = RuntimeError("boom setup")
+
+        res = await tool.execute(
+            {"action": "send_message", "session_id": "sub-setup", "message": "hi"}, ctx=mock_app
+        )
+        self.assertIn("ERR: subagent_setup 'sub-setup': boom setup", res)
+        self.assertEqual(sess.status, "error")
+
+    async def test_send_message_with_done_task_starts(self):
+        tool = ManageSubagentTool()
+        sess = self._mk_subagent("sub-done", role="worker")
+
+        mock_app = MagicMock()
+        mock_app.current_session_id = None
+        mock_app.project_dir = None
+        mock_app.agent = None
+        mock_app.sm = self.store
+        mock_app.pm = MagicMock()
+        mock_app.pm.create_active_agent.return_value = None
+
+        done_task = MagicMock()
+        done_task.done.return_value = True
+        sess.async_task = done_task
+
+        res = await tool.execute(
+            {"action": "send_message", "session_id": "sub-done", "message": "hi"}, ctx=mock_app
+        )
+        self.assertIn("ERR: context 'sub-done': no active agent", res)
 
 
 if __name__ == "__main__":
