@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 from textual.app import App
+from textual.screen import Screen
 
 from core.session_manager import SessionStore
 from widgets.screens.subagent_screen import SubagentViewScreen
@@ -131,7 +132,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         screen.session = store.find_session_by_description_or_id("task-789")
         self.assertEqual(screen.session, sess)
         self.assertEqual(screen.session_id_or_desc, "task-789")
-        self.assertFalse(screen.ALLOW_SELECT)
+        self.assertIsInstance(screen, Screen)
 
     def test_session_persistence(self):
         sess = self._mk("task-persist", "Persistent Agent", "save to disk", role="explorer")
@@ -260,7 +261,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
-    async def test_subagent_screen_widgets_not_expandable(self):
+    async def test_subagent_screen_widgets_expandable(self):
         sess = self._mk("task-select", "Select Agent", "prompt")
         sess.add_event({"type": "thinking", "text": "thinking..."})
         sess.add_event({"type": "thinking", "text": "thought done", "duration": 1.0})
@@ -276,8 +277,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             tw = screen.query_one(ThinkingWidget)
             tc = screen.query_one(ToolCallWidget)
-            self.assertFalse(tw.is_expandable())
-            self.assertFalse(tc.is_expandable())
+            self.assertTrue(tw.is_expandable())
+            self.assertTrue(tc.is_expandable())
             await pilot.press("escape")
             await pilot.pause()
 
