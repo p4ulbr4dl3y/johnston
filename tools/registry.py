@@ -233,7 +233,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     from tools.base import check_mcp_role_policy
 
     ctx_or_app = context or app
-    policy_err = check_mcp_role_policy(ctx_or_app, clean_name, [clean_name, resolved_name])
+    policy_err = check_mcp_role_policy(ctx_or_app, [clean_name, resolved_name])
     if policy_err:
         return policy_err
 

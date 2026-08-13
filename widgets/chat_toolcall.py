@@ -354,12 +354,6 @@ class _DisplayNamesDict(dict):
             return self.CANONICAL_NAMES[canonical]
         return super().get(key, default)
 
-    def __getitem__(self, key):
-        res = self.get(key, None)
-        if res is None:
-            raise KeyError(key)
-        return res
-
 
 class _SystemToolsSet(set):
     def __contains__(self, item):

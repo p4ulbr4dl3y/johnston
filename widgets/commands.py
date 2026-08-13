@@ -596,7 +596,6 @@ async def handle_slash_command(app, command_text: str) -> bool:
             from widgets.chat_view import ChatView
 
             chat_view = app.query_one(ChatView)
-            import asyncio
 
             asyncio.create_task(chat_view.add_user_message(command_text))
             app.trigger_ai_response(prompt, show_in_ui=False)
