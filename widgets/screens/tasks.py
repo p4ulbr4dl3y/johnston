@@ -128,14 +128,14 @@ class TasksListScreen(BaseModalScreen[None]):
         items = []
 
         # 1. Gather shell background tasks
-        all_bg_tasks = getattr(self.app, "background_tasks", []) if hasattr(self, "app") and self.app else []
-        curr_sid = getattr(self.app, "current_session_id", None) if hasattr(self, "app") and self.app else None
-        if curr_sid:
-            bg_tasks = [t for t in all_bg_tasks if getattr(t, "session_id", None) == curr_sid]
-        else:
-            bg_tasks = list(all_bg_tasks)
+        from core.task_collection import collect_current_tasks
 
-        for t in bg_tasks:
+        all_bg_tasks, sessions = collect_current_tasks(
+            self.app if (hasattr(self, "app") and self.app) else None,
+            getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None,
+        )
+
+        for t in all_bg_tasks:
             task_id = getattr(t, "task_id", "")
             if getattr(t, "is_background", False):
                 items.append(
@@ -148,15 +148,6 @@ class TasksListScreen(BaseModalScreen[None]):
                         "raw_obj": t,
                     }
                 )
-
-        # 2. Gather subagent sessions
-        store = getattr(self.app, "sm", None) if hasattr(self, "app") and self.app else None
-        if store is None:
-            from core.session_manager import SessionStore
-
-            store = SessionStore.get_instance()
-        store.list(kind="subagent")
-        sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()

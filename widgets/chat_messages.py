@@ -289,6 +289,14 @@ class ThinkingWidget(Vertical):
 
     def is_expandable(self) -> bool:
         try:
+            if hasattr(self, "screen") and self.screen:
+                from widgets.screens.subagent_screen import SubagentViewScreen
+
+                if isinstance(self.screen, SubagentViewScreen):
+                    return False
+        except Exception:
+            pass
+        try:
             if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
                 return False
         except Exception:
