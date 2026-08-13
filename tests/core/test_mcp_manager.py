@@ -82,6 +82,9 @@ class TestMCPManager(unittest.TestCase):
             def start(self):
                 return True
 
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
             def call_tool(self, tool_name, args, **kwargs):
                 return f"result from {self.name}:{tool_name}"
 
@@ -116,6 +119,9 @@ class TestMCPManager(unittest.TestCase):
 
             def start(self):
                 return True
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
 
             def call_tool(self, tool_name, args, **kwargs):
                 return f"executed {self.name}:{tool_name}"
@@ -154,6 +160,9 @@ class TestMCPManagerRegression(unittest.TestCase):
             def __init__(self, name):
                 self.name = name
                 self.tools = [{"name": "search", "description": "Search", "inputSchema": {"type": "object"}}]
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
 
             def call_tool(self, name, args, timeout=None):
                 return f"{self.name}:{name}:{args}:{timeout}"
