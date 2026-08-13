@@ -6,6 +6,7 @@ from core.config import CONFIG_DIR
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.defaults.tools import WRITE_TOOLS
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
+from core.fs_signature import compute_dir_signature
 from tools.base import format_tool_error
 
 # Legacy scope aliases -> canonical names. Kept indefinitely so existing role
@@ -255,7 +256,7 @@ class RoleRegistry:
 
         dirs.append((os.path.join(p_dir, ".johnston", "roles"), "project"))
 
-        signature = self._roles_signature(dirs)
+        signature = compute_dir_signature(dirs, [".md", ".markdown"])
         now = time.time()
         if (
             signature is not None
@@ -274,27 +275,6 @@ class RoleRegistry:
         self._roles_cache_signature = signature
         self._roles_cache_ts = now
         return roles
-
-    @staticmethod
-    def _roles_signature(dirs: List[Tuple[str, str]]) -> Optional[Tuple]:
-        """Cheap (path, mtime_ns, size) signature of every role file to detect
-        external changes without re-reading contents. None when no dirs exist."""
-        entries = []
-        for dpath, _source in dirs:
-            if not os.path.isdir(dpath):
-                continue
-            try:
-                for fname in sorted(os.listdir(dpath)):
-                    if not (fname.endswith(".md") or fname.endswith(".markdown")):
-                        continue
-                    fpath = os.path.join(dpath, fname)
-                    if not os.path.isfile(fpath):
-                        continue
-                    st = os.stat(fpath)
-                    entries.append((fpath, st.st_mtime_ns, st.st_size))
-            except OSError:
-                continue
-        return tuple(entries) if entries else None
 
     def invalidate_cache(self) -> None:
         """Force the next load_roles/get_role/get_system_prompt_snippet to re-scan from disk."""

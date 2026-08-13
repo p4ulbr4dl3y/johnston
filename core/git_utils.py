@@ -33,6 +33,12 @@ def run_git(
         return subprocess.CompletedProcess(args=["git"] + args, returncode=1, stdout="", stderr=str(e))
 
 
+def is_git_repository(cwd: Optional[str] = None) -> bool:
+    """Returns True if ``cwd`` (default: process cwd) is inside a git working tree."""
+    res = run_git(["rev-parse", "--is-inside-work-tree"], cwd=cwd, timeout=5)
+    return res.returncode == 0 and res.stdout.strip() == "true"
+
+
 def _content_to_text(content: str | list[str]) -> str:
     """Converts content to raw text, preserving a bare trailing newline."""
     if isinstance(content, list):
