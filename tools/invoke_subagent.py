@@ -48,7 +48,7 @@ class InvokeSubagentTool(BaseTool):
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "type": {"type": "string", "description": "Subagent type"},
                     "workspace": {"type": "string", "description": "Workspace: inherit or branch"},
-                    "task_id": {"type": "string", "description": "Task ID (auto-generated if omitted)"},
+                    "session_id": {"type": "string", "description": "Subagent session ID (auto-generated if omitted)"},
                 },
                 "required": ["prompt", "description"],
             },
