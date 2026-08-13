@@ -22,7 +22,6 @@ class ManageSubagentTool(BaseTool):
                     "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
                     "session_id": {"type": "string", "description": "Target subagent session_id"},
                     "message": {"type": "string", "description": "Follow-up message for subagent"},
-                    "background": {"type": "boolean", "description": "Run follow-up message asynchronously"},
                 },
                 "required": ["action"],
             },
@@ -193,7 +192,7 @@ class ManageSubagentTool(BaseTool):
                         error_prefix="Subagent message error",
                         notification_template=notification_hdr,
                         session_id=session.id,
-                        truncate_result=False,
+                        truncate_result=True,
                     )
                 )
                 session.async_task = bg_task

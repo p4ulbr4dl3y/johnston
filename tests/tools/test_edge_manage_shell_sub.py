@@ -448,18 +448,21 @@ async def test_send_message_to_completed_session_not_crash(sub_tool, store):
     """Follow-up to a finished subagent must still work / not crash (tool supports re-activation)."""
     sess = _mk("sfin", status="completed")
 
-    async def _stream(msg):
-        yield ("bot_text", "post-done reply")
-
     agent = _SimpleAgent()
     agent._resp = "post-done reply"
     app = _SmApp(store, agent_factory=lambda: agent)
     res = await sub_tool.execute(
-        {"action": "send_message", "session_id": "sfin", "message": "again", "background": False}, ctx=_ctx(app)
+        {"action": "send_message", "session_id": "sfin", "message": "again"}, ctx=_ctx(app)
     )
-    # soft: either a completed result or cancelled/error, never an exception
     assert isinstance(res, str)
-    assert sess.status in ("completed", "cancelled", "error")
+    assert "message sent to sfin" in res
+    assert sess.status in ("running",)
+    # Now always async: drain completes the session once the bg stream finishes.
+    assert sess.async_task is not None
+    if sess.async_task:
+        with suppress_cancelled():
+            await sess.async_task
+    assert sess.status == "completed"
 
 
 async def test_send_message_background_nonblocking_does_not_complete(sub_tool, store):
