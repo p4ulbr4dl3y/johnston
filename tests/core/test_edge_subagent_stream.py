@@ -342,6 +342,63 @@ class TestRunStream:
         store = FakeStore()
         result = await run_subagent_stream_bg(sub, "p", sess, ctx, store)
         assert result == "hello world"
+        assert sess.status == STATUS_COMPLETED
+
+
+# ---------------------------------------------------------------------------
+# _safe_save / save-failure propagation
+# ---------------------------------------------------------------------------
+
+
+class FailingStore:
+    def save(self, sess):
+        raise OSError("disk full")
+
+
+class TestSafeSaves:
+    def test_error_logged_not_swallowed(self, caplog):
+        import logging as _logging
+
+        from core import subagent_stream
+
+        s = make_session()
+        with caplog.at_level(_logging.ERROR):
+            with pytest.raises(OSError):
+                subagent_stream._safe_save(FailingStore(), s)
+        assert "Failed to save subagent session" in caplog.text
+
+    def test_error_propagates_to_caller(self):
+        from core import subagent_stream
+
+        s = make_session()
+        with pytest.raises(OSError):
+            subagent_stream._safe_save(FailingStore(), s)
+
+    @pytest.mark.asyncio
+    async def test_save_failure_not_left_completed(self):
+        sub = FakeSubagent(steps=[("bot_text", "hi")])
+        sess = make_session()
+        ctx = FakeCtx()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, FailingStore())
+        assert sess.status == STATUS_ERROR  # never left COMPLETED
+        assert "Subagent error" in result
+
+    @pytest.mark.asyncio
+    async def test_save_failure_error_status_has_oserror(self):
+        sub = FakeSubagent(steps=[("bot_text", "hi")])
+        sess = make_session()
+        ctx = FakeCtx()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, FailingStore())
+        assert "disk full" in result
+
+    @pytest.mark.asyncio
+    async def test_save_failure_cancelled_keeps_cancelled_status(self):
+        sub = FakeSubagent(exc=asyncio.CancelledError())
+        sess = make_session()
+        ctx = FakeCtx()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, FailingStore())
+        assert sess.status == STATUS_CANCELLED
+        assert "failed to save cancelled session" in result
 
 
 # ---------------------------------------------------------------------------
