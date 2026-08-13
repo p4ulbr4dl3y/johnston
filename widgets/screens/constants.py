@@ -10,19 +10,15 @@ Each widget id has two forms:
 
 # Modal dialog container / common widgets
 MODAL_DIALOG_ID = "modal-dialog"
-MODAL_DIALOG_SEL = "#modal-dialog"
 
 MODAL_HINT_ID = "modal-hint"
-MODAL_HINT_SEL = "#modal-hint"
-MODAL_HINT = MODAL_HINT_SEL
+MODAL_HINT = "#modal-hint"
 
 MODAL_SEARCH_INPUT_ID = "modal-search-input"
-MODAL_SEARCH_INPUT_SEL = "#modal-search-input"
-MODAL_SEARCH_INPUT = MODAL_SEARCH_INPUT_SEL
+MODAL_SEARCH_INPUT = "#modal-search-input"
 
 MODAL_OPTION_LIST_ID = "modal-option-list"
-MODAL_OPTION_LIST_SEL = "#modal-option-list"
-MODAL_OPTION_LIST = MODAL_OPTION_LIST_SEL
+MODAL_OPTION_LIST = "#modal-option-list"
 
 # Modal CSS classes
 MODAL_MARKDOWN = "modal-markdown"
@@ -39,23 +35,15 @@ TOOL_HEADER_EXPANDABLE = "tool-header-expandable"
 SHIFT_TAB_KEYS = ("shift+tab", "backtab", "shift_tab")
 
 # Main app widgets
-STATUS_FOOTER_ID = "status-footer"
-STATUS_FOOTER_SEL = "#status-footer"
-STATUS_FOOTER = STATUS_FOOTER_SEL
+STATUS_FOOTER = "#status-footer"
 
-MESSAGE_INPUT_ID = "message-input"
-MESSAGE_INPUT_SEL = "#message-input"
-MESSAGE_INPUT = MESSAGE_INPUT_SEL
+MESSAGE_INPUT = "#message-input"
 
-COMMAND_SUGGESTIONS_ID = "command-suggestions"
-COMMAND_SUGGESTIONS_SEL = "#command-suggestions"
-COMMAND_SUGGESTIONS = COMMAND_SUGGESTIONS_SEL
+COMMAND_SUGGESTIONS = "#command-suggestions"
 
 # AskUser wizard widgets
 OPTIONS_LIST_ID = "options-list"
-OPTIONS_LIST_SEL = "#options-list"
-OPTIONS_LIST = OPTIONS_LIST_SEL
+OPTIONS_LIST = "#options-list"
 
 WRITE_IN_INPUT_ID = "write-in-input"
-WRITE_IN_INPUT_SEL = "#write-in-input"
-WRITE_IN_INPUT = WRITE_IN_INPUT_SEL
+WRITE_IN_INPUT = "#write-in-input"

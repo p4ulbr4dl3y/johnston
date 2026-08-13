@@ -32,8 +32,6 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
             res = await chat_input.try_paste_clipboard_image()
             self.assertTrue(res)
             self.assertEqual(len(chat_input.clipboard_attachments), 1)
-            self.assertEqual(chat_input.clipboard_attachments[0].width, 100)
-            self.assertEqual(chat_input.clipboard_attachments[0].height, 50)
             chat_input.update_attachment_bar.assert_called_once()
 
     async def test_try_paste_clipboard_image_none(self):

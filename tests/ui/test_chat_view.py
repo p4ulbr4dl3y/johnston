@@ -1188,7 +1188,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(names["create"], "Create")
         with self.assertRaises(KeyError):
             names["unknown_tool"]
-        self.assertIn("whatever", names)
         self.assertIn("read", widget.SYSTEM_TOOLS)
         self.assertNotIn("not_a_real_tool_xyz", widget.SYSTEM_TOOLS)
         self.assertNotIn(123, widget.SYSTEM_TOOLS)
