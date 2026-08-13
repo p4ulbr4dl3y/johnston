@@ -1,46 +1,13 @@
 import asyncio
 import logging
 import os
-import re
 from collections import deque
 
 from core.platform_utils import decode_output, terminate_process
+from core.tasks.output import _OUTPUT_BYTE_LIMIT, _OUTPUT_TRUNCATED_MARKER, process_carriage_returns, strip_ansi
 from tools.base import format_tool_error
 
 logger = logging.getLogger(__name__)
-
-ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-
-# Cap on retained raw output bytes for a task. Old chunks are dropped from the
-# front (tail preserved) past this limit so `"".join` stays bounded.
-_OUTPUT_BYTE_LIMIT = 200 * 1024  # 200 KB
-_OUTPUT_TRUNCATED_MARKER = "[Output truncated: showing recent output]\n"
-
-
-def strip_ansi(text: str) -> str:
-    return ANSI_ESCAPE.sub("", text)
-
-
-def process_carriage_returns(text: str) -> str:
-    if not text:
-        return ""
-    lines = text.split("\n")
-    processed = []
-    for line in lines:
-        if "\r" in line:
-            parts = [p for p in line.split("\r") if p]
-            line = parts[-1] if parts else ""
-        processed.append(line)
-
-    filtered = []
-    spinner_chars = {"-", "\\", "|", "/", "—"}
-    for line in processed:
-        stripped = line.strip()
-        if stripped in spinner_chars and filtered and filtered[-1].strip() in spinner_chars:
-            filtered[-1] = line
-        else:
-            filtered.append(line)
-    return "\n".join(filtered)
 
 
 class BackgroundTask:

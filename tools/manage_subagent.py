@@ -1,5 +1,4 @@
 import asyncio
-import os
 from typing import Any, Dict
 
 from core.session_manager import (
@@ -151,15 +150,9 @@ class ManageSubagentTool(BaseTool):
             # keeps working on its own branch/cwd instead of silently falling back
             # to the parent checkout (worktree is removed on completion).
             if subagent and session.project_dir and session.branch_name:
-                project_dir = session.project_dir
-                branch_name = session.branch_name
-                if not os.path.isdir(project_dir):
-                    from core.subagent_worktree import SubagentWorktreeManager
+                from core.subagent_worktree import SubagentWorktreeManager
 
-                    parent_dir = ctx.project_dir
-                    reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
-                    if reattached:
-                        project_dir = reattached
+                project_dir = SubagentWorktreeManager.ensure_worktree_available(session, parent_dir=ctx.project_dir)
                 subagent.project_dir = project_dir
                 subagent.cwd = project_dir
 

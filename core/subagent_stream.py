@@ -8,7 +8,6 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
-from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, AgentSession
 
 
@@ -61,28 +60,12 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
 def _apply_provider_config(subagent: Any, provider_key: str) -> None:
     """Rebind an existing subagent agent to a different provider in place.
 
-    Builds a fresh agent for the target provider and copies its configuration
-    (including the HTTP client bound to that provider's base_url/api_key) onto
-    the existing subagent object, preserving caller-attached identity fields.
-    Keeps the same object so session.agent and surrounding code stay valid.
+    Delegates to core.roles.provider.rebind_provider (kept here for backward
+    compatibility with callers/tests that imported this from this module).
     """
-    from core.provider_manager import ProviderManager
+    from core.roles.provider import rebind_provider
 
-    pm = ProviderManager()
-    rebuilt = pm.create_agent_for_provider(provider_key)
-    if rebuilt is None:
-        return
-
-    # Preserve identity plumbing attached by the caller.
-    preserved = {
-        name: getattr(subagent, name)
-        for name in ("app", "is_subagent", "history", "tools", "project_dir", "cwd")
-        if hasattr(subagent, name)
-    }
-    # Replace the whole state (client, provider_key, base_url, api_key, ...).
-    subagent.__dict__.update(rebuilt.__dict__)
-    for name, value in preserved.items():
-        setattr(subagent, name, value)
+    rebind_provider(subagent, provider_key)
 
 
 def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, project_dir: Optional[str] = None) -> Any:
@@ -100,71 +83,13 @@ def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, proj
 def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
     """Applies a role definition to a subagent agent.
 
-    Sets role, system prompt, model, and filters tools according to the role
-    (excluded delegation/UI tools, read-only/allowed/disallowed lists, and the
-    hardened shell description). Shared by invoke_subagent spawn and
-    manage_subagent follow-ups so role behavior survives process restarts.
+    Thin facade delegating to the decomposed core.roles package (resolution,
+    provider switching, tool filtering, prompt/model wiring). Kept as the
+    public entry point used by invoke_subagent and manage_subagent follow-ups.
     """
-    import copy
+    from core.roles import apply_role
 
-    from core.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
-    from core.role_registry import RoleRegistry
-
-    registry = RoleRegistry.get_instance()
-    registry.load_roles(project_dir=project_dir)
-    definition = registry.get_role(role_key)
-
-    # A main-only role must never be used as a subagent type. Fall back to
-    # worker so the spawn still produces a usable agent instead of failing.
-    if definition.scope == "main":
-        definition = registry.get_role("worker")
-
-    # If the role pins a provider, switch the subagent to it. Otherwise inherit
-    # the active provider from the parent (the default subagent).
-    if definition.provider:
-        from core.provider_manager import ProviderManager
-
-        pm = ProviderManager()
-        pm.load_providers()
-        if not pm.is_provider_connected(definition.provider):
-            raise ValueError(
-                f"provider '{definition.provider}' for role '{definition.key}' is not connected"
-            )
-        if getattr(subagent, "provider_key", "") != definition.provider:
-            _apply_provider_config(subagent, definition.provider)
-
-    subagent.role = definition.key
-    subagent.system_prompt = f"{SUBAGENT_DEFAULT_SYSTEM_PROMPT}\n\n{definition.system_prompt}"
-    if definition.model:
-        subagent.model = definition.model
-
-    # Disable nested subagent spawning, background task management, and UI questions
-    subagent.allow_task = False
-    excluded_tools = SUBAGENT_EXCLUDED_TOOLS
-    subagent.tools = [
-        t
-        for t in (getattr(subagent, "tools", None) or [])
-        if t.get("function", {}).get("name", "").lower() not in excluded_tools
-    ]
-
-    if definition.read_only or definition.disallowed_tools or definition.allowed_tools:
-        subagent.tools = [
-            t for t in subagent.tools if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
-        ]
-
-    custom_tools = []
-    for t in subagent.tools:
-        if isinstance(t, dict) and t.get("function", {}).get("name") == "shell":
-            t_copy = copy.deepcopy(t)
-            t_copy["function"]["description"] = (
-                "Run a synchronous terminal command with a configurable timeout (default 60s, max 300s). "
-                "Processes terminate on timeout. Always use non-interactive flags (e.g. -y, --non-interactive) to prevent hanging."
-            )
-            custom_tools.append(t_copy)
-        else:
-            custom_tools.append(t)
-    subagent.tools = custom_tools
-    return definition
+    return apply_role(subagent, role_key, project_dir=project_dir)
 
 
 def merge_subagent_metrics(subagent: Any, context: Any) -> None:

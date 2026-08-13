@@ -125,6 +125,27 @@ class SubagentWorktreeManager:
                 pass
 
     @staticmethod
+    def ensure_worktree_available(session, parent_dir: Optional[str] = None) -> str:
+        """Return a working project_dir for a subagent, re-attaching its worktree
+        if it was removed (e.g. after a process restart). Returns the live path.
+
+        Encapsulates the re-attach check so tool callers don't poke at
+        ``os.path`` / worktree plumbing directly.
+        """
+        project_dir = getattr(session, "project_dir", "") or ""
+        branch_name = getattr(session, "branch_name", "") or ""
+        if not project_dir or not branch_name:
+            return project_dir
+        if os.path.isdir(project_dir):
+            return project_dir
+        reattached = None
+        if parent_dir:
+            reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
+        if reattached:
+            return reattached
+        return project_dir
+
+    @staticmethod
     def make_worktree_cleanup_fn(parent_dir: str, wt_path: Optional[str], wt_branch: Optional[str], is_followup: bool = False):
         """Builds a cleanup callback that appends the worktree diff to acc and
         removes the worktree. Shared by invoke_subagent and manage_subagent so
