@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from core.config import PROJECTS_DIR
+from core.fs_signature import compute_dir_signature_hash
 from core.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
@@ -371,27 +372,25 @@ class SessionStore:
         return sessions
 
     def _disk_signature(self) -> Optional[int]:
-        """Hash of (relpath, mtime_ns, size) for every session JSON on disk,
+        """Hash of (path, mtime_ns, size) for every session JSON on disk,
         used to detect external changes without re-reading file contents."""
         if not os.path.isdir(self.sessions_dir):
             return None
-        acc = 0
+        # Sessions may live in the root dir or in one-level "<name>.subagents"
+        # subdirs. Both are scanned by the shared helper; XOR-hash order is
+        # irrelevant so aggregation is order-independent.
+        sub_dirs = []
         try:
             for fname in sorted(os.listdir(self.sessions_dir)):
                 fpath = os.path.join(self.sessions_dir, fname)
-                if os.path.isdir(fpath):
-                    if fname.endswith(".subagents"):
-                        for sub_name in sorted(os.listdir(fpath)):
-                            spath = os.path.join(fpath, sub_name)
-                            if sub_name.endswith(".json") and os.path.isfile(spath):
-                                st = os.stat(spath)
-                                acc ^= hash((spath, st.st_mtime_ns, st.st_size))
-                elif fname.endswith(".json") and os.path.isfile(fpath):
-                    st = os.stat(fpath)
-                    acc ^= hash((fpath, st.st_mtime_ns, st.st_size))
+                if os.path.isdir(fpath) and fname.endswith(".subagents"):
+                    sub_dirs.append(fpath)
         except OSError:
             return None
-        return acc
+        # Helper returns None when the dirs are empty; keep the original "0"
+        # value for an empty-but-present dir so the (int) cache signature
+        # compares consistently.
+        return compute_dir_signature_hash([self.sessions_dir, *sub_dirs], [".json"]) or 0
 
     def _invalidate_disk_cache(self) -> None:
         self._disk_cache_signature = None

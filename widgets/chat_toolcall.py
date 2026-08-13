@@ -360,9 +360,6 @@ class _DisplayNamesDict(dict):
             raise KeyError(key)
         return res
 
-    def __contains__(self, key):
-        return True
-
 
 class _SystemToolsSet(set):
     def __contains__(self, item):
@@ -410,9 +407,24 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "Plan",
     }
 
+    def _on_subagent_screen(self) -> bool:
+        """True when this widget lives inside the SubagentViewScreen."""
+        try:
+            if hasattr(self, "screen") and self.screen:
+                from widgets.screens.subagent_screen import SubagentViewScreen
+
+                if isinstance(self.screen, SubagentViewScreen):
+                    return True
+        except Exception:
+            pass
+        try:
+            return hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen"
+        except Exception:
+            return False
+
     def is_expandable(self) -> bool:
         try:
-            if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
+            if self._on_subagent_screen():
                 return False
         except Exception:
             pass
@@ -432,7 +444,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def is_clickable_header(self) -> bool:
         try:
-            if hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen":
+            if self._on_subagent_screen():
                 return False
         except Exception:
             pass

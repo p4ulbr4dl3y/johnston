@@ -3,7 +3,7 @@ import shutil
 from typing import Optional, Tuple
 
 from core.config import WORKTREES_DIR
-from core.git_utils import run_git
+from core.git_utils import is_git_repository, run_git
 
 
 class SubagentWorktreeManager:
@@ -13,8 +13,9 @@ class SubagentWorktreeManager:
     def is_git_repo(path: str) -> bool:
         if not path or not os.path.exists(path):
             return False
-        res = run_git(["rev-parse", "--is-inside-work-tree"], cwd=path, timeout=5)
-        return res.returncode == 0 and res.stdout.strip() == "true"
+        # Semantically identical to is_git_repository; the exists() guard is kept
+        # so early callers skip shelling out to git for dangling paths.
+        return is_git_repository(path)
 
     @staticmethod
     def create_worktree(project_dir: str, session_id: str) -> Tuple[Optional[str], Optional[str]]:

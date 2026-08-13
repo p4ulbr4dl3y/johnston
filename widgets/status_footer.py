@@ -168,19 +168,13 @@ class StatusFooter(Static):
                     continue
                 mcp_tooled += 1
             mcp_active = mcp_tooled
-            bg_tasks = getattr(self.app, "background_tasks", [])
-            curr_sid = getattr(self.app, "current_session_id", None)
-            if curr_sid:
-                bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) == curr_sid]
+            from core.task_collection import collect_current_tasks
+
+            bg_tasks, sessions = collect_current_tasks(self.app, getattr(self.app, "current_session_id", None))
+
             active_bg_tasks = len(
                 [t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)]
             )
-
-            from core.session_manager import SessionStore
-
-            store = getattr(self.app, "sm", None) if hasattr(self.app, "sm") else SessionStore.get_instance()
-            store.list(kind="subagent")
-            sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
             subagents_active = len([s for s in sessions if getattr(s, "status", "") == "running"])
             subagents_total = len(sessions)

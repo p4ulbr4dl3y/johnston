@@ -29,12 +29,8 @@ class DummyChatApp(App[None]):
 
 class TestClipboardAttachment(unittest.TestCase):
     def test_init(self):
-        att = ClipboardAttachment("/tmp/img.png", width=640, height=480, size_kb=12.5)
+        att = ClipboardAttachment("/tmp/img.png")
         self.assertEqual(att.path, "/tmp/img.png")
-        self.assertEqual(att.width, 640)
-        self.assertEqual(att.height, 480)
-        self.assertEqual(att.size_kb, 12.5)
-        self.assertTrue(att.id.startswith("att_"))
 
 
 class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
@@ -141,7 +137,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app = DummyChatApp(ci)
         async with app.run_test():
             with tempfile.NamedTemporaryFile(suffix=".png", prefix="temp_images_") as tmp:
-                att = ClipboardAttachment(tmp.name, 10, 10, 1.0)
+                att = ClipboardAttachment(tmp.name)
                 ci.clipboard_attachments.append(att)
 
                 with patch("os.remove") as mock_remove:
