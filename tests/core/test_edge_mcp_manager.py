@@ -25,7 +25,6 @@ def make_manager(project_dir=None) -> MCPManager:
     m._tools_refresh_task = None
     m._servers_cache_signature = None
     m._servers_cache = []
-    m._tools_fetch_time = {}
     return m
 
 

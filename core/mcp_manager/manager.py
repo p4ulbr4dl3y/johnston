@@ -50,7 +50,6 @@ class MCPManager:
         self._tools_refresh_task: Optional[asyncio.Task] = None
         self._servers_cache_signature: Optional[Tuple] = None
         self._servers_cache: List[Dict[str, Any]] = []
-        self._tools_fetch_time: Dict[str, float] = {}  # server name -> last fetch_tools monotonic time
         self.ensure_default_configs()
         atexit.register(self.stop_all)
 
@@ -79,7 +78,6 @@ class MCPManager:
         self.clients.clear()
         self._servers_cache_signature = None
         self._servers_cache = []
-        self._tools_fetch_time.clear()
 
     def ensure_default_configs(self):
         from core.config_helpers import ensure_json_config
@@ -99,10 +97,8 @@ class MCPManager:
 
     def _tools_fetch_stale(self, server_name: str, ttl: float = 5.0) -> bool:
         """True if this server's cached tools list is stale, based on last fetch time."""
-        last = self._tools_fetch_time.get(server_name)
-        if last is None:
-            return True
-        return (time.monotonic() - last) >= ttl
+        client = self.clients.get(server_name)
+        return client.is_tools_stale(ttl=ttl)
 
     def load_servers(self) -> List[Dict[str, Any]]:
         """
@@ -274,7 +270,6 @@ class MCPManager:
                 if self._tools_fetch_stale(name):
                     try:
                         client.fetch_tools()
-                        self._tools_fetch_time[name] = time.monotonic()
                     except Exception:
                         logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
 
@@ -345,7 +340,6 @@ class MCPManager:
             elif self._tools_fetch_stale(name):
                 try:
                     await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
-                    self._tools_fetch_time[name] = time.monotonic()
                 except (asyncio.TimeoutError, Exception):
                     logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
