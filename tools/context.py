@@ -43,21 +43,21 @@ class ToolContext:
 
     @property
     def background_tasks(self) -> List[Any]:
-        if self.app and hasattr(self.app, "background_tasks"):
-            return self.app.background_tasks
+        """Live shell tasks currently managed by the app's TaskManager."""
+        mgr = getattr(self.app, "task_manager", None) if self.app else None
+        if mgr is not None:
+            return [t for t in mgr if getattr(t, "kind", "") == "shell"]
         return []
 
     def add_background_task(self, task: Any) -> None:
-        if self.app and hasattr(self.app, "background_tasks"):
+        mgr = getattr(self.app, "task_manager", None) if self.app else None
+        if mgr is not None:
             if getattr(task, "session_id", None) is None and hasattr(task, "__dict__"):
                 try:
                     setattr(task, "session_id", getattr(self.app, "current_session_id", None))
                 except AttributeError:
                     pass
-            # Finished output is delivered via the completion callback, so prune
-            # done tasks to keep the registry limited to active ones.
-            self.app.background_tasks[:] = [t for t in self.app.background_tasks if getattr(t, "is_running", False)]
-            self.app.background_tasks.append(task)
+            mgr.register(task)
         self.refresh_status()
 
     def create_agent(self) -> Any:

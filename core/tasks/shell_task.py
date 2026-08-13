@@ -13,7 +13,7 @@ import signal
 from typing import Any, Optional
 
 from core.platform_utils import decode_output, terminate_process
-from core.tasks.output import OutputBuffer
+from core.tasks.output import OutputBuffer, strip_ansi
 from core.tasks.task import BaseTask, TaskStatus
 from tools.base import format_tool_error
 
@@ -33,6 +33,7 @@ class ShellTask(BaseTask):
         reader: Any = None,
         transport: Any = None,
         session_id: Optional[str] = None,
+        widget: Any = None,
     ) -> None:
         super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)
         self.process = process
@@ -40,11 +41,18 @@ class ShellTask(BaseTask):
         self.reader = reader
         self.transport = transport
         self.session_id = session_id
+        self.widget = widget
         self.output = OutputBuffer()
         self.is_background = False
         self.was_killed = False
         self.read_task: Optional[asyncio.Task] = None
-        self._done: asyncio.Future = asyncio.get_event_loop().create_future()
+        self.background_event = asyncio.Event()
+        self._done: Optional[asyncio.Future] = None
+
+    def _done_future(self) -> asyncio.Future:
+        if self._done is None:
+            self._done = asyncio.get_event_loop().create_future()
+        return self._done
 
     def __repr__(self) -> str:
         return f"ShellTask(id={self.id!r}, status={self._status.value})"
@@ -53,6 +61,11 @@ class ShellTask(BaseTask):
 
     def move_to_background(self) -> None:
         self.is_background = True
+        self.background_event.set()
+
+    def get_formatted_output(self) -> str:
+        """Return the fully formatted output (truncation marker + stripped text)."""
+        return self.output.formatted()
 
     def close_pty(self) -> None:
         if self.transport is not None:
@@ -81,6 +94,15 @@ class ShellTask(BaseTask):
 
         def _append_chunk(text: str) -> None:
             self.output.append(text)
+            if self.widget is not None:
+                func = getattr(
+                    self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None)
+                )
+                if func and getattr(self.widget, "is_mounted", True):
+                    try:
+                        func(strip_ansi(text))
+                    except Exception:
+                        pass
             if on_chunk is not None:
                 try:
                     on_chunk(text)
@@ -133,10 +155,10 @@ class ShellTask(BaseTask):
         return self.read_task
 
     def _mark_terminated(self, status: TaskStatus = TaskStatus.COMPLETED) -> None:
-        if self._done.done():
+        if self._done is not None and self._done.done():
             return
         self.status = status
-        self._done.set_result(True)
+        self._done_future().set_result(True)
 
     # -- BaseTask API -------------------------------------------------------
 
@@ -147,7 +169,7 @@ class ShellTask(BaseTask):
         return self.output.formatted(max_chars=max_chars)
 
     async def wait(self) -> None:
-        await self._done
+        await self._done_future()
 
     # -- input --------------------------------------------------------------
 

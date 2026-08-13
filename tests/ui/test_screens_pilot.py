@@ -8,6 +8,7 @@ from textual.app import App
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
+from core.tasks.manager import TaskManager
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
@@ -23,7 +24,7 @@ class DummyHostApp(App[None]):
         super().__init__()
         self.screen_to_test = screen_to_test
         self.dismiss_result = None
-        self.background_tasks = []
+        self.task_manager = TaskManager()
 
     def on_mount(self) -> None:
         def callback(res=None):
@@ -100,7 +101,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_subagents_screen_empty_pilot(self):
         screen = SubagentsScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = []
         app.sm = MagicMock()
         app.sm.get_subagents_for_parent.return_value = []
 
@@ -121,7 +121,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         screen = SubagentsScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = []
         app.current_session_id = "main-1"
         app.sm = MagicMock()
         app.sm.get_subagents_for_parent.return_value = [sub_session]
@@ -149,7 +148,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         screen = SubagentsScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = []
         app.current_session_id = "main-1"
         app.sm = MagicMock()
         app.sm.get_subagents_for_parent.return_value = [sub_session]
@@ -211,7 +209,9 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_screen_pilot(self):
         task_normal = MagicMock()
+        task_normal.id = "task-norm"
         task_normal.task_id = "task-norm"
+        task_normal.kind = "shell"
         task_normal.command = "norm task"
         task_normal.is_background = True
         task_normal.is_running = False
@@ -219,7 +219,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         screen = ShellTasksScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = [task_normal]
+        app.task_manager.register(task_normal)
         app.current_session_id = "main-1"
 
         async with app.run_test() as pilot:
@@ -238,7 +238,9 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_screen_kill_pilot(self):
         task_run = MagicMock()
+        task_run.id = "task-run"
         task_run.task_id = "task-run"
+        task_run.kind = "shell"
         task_run.command = "sleep 100"
         task_run.is_background = True
         task_run.is_running = True
@@ -251,7 +253,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         screen = ShellTasksScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = [task_run]
+        app.task_manager.register(task_run)
         app.current_session_id = "main-1"
         app.sm = MagicMock()
 

@@ -85,7 +85,6 @@ class ManageShellTool(BaseTool):
                         await t.kill()
                     elif getattr(t, "process", None) and t.process.returncode is None:
                         t.process.kill()
-                    t.is_running = False
                     ctx.refresh_status()
                     return f"{task_id} killed"
                 except Exception as e:

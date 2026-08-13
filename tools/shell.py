@@ -5,7 +5,6 @@ import time
 from collections import deque
 from typing import Any, Dict
 
-from core.background_task import BackgroundTask, process_carriage_returns, strip_ansi
 from core.platform_utils import (
     decode_output,
     is_windows,
@@ -14,6 +13,8 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
+from core.tasks.output import process_carriage_returns, strip_ansi
+from core.tasks.shell_task import ShellTask
 from tools.base import BaseTool, format_tool_error, tail_output, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r"^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$", re.DOTALL)
@@ -168,7 +169,7 @@ class ShellTool(BaseTool):
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
         curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
-        task = BackgroundTask(
+        task = ShellTask(
             task_id,
             cmd,
             p,
@@ -180,12 +181,12 @@ class ShellTool(BaseTool):
         if run_in_bg:
             task.is_background = True
             ctx.add_background_task(task)
-            task.start_reading(ctx.app, callback)
+            task.start_reading(on_completed=callback)
 
             return _format_background_task_response(task_id, cmd)
 
         ctx.add_background_task(task)
-        task.start_reading(ctx.app, callback)
+        task.start_reading(on_completed=callback)
 
         try:
             wait_proc_task = asyncio.ensure_future(p.wait())
@@ -242,8 +243,8 @@ class ShellTool(BaseTool):
             raise
         finally:
             if "task" in locals() and task and not getattr(task, "is_background", False):
-                if ctx.app and hasattr(ctx.app, "background_tasks") and task in ctx.app.background_tasks:
-                    ctx.app.background_tasks.remove(task)
+                if ctx.app and hasattr(ctx.app, "task_manager"):
+                    ctx.app.task_manager.drop(task.task_id)
 
     async def _create_std_process(self, command: str, env: dict[str, str], cwd: str = None):
         if is_windows():

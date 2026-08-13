@@ -37,7 +37,8 @@ class ActionsMixin:
     def action_background_all(self) -> None:
         """Background all running foreground shell tasks"""
         count = 0
-        for t in list(getattr(self, "background_tasks", [])):
+        shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
+        for t in list(shell_tasks):
             if getattr(t, "is_running", False) and not getattr(t, "is_background", False):
                 if hasattr(t, "move_to_background"):
                     t.move_to_background()

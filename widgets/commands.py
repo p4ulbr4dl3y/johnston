@@ -51,11 +51,7 @@ class NewCommand(BaseCommand):
     async def execute(self, app) -> None:
         for w in [w for w in getattr(app, "workers", []) if w.is_running]:
             w.cancel()
-        from core.background_task import kill_all_background_tasks
-
-        kill_all_background_tasks(getattr(app, "background_tasks", []))
-        if hasattr(app, "background_tasks"):
-            app.background_tasks.clear()
+        await app.task_manager.kill_all()
         from core.subagent_stream import cancel_running_subagents
 
         cancel_running_subagents(app.sm)
@@ -357,7 +353,7 @@ class ShellTasksCommand(BaseCommand):
     description = "Manage background shell tasks"
 
     async def execute(self, app) -> None:
-        all_tasks = getattr(app, "background_tasks", [])
+        all_tasks = [t for t in getattr(app, "task_manager", []) if getattr(t, "kind", "") == "shell"]
         curr_sid = getattr(app, "current_session_id", None)
         if curr_sid:
             tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]

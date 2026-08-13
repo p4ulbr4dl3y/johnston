@@ -1,14 +1,32 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.background_task import BackgroundTask
+from core.tasks.manager import TaskManager
+from core.tasks.shell_task import ShellTask
+from core.tasks.task import TaskStatus
 from tools.manage_shell import ManageShellTool
+
+
+def _make_task(task_id, command="cmd", status=None, output=None, proc=None):
+    t = ShellTask(task_id, command, proc)
+    t.session_id = getattr(t, "session_id", "sess-A")
+    t.is_background = True
+    if status is not None:
+        t.status = status
+    if output:
+        for line in output:
+            t.output.append(line)
+    return t
 
 
 class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
     def _make_app(self, tasks=None):
         mock_app = MagicMock()
-        mock_app.background_tasks = tasks if tasks is not None else []
+        mock_app.current_session_id = None
+        mgr = TaskManager()
+        for t in tasks or []:
+            mgr.register(t)
+        mock_app.task_manager = mgr
         return mock_app
 
     async def test_list_no_tasks(self):
@@ -19,9 +37,9 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_scoped_to_current_session(self):
         tool = ManageShellTool()
-        t1 = BackgroundTask("t1", "echo hi", MagicMock())
+        t1 = _make_task("t1", "echo hi")
         t1.session_id = "sess-A"
-        t2 = BackgroundTask("t2", "ls -la", MagicMock())
+        t2 = _make_task("t2", "ls -la")
         t2.session_id = "sess-B"
         mock_app = self._make_app([t1, t2])
         mock_app.current_session_id = "sess-A"
@@ -33,9 +51,8 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_with_tasks(self):
         tool = ManageShellTool()
-        t1 = BackgroundTask("t1", "echo hello", MagicMock())
-        t2 = BackgroundTask("t2", "ls -la", MagicMock())
-        t2.is_running = False
+        t1 = _make_task("t1", "echo hello")
+        t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
         mock_app = self._make_app([t1, t2])
         res = await tool.execute({"action": "list"}, ctx=mock_app)
         self.assertIn("Active Background Tasks", res)
@@ -59,8 +76,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_status_running_task(self):
         tool = ManageShellTool()
-        t = BackgroundTask("t-run", "npm build", MagicMock())
-        t.output = ["Building...\n", "Done\n"]
+        t = _make_task("t-run", "npm build", output=["Building...\n", "Done\n"])
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "status", "task_id": "t-run"}, ctx=mock_app)
         self.assertIn("t-run", res)
@@ -70,8 +86,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_status_truncates_long_output(self):
         tool = ManageShellTool()
-        t = BackgroundTask("t-big", "big cmd", MagicMock())
-        t.output = ["x" * 5000]
+        t = _make_task("t-big", "big cmd", output=["x" * 5000])
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "status", "task_id": "t-big"}, ctx=mock_app)
         self.assertIn("truncated", res)
@@ -92,8 +107,12 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_kill_running_task(self):
         tool = ManageShellTool()
         mock_proc = MagicMock()
-        t = BackgroundTask("t-kill", "sleep 100", mock_proc)
-        t.kill = MagicMock(return_value=_noop_async())
+        t = _make_task("t-kill", "sleep 100", proc=mock_proc)
+
+        async def _fake_kill():
+            t.status = TaskStatus.KILLED
+
+        t.kill = _fake_kill
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "kill", "task_id": "t-kill"}, ctx=mock_app)
         self.assertIn("t-kill killed", res)
@@ -101,8 +120,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_kill_not_running_task(self):
         tool = ManageShellTool()
-        t = BackgroundTask("t-done", "echo hi", MagicMock())
-        t.is_running = False
+        t = _make_task("t-done", "echo hi", status=TaskStatus.COMPLETED)
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "kill", "task_id": "t-done"}, ctx=mock_app)
         self.assertIn("ERR: notrunning", res)

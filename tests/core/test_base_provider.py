@@ -214,7 +214,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_manage_shell_tool(self):
         class DummyApp:
-            background_tasks = []
+            def __init__(self):
+                from core.tasks.manager import TaskManager
+
+                self.task_manager = TaskManager()
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)

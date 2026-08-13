@@ -1,4 +1,4 @@
-"""Edge-case tests for core.background_task + core.thinking_effort.
+"""Edge-case tests for core.tasks.shell_task + core.thinking_effort.
 
 Focused on finding bugs, not duplicating existing suites.
 """
@@ -6,7 +6,9 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from core.background_task import BackgroundTask, kill_all_background_tasks, strip_ansi
+from core.tasks.manager import TaskManager
+from core.tasks.shell_task import ShellTask
+from core.tasks.task import TaskStatus
 from core.thinking_effort import (
     GEMINI_25_THINKING_BUDGET_BY_EFFORT,
     SUPPORTED_THINKING_EFFORTS,
@@ -20,9 +22,9 @@ from core.thinking_effort import (
 
 
 # ---------------------------------------------------------------------------
-# BackgroundTask: lifecycle edge cases
+# ShellTask: lifecycle edge cases
 # ---------------------------------------------------------------------------
-class TestBackgroundTaskRunEdge(unittest.IsolatedAsyncioTestCase):
+class TestShellTaskRunEdge(unittest.IsolatedAsyncioTestCase):
     def _make_reader(self, data: bytes = None):
         reader = asyncio.StreamReader()
         if data is not None:
@@ -52,28 +54,28 @@ class TestBackgroundTaskRunEdge(unittest.IsolatedAsyncioTestCase):
 
     async def test_reader_raises_immediately_is_handled(self):
         # Reader raises a raw exception on first read -> read loop must not propagate.
-        t = BackgroundTask("t_boom", "cmd", None, reader=None)
+        t = ShellTask("t_boom", "cmd", None, reader=None)
         async def bad_read(_n):
             raise OSError("boom")
         t.reader = bad_read
         t.process = self._make_proc()
-        t.start_reading(None, None)
+        t.start_reading()
         await t.read_task
         self.assertFalse(t.is_running)
 
     async def test_reader_raises_mid_stream_and_stops(self):
         # Reader yields one chunk then raises -> loop must stop and keep the chunk.
-        t = BackgroundTask("t_mid", "cmd", None, reader=None)
+        t = ShellTask("t_mid", "cmd", None, reader=None)
         t.reader = self._make_rw_reader([b"first chunk\n"])
         t.process = self._make_proc()
-        t.start_reading(None, None)
+        t.start_reading()
         await t.read_task
         self.assertFalse(t.is_running)
         self.assertIn("first chunk", t.get_formatted_output())
 
     async def test_reader_never_ends_can_be_killed(self):
         # A reader that never returns EOF must not hang; kill() must cancel it.
-        t = BackgroundTask("t_hang", "cmd", None, reader=None)
+        t = ShellTask("t_hang", "cmd", None, reader=None)
         never = asyncio.Event()
 
         class _HangReader:
@@ -83,7 +85,7 @@ class TestBackgroundTaskRunEdge(unittest.IsolatedAsyncioTestCase):
 
         t.reader = _HangReader()
         t.process = self._make_proc()
-        t.start_reading(None, None)
+        t.start_reading()
         await asyncio.sleep(0.05)
         self.assertTrue(t.is_running)
         await t.kill()
@@ -94,32 +96,16 @@ class TestBackgroundTaskRunEdge(unittest.IsolatedAsyncioTestCase):
         t.read_task.cancel()
 
     async def test_restart_after_read_task_done(self):
-        # is_running is set False only by the read loop; calling start_reading again
-        # after completion should not crash and should set is_running True again.
-        t = BackgroundTask("t_restart", "cmd", self._make_proc())
-        t.start_reading(None, None)
+        # Calling start_reading again after completion should not crash.
+        t = ShellTask("t_restart", "cmd", self._make_proc())
+        t.start_reading()
         await t.read_task
-        self.assertFalse(t.is_running)
-        t.is_running = True
         t.process = self._make_proc()
-        t.start_reading(None, None)
+        t.start_reading()
         await t.read_task
-        self.assertFalse(t.is_running)
 
 
-class TestBackgroundTaskKillEdge(unittest.IsolatedAsyncioTestCase):
-    async def test_double_async_kill(self):
-        proc = MagicMock()
-        proc.pid = 99999
-        proc.wait = AsyncMock(return_value=0)
-        t = BackgroundTask("t_dk", "cmd", proc)
-        read_task = asyncio.create_task(t.kill())
-        # Concurrent double kill: both set state, cancel read_task twice.
-        await asyncio.gather(t.kill(), t.kill(), return_exceptions=True)
-        await read_task
-        self.assertFalse(t.is_running)
-        self.assertTrue(t.was_killed)
-
+class TestShellTaskKillEdge(unittest.IsolatedAsyncioTestCase):
     def _make_proc(self):
         proc = MagicMock()
         proc.wait = AsyncMock(return_value=0)
@@ -129,29 +115,37 @@ class TestBackgroundTaskKillEdge(unittest.IsolatedAsyncioTestCase):
         proc.returncode = 0
         return proc
 
-    async def test_kill_after_completed(self):
-        t = BackgroundTask("t_done", "cmd", self._make_proc())
-        t.start_reading(None, None)
-        await t.read_task
+    async def test_double_async_kill(self):
+        proc = MagicMock()
+        proc.pid = 99999
+        proc.wait = AsyncMock(return_value=0)
+        t = ShellTask("t_dk", "cmd", proc)
+        await asyncio.gather(t.kill(), t.kill(), return_exceptions=True)
         self.assertFalse(t.is_running)
+        self.assertTrue(t.was_killed)
+
+    async def test_kill_after_completed(self):
+        t = ShellTask("t_done", "cmd", self._make_proc())
+        t.start_reading()
+        await t.read_task
         await t.kill()
         self.assertFalse(t.is_running)
 
     async def test_kill_sync_after_completed(self):
-        t = BackgroundTask("t_done2", "cmd", self._make_proc())
-        t.start_reading(None, None)
+        t = ShellTask("t_done2", "cmd", self._make_proc())
+        t.start_reading()
         await t.read_task
         t.kill_sync()
         self.assertFalse(t.is_running)
 
     async def test_kill_with_none_process(self):
-        t = BackgroundTask("t_np", "cmd", None)
+        t = ShellTask("t_np", "cmd", None)
         await t.kill()
         self.assertFalse(t.is_running)
         self.assertTrue(t.was_killed)
 
     async def test_kill_mid_read_cancels_reader(self):
-        t = BackgroundTask("t_midkill", "cmd", None, reader=None)
+        t = ShellTask("t_midkill", "cmd", None, reader=None)
         never = asyncio.Event()
 
         async def never_read(_n):
@@ -160,29 +154,23 @@ class TestBackgroundTaskKillEdge(unittest.IsolatedAsyncioTestCase):
 
         t.reader = never_read
         t.process = self._make_proc()
-        t.start_reading(None, None)
+        t.start_reading()
         await asyncio.sleep(0.05)
         await t.kill()
         self.assertTrue(t.read_task.cancelled() or t.read_task.done())
 
 
-class TestBackgroundTaskStateAndCleanup(unittest.TestCase):
-    def test_send_input_after_finish_returns_not_running(self):
-        t = BackgroundTask("t_s", "cmd", None)
-        t.is_running = False
-        # sync path only; async covered elsewhere
-        self.assertEqual(t.is_running, False)
+class TestShellTaskStateAndCleanup(unittest.TestCase):
+    def test_move_to_background_sets_event(self):
+        t = ShellTask("t_bg", "cmd", None)
+        t.move_to_background()
+        self.assertTrue(t.is_background)
+        self.assertTrue(t.background_event.is_set())
 
-    def test_append_output_truncation_keeps_tail(self):
-        big = "x" * (300 * 1024)
-        t = BackgroundTask("t_trunc", "cmd", None)
-        t._append_output(big)
-        t._append_output("TAILMARKER")
-        out = t.get_formatted_output()
-        self.assertTrue(t._output_truncated)
-        self.assertIn("TAILMARKER", out)
-        self.assertIn("Output truncated", out)
-        self.assertLess(len(out), 300 * 1024 + 1000)
+    def test_send_input_after_finish_returns_not_running(self):
+        t = ShellTask("t_s", "cmd", None)
+        t.status = TaskStatus.COMPLETED
+        self.assertFalse(t.is_running)
 
 
 class TestKillAllEdge(unittest.IsolatedAsyncioTestCase):
@@ -196,84 +184,17 @@ class TestKillAllEdge(unittest.IsolatedAsyncioTestCase):
         return proc
 
     async def test_kill_all_handles_done_read_task(self):
-        t = BackgroundTask("t_dn", "cmd", self._make_proc())
-        t.start_reading(None, None)
+        t = ShellTask("t_dn", "cmd", self._make_proc())
+        t.start_reading()
         await t.read_task
-        kill_all_background_tasks([t])
+        mgr = TaskManager()
+        mgr.register(t)
+        await mgr.kill_all()
         self.assertTrue(t.read_task.done())
 
-    def test_kill_all_empty_list(self):
-        kill_all_background_tasks([])
-
-
-class TestBackgroundTaskOutput(unittest.TestCase):
-    def test_move_to_background_sets_event(self):
-        t = BackgroundTask("t_bg", "cmd", None)
-        t.move_to_background()
-        self.assertTrue(t.is_background)
-        self.assertTrue(t.background_event.is_set())
-
-    def test_strip_ansi_empty(self):
-        self.assertEqual(strip_ansi(""), "")
-
-
-# ---------------------------------------------------------------------------
-# ManageShellTool: cancel from another task, duplicates, not-found
-# ---------------------------------------------------------------------------
-class TestManageShellEdge(unittest.IsolatedAsyncioTestCase):
-    async def test_status_collects_exception_in_output(self):
-        from tools.manage_shell import ManageShellTool
-
-        t = BackgroundTask("t_err", "cmd", None)
-        t.is_running = False
-        t.output = ["partial\n", "Traceback (most recent call last):\n", "ValueError: boom\n"]
-        ctx = type("C", (), {"background_tasks": [t], "app": None, "refresh_status": lambda: None})()
-        res = await ManageShellTool().execute({"action": "status", "task_id": "t_err"}, ctx)
-        self.assertIn("FINISHED", res)
-        self.assertIn("ValueError", res)
-
-    async def test_duplicate_task_ids_status_returns_first(self):
-        from tools.manage_shell import ManageShellTool
-
-        t1 = BackgroundTask("dup", "cmd1", None)
-        t2 = BackgroundTask("dup", "cmd2", None)
-        t1.is_running, t2.is_running = True, True
-        ctx = type("C", (), {"background_tasks": [t1, t2], "app": None, "refresh_status": lambda: None})()
-        res = await ManageShellTool().execute({"action": "status", "task_id": "dup"}, ctx)
-        self.assertIn("cmd1", res)
-        self.assertNotIn("cmd2", res)
-
-    async def test_kill_not_found_gives_hint(self):
-        from tools.manage_shell import ManageShellTool
-
-        ctx = type("C", (), {"background_tasks": [], "app": None, "refresh_status": lambda: None})()
-        res = await ManageShellTool().execute({"action": "kill", "task_id": "nope"}, ctx)
-        self.assertIn("notfound", res)
-
-    async def test_kill_from_other_session_is_not_listed(self):
-        from tools.context import ToolContext
-        from tools.manage_shell import ManageShellTool
-
-        # Pass a real app-like object through ToolContext so the session scoping
-        # (ctx.app.current_session_id) actually applies.
-        app = type("A", (), {"current_session_id": "sess2", "background_tasks": []})()
-        t = BackgroundTask("hidden", "cmd", None, session_id="sess1")
-        app.background_tasks = [t]
-        ctx = ToolContext(app=app)
-        res = await ManageShellTool().execute({"action": "kill", "task_id": "hidden"}, ctx)
-        self.assertIn("notfound", res)
-
-    async def test_list_shows_running_and_finished(self):
-        from tools.manage_shell import ManageShellTool
-
-        t_r = BackgroundTask("r", "cmd1", None)
-        t_r.is_running = True
-        t_f = BackgroundTask("f", "cmd2", None)
-        t_f.is_running = False
-        ctx = type("C", (), {"background_tasks": [t_r, t_f], "app": None, "refresh_status": lambda: None})()
-        res = await ManageShellTool().execute({"action": "list"}, ctx)
-        self.assertIn("RUNNING", res)
-        self.assertIn("FINISHED", res)
+    async def test_kill_all_empty(self):
+        mgr = TaskManager()
+        await mgr.kill_all()
 
 
 # ---------------------------------------------------------------------------

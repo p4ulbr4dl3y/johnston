@@ -686,7 +686,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self._raw_bash_buffer += text
         if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
             self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
-        from core.background_task import process_carriage_returns
+        from core.tasks.output import process_carriage_returns
 
         cleaned = self._clean_bash_output(self._raw_bash_buffer)
         self.result_text = process_carriage_returns(cleaned)
@@ -878,12 +878,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     is_running = False
-                    if self.app and hasattr(self.app, "background_tasks"):
+                    if self.app and hasattr(self.app, "task_manager"):
                         bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
                         if bg_match:
                             tid = bg_match.group(1)
-                            for t in self.app.background_tasks:
-                                if getattr(t, "task_id", "") == tid and getattr(t, "is_running", False):
+                            for t in self.app.task_manager:
+                                if getattr(t, "task_id", "") == tid and getattr(t, "kind", "") == "shell" and getattr(t, "is_running", False):
                                     is_running = True
                                     break
                     if is_running:

@@ -1676,9 +1676,12 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w.render_content()
         self.assertTrue(w.content_widget.display)
 
+        from core.tasks.manager import TaskManager
+
+        empty_mgr = TaskManager()
         w2 = self._widget("shell", "")
         with (
-            patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])),
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=empty_mgr)),
             patch.object(w2.content_widget, "update") as upd,
         ):
             w2.render_content()
@@ -1686,11 +1689,15 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
         w3 = self._widget("shell", "[Background Task ID: 7] running")
         task = MagicMock()
+        task.id = "7"
         task.task_id = "7"
+        task.kind = "shell"
         task.is_running = True
+        running_mgr = TaskManager()
+        running_mgr.register(task)
         with (
             patch.object(
-                ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[task])
+                ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=running_mgr)
             ),
             patch.object(w3.content_widget, "update") as upd,
         ):
@@ -1699,7 +1706,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
         w4 = self._widget("shell", "")
         with patch.object(
-            ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(background_tasks=[])
+            ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=empty_mgr)
         ):
             w4.render_content()
 

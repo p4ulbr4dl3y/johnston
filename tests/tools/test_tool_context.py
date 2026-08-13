@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+from core.tasks.manager import TaskManager
 from tools.context import ToolContext
 
 
@@ -17,7 +18,7 @@ class MockProviderManager:
 class MockApp:
     def __init__(self):
         self.status_refreshed = False
-        self.background_tasks = []
+        self.task_manager = TaskManager()
         self.agent = MockAgent()
         self.pm = MockProviderManager()
 
@@ -30,8 +31,12 @@ class TestToolContext(unittest.TestCase):
         app = MockApp()
         ctx = ToolContext(app)
 
-        ctx.add_background_task("task1")
-        self.assertIn("task1", ctx.background_tasks)
+        task = MagicMock()
+        task.task_id = "task1"
+        task.id = "task1"
+        task.kind = "shell"
+        ctx.add_background_task(task)
+        self.assertIn(task, ctx.background_tasks)
 
     def test_context_without_app(self):
         ctx = ToolContext(None)
@@ -39,16 +44,15 @@ class TestToolContext(unittest.TestCase):
         self.assertEqual(ctx.background_tasks, [])
         self.assertIsNone(ctx.create_agent())
 
-    def test_add_background_task_prunes_finished(self):
+    def test_add_background_task_registers_in_manager(self):
         app = MockApp()
         ctx = ToolContext(app)
-        finished = MagicMock()
-        finished.is_running = False
-        running = MagicMock()
-        running.is_running = True
-        app.background_tasks = [finished, running]
-        ctx.add_background_task("task_new")
-        self.assertEqual(app.background_tasks, [running, "task_new"])
+        task = MagicMock()
+        task.task_id = "task_new"
+        task.id = "task_new"
+        task.kind = "shell"
+        ctx.add_background_task(task)
+        self.assertIn("task_new", [t.id for t in app.task_manager])
 
 
 class TestToolContextAdvanced(unittest.TestCase):

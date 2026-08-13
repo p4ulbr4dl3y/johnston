@@ -9,16 +9,19 @@ from typing import Any, List, Tuple
 
 
 def collect_current_tasks(app, current_session_id: str) -> Tuple[List[Any], List[Any]]:
-    """Return (shell background tasks, subagent sessions) for the current session.
+    """Return (shell tasks, subagent sessions) for the current session.
 
-    ``background_tasks`` are filtered by ``session_id`` when a session is active,
-    otherwise all are returned. Subagents are resolved via the session store.
+    Shell tasks come from the app's TaskManager and are filtered by
+    ``session_id`` when a session is active, otherwise all are returned.
+    Subagents are resolved via the session store.
     """
-    background_tasks = getattr(app, "background_tasks", []) if app else []
-    if current_session_id:
-        bg_tasks = [t for t in background_tasks if getattr(t, "session_id", None) == current_session_id]
+    mgr = getattr(app, "task_manager", None) if app else None
+    if mgr is not None:
+        bg_tasks = [t for t in mgr if getattr(t, "kind", "") == "shell"]
     else:
-        bg_tasks = list(background_tasks)
+        bg_tasks = []
+    if current_session_id:
+        bg_tasks = [t for t in bg_tasks if getattr(t, "session_id", None) == current_session_id]
 
     store = getattr(app, "sm", None) if app else None
     if store is None:

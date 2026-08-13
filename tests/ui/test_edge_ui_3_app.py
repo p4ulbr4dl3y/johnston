@@ -20,7 +20,7 @@ class TestAppBootEdge(unittest.TestCase):
         """Teardown must tolerate failures in every cleanup subsystem."""
         app = JohnstonApp()
         with (
-            patch("core.background_task.kill_all_background_tasks", side_effect=RuntimeError("bg")),
+            patch.object(app.task_manager, "kill_all", side_effect=RuntimeError("bg")),
             patch("core.subagent_stream.cancel_running_subagents", side_effect=RuntimeError("sub")),
             patch("app.JohnstonApp.save_current_session", side_effect=RuntimeError("save")),
             patch("core.mcp_manager.get_mcp_manager", side_effect=RuntimeError("mcp")),
