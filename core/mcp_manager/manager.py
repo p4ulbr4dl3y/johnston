@@ -307,19 +307,17 @@ class MCPManager:
             created = True
 
         def _cleanup_if_created() -> None:
-            if created and self.clients.get(name) is not client:
-                try:
-                    client.stop()
-                except Exception:
-                    logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
-            elif created and not self.clients.get(name):
-                # Freshly created client that failed to become ready was (accidentally)
-                # cached before cleanup; make sure it doesn't stay cached as a live orphan.
-                try:
-                    client.stop()
-                except Exception:
-                    logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
-                self.clients.pop(name, None)
+            # A freshly-created client that failed to become ready must be torn
+            # down so no orphaned subprocess leaks. Both failure paths (start
+            # timeout and start failure) pop the client from the cache before
+            # calling this, so the guard reduces to "we created it".
+            if not created:
+                return
+            try:
+                client.stop()
+            except Exception:
+                logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
+            self.clients.pop(name, None)
 
         try:
             if created:

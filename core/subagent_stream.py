@@ -85,6 +85,18 @@ def _apply_provider_config(subagent: Any, provider_key: str) -> None:
         setattr(subagent, name, value)
 
 
+def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, project_dir: Optional[str] = None) -> Any:
+    """Configures a subagent agent: binds the app, marks it as a subagent, and
+    applies its role (system prompt, model, tool filtering).
+
+    Shared by invoke_subagent spawn and manage_subagent follow-ups so the setup
+    stays identical (and survives process restarts in the follow-up path).
+    """
+    subagent.app = app
+    subagent.is_subagent = True
+    return apply_subagent_role(subagent, role_key, project_dir=project_dir)
+
+
 def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
     """Applies a role definition to a subagent agent.
 
