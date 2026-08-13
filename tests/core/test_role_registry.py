@@ -158,6 +158,24 @@ Architect prompt content""")
         worker = reg.get_role("worker")
         self.assertIsNone(role_tool_error(worker, "create"))
 
+    def test_role_tool_error_allowed_tools_enforced(self):
+        # Regression: role_tool_error must honor allowed_tools (previous buggy
+        # free function ignored the allow-list and let restricted tools through).
+        restricted = AgentRole(key="limited", name="Limited", allowed_tools=["read", "grep"])
+        self.assertIsNone(role_tool_error(restricted, "read"))
+        self.assertIsNotNone(role_tool_error(restricted, "shell"))
+        self.assertIsNotNone(role_tool_error(restricted, "edit"))
+
+        # Parrot an AgentRole through the non-AgentRole duck-typed mode branch too.
+        mode = type("Mode", (), {
+            "name": "Limited",
+            "allowed_tools": ["read", "grep"],
+            "disallowed_tools": [],
+            "read_only": False,
+        })()
+        self.assertIsNone(role_tool_error(mode, "read"))
+        self.assertIsNotNone(role_tool_error(mode, "shell"))
+
     def test_role_tool_error_custom_read_only_without_disallowed(self):
         ro_mode = AgentRole(key="ro", name="RO", read_only=True)
         self.assertIsNotNone(role_tool_error(ro_mode, "create"))

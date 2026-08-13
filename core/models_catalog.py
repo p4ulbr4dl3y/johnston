@@ -68,7 +68,6 @@ def format_context_tokens(tokens: int) -> str:
 class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
-        self._output_limits: Dict[str, int] = {}
         self._reasoning: List[str] = []
         self._open_weights: List[str] = []
         self._names: Dict[str, str] = {}
@@ -85,7 +84,6 @@ class ModelsCatalog:
         data = read_json(CACHE_FILE)
         if data and isinstance(data, dict):
             self._limits = data.get("model_limits", {})
-            self._output_limits = data.get("output_limits", {})
             self._reasoning = data.get("reasoning_models", [])
             self._open_weights = data.get("open_weights_models", [])
             self._names = data.get("model_names", {})
@@ -107,7 +105,6 @@ class ModelsCatalog:
             payload = {
                 "updated_at": now,
                 "model_limits": model_limits if model_limits is not None else self._limits,
-                "output_limits": self._output_limits,
                 "reasoning_models": self._reasoning,
                 "open_weights_models": self._open_weights,
                 "model_names": model_names if model_names is not None else self._names,
@@ -123,7 +120,6 @@ class ModelsCatalog:
             return self._limits
 
         model_limits: Dict[str, int] = {}
-        output_limits: Dict[str, int] = {}
         reasoning_models: List[str] = []
         open_weights_models: List[str] = []
         model_names: Dict[str, str] = {}
@@ -170,10 +166,6 @@ class ModelsCatalog:
                                     if ctx and isinstance(ctx, (int, float)):
                                         model_limits[full_id] = int(ctx)
                                         model_limits[alias_id] = int(ctx)
-                                    out_len = limits_info.get("output")
-                                    if out_len and isinstance(out_len, (int, float)):
-                                        output_limits[full_id] = int(out_len)
-                                        output_limits[alias_id] = int(out_len)
 
                                 if m_info.get("reasoning"):
                                     reasoning_models.extend([full_id, alias_id])
@@ -231,7 +223,6 @@ class ModelsCatalog:
                     logger.warning("Error parsing OpenRouter response: %s", e)
 
             self._limits = model_limits
-            self._output_limits = output_limits
             self._reasoning = list(set(reasoning_models))
             self._open_weights = list(set(open_weights_models))
             self._names = model_names
@@ -286,10 +277,6 @@ class ModelsCatalog:
             hasattr(search_space, "__self__") and search_space.__self__ is self._pricing
         ):
             space_tag = "pricing"
-        elif search_space is self._output_limits or (
-            hasattr(search_space, "__self__") and search_space.__self__ is self._output_limits
-        ):
-            space_tag = "output_limits"
         else:
             space_obj = getattr(search_space, "__self__", search_space)
             space_tag = id(space_obj) if space_obj is not None else id(self._limits)
