@@ -531,7 +531,8 @@ async def test_kill_twice_idempotent(sub_tool, store):
 
 async def test_list_no_subagents_no_crash(sub_tool, store):
     res = await sub_tool.execute({"action": "list"})
-    assert "Available Subagent Roles" in res
+    assert "No subagent sessions found" in res
+    assert "Roles" not in res
 
 
 async def test_list_filters_by_parent(sub_tool, store):
@@ -560,7 +561,7 @@ async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
     res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
-    assert "Available Subagent Roles" in res
+    assert "No subagent sessions found" in res
     # parent scoping means sip not listed under parent-zzz
     assert "sip" not in res
 

@@ -21,7 +21,7 @@ class ManageSubagentTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
-                    "task_id": {"type": "string", "description": "Target task session_id or description"},
+                    "session_id": {"type": "string", "description": "Target subagent session_id or description"},
                     "message": {"type": "string", "description": "Follow-up message for subagent"},
                     "background": {"type": "boolean", "description": "Run follow-up message asynchronously"},
                 },
@@ -49,16 +49,6 @@ class ManageSubagentTool(BaseTool):
         curr_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
 
         if action == "list":
-            from core.role_registry import RoleRegistry
-
-            registry = RoleRegistry.get_instance()
-            registry.reload(project_dir=getattr(ctx.app, "project_dir", None))
-            defs = registry.list_subagent_roles()
-
-            lines = ["Available Subagent Roles:"]
-            for dname, dval in defs.items():
-                lines.append(f"• Type: '{dname}' [{dval.source}] — {dval.description}")
-
             show_all = bool(args.get("all", False))
             if show_all:
                 target_sessions = store.list(kind="subagent")
@@ -66,12 +56,13 @@ class ManageSubagentTool(BaseTool):
                 target_sessions = (
                     store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
                 )
-            if target_sessions:
-                lines.append("\nActive/Past Subagent Sessions:")
-                for sess in target_sessions:
-                    lines.append(
-                        f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Description: {sess.description}"
-                    )
+            if not target_sessions:
+                return "No subagent sessions found for current session."
+            lines = ["Active/Past Subagent Sessions:"]
+            for sess in target_sessions:
+                lines.append(
+                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Description: {sess.description}"
+                )
             return "\n".join(lines)
 
         if not session_id:
