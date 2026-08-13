@@ -29,7 +29,11 @@ TOOL_CLASSES = [
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLASSES}
 
-from tools.aliases import ALIAS_MAP, PARAM_ALIAS_MAP  # noqa: E402  (re-export for downstream imports)
+from tools.aliases import (  # noqa: E402  # re-export for downstream imports
+    ALIAS_MAP,
+    EDIT_CHUNK_ALIAS_MAP,
+    PARAM_ALIAS_MAP,
+)
 
 
 def _build_close_match_candidates() -> list[str]:
@@ -91,28 +95,7 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
                 normalized[canonical] = v
 
     if resolved_name in ("multi_edit", "edit") and isinstance(normalized.get("edits"), list):
-        chunk_aliases = {
-            "target_content": "old_str",
-            "TargetContent": "old_str",
-            "old_content": "old_str",
-            "search": "old_str",
-            "oldStr": "old_str",
-            "old": "old_str",
-            "replacement_content": "new_str",
-            "ReplacementContent": "new_str",
-            "new_content": "new_str",
-            "replace": "new_str",
-            "newStr": "new_str",
-            "new": "new_str",
-            "start_line": "start_line",
-            "StartLine": "start_line",
-            "start": "start_line",
-            "end_line": "end_line",
-            "EndLine": "end_line",
-            "end": "end_line",
-            "allow_multiple": "allow_multiple",
-            "multiple": "allow_multiple",
-        }
+        chunk_aliases = EDIT_CHUNK_ALIAS_MAP
         normalized_edits = []
         for chunk in normalized["edits"]:
             if isinstance(chunk, dict):
