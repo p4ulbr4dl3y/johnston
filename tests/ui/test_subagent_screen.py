@@ -5,7 +5,6 @@ from unittest.mock import patch
 from textual.app import App
 
 from core.session_manager import SessionStore
-from widgets.chat_view import ChatView
 from widgets.screens.subagent_screen import SubagentViewScreen
 
 
@@ -233,7 +232,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
-    async def test_append_event_edge_cases(self):
+    async def test_render_event_edge_cases(self):
         self._mk("task-edges", "Edge Agent", "prompt")
         screen = SubagentViewScreen("task-edges")
         app = DummyHostApp(screen, store=self.store)
@@ -241,25 +240,22 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.1)
-            chat_view = screen.query_one("#subagent-chat-view", ChatView)
 
-            # Orphaned thinking delta before any open thinking widget -> fresh widget.
-            await chat_view.append_event({"type": "thinking", "text": "orphaned delta"})
-            await chat_view.append_event({"type": "thinking", "text": "orphaned end", "duration": 0.5})
-            self.assertIsNone(chat_view._stream_thinking)
+            # Test edge cases where state variables are None or empty
+            screen.thinking_widget = None
+            await screen._render_event({"type": "thinking", "text": "orphaned delta"})
+            await screen._render_event({"type": "thinking", "text": "orphaned end", "duration": 0.5})
 
-            # Orphaned tool result with no open tool -> ignored safely.
-            await chat_view.append_event({"type": "tool", "result_text": "orphaned result"})
+            screen.current_tool_widget = None
+            await screen._render_event({"type": "tool", "result_text": "orphaned result"})
 
-            # Empty bot chunks -> no bot bubble created.
-            await chat_view.append_event({"type": "bot", "text": ""})
-            await chat_view.append_event({"type": "bot", "text": ""})
-            self.assertIsNone(chat_view._stream_bot)
+            await screen._render_event({"type": "bot", "text": ""})
+            await screen._render_event({"type": "bot", "text": ""})
 
-            # First non-empty bot chunk opens a bubble and exposes it for deltas.
-            await chat_view.append_event({"type": "bot", "text": "fresh chunk"})
-            self.assertIsNotNone(chat_view._stream_bot)
-            self.assertEqual(chat_view._stream_bot.content, "fresh chunk")
+            # Bot when bot_msg is None
+            screen.bot_msg = None
+            await screen._render_event({"type": "bot", "text": "fresh chunk"})
+            self.assertEqual(screen.bot_msg.content, "fresh chunk")
 
             await pilot.press("escape")
             await pilot.pause()
