@@ -174,14 +174,14 @@ def print_linters():
 
 def print_rules():
     """Print active project instructions and rules summary to stdout"""
+    from core.prompt_builder import INSTRUCTION_FILES
     from core.rules_manager import RulesManager
 
     print("Active Rules & Project Instructions:")
     cwd = Path.cwd()
-    instruction_files = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
 
     items = []
-    for name in instruction_files:
+    for name in INSTRUCTION_FILES:
         filepath = cwd / name
         if filepath.is_file():
             try:

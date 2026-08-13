@@ -1,7 +1,7 @@
 import inspect
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.platform_utils import atomic_write_text
 from tools.context import ToolContext
@@ -153,6 +153,16 @@ def _write_output_log(
     return log_path
 
 
+def _truncate_output_leading(text: str, max_chars: int) -> Tuple[str, int]:
+    """Clips text to the leading max_chars and reports the shown line count.
+
+    Shared leading-truncation step so callers only append their own footer text.
+    """
+    truncated = text[:max_chars]
+    shown_lines = truncated.count("\n") + (1 if truncated else 0)
+    return truncated, shown_lines
+
+
 def truncate_output(
     text: str,
     max_chars: int = 8000,
@@ -208,8 +218,7 @@ def truncate_output(
         header += "]\n...\n"
         return header + truncated
     else:
-        truncated = text[:max_chars]
-        shown_lines = truncated.count("\n") + (1 if truncated else 0)
+        truncated, shown_lines = _truncate_output_leading(text, max_chars)
         next_line = shown_lines + 1
         footer = f"\n... [Output truncated at {max_chars} chars (lines 1-{shown_lines} shown)."
         if save_log:

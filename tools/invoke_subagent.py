@@ -13,15 +13,14 @@ def _truncate_subagent_result(text: str, session_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
     is saved on truncation and the path is returned in the hint."""
-    from tools.base import _write_output_log
+    from tools.base import _truncate_output_leading, _write_output_log
 
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
 
     log_path = _write_output_log(text, session_id=session_id or "subagent") or "log file"
-    truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
-    shown_lines = truncated.count("\n") + (1 if truncated else 0)
+    truncated, shown_lines = _truncate_output_leading(text, MAX_SUBAGENT_RESULT_CHARS)
     next_line = shown_lines + 1
     return (
         truncated
