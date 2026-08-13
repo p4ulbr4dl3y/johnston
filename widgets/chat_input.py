@@ -18,14 +18,8 @@ MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 class ClipboardAttachment:
     """Represents a clipboard image attachment"""
 
-    def __init__(self, path: str, width: int = 0, height: int = 0, size_kb: float = 0.0):
-        import time
-
+    def __init__(self, path: str):
         self.path = path
-        self.width = width
-        self.height = height
-        self.size_kb = size_kb
-        self.id = f"att_{int(time.time() * 1000)}"
 
 
 class ChatInput(TextArea):
@@ -241,9 +235,7 @@ class ChatInput(TextArea):
                 img = img.convert("RGB")
 
             await asyncio.to_thread(img.save, final_path, format="PNG")
-            w, h = img.size
-            sz = os.path.getsize(final_path) / 1024.0
-            att = ClipboardAttachment(final_path, w, h, sz)
+            att = ClipboardAttachment(final_path)
             self.clipboard_attachments.append(att)
             self.update_attachment_bar()
             return True

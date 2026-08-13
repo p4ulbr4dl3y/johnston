@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Generator, List, Optional
 
 from core.defaults.git_excludes import DEFAULT_EXCLUDES
-from core.git_utils import run_git
+from core.git_utils import is_git_repository, run_git
 from core.platform_utils import johnston_config_dir
 
 
@@ -150,12 +150,13 @@ class GitCheckpointManager:
         cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
         home = os.path.realpath(os.path.expanduser("~"))
 
-        # Block home dir and any drive/system root ('/', 'C:\', 'D:\', etc.)
+        # Keep the home/root block first (cheap, avoids shelling out to git
+        # for paths that should never be checkpoint targets), then delegate the
+        # actual git-work-tree check to the shared helper.
         if cwd == home or os.path.dirname(cwd) == cwd:
             return False
 
-        res = cls._run_git(["rev-parse", "--is-inside-work-tree"], cwd=cwd)
-        return res.returncode == 0 and res.stdout.strip() == "true"
+        return is_git_repository(cwd)
 
     @classmethod
     def create_checkpoint(

@@ -1,9 +1,10 @@
 import os
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from core.config import CONFIG_DIR
 from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
+from core.fs_signature import compute_dir_signature
 
 
 class RuleDefinition:
@@ -49,7 +50,7 @@ class RulesManager:
         dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
 
         now = time.time()
-        signature = self._rules_signature(dirs)
+        signature = compute_dir_signature(dirs, [".md", ".markdown"]) or ()
         if (
             signature is not None
             and signature == self._rules_cache_signature
@@ -67,27 +68,6 @@ class RulesManager:
         self._rules_cache_signature = signature
         self._rules_cache_ts = now
         return rules
-
-    @staticmethod
-    def _rules_signature(dirs: List[Tuple[str, str]]) -> Optional[Tuple]:
-        """Cheap (relpath, mtime_ns, size) signature of every rule file to detect
-        external changes without re-reading contents. None when dirs are absent."""
-        entries = []
-        for dpath, _source in dirs:
-            if not os.path.isdir(dpath):
-                continue
-            try:
-                for fname in sorted(os.listdir(dpath)):
-                    if not (fname.endswith(".md") or fname.endswith(".markdown")):
-                        continue
-                    fpath = os.path.join(dpath, fname)
-                    if not os.path.isfile(fpath):
-                        continue
-                    st = os.stat(fpath)
-                    entries.append((fpath, st.st_mtime_ns, st.st_size))
-            except OSError:
-                continue
-        return tuple(entries)
 
     def invalidate_cache(self) -> None:
         """Force the next load_rules/get_formatted_rules to re-scan from disk."""

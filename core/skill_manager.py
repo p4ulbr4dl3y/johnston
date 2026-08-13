@@ -13,6 +13,7 @@ from core.config import CONFIG_DIR
 from core.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
 from core.frontmatter import parse_frontmatter
+from core.fs_signature import compute_dir_signature_recursive
 
 logger = logging.getLogger(__name__)
 
@@ -103,20 +104,14 @@ class SkillManager:
         """Cheap signature of (path, mtime_ns, size) for every SKILL.md under
         both global and project trees, detecting external changes without
         re-reading contents."""
-        entries = []
-        for dir_path in (self.global_dir, self.project_dir_skills):
-            if not os.path.isdir(dir_path):
-                continue
-            try:
-                for root, dirs, files in os.walk(dir_path):
-                    self._filter_scan_dirs(dirs)
-                    for f in files:
-                        if f == "SKILL.md":
-                            fpath = os.path.join(root, f)
-                            st = os.stat(fpath)
-                            entries.append((fpath, st.st_mtime_ns, st.st_size))
-            except OSError:
-                continue
+        def _skip(subdir: str) -> bool:
+            return subdir in DEFAULT_IGNORE_DIRS or subdir.startswith(".")
+
+        entries = compute_dir_signature_recursive(
+            [self.global_dir, self.project_dir_skills],
+            filenames=["SKILL.md"],
+            skip_dir=_skip,
+        )
         return tuple(entries)
 
     def _scan_skills(self) -> tuple:
