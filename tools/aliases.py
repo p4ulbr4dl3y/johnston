@@ -58,6 +58,32 @@ ALIAS_MAP: Dict[str, str] = {
 }
 
 
+# Canonical names for the fields inside an `edit`/`multi_edit` replacement chunk.
+# Single source of truth shared by the registry's chunk normalizer and the
+# `edit` param-alias table (which also carries path/description aliases).
+EDIT_CHUNK_ALIAS_MAP: Dict[str, str] = {
+    "target_content": "old_str",
+    "TargetContent": "old_str",
+    "old_content": "old_str",
+    "search": "old_str",
+    "oldStr": "old_str",
+    "old": "old_str",
+    "replacement_content": "new_str",
+    "ReplacementContent": "new_str",
+    "new_content": "new_str",
+    "replace": "new_str",
+    "newStr": "new_str",
+    "new": "new_str",
+    "start_line": "start_line",
+    "StartLine": "start_line",
+    "start": "start_line",
+    "end_line": "end_line",
+    "EndLine": "end_line",
+    "end": "end_line",
+    "allow_multiple": "allow_multiple",
+    "multiple": "allow_multiple",
+}
+
 PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
     "shell": {
         "cmd": "command",
@@ -125,30 +151,10 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
         "filepath": "target_file",
         "file": "target_file",
         "filename": "target_file",
-        "target_content": "old_str",
-        "TargetContent": "old_str",
         "old_str": "old_str",
-        "old_content": "old_str",
         "old_string": "old_str",
-        "search": "old_str",
-        "oldStr": "old_str",
-        "old": "old_str",
-        "replacement_content": "new_str",
-        "ReplacementContent": "new_str",
         "new_str": "new_str",
-        "new_content": "new_str",
         "new_string": "new_str",
-        "replace": "new_str",
-        "newStr": "new_str",
-        "new": "new_str",
-        "start_line": "start_line",
-        "StartLine": "start_line",
-        "start": "start_line",
-        "end_line": "end_line",
-        "EndLine": "end_line",
-        "end": "end_line",
-        "allow_multiple": "allow_multiple",
-        "multiple": "allow_multiple",
         "desc": "description",
         "prompt": "instruction",
         "replacement_chunks": "edits",
@@ -156,6 +162,7 @@ PARAM_ALIAS_MAP: Dict[str, Dict[str, str]] = {
         "chunks": "edits",
         "changes": "edits",
         "replacements": "edits",
+        **EDIT_CHUNK_ALIAS_MAP,
     },
     "multi_edit": {
         "path": "target_file",
