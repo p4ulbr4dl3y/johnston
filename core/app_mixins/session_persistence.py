@@ -29,7 +29,6 @@ class SessionPersistenceMixin:
 
         chat_view = self.query_one(ChatView)
         chat_view.loading = True
-        chat_view._is_loading_session = True
         for child in list(chat_view.children):
             child.remove()
 
@@ -38,47 +37,15 @@ class SessionPersistenceMixin:
 
         async def _restore_messages(msgs: list):
             try:
-                for msg in msgs:
-                    if not isinstance(msg, dict):
-                        continue
-                    try:
-                        mtype = msg.get("type")
-                        if mtype == "user":
-                            text = msg.get("text", "")
-                            await chat_view.add_user_message(text, animate=False)
-                        elif mtype == "bot":
-                            text = msg.get("text", "")
-                            bm = await chat_view.add_bot_message(animate=False)
-                            await bm.set_final_content(text)
-                        elif mtype == "thinking":
-                            dur = msg.get("duration", 0.0)
-                            txt = msg.get("text", "")
-                            tw = await chat_view.add_thinking_widget(animate=False)
-                            tw.finish_thinking(dur, txt)
-                        elif mtype == "tool":
-                            ttype = msg.get("tool_type", "")
-                            target = msg.get("target", "")
-                            rtext = msg.get("result_text", "")
-                            targs = msg.get("args", {})
-                            await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
-                        elif mtype == "event_divider":
-                            ctxt = msg.get("text", "Session Compacted")
-                            await chat_view.add_event_divider(ctxt, animate=False)
-                        elif mtype == "status_change":
-                            pass
-                        if len(chat_view.children) % 5 == 0:
-                            await asyncio.sleep(0)
-                    except Exception as err:
-                        logger.warning("Error restoring UI message item: %s", err)
+                await chat_view.restore_messages(msgs, loading=True)
             except Exception as err:
+                logger.warning("Error restoring UI messages: %s", err)
                 try:
                     self.notify(f"UI restoration failed: {err}", severity="warning")
                 except Exception:
                     pass
-
             chat_view.check_welcome()
             await asyncio.sleep(0.15)
-            chat_view._is_loading_session = False
             chat_view.loading = False
             try:
                 chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
