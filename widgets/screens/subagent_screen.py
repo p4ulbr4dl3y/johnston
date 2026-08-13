@@ -30,7 +30,7 @@ class SubagentViewScreen(Screen[None]):
         with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield Label("", id="subagent-info")
-            yield StatusFooter(id="status-footer")
+            yield StatusFooter(id="status-footer", is_subagent=True)
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
