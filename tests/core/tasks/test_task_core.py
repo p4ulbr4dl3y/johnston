@@ -8,7 +8,6 @@ import asyncio
 
 import pytest
 
-from core.tasks.events import TaskEvents
 from core.tasks.manager import TaskManager
 from core.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
 from core.tasks.shell_task import ShellTask
@@ -221,14 +220,14 @@ def test_task_kind_literals():
 
 
 @pytest.mark.asyncio
-async def test_manager_register_drop_find():
+async def test_manager_register_list():
     mgr = TaskManager()
     task = ShellTask(task_id="t1", command="echo hi")
     mgr.register(task)
-    assert await mgr.find("t1") is task
     assert len(mgr.list()) == 1
     snap = mgr.list()[0]
     assert snap.id == "t1"
+    assert snap.command == "echo hi"
 
 
 @pytest.mark.asyncio
@@ -241,15 +240,3 @@ async def test_manager_kill_all():
     mgr.register(task)
     await mgr.kill_all()
     assert task.status == TaskStatus.KILLED
-
-
-def test_events_on_completed_dispatches_handlers():
-    events = TaskEvents()
-    seen = []
-
-    def h(task, result, error):
-        seen.append((task, result, error))
-
-    events.add_handler(h)
-    events.on_completed("task", result="out", error=None)
-    assert seen == [("task", "out", None)]

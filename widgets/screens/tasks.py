@@ -40,7 +40,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     def update_log(self) -> None:
         from core.tasks.output import process_carriage_returns, strip_ansi
 
-        lines = self.bg_task.output.history if hasattr(self.bg_task.output, "history") else self.bg_task.output
+        lines = self.bg_task.output.history
         if len(lines) > self.printed_count:
             for i in range(self.printed_count, len(lines)):
                 raw_line = lines[i].rstrip("\r\n")

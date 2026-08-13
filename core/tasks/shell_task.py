@@ -1,10 +1,7 @@
 """Shell task: a BaseTask backed by a live subprocess.
 
-This is the target implementation meant to eventually replace
-core/background_task.py. It is intentionally self-contained: it composes a
-subprocess + OutputBuffer directly (rather than wrapping a BackgroundTask),
-so it can evolve without touching the legacy machinery. The old
-BackgroundTask stays untouched during the migration window.
+Self-contained: composes a subprocess + OutputBuffer directly, providing
+real-time output, input and kill semantics for background shell processes.
 """
 
 import asyncio
@@ -51,13 +48,13 @@ class ShellTask(BaseTask):
 
     def _done_future(self) -> asyncio.Future:
         if self._done is None:
-            self._done = asyncio.get_event_loop().create_future()
+            self._done = asyncio.get_running_loop().create_future()
         return self._done
 
     def __repr__(self) -> str:
         return f"ShellTask(id={self.id!r}, status={self._status.value})"
 
-    # -- BackgroundTask-compatible surface ---------------------------------
+    # -- Task API ------------------------------------------------------------
 
     def move_to_background(self) -> None:
         self.is_background = True
