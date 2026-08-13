@@ -188,9 +188,13 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         screen.update_tasks_list()
 
     async def test_task_console_screen_pilot(self):
+        from core.tasks.output import OutputBuffer
+
         mock_task = MagicMock()
         mock_task.command = "python long_running_script.py"
-        mock_task.output = ["Line 1\r\n", "Line 2\n"]
+        mock_task.output = OutputBuffer()
+        mock_task.output.append("Line 1\r\n")
+        mock_task.output.append("Line 2\n")
 
         screen = TaskConsoleScreen(mock_task)
         app = DummyHostApp(screen)

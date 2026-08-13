@@ -280,7 +280,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         class DummyApp:
             pm = DummyPM()
-            background_tasks = []
             notified = []
 
             def notify(self, msg):
@@ -297,8 +296,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             "subagent", {"prompt": "bg task", "description": "bg job", "background": True, "branch": "main"}, app=app
         )
         self.assertIn("subagent 'bg job' launched", res)
-        # Subagents live in the session store, not in the shell task registry.
-        self.assertEqual(app.background_tasks, [])
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].description, "bg job")

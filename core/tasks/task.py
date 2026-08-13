@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+# Literal kind strings a task may carry ("shell" or "subagent").
+TASK_KINDS = ("shell", "subagent")
+
 
 class TaskStatus(str, Enum):
     """Lifecycle status for a task."""
@@ -25,22 +28,6 @@ class TaskStatus(str, Enum):
     @property
     def is_running(self) -> bool:
         return self in (TaskStatus.QUEUED, TaskStatus.RUNNING)
-
-
-class TaskIDKind(str, Enum):
-    """Kinds of task identifiers a BaseTask may carry.
-
-    Tasks back either a background shell process (kind="shell") or an
-    AgentSession (kind="subagent"). The kind is used to route manager
-    operations (e.g. shell lookup by id vs. session lookup).
-    """
-
-    SHELL = "shell"
-    SUBAGENT = "subagent"
-
-
-# Backwards-friendly literal for task "kind" strings.
-TASK_KINDS = ("shell", "subagent")
 
 
 @dataclass
@@ -77,7 +64,7 @@ class BaseTask(ABC):
         if kind not in TASK_KINDS:
             raise ValueError(f"unknown task kind: {kind!r}")
         self.id = task_id
-        self.task_id = task_id  # alias for BackgroundTask parity
+        self.task_id = task_id
         self.kind = kind
         self.command = command
         self._status = status

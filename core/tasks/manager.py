@@ -1,12 +1,11 @@
 """TaskManager: pure in-memory aggregate of live tasks.
 
 Holds no subprocess/session logic itself; it just registers BaseTask instances
-and answers queries for the UI/footer. It accepts (but does not require)
-references to app.background_tasks and app.sm so older code paths can be
-bridged later without changing this module's interface.
+and answers queries for the UI/footer.
 """
 
-from typing import Any, Dict, List, Optional
+import asyncio
+from typing import Any, Dict, List
 
 from core.tasks.task import BaseTask, TaskSnapshot
 
@@ -33,12 +32,7 @@ class TaskManager:
     # -- query --------------------------------------------------------------
 
     def list(self) -> List[TaskSnapshot]:
-        snapshots = [
-            task.snapshot()
-            for task in self._tasks.values()
-            if getattr(task, "kind", "") != "session"
-        ]
-        return snapshots
+        return [task.snapshot() for task in self._tasks.values()]
 
     def by_session(self, session_id: str) -> List[BaseTask]:
         """Filter tasks by the session they back (shell/subagent session_id)."""
@@ -51,28 +45,14 @@ class TaskManager:
                 result.append(task)
         return result
 
-    async def find(self, identifier: str) -> Optional[BaseTask]:
-        """Locate a task by exact id, or by its description/command text."""
-        if not identifier:
-            return None
-        clean = identifier.strip("\"' `")
-        for task in self._tasks.values():
-            if task.id == identifier or task.id == clean:
-                return task
-        for task in self._tasks.values():
-            desc = getattr(task, "description", None) or getattr(task, "command", "")
-            if not desc:
-                continue
-            if desc.strip("\"' `") == clean or clean in desc or desc in clean:
-                return task
-        return None
-
     # -- lifecycle ----------------------------------------------------------
 
     async def kill_all(self) -> None:
         for task in list(self._tasks.values()):
             try:
                 await task.kill()
+            except asyncio.CancelledError:
+                raise
             except Exception:
                 pass
 
