@@ -42,7 +42,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # Attempt to spawn one more
-        res = await tool.execute({"prompt": "another task", "description": "Over limit"})
+        res = await tool.execute({"prompt": "another task", "description": "Over limit", "branch": "main"})
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
     async def test_explore_subagent_tool_filtering(self):
@@ -71,7 +71,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "search codebase", "subagent_type": "explorer"})
+        await tool.execute({"prompt": "search codebase", "subagent_type": "explorer", "branch": "main"})
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
@@ -105,7 +105,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "run task", "subagent_type": "worker"})
+        await tool.execute({"prompt": "run task", "subagent_type": "worker", "branch": "main"})
 
         self.assertTrue(mock_agent.is_subagent)
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]

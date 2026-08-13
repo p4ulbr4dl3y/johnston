@@ -188,7 +188,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "independent experiments. These parallelize cleanly and transfer cheaply.\n"
             "4. For analysis or reconnaissance, delegate to `subagent_type` 'explorer'. "
             "For isolated execution, delegate to `subagent_type` 'worker'. Prefer "
-            "`workspace='branch'` for work that mutates state, then merge the branch.\n\n"
+            "setting `branch` to the target git branch for work that mutates state, then merge the branch.\n\n"
             "### Orchestration Rules\n"
             "1. Decompose first, then delegate: lay out the subtasks and dependencies "
             "before launching anything.\n"

@@ -477,65 +477,40 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
         self.assertEqual(len(app.background_tasks), 0)
 
-    async def test_tasks_command_filters_non_background_tasks(self):
+    async def test_subagents_command_no_subagents(self):
         from unittest.mock import MagicMock
 
-        from core.background_task import BackgroundTask
-        from widgets.commands import TasksCommand
-
-        app = MockApp()
-        app.notify = MagicMock()
-        app.push_screen = MagicMock()
-
-        # Task with is_background=False
-        t_sync = BackgroundTask("t-sync", "echo 1", None)
-        t_sync.is_background = False
-        app.background_tasks = [t_sync]
-
-        cmd = TasksCommand()
-        await cmd.execute(app)
-
-        # Since only sync task exists, toast should show and screen should not be pushed
-        app.notify.assert_called_once_with("No active background tasks", severity="warning")
-        app.push_screen.assert_not_called()
-
-        # Task with is_background=True and matching session_id
-        t_bg = BackgroundTask("t-bg", "sleep 100", None, session_id="test_session_id")
-        t_bg.is_background = True
-        app.background_tasks = [t_bg]
-        app.notify.reset_mock()
-
-        await cmd.execute(app)
-        app.notify.assert_not_called()
-        app.push_screen.assert_called_once()
-
-    async def test_tasks_command_filters_by_session_id(self):
-        from unittest.mock import MagicMock
-
-        from core.background_task import BackgroundTask
-        from widgets.commands import TasksCommand
+        from widgets.commands import SubagentsCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
         app.notify = MagicMock()
         app.push_screen = MagicMock()
+        app.sm = MagicMock()
+        app.sm.get_subagents_for_parent.return_value = []
 
-        # Task belonging to another session
-        t_other = BackgroundTask("t-other", "echo 1", None, session_id="sess-b")
-        t_other.is_background = True
-
-        # Task without session_id
-        t_none = BackgroundTask("t-none", "echo 2", None, session_id=None)
-        t_none.is_background = True
-
-        app.background_tasks = [t_other, t_none]
-
-        cmd = TasksCommand()
+        cmd = SubagentsCommand()
         await cmd.execute(app)
 
-        # Should notify no active tasks because neither matches current session 'sess-a'
-        app.notify.assert_called_once_with("No active background tasks", severity="warning")
+        # No subagents for current session -> toast, no screen
+        app.notify.assert_called_once_with("No active subagents", severity="warning")
         app.push_screen.assert_not_called()
+
+    async def test_subagents_command_with_subagents(self):
+        from unittest.mock import MagicMock
+
+        from widgets.commands import SubagentsCommand
+
+        app = MockApp()
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+        app.sm = MagicMock()
+        app.sm.get_subagents_for_parent.return_value = [MagicMock()]
+
+        cmd = SubagentsCommand()
+        await cmd.execute(app)
+        app.notify.assert_not_called()
+        app.push_screen.assert_called_once()
 
 
 if __name__ == "__main__":

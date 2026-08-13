@@ -12,7 +12,7 @@ from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.subagent_screen import SubagentViewScreen
-from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
+from widgets.screens.tasks import SubagentsScreen
 
 
 class DummyHostApp(App[None]):
@@ -96,36 +96,12 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
-    async def test_task_console_screen_pilot(self):
-        mock_task = MagicMock()
-        mock_task.command = "python long_running_script.py"
-        mock_task.output = ["Line 1\r\n", "Line 2\n"]
-
-        screen = TaskConsoleScreen(mock_task)
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            self.assertEqual(screen.printed_count, 2)
-
-            # Test updating log with new lines
-            mock_task.output.append("Line 3\n")
-            screen.update_log()
-            self.assertEqual(screen.printed_count, 3)
-
-            # Test action_quit_app while mounted
-            with patch.object(screen.app, "exit") as mock_exit:
-                screen.action_quit_app()
-                mock_exit.assert_called_once()
-
-            # Press escape (action_back)
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_tasks_list_screen_empty_pilot(self):
-        screen = TasksListScreen()
+    async def test_subagents_screen_empty_pilot(self):
+        screen = SubagentsScreen()
         app = DummyHostApp(screen)
         app.background_tasks = []
+        app.sm = MagicMock()
+        app.sm.get_subagents_for_parent.return_value = []
 
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -134,27 +110,17 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("escape")
             await pilot.pause()
 
-    async def test_tasks_list_screen_option_selected_pilot(self):
+    async def test_subagents_screen_option_selected_pilot(self):
         from textual.widgets.option_list import Option
-
-        # Subagent tasks (kind="subagent") are excluded from the shell list and
-        # shown once as subagent sessions from the store instead.
-        task_normal = MagicMock()
-        task_normal.task_id = "task-norm"
-        task_normal.kind = "shell"
-        task_normal.command = "norm task"
-        task_normal.is_background = True
-        task_normal.is_running = False
-        task_normal.session_id = "main-1"
 
         sub_session = MagicMock()
         sub_session.id = "sub-1"
         sub_session.status = "running"
         sub_session.description = "sub task"
 
-        screen = TasksListScreen()
+        screen = SubagentsScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = [task_normal]
+        app.background_tasks = []
         app.current_session_id = "main-1"
         app.sm = MagicMock()
         app.sm.get_subagents_for_parent.return_value = [sub_session]
@@ -162,7 +128,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
 
-            opt_list = screen.query_one("#tasks-option-list", OptionList)
+            opt_list = screen.query_one("#subagents-option-list", OptionList)
             screen.update_tasks_list()
             with patch.object(app, "push_screen") as mock_push:
                 # index 1 = sub task (running, first selectable after Running header)
@@ -170,74 +136,50 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
                 mock_push.assert_called_once()
                 self.assertIsInstance(mock_push.call_args[0][0], SubagentViewScreen)
 
-            with patch.object(app, "push_screen") as mock_push:
-                # index 4 = norm task (Running@0,sub@1,Completed@3, norm@4)
-                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 4))
-                mock_push.assert_called_once()
-                self.assertIsInstance(mock_push.call_args[0][0], TaskConsoleScreen)
+    async def test_subagents_screen_kill_task_pilot(self):
 
-    async def test_tasks_list_screen_kill_task_pilot(self):
+        sub_session = MagicMock()
+        sub_session.id = "sub-1"
+        sub_session.status = "running"
+        sub_session.description = "long " + "a" * 40
+        sub_session.async_task = MagicMock()
+        sub_session.async_task.done.return_value = False
+        sub_session.finish = MagicMock()
 
-        task_sub = MagicMock()
-        task_sub.task_id = "task-sub"
-        task_sub.command = "a" * 40
-        task_sub.is_running = True
-        task_sub.is_background = True
-
-        async def mock_kill_async():
-            task_sub.is_running = False
-
-        task_sub.kill = MagicMock(side_effect=mock_kill_async)
-
-        task_normal = MagicMock()
-        task_normal.task_id = "task-norm"
-        task_normal.command = "short cmd"
-        task_normal.is_running = True
-        task_normal.is_background = True
-        task_normal.kill = MagicMock(return_value=None)
-        task_normal.get_formatted_output.return_value = "killed output"
-
-        screen = TasksListScreen()
+        screen = SubagentsScreen()
         app = DummyHostApp(screen)
-        app.background_tasks = [task_sub, task_normal]
+        app.background_tasks = []
+        app.current_session_id = "main-1"
+        app.sm = MagicMock()
+        app.sm.get_subagents_for_parent.return_value = [sub_session]
 
-        with patch("tools.context.ToolContext") as mock_tc_cls:
-            mock_tc = MagicMock()
-            mock_tc_cls.return_value = mock_tc
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen.update_tasks_list()
 
-            async with app.run_test() as pilot:
-                await pilot.pause()
+            # One running subagent -> one Running group: [None, sub_session]
+            # Kill first subagent
+            mock_opt_list = MagicMock()
+            mock_opt_list.highlighted = 1
+            with patch.object(screen, "query_one", return_value=mock_opt_list):
+                await screen.action_kill_task()
+            sub_session.async_task.cancel.assert_called_once()
+            sub_session.finish.assert_called_once_with("cancelled", "Terminated from subagents menu")
+
+            # Kill header row -> noop
+            mock_opt_list.highlighted = 0
+            with patch.object(screen, "query_one", return_value=mock_opt_list):
+                await screen.action_kill_task()
+
+            # Test update_tasks_list when current_highlighted >= len(tasks)
+            mock_opt_list.highlighted = 99
+            screen._last_signatures = None
+            with patch.object(screen, "query_one", return_value=mock_opt_list):
                 screen.update_tasks_list()
 
-                # Two running shell tasks -> one Running group: [None, task_sub, task_normal]
-                # Kill first task (async kill, background)
-                mock_opt_list = MagicMock()
-                mock_opt_list.highlighted = 1
-                with patch.object(screen, "query_one", return_value=mock_opt_list):
-                    await screen.action_kill_task()
-                self.assertFalse(task_sub.is_running)
-
-                # Kill second task
-                mock_opt_list.highlighted = 2
-                with patch.object(screen, "query_one", return_value=mock_opt_list):
-                    await screen.action_kill_task()
-                mock_tc.trigger_ai_response.assert_not_called()
-
-                # Kill header row -> noop
-                mock_opt_list.highlighted = 0
-                with patch.object(screen, "query_one", return_value=mock_opt_list):
-                    await screen.action_kill_task()
-                mock_tc.trigger_ai_response.assert_not_called()
-
-                # Test update_tasks_list when current_highlighted >= len(tasks)
-                mock_opt_list.highlighted = 99
-                screen._last_signatures = None
-                with patch.object(screen, "query_one", return_value=mock_opt_list):
-                    screen.update_tasks_list()
-
-                with patch.object(screen.app, "exit") as mock_exit:
-                    screen.action_quit_app()
-                    mock_exit.assert_called_once()
+            with patch.object(screen.app, "exit") as mock_exit:
+                screen.action_quit_app()
+                mock_exit.assert_called_once()
 
                 await pilot.press("escape")
                 await pilot.pause()

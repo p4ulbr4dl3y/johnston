@@ -247,7 +247,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             pm = DummyPM()
 
         app = DummyApp()
-        res = await execute_tool("subagent", {"prompt": "do research", "description": "research task"}, app=app)
+        res = await execute_tool(
+            "subagent", {"prompt": "do research", "description": "research task", "branch": "main"}, app=app
+        )
         self.assertIn("subagent 'research task' launched", res)
 
     async def test_task_tool_background(self):
@@ -289,7 +291,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "subagent", {"prompt": "bg task", "description": "bg job", "background": True}, app=app
+            "subagent", {"prompt": "bg task", "description": "bg job", "background": True, "branch": "main"}, app=app
         )
         self.assertIn("subagent 'bg job' launched", res)
         # Subagents live in the session store, not in the shell task registry.
