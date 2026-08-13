@@ -945,7 +945,7 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
         role_def = AgentRole("explorer", "Explorer", read_only=True, disallowed_tools=["write_file", "create", "edit"])
-        err = agent._tool_policy_error("write_file", {"path": "core/example.py"}, role_def)
+        err = agent._tool_policy_error("write_file", role_def)
         self.assertIsNotNone(err)
         self.assertIn("disabled in Explorer role", err)
 
@@ -955,7 +955,7 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
         role_def = AgentRole("locked", "Locked", disallowed_tools=["shell"])
-        err = agent._tool_policy_error("shell", {"command": "pwd"}, role_def)
+        err = agent._tool_policy_error("shell", role_def)
         self.assertIsNotNone(err)
         self.assertIn("disabled in Locked role", err)
 

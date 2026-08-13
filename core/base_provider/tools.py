@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 
 class ToolMixin:
@@ -9,7 +9,7 @@ class ToolMixin:
 
         return normalize_tool_name(tool_name or "")
 
-    def _tool_policy_error(self, tool_name: str, args: Dict[str, Any], mode_def: Any) -> str | None:
+    def _tool_policy_error(self, tool_name: str, mode_def: Any) -> str | None:
         from core.role_registry import role_tool_error
 
         clean_name = self._canonical_tool_name(tool_name).lower()

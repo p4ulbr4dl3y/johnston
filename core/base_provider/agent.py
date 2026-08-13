@@ -222,7 +222,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         )
         sys_prompt = builder.build_system_prompt()
         all_tools = builder.build_tools(
-            provider_key=getattr(self, "provider_key", ""), model_id=getattr(self, "model", "")
+            provider_key=getattr(self, "provider_key", "")
         )
         self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
 
@@ -624,7 +624,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     current_role = getattr(self, "role", "worker").lower()
                     role_def = RoleRegistry.get_instance().get_role(current_role)
 
-                    policy_err = self._tool_policy_error(t_name, args, role_def)
+                    policy_err = self._tool_policy_error(t_name, role_def)
                     if policy_err:
                         tool_result = policy_err
                     else:
