@@ -166,7 +166,7 @@ class ProviderManager:
                     jdata[key]["model"] = model_name
                     self._save_providers_json(jdata)
                 except Exception:
-                    pass
+                    logger.exception("Failed to save provider model selection to %s", PROVIDERS_JSON_FILE)
         self.invalidate_cache()
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
@@ -338,18 +338,13 @@ class ProviderManager:
                                 models.append(m_id)
                                 m_name = m.get("name")
                                 if m_name:
-                                    from core.models_catalog import catalog
+                                    from core.models_catalog import catalog, extract_context_length
 
                                     catalog._names[m_id] = m_name
                                     catalog._names[m_id.split("/")[-1]] = m_name
-                                ctx_len = (
-                                    m.get("context_length")
-                                    or (m.get("top_provider", {}) or {}).get("context_length")
-                                    or m.get("context_window")
-                                    or m.get("max_context_length")
-                                )
-                                if ctx_len and isinstance(ctx_len, (int, float)):
-                                    model_limits[m_id] = int(ctx_len)
+                                ctx_len = extract_context_length(m)
+                                if ctx_len:
+                                    model_limits[m_id] = ctx_len
             except Exception as e:
                 logger.warning("Error fetching models for %s: %s", provider_key, e)
 

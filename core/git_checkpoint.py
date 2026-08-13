@@ -56,6 +56,17 @@ class GitCheckpointManager:
     ) -> subprocess.CompletedProcess:
         return run_git(args=args, cwd=cwd, env=env, timeout=timeout)
 
+    @staticmethod
+    def _parse_numstat(output: str) -> tuple[int, int]:
+        """Parses `git diff --numstat` output into (added, deleted) line counts."""
+        added, deleted = 0, 0
+        for line in output.splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
+                added += int(parts[0])
+                deleted += int(parts[1])
+        return added, deleted
+
     # Cache of the baseline shadow env (GIT_DIR + GIT_WORK_TREE) keyed by (shadow_dir, cwd).
     # Built once via a single os.environ.copy() per key; each invocation copies only this
     # small cached dict instead of the whole process environment.
@@ -311,12 +322,7 @@ class GitCheckpointManager:
             if diff_res.returncode != 0:
                 return None
 
-            added, deleted = 0, 0
-            for line in diff_res.stdout.splitlines():
-                parts = line.split()
-                if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
-                    added += int(parts[0])
-                    deleted += int(parts[1])
+            added, deleted = cls._parse_numstat(diff_res.stdout)
 
             if added == 0 and deleted == 0:
                 return "no changes"
@@ -360,12 +366,7 @@ class GitCheckpointManager:
                 if diff_res.returncode != 0:
                     continue
 
-                added, deleted = 0, 0
-                for line in diff_res.stdout.splitlines():
-                    parts = line.split()
-                    if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
-                        added += int(parts[0])
-                        deleted += int(parts[1])
+                added, deleted = cls._parse_numstat(diff_res.stdout)
 
                 if added == 0 and deleted == 0:
                     results[msg_idx] = "no changes"
