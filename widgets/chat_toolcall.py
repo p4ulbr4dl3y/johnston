@@ -360,9 +360,6 @@ class _DisplayNamesDict(dict):
             raise KeyError(key)
         return res
 
-    def __contains__(self, key):
-        return True
-
 
 class _SystemToolsSet(set):
     def __contains__(self, item):
