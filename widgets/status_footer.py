@@ -69,39 +69,36 @@ class StatusFooter(Static):
             # above (or drifted since). `refresh_footer` caches mcp servers for
             # 5s, but the client/tool state is read fresh each call, so this is
             # cheap enough at a 1s cadence.
-            active = self._mcp_active_count()
+            active = self._active_mcp_count(get_mcp_manager().load_servers())
             if active != getattr(self, "_mcp_last_active", None):
                 self._mcp_last_active = active
                 self.refresh_footer()
         except Exception:
             pass
 
-    def _mcp_active_count(self) -> int:
-        """Current number of enabled MCP servers that finished loading tools."""
-        try:
-            from core.mcp_manager import get_mcp_manager
+    def _active_mcp_count(self, servers) -> int:
+        """Count enabled MCP servers that finished loading tools (no error, has tools)."""
+        from core.mcp_manager import get_mcp_manager
 
-            mm = get_mcp_manager()
-            count = 0
-            for s in mm.load_servers():
-                s_name = s.get("name")
-                cmd = s.get("command")
-                url = s.get("url")
-                if url and not cmd:
-                    continue
-                if s.get("disabled", False):
-                    continue
-                client = mm.clients.get(s_name) if hasattr(mm, "clients") else None
-                if client is None:
-                    continue
-                if getattr(client, "last_error", None):
-                    continue
-                if not getattr(client, "tools", None):
-                    continue
-                count += 1
-            return count
-        except Exception:
-            return None
+        mm = get_mcp_manager()
+        count = 0
+        for s in servers:
+            s_name = s.get("name")
+            cmd = s.get("command")
+            url = s.get("url")
+            if url and not cmd:
+                continue
+            if s.get("disabled", False):
+                continue
+            client = mm.clients.get(s_name) if hasattr(mm, "clients") else None
+            if client is None:
+                continue
+            if getattr(client, "last_error", None):
+                continue
+            if not getattr(client, "tools", None):
+                continue
+            count += 1
+        return count
 
     def refresh_footer(self) -> None:
         try:
@@ -142,32 +139,17 @@ class StatusFooter(Static):
                 self._mcp_cache_time = now
             mcp_servers = self._cached_mcp_servers
 
-            mcp_mgr = get_mcp_manager()
             # Count only servers that are actually loading (enabled, stdio
             # command) and of those, only the ones that finished loading: a
             # running client that discovered tools and has no error. Pending or
             # errored servers don't count, so while loading the footer flips to
             # the spinner.
             mcp_total = 0
-            mcp_tooled = 0
             for s in mcp_servers:
-                s_name = s.get("name")
-                cmd = s.get("command")
-                url = s.get("url")
-                if url and not cmd:
+                if s.get("url") and not s.get("command"):
                     continue
                 mcp_total += 1
-                if s.get("disabled", False):
-                    continue
-                client = mcp_mgr.clients.get(s_name) if hasattr(mcp_mgr, "clients") else None
-                if client is None:
-                    continue
-                if getattr(client, "last_error", None):
-                    continue
-                if not getattr(client, "tools", None):
-                    continue
-                mcp_tooled += 1
-            mcp_active = mcp_tooled
+            mcp_active = self._active_mcp_count(mcp_servers)
             from core.task_collection import collect_current_tasks
 
             bg_tasks, sessions = collect_current_tasks(self.app, getattr(self.app, "current_session_id", None))
