@@ -11,7 +11,6 @@ Each widget id has two forms:
 # Modal dialog container / common widgets
 MODAL_DIALOG_ID = "modal-dialog"
 MODAL_DIALOG_SEL = "#modal-dialog"
-MODAL_DIALOG = MODAL_DIALOG_SEL
 
 MODAL_HINT_ID = "modal-hint"
 MODAL_HINT_SEL = "#modal-hint"
@@ -31,7 +30,6 @@ MODAL_MARKDOWN_CENTERED = "modal-markdown-centered"
 
 # Tool / diff display
 TOOL_SCROLL_BOX = "tool-scroll-box"
-MODAL_DIFF_VIEW = "modal-diff-view"
 
 # Tool call widget header classes
 TOOL_HEADER = "tool-header"

@@ -147,3 +147,13 @@ DEFAULT_EXCLUDES = (
     "core.*\n"
     "desktop.ini\n"
 )
+
+# Directory names that should always be skipped during directory scans. Derived
+# from the git exclude patterns (stripping slashes and glob prefix) so there is
+# a single source of truth for ignored paths.
+DEFAULT_IGNORE_DIRS = frozenset(
+    name
+    for pattern in DEFAULT_EXCLUDES.strip().splitlines()
+    if pattern.endswith("/") and "*" not in pattern
+    for name in (pattern.rstrip("/"),)
+)
