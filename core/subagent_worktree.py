@@ -125,6 +125,30 @@ class SubagentWorktreeManager:
                 pass
 
     @staticmethod
+    def make_worktree_cleanup_fn(parent_dir: str, wt_path: Optional[str], wt_branch: Optional[str], is_followup: bool = False):
+        """Builds a cleanup callback that appends the worktree diff to acc and
+        removes the worktree. Shared by invoke_subagent and manage_subagent so
+        the follow-up vs initial-spawn handling stays in one place.
+
+        Mirrors the historical contract: for initial spawns append_worktree_diff_to_acc
+        returns the (possibly recreated) worktree paths, for follow-ups it mutates
+        session paths on disk directly.
+        """
+        if is_followup:
+            def _cleanup_followup(acc):
+                SubagentWorktreeManager.append_worktree_diff_to_acc(
+                    parent_dir, wt_path, wt_branch, acc, is_followup=True
+                )
+            return _cleanup_followup
+
+        def _cleanup_worktree_and_append_diff(acc):
+            nonlocal wt_path, wt_branch
+            wt_path, wt_branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
+                parent_dir, wt_path, wt_branch, acc, is_followup=False
+            )
+        return _cleanup_worktree_and_append_diff
+
+    @staticmethod
     def append_worktree_diff_to_acc(
         parent_dir: str,
         wt_path: Optional[str],

@@ -132,18 +132,17 @@ class ManageSubagentTool(BaseTool):
             if not subagent:
                 subagent = ctx.create_agent()
                 if subagent:
-                    subagent.app = ctx.app
-                    subagent.is_subagent = True
                     hist = session.agent_history
                     if hist:
                         subagent.history = hist
                     # Restore role behavior (system prompt, model, tool filtering)
                     # so follow-ups match the original spawn, even after restart.
-                    from core.subagent_stream import apply_subagent_role
+                    from core.subagent_stream import configure_subagent_agent
 
-                    apply_subagent_role(
+                    configure_subagent_agent(
                         subagent,
                         session.role,
+                        app=ctx.app,
                         project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
                     )
                     session.agent = subagent
@@ -178,12 +177,9 @@ class ManageSubagentTool(BaseTool):
             )
             from core.subagent_worktree import SubagentWorktreeManager
 
-            def _cleanup_followup(acc):
-                wt_path = session.project_dir
-                wt_branch = session.branch_name
-                SubagentWorktreeManager.append_worktree_diff_to_acc(
-                    ctx.project_dir, wt_path, wt_branch, acc, is_followup=True
-                )
+            cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
+                ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
+            )
 
             run_bg = (
                 bool(args["background"])
@@ -205,7 +201,7 @@ class ManageSubagentTool(BaseTool):
                         session,
                         ctx,
                         store,
-                        cleanup_fn=_cleanup_followup,
+                        cleanup_fn=cleanup_fn,
                         error_prefix="Subagent message error",
                         notification_template=notification_hdr,
                         session_id=session.id,
@@ -231,7 +227,7 @@ class ManageSubagentTool(BaseTool):
                     store.save(session)
                     return format_tool_error("subagent", detail=str(err), name=session.id)
                 finally:
-                    _cleanup_followup(acc)
+                    cleanup_fn(acc)
                     merge_subagent_metrics(subagent, ctx)
 
                 return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"

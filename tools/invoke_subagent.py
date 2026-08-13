@@ -94,8 +94,6 @@ class InvokeSubagentTool(BaseTool):
         subagent = ctx.create_agent()
         if not subagent:
             return format_tool_error("context", name="app", detail="unavailable")
-        subagent.app = ctx.app
-        subagent.is_subagent = True
 
         wt_path = None
         wt_branch = None
@@ -113,9 +111,11 @@ class InvokeSubagentTool(BaseTool):
         # BEFORE creating the session so session.role captures the canonically
         # applied role (apply_subagent_role falls back to 'worker' for empty,
         # unknown, or main-only roles), not the raw caller-supplied subagent_type.
-        from core.subagent_stream import apply_subagent_role
+        from core.subagent_stream import configure_subagent_agent
 
-        applied_role = apply_subagent_role(subagent, subagent_type, project_dir=project_dir)
+        applied_role = configure_subagent_agent(
+            subagent, subagent_type, app=ctx.app, project_dir=project_dir
+        )
         canonical_role = getattr(subagent, "role", None) or (getattr(applied_role, "key", None) or subagent_type or "worker")
         if not canonical_role:
             canonical_role = "worker"
@@ -136,11 +136,9 @@ class InvokeSubagentTool(BaseTool):
         from core.subagent_stream import run_subagent_stream_bg
         from core.subagent_worktree import SubagentWorktreeManager
 
-        def _cleanup_worktree_and_append_diff(acc):
-            nonlocal wt_path, wt_branch
-            wt_path, wt_branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
-                project_dir, wt_path, wt_branch, acc, is_followup=False
-            )
+        cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
+            project_dir, wt_path, wt_branch, is_followup=False
+        )
 
         from tools.base import format_background_notification
 
@@ -156,7 +154,7 @@ class InvokeSubagentTool(BaseTool):
                 session,
                 ctx,
                 store,
-                cleanup_fn=_cleanup_worktree_and_append_diff,
+                cleanup_fn=cleanup_fn,
                 error_prefix="Subagent error",
                 notification_template=f"{notification_hdr}\n{notification_ftr}",
                 session_id=session_id,
