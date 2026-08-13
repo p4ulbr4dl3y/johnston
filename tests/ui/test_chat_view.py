@@ -1185,9 +1185,8 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(names.get("read"), "Read")
         self.assertEqual(names.get("shell"), "Shell")
         self.assertEqual(names.get("nope", "fallback"), "fallback")
-        self.assertEqual(names["create"], "Create")
-        with self.assertRaises(KeyError):
-            names["unknown_tool"]
+        self.assertEqual(names.get("create"), "Create")
+        self.assertEqual(names.get("unknown_tool"), None)
         self.assertIn("read", widget.SYSTEM_TOOLS)
         self.assertNotIn("not_a_real_tool_xyz", widget.SYSTEM_TOOLS)
         self.assertNotIn(123, widget.SYSTEM_TOOLS)

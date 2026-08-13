@@ -237,7 +237,7 @@ def truncate_output(
         return truncated + footer
 
 
-def check_mcp_role_policy(ctx_or_app: Any, tool_name: str, targets: List[str]) -> Optional[str]:
+def check_mcp_role_policy(ctx_or_app: Any, targets: List[str]) -> Optional[str]:
     """Checks the active role's tool policy for an MCP tool call.
 
     Returns an error string if the tool is disallowed by role policy, else None.
