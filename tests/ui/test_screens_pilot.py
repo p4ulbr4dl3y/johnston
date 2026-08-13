@@ -6,13 +6,14 @@ from unittest.mock import MagicMock, patch
 
 from textual.app import App
 from textual.widgets import OptionList
+from textual.widgets.option_list import Option
 
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.subagent_screen import SubagentViewScreen
-from widgets.screens.tasks import SubagentsScreen
+from widgets.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
 class DummyHostApp(App[None]):
@@ -187,6 +188,91 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         # Calling update when not mounted
         screen._is_mounted = False
         screen.update_tasks_list()
+
+    async def test_task_console_screen_pilot(self):
+        mock_task = MagicMock()
+        mock_task.command = "python long_running_script.py"
+        mock_task.output = ["Line 1\r\n", "Line 2\n"]
+
+        screen = TaskConsoleScreen(mock_task)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(screen.printed_count, 2)
+
+            # Test updating log with new lines
+            mock_task.output.append("Line 3\n")
+            screen.update_log()
+            self.assertEqual(screen.printed_count, 3)
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_shell_screen_pilot(self):
+        task_normal = MagicMock()
+        task_normal.task_id = "task-norm"
+        task_normal.command = "norm task"
+        task_normal.is_background = True
+        task_normal.is_running = False
+        task_normal.session_id = "main-1"
+
+        screen = ShellTasksScreen()
+        app = DummyHostApp(screen)
+        app.background_tasks = [task_normal]
+        app.current_session_id = "main-1"
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen.update_tasks_list()
+
+            opt_list = screen.query_one("#shell-option-list", OptionList)
+            with patch.object(app, "push_screen") as mock_push:
+                # index 1 = task (Completed header@0, task@1)
+                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
+                mock_push.assert_called_once()
+                self.assertIsInstance(mock_push.call_args[0][0], TaskConsoleScreen)
+
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_shell_screen_kill_pilot(self):
+        task_run = MagicMock()
+        task_run.task_id = "task-run"
+        task_run.command = "sleep 100"
+        task_run.is_background = True
+        task_run.is_running = True
+        task_run.session_id = "main-1"
+
+        async def mock_kill_async():
+            task_run.is_running = False
+
+        task_run.kill = MagicMock(side_effect=mock_kill_async)
+
+        screen = ShellTasksScreen()
+        app = DummyHostApp(screen)
+        app.background_tasks = [task_run]
+        app.current_session_id = "main-1"
+        app.sm = MagicMock()
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen.update_tasks_list()
+
+            mock_opt_list = MagicMock()
+            mock_opt_list.highlighted = 1
+            with patch.object(screen, "query_one", return_value=mock_opt_list):
+                await screen.action_kill_task()
+            task_run.kill.assert_called_once()
+            self.assertFalse(task_run.is_running)
+
+            # Kill header row -> noop
+            mock_opt_list.highlighted = 0
+            with patch.object(screen, "query_one", return_value=mock_opt_list):
+                await screen.action_kill_task()
+
+            await pilot.press("escape")
+            await pilot.pause()
 
     async def test_help_screen_pilot(self):
         screen = HelpScreen()

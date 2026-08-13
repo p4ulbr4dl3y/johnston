@@ -512,6 +512,40 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_not_called()
         app.push_screen.assert_called_once()
 
+    async def test_shell_command_no_tasks(self):
+        from unittest.mock import MagicMock
+
+        from widgets.commands import ShellTasksCommand
+
+        app = MockApp()
+        app.current_session_id = "sess-a"
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+        app.background_tasks = []
+
+        cmd = ShellTasksCommand()
+        await cmd.execute(app)
+        app.notify.assert_called_once_with("No active shell tasks", severity="warning")
+        app.push_screen.assert_not_called()
+
+    async def test_shell_command_with_tasks(self):
+        from unittest.mock import MagicMock
+
+        from core.background_task import BackgroundTask
+        from widgets.commands import ShellTasksCommand
+
+        app = MockApp()
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+        t_bg = BackgroundTask("t-bg", "sleep 100", None, session_id="test_session_id")
+        t_bg.is_background = True
+        app.background_tasks = [t_bg]
+
+        cmd = ShellTasksCommand()
+        await cmd.execute(app)
+        app.notify.assert_not_called()
+        app.push_screen.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
