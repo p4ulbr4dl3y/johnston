@@ -2,15 +2,14 @@ import asyncio
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown
+from textual.screen import Screen
+from textual.widgets import Label
 
 from widgets.chat_view import ChatView
-from widgets.screens.base_modal import BaseModalScreen
-from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
 
 
-class SubagentViewScreen(BaseModalScreen[None]):
-    """Modal screen for watching subagent execution in a full chat window without input panel."""
+class SubagentViewScreen(Screen[None]):
+    """Full-screen view of a subagent's chat without input panel or status footer."""
 
     BINDINGS = [
         ("escape", "close", "Close Screen"),
@@ -27,10 +26,9 @@ class SubagentViewScreen(BaseModalScreen[None]):
         self.queue_task = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown("### **Subagent Details**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+        with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield Label("esc: cancel", id=MODAL_HINT_ID)
+            yield Label("esc: cancel", id="subagent-hint")
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -177,3 +175,6 @@ class SubagentViewScreen(BaseModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
+
+    def action_quit_app(self) -> None:
+        self.app.exit()

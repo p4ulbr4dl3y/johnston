@@ -801,18 +801,6 @@ class TestThinkingWidget(unittest.TestCase):
         self.assertFalse(widget.is_expanded)
         self.assertFalse(widget.content_widget.display)
 
-    def test_thinking_widget_not_expandable_on_subagent_screen(self):
-        class SubagentViewScreen:
-            pass
-
-        widget = self._make_widget()
-        with patch.object(type(widget), "screen", new_callable=PropertyMock) as screen_prop:
-            screen_prop.return_value = SubagentViewScreen()
-            self.assertFalse(widget.is_expandable())
-            event = MagicMock()
-            widget.on_click(event)
-            event.stop.assert_not_called()
-
     def test_thinking_widget_is_expandable_default(self):
         widget = self._make_widget()
         self.assertTrue(widget.is_expandable())
@@ -1058,15 +1046,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertTrue(ToolCallWidget("shell", "cmd").is_expandable())
         self.assertTrue(ToolCallWidget("create", "f.py").is_expandable())
         self.assertTrue(ToolCallWidget("custom_tool", "x").is_expandable())
-
-    def test_is_expandable_subagent_screen(self):
-        class SubagentViewScreen:
-            pass
-
-        widget = ToolCallWidget("shell", "cmd")
-        with patch.object(type(widget), "screen", new_callable=PropertyMock) as screen_prop:
-            screen_prop.return_value = SubagentViewScreen()
-            self.assertFalse(widget.is_expandable())
 
     def test_init_normalizes_target_and_status(self):
         widget = ToolCallWidget("read", "a\n\n b \t c")

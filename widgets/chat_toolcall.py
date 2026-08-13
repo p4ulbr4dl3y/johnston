@@ -401,27 +401,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "Plan",
     }
 
-    def _on_subagent_screen(self) -> bool:
-        """True when this widget lives inside the SubagentViewScreen."""
-        try:
-            if hasattr(self, "screen") and self.screen:
-                from widgets.screens.subagent_screen import SubagentViewScreen
-
-                if isinstance(self.screen, SubagentViewScreen):
-                    return True
-        except Exception:
-            pass
-        try:
-            return hasattr(self, "screen") and type(self.screen).__name__ == "SubagentViewScreen"
-        except Exception:
-            return False
-
     def is_expandable(self) -> bool:
-        try:
-            if self._on_subagent_screen():
-                return False
-        except Exception:
-            pass
         from tools.registry import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
@@ -437,11 +417,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return self.tool_type in self.EXPANDABLE_TOOLS
 
     def is_clickable_header(self) -> bool:
-        try:
-            if self._on_subagent_screen():
-                return False
-        except Exception:
-            pass
         return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "ask_user")
 
     def __init__(
