@@ -344,6 +344,65 @@ class TestRunStream:
         assert result == "hello world"
         assert sess.status == STATUS_COMPLETED
 
+    @pytest.mark.asyncio
+    async def test_queued_messages_drained_in_order(self):
+        class QueueSubagent(FakeSubagent):
+            async def stream_steps(self, *a, **k):
+                yield ("bot_text", f"reply:{a[0]}")
+
+        sub = QueueSubagent()
+        sess = make_session()
+        sess.pending_messages = ["second", "third"]
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "first", sess, ctx, store)
+        # One stream task processes all queued messages, accumulating the last reply.
+        assert result == "reply:third"
+        assert sess.status == STATUS_COMPLETED
+        assert sess.pending_messages == []
+        # Each message was processed and saved.
+        assert len(store.saved) == 3
+
+    @pytest.mark.asyncio
+    async def test_queued_drain_keeps_running_until_busy_returns(self):
+        class QueueSubagent(FakeSubagent):
+            async def stream_steps(self, *a, **k):
+                yield ("bot_text", f"reply:{a[0]}")
+
+        sub = QueueSubagent()
+        sess = make_session()
+        # Simulate a follow-up arriving mid-completion of the first message.
+        sess.pending_messages = ["mid"]
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "first", sess, ctx, store)
+        assert result == "reply:mid"
+        assert sess.status == STATUS_COMPLETED
+        assert sess.pending_messages == []
+
+    @pytest.mark.asyncio
+    async def test_queued_message_appended_after_first_save_drained(self):
+        class QueueSubagent(FakeSubagent):
+            def __init__(self):
+                self.count = 0
+
+            async def stream_steps(self, *a, **k):
+                self.count += 1
+                if self.count == 1:
+                    # First message ran; follow-up queued after it finished streaming.
+                    self._sess.pending_messages.append("late")
+                yield ("bot_text", f"reply:{a[0]}")
+
+        sub = QueueSubagent()
+        sess = make_session()
+        sub._sess = sess
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "first", sess, ctx, store)
+        assert result == "reply:late"
+        assert sess.status == STATUS_COMPLETED
+        assert sess.pending_messages == []
+
 
 # ---------------------------------------------------------------------------
 # _safe_save / save-failure propagation

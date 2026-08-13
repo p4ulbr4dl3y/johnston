@@ -3,7 +3,6 @@ from typing import Any, Dict
 
 from core.session_manager import (
     STATUS_CANCELLED,
-    STATUS_COMPLETED,
     STATUS_ERROR,
     SessionStore,
 )
@@ -21,7 +20,7 @@ class ManageSubagentTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
-                    "session_id": {"type": "string", "description": "Target subagent session_id or description"},
+                    "session_id": {"type": "string", "description": "Target subagent session_id"},
                     "message": {"type": "string", "description": "Follow-up message for subagent"},
                     "background": {"type": "boolean", "description": "Run follow-up message asynchronously"},
                 },
@@ -118,70 +117,75 @@ class ManageSubagentTool(BaseTool):
             if not message:
                 return format_tool_error("params", name="message", detail="required for 'send_message'")
 
-            subagent = session.agent
-            if not subagent:
-                subagent = ctx.create_agent()
-                if subagent:
-                    hist = session.agent_history
-                    if hist:
-                        subagent.history = hist
-                    # Restore role behavior (system prompt, model, tool filtering)
-                    # so follow-ups match the original spawn, even after restart.
-                    from core.subagent_stream import configure_subagent_agent
+            # Mirror the main agent's semantics: a follow-up can be sent in any
+            # status. If the subagent is currently busy (live async_task), the
+            # message is queued and drained by the running stream; otherwise it
+            # starts immediately.
+            if session.async_task and hasattr(session.async_task, "done") and not session.async_task.done():
+                if not hasattr(session, "pending_messages"):
+                    session.pending_messages = []
+                session.pending_messages.append(message)
+                return f"queued for {session.id}"
 
-                    configure_subagent_agent(
-                        subagent,
-                        session.role,
-                        app=ctx.app,
-                        project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
-                    )
-                    session.agent = subagent
+            try:
+                subagent = session.agent
+                if not subagent:
+                    subagent = ctx.create_agent()
+                    if subagent:
+                        hist = session.agent_history
+                        if hist:
+                            subagent.history = hist
+                        # Restore role behavior (system prompt, model, tool filtering)
+                        # so follow-ups match the original spawn, even after restart.
+                        from core.subagent_stream import configure_subagent_agent
 
-            # Restore the isolated worktree context for follow-up so the subagent
-            # keeps working on its own branch/cwd instead of silently falling back
-            # to the parent checkout (worktree is removed on completion).
-            if subagent and session.project_dir and session.branch_name:
+                        configure_subagent_agent(
+                            subagent,
+                            session.role,
+                            app=ctx.app,
+                            project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
+                        )
+                        session.agent = subagent
+
+                # Restore the isolated worktree context for follow-up so the subagent
+                # keeps working on its own branch/cwd instead of silently falling back
+                # to the parent checkout (worktree is removed on completion).
+                if subagent and session.project_dir and session.branch_name:
+                    from core.subagent_worktree import SubagentWorktreeManager
+
+                    project_dir = SubagentWorktreeManager.ensure_worktree_available(session, parent_dir=ctx.project_dir)
+                    subagent.project_dir = project_dir
+                    subagent.cwd = project_dir
+
+                if not subagent:
+                    return format_tool_error("context", name=session.id, detail="no active agent")
+
+                session.status = "running"
+                if not hasattr(session, "pending_messages"):
+                    session.pending_messages = []
+                session.pending_messages.append(message)
+                session.add_event({"type": "user", "text": message})
+                session.add_event({"type": "status_change", "status": "running"})
+
+                from core.subagent_stream import run_subagent_stream_bg
                 from core.subagent_worktree import SubagentWorktreeManager
-
-                project_dir = SubagentWorktreeManager.ensure_worktree_available(session, parent_dir=ctx.project_dir)
-                subagent.project_dir = project_dir
-                subagent.cwd = project_dir
-
-            if not subagent:
-                return format_tool_error("context", name=session.id, detail="no active agent")
-
-            session.status = "running"
-            session.add_event({"type": "user", "text": message})
-            session.add_event({"type": "status_change", "status": "running"})
-
-            from core.subagent_stream import (
-                merge_subagent_metrics,
-                record_subagent_step,
-                run_subagent_stream_bg,
-            )
-            from core.subagent_worktree import SubagentWorktreeManager
-
-            cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
-                ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
-            )
-
-            run_bg = (
-                bool(args["background"])
-                if "background" in args
-                else session.background
-                if hasattr(session, "background")
-                else True
-            )
-            if run_bg:
                 from tools.base import format_background_notification
+
+                cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
+                    ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
+                )
 
                 notification_hdr = format_background_notification(
                     "Subagent follow-up", session.description, session.id, "{result_text}"
                 )
+
+                # The stream drains session.pending_messages inline, so only the
+                # first (this) message is passed; queued follow-ups are consumed
+                # by the loop until empty, keeping session running.
                 bg_task = asyncio.create_task(
                     run_subagent_stream_bg(
                         subagent,
-                        message,
+                        session.pending_messages.pop(0),
                         session,
                         ctx,
                         store,
@@ -195,26 +199,10 @@ class ManageSubagentTool(BaseTool):
                 session.async_task = bg_task
 
                 return f"message sent to {session.id}"
-            else:
-                acc = [""]
-                try:
-                    async for step in subagent.stream_steps(message):
-                        record_subagent_step(step, session, acc)
-                    session.finish(STATUS_COMPLETED)
-                    store.save(session)
-                except asyncio.CancelledError:
-                    session.finish(STATUS_CANCELLED, "Cancelled by user")
-                    store.save(session)
-                    return format_tool_error("cancelled", name=session.id, detail="message cancelled")
-                except Exception as err:
-                    session.finish(STATUS_ERROR, str(err))
-                    store.save(session)
-                    return format_tool_error("subagent", detail=str(err), name=session.id)
-                finally:
-                    cleanup_fn(acc)
-                    merge_subagent_metrics(subagent, ctx)
-
-                return f"<task_result>\n{acc[0].strip() or 'Subagent replied with no text output.'}\n</task_result>"
+            except Exception as err:
+                session.finish(STATUS_ERROR, str(err))
+                store.save(session)
+                return format_tool_error("subagent_setup", detail=str(err), name=session.id)
 
         else:
             return format_tool_error("action", detail="valid: list, status, kill, send_message", name=action)

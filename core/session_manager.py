@@ -84,6 +84,7 @@ class AgentSession:
         self.agent: Any = None
         self.listeners: List[Any] = []
         self.async_task: Any = None
+        self.pending_messages: List[Any] = []  # follow-up queue (live, not persisted)
         self.project_dir: str = ""
         self.branch_name: str = ""
         self.background: bool = True
