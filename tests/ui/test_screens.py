@@ -6,7 +6,7 @@ from widgets.screens.base_selection import BaseSelectionScreen
 from widgets.screens.help import HelpScreen
 from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.screens.resume import ResumeScreen
-from widgets.screens.tasks import TaskConsoleScreen, TasksListScreen
+from widgets.screens.tasks import SubagentsScreen
 
 
 class TestConfirmScreen(unittest.TestCase):
@@ -63,21 +63,10 @@ class TestBaseSelectionScreen(unittest.TestCase):
 
 
 class TestTaskScreens(unittest.TestCase):
-    def test_console_init(self):
-        mock_task = MagicMock()
-        mock_task.command = "npm run dev"
-        s = TaskConsoleScreen(mock_task)
-        self.assertEqual(s.bg_task, mock_task)
-        self.assertEqual(s.printed_count, 0)
-
-    def test_console_bindings(self):
-        keys = [b[0] for b in TaskConsoleScreen(MagicMock()).BINDINGS]
-        self.assertIn("escape", keys)
-
     def test_list_bindings(self):
-        keys = [b[0] for b in TasksListScreen.BINDINGS]
+        keys = [b[0] for b in SubagentsScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("tab", keys)
+        self.assertIn("k", keys)
 
 
 class TestMCPScreen(unittest.TestCase):

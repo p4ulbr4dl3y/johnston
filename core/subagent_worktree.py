@@ -18,24 +18,30 @@ class SubagentWorktreeManager:
         return is_git_repository(path)
 
     @staticmethod
-    def create_worktree(project_dir: str, session_id: str) -> Tuple[Optional[str], Optional[str]]:
-        """Creates an isolated git worktree and branch for subagent session_id.
+    def create_worktree(project_dir: str, session_id: str, branch_name: str) -> Tuple[Optional[str], Optional[str]]:
+        """Creates an isolated git worktree for subagent session_id on branch_name.
 
-        Returns (worktree_path, branch_name) on success, or (None, None) if unavailable.
+        If branch_name already exists it attaches the worktree to it; otherwise the
+        branch is created from HEAD. Returns (worktree_path, branch_name) on success,
+        or (None, None) if unavailable. The branch name is caller-supplied, never
+        derived from the session id.
         """
-        if not SubagentWorktreeManager.is_git_repo(project_dir):
+        if not SubagentWorktreeManager.is_git_repo(project_dir) or not branch_name:
             return None, None
 
         base_worktree_dir = WORKTREES_DIR
         os.makedirs(base_worktree_dir, exist_ok=True)
 
         wt_path = os.path.join(base_worktree_dir, session_id)
-        branch_name = session_id if session_id.startswith("subagent-") else f"subagent-{session_id}"
 
-        # Clean up any leftover worktree or branch with same session_id
-        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=False)
+        # Clean up any leftover worktree with same session_id (keep its branch).
+        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=True)
 
-        res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=15)
+        exists = run_git(["rev-parse", "--verify", f"refs/heads/{branch_name}"], cwd=project_dir, timeout=5)
+        if exists.returncode == 0:
+            res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=15)
+        else:
+            res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=15)
         if res.returncode == 0 and os.path.exists(wt_path):
             return wt_path, branch_name
 

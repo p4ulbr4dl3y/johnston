@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.session_manager import SessionStore
+from core.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool, format_tool_error
 
 MAX_SUBAGENT_RESULT_CHARS = 15000
@@ -32,7 +33,8 @@ class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
         f"Launch an autonomous subagent for a bounded subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
-        "Returns <task_result>. workspace='branch' returns branch name and diff summary."
+        "Returns <task_result>. branch='<name>' runs the subagent on that git branch: if it matches "
+        "the current branch it works in the main tree, otherwise in an isolated worktree."
     )
     schema = {
         "type": "function",
@@ -47,10 +49,12 @@ class InvokeSubagentTool(BaseTool):
                     },
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
                     "type": {"type": "string", "description": "Subagent type"},
-                    "workspace": {"type": "string", "description": "Workspace: inherit or branch"},
-                    "session_id": {"type": "string", "description": "Subagent session ID (auto-generated if omitted)"},
+                    "branch": {
+                        "type": "string",
+                        "description": "Git branch to work on. If it matches the current branch, the subagent works in the main tree; otherwise it runs in an isolated worktree on that branch (created if missing).",
+                    },
                 },
-                "required": ["prompt", "description"],
+                "required": ["prompt", "description", "branch"],
             },
         },
     }
@@ -63,10 +67,13 @@ class InvokeSubagentTool(BaseTool):
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
         subagent_type = args.get("subagent_type", "worker").strip().lower()
-        workspace_mode = args.get("workspace", "inherit").strip().lower()
+        branch_name = args.get("branch", "").strip()
 
         if not prompt:
             return format_tool_error("params", name="prompt", detail="required")
+
+        if not branch_name:
+            return format_tool_error("params", name="branch", detail="required")
 
         session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args["session_id"] = session_id
@@ -99,10 +106,17 @@ class InvokeSubagentTool(BaseTool):
         wt_branch = None
         project_dir = ctx.project_dir
 
-        if workspace_mode in ("branch", "share"):
-            from core.subagent_worktree import SubagentWorktreeManager
+        from core.git_utils import run_git
 
-            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, session_id)
+        current_branch = ""
+        if SubagentWorktreeManager.is_git_repo(project_dir):
+            res = run_git(["branch", "--show-current"], cwd=project_dir, timeout=5)
+            current_branch = res.stdout.strip()
+
+        # Same branch as the main tree -> work directly in it; otherwise isolate
+        # in a worktree on the requested branch (created if missing).
+        if branch_name != current_branch:
+            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, session_id, branch_name)
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
@@ -128,13 +142,12 @@ class InvokeSubagentTool(BaseTool):
             prompt=prompt,
             status="running",
             project_dir=wt_path or "",
-            branch_name=wt_branch or "",
+            branch_name=wt_branch or branch_name,
         )
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 
         from core.subagent_stream import run_subagent_stream_bg
-        from core.subagent_worktree import SubagentWorktreeManager
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
             project_dir, wt_path, wt_branch, is_followup=False
@@ -164,4 +177,4 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        return f"subagent '{description}' launched ({session_id})"
+        return f"subagent '{description}' launched (session_id: {session_id})"

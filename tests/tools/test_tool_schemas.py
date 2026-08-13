@@ -41,13 +41,14 @@ class TestToolSchemas(unittest.TestCase):
         )
         self.assertIn("action", params["required"])
 
-    def test_subagent_schema_has_session_id(self):
+    def test_subagent_schema_has_branch_and_no_session_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
 
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
-        self.assertIn("session_id", props)
+        self.assertIn("branch", props)
+        self.assertIn("branch", InvokeSubagentTool.schema["function"]["parameters"]["required"])
+        self.assertNotIn("session_id", props)
         self.assertNotIn("task_id", props)
-        self.assertNotIn("task_id", props and props.get("edits", {}))
 
     def test_manage_subagent_schema_has_session_id(self):
         from tools.manage_subagent import ManageSubagentTool

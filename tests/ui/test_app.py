@@ -12,7 +12,7 @@ from widgets.modal_screens import (
     ProvidersScreen,
     ResumeScreen,
     RewindScreen,
-    TasksListScreen,
+    SubagentsScreen,
 )
 
 
@@ -90,10 +90,10 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
             self.assertEqual(len(chat_view.get_user_messages()), 0)
 
-            # 8. Test /tasks
-            await handle_slash_command(app, "/tasks")
+            # 8. Test /subagents
+            await handle_slash_command(app, "/subagents")
             await pilot.pause(0.2)
-            self.assertFalse(isinstance(app.screen, TasksListScreen))
+            self.assertFalse(isinstance(app.screen, SubagentsScreen))
 
             # 9. Test mode toggle via Shift+Tab
             self.assertEqual(getattr(app.agent, "role", "worker"), "worker")

@@ -15,7 +15,7 @@ from widgets.modal_screens import (
     ResumeScreen,
     RewindScreen,
     SkillsScreen,
-    TasksListScreen,
+    SubagentsScreen,
     ThinkingEffortScreen,
 )
 from widgets.screens.constants import MESSAGE_INPUT
@@ -332,29 +332,22 @@ class ResumeCommand(BaseCommand):
         app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
 
 
-class TasksCommand(BaseCommand):
-    name = "/tasks"
-    aliases = ["/task"]
-    description = "Manage background tasks"
+class SubagentsCommand(BaseCommand):
+    name = "/subagents"
+    aliases = ["/agents", "/subagent"]
+    description = "Manage subagents"
 
     async def execute(self, app) -> None:
-        all_tasks = getattr(app, "background_tasks", [])
-        curr_sid = getattr(app, "current_session_id", None)
-        if curr_sid:
-            tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
-        else:
-            tasks = list(all_tasks)
-        tasks = [t for t in tasks if getattr(t, "is_background", False)]
-
         store = getattr(app, "sm", None)
+        curr_sid = getattr(app, "current_session_id", None)
         sessions = []
         if store:
             sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
-        if not tasks and not sessions:
-            app.notify("No active background tasks", severity="warning")
+        if not sessions:
+            app.notify("No active subagents", severity="warning")
             return
-        app.push_screen(TasksListScreen(default_tab=0))
+        app.push_screen(SubagentsScreen())
 
 
 class SkillsCommand(BaseCommand):
@@ -498,7 +491,7 @@ COMMAND_CLASSES = [
     ThinkingEffortCommand,
     RewindCommand,
     ResumeCommand,
-    TasksCommand,
+    SubagentsCommand,
     SkillsCommand,
     MCPCommand,
     LintersCommand,
