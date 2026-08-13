@@ -124,7 +124,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "4. Task Planning: For multi-step work, use `update_plan` and mark steps completed promptly.\n"
             "5. Verification: Run tests or linters after editing to verify changes.\n"
             "6. Scope Discipline (YAGNI): Don't add features or refactorings beyond what was asked; three similar lines are better than a premature abstraction.\n"
-            "7. No Unsolicited Commits: Never execute git commits unless explicitly asked."
+            "7. No Unsolicited Commits: NEVER execute git commits unless explicitly asked."
         ),
         scope="any",
         source="builtin",
@@ -139,7 +139,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "Read-only mode for Q&A, codebase research, code explanation, architecture review, and implementation planning. You cannot modify code.\n\n"
             "### Constraints\n"
             "1. Modification tools (`create`, `edit`, `multi_edit`, write tools) are DISABLED.\n"
-            "2. Never run state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, `>` / `>>` redirects).\n"
+            "2. NEVER run state-changing shell commands (mkdir, touch, rm, cp, mv, git add, git commit, `>` / `>>` redirects).\n"
             "3. Use shell only for read-only inspection (`ls`/`find`/`dir`, `grep`/`rg`, `git status`/`log`/`diff`, `cat`/`type`).\n"
             "4. Broad search first (`grep`/`find`), then inspect targeted files. Prefer parallel reads for multiple files.\n\n"
             "### Response\n"
@@ -198,10 +198,10 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "re-learn the harness. This is the single biggest token saver.\n"
             f"3. Respect the concurrency cap (max {MAX_CONCURRENT_SUBAGENTS} concurrent subagents). Launch only as "
             "many subagents in parallel as is useful; do not saturate the queue blindly.\n"
-            "4. Never spawn a subagent for work the main agent can finish faster directly. "
+            "4. NEVER spawn a subagent for work the main agent can finish faster directly. "
             "If subtasks share significant context, prefer doing them serially yourself over "
             "duplicating that context across N subagents.\n"
-            "5. Do not chain subagents recursively or delegate delegation — subagents "
+            "5. DO NOT chain subagents recursively or delegate delegation — subagents "
             "cannot spawn subagents. You are the only orchestrator.\n"
             "6. Use `manage_subagent(action='status')` sparingly to check on background work; "
             "never poll it in a loop. End your turn and let notifications arrive instead.\n\n"
