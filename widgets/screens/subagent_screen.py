@@ -6,6 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Label
 
 from widgets.chat_view import ChatView
+from widgets.status_footer import StatusFooter
 
 
 class SubagentViewScreen(Screen[None]):
@@ -27,13 +28,15 @@ class SubagentViewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
+            yield Label("", id="subagent-info")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield Label("esc: cancel", id="subagent-hint")
+            yield StatusFooter(id="status-footer")
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.focus()
         chat_view.clear_welcome()
+        self._update_info_label(self.session_id_or_desc)
 
         store = getattr(self.app, "sm", None) if self.app else None
         if store is None:
@@ -55,7 +58,18 @@ class SubagentViewScreen(Screen[None]):
             self.run_worker(_no_sess())
             return
 
+        if getattr(self.session, "description", None):
+            self._update_info_label(self.session.description)
+
         self.run_worker(self._load_history_session())
+
+    def _update_info_label(self, text: str) -> None:
+        label = self.query_one("#subagent-info", Label)
+        label.update(f"{text}  •  esc: cancel")
+        try:
+            self.query_one("#status-footer", StatusFooter).refresh_footer()
+        except Exception:
+            pass
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
