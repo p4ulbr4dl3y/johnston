@@ -25,6 +25,9 @@ class CreateTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+        from tools.registry import normalize_tool_args
+
+        args = normalize_tool_args("create", args)
         ctx = self._ensure_context(ctx)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
 
