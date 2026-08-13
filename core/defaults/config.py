@@ -11,25 +11,6 @@ THEME_SECONDARY = "#f4f4f5"
 THEME_MUTED = "#71717a"
 THEME_SUBTLE = "#e4e4e7"
 
-# Standard Ignored Directories
-DEFAULT_IGNORE_DIRS = {
-    ".git",
-    ".johnston",
-    "venv",
-    ".venv",
-    "env",
-    ".env",
-    "node_modules",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "dist",
-    "build",
-    ".next",
-    ".nuxt",
-}
-
 # Permissions Defaults
 DEFAULT_PERMISSIONS = {
     "default": "allow",
