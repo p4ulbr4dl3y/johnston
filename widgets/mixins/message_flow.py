@@ -102,6 +102,8 @@ class MessageFlowMixin:
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
         """Stream AI response generation with cancellation support via Esc"""
+        from core.subagent_stream import record_subagent_step
+
         act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
         is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
         if not is_connected or not getattr(self.agent, "model", ""):
@@ -119,10 +121,15 @@ class MessageFlowMixin:
         self.is_generating = True
         chat_view = self.query_one(ChatView)
 
+        # Ensure the transcript session exists (source of truth for persistence).
+        session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
+        transcript_acc = [""]
+
         try:
 
             if show_in_ui:
                 await chat_view.add_user_message(user_text, attachments=attachments)
+                session.add_event({"type": "user", "text": user_text})
 
             bot_msg = None
 
@@ -182,6 +189,14 @@ class MessageFlowMixin:
                 val1 = step[1] if len(step) > 1 else ""
                 val2 = step[2] if len(step) > 2 else ""
                 val3 = step[3] if len(step) > 3 else None
+
+                if event_type == "queued_user_message":
+                    # Queued prompts are recorded into the transcript as user msgs;
+                    # do not feed the raw 4-tuple to record_subagent_step.
+                    session.add_event({"type": "user", "text": val1})
+                    transcript_acc[0] = ""
+                else:
+                    record_subagent_step(step, session, transcript_acc)
 
                 if event_type == "thinking_start":
                     thinking_widget = await chat_view.add_thinking_widget(val1)
