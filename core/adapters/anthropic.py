@@ -14,7 +14,7 @@ from core.adapters.base import (
     sort_keys_recursive,
 )
 from core.base_provider.tools import new_tool_call_id
-from core.thinking_effort import build_anthropic_thinking_payload
+from core.infrastructure.runtime.thinking_effort import build_anthropic_thinking_payload
 
 # Bounded LRU cache for deterministic tool-schema sorting. `sort_keys_recursive`
 # deep-copies + sorts the whole structure on every stream request; tool schemas

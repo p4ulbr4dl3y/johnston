@@ -248,7 +248,7 @@ async def _handle_interruption(
             agent.history.append({"role": "assistant", "content": partial})
         agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
         try:
-            from core.token_util import estimate_tokens
+            from core.infrastructure.runtime.token_util import estimate_tokens
 
             sys_tok = getattr(agent, "_last_sys_tokens", 0)
             hist_tok = estimate_tokens(agent.history)

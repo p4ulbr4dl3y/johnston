@@ -10,7 +10,7 @@ from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.models_catalog import cached_json_read, catalog, extract_context_length
 from core.platform_utils import atomic_write_json, read_json
-from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
+from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 
 logger = logging.getLogger(__name__)
 

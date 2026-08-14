@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-from core.thinking_effort import (
+from core.infrastructure.runtime.thinking_effort import (
     build_gemini_thinking_config,
     build_openai_thinking_kwargs,
     normalize_thinking_effort,

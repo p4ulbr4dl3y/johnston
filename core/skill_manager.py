@@ -12,8 +12,8 @@ from typing import Any, Dict, List, Optional
 from core.config import CONFIG_DIR
 from core.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
-from core.frontmatter import parse_frontmatter
-from core.fs_signature import compute_dir_signature_recursive
+from core.infrastructure.runtime.frontmatter import parse_frontmatter
+from core.infrastructure.runtime.fs_signature import compute_dir_signature_recursive
 
 logger = logging.getLogger(__name__)
 
