@@ -9,7 +9,7 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.permission_manager import PermissionManager
-from tools.registry import REGISTRY
+from core.tool_helpers import get_all_tool_types
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.screens.constants import (
@@ -124,7 +124,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
         # --- Builtin tools section ---
         items.append(self._header_item("builtin", "Builtin"))
-        for t in sorted(REGISTRY):
+        for t in get_all_tool_types():
             act = tools_cfg.get(t) or default_act
             items.append(self._tool_item(t, act, tools_cfg))
 
