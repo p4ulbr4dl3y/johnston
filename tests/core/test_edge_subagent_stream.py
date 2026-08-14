@@ -133,6 +133,18 @@ class FakeAgent:
         self.total_tokens = 0
         self.cost_usd = 0.0
 
+    def get_metrics(self):
+        """Mirrors core.base_provider.agent.get_metrics contract used by the footer."""
+        return {
+            "total_tokens": self.total_tokens,
+            "tokens_input": self.tokens_input,
+            "tokens_output": self.tokens_output,
+            "context_used": 0,
+            "context": "128k",
+            "context_limit": 128000,
+            "cost_usd": self.cost_usd,
+        }
+
 
 class _FakeApp:
     def __init__(self, agent=None):
@@ -333,6 +345,34 @@ class TestRunStream:
         store = FakeStore()
         await run_subagent_stream_bg(sub, "p", sess, ctx, store)
         assert ctx.app.agent.tokens_input == 42
+
+    @pytest.mark.asyncio
+    async def test_merged_metrics_visible_via_parent_get_metrics(self):
+        """End-to-end: subagent token/cost merge shows up in the parent agent's
+        get_metrics() — the exact contract the main footer reads for row2."""
+        sub = FakeSubagent(steps=[("bot_text", "hi")])
+        sub.tokens_input = 24
+        sub.tokens_output = 18
+        sub.total_tokens = 42
+        sub.cost_usd = 0.0075
+        sess = make_session()
+        store = FakeStore()
+
+        parent_agent = FakeAgent()
+        ctx = FakeCtx()  # has refresh_status; reuse its FakeAgent holder
+        ctx.app = _FakeApp(parent_agent)
+
+        await run_subagent_stream_bg(sub, "p", sess, ctx, store)
+
+        metrics = parent_agent.get_metrics()
+        assert metrics["tokens_input"] == 24
+        assert metrics["tokens_output"] == 18
+        assert metrics["total_tokens"] == 42
+        assert metrics["cost_usd"] == 0.0075
+        # Merger bookkeeping records the already-merged totals on the subagent,
+        # so a second run of the merger (e.g. re-finish) is a no-op.
+        assert sub._merged_tokens_input == 24
+        assert sub._merged_total_tokens == 42
 
     @pytest.mark.asyncio
     async def test_return_acc_first_value(self):
