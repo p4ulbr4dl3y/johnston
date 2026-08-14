@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import math
-import time
 
 from textual import events, work
 
@@ -11,6 +9,16 @@ from widgets.commands import handle_slash_command
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger(__name__)
+
+
+def _register_tool_widget(mixin):
+    """Return a callback that stores the created tool widget on the mixin."""
+
+    def _cb(widget):
+        mixin.current_tool_widget = widget
+        return widget
+
+    return _cb
 
 
 class MessageFlowMixin:
@@ -82,28 +90,16 @@ class MessageFlowMixin:
             kwargs = {"attachments": attachments} if attachments else {}
             self.generate_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
-    async def _create_git_checkpoint_async(self, chat_view) -> None:
-        try:
-            await self.save_current_session_async()
-            curr_sid = getattr(self, "current_session_id", None)
-            if curr_sid:
-                user_msgs = chat_view.get_user_messages()
-                msg_idx = len(user_msgs) - 1
-                if msg_idx >= 0:
-                    proj_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
-                    from core.git_checkpoint import GitCheckpointManager
-
-                    await asyncio.to_thread(
-                        GitCheckpointManager.create_checkpoint, curr_sid, msg_idx, project_path=proj_path
-                    )
-        except Exception as e:
-            logger.warning("Git checkpoint creation failed: %s", e)
-
     @work(exclusive=True, thread=False)
     async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
-        """Stream AI response generation with cancellation support via Esc"""
-        from core.subagent_stream import record_subagent_step
+        """Stream AI response generation with cancellation support via Esc.
 
+        Thin wrapper that builds a GenCanvas and delegates to the engine.
+        """
+        from core.ai_generator import GenCanvas
+        from core.ai_generator import generate_ai_response as _engine
+
+        # ---- connectivity check (mixin-level) ----
         act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
         is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
         if not is_connected or not getattr(self.agent, "model", ""):
@@ -121,213 +117,52 @@ class MessageFlowMixin:
         self.is_generating = True
         chat_view = self.query_one(ChatView)
 
-        # Ensure the transcript session exists (source of truth for persistence).
+        # Ensure the transcript session exists.
         session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
-        transcript_acc = [""]
+
+        # ---- build canvas ----
+        project_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
+
+        canvas = GenCanvas(
+            add_user_message=lambda text, atts: chat_view.add_user_message(text, attachments=atts),
+            add_thinking_widget=chat_view.add_thinking_widget,
+            add_tool_call=lambda name, desc, args: chat_view.add_tool_call(name, desc, args=args),
+            register_tool_widget=_register_tool_widget(self),
+            add_bot_message=chat_view.add_bot_message,
+            add_event_divider=chat_view.add_event_divider,
+            get_user_messages=chat_view.get_user_messages,
+            refresh_status_footer=self.refresh_status_footer,
+            notify=self.notify,
+            save_session=lambda: self.save_current_session_async(),
+        )
+
+        # ---- pre-stream footer & CancelledError guard ----
+        try:
+            footer = self.query_one("#status-footer", StatusFooter)
+            footer.set_generating(True)
+        except Exception:
+            pass
 
         try:
-
-            if show_in_ui:
-                await chat_view.add_user_message(user_text, attachments=attachments)
-                session.add_event({"type": "user", "text": user_text, "show_in_ui": True})
-            else:
-                session.add_event({"type": "user", "text": user_text, "show_in_ui": False})
-
-            bot_msg = None
-
-            await self._create_git_checkpoint_async(chat_view)
-
-            full_prompt = user_text
+            await _engine(
+                self.agent,
+                session,
+                canvas,
+                session_id=getattr(self, "current_session_id", None),
+                user_text=user_text,
+                show_in_ui=show_in_ui,
+                attachments=attachments,
+                project_path=project_path,
+            )
         except asyncio.CancelledError:
-            # Cancellation can arrive while the user message / checkpoint work
-            # above is awaiting (before the main stream loop). It must not leave
-            # is_generating stuck True with a dead generation that never drains
-            # the message queue, so run the same cleanup as the finally below.
-            try:
-                footer = self.query_one("#status-footer", StatusFooter)
-                footer.set_generating(False)
-            except Exception:
-                pass
-            try:
-                if getattr(self, "is_app_active", True):
-                    await self.save_current_session_async(force=True)
-            except Exception:
-                pass
-            self.is_generating = False
-            if getattr(self, "is_app_active", True):
-                next_item = self._pop_queued_for_current_session()
-                if next_item is not None:
-                    asyncio.create_task(self._process_queued_message(next_item[0], next_item[1], next_item[2]))
-            return
-        except Exception as e:
-            try:
-                footer = self.query_one("#status-footer", StatusFooter)
-                footer.set_generating(False)
-            except Exception:
-                pass
-            try:
-                if getattr(self, "is_app_active", True):
-                    await self.save_current_session_async(force=True)
-            except Exception:
-                pass
-            self.is_generating = False
-            if getattr(self, "is_app_active", True):
-                self.notify(f"Generation failed: {e}", severity="error")
-            return
-
-        thinking_widget = None
-        current_tool_widget = None
-
-        start_time = time.time()
-        try:
-            try:
-                footer = self.query_one("#status-footer", StatusFooter)
-                footer.set_generating(True)
-            except Exception:
-                pass
-
-            async for step in self.agent.stream_steps(full_prompt, attachments=attachments):
-                event_type = step[0]
-                val1 = step[1] if len(step) > 1 else ""
-                val2 = step[2] if len(step) > 2 else ""
-                val3 = step[3] if len(step) > 3 else None
-
-                if event_type == "queued_user_message":
-                    # Queued prompts are recorded into the transcript as user msgs,
-                    # rendered to the chat view, and given their own git checkpoint.
-                    q_msg = val1
-                    q_atts = val2 if val2 else None
-                    q_show = val3 if val3 is not None else True
-                    session.add_event({"type": "user", "text": q_msg, "show_in_ui": q_show})
-                    transcript_acc[0] = ""
-                    if q_show:
-                        await chat_view.add_user_message(q_msg, attachments=q_atts)
-                    await self._create_git_checkpoint_async(chat_view)
-                else:
-                    record_subagent_step(step, session, transcript_acc)
-
-                if event_type == "thinking_start":
-                    thinking_widget = await chat_view.add_thinking_widget(val1)
-                elif event_type == "thinking_delta":
-                    if thinking_widget:
-                        thinking_widget.update_thinking(val1)
-                elif event_type == "thinking_end":
-                    if thinking_widget:
-                        try:
-                            duration = float(val1)
-                            if not math.isfinite(duration):
-                                duration = 0.0
-                        except Exception:
-                            duration = 0.0
-                        thinking_widget.finish_thinking(duration, val2)
-                    thinking_widget = None
-                elif event_type == "tool":
-                    if bot_msg:
-                        if not bot_msg.content.strip():
-                            bot_msg.remove()
-                        else:
-                            # Flush any pending debounced stream render so the last
-                            # character is drawn before finalizing to the tool call.
-                            bot_msg.flush_pending_stream()
-                            await bot_msg.finalize_stream()
-                    bot_msg = None
-                    targs = val3 if isinstance(val3, dict) else {}
-                    current_tool_widget = await chat_view.add_tool_call(val1, val2, args=targs)
-                    self.current_tool_widget = current_tool_widget
-                elif event_type == "tool_result":
-                    if current_tool_widget:
-                        current_tool_widget.set_result(val1)
-                    try:
-                        await self.save_current_session_async()
-                    except Exception:
-                        pass
-                elif event_type == "bot_delta":
-                    if val1:
-                        if bot_msg is None:
-                            bot_msg = await chat_view.add_bot_message()
-                        # Stream whitespace deltas too (e.g. a trailing newline right
-                        # before a tool call) so the final character isn't dropped.
-                        bot_msg.append_stream_content(val1)
-                elif event_type == "bot_reset":
-                    # A retry is restarting the reply from scratch: drop the partial
-                    # text streamed so far so it doesn't duplicate the new attempt.
-                    if bot_msg is not None:
-                        try:
-                            await bot_msg.reset_stream()
-                        except Exception:
-                            pass
-                elif event_type in ("bot_text", "outro"):
-                    if val1.strip():
-                        if bot_msg is None:
-                            bot_msg = await chat_view.add_bot_message()
-                        await bot_msg.finalize_stream(val1)
-                        bot_msg = None
-                    try:
-                        await self.save_current_session_async()
-                    except Exception:
-                        pass
-                elif event_type == "event_divider":
-                    await chat_view.add_event_divider(val1 or "Session Compacted")
-                    self.refresh_status_footer()
-                    try:
-                        await self.save_current_session_async()
-                    except Exception:
-                        pass
-        except (asyncio.CancelledError, RuntimeError, Exception) as e:
-            if thinking_widget:
-                try:
-                    duration = time.time() - start_time
-                    thinking_widget.finish_thinking(duration)
-                except Exception:
-                    pass
-            if bot_msg and bot_msg.content.strip():
-                try:
-                    await bot_msg.finalize_stream()
-                except Exception:
-                    pass
-            if isinstance(e, (asyncio.CancelledError, RuntimeError)):
-                if hasattr(self, "agent") and hasattr(self.agent, "history"):
-                    partial = (bot_msg.content if bot_msg else "").strip()
-                    if partial:
-                        self.agent.history.append({"role": "assistant", "content": partial})
-                    self.agent.history.append(
-                        {"role": "user", "content": "[System Note: Response interrupted by user]"}
-                    )
-                    try:
-                        from core.token_util import estimate_tokens
-
-                        sys_tok = getattr(self.agent, "_last_sys_tokens", 0)
-                        hist_tok = estimate_tokens(self.agent.history)
-                        self.agent.last_context_tokens = sys_tok + hist_tok
-                        self.refresh_status_footer()
-                    except Exception:
-                        pass
-                try:
-                    await chat_view.add_event_divider("Response Interrupted")
-                except Exception:
-                    pass
-
-                # The current tool may have been killed mid-execution (before a
-                # tool_result event). Mark its widget as cancelled so it doesn't
-                # stay visually stuck in "running".
-                if getattr(self, "current_tool_widget", None) is not None:
-                    try:
-                        self.current_tool_widget.mark_cancelled()
-                    except Exception:
-                        pass
-
-            else:
-                if getattr(self, "is_app_active", True):
-                    try:
-                        self.notify(f"Generation failed: {e}", severity="error")
-                    except Exception:
-                        pass
+            # The engine raises CancelledError outwards after cleaning up
+            # partial widgets. We just need to reset mixin-level state and
+            # drain the queue.
+            pass
+        except Exception:
+            # The engine already called canvas.notify for generic exceptions.
+            pass
         finally:
-            if bot_msg and not getattr(bot_msg, "content", "").strip():
-                try:
-                    bot_msg.remove()
-                except Exception:
-                    pass
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
                 footer.set_generating(False)
@@ -339,8 +174,6 @@ class MessageFlowMixin:
             except Exception:
                 pass
             self.is_generating = False
-            # Race guard: if a message was queued after the agent's last step
-            # check but before we finished, kick off a fresh generation.
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
                 if next_item is not None:
