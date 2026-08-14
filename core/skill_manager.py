@@ -39,7 +39,7 @@ class SkillManager:
 
     def ensure_dirs(self):
         os.makedirs(self.global_dir, exist_ok=True)
-        from core.platform_utils import atomic_write_text
+        from core.infrastructure.platform.platform_utils import atomic_write_text
 
         # Provision bundled default skills (init, handoff, johnston-guide) into
         # the user's global skills dir. Each skill is a directory with SKILL.md
@@ -248,7 +248,7 @@ class SkillManager:
             else:
                 new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
 
-            from core.platform_utils import atomic_write_text
+            from core.infrastructure.platform.platform_utils import atomic_write_text
 
             atomic_write_text(filepath, new_content)
             self.invalidate_cache()

@@ -151,7 +151,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             mock_img = Image.new("L", (50, 50))
             with (
-                patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+                patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
                 patch("os.makedirs"),
                 patch("os.path.getsize", return_value=512),
                 patch.object(Image.Image, "save") as mock_save,

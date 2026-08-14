@@ -36,7 +36,7 @@ class TestGenerateChunkUnifiedDiff(unittest.TestCase):
         self.assertIn("-a", lines)
 
     def test_fallback_when_git_unavailable(self):
-        with patch("core.git_utils.run_git", side_effect=OSError("no git")):
+        with patch("core.infrastructure.runtime.git_utils.run_git", side_effect=OSError("no git")):
             lines = generate_chunk_unified_diff("a\nb\n", "a\nc\n", "f.py", 2)
         self.assertIn("-b", lines)
         self.assertIn("+c", lines)

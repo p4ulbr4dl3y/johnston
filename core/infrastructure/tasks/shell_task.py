@@ -9,9 +9,9 @@ import os
 import signal
 from typing import Any, Optional
 
+from core.infrastructure.platform.platform_utils import decode_output, terminate_process
 from core.infrastructure.tasks.output import OutputBuffer, strip_ansi
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
-from core.platform_utils import decode_output, terminate_process
 from tools.base import format_tool_error
 
 _TASK_TERMINATED_BY_USER = "\n[Task terminated by user]\n"

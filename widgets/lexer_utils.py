@@ -116,7 +116,7 @@ def generate_chunk_unified_diff(
     if not old_content and not new_content:
         return []
 
-    from core.git_utils import make_git_diff
+    from core.infrastructure.runtime.git_utils import make_git_diff
 
     diff_text = make_git_diff(
         old_content,

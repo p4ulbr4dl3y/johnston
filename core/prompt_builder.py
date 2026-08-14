@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
-from core.git_utils import run_git
+from core.infrastructure.runtime.git_utils import run_git
 from core.skill_manager import SkillManager
 from tools.invoke_subagent import InvokeSubagentTool
 

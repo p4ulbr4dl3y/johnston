@@ -16,7 +16,7 @@ import httpx
 
 from core.config import CONFIG_DIR
 from core.defaults.config import DEFAULT_CONTEXT_LIMIT
-from core.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 

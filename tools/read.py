@@ -6,7 +6,7 @@ import time
 from collections import OrderedDict
 from typing import Any, Callable, Dict, Tuple
 
-from core.platform_utils import IMAGE_EXTENSIONS
+from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
 from tools.utils import DEFAULT_LINE_WINDOW, MAX_TOOL_PAYLOAD_BYTES

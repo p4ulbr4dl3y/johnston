@@ -126,7 +126,7 @@ class InvokeSubagentTool(BaseTool):
         wt_branch = None
         project_dir = ctx.project_dir
 
-        from core.git_utils import run_git
+        from core.infrastructure.runtime.git_utils import run_git
 
         current_branch = ""
         if SubagentWorktreeManager.is_git_repo(project_dir):
