@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 
-from tools.base import BaseTool, format_tool_error
+from core.infrastructure.errors import format_tool_error
+from tools.base import BaseTool
 
 
 class UpdatePlanTool(BaseTool):

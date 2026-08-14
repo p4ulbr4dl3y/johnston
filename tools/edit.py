@@ -2,10 +2,10 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
+from core.infrastructure.errors import format_tool_error
 from core.linters_manager import get_linters_manager
 from tools.base import (
     BaseTool,
-    format_tool_error,
     make_unified_diff,
     read_file_text,
     resolve_path,

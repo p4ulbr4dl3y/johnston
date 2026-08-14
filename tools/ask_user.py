@@ -1,7 +1,8 @@
 import asyncio
 from typing import Any, Dict
 
-from tools.base import BaseTool, format_tool_error
+from core.infrastructure.errors import format_tool_error
+from tools.base import BaseTool
 
 
 def _is_recommended_option(opt: str) -> bool:

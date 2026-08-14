@@ -8,6 +8,13 @@ and a hard byte cap with a truncation marker.
 import re
 from typing import List, Optional
 
+__all__ = [
+    "OutputBuffer",
+    "strip_ansi",
+    "process_carriage_returns",
+    "tail_output",
+]
+
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 # Cap on retained raw output bytes for a task. Old chunks are dropped from the
@@ -88,3 +95,10 @@ class OutputBuffer:
 
     def tail(self, max_chars: int = 4000) -> str:
         return self.formatted(max_chars=max_chars)
+
+
+def tail_output(text: str, max_chars: int = 2000) -> str:
+    """Returns tail of text with a truncation notice if max_chars is exceeded."""
+    if not text or len(text) <= max_chars:
+        return text
+    return f"... [Output truncated, showing last {max_chars} chars]\n{text[-max_chars:]}"

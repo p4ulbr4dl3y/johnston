@@ -1,8 +1,9 @@
 import inspect
 from typing import Any, Dict, Type
 
+from core.infrastructure.errors import format_tool_error
 from tools.ask_user import AskUserTool
-from tools.base import BaseTool, _resolve_app, format_tool_error
+from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.invoke_subagent import InvokeSubagentTool

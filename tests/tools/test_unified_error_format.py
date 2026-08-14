@@ -12,7 +12,7 @@ import os
 import unittest
 from pathlib import Path
 
-from tools.base import format_tool_error
+from core.infrastructure.errors import format_tool_error
 
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
 
