@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from core.git_checkpoint import GitCheckpointManager
+from core.git_utils import run_git
 from core.rules_manager import RuleDefinition, RulesManager
 
 
@@ -68,13 +69,13 @@ class TestRulesManagerEdge(unittest.TestCase):
 
     def test_get_formatted_rules_no_match_empty(self):
         _write_rule(self.tmpdir, "a.md", "---\nrole: worker\n---\nx")
-        with mock.patch("core.rules_manager.CONFIG_DIR", self.tmpdir):
+        with mock.patch("core.markdown_scanner.CONFIG_DIR", self.tmpdir):
             rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
             self.assertEqual(len(rules), 1)
             self.assertEqual(self.rm.get_formatted_rules(role="explorer", project_dir=self.tmpdir), "")
 
     def test_load_rules_include_global_false(self):
-        with mock.patch("core.rules_manager.CONFIG_DIR", self.tmpdir):
+        with mock.patch("core.markdown_scanner.CONFIG_DIR", self.tmpdir):
             # global rule
             global_rules = os.path.join(self.tmpdir, "rules")
             os.makedirs(global_rules, exist_ok=True)
@@ -213,8 +214,8 @@ class TestGitCheckpointEdge(unittest.TestCase):
         shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo)
         # create a ref with non-numeric trailing component in the session namespace
         bad_ref = f"{GitCheckpointManager.REF_PREFIX}/s/notnum"
-        sha = GitCheckpointManager._run_git(["rev-parse", "HEAD"], cwd=shadow_dir).stdout.strip()
-        GitCheckpointManager._run_git(["update-ref", bad_ref, sha], cwd=shadow_dir)
+        sha = run_git(["rev-parse", "HEAD"], cwd=shadow_dir).stdout.strip()
+        run_git(["update-ref", bad_ref, sha], cwd=shadow_dir)
         # should not raise ValueError
         GitCheckpointManager.purge_checkpoints_after("s", 0, project_path=repo)
         # numeric checkpoint 0 survives purge
@@ -233,8 +234,8 @@ class TestGitCheckpointEdge(unittest.TestCase):
         repo = self._init_git_repo()
         GitCheckpointManager.ensure_git_repo(repo)
         shadow, _ = GitCheckpointManager._get_shadow_dir(repo)
-        name = GitCheckpointManager._run_git(["config", "user.name"], cwd=shadow).stdout.strip()
-        email = GitCheckpointManager._run_git(["config", "user.email"], cwd=shadow).stdout.strip()
+        name = run_git(["config", "user.name"], cwd=shadow).stdout.strip()
+        email = run_git(["config", "user.email"], cwd=shadow).stdout.strip()
         self.assertEqual(name, "Johnston AI")
         self.assertEqual(email, "johnston@local")
 

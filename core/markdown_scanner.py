@@ -12,8 +12,8 @@ import time
 from typing import Any, Callable, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
-from core.fs_signature import compute_dir_signature
 from core.frontmatter import iter_md_files
+from core.fs_signature import compute_dir_signature
 
 _CACHE_TTL = 2.0  # seconds
 
@@ -25,9 +25,10 @@ def build_markdown_dirs(
     project_dir: Optional[str] = None,
     include_global: bool = True,
     subpath: str = "roles",
-    config_dir: str = CONFIG_DIR,
+    config_dir: Optional[str] = None,
 ) -> MarkdownDirs:
     """Return ``[(dir, source), ...]`` for the global and project markdown trees."""
+    config_dir = config_dir or CONFIG_DIR
     p_dir = project_dir or os.getcwd()
     dirs: MarkdownDirs = []
     if include_global:

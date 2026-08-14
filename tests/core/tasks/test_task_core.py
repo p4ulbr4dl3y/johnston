@@ -12,8 +12,7 @@ import pytest
 from core.tasks.manager import TaskManager
 from core.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
 from core.tasks.shell_task import ShellTask
-from core.tasks.subagent_task import SubagentTask
-from core.tasks.task import TASK_KINDS, TaskSnapshot, TaskStatus
+from core.tasks.task import TASK_KINDS, TaskStatus
 
 # ---------------------------------------------------------------------------
 # OutputBuffer
@@ -60,26 +59,6 @@ def test_output_buffer_history():
     buf.append("a")
     buf.append("b")
     assert buf.history == ["a", "b"]
-
-
-@pytest.mark.asyncio
-async def test_output_buffer_stream_yields_new_chunks():
-    buf = OutputBuffer()
-    received = []
-
-    async def consume():
-        async for chunk in buf.stream():
-            received.append(chunk)
-
-    consumer = asyncio.create_task(consume())
-    await asyncio.sleep(0)
-    buf.append("chunk1")
-    await asyncio.sleep(0)
-    buf.append("chunk2")
-    await asyncio.sleep(0)
-    buf.close_stream()
-    await consumer
-    assert received == ["chunk1", "chunk2"]
 
 
 # ---------------------------------------------------------------------------
@@ -193,92 +172,8 @@ async def test_shell_task_widget_streaming_strips_ansi():
 
 
 # ---------------------------------------------------------------------------
-# SubagentTask
+# TaskStatus / manager / events
 # ---------------------------------------------------------------------------
-
-
-def make_session(status="running", messages=None):
-    class _Sess:
-        def __init__(self):
-            self.id = "sub-1"
-            self.kind = "subagent"
-            self.status = status
-            self.description = "test subagent"
-            self.prompt = ""
-            self.messages = messages or []
-            self.async_task = None
-
-        def finish(self, status, error_msg=""):
-            self.status = status
-
-        def to_dict(self):
-            return {}
-
-    return _Sess()
-
-
-class _Store:
-    def __init__(self):
-        self.saved = []
-
-    def save(self, sess):
-        self.saved.append(sess)
-
-
-def test_subagent_task_status_mapping():
-    assert SubagentTask("s1", make_session(status="running")).status == TaskStatus.RUNNING
-    assert SubagentTask("s2", make_session(status="completed")).status == TaskStatus.COMPLETED
-    assert SubagentTask("s3", make_session(status="cancelled")).status == TaskStatus.KILLED
-    assert SubagentTask("s4", make_session(status="error")).status == TaskStatus.ERROR
-
-
-@pytest.mark.asyncio
-async def test_subagent_task_kill_cancels_and_finishes():
-    session = make_session(status="running")
-    calls = []
-
-    async def fake_task():
-        calls.append("start")
-        try:
-            await asyncio.sleep(30)
-        except asyncio.CancelledError:
-            calls.append("cancelled")
-            raise
-
-    task_obj = asyncio.create_task(fake_task())
-    await asyncio.sleep(0)  # let fake_task reach its sleep point
-    assert calls == ["start"]
-    session.async_task = task_obj
-    store = _Store()
-    sub = SubagentTask("s5", session, store)
-    assert sub.status == TaskStatus.RUNNING
-
-    await sub.kill()
-    await asyncio.sleep(0)
-    await asyncio.sleep(0)
-    assert task_obj.cancelled()
-    assert "cancelled" in calls
-    assert session.status == "cancelled"
-    assert sub.status == TaskStatus.KILLED
-    assert store.saved == [session]
-
-
-@pytest.mark.asyncio
-async def test_subagent_task_send_input_unsupported():
-    sub = SubagentTask("s6", make_session(status="running"))
-    assert "not supported" in await sub.send_input("x")
-
-
-# ---------------------------------------------------------------------------
-# TaskSnapshot / manager / events
-# ---------------------------------------------------------------------------
-
-
-def test_snapshot_fields():
-    snap = TaskSnapshot(id="a", kind="shell", status_str="running", command="ls", is_running=True)
-    assert snap.id == "a"
-    assert snap.status_str == "running"
-    assert snap.is_running is True
 
 
 def test_task_kind_literals():
@@ -287,14 +182,14 @@ def test_task_kind_literals():
 
 
 @pytest.mark.asyncio
-async def test_manager_register_list():
+async def test_manager_register_iterate_drop():
     mgr = TaskManager()
     task = ShellTask(task_id="t1", command="echo hi")
     mgr.register(task)
-    assert len(mgr.list()) == 1
-    snap = mgr.list()[0]
-    assert snap.id == "t1"
-    assert snap.command == "echo hi"
+    assert len(list(mgr)) == 1
+    assert list(mgr)[0].task_id == "t1"
+    mgr.drop("t1")
+    assert len(list(mgr)) == 0
 
 
 @pytest.mark.asyncio

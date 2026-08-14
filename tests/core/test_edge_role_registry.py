@@ -382,7 +382,7 @@ class TestSingletonAndCache:
                 f.write("---\nkey: mut\n---\nversion 2")
             os.utime(p, (time.time() + 5, time.time() + 5))
             reg.invalidate_cache()
-            reg.reload(project_dir=tmpdir)
+            reg.load_roles(project_dir=tmpdir)
             assert reg.roles["mut"].prompt == "version 2"
 
     def test_ttl_expiry_reloads_if_signature_changed(self):

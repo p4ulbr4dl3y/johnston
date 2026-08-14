@@ -46,7 +46,7 @@ model: gpt-4o
 You run tests and report coverage.""")
 
             registry = RoleRegistry()
-            registry.reload(project_dir=tmpdir)
+            registry.load_roles(project_dir=tmpdir)
             defs = registry.list_subagent_roles()
 
             self.assertIn("reviewer", defs)
