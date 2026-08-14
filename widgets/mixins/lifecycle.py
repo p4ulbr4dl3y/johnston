@@ -30,7 +30,7 @@ class LifecycleMixin:
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):
             self.load_session_ui(self.resume_session_id)
-        from core.mcp_manager import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
 
         self.refresh_status_footer()
         asyncio.create_task(catalog.refresh())
@@ -80,7 +80,7 @@ class LifecycleMixin:
             logger.debug(f"Unmount session save error: {err}")
 
         try:
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
 
             get_mcp_manager().stop_all()
         except Exception as err:

@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from core.mcp_manager import MCPManager
+from core.infrastructure.mcp import MCPManager
 from widgets.commands import COMMAND_REGISTRY
 
 
@@ -205,7 +205,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         shutil.rmtree(self.test_dir)
 
     def test_get_mcp_manager_singleton(self):
-        from core.mcp_manager import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
 
         inst1 = get_mcp_manager(self.test_dir)
         self.assertEqual(inst1.project_dir, os.path.realpath(self.test_dir))
@@ -219,7 +219,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
     def test_list_changed_notification(self):
         from unittest.mock import MagicMock, patch
 
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("test", "echo")
         client.process = MagicMock()
@@ -240,7 +240,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
     def test_client_start_initialize_and_call_tool(self):
         from unittest.mock import MagicMock
 
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("mock_server", "echo hello", cwd=self.test_dir, env={"TEST_ENV": "1"})
 
@@ -302,7 +302,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 self.assertTrue(client._stopped)
 
     def test_out_of_order_responses_buffering(self):
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("buffer_test", "echo 1")
         client.process = unittest.mock.MagicMock()
@@ -329,7 +329,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         self.assertEqual(res2["id"], 2)
 
     def test_client_call_tool_not_running(self):
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("dead_server", ["invalid_command_xyz_12345"])
         client.start = lambda: False
@@ -342,7 +342,7 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from unittest.mock import MagicMock
 
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         test_dir = tempfile.mkdtemp()
         try:
@@ -373,7 +373,7 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
     async def test_call_tool_async_after_sync_start(self):
         import sys
 
-        from core.mcp_manager import MCPProcessClient
+        from core.infrastructure.mcp import MCPProcessClient
 
         # Python script that reads JSON-RPC requests from stdin and responds
         script = (

@@ -73,7 +73,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     async def _load_mcp_tools_async(self) -> None:
         try:
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
 
             mcp_mgr = get_mcp_manager()
             ready = getattr(mcp_mgr, "ensure_tools_ready_async", None)
@@ -92,7 +92,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def _get_cached_mcp_tools(self) -> List[Dict[str, Any]]:
         """Synchronously returns tools from already-connected MCP clients (no I/O)."""
         try:
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
 
             return get_mcp_manager().get_cached_tools() or []
         except Exception:

@@ -134,7 +134,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test():
             footer = app.query_one(StatusFooter)
-            with patch("core.mcp_manager.get_mcp_manager", side_effect=Exception("boom")):
+            with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("boom")):
                 with patch.object(footer, "update_status") as mock_us:
                     footer.refresh_footer()
                     mock_us.assert_called_once_with(provider_key="default")
@@ -173,7 +173,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 "good": MagicMock(last_error=None),
             }
             footer._mcp_cache_time = 0  # force reload of cached servers
-            with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+            with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
                 footer.refresh_footer()
                 await pilot.pause()
             self.assertEqual(footer._last_status_args["mcp_active"], 1)
@@ -237,7 +237,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         footer = StatusFooter()
         mgr = MagicMock()
         mgr.is_loading.return_value = True
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             with patch.object(footer, "refresh_footer") as mock_rf:
                 footer._poll_mcp_refresh()
                 mock_rf.assert_called_once()

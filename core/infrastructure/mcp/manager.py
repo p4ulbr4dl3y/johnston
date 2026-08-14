@@ -12,7 +12,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
-from core.mcp_manager.process_client import MCPProcessClient
+from core.infrastructure.mcp.process_client import MCPProcessClient
 
 logger = logging.getLogger(__name__)
 

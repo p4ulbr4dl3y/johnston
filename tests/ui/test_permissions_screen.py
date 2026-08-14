@@ -49,7 +49,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         os.chdir(self.test_dir)
         self.config_patcher = patch("core.permission_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
         self.config_patcher.start()
-        self.mcp_patcher = patch("core.mcp_manager.get_mcp_manager", return_value=_make_mcp_mock())
+        self.mcp_patcher = patch("core.infrastructure.mcp.get_mcp_manager", return_value=_make_mcp_mock())
         self.mcp_patcher.start()
 
     def tearDown(self):
@@ -225,7 +225,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
                 _mcp_tool("beta_tool", "beta", description="beta desc"),
             ]
         )
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             screen = PermissionsScreen()
             items = screen._get_items()
 
@@ -242,7 +242,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_search_hides_group_headers(self):
         mgr = _make_mcp_mock(cached=[_mcp_tool("alpha_tool", "alpha", description="alpha desc")])
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             screen = PermissionsScreen()
             async with DummyHostApp(screen).run_test() as pilot:
                 await pilot.pause()
@@ -257,7 +257,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
         mgr = _make_mcp_mock(
             cached=[_mcp_tool("srv__search", "srv", raw_name="search", description="search on srv")]
         )
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             screen = PermissionsScreen()
             async with DummyHostApp(screen).run_test() as pilot:
                 await pilot.pause()
@@ -281,7 +281,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_mcp_tools_load_in_background(self):
         mgr = _make_mcp_mock(active=[_mcp_tool("bg_tool", "bg", description="bg desc")])
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             screen = PermissionsScreen()
             async with DummyHostApp(screen).run_test() as pilot:
                 await pilot.pause()
@@ -295,7 +295,7 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_background_load_exception_safe(self):
         mgr = _make_mcp_mock()
         mgr.get_active_tools_async = AsyncMock(side_effect=RuntimeError("server down"))
-        with patch("core.mcp_manager.get_mcp_manager", return_value=mgr):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             screen = PermissionsScreen()
             async with DummyHostApp(screen).run_test() as pilot:
                 await pilot.pause()

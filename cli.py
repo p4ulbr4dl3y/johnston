@@ -77,7 +77,7 @@ def print_skills():
 
 def print_mcp():
     """Print configured MCP servers to stdout"""
-    from core.mcp_manager import get_mcp_manager
+    from core.infrastructure.mcp import get_mcp_manager
 
     mgr = get_mcp_manager()
     servers = mgr.load_servers()

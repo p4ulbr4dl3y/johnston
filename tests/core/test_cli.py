@@ -42,7 +42,7 @@ class TestCLI(unittest.TestCase):
         output = f.getvalue()
         self.assertIn("Configured MCP Servers:", output)
 
-    @patch("core.mcp_manager.MCPManager.load_servers")
+    @patch("core.infrastructure.mcp.MCPManager.load_servers")
     def test_print_mcp_url_error(self, mock_load):
         mock_load.return_value = [
             {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global", "disabled": False}
@@ -55,8 +55,8 @@ class TestCLI(unittest.TestCase):
         self.assertIn("URL: https://hf.co/mcp", output)
         self.assertIn("HTTP/SSE URL transport not supported yet", output)
 
-    @patch("core.mcp_manager.MCPManager.load_servers")
-    @patch("core.mcp_manager.MCPManager.get_active_tools")
+    @patch("core.infrastructure.mcp.MCPManager.load_servers")
+    @patch("core.infrastructure.mcp.MCPManager.get_active_tools")
     def test_print_mcp_with_tools(self, mock_tools, mock_load):
         mock_load.return_value = [
             {"name": "my_server", "command": "node server.js", "scope": "project", "disabled": False}
@@ -132,7 +132,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_tools_scan_exception(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.side_effect = Exception("boom")
@@ -278,7 +278,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_empty(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mock_get.return_value.load_servers.return_value = []
             with redirect_stdout(f):
                 print_mcp()
@@ -286,7 +286,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_cmd_with_args_disabled(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [
                 {
@@ -307,7 +307,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_no_cmd_no_url(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "scope": "global"}]
             mgr.get_active_tools.return_value = []
@@ -320,7 +320,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_client_error(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
@@ -334,7 +334,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_no_tools_no_client(self):
         f = io.StringIO()
-        with patch("core.mcp_manager.get_mcp_manager") as mock_get:
+        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []

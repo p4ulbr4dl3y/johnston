@@ -8,7 +8,7 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.config import CONFIG_DIR
-from core.mcp_manager import get_mcp_manager
+from core.infrastructure.mcp import get_mcp_manager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.screens.constants import (

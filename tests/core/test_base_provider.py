@@ -1054,7 +1054,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         fake_mgr = unittest.mock.MagicMock()
         fake_mgr.ensure_tools_ready_async = unittest.mock.AsyncMock(return_value=None)
         with unittest.mock.patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
-            with unittest.mock.patch("core.mcp_manager.get_mcp_manager", return_value=fake_mgr):
+            with unittest.mock.patch("core.infrastructure.mcp.get_mcp_manager", return_value=fake_mgr):
                 with unittest.mock.patch.object(
                     agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
                 ) as mock_create:
@@ -1069,7 +1069,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         # Failure inside ensure_tools_ready_async is swallowed (try/except pass).
         fake_mgr.ensure_tools_ready_async = unittest.mock.AsyncMock(side_effect=RuntimeError("mcp down"))
         with unittest.mock.patch.dict(os.environ, {"PYTEST_CURRENT_TEST": ""}):
-            with unittest.mock.patch("core.mcp_manager.get_mcp_manager", return_value=fake_mgr):
+            with unittest.mock.patch("core.infrastructure.mcp.get_mcp_manager", return_value=fake_mgr):
                 with unittest.mock.patch.object(
                     agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
                 ) as mock_create:

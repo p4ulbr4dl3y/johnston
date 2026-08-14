@@ -182,7 +182,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         except Exception as e:
             return format_tool_error("execute", detail=str(e), name=name)
 
-    from core.mcp_manager import get_mcp_manager
+    from core.infrastructure.mcp import get_mcp_manager
 
     mcp_mgr = get_mcp_manager()
 

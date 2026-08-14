@@ -61,7 +61,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         mock_mgr = MagicMock()
         mock_mgr.get_active_tools.side_effect = RuntimeError("broken transport")
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),
         ):
             res = await execute_tool("recent_tool", {"arg": 1})
@@ -76,7 +76,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         mock_mgr.get_active_tools.return_value = []
         mock_mgr.get_capabilities_for_exposed_tool.side_effect = RuntimeError("policy crash")
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),
         ):
             res = await execute_tool("gh__search", {"q": "x"})
