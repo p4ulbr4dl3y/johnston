@@ -44,7 +44,7 @@ class ManageSubagentTool(BaseTool):
 
         store = self._get_store(ctx.app)
 
-        curr_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        curr_session_id = ctx.session_id
 
         if action == "list":
             show_all = bool(args.get("all", False))
