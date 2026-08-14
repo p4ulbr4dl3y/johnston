@@ -309,7 +309,10 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
     except (UnicodeDecodeError, UnicodeEncodeError) as ue:
         return format_tool_error("file", detail=str(ue), name=path)
     except ValueError as ve:
-        return str(ve)
+        message = str(ve)
+        # apply_chunk_replacements raises ValueError only via format_tool_error, but
+        # guard against any bare message leaking out unformatted.
+        return message if message.startswith("ERR:") else format_tool_error("params", detail=message)
     except Exception as e:
         return format_tool_error("file", detail=str(e), name=path)
 

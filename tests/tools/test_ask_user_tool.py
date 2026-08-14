@@ -154,10 +154,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Question: Choice?", res)
         self.assertIn("Answer: Opt1", res)
 
-    async def test_minimized_then_esc_clears_pending_and_cancels(self):
-        # User minimizes the wizard (pending saved), then interrupts with Esc.
-        # The CancelledError must clear the pending flag and return a cancellation
-        # signal instead of leaving a stale resumable state behind.
+    async def test_minimized_then_esc_clears_pending_and_re_raises(self):
+        # User minimizes the wizard (pending saved), then the agent run is cancelled.
+        # The CancelledError must clear the pending flag and re-raise (cooperative
+        # cancellation), not swallow the cancellation as a normal result.
         import asyncio
 
         tool = AskUserTool()
@@ -168,11 +168,11 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             raise asyncio.CancelledError()
 
         mock_app.ask_user = cancelled_ask_user
-        res = await tool.execute(
-            {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
-            ctx=mock_app,
-        )
-        self.assertEqual(res, "cancelled by user")
+        with self.assertRaises(asyncio.CancelledError):
+            await tool.execute(
+                {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
+                ctx=mock_app,
+            )
         self.assertIsNone(mock_app._pending_ask_user)
 
 

@@ -98,9 +98,13 @@ class AskUserTool(BaseTool):
         try:
             return await ctx.ask_user(validated_questions)
         except asyncio.CancelledError:
+            # A real task cancellation (e.g. the agent run being interrupted): clear
+            # any pending wizard state, then re-raise so cooperative cancellation
+            # propagates. The model-facing "cancelled by user" string is produced by
+            # the host's ask_user() (widgets/mixins/actions.py) for a voluntary Esc.
             if hasattr(ctx.app, "_pending_ask_user"):
                 setattr(ctx.app, "_pending_ask_user", None)
-            return "cancelled by user"
+            raise
         except Exception as e:
             if hasattr(ctx.app, "_pending_ask_user"):
                 setattr(ctx.app, "_pending_ask_user", None)
