@@ -2,6 +2,7 @@ import asyncio
 
 from textual.containers import VerticalScroll
 
+from widgets.chat_markdown import _apply_chat_markdown_patches
 from widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
 from widgets.chat_tools import ToolCallWidget
 from widgets.chat_welcome import WelcomeWidget
@@ -13,6 +14,7 @@ class ChatView(VerticalScroll):
     can_focus = False
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):
+        _apply_chat_markdown_patches()
         super().__init__(*args, **kwargs)
         self.show_welcome = show_welcome
         self._is_loading_session: bool = False
