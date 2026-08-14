@@ -206,6 +206,34 @@ def _new_markdown_init(self, *args, **kwargs):
 _old_markdown_block_get_style = MarkdownBlock._get_style
 
 
+JOHNSTON_RICH_MARKDOWN_STYLES = {
+    "markdown.paragraph": "#f4f4f5",
+    "markdown.text": "#f4f4f5",
+    "markdown.h1": "bold #ffffff",
+    "markdown.h1.border": "bold #ffffff",
+    "markdown.h2": "bold #ffffff",
+    "markdown.h3": "bold #ffffff",
+    "markdown.h4": "bold #ffffff",
+    "markdown.h5": "bold #ffffff",
+    "markdown.h6": "bold #a1a1aa",
+    "markdown.code": "#ffffff on #27272a",
+    "markdown.code_block": "#f4f4f5 on #27272a",
+    "markdown.block_quote": "#e4e4e7 on #18181b",
+    "markdown.list": "#a1a1aa",
+    "markdown.item": "#f4f4f5",
+    "markdown.item.bullet": "bold #a1a1aa",
+    "markdown.item.number": "bold #a1a1aa",
+    "markdown.table.border": "#27272a",
+    "markdown.table.header": "bold #ffffff",
+    "markdown.hr": "#27272a",
+    "markdown.link": "underline #60a5fa",
+    "markdown.link_url": "underline #60a5fa",
+    "markdown.em": "italic #f4f4f5",
+    "markdown.strong": "bold #ffffff",
+    "markdown.s": "strike #71717a",
+}
+
+
 def _apply_chat_markdown_patches() -> None:
     """Applies Textual Markdown monkey-patches (custom theme, blocks, renderers).
 
@@ -223,23 +251,32 @@ def _apply_chat_markdown_patches() -> None:
     HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
 
     from rich.default_styles import DEFAULT_STYLES
+    from rich.markdown import Heading
+    from rich.style import Style as RichStyle
+    from rich.theme import Theme
+    from textual._context import active_app
+    from textual.app import App
 
-    DEFAULT_STYLES["markdown.h1"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.h2"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.h3"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.h4"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.h5"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.h6"] = Style.parse("bold #a1a1aa")
-    DEFAULT_STYLES["markdown.code"] = Style.parse("#f4f4f5 on #27272a")
-    DEFAULT_STYLES["markdown.code_block"] = Style.parse("#f4f4f5 on #27272a")
-    DEFAULT_STYLES["markdown.block_quote"] = Style.parse("#a1a1aa")
-    DEFAULT_STYLES["markdown.list"] = Style.parse("#a1a1aa")
-    DEFAULT_STYLES["markdown.item.bullet"] = Style.parse("bold #a1a1aa")
-    DEFAULT_STYLES["markdown.item.number"] = Style.parse("#a1a1aa")
-    DEFAULT_STYLES["markdown.table.border"] = Style.parse("#27272a")
-    DEFAULT_STYLES["markdown.table.header"] = Style.parse("bold #ffffff")
-    DEFAULT_STYLES["markdown.link"] = Style.parse("underline #60a5fa")
-    DEFAULT_STYLES["markdown.link_url"] = Style.parse("underline #60a5fa")
+    Heading.LEVEL_ALIGN = {"h1": "left", "h2": "left", "h3": "left", "h4": "left", "h5": "left", "h6": "left"}
+    for k, v in JOHNSTON_RICH_MARKDOWN_STYLES.items():
+        DEFAULT_STYLES[k] = RichStyle.parse(v)
+
+    theme = Theme(JOHNSTON_RICH_MARKDOWN_STYLES)
+    _old_app_init = App.__init__
+
+    def _new_app_init(self, *args, **kwargs):
+        _old_app_init(self, *args, **kwargs)
+        if getattr(self, "console", None):
+            self.console.push_theme(theme)
+
+    App.__init__ = _new_app_init
+
+    try:
+        current = active_app.get()
+        if current and getattr(current, "console", None):
+            current.console.push_theme(theme)
+    except Exception:
+        pass
 
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
