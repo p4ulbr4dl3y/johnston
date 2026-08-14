@@ -101,10 +101,21 @@ You run tests and report coverage.""")
         self.assertIsNone(role_tool_error(role_ro, "read"))
 
     def test_alias_resolution_in_is_tool_allowed(self):
-        role_ro = AgentRole(key="reviewer", name="Reviewer", read_only=True, disallowed_tools=["invoke_subagent"])
+        from tools.registry import normalize_tool_name
+
+        role_ro = AgentRole(
+            key="reviewer",
+            name="Reviewer",
+            read_only=True,
+            disallowed_tools=["invoke_subagent"],
+            tool_name_normalizer=normalize_tool_name,
+        )
 
         # Alias 'subagent' resolves to 'invoke_subagent' via ALIAS_MAP -> blocked
         self.assertIsNotNone(role_ro.is_tool_allowed("subagent"))
+        # Without a normalizer, aliases are not resolved and 'subagent' is allowed
+        role_no_norm = AgentRole(key="reviewer", name="Reviewer", read_only=True, disallowed_tools=["invoke_subagent"])
+        self.assertIsNone(role_no_norm.is_tool_allowed("subagent"))
         # Alias 'write_file' resolves to write tools -> blocked in read_only
         self.assertIsNotNone(role_ro.is_tool_allowed("write_file"))
 

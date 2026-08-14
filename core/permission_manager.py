@@ -1,19 +1,33 @@
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
 
 from core.config import CONFIG_FILE
 from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
-
-def _builtin_tool_names() -> frozenset:
-    """Canonical names of builtin tools (imports the registry lazily to avoid
-    a circular import: tools.registry imports tools.* which import core.*)."""
-    try:
-        from tools.registry import REGISTRY
-
-        return frozenset(REGISTRY.keys())
-    except Exception:
-        return frozenset()
+# Builtin tools that are NOT covered by an explicit config entry fall back to
+# the configured default action (ask/deny). MCP tools (not in this set) default
+# to 'allow'. Used as the fallback when no builtin_tool_names frozenset is
+# injected via DI.
+_BUILTIN_TOOLS = frozenset(
+    {
+        "read",
+        "create",
+        "edit",
+        "multi_edit",
+        "replace_file_content",
+        "multi_replace_file_content",
+        "write_to_file",
+        "glob",
+        "grep",
+        "list",
+        "shell",
+        "ask_user",
+        "web_fetch",
+        "web_search",
+        "invoke_subagent",
+        "manage_subagent",
+    }
+)
 
 
 class PermissionManager:
@@ -23,8 +37,14 @@ class PermissionManager:
 
     _instance: Optional["PermissionManager"] = None
 
-    def __init__(self):
+    def __init__(
+        self,
+        tool_name_normalizer: Optional[Callable[[str], str]] = None,
+        builtin_tool_names: Optional[FrozenSet[str]] = None,
+    ):
         self.session_overrides: Dict[str, str] = {}
+        self.tool_name_normalizer = tool_name_normalizer
+        self.builtin_tool_names = builtin_tool_names if builtin_tool_names is not None else _BUILTIN_TOOLS
 
     @classmethod
     def get_instance(cls) -> "PermissionManager":
@@ -45,10 +65,18 @@ class PermissionManager:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
         normalized = self.normalize_action(action)
         if normalized in self.VALID_ACTIONS:
-            from tools.registry import normalize_tool_name
-
-            canonical = normalize_tool_name(tool_name or "")
+            canonical = self._normalize_name(tool_name or "")
             self.session_overrides[canonical] = normalized
+
+    def _normalize_name(self, tool_name: str) -> str:
+        """Canonicalizes a tool name via the injected normalizer, falling back
+        to a plain lowercase strip when none is provided."""
+        if self.tool_name_normalizer:
+            try:
+                return self.tool_name_normalizer(tool_name)
+            except Exception:
+                return (tool_name or "").strip().lower()
+        return (tool_name or "").strip().lower()
 
     def clear_session_overrides(self) -> None:
         self.session_overrides.clear()
@@ -67,9 +95,7 @@ class PermissionManager:
             raise ValueError(f"Invalid target_type: '{target_type}'")
 
         target_name = (target_name or "").strip().lower()
-        from tools.registry import normalize_tool_name
-
-        target_name = normalize_tool_name(target_name)
+        target_name = self._normalize_name(target_name)
 
         # Validate the raw value BEFORE normalization: normalize_action() would
         # turn junk into the valid 'ask' default and mask the error.
@@ -122,9 +148,7 @@ class PermissionManager:
         Returns (action, reason) where action is 'allow', 'ask', or 'deny'.
         """
         raw_tool = (tool_name or "").strip().lower()
-        from tools.registry import normalize_tool_name
-
-        canonical_name = normalize_tool_name(raw_tool)
+        canonical_name = self._normalize_name(raw_tool)
         # Fail-closed: an empty/absent tool name must never grant execution.
         if not canonical_name:
             return "deny", "No tool name given"
@@ -142,7 +166,7 @@ class PermissionManager:
 
         # 3. MCP tools (not in the builtin registry) default to 'allow' so that
         #    connected servers work out of the box; explicit config still applies.
-        if canonical_name not in _builtin_tool_names():
+        if canonical_name not in self.builtin_tool_names:
             # Fail-closed: a broken raw 'default' config must never silently allow.
             global_cfg = self._load_json_config(CONFIG_FILE)
             perms_cfg = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
