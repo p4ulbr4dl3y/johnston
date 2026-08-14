@@ -59,7 +59,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             super().copy_to_clipboard(text)
         except Exception:
             pass
-        from core.platform_utils import copy_to_os_clipboard
+        from core.infrastructure.platform.platform_utils import copy_to_os_clipboard
 
         copy_to_os_clipboard(text)
 
