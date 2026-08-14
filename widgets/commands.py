@@ -4,6 +4,14 @@ import os
 from typing import Any
 
 from core.models_catalog import catalog
+from core.provider_actions import (
+    fetch_api_key_and_provider_info,
+    fetch_grouped_models,
+    get_current_thinking_effort,
+    select_model,
+    set_provider_credentials,
+    set_thinking_effort,
+)
 from core.session_actions import compact_session, new_session, resume_session, rewind_session
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
@@ -93,17 +101,12 @@ class ProvidersCommand(BaseCommand):
                     app.query_one(MESSAGE_INPUT, ChatInput).focus()
                     return
 
-                p_info = provs.get(selected_key, {})
-                p_name = p_info.get("name", selected_key)
-                curr_key = app.pm.get_api_key(selected_key)
+                p_name, curr_key = fetch_api_key_and_provider_info(app.pm, selected_key)
 
                 def on_key_entered(entered_key: str | None) -> None:
                     if entered_key is not None:
-                        if entered_key:
-                            app.pm.set_provider_api_key(selected_key, entered_key)
-                            app.pm.set_provider_disabled(selected_key, False)
-                        app.pm.recreate_active_agent(app, provider_key=selected_key)
-                        if entered_key:
+                        fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
+                        if fetched:
                             asyncio.create_task(ModelsCommand().execute(app))
                         else:
                             open_providers_screen(focus_key=selected_key)
@@ -131,10 +134,9 @@ class ModelsCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         asyncio.create_task(catalog.refresh())
-        grouped_models = await app.pm.fetch_models_grouped()
+        grouped_models, is_disconnected = await fetch_grouped_models(app.pm)
         if not grouped_models:
-            connected = any(app.pm.is_provider_connected(k, v) for k, v in app.pm.load_providers().items())
-            if not connected:
+            if is_disconnected:
                 await ProvidersCommand().execute(app)
                 return
             app.notify("Failed to fetch models: check API key or network connection", severity="warning")
@@ -155,12 +157,7 @@ class ModelsCommand(BaseCommand):
                     selected_prov = curr_provider
                     selected_model = item_val
 
-                if selected_prov != app.pm.get_active_provider_key():
-                    app.pm.recreate_active_agent(app, provider_key=selected_prov)
-
-                if hasattr(app.agent, "model"):
-                    app.agent.model = selected_model
-                app.pm.set_provider_model(selected_prov, selected_model)
+                select_model(app.pm, app.agent, selected_prov, selected_model, app)
                 app.refresh_status_footer()
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
@@ -177,20 +174,14 @@ class ThinkingEffortCommand(BaseCommand):
             app.notify("Provider manager not available", severity="warning")
             return
 
-        provider_key = app.pm.get_active_provider_key()
-        model_name = getattr(getattr(app, "agent", None), "model", "") or app.pm.get_provider_model(provider_key)
-        current_effort = ""
-        if hasattr(app.pm, "get_provider_thinking_effort"):
-            current_effort = app.pm.get_provider_thinking_effort(provider_key, model_name)
+        provider_key, model_name, current_effort = get_current_thinking_effort(app.pm, app.agent)
 
         def on_effort_selected(effort: str):
             if not effort:
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
-            if hasattr(app.pm, "set_provider_thinking_effort"):
-                app.pm.set_provider_thinking_effort(provider_key, model_name, effort)
-            app.pm.recreate_active_agent(app)
+            set_thinking_effort(app.pm, provider_key, model_name, effort, app)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
         app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)
