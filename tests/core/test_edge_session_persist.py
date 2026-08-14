@@ -170,7 +170,7 @@ def test_mid_write_crash_leaves_original_intact(store, monkeypatch):
     fpath = os.path.join(store.sessions_dir, "crash.json")
     original_content = open(fpath, encoding="utf-8").read()
 
-    from core import platform_utils
+    from core.infrastructure.platform import platform_utils
 
     def boom(src, dst):
         raise OSError("simulated crash after tmp write")
