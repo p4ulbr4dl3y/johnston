@@ -267,7 +267,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 if setup:
                     setup(app)
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         return app
 
     async def _wait_not_generating(self, pilot, app, deadline=10.0) -> None:
@@ -275,9 +275,13 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         loop = asyncio.get_running_loop()
         end = loop.time() + deadline
         while loop.time() < end:
+            if app.is_generating:
+                break
+            await pilot.pause(0.05)
+        while loop.time() < end:
             if not app.is_generating:
                 return
-            await pilot.pause(0.1)
+            await pilot.pause(0.05)
         self.assertFalse(app.is_generating)
 
     async def test_thinking_events(self):
@@ -401,7 +405,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 _configure_connected(app, stream)
                 app.save_current_session_async = flaky_save
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_save_session_exception_bot_text(self):
@@ -422,7 +426,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 _configure_connected(app, stream)
                 app.save_current_session_async = flaky_save
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_footer_exception_ignored(self):
@@ -443,7 +447,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
 
                 app.query_one = raiser
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_thinking_end_duration_exception(self):
@@ -904,7 +908,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 _configure_connected(app, stream)
                 app.notify = MagicMock(side_effect=Exception("boom"))
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_empty_bot_msg_removed_in_finally(self):
@@ -932,7 +936,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
 
                 app.query_one = raiser
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
     async def test_save_force_exception_in_finally(self):
@@ -953,7 +957,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 _configure_connected(app, stream)
                 app.save_current_session_async = flaky_save
                 app.generate_ai_response("Prompt")
-                await pilot.pause(0.5)
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
 
 

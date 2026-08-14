@@ -6,7 +6,7 @@ from textual.screen import Screen
 from textual.widgets import Label
 
 from widgets.chat_view import ChatView
-from widgets.status_footer import StatusFooter
+from widgets.status_footer import SubagentStatusFooter
 
 
 class SubagentInfoLabel(Label):
@@ -37,7 +37,7 @@ class SubagentViewScreen(Screen[None]):
         with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield SubagentInfoLabel("", id="subagent-info")
-            yield StatusFooter(id="status-footer", is_subagent=True)
+            yield SubagentStatusFooter(id="subagent-status-footer")
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -68,13 +68,19 @@ class SubagentViewScreen(Screen[None]):
         if getattr(self.session, "description", None):
             self._update_info_label(self.session.description)
 
-        footer = self.query_one("#status-footer", StatusFooter)
-        footer.update_subagent_footer(self.session)
+        footer = self.query_one("#subagent-status-footer", SubagentStatusFooter)
+        footer.update_session(self.session)
 
         # Keep the footer live while the subagent streams (tokens, spinner).
-        self._footer_refresh = self.set_interval(1.0, lambda: footer.update_subagent_footer(self.session))
+        # Stop any stale interval from a previous mount before re-arming.
+        if getattr(self, "_footer_refresh", None) is not None:
+            try:
+                self._footer_refresh.stop()
+            except Exception:
+                pass
+        self._footer_refresh = self.set_interval(1.0, lambda: footer.update_session(self.session))
 
-        self.run_worker(self._load_history_session())
+        self._history_worker = self.run_worker(self._load_history_session())
 
     def _update_info_label(self, text: str) -> None:
         from rich.table import Table
@@ -122,6 +128,9 @@ class SubagentViewScreen(Screen[None]):
         except Exception:
             pass
 
+        if not self.is_mounted:
+            return
+
         if not self.queue_task or self.queue_task.done():
             self.queue_task = asyncio.create_task(self._process_queue())
 
@@ -130,6 +139,18 @@ class SubagentViewScreen(Screen[None]):
             self.session.add_listener(self._on_live_event)
 
     def on_unmount(self) -> None:
+        if getattr(self, "_footer_refresh", None) is not None:
+            try:
+                self._footer_refresh.stop()
+            except Exception:
+                pass
+            self._footer_refresh = None
+        if getattr(self, "_history_worker", None) is not None:
+            try:
+                self._history_worker.cancel()
+            except Exception:
+                pass
+            self._history_worker = None
         if self.queue_task and not self.queue_task.done():
             self.queue_task.cancel()
         if self.session:
@@ -179,6 +200,7 @@ class SubagentViewScreen(Screen[None]):
                         except Exception:
                             pass
                     else:
+                        self.bot_msg.flush_pending_stream()
                         await self.bot_msg.finalize_stream()
                     self.bot_msg = None
                 self.current_tool_widget = await chat_view.add_tool_call(
@@ -198,6 +220,12 @@ class SubagentViewScreen(Screen[None]):
                     self.bot_msg = None
                 else:
                     self.bot_msg.set_stream_content(txt)
+        elif etype == "bot_reset":
+            if self.bot_msg:
+                try:
+                    await self.bot_msg.reset_stream()
+                except Exception:
+                    pass
         elif etype == "event_divider":
             await chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
         elif etype == "status_change":

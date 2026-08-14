@@ -106,6 +106,9 @@ class AgentSession:
             last["text"] = event.get("text", "")
             if event.get("final"):
                 last["final"] = True
+        elif etype == "bot_reset" and last and last.get("type") == "bot":
+            last["text"] = ""
+            last.pop("final", None)
         elif etype == "thinking" and last and last.get("type") == "thinking" and "duration" not in last:
             last["text"] = event.get("text", "")
             if event.get("duration") is not None:
