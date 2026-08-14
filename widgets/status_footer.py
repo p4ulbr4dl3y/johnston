@@ -45,6 +45,74 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
         return raw_path
 
 
+def _build_subagent_grid(
+    *,
+    role_formatted: str,
+    provider_display: str,
+    clean_model: str,
+    is_connected: bool,
+    model_name: str,
+    context_used: int,
+    total_tokens: int,
+    context_limit: int,
+    context_window: str,
+    cost_usd: float,
+    thinking_effort: str,
+    directory: str = "",
+    branch: str = "",
+    git_diff_stats,
+) -> Table:
+    """Shared subagent-status table builder.
+
+    Used by both ``StatusFooter._render_subagent`` and
+    ``SubagentStatusFooter._render_footer`` to deduplicate ~60 lines of
+    identical table-construction logic.
+    """
+    grid = Table.grid(expand=True)
+    grid.add_column(justify="left")
+    grid.add_column(justify="right")
+
+    row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
+    if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
+        row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
+    grid.add_row("  •  ".join(row1_left_parts), "")
+
+    # Line 2: [context]  [tokens • cost • effort]
+    if is_connected and model_name:
+        pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
+        pct = min(100.0, max(0.0, pct))
+        bar_len = 8
+        filled = int(round((pct / 100) * bar_len))
+        bar_str = "█" * filled + "░" * (bar_len - filled)
+        row2_left = (
+            f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
+            f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
+        )
+    else:
+        row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
+    cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+    row2_right_parts = [
+        f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+        f"[{THEME_SECONDARY}]{cost_str}[/]",
+        f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
+    ]
+    row2_right = "  •  ".join(row2_right_parts)
+    grid.add_row(row2_left, row2_right)
+
+    # Line 3: [directory • branch • +N/-M]
+    dir_text = format_display_path(directory)
+    row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+    if branch:
+        row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+    diff_text = git_diff_stats()
+    if diff_text:
+        row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
+    row3_left = "  •  ".join(row3_left_parts)
+    grid.add_row(row3_left, "")
+
+    return grid
+
+
 class StatusFooter(GitMetricsMixin, Static):
     """Two-line status footer below chat"""
 
@@ -350,48 +418,22 @@ class StatusFooter(GitMetricsMixin, Static):
     ) -> None:
         """Footer for the subagent screen: role/model, context/tokens, dir/branch."""
         branch = branch_name or self._git_branch()
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-
-        row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
-        if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
-            row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
-        grid.add_row("  •  ".join(row1_left_parts), "")
-
-        # Line 2: [context]  [tokens • cost • effort]
-        if is_connected and bool(model_name):
-            pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
-            pct = min(100.0, max(0.0, pct))
-            bar_len = 8
-            filled = int(round((pct / 100) * bar_len))
-            bar_str = "█" * filled + "░" * (bar_len - filled)
-            row2_left = (
-                f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
-                f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
-            )
-        else:
-            row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
-        cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
-        row2_right_parts = [
-            f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
-            f"[{THEME_SECONDARY}]{cost_str}[/]",
-            f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
-        ]
-        row2_right = "  •  ".join(row2_right_parts)
-        grid.add_row(row2_left, row2_right)
-
-        # Line 3: [directory • branch • +N/-M]  []
-        dir_text = format_display_path(directory)
-        row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
-        if branch:
-            row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
-        diff_text = self._git_diff_stats()
-        if diff_text:
-            row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
-        row3_left = "  •  ".join(row3_left_parts)
-        grid.add_row(row3_left, "")
-
+        grid = _build_subagent_grid(
+            role_formatted=role_formatted,
+            provider_display=provider_display,
+            clean_model=clean_model,
+            is_connected=is_connected,
+            model_name=model_name,
+            context_used=context_used,
+            total_tokens=total_tokens,
+            context_limit=context_limit,
+            context_window=context_window,
+            cost_usd=cost_usd,
+            thinking_effort=thinking_effort,
+            directory=directory,
+            branch=branch,
+            git_diff_stats=self._git_diff_stats,
+        )
         self.update(grid)
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
@@ -722,45 +764,22 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             role_formatted += role.capitalize()
 
             branch = getattr(session, "branch_name", "") or self._git_branch()
-            grid = Table.grid(expand=True)
-            grid.add_column(justify="left")
-            grid.add_column(justify="right")
-
-            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
-            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
-            grid.add_row("  •  ".join(row1_left_parts), "")
-
-            if is_connected and bool(model_name):
-                pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
-                pct = min(100.0, max(0.0, pct))
-                bar_len = 8
-                filled = int(round((pct / 100) * bar_len))
-                bar_str = "█" * filled + "░" * (bar_len - filled)
-                row2_left = (
-                    f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
-                    f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
-                )
-            else:
-                row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
-            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
-            row2_right_parts = [
-                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
-                f"[{THEME_SECONDARY}]{cost_str}[/]",
-                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
-            ]
-            row2_right = "  •  ".join(row2_right_parts)
-            grid.add_row(row2_left, row2_right)
-
-            dir_text = format_display_path(directory)
-            row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
-            if branch:
-                row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
-            diff_text = self._git_diff_stats()
-            if diff_text:
-                row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
-            row3_left = "  •  ".join(row3_left_parts)
-            grid.add_row(row3_left, "")
+            grid = _build_subagent_grid(
+                role_formatted=role_formatted,
+                provider_display=provider_display,
+                clean_model=clean_model,
+                is_connected=is_connected,
+                model_name=model_name,
+                context_used=context_used,
+                total_tokens=total_tokens,
+                context_limit=context_limit,
+                context_window=context_window,
+                cost_usd=cost_usd,
+                thinking_effort=thinking_effort,
+                directory=directory,
+                branch=branch,
+                git_diff_stats=self._git_diff_stats,
+            )
 
             self.update(grid)
         except Exception:
