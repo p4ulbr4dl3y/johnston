@@ -94,7 +94,7 @@ class SessionPersistenceMixin:
             ctx = session.last_context_tokens
             if not ctx and self.agent.history:
                 from core.prompt_builder import PromptBuilder
-                from core.token_util import estimate_tokens
+                from core.infrastructure.runtime.token_util import estimate_tokens
 
                 is_subagent = getattr(self.agent, "is_subagent", False)
                 builder = PromptBuilder(

@@ -12,8 +12,8 @@ import time
 from typing import Any, Callable, List, Optional, Tuple
 
 from core.config import CONFIG_DIR
-from core.frontmatter import iter_md_files
-from core.fs_signature import compute_dir_signature
+from core.infrastructure.runtime.frontmatter import iter_md_files
+from core.infrastructure.runtime.fs_signature import compute_dir_signature
 
 _CACHE_TTL = 2.0  # seconds
 

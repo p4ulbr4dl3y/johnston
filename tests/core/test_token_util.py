@@ -1,7 +1,7 @@
 import unittest
 
 from core.base_provider import BaseAgent
-from core.token_util import estimate_tokens, parse_usage
+from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 
 
 class DummyUsage:

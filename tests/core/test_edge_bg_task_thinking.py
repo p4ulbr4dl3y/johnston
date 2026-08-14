@@ -1,4 +1,4 @@
-"""Edge-case tests for core.infrastructure.tasks.shell_task + core.thinking_effort.
+"""Edge-case tests for core.infrastructure.tasks.shell_task + core.infrastructure.runtime.thinking_effort.
 
 Focused on finding bugs, not duplicating existing suites.
 """
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 from core.infrastructure.tasks.manager import TaskManager
 from core.infrastructure.tasks.shell_task import ShellTask
 from core.infrastructure.tasks.task import TaskStatus
-from core.thinking_effort import (
+from core.infrastructure.runtime.thinking_effort import (
     GEMINI_25_THINKING_BUDGET_BY_EFFORT,
     SUPPORTED_THINKING_EFFORTS,
     build_anthropic_thinking_payload,

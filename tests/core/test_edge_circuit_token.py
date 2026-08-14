@@ -7,8 +7,8 @@ cover. A failing assertion here may indicate a real defect in core/.
 import unittest
 from unittest import mock
 
-from core.circuit_breaker import CircuitBreaker
-from core.token_util import estimate_tokens, parse_usage
+from core.infrastructure.runtime.circuit_breaker import CircuitBreaker
+from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 
 
 class _ControlledTime:
@@ -25,7 +25,7 @@ class TestCircuitBreakerEdgeCases(unittest.TestCase):
     def setUp(self):
         self.clock = _ControlledTime
         self.clock.now = 1000.0
-        self.time_patcher = mock.patch("core.circuit_breaker.time.time", self.clock.time)
+        self.time_patcher = mock.patch("core.infrastructure.runtime.circuit_breaker.time.time", self.clock.time)
         self.time_patcher.start()
         self.addCleanup(self.time_patcher.stop)
 
