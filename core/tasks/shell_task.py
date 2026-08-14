@@ -141,7 +141,7 @@ class ShellTask(BaseTask):
                     except Exception:
                         pass
 
-                if on_completed is not None and not self.was_killed:
+                if on_completed is not None and not self.was_killed and self.is_background:
                     try:
                         out = self.output.formatted()
                         on_completed(self.task_id, self.command, out or "(no output)")

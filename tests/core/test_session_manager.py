@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.session_manager import SessionStore
+from core.session_manager import SessionStore, is_ui_visible_user_message
 
 
 def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore:
@@ -192,6 +192,16 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0]["id"], sid)
 
+    def test_is_ui_visible_user_message(self):
+        self.assertTrue(is_ui_visible_user_message({"type": "user", "text": "hello"}))
+        self.assertTrue(is_ui_visible_user_message({"type": "user", "text": "hello", "show_in_ui": True}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "hello", "show_in_ui": False}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "[System Notification] Background shell"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "[System Note: Response interrupted]"}))
+        self.assertFalse(is_ui_visible_user_message("not a dict"))
+        self.assertFalse(is_ui_visible_user_message(None))
+
 
 if __name__ == "__main__":
     unittest.main()
+

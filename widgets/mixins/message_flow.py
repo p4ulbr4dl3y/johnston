@@ -129,7 +129,9 @@ class MessageFlowMixin:
 
             if show_in_ui:
                 await chat_view.add_user_message(user_text, attachments=attachments)
-                session.add_event({"type": "user", "text": user_text})
+                session.add_event({"type": "user", "text": user_text, "show_in_ui": True})
+            else:
+                session.add_event({"type": "user", "text": user_text, "show_in_ui": False})
 
             bot_msg = None
 
@@ -193,11 +195,11 @@ class MessageFlowMixin:
                 if event_type == "queued_user_message":
                     # Queued prompts are recorded into the transcript as user msgs,
                     # rendered to the chat view, and given their own git checkpoint.
-                    session.add_event({"type": "user", "text": val1})
-                    transcript_acc[0] = ""
                     q_msg = val1
                     q_atts = val2 if val2 else None
                     q_show = val3 if val3 is not None else True
+                    session.add_event({"type": "user", "text": q_msg, "show_in_ui": q_show})
+                    transcript_acc[0] = ""
                     if q_show:
                         await chat_view.add_user_message(q_msg, attachments=q_atts)
                     await self._create_git_checkpoint_async(chat_view)

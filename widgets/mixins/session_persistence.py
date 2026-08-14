@@ -3,6 +3,7 @@ import logging
 import time
 from typing import Optional
 
+from core.session_manager import is_ui_visible_user_message
 from widgets.chat_view import ChatView
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ class SessionPersistenceMixin:
                     try:
                         mtype = msg.get("type")
                         if mtype == "user":
+                            if not is_ui_visible_user_message(msg):
+                                continue
                             text = msg.get("text", "")
                             await chat_view.add_user_message(text, animate=False)
                         elif mtype == "bot":
@@ -124,7 +127,7 @@ class SessionPersistenceMixin:
 
         title = ""
         for msg in messages:
-            if isinstance(msg, dict) and msg.get("type") == "user":
+            if isinstance(msg, dict) and msg.get("type") == "user" and is_ui_visible_user_message(msg):
                 first_msg = msg.get("text", "")
                 title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
                 break
