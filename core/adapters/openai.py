@@ -8,7 +8,9 @@ from core.adapters.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
     extract_image_details,
+    image_url_block,
 )
+from core.base_provider.tools import new_tool_call_id
 from core.thinking_effort import build_openai_thinking_kwargs
 
 
@@ -44,10 +46,7 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
                             "role": "user",
                             "content": [
                                 {"type": "text", "text": f"Image preview ({summary_text}):"},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val},
-                                },
+                                image_url_block(media_type, b64_data, detail_val),
                             ],
                         }
                     )
@@ -177,7 +176,7 @@ class OpenAIAdapter(BaseApiAdapter):
                 yield (
                     "adapter_tool_call",
                     {
-                        "id": tc["id"] or f"call_{idx}",
+                        "id": tc["id"] or new_tool_call_id(idx),
                         "name": tc["name"],
                         "arguments": tc["arguments"] or "{}",
                     },

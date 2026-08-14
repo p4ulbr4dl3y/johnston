@@ -119,21 +119,11 @@ class TestModelsCatalog(unittest.TestCase):
     def test_fuzzy_matching_local_models(self):
         cat = ModelsCatalog()
         cat._limits = {"google/gemma-4-31b": 262144, "gemma-4": 262144}
-        cat._reasoning = ["google/gemma-4-31b", "gemma-4"]
 
         # Test exact match
         self.assertEqual(cat.get_context_limit("google", "gemma-4"), 262144)
         # Test fuzzy match with MLX/4bit suffix
         self.assertEqual(cat.get_context_limit("omlx", "gemma-4-E4B-it-MLX-4bit"), 262144)
-
-    def test_reasoning_and_open_weights_parsed_from_cache(self):
-        cat = ModelsCatalog()
-        cat._limits = {"deepseek/deepseek-v4-pro": 1000000}
-        cat._reasoning = ["deepseek/deepseek-v4-pro"]
-        cat._open_weights = ["deepseek/deepseek-v4-pro"]
-
-        self.assertIn("deepseek/deepseek-v4-pro", cat._reasoning)
-        self.assertIn("deepseek/deepseek-v4-pro", cat._open_weights)
 
     def test_save_and_load_cache(self):
         cat = ModelsCatalog()
@@ -199,11 +189,8 @@ class TestModelsCatalog(unittest.TestCase):
         cat = ModelsCatalog()
         cat._limits = {"a/1": 1}
         cat._names = {"a/2": "x"}
-        cat._descriptions = {"a/3": "d"}
         cat._pricing = {"a/4": {}}
-        cat._reasoning = ["a/5"]
-        cat._open_weights = ["a/6"]
-        self.assertEqual(cat._get_all_catalog_keys(), {"a/1", "a/2", "a/3", "a/4", "a/5", "a/6"})
+        self.assertEqual(cat._get_all_catalog_keys(), {"a/1", "a/2", "a/4"})
 
     def test_resolve_catalog_key_empty_model_id(self):
         cat = ModelsCatalog()
@@ -217,22 +204,15 @@ class TestModelsCatalog(unittest.TestCase):
         cat = ModelsCatalog()
         cat._limits = {"google/gemma-4": 262144}
         cat._names = {"google/gemma-4": "Gemma 4"}
-        cat._descriptions = {"google/gemma-4": "desc"}
         cat._pricing = {"google/gemma-4": {"prompt": 0.0, "completion": 0.0}}
-        cat._reasoning = ["google/gemma-4"]
-        cat._open_weights = ["google/gemma-4"]
 
         # Direct identity branches
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._reasoning), "google/gemma-4")
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._open_weights), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._limits), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._names), "google/gemma-4")
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._descriptions), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._pricing), "google/gemma-4")
         # Bound-view branches (search_space.__self__)
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._limits.keys()), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._names.keys()), "google/gemma-4")
-        self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._descriptions.keys()), "google/gemma-4")
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", cat._pricing.keys()), "google/gemma-4")
         # Unknown search space falls through to the id() branch
         self.assertEqual(cat._resolve_catalog_key("google", "gemma-4", {"gemma-4": "custom"}), "gemma-4")
@@ -393,12 +373,10 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(limits["openai/gpt-4o"], 128000)
         self.assertEqual(limits["gpt-4o"], 128000)
         self.assertEqual(limits["ctx-only"], 1000)
-        self.assertIn("openai/gpt-4o", cat._reasoning)
-        self.assertIn("openai/gpt-4o", cat._open_weights)
+        self.assertIn("openai/gpt-4o", cat._names)
         self.assertEqual(cat._names["openai/gpt-4o"], "GPT-4o")
         self.assertEqual(cat._names["anthropic/claude-3.5-sonnet"], "Claude 3.5 Sonnet")
         self.assertEqual(cat._names["llama-4"], "Meta Llama 4")
-        self.assertEqual(cat._descriptions["gpt-4o"], "Flagship model")
         self.assertAlmostEqual(cat._pricing["openai/gpt-4o"]["prompt"], 2.5e-6)
         self.assertAlmostEqual(cat._pricing["openai/gpt-4o"]["completion"], 1e-5)
         self.assertEqual(cat._pricing["anthropic/claude-3.5-sonnet"]["prompt"], 0.000003)
