@@ -1,7 +1,5 @@
 """Provider switching for a subagent based on its role definition."""
 
-from typing import Optional
-
 
 def rebind_provider(subagent, provider_key: str) -> None:
     """Rebind an existing subagent agent to a different provider in place.
@@ -28,7 +26,7 @@ def rebind_provider(subagent, provider_key: str) -> None:
         setattr(subagent, name, value)
 
 
-def apply_provider(subagent, definition, project_dir: Optional[str] = None) -> None:
+def apply_provider(subagent, definition) -> None:
     """If the role pins a provider, switch the subagent to it.
 
     Otherwise inherit the active provider from the parent (the default). Raises

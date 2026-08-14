@@ -1,26 +1,19 @@
-from typing import Any, Dict, FrozenSet, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from core.config import CONFIG_FILE
 from core.defaults.config import DEFAULT_PERMISSIONS
 from core.platform_utils import atomic_write_json, read_json
 
-# Canonical names of builtin tools (kept out of tools/registry import to avoid
-# a circular import: tools.registry imports tools.* which import core.*).
-BUILTIN_TOOL_NAMES: FrozenSet[str] = frozenset(
-    {
-        "read",
-        "create",
-        "edit",
-        "multi_edit",
-        "shell",
-        "ask_user",
-        "update_plan",
-        "manage_shell",
-        "invoke_subagent",
-        "manage_subagent",
-        "web_fetch",
-    }
-)
+
+def _builtin_tool_names() -> frozenset:
+    """Canonical names of builtin tools (imports the registry lazily to avoid
+    a circular import: tools.registry imports tools.* which import core.*)."""
+    try:
+        from tools.registry import REGISTRY
+
+        return frozenset(REGISTRY.keys())
+    except Exception:
+        return frozenset()
 
 
 class PermissionManager:
@@ -149,7 +142,7 @@ class PermissionManager:
 
         # 3. MCP tools (not in the builtin registry) default to 'allow' so that
         #    connected servers work out of the box; explicit config still applies.
-        if canonical_name not in BUILTIN_TOOL_NAMES:
+        if canonical_name not in _builtin_tool_names():
             # Fail-closed: a broken raw 'default' config must never silently allow.
             global_cfg = self._load_json_config(CONFIG_FILE)
             perms_cfg = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}

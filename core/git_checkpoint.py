@@ -1,6 +1,5 @@
 import hashlib
 import os
-import subprocess
 import uuid
 from contextlib import contextmanager
 from typing import Generator, List, Optional
@@ -46,15 +45,6 @@ class GitCheckpointManager:
                     f.write("\n".join(new_lines) + "\n")
         except Exception:
             pass
-
-    @staticmethod
-    def _run_git(
-        args: List[str],
-        cwd: str,
-        env: Optional[dict] = None,
-        timeout: Optional[float] = None,
-    ) -> subprocess.CompletedProcess:
-        return run_git(args=args, cwd=cwd, env=env, timeout=timeout)
 
     @staticmethod
     def _parse_numstat(output: str) -> tuple[int, int]:
@@ -110,7 +100,7 @@ class GitCheckpointManager:
         shadow_dir, _ = cls._get_shadow_dir(project_path)
         if not os.path.exists(shadow_dir):
             return False
-        res = cls._run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
+        res = run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
         return res.returncode == 0
 
     @classmethod
@@ -123,35 +113,31 @@ class GitCheckpointManager:
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
         os.makedirs(shadow_dir, exist_ok=True)
 
-        rev_res = cls._run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
+        rev_res = run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
         if rev_res.returncode != 0:
-            init_res = cls._run_git(["init", "--bare"], cwd=shadow_dir)
+            init_res = run_git(["init", "--bare"], cwd=shadow_dir)
             if init_res.returncode != 0:
                 return False
 
-        cls._run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
-        cls._run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
+        run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
+        run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
         cls._ensure_shadow_exclude(shadow_dir)
 
-        head_res = cls._run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
+        head_res = run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
         if head_res.returncode != 0:
-            mktree_res = subprocess.run(
-                ["git", "mktree"],
-                cwd=shadow_dir,
-                input="",
-                capture_output=True,
-                text=True,
-            )
+            # Single source of truth for the empty tree: prefer a live git
+            # mktree (no stdin content) and fall back to the well-known constant.
+            mktree_res = run_git(["mktree"], cwd=shadow_dir)
             empty_tree_sha = mktree_res.stdout.strip() if mktree_res.returncode == 0 else cls.EMPTY_TREE_SHA
-            commit_res = cls._run_git(
+            commit_res = run_git(
                 ["commit-tree", empty_tree_sha, "-m", "Initial commit by Johnston"],
                 cwd=shadow_dir,
             )
             if commit_res.returncode != 0:
                 return False
             commit_sha = commit_res.stdout.strip()
-            cls._run_git(["update-ref", "refs/heads/main", commit_sha], cwd=shadow_dir)
-            cls._run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=shadow_dir)
+            run_git(["update-ref", "refs/heads/main", commit_sha], cwd=shadow_dir)
+            run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=shadow_dir)
 
         return True
 
@@ -195,19 +181,19 @@ class GitCheckpointManager:
 
         ref_name = cls.get_ref_name(session_id, message_index)
 
-        head_res = cls._run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
+        head_res = run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
         if head_res.returncode != 0:
             return None
         head_sha = head_res.stdout.strip()
 
         with cls._shadow_index_env(shadow_dir, cwd) as env:
-            cls._run_git(["add", "-A"], cwd=cwd, env=env)
-            tree_res = cls._run_git(["write-tree"], cwd=cwd, env=env)
+            run_git(["add", "-A"], cwd=cwd, env=env)
+            tree_res = run_git(["write-tree"], cwd=cwd, env=env)
             if tree_res.returncode != 0:
                 return None
             tree_sha = tree_res.stdout.strip()
 
-            commit_res = cls._run_git(
+            commit_res = run_git(
                 ["commit-tree", tree_sha, "-p", head_sha, "-m", f"Johnston Checkpoint {session_id}:{message_index}"],
                 cwd=shadow_dir,
                 env=env,
@@ -216,7 +202,7 @@ class GitCheckpointManager:
                 return None
             commit_sha = commit_res.stdout.strip()
 
-            ref_res = cls._run_git(["update-ref", ref_name, commit_sha], cwd=shadow_dir)
+            ref_res = run_git(["update-ref", ref_name, commit_sha], cwd=shadow_dir)
             if ref_res.returncode == 0:
                 return commit_sha
             return None
@@ -234,12 +220,12 @@ class GitCheckpointManager:
             return False
 
         ref_name = cls.get_ref_name(session_id, message_index)
-        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
+        rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
         if rev_res.returncode != 0:
             return False
         commit_sha = rev_res.stdout.strip()
 
-        cat_res = cls._run_git(["cat-file", "-p", commit_sha], cwd=shadow_dir)
+        cat_res = run_git(["cat-file", "-p", commit_sha], cwd=shadow_dir)
         if cat_res.returncode != 0:
             return False
 
@@ -254,13 +240,13 @@ class GitCheckpointManager:
         env["GIT_WORK_TREE"] = cwd
 
         try:
-            res1 = cls._run_git(["read-tree", "--reset", "-u", commit_sha], cwd=cwd, env=env)
+            res1 = run_git(["read-tree", "--reset", "-u", commit_sha], cwd=cwd, env=env)
             if res1.returncode != 0:
                 return False
 
-            cls._run_git(["clean", "-fd"], cwd=cwd, env=env)
-            cls._run_git(["update-ref", "HEAD", parent_sha], cwd=shadow_dir)
-            cls._run_git(["reset"], cwd=cwd, env=env)
+            run_git(["clean", "-fd"], cwd=cwd, env=env)
+            run_git(["update-ref", "HEAD", parent_sha], cwd=shadow_dir)
+            run_git(["reset"], cwd=cwd, env=env)
             return True
         except Exception:
             return False
@@ -277,7 +263,7 @@ class GitCheckpointManager:
         if not cls.is_git_repo(cwd):
             return
 
-        refs_res = cls._run_git(
+        refs_res = run_git(
             ["for-each-ref", "--format=%(refname)", f"{cls.REF_PREFIX}/{session_id}/*"], cwd=shadow_dir
         )
         if refs_res.returncode != 0 or not refs_res.stdout.strip():
@@ -291,7 +277,7 @@ class GitCheckpointManager:
                 idx_str = ref.rstrip("/").split("/")[-1]
                 idx = int(idx_str)
                 if idx > target_message_index:
-                    cls._run_git(["update-ref", "-d", ref], cwd=shadow_dir)
+                    run_git(["update-ref", "-d", ref], cwd=shadow_dir)
             except ValueError:
                 pass
 
@@ -311,14 +297,14 @@ class GitCheckpointManager:
             return None
 
         ref_name = cls.get_ref_name(session_id, message_index)
-        rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
+        rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
         if rev_res.returncode != 0:
             return None
         commit_sha = rev_res.stdout.strip()
 
         with cls._shadow_index_env(shadow_dir, cwd) as env:
-            cls._run_git(["add", "-A"], cwd=cwd, env=env)
-            diff_res = cls._run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env)
+            run_git(["add", "-A"], cwd=cwd, env=env)
+            diff_res = run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env)
             if diff_res.returncode != 0:
                 return None
 
@@ -351,18 +337,18 @@ class GitCheckpointManager:
         cls._ensure_shadow_exclude(shadow_dir)
 
         with cls._shadow_index_env(shadow_dir, cwd) as env:
-            add_res = cls._run_git(["add", "-A"], cwd=cwd, env=env, timeout=1.5)
+            add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=1.5)
             if add_res.returncode != 0:
                 return results
 
             for msg_idx in message_indices:
                 ref_name = cls.get_ref_name(session_id, msg_idx)
-                rev_res = cls._run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.2)
+                rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.2)
                 if rev_res.returncode != 0:
                     continue
                 commit_sha = rev_res.stdout.strip()
 
-                diff_res = cls._run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env, timeout=0.3)
+                diff_res = run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env, timeout=0.3)
                 if diff_res.returncode != 0:
                     continue
 
