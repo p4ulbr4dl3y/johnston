@@ -337,11 +337,11 @@ class SubagentsCommand(BaseCommand):
     async def execute(self, app) -> None:
         store = getattr(app, "sm", None)
         curr_sid = getattr(app, "current_session_id", None)
-        sessions = []
-        if store:
-            sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
+        has_sessions = bool(
+            store and (store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent"))
+        )
 
-        if not sessions:
+        if not has_sessions:
             app.notify("No active subagents", severity="warning")
             return
         app.push_screen(SubagentsScreen())
@@ -353,15 +353,18 @@ class ShellTasksCommand(BaseCommand):
     description = "Manage background shell tasks"
 
     async def execute(self, app) -> None:
-        all_tasks = [t for t in getattr(app, "task_manager", []) if getattr(t, "kind", "") == "shell"]
+        all_tasks = getattr(app, "task_manager", [])
         curr_sid = getattr(app, "current_session_id", None)
-        if curr_sid:
-            tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
-        else:
-            tasks = list(all_tasks)
-        tasks = [t for t in tasks if getattr(t, "is_background", False)]
+        has_tasks = bool(
+            any(
+                getattr(t, "kind", "") == "shell"
+                and getattr(t, "is_background", False)
+                and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
+                for t in all_tasks
+            )
+        )
 
-        if not tasks:
+        if not has_tasks:
             app.notify("No active shell tasks", severity="warning")
             return
         app.push_screen(ShellTasksScreen())
@@ -555,10 +558,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
     if command_text.strip().startswith("/") and normalized_name in COMMAND_REGISTRY:
         cmd_instance = COMMAND_REGISTRY[normalized_name]()
-        try:
-            await cmd_instance.execute(app, args=words[1:])
-        except TypeError:
-            await cmd_instance.execute(app)
+        await cmd_instance.execute(app)
         return True
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
