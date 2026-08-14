@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.tasks.manager import TaskManager
-from core.tasks.shell_task import ShellTask
-from core.tasks.task import TaskStatus
+from core.infrastructure.tasks.manager import TaskManager
+from core.infrastructure.tasks.shell_task import ShellTask
+from core.infrastructure.tasks.task import TaskStatus
 from tools.manage_shell import ManageShellTool
 
 

@@ -5,6 +5,8 @@ import time
 from collections import deque
 from typing import Any, Dict
 
+from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
+from core.infrastructure.tasks.shell_task import ShellTask
 from core.platform_utils import (
     decode_output,
     is_windows,
@@ -13,8 +15,6 @@ from core.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
-from core.tasks.output import process_carriage_returns, strip_ansi
-from core.tasks.shell_task import ShellTask
 from tools.base import BaseTool, format_tool_error, tail_output, truncate_output
 
 SLEEP_CHAIN_REGEX = re.compile(r"^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$", re.DOTALL)

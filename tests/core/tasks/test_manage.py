@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
+from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
 
 
 def _mk_task(tid: str, sid: str = None, running: bool = True) -> MagicMock:
