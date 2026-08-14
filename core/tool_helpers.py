@@ -36,6 +36,13 @@ def is_system_tool(tool_type: str) -> bool:
     return False
 
 
+def get_all_tool_types() -> list[str]:
+    """Return the sorted list of registered system tool type keys."""
+    from tools.registry import REGISTRY
+
+    return sorted(REGISTRY)
+
+
 def read_file_content(file_path: str) -> str | None:
     """Read a file from disk for display purposes.
 
