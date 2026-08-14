@@ -13,6 +13,21 @@ from widgets.screens.base_selection import HeaderWrapOptionList
 from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
 
 
+def format_task_row(cmd: str) -> str:
+    """Format a task command line for display in the option list."""
+    if len(cmd) > 35:
+        cmd = cmd[:32] + "..."
+    return f"   {cmd}".rstrip()
+
+
+def _filter_and_sort_tasks(items: list, search_query: str) -> list:
+    """Apply text search filter and running-first ordering to task rows."""
+    q = search_query.strip().lower()
+    if q:
+        items = [it for it in items if q in it["command"].lower() or q in it["id"].lower()]
+    return sorted(items, key=lambda item: not item["is_running"])
+
+
 class TaskConsoleScreen(BaseModalScreen[None]):
     """Modal screen for viewing console output of a specific task in real-time"""
 
@@ -94,11 +109,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
                 }
             )
 
-        q = self.search_query.strip().lower()
-        if q:
-            items = [it for it in items if q in it["command"].lower() or q in it["id"].lower()]
-
-        return sorted(items, key=lambda item: not item["is_running"])
+        return _filter_and_sort_tasks(items, self.search_query)
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -161,10 +172,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
                     break
 
     def _format_task_row(self, item: dict) -> str:
-        cmd = item["command"]
-        if len(cmd) > 35:
-            cmd = cmd[:32] + "..."
-        return f"   {cmd}".rstrip()
+        return format_task_row(item["command"])
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_tasks):
@@ -232,12 +240,9 @@ class SubagentsScreen(BaseModalScreen[None]):
 
         items = []
 
-        store = getattr(self.app, "sm", None) if (hasattr(self, "app") and self.app) else None
-        if store is None:
-            from core.session_manager import SessionStore
+        from core.session_manager import get_session_store
 
-            store = SessionStore.get_instance()
-
+        store = get_session_store(self.app)
         curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None
         sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
 
@@ -254,16 +259,7 @@ class SubagentsScreen(BaseModalScreen[None]):
                 }
             )
 
-        # Filter by search query
-        q = self.search_query.strip().lower()
-        if q:
-            items = [
-                item
-                for item in items
-                if q in item["command"].lower() or q in item["id"].lower()
-            ]
-
-        result = sorted(items, key=lambda item: not item["is_running"])
+        result = _filter_and_sort_tasks(items, self.search_query)
         self._cached_tasks = result
         self._tasks_cache_ts = time.monotonic()
         return result
@@ -332,10 +328,7 @@ class SubagentsScreen(BaseModalScreen[None]):
                     break
 
     def _format_task_row(self, item: dict) -> str:
-        cmd = item["command"]
-        if len(cmd) > 35:
-            cmd = cmd[:32] + "..."
-        return f"   {cmd}".rstrip()
+        return format_task_row(item["command"])
 
     def _open_task_details(self, item: dict) -> None:
         from widgets.screens.subagent_screen import SubagentViewScreen
