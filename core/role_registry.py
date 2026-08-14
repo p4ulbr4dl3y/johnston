@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
@@ -37,6 +37,7 @@ class AgentRole:
         provider: str = "",
         scope: str = "any",
         source: str = "builtin",
+        tool_name_normalizer: Optional[Callable[[str], str]] = None,
     ):
         self.key = key.lower().strip()
         self.name = name or self.key.capitalize()
@@ -49,6 +50,7 @@ class AgentRole:
         self.provider = (provider or "").strip().lower()
         self.scope = normalize_role_scope(scope)
         self.source = source
+        self.tool_name_normalizer = tool_name_normalizer
 
     @property
     def system_prompt(self) -> str:
@@ -56,7 +58,7 @@ class AgentRole:
 
     def is_tool_allowed(self, tool_name: str) -> Optional[str]:
         """Returns an error string if this role disables tool_name, else None."""
-        return role_tool_error(self, tool_name)
+        return role_tool_error(self, tool_name, tool_name_normalizer=getattr(self, "tool_name_normalizer", None))
 
 
 # Single source of truth for role/mode tool-policy checks. Used by
@@ -64,14 +66,18 @@ class AgentRole:
 # disallowed, read_only, allowed_tools, and subagent exclusions are honored in
 # one place.
 def _tool_policy_result(
-    role_def: Any, tool_name: str, is_subagent: bool = False
+    role_def: Any,
+    tool_name: str,
+    is_subagent: bool = False,
+    tool_name_normalizer: Optional[Callable[[str], str]] = None,
 ) -> Tuple[bool, Optional[str]]:
     """Evaluate a tool call against a role or mode object.
 
     Returns (allowed, reason). reason is None when allowed. Works with both
     AgentRole instances and duck-typed mode objects exposing disallowed_tools,
     read_only, allowed_tools, and name attributes. When ``is_subagent`` is set,
-    subagent-excluded tools are always denied.
+    subagent-excluded tools are always denied. ``tool_name_normalizer`` canonicalizes
+    tool names; when None (or on error) the name is used as-is.
     """
     if not tool_name:
         return True, None
@@ -80,9 +86,7 @@ def _tool_policy_result(
         clean = clean.split(".", 1)[1]
 
     try:
-        from tools.registry import normalize_tool_name
-
-        resolved = normalize_tool_name(clean)
+        resolved = tool_name_normalizer(clean) if tool_name_normalizer else clean
     except Exception:
         resolved = clean
 
@@ -106,11 +110,20 @@ def _tool_policy_result(
 
 # Canonical predicate for "is this tool allowed for the role?". Returns None when
 # allowed, or an error string describing the denial.
-def role_tool_error(role_def: Any, tool_name: str, is_subagent: bool = False) -> Optional[str]:
+def role_tool_error(
+    role_def: Any,
+    tool_name: str,
+    is_subagent: bool = False,
+    tool_name_normalizer: Optional[Callable[[str], str]] = None,
+) -> Optional[str]:
     """Return an error string if role_def denies tool_name, else None."""
     if not role_def:
         return None
-    _, reason = _tool_policy_result(role_def, tool_name, is_subagent=is_subagent)
+    if tool_name_normalizer is None:
+        tool_name_normalizer = getattr(role_def, "tool_name_normalizer", None)
+    _, reason = _tool_policy_result(
+        role_def, tool_name, is_subagent=is_subagent, tool_name_normalizer=tool_name_normalizer
+    )
     return reason
 
 
@@ -235,10 +248,18 @@ class RoleRegistry:
 
     _instance: Optional["RoleRegistry"] = None
 
-    def __init__(self):
+    def __init__(self, tool_name_normalizer: Optional[Callable[[str], str]] = None):
+        self.tool_name_normalizer = tool_name_normalizer
         self.roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
+        self._apply_normalizer(self.roles)
         self.current_project_dir: Optional[str] = None
         self._cache = MarkdownScannerCache(subpath="roles")
+
+    def _apply_normalizer(self, roles: Dict[str, AgentRole]) -> None:
+        if self.tool_name_normalizer is None:
+            return
+        for role in roles.values():
+            role.tool_name_normalizer = self.tool_name_normalizer
 
     @classmethod
     def get_instance(cls) -> "RoleRegistry":
@@ -264,6 +285,7 @@ class RoleRegistry:
             include_global=include_global,
             build=_build,
         )
+        self._apply_normalizer(self.roles)
         return self.roles
 
     def invalidate_cache(self) -> None:
@@ -355,6 +377,7 @@ class RoleRegistry:
                 provider=provider,
                 scope=scope,
                 source=source,
+                tool_name_normalizer=self.tool_name_normalizer,
             )
         except Exception:
             return None
