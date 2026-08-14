@@ -258,4 +258,64 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 footer._poll_mcp_refresh()
                 mock_rf.assert_not_called()  # idle, count unchanged
 
+    async def test_subagent_footer_mount_unmount_and_spin(self):
+        from widgets.status_footer import SubagentStatusFooter
+
+        class SubagentFooterApp(App[None]):
+            def compose(self):
+                yield SubagentStatusFooter(id="subagent-status-footer")
+
+        app = SubagentFooterApp()
+        async with app.run_test():
+            footer = app.query_one(SubagentStatusFooter)
+
+            sess = MagicMock()
+            sess.agent = None
+            sess.role = "explorer"
+            sess.status = "running"
+            sess.project_dir = "/tmp/test"
+            sess.branch_name = "feat"
+            sess.last_context_tokens = 500
+            sess.total_tokens = 1200
+            sess.cost_usd = 0.05
+
+            footer.update_session(sess)
+            self.assertTrue(footer.is_generating)
+            self.assertIsNotNone(footer._spinner_timer)
+
+            # Test _spin re-renders with next frame
+            old_idx = footer._spinner_idx
+            footer._spin()
+            self.assertEqual(footer._spinner_idx, old_idx + 1)
+
+            # Test on_unmount cleans up timers
+            footer.on_unmount()
+            self.assertIsNone(footer._spinner_timer)
+
+    async def test_subagent_footer_old_session_fallback_metrics(self):
+        from widgets.status_footer import SubagentStatusFooter
+
+        class SubagentFooterApp(App[None]):
+            def compose(self):
+                yield SubagentStatusFooter(id="subagent-status-footer")
+
+        app = SubagentFooterApp()
+        async with app.run_test():
+            footer = app.query_one(SubagentStatusFooter)
+
+            sess = MagicMock()
+            sess.agent = None
+            sess.role = "explorer"
+            sess.status = "completed"
+            sess.project_dir = "/tmp/test"
+            sess.branch_name = "main"
+            sess.last_context_tokens = 0
+            sess.total_tokens = 0
+            sess.cost_usd = 0.0
+            sess.messages = [{"role": "user", "content": "hello " * 50}]
+
+            footer.update_session(sess)
+            self.assertFalse(footer.is_generating)
+            self.assertIsNone(footer._spinner_timer)
+
 

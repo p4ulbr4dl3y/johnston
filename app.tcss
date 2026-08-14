@@ -671,7 +671,8 @@ SubagentViewScreen {
 }
 
 /* Status Footer - Matching dark grey background with muted zinc text */
-#status-footer {
+#status-footer,
+#subagent-status-footer {
     width: 100%;
     height: 4;
     padding: 0 1;

@@ -43,6 +43,7 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         # Informational thinking (auto-compaction/retry notices): always final.
         session.add_event({"type": "thinking", "text": val1, "duration": 0.0})
     elif etype == "tool":
+        text_accumulator[0] = ""
         targs = val3 if isinstance(val3, dict) else {}
         session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
     elif etype == "tool_result":
@@ -50,6 +51,9 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     elif etype == "bot_delta":
         text_accumulator[0] = text_accumulator[0] + val1
         session.add_event({"type": "bot", "text": text_accumulator[0]})
+    elif etype == "bot_reset":
+        text_accumulator[0] = ""
+        session.add_event({"type": "bot_reset"})
     elif etype in ("bot_text", "outro"):
         text_accumulator[0] = val1
         session.add_event({"type": "bot", "text": text_accumulator[0], "final": True})
@@ -168,10 +172,20 @@ async def _run_single_subagent_message(
     try:
         async for step in subagent.stream_steps(message):
             record_subagent_step(step, session, acc)
+        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
+        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
+        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
+        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
+        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
         session.finish(STATUS_COMPLETED)
         _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
+        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
+        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
+        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
+        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
+        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
         session.finish(STATUS_CANCELLED, "Cancelled by user")
         try:
             _safe_save(store, session)
@@ -181,6 +195,11 @@ async def _run_single_subagent_message(
         # Covers stream errors AND a failed post-completion save (propagated by
         # _safe_save). A failure to persist must not leave a COMPLETED status.
         acc[0] = f"[{error_prefix}: {err}]"
+        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
+        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
+        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
+        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
+        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
         session.finish(STATUS_ERROR, str(err))
         try:
             _safe_save(store, session)

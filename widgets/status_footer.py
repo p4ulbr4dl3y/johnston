@@ -22,6 +22,7 @@ class StatusFooter(Static):
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
+        self._mcp_poll_timer = None
         self._resize_timer = None
         self._last_resize_size = None
 
@@ -41,17 +42,41 @@ class StatusFooter(Static):
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        if hasattr(self, "_last_status_args"):
+        if self.is_subagent:
+            if getattr(self, "_subagent_session", None):
+                self.update_subagent_footer(self._subagent_session)
+        elif hasattr(self, "_last_status_args"):
             self.update_status(**self._last_status_args)
         else:
             self.refresh_footer()
 
     def on_mount(self) -> None:
-        self.refresh_footer()
-        # While MCP servers are still warming up (or their tool counts change),
-        # poll so the footer spinner and loaded-server count stay current even
-        # when not generating.
-        self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
+        if not self.is_subagent:
+            self.refresh_footer()
+            # While MCP servers are still warming up (or their tool counts change),
+            # poll so the footer spinner and loaded-server count stay current even
+            # when not generating.
+            self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
+
+    def on_unmount(self) -> None:
+        if getattr(self, "_spinner_timer", None):
+            try:
+                self._spinner_timer.stop()
+            except Exception:
+                pass
+            self._spinner_timer = None
+        if getattr(self, "_mcp_poll_timer", None):
+            try:
+                self._mcp_poll_timer.stop()
+            except Exception:
+                pass
+            self._mcp_poll_timer = None
+        if getattr(self, "_resize_timer", None):
+            try:
+                self._resize_timer.stop()
+            except Exception:
+                pass
+            self._resize_timer = None
 
     def _poll_mcp_refresh(self) -> None:
         try:
@@ -192,14 +217,19 @@ class StatusFooter(Static):
 
     def update_subagent_footer(self, session) -> None:
         """Render footer for a subagent session using its own agent/dir/branch/metrics."""
+        self._subagent_session = session
         try:
             agent = getattr(session, "agent", None)
-            model_name = getattr(agent, "model", "") if agent else ""
+            app_agent = getattr(self.app, "agent", None) if self.app else None
             role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
-            effort_val = getattr(agent, "thinking_effort", None) if agent else None
+            effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
             thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
-            provider_key = getattr(agent, "provider_key", "") if agent else ""
+            provider_key = (
+                getattr(agent, "provider_key", "")
+                if agent
+                else (getattr(app_agent, "provider_key", "") if app_agent else "")
+            )
 
             pm = getattr(self.app, "pm", None)
             if not provider_key and pm:
@@ -208,6 +238,12 @@ class StatusFooter(Static):
             provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
             provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
             is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False
+
+            model_name = (
+                getattr(agent, "model", "")
+                if agent
+                else (getattr(app_agent, "model", "") if app_agent else provider_info.get("model", ""))
+            )
             clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
             if not clean_model:
                 clean_model = "[Select model: /models]"
@@ -219,8 +255,26 @@ class StatusFooter(Static):
             context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0)
             total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0)
             cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
-            context_window = metrics.get("context", "128k")
-            context_limit = metrics.get("context_limit", 128000)
+            context_limit = (
+                metrics.get("context_limit")
+                or getattr(agent, "context_limit", None)
+                or getattr(app_agent, "context_limit", 128000)
+                or 128000
+            )
+            context_window = metrics.get("context") or format_context_tokens(context_limit)
+
+            # Live spinner while the subagent session is still streaming/running.
+            is_running = getattr(session, "status", "") == "running"
+            if is_running and not self.is_generating:
+                self.is_generating = True
+                if not self._spinner_timer:
+                    self._spinner_timer = self.set_interval(0.2, self._spin)
+            elif not is_running and self.is_generating:
+                self.is_generating = False
+                if self._spinner_timer:
+                    self._spinner_timer.stop()
+                    self._spinner_timer = None
+                self._spinner_idx = 0
 
             role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
             role_formatted += role.capitalize()
@@ -241,7 +295,7 @@ class StatusFooter(Static):
                 branch_name=getattr(session, "branch_name", ""),
             )
         except Exception:
-            self.refresh_footer()
+            pass
 
     def _render_subagent(
         self,
@@ -292,13 +346,16 @@ class StatusFooter(Static):
         row2_right = "  •  ".join(row2_right_parts)
         grid.add_row(row2_left, row2_right)
 
-        # Line 3: [directory • branch]  [+N / -M]
+        # Line 3: [directory • branch • +N/-M]  []
         dir_text = f"~/{directory}" if directory else ""
         row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
         if branch:
             row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+        diff_text = self._git_diff_stats()
+        if diff_text:
+            row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
         row3_left = "  •  ".join(row3_left_parts)
-        grid.add_row(row3_left, self._git_diff_right())
+        grid.add_row(row3_left, "")
 
         self.update(grid)
 
@@ -385,10 +442,10 @@ class StatusFooter(Static):
             row2_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row2_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
-            row2_parts.append(f"[{THEME_SECONDARY}]{total_tokens:,}t[/]")
             diff_text = self._git_diff_stats()
             if diff_text:
                 row2_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
+            row2_parts.append(f"[{THEME_SECONDARY}]{total_tokens:,}t[/]")
             row2 = " • ".join(row2_parts)
 
             if is_connected and bool(model_name):
@@ -454,16 +511,16 @@ class StatusFooter(Static):
             ]
             row2_right = "  •  ".join(row2_right_parts)
 
-            # Line 3: [directory • branch]  [diff • agents • shells]
+            # Line 3: [directory • branch • +N/-M]  [agents • shells]
             row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            diff_text = self._git_diff_stats()
+            if diff_text:
+                row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
             row3_left = "  •  ".join(row3_left_parts)
 
             row3_right_parts = []
-            diff_text = self._git_diff_right()
-            if diff_text:
-                row3_right_parts.append(diff_text)
             task_parts = []
             if subagents_active > 0:
                 task_parts.append(
@@ -554,13 +611,6 @@ class StatusFooter(Static):
             pass
         return text
 
-    def _git_diff_right(self) -> str:
-        """Coloured '+N / -M' git diff counts for the footer's right column."""
-        diff = self._git_diff_stats()
-        if not diff:
-            return ""
-        return f"[{THEME_SECONDARY}]{diff}[/]"
-
     def _git_branch(self) -> str:
         """Return the current git branch name or '' when not in a repo."""
         try:
@@ -588,3 +638,253 @@ class StatusFooter(Static):
     def _debounced_refresh(self) -> None:
         self._resize_timer = None
         self.refresh_footer()
+
+
+class SubagentStatusFooter(Static):
+    """Dedicated status footer for subagent screen, isolated from main app footer."""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__("", *args, **kwargs)
+        self.session = None
+        self.is_generating: bool = False
+        self._spinner_idx: int = 0
+        self._spinner_timer = None
+        self._diff_text: str = ""
+        self._diff_time: float = 0.0
+        self._diff_loading: bool = False
+
+    def on_mount(self) -> None:
+        self._render_footer()
+
+    def on_unmount(self) -> None:
+        if self._spinner_timer:
+            try:
+                self._spinner_timer.stop()
+            except Exception:
+                pass
+            self._spinner_timer = None
+
+    def update_session(self, session) -> None:
+        """Update with a subagent session record (AgentSession) and refresh render."""
+        self.session = session
+        if not session:
+            self._render_footer()
+            return
+
+        is_running = getattr(session, "status", "") == "running"
+        if is_running and not self.is_generating:
+            self.is_generating = True
+            if not self._spinner_timer:
+                self._spinner_timer = self.set_interval(0.2, self._spin)
+        elif not is_running and self.is_generating:
+            self.is_generating = False
+            if self._spinner_timer:
+                self._spinner_timer.stop()
+                self._spinner_timer = None
+            self._spinner_idx = 0
+
+        self._render_footer()
+
+    def update_subagent_footer(self, session) -> None:
+        """Alias for update_session for compatibility."""
+        self.update_session(session)
+
+    def _spin(self) -> None:
+        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
+        self._render_footer()
+
+    def _render_footer(self) -> None:
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
+        if not self.session:
+            grid.add_row("", "")
+            grid.add_row("", "")
+            grid.add_row("", "")
+            self.update(grid)
+            return
+        session = self.session
+        try:
+            agent = getattr(session, "agent", None)
+            app_agent = getattr(self.app, "agent", None) if self.app else None
+            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
+            effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
+            thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
+            metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
+            provider_key = (
+                getattr(agent, "provider_key", "")
+                if agent
+                else (getattr(app_agent, "provider_key", "") if app_agent else "")
+            )
+
+            pm = getattr(self.app, "pm", None)
+            if not provider_key and pm:
+                provider_key = pm.get_active_provider_key()
+            providers = pm.load_providers() if pm else {}
+            provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
+            provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
+            is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False
+
+            model_name = (
+                getattr(agent, "model", "")
+                if agent
+                else (getattr(app_agent, "model", "") if app_agent else provider_info.get("model", ""))
+            )
+            clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
+            if not clean_model:
+                clean_model = "[Select model: /models]"
+
+            directory = getattr(session, "project_dir", "") or os.path.basename(os.path.realpath(os.getcwd()))
+            if os.path.basename(directory) != directory:
+                directory = os.path.basename(os.path.normpath(directory)) or directory
+
+            from core.token_util import estimate_tokens
+
+            history_tokens = estimate_tokens(session.messages) if getattr(session, "messages", None) else 0
+            context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0) or history_tokens
+            total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0) or history_tokens
+            cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
+            if cost_usd == 0.0 and total_tokens > 0 and (provider_key or model_name):
+                pricing = catalog.get_model_pricing(provider_key, model_name)
+                if pricing:
+                    p_in = pricing.get("prompt", 0.0)
+                    p_out = pricing.get("completion", 0.0)
+                    half = total_tokens / 2.0
+                    cost_usd = half * p_in + half * p_out
+
+            context_limit = (
+                metrics.get("context_limit")
+                or getattr(agent, "context_limit", None)
+                or getattr(app_agent, "context_limit", 128000)
+                or 128000
+            )
+            context_window = metrics.get("context") or format_context_tokens(context_limit)
+
+            role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
+            role_formatted += role.capitalize()
+
+            branch = getattr(session, "branch_name", "") or self._git_branch()
+            grid = Table.grid(expand=True)
+            grid.add_column(justify="left")
+            grid.add_column(justify="right")
+
+            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
+            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
+            grid.add_row("  •  ".join(row1_left_parts), "")
+
+            if is_connected and bool(model_name):
+                pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
+                pct = min(100.0, max(0.0, pct))
+                bar_len = 8
+                filled = int(round((pct / 100) * bar_len))
+                bar_str = "█" * filled + "░" * (bar_len - filled)
+                row2_left = (
+                    f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
+                    f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
+                )
+            else:
+                row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
+            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+            row2_right_parts = [
+                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+                f"[{THEME_SECONDARY}]{cost_str}[/]",
+                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
+            ]
+            row2_right = "  •  ".join(row2_right_parts)
+            grid.add_row(row2_left, row2_right)
+
+            dir_text = f"~/{directory}" if directory else ""
+            row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+            if branch:
+                row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            diff_text = self._git_diff_stats()
+            if diff_text:
+                row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
+            row3_left = "  •  ".join(row3_left_parts)
+            grid.add_row(row3_left, "")
+
+            self.update(grid)
+        except Exception:
+            pass
+
+    def _git_diff_stats(self) -> str:
+        import time
+
+        now = time.time()
+        if getattr(self, "_diff_text", None) is not None and now - getattr(self, "_diff_time", 0.0) < 5.0:
+            return self._diff_text
+        if getattr(self, "_diff_loading", False):
+            return getattr(self, "_diff_text", "") or ""
+        self._diff_loading = True
+        import asyncio
+
+        try:
+            asyncio.get_running_loop().create_task(self._compute_diff_async())
+        except RuntimeError:
+            text = self._compute_diff_sync()
+            self._diff_loading = False
+            self._diff_text = text
+            self._diff_time = time.time()
+        return getattr(self, "_diff_text", "") or ""
+
+    async def _compute_diff_async(self) -> None:
+        import asyncio
+        import time
+
+        try:
+            text = await asyncio.to_thread(self._compute_diff_sync)
+        finally:
+            self._diff_loading = False
+        self._diff_text = text
+        self._diff_time = time.time()
+        try:
+            if self.is_mounted:
+                self._render_footer()
+        except Exception:
+            pass
+
+    def _compute_diff_sync(self) -> str:
+        text = ""
+        try:
+            import subprocess
+
+            res = subprocess.run(
+                ["git", "diff", "HEAD", "--numstat"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                cwd=os.getcwd(),
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                adds = dels = 0
+                for line in res.stdout.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) < 2:
+                        continue
+                    try:
+                        adds += int(parts[0])
+                        dels += int(parts[1])
+                    except ValueError:
+                        pass
+                if adds or dels:
+                    text = f"+{adds} / -{dels}"
+        except Exception:
+            pass
+        return text
+
+    def _git_branch(self) -> str:
+        try:
+            from core.prompt_builder import get_git_info
+
+            info = (get_git_info() or "").strip()
+            if info.startswith("branch '"):
+                return info[len("branch '") : -1]
+            if info.startswith("detached HEAD"):
+                return info.replace("detached HEAD (", "detached (").rstrip(")")
+            return ""
+        except Exception:
+            return ""

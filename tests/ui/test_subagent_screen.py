@@ -114,6 +114,57 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(msgs[3], {"type": "event_divider", "text": "Session Compacted"})
         self.assertEqual(acc[0], "Final answer")
 
+    def test_record_subagent_step_multistep_tools_no_accumulation(self):
+        from core.subagent_stream import record_subagent_step
+
+        sess = self._mk("task-multi", "multistep", "prompt")
+        acc = [""]
+        # Step 1: text before tool
+        record_subagent_step(("bot_delta", "Step 1 checking files...", ""), sess, acc)
+        record_subagent_step(("tool", "read", "a.py", {"path": "a.py"}), sess, acc)
+        record_subagent_step(("tool_result", "content A", ""), sess, acc)
+
+        # Step 2: text before second tool (should NOT accumulate Step 1 text)
+        record_subagent_step(("bot_delta", "Step 2 checking tests...", ""), sess, acc)
+        record_subagent_step(("tool", "read", "b.py", {"path": "b.py"}), sess, acc)
+        record_subagent_step(("tool_result", "content B", ""), sess, acc)
+
+        # Step 3: final answer
+        record_subagent_step(("bot_delta", "All done!", ""), sess, acc)
+        record_subagent_step(("bot_text", "All done!", ""), sess, acc)
+
+        msgs = sess.messages
+        # Message 0: bot step 1
+        self.assertEqual(msgs[0], {"type": "bot", "text": "Step 1 checking files..."})
+        # Message 1: tool 1
+        self.assertEqual(msgs[1]["type"], "tool")
+        self.assertEqual(msgs[1]["target"], "a.py")
+        # Message 2: bot step 2 (isolated text, no step 1 prefix!)
+        self.assertEqual(msgs[2], {"type": "bot", "text": "Step 2 checking tests..."})
+        # Message 3: tool 2
+        self.assertEqual(msgs[3]["type"], "tool")
+        self.assertEqual(msgs[3]["target"], "b.py")
+        # Message 4: final bot
+        self.assertEqual(msgs[4], {"type": "bot", "text": "All done!", "final": True})
+        self.assertEqual(acc[0], "All done!")
+
+    def test_record_subagent_step_bot_reset(self):
+        from core.subagent_stream import record_subagent_step
+
+        sess = self._mk("task-reset", "reset", "prompt")
+        acc = [""]
+        record_subagent_step(("bot_delta", "flaky draft", ""), sess, acc)
+        self.assertEqual(sess.messages[0]["text"], "flaky draft")
+        # Retry triggers bot_reset
+        record_subagent_step(("bot_reset", "", ""), sess, acc)
+        self.assertEqual(sess.messages[0]["text"], "")
+        self.assertEqual(acc[0], "")
+        # Retried attempt generates clean output
+        record_subagent_step(("bot_delta", "clean reply", ""), sess, acc)
+        record_subagent_step(("bot_text", "clean reply", ""), sess, acc)
+        self.assertEqual(sess.messages[0]["text"], "clean reply")
+        self.assertEqual(acc[0], "clean reply")
+
     def test_record_subagent_step_thinking_info_and_outro(self):
         from core.subagent_stream import record_subagent_step
 
@@ -306,11 +357,11 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             from textual.widgets import Label
 
-            from widgets.status_footer import StatusFooter
+            from widgets.status_footer import SubagentStatusFooter
 
             info = screen.query_one("#subagent-info", Label)
             self.assertEqual(info._raw_text, "Canon Agent")
-            footer = screen.query_one("#status-footer", StatusFooter)
+            footer = screen.query_one("#subagent-status-footer", SubagentStatusFooter)
             self.assertTrue(footer.is_mounted)
             await pilot.press("escape")
             await pilot.pause()
