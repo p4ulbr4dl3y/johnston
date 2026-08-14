@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
-from core.frontmatter import parse_csv_list, parse_frontmatter
+from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
 from core.markdown_scanner import MarkdownScannerCache
 from tools.base import format_tool_error
 

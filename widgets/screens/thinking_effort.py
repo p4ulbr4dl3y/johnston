@@ -1,4 +1,4 @@
-from core.thinking_effort import EFFORT_AUTO, display_thinking_effort
+from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, display_thinking_effort
 from widgets.screens.base_modal import status_tag
 from widgets.screens.base_selection import BaseSelectionScreen
 

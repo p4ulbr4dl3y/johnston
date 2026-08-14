@@ -5,7 +5,7 @@ from textual.widgets import Static
 
 from core.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import catalog, format_context_tokens
-from core.thinking_effort import display_thinking_effort
+from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from widgets.git_metrics_mixin import GitMetricsMixin
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -278,7 +278,7 @@ class StatusFooter(GitMetricsMixin, Static):
                     continue
                 mcp_total += 1
             mcp_active = self._active_mcp_count(mcp_servers)
-            from core.task_collection import collect_current_tasks
+            from core.infrastructure.runtime.task_collection import collect_current_tasks
 
             bg_tasks, sessions = collect_current_tasks(self.app, getattr(self.app, "current_session_id", None))
 
@@ -738,7 +738,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
 
             directory = getattr(session, "project_dir", "") or os.getcwd()
 
-            from core.token_util import estimate_tokens
+            from core.infrastructure.runtime.token_util import estimate_tokens
 
             history_tokens = estimate_tokens(session.messages) if getattr(session, "messages", None) else 0
             context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0) or history_tokens

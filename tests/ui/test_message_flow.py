@@ -926,7 +926,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                         break
                     await pilot.pause(0.1)
                 self.assertTrue(app.is_generating)
-                with patch("core.token_util.estimate_tokens", side_effect=Exception("boom")):
+                with patch("core.infrastructure.runtime.token_util.estimate_tokens", side_effect=Exception("boom")):
                     chat_input = app.query_one("#message-input")
                     chat_input.focus()
                     await pilot.press("escape")
