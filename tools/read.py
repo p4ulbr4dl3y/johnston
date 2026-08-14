@@ -9,11 +9,12 @@ from typing import Any, Callable, Dict, Tuple
 from core.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, format_tool_error, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
-from tools.utils import DEFAULT_LINE_WINDOW
+from tools.utils import DEFAULT_LINE_WINDOW, MAX_TOOL_PAYLOAD_BYTES
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+# Backward-compat alias: read's size cap is the shared tools-layer payload cap.
+MAX_FILE_SIZE = MAX_TOOL_PAYLOAD_BYTES
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
@@ -367,21 +368,15 @@ class ReadTool(BaseTool):
                             for _ in range(s_line - 1):
                                 if not f.readline():
                                     break
-                        tail_lines = []
                         if e_line is not None:
                             # Read only up to the requested end line.
                             remaining = max(1, e_line - max(1, s_line or 1) + 1)
-                            for _ in range(remaining):
-                                line = f.readline()
-                                if not line:
-                                    break
-                                tail_lines.append(line.rstrip(b"\r\n"))
+                            raw_lines = [f.readline() for _ in range(remaining)]
+                            raw_lines = [ln for ln in raw_lines if ln]
                         else:
-                            raw_bytes = f.read()
-                            tail_lines = raw_bytes.decode("utf-8", errors="replace").splitlines(keepends=True)
-                        if e_line is not None:
-                            return [line.rstrip(b"\r\n").decode("utf-8", errors="replace") for line in tail_lines], total
-                    return ([line.rstrip("\r\n") for line in tail_lines], total)
+                            raw_lines = f.read().splitlines(keepends=True)
+                        lines = [ln.rstrip(b"\r\n").decode("utf-8", errors="replace") for ln in raw_lines]
+                        return lines, total
 
                 lines = await run_cancellable(_read_file_lines, path, content_offset, start_line_int, end_line_int)
             except Exception as e:

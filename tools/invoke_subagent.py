@@ -3,7 +3,6 @@ import uuid
 from typing import Any, Dict
 
 from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.session_manager import SessionStore
 from core.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool, format_tool_error
 
@@ -14,19 +13,41 @@ def _truncate_subagent_result(text: str, session_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
     parent agent's context with a huge <task_result> block. The full session log
     is saved on truncation and the path is returned in the hint."""
-    from tools.base import _truncate_output_leading, _write_output_log
+    from tools.base import _write_output_log
+    from tools.utils import truncate_leading
 
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
 
     log_path = _write_output_log(text, session_id=session_id or "subagent") or "log file"
-    truncated, shown_lines = _truncate_output_leading(text, MAX_SUBAGENT_RESULT_CHARS)
+    truncated, shown_lines = truncate_leading(text, MAX_SUBAGENT_RESULT_CHARS)
     next_line = shown_lines + 1
     return (
         truncated
         + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
     )
+
+
+def _record_subagent_session(app: Any, session_id: str) -> None:
+    """Associate a spawned subagent's session id with the host's current tool widget.
+
+    The subagent_screen/chat_toolcall widgets (UI zone, outside the tools layer)
+    read ``session_id`` from the current tool widget to launch the subagent view on
+    click. This helper is the single tools-side touchpoint for that coupling; the
+    widget access itself cannot be fully isolated without touching the UI zone.
+    """
+    if app is None:
+        return
+    widget = getattr(app, "current_tool_widget", None)
+    if widget is None:
+        return
+    if isinstance(getattr(widget, "args", None), dict):
+        widget.args["session_id"] = session_id
+    try:
+        setattr(widget, "subagent_session_id", session_id)
+    except Exception:
+        pass
 
 
 class InvokeSubagentTool(BaseTool):
@@ -76,19 +97,16 @@ class InvokeSubagentTool(BaseTool):
             return format_tool_error("params", name="branch", detail="required")
 
         session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
-        args["session_id"] = session_id
+        args = {**args, "session_id": session_id}
 
-        if ctx.app and getattr(ctx.app, "current_tool_widget", None):
-            ctx.app.current_tool_widget.args["session_id"] = session_id
-            setattr(ctx.app.current_tool_widget, "subagent_session_id", session_id)
+        _record_subagent_session(ctx.app, session_id)
 
         parent_session_id = ctx.session_id
         if not isinstance(parent_session_id, str) or not parent_session_id:
             parent_session_id = getattr(getattr(ctx, "app", None), "current_session_id", None)
-        if ctx.app and getattr(ctx.app, "sm", None):
-            store = ctx.app.sm
-        else:
-            store = SessionStore.get_instance()
+        from tools.utils import get_session_store
+
+        store = get_session_store(ctx.app)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
         active_sessions = (
@@ -132,9 +150,7 @@ class InvokeSubagentTool(BaseTool):
         applied_role = configure_subagent_agent(
             subagent, subagent_type, app=ctx.app, project_dir=project_dir
         )
-        canonical_role = getattr(subagent, "role", None) or (getattr(applied_role, "key", None) or subagent_type or "worker")
-        if not canonical_role:
-            canonical_role = "worker"
+        canonical_role = getattr(subagent, "role", None) or getattr(applied_role, "key", None) or "worker"
 
         session = store.create_subagent(
             parent_id=parent_session_id or "",

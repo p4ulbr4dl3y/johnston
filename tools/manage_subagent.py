@@ -29,9 +29,9 @@ class ManageSubagentTool(BaseTool):
     }
 
     def _get_store(self, app: Any) -> SessionStore:
-        if app and getattr(app, "sm", None):
-            return app.sm
-        return SessionStore.get_instance()
+        from tools.utils import get_session_store
+
+        return get_session_store(app)
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args

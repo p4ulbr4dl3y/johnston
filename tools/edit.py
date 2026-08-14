@@ -106,13 +106,12 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
     if not raw_chunks:
         raise ValueError(format_tool_error("params", "no replacement chunks provided"))
 
+    from tools.utils import normalize_chunk_aliases
+
     parsed_chunks = []
     for idx, c in enumerate(raw_chunks, start=1):
+        c = normalize_chunk_aliases(c)
         target = c.get("old_str")
-        if target is None:
-            target = c.get("target_content")
-        if target is None:
-            target = c.get("old_string")
         if target is None:
             raise ValueError(format_tool_error("params", f"chunk {idx} missing 'old_str' or 'target_content'"))
 
@@ -120,10 +119,6 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
             raise ValueError(format_tool_error("params", f"chunk {idx} old_str (target_content) cannot be empty"))
 
         replacement = c.get("new_str")
-        if replacement is None:
-            replacement = c.get("replacement_content")
-        if replacement is None:
-            replacement = c.get("new_string")
         if replacement is None:
             raise ValueError(format_tool_error("params", f"chunk {idx} missing 'new_str' or 'replacement_content'"))
 

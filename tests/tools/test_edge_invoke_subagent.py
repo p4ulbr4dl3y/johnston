@@ -521,39 +521,31 @@ async def test_no_parent_session_id_uses_global_running_scan():
 @pytest.mark.asyncio
 async def test_ctx_app_none_falls_back_to_singleton_store():
     """ctx=None + app.sm absent -> SessionStore singleton used, spawn works."""
+    from unittest.mock import patch
+
     store, app, tool, tmp = _make_env(_agent_with_stream(_gen_ok))
     try:
         app.sm = None
-        import tools.invoke_subagent as inv
-
-        old = inv.SessionStore._instance
-        inv.SessionStore._instance = store
-        try:
+        with patch("core.session_manager.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "description": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert res.startswith("subagent ")
-        finally:
-            inv.SessionStore._instance = old
     finally:
         tmp.cleanup()
 
 
 @pytest.mark.asyncio
 async def test_app_has_no_sm_uses_singleton():
+    from unittest.mock import patch
+
     agent = _agent_with_stream(_gen_ok)
     store, app, tool, tmp = _make_env(agent)
     try:
         app.sm = None
-        import tools.invoke_subagent as inv
-
-        old = inv.SessionStore._instance
-        inv.SessionStore._instance = store
         tool._ensure_context = lambda ctx=None: ToolContext(app=app)
-        try:
+        with patch("core.session_manager.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "description": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
-        finally:
-            inv.SessionStore._instance = old
     finally:
         tmp.cleanup()
 
