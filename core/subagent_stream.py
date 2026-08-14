@@ -255,9 +255,9 @@ async def run_subagent_stream_bg(
         if notification_template:
             sid = session_id or session.id
             if truncate_result:
-                from tools.invoke_subagent import _truncate_subagent_result
+                from core.infrastructure.tasks.output import truncate_subagent_result
 
-                result_text = _truncate_subagent_result(acc[0], sid) or "Completed with no text output."
+                result_text = truncate_subagent_result(acc[0], sid) or "Completed with no text output."
             else:
                 result_text = acc[0].strip() or "Completed with no text output."
 

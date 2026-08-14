@@ -3,7 +3,8 @@ import unittest
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.session_manager import SessionStore
-from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool, _truncate_subagent_result
+from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
+from tools.invoke_subagent import InvokeSubagentTool
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
@@ -115,13 +116,13 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("manage_shell", tool_names)
 
     def test_truncate_subagent_result_short(self):
-        self.assertEqual(_truncate_subagent_result("short result"), "short result")
-        self.assertEqual(_truncate_subagent_result(""), "")
-        self.assertEqual(_truncate_subagent_result(None), "")
+        self.assertEqual(truncate_subagent_result("short result"), "short result")
+        self.assertEqual(truncate_subagent_result(""), "")
+        self.assertEqual(truncate_subagent_result(None), "")
 
     def test_truncate_subagent_result_long(self):
         long_text = "x" * (MAX_SUBAGENT_RESULT_CHARS + 500)
-        result = _truncate_subagent_result(long_text)
+        result = truncate_subagent_result(long_text)
         # Clipped and annotated with a pointer to the full session log
         self.assertLess(len(result), len(long_text))
         self.assertTrue(result.startswith("x" * MAX_SUBAGENT_RESULT_CHARS))
