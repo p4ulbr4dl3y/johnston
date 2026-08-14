@@ -2,7 +2,7 @@
 
 import copy
 
-from core.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
+from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 
 HARDENED_SHELL_DESCRIPTION = (
     "Run a synchronous terminal command with a configurable timeout (default 60s, max 300s). "

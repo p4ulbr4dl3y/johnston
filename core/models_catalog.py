@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterable, Optional, Set
 import httpx
 
 from core.config import CONFIG_DIR
-from core.defaults.config import DEFAULT_CONTEXT_LIMIT
+from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
 from core.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import uuid
 from contextlib import contextmanager
 from typing import Generator, List, Optional
 
-from core.defaults.git_excludes import DEFAULT_EXCLUDES
+from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
 from core.git_utils import is_git_repository, run_git
 from core.platform_utils import johnston_config_dir
 
