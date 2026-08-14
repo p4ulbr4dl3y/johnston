@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from core.adapters.base import extract_image_payload
+from core.infrastructure.adapters.base import extract_image_payload
 
 
 def format_api_error(err: Exception) -> str:

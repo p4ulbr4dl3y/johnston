@@ -4,16 +4,16 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import (
+from core.adapters.base import check_httpx_response_status
+from core.infrastructure.adapters.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
-    check_httpx_response_status,
     extract_image_details,
+    new_tool_call_id,
     parse_sse_line,
     parse_tool_call_args,
     sort_keys_recursive,
 )
-from core.base_provider.tools import new_tool_call_id
 from core.infrastructure.runtime.thinking_effort import build_anthropic_thinking_payload
 
 # Bounded LRU cache for deterministic tool-schema sorting. `sort_keys_recursive`
