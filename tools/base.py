@@ -11,11 +11,9 @@ __all__ = [
     "write_file_text",
     "read_file_text",
     "try_int",
-    "tail_output",
     "make_unified_diff",
     "get_fuzzy_matches",
     "truncate_output",
-    "format_tool_error",
     "format_background_notification",
     "execute_mcp_tool",
     "check_mcp_role_policy",
@@ -61,13 +59,6 @@ def try_int(val: Any, default: int | None = None) -> int | None:
         return default
 
 
-def tail_output(text: str, max_chars: int = 2000) -> str:
-    """Returns tail of text with a truncation notice if max_chars is exceeded."""
-    if not text or len(text) <= max_chars:
-        return text
-    return f"... [Output truncated, showing last {max_chars} chars]\n{text[-max_chars:]}"
-
-
 def make_unified_diff(
     old_content: str | list[str],
     new_content: str | list[str],
@@ -95,20 +86,6 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
     if not word or not possibilities:
         return []
     return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
-
-
-def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
-    """Unified error prefix for tool/agent messages.
-
-    Produces `ERR: <kind> '<name>': <detail>` (or `ERR: <kind>` when both name
-    and detail are empty). Matches the existing de-facto `ERR:` convention.
-    """
-    base = f"ERR: {kind}"
-    if name:
-        base += f" '{name}'"
-    if detail:
-        base += f": {detail}"
-    return base
 
 
 def format_background_notification(kind: str, name: str, task_id: str, result: str) -> str:

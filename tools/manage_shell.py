@@ -1,7 +1,9 @@
 from typing import Any, Dict
 
+from core.infrastructure.errors import format_tool_error
 from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
-from tools.base import BaseTool, format_tool_error, tail_output
+from core.infrastructure.tasks.output import tail_output
+from tools.base import BaseTool
 
 
 class ManageShellTool(BaseTool):

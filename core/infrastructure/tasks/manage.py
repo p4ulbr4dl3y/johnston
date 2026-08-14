@@ -33,7 +33,7 @@ def list_lines(tasks: List[Any], *, header: str = "Active Background Tasks:") ->
 
 def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
     """Build a scoped not-found error with a hint of the active task ids."""
-    from tools.base import format_tool_error
+    from core.infrastructure.errors import format_tool_error
 
     active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
     if active_ids:

@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
+from core.infrastructure.errors import format_tool_error
 from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
 from core.markdown_scanner import MarkdownScannerCache
-from tools.base import format_tool_error
 
 # Legacy scope aliases -> canonical names. Kept indefinitely so existing role
 # files (and persisted sessions) keep working after the rename.

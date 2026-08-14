@@ -1,12 +1,13 @@
 import asyncio
 from typing import Any, Dict
 
+from core.infrastructure.errors import format_tool_error
 from core.session_manager import (
     STATUS_CANCELLED,
     STATUS_ERROR,
     SessionStore,
 )
-from tools.base import BaseTool, format_tool_error
+from tools.base import BaseTool
 
 
 class ManageSubagentTool(BaseTool):

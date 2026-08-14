@@ -8,7 +8,8 @@ from typing import Any, Dict
 
 import httpx
 
-from tools.base import BaseTool, format_tool_error, truncate_output
+from core.infrastructure.errors import format_tool_error
+from tools.base import BaseTool, truncate_output
 from tools.cancel import run_cancellable
 from tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
