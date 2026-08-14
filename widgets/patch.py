@@ -29,6 +29,6 @@ def apply_textual_patches() -> None:
 
     Screen._forward_event = _safe_forward_event
 
-    # Markdown fence/table overrides are applied in widgets/chat_markdown.py at
-    # import; this module only patches Widget.allow_select and
-    # Screen._forward_event.
+    from widgets.chat_markdown import _apply_chat_markdown_patches
+
+    _apply_chat_markdown_patches()

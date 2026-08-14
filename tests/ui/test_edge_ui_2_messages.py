@@ -4,7 +4,7 @@ Detectors for real bugs in empty/whitespace/None message content handling.
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 from widgets.chat_messages import BotMessage, EventDivider, UserMessage
 
