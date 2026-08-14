@@ -102,6 +102,7 @@ class SessionPersistenceMixin:
                     self.agent.tools,
                     role=getattr(self.agent, "role", "worker"),
                     is_subagent=is_subagent,
+                    subagent_schema=getattr(self.agent, "subagent_schema", None),
                 )
                 sys_prompt = builder.build_system_prompt()
                 all_tools = builder.build_tools(

@@ -21,7 +21,12 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("read-only", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
-        builder = PromptBuilder("System prompt test", [], role="explorer")
+        builder = PromptBuilder(
+            "System prompt test",
+            [],
+            role="explorer",
+            subagent_schema={"type": "function", "function": {"name": "invoke_subagent"}},
+        )
         tools = builder.build_tools()
         names = [t["function"]["name"] for t in tools]
         self.assertNotIn("create", names)

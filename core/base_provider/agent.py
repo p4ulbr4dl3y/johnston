@@ -5,7 +5,7 @@ import os
 import random
 import time
 from asyncio import Queue
-from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
@@ -24,7 +24,6 @@ from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.models_catalog import catalog
 from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.tool_display import extract_tool_display
-from tools.registry import execute_tool
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +48,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
         max_retry_delay: float = 10.0,
+        tool_executor: Optional[Callable[[str, dict, Any], Awaitable[str]]] = None,
+        default_tools_provider: Optional[Callable[[], List[Dict]]] = None,
+        image_processor: Optional[Callable] = None,
+        tool_name_normalizer: Optional[Callable[[str], str]] = None,
     ):
         if tools is None:
-            from tools.registry import get_default_tools
-
-            tools = get_default_tools()
+            tools = default_tools_provider() if default_tools_provider else []
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
@@ -85,6 +86,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.total_tokens = 0
         self.cost_usd = 0.0
         self.role = "worker"
+        self.tool_executor = tool_executor
+        self.default_tools_provider = default_tools_provider
+        self.image_processor = image_processor
+        self.tool_name_normalizer = tool_name_normalizer
 
     async def close(self):
         if hasattr(self, "client") and self.client:
@@ -159,14 +164,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             self.total_tokens += prompt_tokens_est + output_tokens_est
             self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
 
-    @staticmethod
     async def _process_attachment_image(
-        att_path: str, error_prefix: str = "Error processing attachment image"
+        self, att_path: str, error_prefix: str = "Error processing attachment image"
     ) -> Optional[Dict[str, Any]]:
+        if not self.image_processor:
+            return None
         try:
-            from tools.read import process_image_file_sync
-
-            img_data_str = await asyncio.to_thread(process_image_file_sync, att_path)
+            img_data_str = await asyncio.to_thread(self.image_processor, att_path)
             img_dict = json.loads(img_data_str) if isinstance(img_data_str, str) else img_data_str
             if isinstance(img_dict, dict) and img_dict.get("base64"):
                 media_type = img_dict.get("media_type", "image/jpeg")
@@ -601,11 +605,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         tool_result = None
 
                     if tool_result is None:
-                        tool_app = self
-                        try:
-                            tool_result = await execute_tool(t_name, args, app=tool_app)
-                        except Exception as e:
-                            tool_result = format_tool_error("execute", detail=str(e), name=t_name)
+                        if self.tool_executor:
+                            try:
+                                tool_result = await self.tool_executor(t_name, args, self)
+                            except Exception as e:
+                                tool_result = format_tool_error("execute", detail=str(e), name=t_name)
+                        else:
+                            tool_result = format_tool_error("error", "tool_executor not provided", t_name)
 
                     display_result = tool_result
                     parsed_img = extract_image_payload(tool_result)

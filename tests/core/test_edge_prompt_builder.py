@@ -193,6 +193,9 @@ def test_build_tools_subagent_excluded_tools():
     assert "read" in names
 
 
+_SUBAGENT_SCHEMA = {"type": "function", "function": {"name": "invoke_subagent"}}
+
+
 def test_build_tools_no_duplicate_invoke_subagent_when_present():
     """If invoke_subagent already present, allow_task must not append a second."""
     base = [{"function": {"name": "invoke_subagent"}}]
@@ -202,7 +205,7 @@ def test_build_tools_no_duplicate_invoke_subagent_when_present():
 
 
 def test_build_tools_float_allow_task_truthy():
-    b = PromptBuilder("p", [], role="worker", allow_task=1.5)
+    b = PromptBuilder("p", [], role="worker", allow_task=1.5, subagent_schema=_SUBAGENT_SCHEMA)
     names = [t["function"]["name"] for t in b.build_tools()]
     assert "invoke_subagent" in names
 
