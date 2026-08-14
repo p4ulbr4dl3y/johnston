@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 async def new_session(
-    app: Any,
+    sm: SessionStore,
+    agent: Any,
     *,
     cancel_workers: Callable[[], None],
     kill_all_tasks: Callable[[], None],
@@ -25,17 +26,16 @@ async def new_session(
 ) -> str:
     """Create a new main session — pure logic, no UI.
 
-    * Cancels pending UI workers (callers passes cancel_workers which
-      iterates ``app.workers``).
+    * Cancels pending UI workers (callers passes cancel_workers).
     * Kills all app task-manager tasks.
     * Cancels running subagents for current session.
-    * Resets generation state, clears message queue.
     * Generates a fresh session id, creates it in the store.
     * Clears agent history.
 
     Returns the new session id.  The UI caller is responsible for
-    ``chat_view.remove_children()``, ``chat_view.check_welcome()`` and
-    ``app.refresh_status_footer()``.
+    setting ``is_generating``, clearing ``message_queue``, updating
+    ``current_session_id``, removing chat_view children, showing
+    welcome, and refreshing the status footer.
 
     This function does NOT import Textual or any widget module.
     """
@@ -43,14 +43,10 @@ async def new_session(
     await kill_all_tasks()
     cancel_subagents()
 
-    app.is_generating = False
-    app.message_queue.clear()
+    new_id = sm.generate_session_id()
+    sm.create_main(new_id)
 
-    new_id = app.sm.generate_session_id()
-    app.sm.create_main(new_id)
-    app.current_session_id = new_id
-
-    app.agent.clear_history()
+    agent.clear_history()
     return new_id
 
 
@@ -75,15 +71,16 @@ def resume_session(
 # ---------------------------------------------------------------------------
 
 async def compact_session(
-    app: Any,
+    agent: Any,
     *,
     save_session_cb: Callable[[], None],
     on_begin: Callable[[], None],
     on_divider_update: Callable[[str], None],
+    refresh_footer_cb: Callable[[], None],
 ) -> tuple[bool, str]:
     """Compact agent history.
 
-    Calls ``app.agent.compact_history()`` and returns (success, message).
+    Calls ``agent.compact_history()`` and returns (success, message).
     UI side-effects (divider creation, save, is_generating flag) are left
     to the caller via callbacks so this stays pure-core.
 
@@ -92,26 +89,28 @@ async def compact_session(
       create divider widget).
     * ``on_divider_update(title)`` — called after compaction to update the
       divider title in the UI.
+    * ``refresh_footer_cb`` — called after successful compaction to refresh
+      the status footer.
 
     Returns (success, title_or_msg).
     """
-    if not hasattr(app, "agent") or not app.agent:
+    if not agent:
         return False, "No active agent found"
 
-    if not hasattr(app.agent, "compact_history"):
+    if not hasattr(agent, "compact_history"):
         return False, "Active agent does not support context compaction"
 
     on_begin()
 
     try:
-        success, msg = await app.agent.compact_history()
+        success, msg = await agent.compact_history()
         if success:
             title = "Session Compacted"
             if msg and "(" in msg and ")" in msg:
                 tokens_info = msg[msg.find("(") + 1: msg.rfind(")")]
                 title = f"Session Compacted ({tokens_info})"
             on_divider_update(title)
-            app.refresh_status_footer()
+            refresh_footer_cb()
         else:
             on_divider_update(f"Compaction Failed: {msg}")
         return success, msg
@@ -120,7 +119,6 @@ async def compact_session(
         raise
     finally:
         save_session_cb()
-        app.is_generating = False
 
 
 # ---------------------------------------------------------------------------
@@ -175,20 +173,24 @@ async def get_rewind_git_stats(
 # ---------------------------------------------------------------------------
 
 def rewind_session(
-    app: Any,
+    agent: Any,
+    curr_sid: str | None,
+    project_path: str | None,
     user_msgs: list[tuple[int, str]],
     selected_child_idx: int,
     *,
     rollback_ui: Callable[[int], None],
     load_text_into_input: Callable[[str], None],
-    save_cb: Callable[[], None],
+    save_session_cb: Callable[[], None],
+    refresh_footer_cb: Callable[[], None],
 ) -> None:
     """Execute a rewind/rollback for a selected user message.
 
     Does NOT import Textual widgets.  UI callbacks handle ChatView operations:
     * ``rollback_ui(target_idx)`` — calls ``chat_view.rollback_to(target_idx)``.
     * ``load_text_into_input(text)`` — loads msg text into input, moves cursor.
-    * ``save_cb()`` — saves session (async or sync).
+    * ``save_session_cb()`` — saves session (async or sync) after rollback.
+    * ``refresh_footer_cb()`` — refreshes the status footer after rollback.
 
     Core logic performed:
     * Walk user_msgs to find the text and sequence index of the message.
@@ -210,10 +212,10 @@ def rewind_session(
 
     # Agent history: full clear or truncate
     if seq_idx == 0:
-        if hasattr(app.agent, "clear_history"):
-            app.agent.clear_history()
-        elif hasattr(app.agent, "history"):
-            app.agent.history = []
+        if hasattr(agent, "clear_history"):
+            agent.clear_history()
+        elif hasattr(agent, "history"):
+            agent.history = []
         for attr, value in (
             ("tokens_input", 0),
             ("tokens_output", 0),
@@ -222,34 +224,31 @@ def rewind_session(
             ("total_tokens", 0),
             ("cost_usd", 0.0),
         ):
-            if hasattr(app.agent, attr):
-                setattr(app.agent, attr, value)
+            if hasattr(agent, attr):
+                setattr(agent, attr, value)
     else:
-        if hasattr(app.agent, "truncate_history_to_user_message"):
-            app.agent.truncate_history_to_user_message(seq_idx)
-        elif hasattr(app.agent, "history"):
-            app.agent.history = []
+        if hasattr(agent, "truncate_history_to_user_message"):
+            agent.truncate_history_to_user_message(seq_idx)
+        elif hasattr(agent, "history"):
+            agent.history = []
 
     # Restore Git checkpoints in background
-    curr_sid = getattr(app, "current_session_id", None)
-    proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
-
     if curr_sid:
         async def _restore_git_bg():
             try:
                 from core.git_checkpoint import GitCheckpointManager
                 await asyncio.to_thread(
-                    GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path
+                    GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
                 )
                 await asyncio.to_thread(
-                    GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path
+                    GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
                 )
             except Exception as e:
                 logger.warning("Git checkpoint restore failed: %s", e)
         asyncio.create_task(_restore_git_bg())
 
-    app.refresh_status_footer()
-    save_cb()
+    refresh_footer_cb()
+    save_session_cb()
 
     # Load text into input
     load_text_into_input(msg_text)
