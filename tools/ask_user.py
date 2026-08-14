@@ -93,11 +93,10 @@ class AskUserTool(BaseTool):
         if not validated_questions:
             return format_tool_error("params", name="questions", detail="missing or invalid")
 
-        ask_user_fn = getattr(ctx.app, "ask_user", None) if ctx.app else None
-        if not callable(ask_user_fn):
+        if not callable(getattr(ctx.app, "ask_user", None)):
             return format_tool_error("context", name="app", detail="unavailable")
         try:
-            return await ask_user_fn(validated_questions)
+            return await ctx.ask_user(validated_questions)
         except asyncio.CancelledError:
             if hasattr(ctx.app, "_pending_ask_user"):
                 setattr(ctx.app, "_pending_ask_user", None)

@@ -36,7 +36,7 @@ class ManageShellTool(BaseTool):
             return format_tool_error("manager", name="none", detail="available")
 
         # Scope to the current session, matching the tasks screen and status footer.
-        curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        curr_sid = ctx.session_id
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
