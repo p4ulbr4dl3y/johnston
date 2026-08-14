@@ -1,4 +1,4 @@
-"""Coverage-focused tests for core/app_mixins/actions.py.
+"""Coverage-focused tests for widgets/mixins/actions.py.
 
 These tests exercise the uncovered branches of ActionsMixin (pointer handlers,
 mode toggling, expand/background actions, provider switching) using a mounted
@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app import JohnstonApp
-from core.app_mixins.actions import ActionsMixin
+from widgets.mixins.actions import ActionsMixin
 
 
 def _bare_mixin() -> ActionsMixin:
