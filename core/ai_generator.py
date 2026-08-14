@@ -39,6 +39,24 @@ class GenCanvas:
     save_session: Callable[..., Any] = field(default=None)
 
 
+def ensure_provider_ready(pm: Any, agent: Any) -> tuple[bool, str]:
+    """Check provider connection and model config.
+
+    Returns (ready, needs_ui) where:
+    - ready: True if provider connected and model set
+    - needs_ui: empty if ready, otherwise "provider" or "model"
+
+    Pure-core helper — no widget/Textual imports.
+    """
+    act_k = pm.get_active_provider_key() if hasattr(pm, "get_active_provider_key") else ""
+    is_connected = pm.is_provider_connected(act_k) if (hasattr(pm, "is_provider_connected") and act_k) else False
+    if not is_connected:
+        return False, "provider"
+    if not getattr(agent, "model", ""):
+        return False, "model"
+    return True, ""
+
+
 async def _create_git_checkpoint_async(
     canvas: GenCanvas,
     session_id: Optional[str],

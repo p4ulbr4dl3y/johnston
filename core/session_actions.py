@@ -124,6 +124,53 @@ async def compact_session(
 
 
 # ---------------------------------------------------------------------------
+# get_rewind_git_stats
+# ---------------------------------------------------------------------------
+
+async def get_rewind_git_stats(
+    current_session_id: str | None,
+    user_msgs: list[tuple[int, str]],
+    project_path: str | None,
+) -> list[tuple[int, str, str]]:
+    """Fetch git-checkpoint stats for each user message in the rewind list.
+
+    Returns list of (child_idx, text, git_stat) where git_stat is a formatted
+    string like '+12 / -4', 'no changes', or ''.
+    """
+    from core.git_checkpoint import GitCheckpointManager
+
+    msgs_with_stats: list[tuple[int, str, str]] = []
+    checkpoints_enabled = False
+
+    try:
+        checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, project_path)
+    except Exception:
+        checkpoints_enabled = False
+
+    if current_session_id and checkpoints_enabled:
+        seq_indices = list(range(len(user_msgs)))
+        try:
+            stats_map = await asyncio.wait_for(
+                asyncio.to_thread(
+                    GitCheckpointManager.get_diff_stats_batch,
+                    current_session_id,
+                    seq_indices,
+                    project_path=project_path,
+                ),
+                timeout=2.0,
+            )
+        except (asyncio.TimeoutError, Exception):
+            stats_map = {}
+        for seq_idx, (child_idx, text) in enumerate(user_msgs):
+            stat = stats_map.get(seq_idx) or ""
+            msgs_with_stats.append((child_idx, text, stat))
+    else:
+        msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
+
+    return msgs_with_stats
+
+
+# ---------------------------------------------------------------------------
 # rewind_session
 # ---------------------------------------------------------------------------
 
