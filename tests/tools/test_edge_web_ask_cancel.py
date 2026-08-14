@@ -343,15 +343,16 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancelled_clears_pending_when_flag_missing(self):
         # A CancelledError raised while the app has no _pending_ask_user attribute
-        # must still return a cancellation signal (no AttributeError).
+        # must propagate as a cancellation (no AttributeError), while still working
+        # without a _pending_ask_user attribute present.
         async def _cancelled(q):
             raise asyncio.CancelledError()
 
         tool = self._tool()
         app = MagicMock()
         app.ask_user = _cancelled
-        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app)
-        self.assertEqual(res, "cancelled by user")
+        with self.assertRaises(asyncio.CancelledError):
+            await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app)
 
     async def test_options_with_none_and_ints_coerced(self):
         # Non-string option values are coerced to str rather than crashing.

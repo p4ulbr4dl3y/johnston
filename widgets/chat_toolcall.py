@@ -247,42 +247,28 @@ class ParsingMixin:
             return syntax
         return None
 
-    def _check_is_error(self, text: str) -> bool:
-        if isinstance(self.args, dict) and self.args.get("is_error"):
-            return True
+    def _is_explicit_error(self, text: str) -> bool:
+        """True only when the tool result carries the explicit `ERR:` convention.
+
+        The tools layer localizes all failures through ``format_tool_error`` whose
+        canonical prefix is ``ERR:``. Instead of guessing errors by matching
+        pattern keywords (`Traceback`, `error:`, `fatal:`, ...) across arbitrary
+        output, we treat only that explicit marker as authoritative. Combined with
+        the explicit ``is_error`` flag passed by the caller, there is no heuristic
+        classification of tool output.
+        """
         if not text:
             return False
-        cache = getattr(self, "_error_cache", None)
-        if cache is None:
-            cache = {}
-            self._error_cache = cache
-        cached = cache.get(text)
-        if cached is not None:
-            return cached
-        if len(cache) >= 64:
-            cache.clear()
-        cleaned = text.strip().lower()
-        if cleaned.startswith(
-            (
-                "err:",
-                "error:",
-                "[error]",
-                "exception:",
-                "failed:",
-                "failure:",
-                "fatal:",
-                "permission denied",
-                "command failed",
-            )
-        ):
-            cache[text] = True
-            return True
-        if self.canonical_tool in ("read", "create", "edit", "multi_edit"):
-            cache[text] = False
-            return False
-        is_err = "traceback (most recent call last):" in cleaned[:200] or "error:" in cleaned[:80] or "exception:" in cleaned[:80]
-        cache[text] = is_err
-        return is_err
+        return text.lstrip().lower().startswith("err:")
+
+    def _init_status_from_result(self, result_text: str) -> str:
+        if result_text:
+            return "error" if self._is_explicit_error(result_text) else "done"
+        return "running"
+
+    def _has_explicit_arg_error(self) -> bool:
+        """Explicit `is_error` flag supplied on the tool's arguments takes precedence."""
+        return bool(isinstance(self.args, dict) and self.args.get("is_error"))
 
     def _get_status_color(self) -> str:
         if self.status == "running":
@@ -436,9 +422,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.result_text = result_text
         self.args = args or {}
         self.is_expanded = False
-        self.status = "running"
-        if result_text:
-            self.status = "error" if self._check_is_error(result_text) else "done"
+        self.status = self._init_status_from_result(result_text) if not self._has_explicit_arg_error() else "error"
 
         is_clickable = self.is_clickable_header()
         header_cls = f"{TOOL_HEADER} {TOOL_HEADER_EXPANDABLE}" if is_clickable else TOOL_HEADER
@@ -478,7 +462,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.result_text = cleaned
 
-        if is_error or self._check_is_error(cleaned):
+        if is_error or self._is_explicit_error(cleaned):
             self.status = "error"
         else:
             self.status = "done"
@@ -678,7 +662,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             file_path = nargs.get("path") or nargs.get("target_file") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._check_is_error(raw_text):
+                if self.status == "error" or self._is_explicit_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 elif raw_text and (
                     "@@" in raw_text
@@ -738,7 +722,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 "multi_replace",
             ):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._check_is_error(raw_text):
+                if self.status == "error" or self._is_explicit_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 else:
                     diff_text = raw_text
@@ -754,7 +738,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
             elif self.tool_type in ("update_plan", "Plan", "plan"):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._check_is_error(raw_text):
+                if self.status == "error" or self._is_explicit_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 else:
                     plan_items = self.args.get("plan") or []
@@ -765,7 +749,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.content_widget.update(self._format_ask_user_display())
             elif self.tool_type in ("web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
-                if raw_text.strip().lower().startswith("error"):
+                if self._is_explicit_error(raw_text):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                     self.content_widget.display = True
@@ -805,7 +789,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         self.content_widget.display = False
             elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
-                if raw_text.strip().lower().startswith("error"):
+                if self._is_explicit_error(raw_text):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                     self.content_widget.display = True

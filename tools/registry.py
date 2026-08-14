@@ -189,14 +189,25 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     from tools.base import is_mock_manager
 
     # Check if the tool is an active MCP tool
-    if hasattr(mcp_mgr, "get_active_tools_async") and not is_mock_manager(mcp_mgr):
-        res_or_coro = mcp_mgr.get_active_tools_async()
-        active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
-    else:
-        active_mcp_tools = mcp_mgr.get_active_tools() or []
-    is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools) or bool(
-        mcp_mgr.get_capabilities_for_exposed_tool(name)
-    )
+    try:
+        if hasattr(mcp_mgr, "get_active_tools_async") and not is_mock_manager(mcp_mgr):
+            res_or_coro = mcp_mgr.get_active_tools_async()
+            active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
+        else:
+            active_mcp_tools = mcp_mgr.get_active_tools() or []
+        is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+    except Exception as e:
+        return format_tool_error("mcp", detail=f"failed to list active tools: {e}", name=name)
+
+    if not is_mcp:
+        # Short-circuit: only check the capability lookup when the name wasn't
+        # found among active tools. Kept outside the listing try so its failure
+        # is reported distinctly and not confused with transport listing errors.
+        try:
+            if mcp_mgr.get_capabilities_for_exposed_tool(name):
+                is_mcp = True
+        except Exception as e:
+            return format_tool_error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
 
     if not is_mcp:
         import difflib

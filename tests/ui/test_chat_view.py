@@ -1051,14 +1051,19 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget = ToolCallWidget("read", "a\n\n b \t c")
         self.assertEqual(widget.target, "a b c")
         self.assertEqual(widget.status, "running")
+        # Only the explicit `ERR:` convention marks an error (no pattern guessing).
         widget2 = ToolCallWidget("shell", "cmd", result_text="Error: failed")
-        self.assertEqual(widget2.status, "error")
+        self.assertEqual(widget2.status, "done")
+        widget2b = ToolCallWidget("shell", "cmd", result_text="ERR: execute 'shell': boom")
+        self.assertEqual(widget2b.status, "error")
         widget3 = ToolCallWidget("read", "f.py", result_text="ok")
         self.assertEqual(widget3.status, "done")
+        # Explicit is_error flag takes precedence (error even without ERR:).
         widget4 = ToolCallWidget("read", "f.py", args={"is_error": True})
-        self.assertEqual(widget4.status, "running")
+        self.assertEqual(widget4.status, "error")
+        # "Error:" alone is not the explicit convention -> done.
         widget5 = ToolCallWidget("read", "f.py", result_text="Error: boom")
-        self.assertEqual(widget5.status, "error")
+        self.assertEqual(widget5.status, "done")
 
     def test_clean_hints_and_markup(self):
         widget = ToolCallWidget("shell", "cmd")
@@ -1102,18 +1107,17 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertIsNotNone(truncated)
         self.assertIsNone(widget._format_json_result("plain text"))
 
-    def test_check_is_error(self):
+    def test_is_explicit_error(self):
         widget = ToolCallWidget("shell", "cmd")
-        self.assertTrue(widget._check_is_error("Error: boom"))
-        self.assertTrue(widget._check_is_error("err: boom"))
-        self.assertTrue(widget._check_is_error("[Error] boom"))
-        self.assertTrue(widget._check_is_error("Traceback (most recent call last):\n..."))
-        self.assertTrue(widget._check_is_error("Permission denied"))
-        self.assertTrue(widget._check_is_error("Command failed"))
-        self.assertFalse(widget._check_is_error("all good"))
-        self.assertFalse(widget._check_is_error(""))
-        widget2 = ToolCallWidget("shell", "cmd", args={"is_error": True})
-        self.assertTrue(widget2._check_is_error("even happy text"))
+        # Only the explicit `ERR:` prefix is an error (case/padding-insensitive).
+        self.assertTrue(widget._is_explicit_error("ERR: boom"))
+        self.assertTrue(widget._is_explicit_error("  err: boom"))
+        self.assertFalse(widget._is_explicit_error("Error: boom"))
+        self.assertFalse(widget._is_explicit_error("Traceback (most recent call last):\n..."))
+        self.assertFalse(widget._is_explicit_error("Permission denied"))
+        self.assertFalse(widget._is_explicit_error("Command failed"))
+        self.assertFalse(widget._is_explicit_error("all good"))
+        self.assertFalse(widget._is_explicit_error(""))
 
     def test_get_status_color(self):
         widget = ToolCallWidget("shell", "cmd")
