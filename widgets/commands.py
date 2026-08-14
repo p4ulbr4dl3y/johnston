@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from core.models_catalog import catalog
+from core.session_actions import compact_session, new_session, resume_session, rewind_session
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
@@ -49,23 +50,23 @@ class NewCommand(BaseCommand):
     description = "Start a new chat session"
 
     async def execute(self, app) -> None:
-        for w in [w for w in getattr(app, "workers", []) if w.is_running]:
-            w.cancel()
-        await app.task_manager.kill_all()
-        from core.subagent_stream import cancel_running_subagents
+        def cancel_workers():
+            for w in [w for w in getattr(app, "workers", []) if w.is_running]:
+                w.cancel()
 
-        cancel_running_subagents(app.sm)
-        # Reset generation state synchronously: cancelled workers clear is_generating
-        # in their own finally, but that runs asynchronously, so /new could leave the
-        # app stuck "generating" and swallow subsequent input into the queue.
-        app.is_generating = False
-        app.message_queue.clear()
-        app.current_session_id = app.sm.generate_session_id()
-        app.sm.create_main(app.current_session_id)
+        async def kill_all_tasks():
+            await app.task_manager.kill_all()
+
+        def cancel_subagents():
+            from core.subagent_stream import cancel_running_subagents
+            cancel_running_subagents(app.sm)
+
+        await new_session(app, cancel_workers=cancel_workers, kill_all_tasks=kill_all_tasks, cancel_subagents=cancel_subagents)
+
+        # UI: clear chat view, show welcome, refresh footer
         chat_view = app.query_one(ChatView)
         await chat_view.remove_children()
         chat_view.check_welcome()
-        app.agent.clear_history()
         app.refresh_status_footer()
 
 
@@ -240,69 +241,29 @@ class RewindCommand(BaseCommand):
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
-                # Find original text and sequence index of message being rolled back to
-                msg_text = ""
-                seq_idx = 0
-                for i, (child_idx, text) in enumerate(user_msgs):
-                    if child_idx == selected_idx:
-                        msg_text = text
-                        seq_idx = i
-                        break
+                def rollback_ui(target_idx: int) -> None:
+                    chat_view.rollback_to(target_idx)
 
-                # Rollback chat to position immediately preceding selected message
-                target_idx = selected_idx - 1
-                chat_view.rollback_to(target_idx)
+                def load_text_into_input(text: str) -> None:
+                    chat_input = app.query_one(MESSAGE_INPUT)
+                    chat_input.load_text(text)
+                    lines = chat_input.text.split("\n")
+                    chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
 
-                if seq_idx == 0:
-                    if hasattr(app.agent, "clear_history"):
-                        app.agent.clear_history()
-                    elif hasattr(app.agent, "history"):
-                        app.agent.history = []
-                    for attr, value in (
-                        ("tokens_input", 0),
-                        ("tokens_output", 0),
-                        ("tokens_cache_read", 0),
-                        ("last_context_tokens", 0),
-                        ("total_tokens", 0),
-                        ("cost_usd", 0.0),
-                    ):
-                        if hasattr(app.agent, attr):
-                            setattr(app.agent, attr, value)
-                else:
-                    if hasattr(app.agent, "truncate_history_to_user_message"):
-                        app.agent.truncate_history_to_user_message(seq_idx)
-                    elif hasattr(app.agent, "history"):
-                        app.agent.history = []
+                def save_cb() -> None:
+                    if hasattr(app, "save_current_session_async"):
+                        asyncio.create_task(app.save_current_session_async())
+                    else:
+                        app.save_current_session()
 
-                # Restore Git checkpoint state if available
-                if curr_sid:
-
-                    async def _restore_git_bg():
-                        try:
-                            from core.git_checkpoint import GitCheckpointManager
-
-                            await asyncio.to_thread(
-                                GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=proj_path
-                            )
-                            await asyncio.to_thread(
-                                GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=proj_path
-                            )
-                        except Exception as e:
-                            logger.warning("Git checkpoint restore failed: %s", e)
-
-                    asyncio.create_task(_restore_git_bg())
-
-                app.refresh_status_footer()
-                if hasattr(app, "save_current_session_async"):
-                    asyncio.create_task(app.save_current_session_async())
-                else:
-                    app.save_current_session()
-
-                # Load text into input field
-                chat_input = app.query_one(MESSAGE_INPUT)
-                chat_input.load_text(msg_text)
-                lines = chat_input.text.split("\n")
-                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+                rewind_session(
+                    app,
+                    user_msgs,
+                    selected_idx,
+                    rollback_ui=rollback_ui,
+                    load_text_into_input=load_text_into_input,
+                    save_cb=save_cb,
+                )
             app.query_one(MESSAGE_INPUT).focus()
 
         app.push_screen(
@@ -323,6 +284,7 @@ class ResumeCommand(BaseCommand):
 
         def on_resume_selected(selected_sid: str) -> None:
             if selected_sid:
+                resume_session(app.sm, selected_sid)
                 app.load_session_ui(selected_sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
@@ -422,53 +384,40 @@ class CompactCommand(BaseCommand):
             app.notify("No active agent found", severity="error")
             return
 
-        if hasattr(app.agent, "compact_history"):
-            chat_view = None
-            divider = None
-            if hasattr(app, "query_one"):
-                try:
-                    from widgets.chat_view import ChatView
+        divider = None
 
-                    cv = app.query_one(ChatView)
-                    if cv and hasattr(cv, "add_event_divider"):
-                        chat_view = cv
-                        divider = await chat_view.add_event_divider("Compacting session...")
+        # UI setup: create the "Compacting..." divider
+        if hasattr(app, "query_one"):
+            try:
+                cv = app.query_one(ChatView)
+                if cv and hasattr(cv, "add_event_divider"):
+                    divider = await cv.add_event_divider("Compacting session...")
+            except Exception:
+                pass
+
+        def save_cb() -> None:
+            if hasattr(app, "save_current_session"):
+                try:
+                    app.save_current_session()
                 except Exception:
                     pass
 
+        def on_begin() -> None:
             app.is_generating = True
-            try:
-                success, msg = await app.agent.compact_history()
-                if success:
-                    title = "Session Compacted"
-                    if msg and "(" in msg and ")" in msg:
-                        tokens_info = msg[msg.find("(") + 1 : msg.rfind(")")]
-                        title = f"Session Compacted ({tokens_info})"
 
-                    if divider and hasattr(divider, "update_title"):
-                        divider.update_title(title)
-                    elif chat_view and hasattr(chat_view, "add_event_divider"):
-                        await chat_view.add_event_divider(title)
+        def on_divider_update(title: str) -> None:
+            nonlocal divider
+            if divider and hasattr(divider, "update_title"):
+                divider.update_title(title)
 
-                    if hasattr(app, "refresh_status_footer"):
-                        app.refresh_status_footer()
-                else:
-                    if divider and hasattr(divider, "update_title"):
-                        divider.update_title(f"Compaction Failed: {msg}")
-                    app.notify(msg or "Context compaction failed", severity="warning")
-            except asyncio.CancelledError:
-                if divider and hasattr(divider, "update_title"):
-                    divider.update_title("Compaction Cancelled")
-                raise
-            finally:
-                if hasattr(app, "save_current_session"):
-                    try:
-                        app.save_current_session()
-                    except Exception:
-                        pass
-                app.is_generating = False
-        else:
-            app.notify("Active agent does not support context compaction", severity="warning")
+        success, msg = await compact_session(
+            app,
+            save_session_cb=save_cb,
+            on_begin=on_begin,
+            on_divider_update=on_divider_update,
+        )
+        if not success:
+            app.notify(msg or "Context compaction failed", severity="warning")
 
 
 class PermissionsCommand(BaseCommand):
