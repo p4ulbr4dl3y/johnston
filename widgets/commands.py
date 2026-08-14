@@ -75,7 +75,15 @@ class NewCommand(BaseCommand):
             from core.subagent_stream import cancel_running_subagents
             cancel_running_subagents(app.sm)
 
-        await new_session(app, cancel_workers=cancel_workers, kill_all_tasks=kill_all_tasks, cancel_subagents=cancel_subagents)
+        new_id = await new_session(
+            app.sm, app.agent,
+            cancel_workers=cancel_workers, kill_all_tasks=kill_all_tasks, cancel_subagents=cancel_subagents,
+        )
+
+        # UI state
+        app.is_generating = False
+        app.message_queue.clear()
+        app.current_session_id = new_id
 
         # UI: clear chat view, show welcome, refresh footer
         chat_view = app.query_one(ChatView)
@@ -228,12 +236,15 @@ class RewindCommand(BaseCommand):
                         app.save_current_session()
 
                 rewind_session(
-                    app,
+                    app.agent,
+                    curr_sid,
+                    proj_path,
                     user_msgs,
                     selected_idx,
                     rollback_ui=rollback_ui,
                     load_text_into_input=load_text_into_input,
-                    save_cb=save_cb,
+                    save_session_cb=save_cb,
+                    refresh_footer_cb=lambda: app.refresh_status_footer(),
                 )
             app.query_one(MESSAGE_INPUT).focus()
 
@@ -382,10 +393,11 @@ class CompactCommand(BaseCommand):
                 divider.update_title(title)
 
         success, msg = await compact_session(
-            app,
+            app.agent,
             save_session_cb=save_cb,
             on_begin=on_begin,
             on_divider_update=on_divider_update,
+            refresh_footer_cb=lambda: app.refresh_status_footer(),
         )
         if not success:
             app.notify(msg or "Context compaction failed", severity="warning")
