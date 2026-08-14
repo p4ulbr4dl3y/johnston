@@ -172,14 +172,16 @@ class CustomMarkdownFence(MarkdownFence):
             event.stop()
 
 
-HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
-HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
-HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
-HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
+_patched = False
 
-Markdown.BLOCKS["fence"] = CustomMarkdownFence
-Markdown.BLOCKS["code_block"] = CustomMarkdownFence
-Markdown.BLOCKS["table"] = CustomMarkdownTable
+
+def _new_markdown_block_get_style(self, style):
+    if style == ".code_inline":
+        return Style(
+            background=Color(39, 39, 42),
+            foreground=Color(255, 255, 255),
+        )
+    return _old_markdown_block_get_style(self, style)
 
 
 def _custom_markdown_parser_factory() -> MarkdownIt:
@@ -201,22 +203,32 @@ def _new_markdown_init(self, *args, **kwargs):
     _old_markdown_init(self, *args, **kwargs)
 
 
-Markdown.__init__ = _new_markdown_init
-
-
 _old_markdown_block_get_style = MarkdownBlock._get_style
 
 
-def _new_markdown_block_get_style(self, style):
-    if style == ".code_inline":
-        return Style(
-            background=Color(39, 39, 42),
-            foreground=Color(255, 255, 255),
-        )
-    return _old_markdown_block_get_style(self, style)
+def _apply_chat_markdown_patches() -> None:
+    """Applies Textual Markdown monkey-patches (custom theme, blocks, renderers).
 
+    Kept behind an idempotent flag so importing this module has no side-effects;
+    the first widget that needs chat markdown rendering triggers it exactly once.
+    """
+    global _patched
+    if _patched:
+        return
+    _patched = True
 
-MarkdownBlock._get_style = _new_markdown_block_get_style
+    HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
+    HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
+    HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
+    HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
+
+    Markdown.BLOCKS["fence"] = CustomMarkdownFence
+    Markdown.BLOCKS["code_block"] = CustomMarkdownFence
+    Markdown.BLOCKS["table"] = CustomMarkdownTable
+
+    Markdown.__init__ = _new_markdown_init
+
+    MarkdownBlock._get_style = _new_markdown_block_get_style
 
 
 def _handle_markdown_task_done(task: asyncio.Task) -> None:
