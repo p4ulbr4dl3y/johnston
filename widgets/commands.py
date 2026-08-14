@@ -12,7 +12,13 @@ from core.provider_actions import (
     set_provider_credentials,
     set_thinking_effort,
 )
-from core.session_actions import compact_session, new_session, resume_session, rewind_session
+from core.session_actions import (
+    compact_session,
+    get_rewind_git_stats,
+    new_session,
+    resume_session,
+    rewind_session,
+)
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
@@ -201,34 +207,8 @@ class RewindCommand(BaseCommand):
 
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
-        msgs_with_stats = []
-        checkpoints_enabled = False
-
-        try:
-            from core.git_checkpoint import GitCheckpointManager
-
-            checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, proj_path)
-            if curr_sid and checkpoints_enabled:
-                seq_indices = list(range(len(user_msgs)))
-                try:
-                    stats_map = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            GitCheckpointManager.get_diff_stats_batch,
-                            curr_sid,
-                            seq_indices,
-                            project_path=proj_path,
-                        ),
-                        timeout=2.0,
-                    )
-                except (asyncio.TimeoutError, Exception):
-                    stats_map = {}
-                for seq_idx, (child_idx, text) in enumerate(user_msgs):
-                    stat = stats_map.get(seq_idx) or ""
-                    msgs_with_stats.append((child_idx, text, stat))
-            else:
-                msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
-        except Exception:
-            msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
+        msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path)
+        checkpoints_enabled = any(stat for _, _, stat in msgs_with_stats)
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
