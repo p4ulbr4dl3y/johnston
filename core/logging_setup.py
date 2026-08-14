@@ -1,7 +1,7 @@
 """Logging setup for Johnston.
 
 Configures a rotating file handler under LOGS_DIR once per process.
-UI/CLI modules should obtain loggers via get_logger() so the handler is
+UI/CLI modules should call setup_logging() during startup so the handler is
 guaranteed to be installed before any record is emitted.
 """
 
@@ -35,9 +35,3 @@ def setup_logging() -> None:
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
-
-
-def get_logger(name: str) -> logging.Logger:
-    """Return a logger for ``name``, ensuring the file handler is installed."""
-    setup_logging()
-    return logging.getLogger(name)

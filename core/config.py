@@ -1,6 +1,8 @@
 import os
 
-from core.platform_utils import IMAGE_EXTENSIONS, johnston_config_dir  # noqa: F401  (IMAGE_EXTENSIONS re-exported)
+from core.platform_utils import IMAGE_EXTENSIONS, johnston_config_dir
+
+__all__ = ["IMAGE_EXTENSIONS"]
 
 CONFIG_DIR = str(johnston_config_dir())
 PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")

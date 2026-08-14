@@ -5,7 +5,8 @@ Token estimation and usage calculation utilities
 import json
 from typing import Any, Dict
 
-CHARS_PER_TOKEN = 4
+# ~4 chars/token BPE density for ASCII text.
+_CHARS_PER_TOKEN = 4
 
 # Per-character token cost by character class. Real BPE tokenizers (cl100k/o200k)
 # treat ASCII densely (~4 chars/token) but tokenize Cyrillic and CJK far less
@@ -15,7 +16,6 @@ CHARS_PER_TOKEN = 4
 _TOKEN_COST_ASCII = 0.25  # ~4 chars/token
 _TOKEN_COST_CYRILLIC = 0.5  # ~2 chars/token
 _TOKEN_COST_CJK = 0.7  # ~1.4 chars/token
-_TOKEN_COST_OTHER = 0.5  # other non-ASCII (latin-extended, emoji, etc.)
 
 # Character class ranges (single-pass classification replaces 3 regex passes).
 # ASCII: same as str.isascii().
@@ -37,7 +37,7 @@ def _estimate_text_tokens(text: str) -> int:
         return 0
     # Fast path: pure ASCII (code, JSON, English) keeps the classic 4 chars/token
     if text.isascii():
-        return max(0, round(len(text) / CHARS_PER_TOKEN))
+        return max(0, round(len(text) / _CHARS_PER_TOKEN))
 
     ascii_n = 0
     cyrillic_n = 0
@@ -62,7 +62,7 @@ def _estimate_text_tokens(text: str) -> int:
         ascii_n * _TOKEN_COST_ASCII
         + cyrillic_n * _TOKEN_COST_CYRILLIC
         + cjk_n * _TOKEN_COST_CJK
-        + other_n * _TOKEN_COST_OTHER
+        + other_n * _TOKEN_COST_CYRILLIC  # non-ASCII residual same density as Cyrillic
     )
     return max(0, round(cost))
 
