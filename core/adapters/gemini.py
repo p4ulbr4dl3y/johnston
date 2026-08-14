@@ -13,7 +13,7 @@ from core.adapters.base import (
     parse_tool_call_args,
 )
 from core.base_provider.tools import new_tool_call_id
-from core.thinking_effort import build_gemini_thinking_config
+from core.infrastructure.runtime.thinking_effort import build_gemini_thinking_config
 
 
 class GeminiAdapter(BaseApiAdapter):

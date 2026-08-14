@@ -15,8 +15,8 @@ from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin, build_prompt_context, new_tool_call_id
 from core.models_catalog import catalog
 from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
-from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
-from core.token_util import estimate_tokens, parse_usage
+from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
+from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
 from tools.base import format_tool_error
 from tools.registry import execute_tool
@@ -277,7 +277,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 max_retry_delay = getattr(self, "max_retry_delay", 10.0)
                 pkey = getattr(self, "provider_key", "default")
 
-                from core.circuit_breaker import CircuitBreakerOpenError, circuit_breaker
+                from core.infrastructure.runtime.circuit_breaker import CircuitBreakerOpenError, circuit_breaker
 
                 if not circuit_breaker.allow_request(pkey):
                     cb_rem = circuit_breaker.remaining_cooldown(pkey)

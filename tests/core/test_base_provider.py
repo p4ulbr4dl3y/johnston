@@ -1164,7 +1164,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         fake_cb = unittest.mock.MagicMock()
         fake_cb.allow_request.return_value = False
         fake_cb.remaining_cooldown.return_value = 42.0
-        with unittest.mock.patch("core.circuit_breaker.circuit_breaker", fake_cb):
+        with unittest.mock.patch("core.infrastructure.runtime.circuit_breaker.circuit_breaker", fake_cb):
             events = []
             async for evt in agent.stream_steps("hi"):
                 events.append(evt)

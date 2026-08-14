@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 
-from core.frontmatter import parse_csv_list, parse_frontmatter
+from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
 from core.markdown_scanner import MarkdownScannerCache
 
 

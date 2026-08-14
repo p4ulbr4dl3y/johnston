@@ -11,7 +11,7 @@ from core.adapters.base import (
     image_url_block,
 )
 from core.base_provider.tools import new_tool_call_id
-from core.thinking_effort import build_openai_thinking_kwargs
+from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
 
 
 def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
