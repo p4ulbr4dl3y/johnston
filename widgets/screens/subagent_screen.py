@@ -9,6 +9,13 @@ from widgets.chat_view import ChatView
 from widgets.status_footer import StatusFooter
 
 
+class SubagentInfoLabel(Label):
+    """Header label for the subagent screen: not selectable, dimmed esc hint."""
+
+    ALLOW_SELECT = False
+    can_focus = False
+
+
 class SubagentViewScreen(Screen[None]):
     """Full-screen view of a subagent's chat without input panel or status footer."""
 
@@ -29,7 +36,7 @@ class SubagentViewScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield Label("", id="subagent-info")
+            yield SubagentInfoLabel("", id="subagent-info")
             yield StatusFooter(id="status-footer", is_subagent=True)
 
     def on_mount(self) -> None:
@@ -64,8 +71,15 @@ class SubagentViewScreen(Screen[None]):
         self.run_worker(self._load_history_session())
 
     def _update_info_label(self, text: str) -> None:
-        label = self.query_one("#subagent-info", Label)
-        label.update(f"{text}  •  esc: cancel")
+        from rich.table import Table
+
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
+        grid.add_row(text, "[dim]esc: cancel[/dim]")
+        label = self.query_one("#subagent-info", SubagentInfoLabel)
+        label._raw_text = text
+        label.update(grid)
         try:
             self.query_one("#status-footer", StatusFooter).refresh_footer()
         except Exception:
