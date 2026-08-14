@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Tuple
 
-from core.models_catalog import catalog, get_context_window
 from core.infrastructure.runtime.token_util import estimate_tokens
+from core.models_catalog import catalog, get_context_window
 
 
 def should_compact(history_len: int, sys_overhead: int, history_tokens: int, threshold: int) -> bool:
