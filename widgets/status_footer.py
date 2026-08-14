@@ -6,6 +6,7 @@ from textual.widgets import Static
 from core.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import catalog, format_context_tokens
 from core.thinking_effort import display_thinking_effort
+from widgets.git_metrics_mixin import GitMetricsMixin
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -44,7 +45,7 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
         return raw_path
 
 
-class StatusFooter(Static):
+class StatusFooter(GitMetricsMixin, Static):
     """Two-line status footer below chat"""
 
     can_focus = False
@@ -578,87 +579,8 @@ class StatusFooter(Static):
             self.update(grid)
             return
 
-    def _git_diff_stats(self) -> str:
-        """Return '+add/-del' line-count diff vs HEAD, cached 5s. Returns '' when unavailable."""
-        import time
-
-        now = time.time()
-        if getattr(self, "_diff_text", None) is not None and now - getattr(self, "_diff_time", 0.0) < 5.0:
-            return self._diff_text
-        # Kick off an async computation so the footer never blocks on git when
-        # the diff isn't cached yet; render shows the last known value meanwhile.
-        if getattr(self, "_diff_loading", False):
-            return getattr(self, "_diff_text", "") or ""
-        self._diff_loading = True
-        import asyncio
-
-        try:
-            asyncio.get_running_loop().create_task(self._compute_diff_async())
-        except RuntimeError:
-            text = self._compute_diff_sync()
-            self._diff_loading = False
-            self._diff_text = text
-            self._diff_time = time.time()
-        return getattr(self, "_diff_text", "") or ""
-
-    async def _compute_diff_async(self) -> None:
-        import asyncio
-        import time
-
-        try:
-            text = await asyncio.to_thread(self._compute_diff_sync)
-        finally:
-            self._diff_loading = False
-        self._diff_text = text
-        self._diff_time = time.time()
-        try:
-            if self.is_mounted:
-                self.refresh_footer()
-        except Exception:
-            pass
-
-    def _compute_diff_sync(self) -> str:
-        text = ""
-        try:
-            import subprocess
-
-            res = subprocess.run(
-                ["git", "diff", "HEAD", "--numstat"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                cwd=os.getcwd(),
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                adds = dels = 0
-                for line in res.stdout.splitlines():
-                    parts = line.split("\t")
-                    if len(parts) < 2:
-                        continue
-                    try:
-                        adds += int(parts[0])
-                        dels += int(parts[1])
-                    except ValueError:
-                        pass
-                if adds or dels:
-                    text = f"+{adds} / -{dels}"
-        except Exception:
-            pass
-        return text
-
-    def _git_branch(self) -> str:
-        """Return the current git branch name or '' when not in a repo."""
-        try:
-            from core.prompt_builder import get_git_info
-
-            info = (get_git_info() or "").strip()
-            if info.startswith("branch '"):
-                return info[len("branch '") : -1]
-            if info.startswith("detached HEAD"):
-                return info.replace("detached HEAD (", "detached (").rstrip(")")
-            return ""
-        except Exception:
-            return ""
+    def _on_diff_updated(self) -> None:
+        self.refresh_footer()
 
     def on_resize(self, event) -> None:
         size = getattr(event, "size", None)
@@ -675,7 +597,7 @@ class StatusFooter(Static):
         self.refresh_footer()
 
 
-class SubagentStatusFooter(Static):
+class SubagentStatusFooter(GitMetricsMixin, Static):
     """Dedicated status footer for subagent screen, isolated from main app footer."""
 
     can_focus = False
@@ -844,80 +766,5 @@ class SubagentStatusFooter(Static):
         except Exception:
             pass
 
-    def _git_diff_stats(self) -> str:
-        import time
-
-        now = time.time()
-        if getattr(self, "_diff_text", None) is not None and now - getattr(self, "_diff_time", 0.0) < 5.0:
-            return self._diff_text
-        if getattr(self, "_diff_loading", False):
-            return getattr(self, "_diff_text", "") or ""
-        self._diff_loading = True
-        import asyncio
-
-        try:
-            asyncio.get_running_loop().create_task(self._compute_diff_async())
-        except RuntimeError:
-            text = self._compute_diff_sync()
-            self._diff_loading = False
-            self._diff_text = text
-            self._diff_time = time.time()
-        return getattr(self, "_diff_text", "") or ""
-
-    async def _compute_diff_async(self) -> None:
-        import asyncio
-        import time
-
-        try:
-            text = await asyncio.to_thread(self._compute_diff_sync)
-        finally:
-            self._diff_loading = False
-        self._diff_text = text
-        self._diff_time = time.time()
-        try:
-            if self.is_mounted:
-                self._render_footer()
-        except Exception:
-            pass
-
-    def _compute_diff_sync(self) -> str:
-        text = ""
-        try:
-            import subprocess
-
-            res = subprocess.run(
-                ["git", "diff", "HEAD", "--numstat"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                cwd=os.getcwd(),
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                adds = dels = 0
-                for line in res.stdout.splitlines():
-                    parts = line.split("\t")
-                    if len(parts) < 2:
-                        continue
-                    try:
-                        adds += int(parts[0])
-                        dels += int(parts[1])
-                    except ValueError:
-                        pass
-                if adds or dels:
-                    text = f"+{adds} / -{dels}"
-        except Exception:
-            pass
-        return text
-
-    def _git_branch(self) -> str:
-        try:
-            from core.prompt_builder import get_git_info
-
-            info = (get_git_info() or "").strip()
-            if info.startswith("branch '"):
-                return info[len("branch '") : -1]
-            if info.startswith("detached HEAD"):
-                return info.replace("detached HEAD (", "detached (").rstrip(")")
-            return ""
-        except Exception:
-            return ""
+    def _on_diff_updated(self) -> None:
+        self._render_footer()
