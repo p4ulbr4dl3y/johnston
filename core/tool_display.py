@@ -49,13 +49,13 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
             for q in qs:
                 q_text = (q.get("question_text") or q.get("question") or "") if isinstance(q, dict) else ""
                 if q_text:
-                    formatted.append(q_text[:27] + "..." if len(q_text) > 30 else q_text)
+                    formatted.append(_truncate(q_text))
             if formatted:
                 return _truncate(", ".join(f'"{t}"' for t in formatted))
         q = args.get("question")
         if q:
             q_text = str(q)
-            return _truncate(f'"{q_text[:47] + "..." if len(q_text) > 50 else q_text}"')
+            return _truncate(f'"{_truncate(q_text)}"')
         return "ask_user"
 
     if name == "invoke_subagent":
