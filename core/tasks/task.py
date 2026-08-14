@@ -7,7 +7,6 @@ races on live objects.
 
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
@@ -30,27 +29,12 @@ class TaskStatus(str, Enum):
         return self in (TaskStatus.QUEUED, TaskStatus.RUNNING)
 
 
-@dataclass
-class TaskSnapshot:
-    """Immutable view of a task for UI layers.
-
-    Deliberately carries only primitives so the UI never touches a live task
-    object (avoiding race conditions when tasks complete/kill concurrently).
-    """
-
-    id: str
-    kind: str
-    status_str: str
-    command: str
-    is_running: bool
-
-
 class BaseTask(ABC):
     """Abstract contract for every task managed by TaskManager.
 
-    Concrete subclasses (ShellTask, SubagentTask) provide execution, buffered
-    output and kill semantics. All methods are safe to call concurrently; the
-    implementations are responsible for their own locking.
+    Concrete subclasses (ShellTask) provide execution, buffered output and kill
+    semantics. All methods are safe to call concurrently; the implementations
+    are responsible for their own locking.
     """
 
     def __init__(
@@ -90,15 +74,6 @@ class BaseTask(ABC):
     def is_running(self) -> bool:
         return self._status.is_running
 
-    def snapshot(self) -> TaskSnapshot:
-        return TaskSnapshot(
-            id=self.id,
-            kind=self.kind,
-            status_str=self._status.value,
-            command=self.command,
-            is_running=self.is_running,
-        )
-
     # -- io -----------------------------------------------------------------
 
     @abstractmethod
@@ -113,7 +88,7 @@ class BaseTask(ABC):
     async def send_input(self, text: str) -> str:
         """Send a line of input to the task.
 
-        Shell tasks write to their pty/stdin. Subagent tasks raise an error.
+        Shell tasks write to their pty/stdin.
         """
 
     @abstractmethod

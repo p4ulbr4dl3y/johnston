@@ -5,18 +5,16 @@ and answers queries for the UI/footer.
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from core.tasks.task import BaseTask, TaskSnapshot
+from core.tasks.task import BaseTask
 
 
 class TaskManager:
-    """Registry of live tasks with snapshot/query helpers."""
+    """Registry of live tasks."""
 
     def __init__(self, app: Any = None) -> None:
-        self.app = app
         self._tasks: Dict[str, BaseTask] = {}
-        self._snapshots: Dict[str, TaskSnapshot] = {}
 
     # -- registration -------------------------------------------------------
 
@@ -25,25 +23,7 @@ class TaskManager:
         return task
 
     def drop(self, task_id: str) -> None:
-        task = self._tasks.pop(task_id, None)
-        if task is not None:
-            self._snapshots.pop(task_id, None)
-
-    # -- query --------------------------------------------------------------
-
-    def list(self) -> List[TaskSnapshot]:
-        return [task.snapshot() for task in self._tasks.values()]
-
-    def by_session(self, session_id: str) -> List[BaseTask]:
-        """Filter tasks by the session they back (shell/subagent session_id)."""
-        result = []
-        for task in self._tasks.values():
-            sid = getattr(task, "session_id", None) or getattr(
-                getattr(task, "session", None), "id", None
-            )
-            if sid == session_id:
-                result.append(task)
-        return result
+        self._tasks.pop(task_id, None)
 
     # -- lifecycle ----------------------------------------------------------
 
