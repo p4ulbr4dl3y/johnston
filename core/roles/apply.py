@@ -19,7 +19,7 @@ def apply_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) 
 
     registry = RoleRegistry.get_instance()
     definition = resolve_role(registry, role_key, project_dir=project_dir)
-    apply_provider(subagent, definition, project_dir=project_dir)
+    apply_provider(subagent, definition)
     apply_role_tools(subagent, definition)
     apply_prompt(subagent, definition)
     return definition
