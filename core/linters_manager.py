@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
 from core.defaults.linters import NOISE_PREFIXES, PRESET_LINTERS
-from core.platform_utils import decode_output, is_windows, read_json
+from core.infrastructure.platform.platform_utils import decode_output, is_windows, read_json
 
 GLOBAL_LINTERS_FILE = os.path.join(CONFIG_DIR, "linters.json")
 
@@ -160,7 +160,7 @@ class LintersManager:
                 entry = {"enabled": enabled}
             cfg["linters"][name] = entry
 
-            from core.platform_utils import atomic_write_json
+            from core.infrastructure.platform.platform_utils import atomic_write_json
 
             atomic_write_json(file_to_update, cfg, indent=2)
             return True

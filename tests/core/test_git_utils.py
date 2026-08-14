@@ -4,12 +4,12 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from core.git_utils import make_git_diff, run_git
+from core.infrastructure.runtime.git_utils import make_git_diff, run_git
 
 
 class TestRunGit(unittest.TestCase):
     def test_successful_run(self):
-        with patch("core.git_utils.subprocess.run") as mock_run:
+        with patch("core.infrastructure.runtime.git_utils.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=["git", "status"], returncode=0, stdout="clean", stderr=""
             )
@@ -22,7 +22,7 @@ class TestRunGit(unittest.TestCase):
 
     def test_timeout_returns_124(self):
         with patch(
-            "core.git_utils.subprocess.run",
+            "core.infrastructure.runtime.git_utils.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd=["git", "fetch"], timeout=1),
         ):
             res = run_git(["fetch"], timeout=1)
@@ -30,13 +30,13 @@ class TestRunGit(unittest.TestCase):
         self.assertIn("timeout", res.stderr)
 
     def test_other_exception_returns_1(self):
-        with patch("core.git_utils.subprocess.run", side_effect=OSError("git missing")):
+        with patch("core.infrastructure.runtime.git_utils.subprocess.run", side_effect=OSError("git missing")):
             res = run_git(["rev-parse", "HEAD"])
         self.assertEqual(res.returncode, 1)
         self.assertEqual(res.stderr, "git missing")
 
     def test_env_and_no_timeout_passthrough(self):
-        with patch("core.git_utils.subprocess.run") as mock_run:
+        with patch("core.infrastructure.runtime.git_utils.subprocess.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=["git", "log"], returncode=0, stdout="", stderr=""
             )
@@ -76,7 +76,7 @@ class TestMakeGitDiff(unittest.TestCase):
         self.assertIn("+y", d)
 
     def test_fallback_when_git_unavailable(self):
-        with patch("core.git_utils.run_git", side_effect=OSError("no git")):
+        with patch("core.infrastructure.runtime.git_utils.run_git", side_effect=OSError("no git")):
             d = make_git_diff("a\nb\n", "a\nc\n", fromfile="old", tofile="new")
         self.assertIn("--- old\n+++ new", d)
         self.assertIn("-b", d)
@@ -84,7 +84,7 @@ class TestMakeGitDiff(unittest.TestCase):
 
     def test_fallback_when_git_errors(self):
         with patch(
-            "core.git_utils.run_git",
+            "core.infrastructure.runtime.git_utils.run_git",
             return_value=subprocess.CompletedProcess(args=[], returncode=2, stdout="", stderr="boom"),
         ):
             d = make_git_diff("a\nb\n", "a\nc\n", fromfile="old", tofile="new")
@@ -92,7 +92,7 @@ class TestMakeGitDiff(unittest.TestCase):
         self.assertIn("+c", d)
 
     def test_identical_does_not_call_git(self):
-        with patch("core.git_utils.run_git") as m:
+        with patch("core.infrastructure.runtime.git_utils.run_git") as m:
             make_git_diff("a\n", "a\n")
         m.assert_not_called()
 

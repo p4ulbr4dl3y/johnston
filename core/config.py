@@ -1,6 +1,6 @@
 import os
 
-from core.platform_utils import IMAGE_EXTENSIONS, johnston_config_dir
+from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS, johnston_config_dir
 
 __all__ = ["IMAGE_EXTENSIONS"]
 

@@ -150,7 +150,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.shell_executable", return_value="/bin/sh"),
             patch("asyncio.create_subprocess_shell", new_callable=AsyncMock) as mock_shell,
         ):
-            from core.platform_utils import shell_subprocess_kwargs
+            from core.infrastructure.platform.platform_utils import shell_subprocess_kwargs
 
             await self.tool._create_windows_process("echo 1", {"ENV": "1"})
             mock_shell.assert_called_once_with(

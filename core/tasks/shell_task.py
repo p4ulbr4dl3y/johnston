@@ -9,7 +9,7 @@ import os
 import signal
 from typing import Any, Optional
 
-from core.platform_utils import decode_output, terminate_process
+from core.infrastructure.platform.platform_utils import decode_output, terminate_process
 from core.tasks.output import OutputBuffer, strip_ansi
 from core.tasks.task import BaseTask, TaskStatus
 from tools.base import format_tool_error

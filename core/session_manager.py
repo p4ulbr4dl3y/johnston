@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from core.config import PROJECTS_DIR
 from core.fs_signature import compute_dir_signature_hash
-from core.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 

@@ -218,7 +218,7 @@ class ChatInput(TextArea):
         import time
 
         from core.config import TEMP_IMAGES_DIR
-        from core.platform_utils import get_clipboard_image_or_file
+        from core.infrastructure.platform.platform_utils import get_clipboard_image_or_file
 
         file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)
 

@@ -185,7 +185,7 @@ class MCPManager:
                 server_dict.update(key_updates)
                 cfg["mcpServers"][name] = server_dict
 
-            from core.platform_utils import atomic_write_json
+            from core.infrastructure.platform.platform_utils import atomic_write_json
 
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:

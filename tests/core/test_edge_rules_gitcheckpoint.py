@@ -6,7 +6,7 @@ import unittest
 from unittest import mock
 
 from core.git_checkpoint import GitCheckpointManager
-from core.git_utils import run_git
+from core.infrastructure.runtime.git_utils import run_git
 from core.rules_manager import RuleDefinition, RulesManager
 
 

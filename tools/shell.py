@@ -5,7 +5,7 @@ import time
 from collections import deque
 from typing import Any, Dict
 
-from core.platform_utils import (
+from core.infrastructure.platform.platform_utils import (
     decode_output,
     is_windows,
     shell_env,

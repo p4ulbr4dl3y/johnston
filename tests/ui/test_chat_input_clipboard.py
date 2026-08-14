@@ -12,7 +12,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
         chat_input.insert = MagicMock()
         chat_input._on_input_change = MagicMock()
 
-        with patch("core.platform_utils.get_clipboard_image_or_file", return_value=("/tmp/sample.png", None)):
+        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=("/tmp/sample.png", None)):
             res = await chat_input.try_paste_clipboard_image()
             self.assertTrue(res)
             chat_input.insert.assert_called_once_with("@/tmp/sample.png ")
@@ -24,7 +24,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
 
         mock_img = Image.new("RGB", (100, 50))
         with (
-            patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+            patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
             patch("os.makedirs"),
             patch("os.path.getsize", return_value=1024),
             patch.object(Image.Image, "save"),
@@ -36,7 +36,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
 
     async def test_try_paste_clipboard_image_none(self):
         chat_input = ChatInput()
-        with patch("core.platform_utils.get_clipboard_image_or_file", return_value=(None, None)):
+        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, None)):
             res = await chat_input.try_paste_clipboard_image()
             self.assertFalse(res)
             self.assertEqual(len(chat_input.clipboard_attachments), 0)
