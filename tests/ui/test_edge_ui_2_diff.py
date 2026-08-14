@@ -29,22 +29,29 @@ class TestDiffRenderable(unittest.TestCase):
 
 
 class TestFormatEditDiffNumbering(unittest.TestCase):
-    def test_removed_line_uses_new_side_column(self):
-        """Numbering uses a single (new-side) column. A `-` line in a hunk with
-        differing old/new counts still takes the running new-side counter."""
+    def test_removed_line_uses_old_side_column(self):
+        """A `-` line takes its line number from the old file."""
         diff = "@@ -5,3 +10,1 @@\nctx\n-old\n+new\n"
         result = format_edit_diff(diff, "f.py")
-        # ctx is new-line 10; the removed line keeps the new-side counter (11).
-        self.assertIn("11 - old", result.plain)
+        # ctx is line 5 (old) / 10 (new); removed line is line 6 in old file.
+        self.assertIn("6 - old", result.plain)
+        self.assertIn("11 + new", result.plain)
 
     def test_removed_line_new_numbering_exact(self):
         diff = "@@ -1,3 +1,3 @@\nctx\n-old\n+new\nctx2\n"
         result = format_edit_diff(diff, "f.py")
-        # ctx new 1, removed line new-line 2, +new new-line 2, ctx2 new-line 3
         self.assertIn("1   ctx", result.plain)
         self.assertIn("2 - old", result.plain)
         self.assertIn("2 + new", result.plain)
         self.assertIn("3   ctx2", result.plain)
+
+    def test_multiline_removed_lines_increment_properly(self):
+        diff = "@@ -6,4 +6,1 @@\n-line1\n-line2\n-line3\n+newline\n"
+        result = format_edit_diff(diff, "f.py")
+        self.assertIn("6 - line1", result.plain)
+        self.assertIn("7 - line2", result.plain)
+        self.assertIn("8 - line3", result.plain)
+        self.assertIn("6 + newline", result.plain)
 
 
 class TestFormatEditDiffEmpty(unittest.TestCase):

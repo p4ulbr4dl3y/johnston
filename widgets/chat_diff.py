@@ -182,7 +182,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             continue
 
         if line.startswith("-"):
-            num_str = str(new_line).rjust(max_num_digits)
+            num_str = str(old_line).rjust(max_num_digits)
             code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
             old_idx += 1
             append_diff_line(num_str, "-", code_text, style_bg="on #2a1215", style_fg="#f85149")
