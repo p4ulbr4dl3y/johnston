@@ -12,7 +12,7 @@ from unittest.mock import MagicMock as MMock
 
 import pytest
 
-from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SessionStore
 from tools.context import ToolContext
 from tools.invoke_subagent import MAX_SUBAGENT_RESULT_CHARS, InvokeSubagentTool

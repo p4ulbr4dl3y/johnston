@@ -10,8 +10,8 @@ import time
 from typing import Any, Dict, List, Optional
 
 from core.config import CONFIG_DIR
-from core.defaults.git_excludes import DEFAULT_IGNORE_DIRS
-from core.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
+from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
+from core.domain.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
 from core.infrastructure.runtime.frontmatter import parse_frontmatter
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_recursive
 

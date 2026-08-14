@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 from core.config import CONFIG_FILE
-from core.defaults.config import DEFAULT_PERMISSIONS
+from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 

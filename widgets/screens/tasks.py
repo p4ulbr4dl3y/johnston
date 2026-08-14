@@ -7,7 +7,7 @@ from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
-from core.defaults.config import THEME_MUTED
+from core.domain.defaults.config import THEME_MUTED
 from widgets.screens.base_modal import BaseModalScreen
 from widgets.screens.base_selection import HeaderWrapOptionList
 from widgets.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID, MODAL_MARKDOWN, MODAL_MARKDOWN_CENTERED
