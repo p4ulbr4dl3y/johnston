@@ -1,8 +1,16 @@
 from typing import Any, Dict, List, Tuple
 
 from core.models_catalog import catalog, get_context_window
-from core.prompt_builder import PromptBuilder
 from core.token_util import estimate_tokens
+
+
+def should_compact(history_len: int, sys_overhead: int, history_tokens: int, threshold: int) -> bool:
+    """Shared guard: run automatic context compaction when history exceeds the threshold.
+
+    Used both at the top of a new turn and after tool execution so the
+    "should I compact" decision is computed exactly one way.
+    """
+    return history_len > 4 and (sys_overhead + history_tokens) > threshold
 
 
 class CompactionMixin:
@@ -156,11 +164,8 @@ class CompactionMixin:
         sys_overhead: int,
         threshold: int,
     ) -> Tuple[List[Dict[str, Any]], bool]:
-        if len(messages) <= 5:
-            return messages, False
-
         current_context = sys_overhead + estimate_tokens(messages[1:])
-        if current_context <= threshold:
+        if not should_compact(len(messages) - 1, sys_overhead, estimate_tokens(messages[1:]), threshold):
             self.last_context_tokens = current_context
             return messages, False
 
@@ -183,26 +188,9 @@ class CompactionMixin:
         if len(self.history) <= 4:
             return False, "History is too short to compact (<= 4 messages)"
 
-        agent_role = getattr(self, "role", "worker")
-        allow_task = getattr(self, "allow_task", True)
-        m_name = catalog.get_model_display_name(
-            getattr(self, "provider_key", ""), getattr(self, "model", "")
-        ) or getattr(self, "model", "")
-        is_subagent = getattr(self, "is_subagent", False)
-        builder = PromptBuilder(
-            self.system_prompt,
-            self.tools,
-            role=agent_role,
-            allow_task=allow_task,
-            model_name=m_name,
-            cwd=getattr(self, "cwd", None),
-            is_subagent=is_subagent,
-        )
-        sys_prompt = builder.build_system_prompt()
-        all_tools = builder.build_tools(
-            provider_key=getattr(self, "provider_key", "")
-        )
-        sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
+        from core.base_provider.tools import build_prompt_context
+
+        _, _, sys_tokens = build_prompt_context(self)
 
         tokens_before = (
             self.last_context_tokens

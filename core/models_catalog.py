@@ -10,7 +10,7 @@ import os
 import re
 import time
 from collections import OrderedDict
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, Optional, Set
 
 import httpx
 
@@ -40,6 +40,28 @@ def _get_match(cache: "OrderedDict", key: tuple):
         cache.move_to_end(key)
         return cache[key]
     return None
+
+
+# Shared JSON read cache keyed by path -> (mtime, parsed dict). Avoids a disk
+# read on repeated reads of unchanged files; deduplicates the JSON caching logic
+# also used by provider_manager (see cached_json_read).
+_json_read_cache: Dict[str, tuple] = {}
+
+
+def cached_json_read(path: str, default: Any = None) -> Any:
+    """Reads a JSON file, returning a cache value when the file mtime is unchanged."""
+    if not os.path.exists(path):
+        return default
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = None
+    cached = _json_read_cache.get(path)
+    if cached is not None and cached[0] == mtime:
+        return cached[1]
+    data = read_json(path, default)
+    _json_read_cache[path] = (mtime, data)
+    return data
 
 
 def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:
@@ -86,26 +108,17 @@ def format_context_tokens(tokens: int) -> str:
 class ModelsCatalog:
     def __init__(self):
         self._limits: Dict[str, int] = {}
-        self._reasoning: List[str] = []
-        self._open_weights: List[str] = []
         self._names: Dict[str, str] = {}
-        self._descriptions: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
-        # Provider-cache JSON read cache: path -> (mtime, parsed dict). Avoids a
-        # disk read on every get_context_limit miss; invalidated by mtime change.
-        self._prov_cache: Dict[str, tuple] = {}
         self.load_cache()
 
     def load_cache(self) -> bool:
         data = read_json(CACHE_FILE)
         if data and isinstance(data, dict):
             self._limits = data.get("model_limits", {})
-            self._reasoning = data.get("reasoning_models", [])
-            self._open_weights = data.get("open_weights_models", [])
             self._names = data.get("model_names", {})
-            self._descriptions = data.get("model_descriptions", {})
             self._pricing = data.get("model_pricing", {})
             self._updated_at = float(data.get("updated_at", 0.0))
             return True
@@ -123,10 +136,7 @@ class ModelsCatalog:
             payload = {
                 "updated_at": now,
                 "model_limits": model_limits if model_limits is not None else self._limits,
-                "reasoning_models": self._reasoning,
-                "open_weights_models": self._open_weights,
                 "model_names": model_names if model_names is not None else self._names,
-                "model_descriptions": self._descriptions,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
             }
             atomic_write_json(CACHE_FILE, payload, indent=2)
@@ -138,10 +148,7 @@ class ModelsCatalog:
             return self._limits
 
         model_limits: Dict[str, int] = {}
-        reasoning_models: List[str] = []
-        open_weights_models: List[str] = []
         model_names: Dict[str, str] = {}
-        model_descriptions: Dict[str, str] = {}
         model_pricing: Dict[str, Dict[str, float]] = {}
 
         try:
@@ -173,23 +180,12 @@ class ModelsCatalog:
                                 model_names[full_id] = raw_name
                                 model_names[alias_id] = raw_name
 
-                                desc = m_info.get("description", "")
-                                if desc:
-                                    model_descriptions[full_id] = desc
-                                    model_descriptions[alias_id] = desc
-
                                 limits_info = m_info.get("limit", {})
                                 if isinstance(limits_info, dict):
                                     ctx = limits_info.get("context")
                                     if ctx and isinstance(ctx, (int, float)):
                                         model_limits[full_id] = int(ctx)
                                         model_limits[alias_id] = int(ctx)
-
-                                if m_info.get("reasoning"):
-                                    reasoning_models.extend([full_id, alias_id])
-
-                                if m_info.get("open_weights"):
-                                    open_weights_models.extend([full_id, alias_id])
 
                                 cost_info = m_info.get("cost", {})
                                 if isinstance(cost_info, dict):
@@ -237,10 +233,7 @@ class ModelsCatalog:
                     logger.warning("Error parsing OpenRouter response: %s", e)
 
             self._limits = model_limits
-            self._reasoning = list(set(reasoning_models))
-            self._open_weights = list(set(open_weights_models))
             self._names = model_names
-            self._descriptions = model_descriptions
             self._pricing = model_pricing
             self._match_cache.clear()
 
@@ -253,10 +246,7 @@ class ModelsCatalog:
         return set().union(
             self._limits,
             self._names,
-            self._descriptions,
             self._pricing,
-            self._reasoning,
-            self._open_weights,
         )
 
     def _resolve_catalog_key(
@@ -271,10 +261,6 @@ class ModelsCatalog:
 
         if tag:
             space_tag = tag
-        elif search_space is self._reasoning:
-            space_tag = "reasoning"
-        elif search_space is self._open_weights:
-            space_tag = "open_weights"
         elif search_space is self._limits or (
             hasattr(search_space, "__self__") and search_space.__self__ is self._limits
         ):
@@ -283,10 +269,6 @@ class ModelsCatalog:
             hasattr(search_space, "__self__") and search_space.__self__ is self._names
         ):
             space_tag = "names"
-        elif search_space is self._descriptions or (
-            hasattr(search_space, "__self__") and search_space.__self__ is self._descriptions
-        ):
-            space_tag = "descriptions"
         elif search_space is self._pricing or (
             hasattr(search_space, "__self__") and search_space.__self__ is self._pricing
         ):
@@ -407,16 +389,7 @@ class ModelsCatalog:
         if provider_id:
             prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
             if os.path.exists(prov_cache):
-                try:
-                    mtime = os.path.getmtime(prov_cache)
-                except OSError:
-                    mtime = None
-                cached = self._prov_cache.get(prov_cache)
-                if cached is not None and cached[0] == mtime:
-                    cdata = cached[1]
-                else:
-                    cdata = read_json(prov_cache, {})
-                    self._prov_cache[prov_cache] = (mtime, cdata)
+                cdata = cached_json_read(prov_cache, {})
                 if isinstance(cdata, dict):
                     lims = cdata.get("model_limits", {})
                     if lims:
@@ -429,6 +402,13 @@ class ModelsCatalog:
                                 return val
 
         return DEFAULT_CONTEXT_LIMIT
+
+    def update_model_names(self, names: Dict[str, str]) -> None:
+        """Merges provider-discovered model display names into the catalog (public API)."""
+        if not names:
+            return
+        self._names.update(names)
+        self._match_cache.clear()
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:

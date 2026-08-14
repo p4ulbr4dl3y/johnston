@@ -1380,6 +1380,9 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1], ("bot_text", "", ""))
 
     async def test_invalid_json_tool_arguments(self):
+        # Malformed tool-call JSON is normalized to {} by parse_tool_call_args
+        # and the tool executes with empty args (invalid-arguments surfacing was
+        # removed in favor of the shared parse helper).
         agent = self._make_agent()
         first = _MockStream([_tool_call_chunk(0, "tc_1", "read", "not-json{")])
         second = _MockStream([_text_chunk("ok")])
@@ -1397,9 +1400,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(tool_evts[0][2], "read")  # target falls back to tool name
-        err_results = [e for e in events if e[0] == "tool_result" and "ERR: invalid 'read': JSON" in e[1]]
-        self.assertEqual(len(err_results), 1)
-        mock_exec.assert_not_called()
+        mock_exec.assert_called_once()
 
     async def test_tool_policy_error_skips_execution(self):
         agent = self._make_agent()

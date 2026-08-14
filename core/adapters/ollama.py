@@ -1,5 +1,4 @@
 import json
-import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
@@ -11,6 +10,7 @@ from core.adapters.base import (
     normalize_tool_arguments_str,
     parse_tool_call_args,
 )
+from core.base_provider.tools import new_tool_call_id
 from core.thinking_effort import build_ollama_thinking_payload
 
 
@@ -88,7 +88,7 @@ class OllamaAdapter(BaseApiAdapter):
                         yield (
                             "adapter_tool_call",
                             {
-                                "id": f"call_{uuid.uuid4().hex[:8]}",
+                                "id": new_tool_call_id(),
                                 "name": fn.get("name", ""),
                                 "arguments": normalize_tool_arguments_str(fn.get("arguments")),
                             },
