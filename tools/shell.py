@@ -168,7 +168,7 @@ class ShellTool(BaseTool):
 
         task_id = _new_task_id()
         target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
-        curr_sid = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        curr_sid = ctx.session_id
         task = ShellTask(
             task_id,
             cmd,
@@ -243,8 +243,12 @@ class ShellTool(BaseTool):
             raise
         finally:
             if "task" in locals() and task and not getattr(task, "is_background", False):
-                if ctx.app and hasattr(ctx.app, "task_manager"):
-                    ctx.app.task_manager.drop(task.task_id)
+                app_obj = getattr(ctx, "app", None)
+                mgr = getattr(app_obj, "task_manager", None) if app_obj is not None else None
+                if mgr is None:
+                    mgr = getattr(ctx, "task_manager", None)
+                if mgr is not None and hasattr(mgr, "drop"):
+                    mgr.drop(task.task_id)
 
     async def _create_std_process(self, command: str, env: dict[str, str], cwd: str = None):
         if is_windows():

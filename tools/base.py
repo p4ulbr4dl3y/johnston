@@ -244,8 +244,13 @@ def check_mcp_role_policy(ctx_or_app: Any, targets: List[str]) -> Optional[str]:
     """
     from core.role_registry import RoleRegistry, role_tool_error
 
-    app_obj = getattr(ctx_or_app, "app", ctx_or_app)
-    role = getattr(app_obj, "role", "worker") if app_obj is not None else "worker"
+    if isinstance(ctx_or_app, ToolContext):
+        # Read the role from the host that the context wraps.
+        role_source = ctx_or_app.host if ctx_or_app.host is not None else None
+    else:
+        # Agents may carry a .app host link; unwrap it, falling back to the agent.
+        role_source = getattr(ctx_or_app, "app", None) or ctx_or_app
+    role = getattr(role_source, "role", "worker") if role_source is not None else "worker"
     role_def = RoleRegistry.get_instance().get_role(str(role).lower())
     for target in targets:
         policy_err = role_tool_error(role_def, target)
