@@ -190,6 +190,59 @@ class StatusFooter(Static):
         except Exception:
             self.update_status(provider_key="default")
 
+    def update_subagent_footer(self, session) -> None:
+        """Render footer for a subagent session using its own agent/dir/branch/metrics."""
+        try:
+            agent = getattr(session, "agent", None)
+            model_name = getattr(agent, "model", "") if agent else ""
+            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
+            effort_val = getattr(agent, "thinking_effort", None) if agent else None
+            thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
+            metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
+            provider_key = getattr(agent, "provider_key", "") if agent else ""
+
+            pm = getattr(self.app, "pm", None)
+            if not provider_key and pm:
+                provider_key = pm.get_active_provider_key()
+            providers = pm.load_providers() if pm else {}
+            provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
+            provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
+            is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False
+            clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
+            if not clean_model:
+                clean_model = "[Select model: /models]"
+
+            directory = getattr(session, "project_dir", "") or os.path.basename(os.path.realpath(os.getcwd()))
+            if os.path.basename(directory) != directory:
+                directory = os.path.basename(os.path.normpath(directory)) or directory
+
+            context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0)
+            total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0)
+            cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
+            context_window = metrics.get("context", "128k")
+            context_limit = metrics.get("context_limit", 128000)
+
+            role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
+            role_formatted += role.capitalize()
+
+            self._render_subagent(
+                role_formatted=role_formatted,
+                provider_display=provider_display or provider_key.capitalize(),
+                clean_model=clean_model or "[Select model: /models]",
+                is_connected=is_connected,
+                model_name=model_name,
+                context_used=context_used,
+                total_tokens=total_tokens,
+                context_limit=context_limit,
+                context_window=context_window,
+                cost_usd=cost_usd,
+                thinking_effort=thinking_effort,
+                directory=directory,
+                branch_name=getattr(session, "branch_name", ""),
+            )
+        except Exception:
+            self.refresh_footer()
+
     def _render_subagent(
         self,
         role_formatted: str,
@@ -204,8 +257,10 @@ class StatusFooter(Static):
         cost_usd: float,
         thinking_effort: str,
         directory: str = "",
+        branch_name: str = "",
     ) -> None:
-        """Compact footer for the subagent screen: role/model, dir/branch, context."""
+        """Footer for the subagent screen: role/model, context/tokens, dir/branch."""
+        branch = branch_name or self._git_branch()
         grid = Table.grid(expand=True)
         grid.add_column(justify="left")
         grid.add_column(justify="right")
@@ -239,7 +294,6 @@ class StatusFooter(Static):
 
         # Line 3: [directory • branch]  [+N / -M]
         dir_text = f"~/{directory}" if directory else ""
-        branch = self._git_branch()
         row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
         if branch:
             row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")

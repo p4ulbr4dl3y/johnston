@@ -68,6 +68,12 @@ class SubagentViewScreen(Screen[None]):
         if getattr(self.session, "description", None):
             self._update_info_label(self.session.description)
 
+        footer = self.query_one("#status-footer", StatusFooter)
+        footer.update_subagent_footer(self.session)
+
+        # Keep the footer live while the subagent streams (tokens, spinner).
+        self._footer_refresh = self.set_interval(1.0, lambda: footer.update_subagent_footer(self.session))
+
         self.run_worker(self._load_history_session())
 
     def _update_info_label(self, text: str) -> None:
@@ -80,10 +86,6 @@ class SubagentViewScreen(Screen[None]):
         label = self.query_one("#subagent-info", SubagentInfoLabel)
         label._raw_text = text
         label.update(grid)
-        try:
-            self.query_one("#status-footer", StatusFooter).refresh_footer()
-        except Exception:
-            pass
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
