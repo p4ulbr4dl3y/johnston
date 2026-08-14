@@ -222,6 +222,25 @@ def _apply_chat_markdown_patches() -> None:
     HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
     HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
 
+    from rich.default_styles import DEFAULT_STYLES
+
+    DEFAULT_STYLES["markdown.h1"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.h2"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.h3"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.h4"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.h5"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.h6"] = Style.parse("bold #a1a1aa")
+    DEFAULT_STYLES["markdown.code"] = Style.parse("#f4f4f5 on #27272a")
+    DEFAULT_STYLES["markdown.code_block"] = Style.parse("#f4f4f5 on #27272a")
+    DEFAULT_STYLES["markdown.block_quote"] = Style.parse("#a1a1aa")
+    DEFAULT_STYLES["markdown.list"] = Style.parse("#a1a1aa")
+    DEFAULT_STYLES["markdown.item.bullet"] = Style.parse("bold #a1a1aa")
+    DEFAULT_STYLES["markdown.item.number"] = Style.parse("#a1a1aa")
+    DEFAULT_STYLES["markdown.table.border"] = Style.parse("#27272a")
+    DEFAULT_STYLES["markdown.table.header"] = Style.parse("bold #ffffff")
+    DEFAULT_STYLES["markdown.link"] = Style.parse("underline #60a5fa")
+    DEFAULT_STYLES["markdown.link_url"] = Style.parse("underline #60a5fa")
+
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     Markdown.BLOCKS["table"] = CustomMarkdownTable
