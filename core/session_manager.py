@@ -202,6 +202,19 @@ class AgentSession:
         return sess
 
 
+def get_session_store(ctx_or_app: Any) -> "SessionStore":
+    """Resolve the session store from a ctx/app that may carry ``.sm``.
+
+    Falls back to the process-wide singleton when the object has no store
+    attached (or is None). Single source of truth for the store resolution
+    previously duplicated across task_collection, tools and widgets.
+    """
+    store = getattr(ctx_or_app, "sm", None) if ctx_or_app else None
+    if store is None:
+        store = SessionStore.get_instance()
+    return store
+
+
 class SessionStore:
     """Unified store for main and subagent sessions, organized by project.
 
