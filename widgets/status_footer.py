@@ -6,7 +6,6 @@ from textual.widgets import Static
 from core.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import catalog, format_context_tokens
 from core.thinking_effort import display_thinking_effort
-from widgets.screens.constants import MESSAGE_INPUT
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
@@ -204,8 +203,9 @@ class StatusFooter(Static):
         context_window: str,
         cost_usd: float,
         thinking_effort: str,
+        directory: str = "",
     ) -> None:
-        """Compact footer for the subagent screen: role, provider/model, ctx, tokens, cost."""
+        """Compact footer for the subagent screen: role/model, dir/branch, context."""
         grid = Table.grid(expand=True)
         grid.add_column(justify="left")
         grid.add_column(justify="right")
@@ -215,6 +215,7 @@ class StatusFooter(Static):
             row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
         grid.add_row("  •  ".join(row1_left_parts), "")
 
+        # Line 2: [context]  [tokens • cost • effort]
         if is_connected and bool(model_name):
             pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
@@ -225,17 +226,26 @@ class StatusFooter(Static):
                 f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
                 f"[{THEME_SECONDARY}]{pct:.1f}% ({format_context_tokens(context_used)}/{context_window})[/]"
             )
-            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
-            row2_right = (
-                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]  •  "
-                f"[{THEME_SECONDARY}]{cost_str}[/]  •  "
-                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]"
-            )
         else:
             row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
-            row2_right = ""
-
+        cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+        row2_right_parts = [
+            f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+            f"[{THEME_SECONDARY}]{cost_str}[/]",
+            f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
+        ]
+        row2_right = "  •  ".join(row2_right_parts)
         grid.add_row(row2_left, row2_right)
+
+        # Line 3: [directory • branch]  [+N / -M]
+        dir_text = f"~/{directory}" if directory else ""
+        branch = self._git_branch()
+        row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+        if branch:
+            row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+        row3_left = "  •  ".join(row3_left_parts)
+        grid.add_row(row3_left, self._git_diff_right())
+
         self.update(grid)
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
@@ -298,6 +308,7 @@ class StatusFooter(Static):
                 context_window=context_window,
                 cost_usd=cost_usd,
                 thinking_effort=thinking_effort,
+                directory=directory,
             )
             return
 
@@ -309,68 +320,55 @@ class StatusFooter(Static):
         is_compact = width > 0 and width < 75
 
         if is_compact:
-            row1_left_parts = [
-                f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]",
-                f"[{THEME_SECONDARY}]{dir_text}[/{THEME_SECONDARY}]",
-            ]
-            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/{THEME_SECONDARY}]")
-            att_count = 0
-            try:
-                if self.app:
-                    from widgets.chat_input import ChatInput
+            branch = self._git_branch()
 
-                    chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
-                    att_count = len(getattr(chat_input, "clipboard_attachments", []))
-            except Exception:
-                pass
-            if att_count > 0:
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count}att[/{THEME_SECONDARY}]")
-            row1_left = " • ".join(row1_left_parts)
-            row1_right = self._mcp_footer_text(mcp_active, mcp_total)
+            row1_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
+            if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
+                row1_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
+            row1_parts.append(self._mcp_footer_text(mcp_active, mcp_total))
+            row1 = " • ".join(row1_parts)
+
+            row2_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+            if branch:
+                row2_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            row2_parts.append(f"[{THEME_SECONDARY}]{total_tokens:,}t[/]")
+            diff_text = self._git_diff_stats()
+            if diff_text:
+                row2_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
+            row2 = " • ".join(row2_parts)
 
             if is_connected and bool(model_name):
-                ctx_val = context_used
-                pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
+                pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
                 pct = min(100.0, max(0.0, pct))
                 pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-                row2_left = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/]"
-                row2_right_parts = [f"[{THEME_SECONDARY}]{total_tokens:,}t[/]"]
-            elif is_connected:
-                row2_left = f"[{THEME_SUBTLE}]Run /models[/{THEME_SUBTLE}]"
-                row2_right_parts = []
+                row3 = f"Ctx: [{THEME_SECONDARY}]{pct_str}[/]"
+                task_parts = []
+                if subagents_active > 0:
+                    task_parts.append(f"{subagents_active}agent")
+                if active_bg_tasks > 0:
+                    task_parts.append(f"{active_bg_tasks}shell")
+                if task_parts:
+                    row3 += f" • [{THEME_SECONDARY}]{', '.join(task_parts)}[/]"
             else:
-                row2_left = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
-                row2_right_parts = []
-            task_parts = []
-            if subagents_active > 0:
-                task_parts.append(f"{subagents_active}agent")
-            if active_bg_tasks > 0:
-                task_parts.append(f"{active_bg_tasks}shell")
-            if task_parts:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
-            row2_right = " • ".join(row2_right_parts)
+                row3 = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
+
+            grid = Table.grid(expand=True)
+            grid.add_column(justify="left")
+            grid.add_row(row1)
+            grid.add_row(row2)
+            if row3:
+                grid.add_row(row3)
+            grid.add_row("", "")
+            self.update(grid)
+            return
         else:
-            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]", f"[{THEME_SECONDARY}]{dir_text}[/]"]
+            branch = self._git_branch()
+
+            # Line 1: [role • provider › model]  [skills • mcp]
+            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
-
-            att_count = 0
-            try:
-                if self.app:
-                    from widgets.chat_input import ChatInput
-
-                    chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
-                    att_count = len(getattr(chat_input, "clipboard_attachments", []))
-            except Exception:
-                pass
-
-            if att_count > 0:
-                img_s = "s" if att_count > 1 else ""
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{att_count} image{img_s} attached[/{THEME_SECONDARY}]")
-
             row1_left = "  •  ".join(row1_left_parts)
-
             row1_right_parts = [
                 f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]"
                 if skills_total > 0
@@ -379,7 +377,7 @@ class StatusFooter(Static):
             ]
             row1_right = "  •  ".join(row1_right_parts)
 
-            # Line 2: Left (Context), Right (Tokens • Cost • Activity)
+            # Line 2: [context]  [tokens • cost • effort]
             if is_connected and bool(model_name):
                 ctx_val = context_used
                 pct = (ctx_val / context_limit * 100) if context_limit > 0 else 0.0
@@ -388,23 +386,30 @@ class StatusFooter(Static):
                 filled = int(round((pct / 100) * bar_len))
                 bar_str = "█" * filled + "░" * (bar_len - filled)
                 used_formatted = format_context_tokens(ctx_val)
-
-                pct_str = "0%" if pct == 0 else f"{pct:.1f}%"
-                row2_left = f"Context: [{THEME_SUBTLE}][{bar_str}][/] [{THEME_SECONDARY}]{pct_str} ({used_formatted}/{context_window})[/]"
-
-                cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
-                row2_right_parts = [
-                    f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
-                    f"[{THEME_SECONDARY}]{cost_str}[/]",
-                    f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
-                ]
-            elif is_connected:
-                row2_left = f"[{THEME_SUBTLE}]Run /models to select a model.[/{THEME_SUBTLE}]"
-                row2_right_parts = []
+                row2_left = (
+                    f"Context: [{THEME_SUBTLE}][{bar_str}][/] "
+                    f"[{THEME_SECONDARY}]{pct:.1f}% ({used_formatted}/{context_window})[/]"
+                )
             else:
                 row2_left = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
-                row2_right_parts = []
+            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.4f}"
+            row2_right_parts = [
+                f"[{THEME_SECONDARY}]{total_tokens:,} tok[/]",
+                f"[{THEME_SECONDARY}]{cost_str}[/]",
+                f"[{THEME_SECONDARY}]effort:{thinking_effort}[/]",
+            ]
+            row2_right = "  •  ".join(row2_right_parts)
 
+            # Line 3: [directory • branch]  [diff • agents • shells]
+            row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+            if branch:
+                row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            row3_left = "  •  ".join(row3_left_parts)
+
+            row3_right_parts = []
+            diff_text = self._git_diff_right()
+            if diff_text:
+                row3_right_parts.append(diff_text)
             task_parts = []
             if subagents_active > 0:
                 task_parts.append(
@@ -413,18 +418,108 @@ class StatusFooter(Static):
             if active_bg_tasks > 0:
                 task_parts.append(f"{active_bg_tasks} shell")
             if task_parts:
-                row2_right_parts.append(f"[{THEME_SECONDARY}]{', '.join(task_parts)}[/{THEME_SECONDARY}]")
+                row3_right_parts.extend(f"[{THEME_SECONDARY}]{p}[/]" for p in task_parts)
+            row3_right = "  •  ".join(row3_right_parts)
 
-            row2_right = "  •  ".join(row2_right_parts)
-
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-        grid.add_row(row1_left, row1_right)
-        if row2_left or row2_right:
+            grid = Table.grid(expand=True)
+            grid.add_column(justify="left")
+            grid.add_column(justify="right")
+            grid.add_row(row1_left, row1_right)
             grid.add_row(row2_left, row2_right)
+            grid.add_row(row3_left, row3_right)
+            grid.add_row("", "")
 
-        self.update(grid)
+            self.update(grid)
+            return
+
+    def _git_diff_stats(self) -> str:
+        """Return '+add/-del' line-count diff vs HEAD, cached 5s. Returns '' when unavailable."""
+        import time
+
+        now = time.time()
+        if getattr(self, "_diff_text", None) is not None and now - getattr(self, "_diff_time", 0.0) < 5.0:
+            return self._diff_text
+        # Kick off an async computation so the footer never blocks on git when
+        # the diff isn't cached yet; render shows the last known value meanwhile.
+        if getattr(self, "_diff_loading", False):
+            return getattr(self, "_diff_text", "") or ""
+        self._diff_loading = True
+        import asyncio
+
+        try:
+            asyncio.get_running_loop().create_task(self._compute_diff_async())
+        except RuntimeError:
+            text = self._compute_diff_sync()
+            self._diff_loading = False
+            self._diff_text = text
+            self._diff_time = time.time()
+        return getattr(self, "_diff_text", "") or ""
+
+    async def _compute_diff_async(self) -> None:
+        import asyncio
+        import time
+
+        try:
+            text = await asyncio.to_thread(self._compute_diff_sync)
+        finally:
+            self._diff_loading = False
+        self._diff_text = text
+        self._diff_time = time.time()
+        try:
+            if self.is_mounted:
+                self.refresh_footer()
+        except Exception:
+            pass
+
+    def _compute_diff_sync(self) -> str:
+        text = ""
+        try:
+            import subprocess
+
+            res = subprocess.run(
+                ["git", "diff", "HEAD", "--numstat"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                cwd=os.getcwd(),
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                adds = dels = 0
+                for line in res.stdout.splitlines():
+                    parts = line.split("\t")
+                    if len(parts) < 2:
+                        continue
+                    try:
+                        adds += int(parts[0])
+                        dels += int(parts[1])
+                    except ValueError:
+                        pass
+                if adds or dels:
+                    text = f"+{adds} / -{dels}"
+        except Exception:
+            pass
+        return text
+
+    def _git_diff_right(self) -> str:
+        """Coloured '+N / -M' git diff counts for the footer's right column."""
+        diff = self._git_diff_stats()
+        if not diff:
+            return ""
+        return f"[{THEME_SECONDARY}]{diff}[/]"
+
+    def _git_branch(self) -> str:
+        """Return the current git branch name or '' when not in a repo."""
+        try:
+            from core.prompt_builder import get_git_info
+
+            info = (get_git_info() or "").strip()
+            if info.startswith("branch '"):
+                return info[len("branch '") : -1]
+            if info.startswith("detached HEAD"):
+                return info.replace("detached HEAD (", "detached (").rstrip(")")
+            return ""
+        except Exception:
+            return ""
 
     def on_resize(self, event) -> None:
         size = getattr(event, "size", None)

@@ -309,7 +309,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             from widgets.status_footer import StatusFooter
 
             info = screen.query_one("#subagent-info", Label)
-            self.assertIn("Canon Agent", str(info.render()))
+            self.assertEqual(info._raw_text, "Canon Agent")
             footer = screen.query_one("#status-footer", StatusFooter)
             self.assertTrue(footer.is_mounted)
             await pilot.press("escape")
