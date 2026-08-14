@@ -10,6 +10,40 @@ from core.thinking_effort import display_thinking_effort
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
+def format_display_path(raw_path: str, max_length: int = 40) -> str:
+    """Format directory path for footer display with ~/ for $HOME and middle truncation if long."""
+    if not raw_path:
+        return ""
+    try:
+        norm_path = os.path.abspath(os.path.expanduser(raw_path))
+        home = os.path.abspath(os.path.expanduser("~"))
+        home_real = os.path.realpath(home)
+        norm_real = os.path.realpath(norm_path)
+
+        if norm_path == home or norm_real == home_real:
+            display_path = "~"
+        elif norm_path.startswith(home + os.sep):
+            rel = os.path.relpath(norm_path, home)
+            display_path = f"~/{rel}"
+        elif norm_real.startswith(home_real + os.sep):
+            rel = os.path.relpath(norm_real, home_real)
+            display_path = f"~/{rel}"
+        else:
+            display_path = norm_path
+
+        if len(display_path) > max_length:
+            parts = display_path.split(os.sep)
+            if len(parts) > 3:
+                display_path = f"{parts[0]}/{parts[1]}/.../{parts[-1]}"
+                if len(display_path) > max_length:
+                    display_path = f"{parts[0]}/.../{parts[-1]}"
+            elif len(parts) == 3:
+                display_path = f"{parts[0]}/.../{parts[-1]}"
+        return display_path
+    except Exception:
+        return raw_path
+
+
 class StatusFooter(Static):
     """Two-line status footer below chat"""
 
@@ -195,7 +229,7 @@ class StatusFooter(Static):
                 "model_name": model_name,
                 "clean_model": clean_model,
                 "agent_role": agent_role,
-                "directory": os.path.basename(os.path.realpath(os.getcwd())),
+                "directory": os.getcwd(),
                 "active_bg_tasks": active_bg_tasks,
                 "subagents_active": subagents_active,
                 "subagents_total": subagents_total,
@@ -347,7 +381,7 @@ class StatusFooter(Static):
         grid.add_row(row2_left, row2_right)
 
         # Line 3: [directory • branch • +N/-M]  []
-        dir_text = f"~/{directory}" if directory else ""
+        dir_text = format_display_path(directory)
         row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
         if branch:
             row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
@@ -387,9 +421,9 @@ class StatusFooter(Static):
         mcp_total: int = 0,
     ) -> None:
         if not directory:
-            directory = os.path.basename(os.path.realpath(os.getcwd())) or "root"
+            directory = os.getcwd()
 
-        dir_text = f"~/{directory}"
+        dir_text = format_display_path(directory)
         if provider_display is None:
             provider_display = provider_key.capitalize() if provider_key else ""
         if is_connected is None:
@@ -512,6 +546,7 @@ class StatusFooter(Static):
             row2_right = "  •  ".join(row2_right_parts)
 
             # Line 3: [directory • branch • +N/-M]  [agents • shells]
+            dir_text = format_display_path(directory)
             row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
@@ -737,9 +772,7 @@ class SubagentStatusFooter(Static):
             if not clean_model:
                 clean_model = "[Select model: /models]"
 
-            directory = getattr(session, "project_dir", "") or os.path.basename(os.path.realpath(os.getcwd()))
-            if os.path.basename(directory) != directory:
-                directory = os.path.basename(os.path.normpath(directory)) or directory
+            directory = getattr(session, "project_dir", "") or os.getcwd()
 
             from core.token_util import estimate_tokens
 
@@ -797,7 +830,7 @@ class SubagentStatusFooter(Static):
             row2_right = "  •  ".join(row2_right_parts)
             grid.add_row(row2_left, row2_right)
 
-            dir_text = f"~/{directory}" if directory else ""
+            dir_text = format_display_path(directory)
             row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")

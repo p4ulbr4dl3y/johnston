@@ -318,4 +318,29 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(footer.is_generating)
             self.assertIsNone(footer._spinner_timer)
 
+    def test_format_display_path(self):
+        import os
+
+        from widgets.status_footer import format_display_path
+
+        home = os.path.realpath(os.path.expanduser("~"))
+        # Home dir itself
+        self.assertEqual(format_display_path(home), "~")
+        # Subdir in home
+        self.assertEqual(format_display_path(os.path.join(home, "johnston")), "~/johnston")
+        # Deep worktree in home
+        self.assertEqual(
+            format_display_path(os.path.join(home, ".johnston", "worktrees", "subagent-123")),
+            "~/.johnston/worktrees/subagent-123",
+        )
+        # Outside home
+        self.assertEqual(format_display_path("/tmp/myproject"), "/tmp/myproject")
+        # Empty
+        self.assertEqual(format_display_path(""), "")
+        # Long path middle truncation
+        very_long = os.path.join(home, "a", "b", "c", "d", "e", "f", "g", "long_subagent_folder_name_xyz")
+        res = format_display_path(very_long, max_length=30)
+        self.assertIn("...", res)
+        self.assertTrue(res.startswith("~/"))
+
 
