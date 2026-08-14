@@ -3,7 +3,7 @@ import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.mcp_manager import MCPManager
+from core.infrastructure.mcp import MCPManager
 from core.prompt_builder import PromptBuilder
 
 
@@ -112,7 +112,7 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         manager.get_cached_tools.return_value = []
         manager.get_active_tools.side_effect = AssertionError("sync MCP discovery is forbidden")
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=manager):
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=manager):
             builder = PromptBuilder("system", [], role="action")
             builder.build_system_prompt()
             builder.build_tools()

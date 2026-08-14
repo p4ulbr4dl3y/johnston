@@ -198,7 +198,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # still-running warmup fills the cache so a later turn picks the rest up.
         # A slow server (npx/uvx cold start) never stalls the send path.
         if not os.environ.get("PYTEST_CURRENT_TEST"):
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
 
             try:
                 await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)

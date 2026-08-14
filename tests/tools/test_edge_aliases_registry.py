@@ -245,7 +245,7 @@ class TestExecuteToolEdge:
             def get_capabilities_for_exposed_tool(self, n):
                 return None
 
-        monkeypatch.setattr("core.mcp_manager.get_mcp_manager", lambda: _FakeMCP())
+        monkeypatch.setattr("core.infrastructure.mcp.get_mcp_manager", lambda: _FakeMCP())
 
     async def test_execute_none_name(self):
         from tools.registry import execute_tool

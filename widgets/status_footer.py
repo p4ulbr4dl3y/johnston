@@ -183,7 +183,7 @@ class StatusFooter(GitMetricsMixin, Static):
 
     def _poll_mcp_refresh(self) -> None:
         try:
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
 
             mm = get_mcp_manager()
             is_loading = mm.is_loading()
@@ -206,7 +206,7 @@ class StatusFooter(GitMetricsMixin, Static):
 
     def _active_mcp_count(self, servers) -> int:
         """Count enabled MCP servers that finished loading tools (no error, has tools)."""
-        from core.mcp_manager import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
 
         mm = get_mcp_manager()
         count = 0
@@ -232,7 +232,7 @@ class StatusFooter(GitMetricsMixin, Static):
         try:
             import time
 
-            from core.mcp_manager import get_mcp_manager
+            from core.infrastructure.mcp import get_mcp_manager
             from core.skill_manager import SkillManager
 
             pm = getattr(self.app, "pm", None)

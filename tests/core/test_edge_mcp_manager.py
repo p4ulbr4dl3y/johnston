@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.mcp_manager import MCPManager, MCPProcessClient
+from core.infrastructure.mcp import MCPManager, MCPProcessClient
 
 
 def make_manager(project_dir=None) -> MCPManager:
@@ -255,7 +255,7 @@ class BugTests(unittest.TestCase):
         failed.start_async.return_value = False
         failed.stop = MagicMock()
 
-        with patch("core.mcp_manager.manager.MCPProcessClient", return_value=failed) as mk:
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed) as mk:
             asyncio.run(m.get_active_tools_async())
 
         self.assertEqual(mk.call_count, 1)

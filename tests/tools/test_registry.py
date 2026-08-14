@@ -179,7 +179,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             mock_app = MagicMock()
@@ -201,7 +201,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
@@ -222,7 +222,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("faulty_mcp", {})
@@ -242,7 +242,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("none_mcp", {})
@@ -320,7 +320,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             async def call_tool_async(self, tool_name, arguments, target_server=None, timeout=None):
                 return "async mcp output"
 
-        with patch("core.mcp_manager.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
             res = await execute_tool("async_mcp", {"q": 1})
         self.assertEqual(res, "async mcp output")
 
@@ -333,7 +333,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
@@ -352,7 +352,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("allow", "")
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
@@ -371,7 +371,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
 
         with (
-            patch("core.mcp_manager.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):

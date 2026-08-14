@@ -137,7 +137,7 @@ class PromptBuilder:
 
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
-        from core.mcp_manager import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
         from core.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
@@ -200,7 +200,7 @@ class PromptBuilder:
         return sys_prompt
 
     def build_tools(self, provider_key: str = "") -> List[Dict[str, Any]]:
-        from core.mcp_manager import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
         from core.role_registry import RoleRegistry, role_tool_error
 
         mcp_mgr = get_mcp_manager()
