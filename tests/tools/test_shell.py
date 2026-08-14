@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.tasks.manager import TaskManager
+from core.infrastructure.tasks.manager import TaskManager
 from tools.shell import ShellTool, _new_task_id
 
 
