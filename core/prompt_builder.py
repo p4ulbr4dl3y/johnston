@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
 from core.infrastructure.runtime.git_utils import run_git
 from core.skill_manager import SkillManager
-from tools.invoke_subagent import InvokeSubagentTool
 
 INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
 
@@ -126,6 +125,7 @@ class PromptBuilder:
         model_name: str = "",
         cwd: str = None,
         is_subagent: bool = False,
+        subagent_schema: Optional[Dict] = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -134,6 +134,7 @@ class PromptBuilder:
         self.model_name = model_name
         self.cwd = os.path.realpath(cwd) if cwd else None
         self.is_subagent = is_subagent
+        self.subagent_schema = subagent_schema
 
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
@@ -222,12 +223,13 @@ class PromptBuilder:
         if (
             not self.is_subagent
             and self.allow_task
+            and self.subagent_schema
             and not any(
                 t.get("function", {}).get("name", "").lower() in ("invoke_subagent", "subagent")
                 for t in filtered_tools
             )
         ):
-            filtered_tools.append(InvokeSubagentTool.schema)
+            filtered_tools.append(self.subagent_schema)
 
         allowed_tools = filtered_tools
 

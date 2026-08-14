@@ -217,8 +217,11 @@ class ProviderManager:
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val) if provider_key else EFFORT_AUTO
 
         from core.base_provider import BaseAgent
+        from tools.invoke_subagent import InvokeSubagentTool
+        from tools.read import process_image_file_sync
+        from tools.registry import execute_tool, get_default_tools, normalize_tool_name
 
-        return BaseAgent(
+        agent = BaseAgent(
             api_key=stored_key or target_provider.get("api_key", ""),
             model=model_val,
             base_url=target_provider.get("base_url", ""),
@@ -234,7 +237,13 @@ class ProviderManager:
             retry_delay=target_provider.get("retry_delay", 1.0),
             retry_backoff=target_provider.get("retry_backoff", 2.0),
             max_retry_delay=target_provider.get("max_retry_delay", 10.0),
+            tool_executor=execute_tool,
+            default_tools_provider=get_default_tools,
+            image_processor=process_image_file_sync,
+            tool_name_normalizer=normalize_tool_name,
         )
+        agent.subagent_schema = InvokeSubagentTool.schema
+        return agent
 
     def create_active_agent(self):
         active_key = self.get_active_provider_key()

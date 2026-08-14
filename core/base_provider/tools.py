@@ -9,9 +9,10 @@ class ToolMixin:
     """Mixin providing tool-name canonicalization and runtime tool-policy checks for BaseAgent."""
 
     def _canonical_tool_name(self, tool_name: str) -> str:
-        from tools.registry import normalize_tool_name
-
-        return normalize_tool_name(tool_name or "")
+        normalizer = getattr(self, "tool_name_normalizer", None)
+        if normalizer:
+            return normalizer(tool_name or "")
+        return (tool_name or "").strip().lower()
 
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> str | None:
         from core.role_registry import role_tool_error
@@ -41,6 +42,7 @@ def build_prompt_context(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
         model_name=m_name,
         cwd=getattr(agent, "cwd", None),
         is_subagent=is_subagent,
+        subagent_schema=getattr(agent, "subagent_schema", None),
     )
     sys_prompt = builder.build_system_prompt()
     all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))

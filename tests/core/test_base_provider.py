@@ -729,14 +729,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             return mock_responses.pop(0)
 
         with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool",
-                new_callable=unittest.mock.AsyncMock,
-                return_value="file content result",
-            ):
-                events = []
-                async for evt in agent.stream_steps("Read file test.txt"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock(return_value="file content result")
+            events = []
+            async for evt in agent.stream_steps("Read file test.txt"):
+                events.append(evt)
 
         # Check reasoning content yielded
         thinking_evts = [e for e in events if e[0] in ("thinking_start", "thinking_delta")]
@@ -803,10 +799,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             return "result"
 
         with unittest.mock.patch.object(agent.client.chat.completions, "create", side_effect=mock_create):
-            with unittest.mock.patch("core.base_provider.agent.execute_tool", side_effect=fake_execute):
-                events = []
-                async for evt in agent.stream_steps("read twice"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock(side_effect=fake_execute)
+            events = []
+            async for evt in agent.stream_steps("read twice"):
+                events.append(evt)
 
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(len(tool_evts), 2)
@@ -1134,20 +1130,20 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 raise RuntimeError("cannot read")
             return img_json
 
+        agent.image_processor = fake_process
         logged = []
-        with unittest.mock.patch("tools.read.process_image_file_sync", side_effect=fake_process):
-            with unittest.mock.patch(
-                "core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)
-            ):
-                with unittest.mock.patch.object(
-                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
-                ) as mock_create:
-                    mock_create.return_value = _MockStream([_text_chunk("ok")])
-                    events = []
-                    async for evt in agent.stream_steps(
-                        "Look", attachments=[_Attachment("a.png"), _Attachment("bad.png")]
-                    ):
-                        events.append(evt)
+        with unittest.mock.patch(
+            "core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)
+        ):
+            with unittest.mock.patch.object(
+                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
+                mock_create.return_value = _MockStream([_text_chunk("ok")])
+                events = []
+                async for evt in agent.stream_steps(
+                    "Look", attachments=[_Attachment("a.png"), _Attachment("bad.png")]
+                ):
+                    events.append(evt)
 
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
         self.assertTrue(any("Error processing attachment image" in str(p) for p in logged))
@@ -1197,12 +1193,10 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             [("adapter_text", "final answer")],
         ]
         with unittest.mock.patch("core.adapters.get_adapter", return_value=_FakeAdapter(streams)):
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock, return_value="tool ok"
-            ):
-                events = []
-                async for evt in agent.stream_steps("run tools"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock(return_value="tool ok")
+            events = []
+            async for evt in agent.stream_steps("run tools"):
+                events.append(evt)
 
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(len(tool_evts), 2)
@@ -1328,17 +1322,17 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_vision_error_sanitizes_and_retries(self):
         agent = self._make_agent()
         img_json = json.dumps({"base64": "QUFB", "media_type": "image/png"})
-        with unittest.mock.patch("tools.read.process_image_file_sync", return_value=img_json):
-            with unittest.mock.patch.object(
-                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
-            ) as mock_create:
-                mock_create.side_effect = [
-                    Exception("No endpoints found that support image input"),
-                    _MockStream([_text_chunk("ok")]),
-                ]
-                events = []
-                async for evt in agent.stream_steps("Look", attachments=[_Attachment("a.png")]):
-                    events.append(evt)
+        agent.image_processor = lambda path: img_json
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.side_effect = [
+                Exception("No endpoints found that support image input"),
+                _MockStream([_text_chunk("ok")]),
+            ]
+            events = []
+            async for evt in agent.stream_steps("Look", attachments=[_Attachment("a.png")]):
+                events.append(evt)
 
         self.assertEqual(mock_create.call_count, 2)
         hints = [e for e in events if e[0] == "thinking" and "does not support vision" in e[1]]
@@ -1390,17 +1384,15 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
         ) as mock_create:
             mock_create.side_effect = [first, second]
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
-            ) as mock_exec:
-                events = []
-                async for evt in agent.stream_steps("read it"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock()
+            events = []
+            async for evt in agent.stream_steps("read it"):
+                events.append(evt)
 
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
         tool_evts = [e for e in events if e[0] == "tool"]
         self.assertEqual(tool_evts[0][2], "read")  # target falls back to tool name
-        mock_exec.assert_called_once()
+        agent.tool_executor.assert_called_once()
 
     async def test_tool_policy_error_skips_execution(self):
         agent = self._make_agent()
@@ -1410,16 +1402,14 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
         ) as mock_create:
             mock_create.side_effect = [first, second]
+            agent.tool_executor = unittest.mock.AsyncMock()
             with unittest.mock.patch.object(agent, "_tool_policy_error", return_value="blocked by policy"):
-                with unittest.mock.patch(
-                    "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
-                ) as mock_exec:
-                    events = []
-                    async for evt in agent.stream_steps("run shell"):
-                        events.append(evt)
+                events = []
+                async for evt in agent.stream_steps("run shell"):
+                    events.append(evt)
 
         self.assertIn(("tool_result", "blocked by policy", ""), events)
-        mock_exec.assert_not_called()
+        agent.tool_executor.assert_not_called()
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 
     async def test_tool_execution_error_returns_err_result(self):
@@ -1430,13 +1420,11 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
         ) as mock_create:
             mock_create.side_effect = [first, second]
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
-            ) as mock_exec:
-                mock_exec.side_effect = Exception("boom")
-                events = []
-                async for evt in agent.stream_steps("read it"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock()
+            agent.tool_executor.side_effect = Exception("boom")
+            events = []
+            async for evt in agent.stream_steps("read it"):
+                events.append(evt)
 
         err_results = [e for e in events if e[0] == "tool_result" and "ERR: execute 'read': boom" in e[1]]
         self.assertEqual(len(err_results), 1)
@@ -1458,13 +1446,11 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
         ) as mock_create:
             mock_create.side_effect = [_MockStream(chunks), _MockStream([_text_chunk("ok")])]
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
-            ) as mock_exec:
-                mock_exec.side_effect = results
-                events = []
-                async for evt in agent.stream_steps("show images"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock()
+            agent.tool_executor.side_effect = results
+            events = []
+            async for evt in agent.stream_steps("show images"):
+                events.append(evt)
 
         displays = [e[1] for e in events if e[0] == "tool_result"]
         self.assertEqual(displays, ["Screenshot", "[Image file: noshot.png]", results[2]])
@@ -1481,13 +1467,11 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
         ) as mock_create:
             mock_create.side_effect = [_MockStream(chunks), _MockStream([_text_chunk("ok")])]
-            with unittest.mock.patch(
-                "core.base_provider.agent.execute_tool", new_callable=unittest.mock.AsyncMock
-            ) as mock_exec:
-                mock_exec.side_effect = [{"type": "image", "path": "y.png"}, {"a": 1}, None]
-                events = []
-                async for evt in agent.stream_steps("do stuff"):
-                    events.append(evt)
+            agent.tool_executor = unittest.mock.AsyncMock()
+            agent.tool_executor.side_effect = [{"type": "image", "path": "y.png"}, {"a": 1}, None]
+            events = []
+            async for evt in agent.stream_steps("do stuff"):
+                events.append(evt)
 
         displays = [e[1] for e in events if e[0] == "tool_result"]
         self.assertEqual(displays, ["[Image file: y.png]", {"a": 1}, None])
@@ -1508,14 +1492,10 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
             ) as mock_create:
                 mock_create.side_effect = [first, second]
-                with unittest.mock.patch(
-                    "core.base_provider.agent.execute_tool",
-                    new_callable=unittest.mock.AsyncMock,
-                    return_value="tool ok",
-                ):
-                    events = []
-                    async for evt in agent.stream_steps("run tool"):
-                        events.append(evt)
+                agent.tool_executor = unittest.mock.AsyncMock(return_value="tool ok")
+                events = []
+                async for evt in agent.stream_steps("run tool"):
+                    events.append(evt)
 
         notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
         dividers = [e for e in events if e[0] == "event_divider" and e[1] == "Session Compacted"]
