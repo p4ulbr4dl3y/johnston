@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from core.platform_utils import atomic_write_json
+from core.infrastructure.platform.platform_utils import atomic_write_json
 
 
 def ensure_json_config(file_path: str, default_data: Dict[str, Any]) -> None:

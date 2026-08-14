@@ -177,7 +177,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name in ("shell", "run_command", "bash"):
                 cmd = nargs.get("command") or ""
-                from core.platform_utils import is_windows
+                from core.infrastructure.platform.platform_utils import is_windows
 
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):

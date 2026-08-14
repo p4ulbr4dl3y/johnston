@@ -255,7 +255,7 @@ def main():
     import argparse
 
     from app import JohnstonApp
-    from core.logging_setup import setup_logging
+    from core.infrastructure.platform.logging_setup import setup_logging
 
     setup_logging()
 

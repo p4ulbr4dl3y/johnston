@@ -3,7 +3,7 @@ import json
 import os
 from typing import Any, Dict, Optional, Tuple
 
-from core.platform_utils import atomic_write_text
+from core.infrastructure.platform.platform_utils import atomic_write_text
 from tools.context import ToolContext
 
 __all__ = [
@@ -78,7 +78,7 @@ def make_unified_diff(
 
     Uses git's patience diff when available, falling back to difflib.
     """
-    from core.git_utils import make_git_diff
+    from core.infrastructure.runtime.git_utils import make_git_diff
 
     return make_git_diff(
         old_content,
