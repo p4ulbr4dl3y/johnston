@@ -1,6 +1,56 @@
+from typing import Any
+
 from tools.base import format_tool_error, try_int
 
 DEFAULT_LINE_WINDOW = 800
+
+# Unified cap for any single file/web response fetched by a tool (read, web_fetch).
+MAX_TOOL_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def normalize_chunk_aliases(chunk: dict) -> dict:
+    """Normalize an edit replacement chunk's field names to canonical keys.
+
+    Resolves the shared EDIT_CHUNK_ALIAS_MAP (old_str/target_content/...,
+    new_str/replacement_content/..., start/end_line, allow_multiple) so the
+    registry's arg normalizer and edit.py's chunk consumer agree on one format.
+    """
+    from tools.aliases import EDIT_CHUNK_ALIAS_MAP
+
+    if not isinstance(chunk, dict):
+        return chunk
+    norm = dict(chunk)
+    for ck, cv in list(chunk.items()):
+        ck_l = ck[0].lower() + ck[1:] if ck else ck
+        canon = EDIT_CHUNK_ALIAS_MAP.get(ck) or EDIT_CHUNK_ALIAS_MAP.get(ck_l)
+        if canon is None:
+            continue
+        if canon not in norm or norm[canon] is None:
+            norm[canon] = cv
+    return norm
+
+
+def truncate_leading(text: str, max_chars: int) -> tuple[str, int]:
+    """Clip ``text`` to its leading ``max_chars`` and report the shown line count.
+
+    Shared leading-truncation step so callers only append their own footer text.
+    Returns ``(truncated_text, shown_line_count)``.
+    """
+    truncated = text[:max_chars]
+    shown_lines = truncated.count("\n") + (1 if truncated else 0)
+    return truncated, shown_lines
+
+
+def get_session_store(app: Any) -> Any:
+    """Return the host's SessionStore or the module singleton fallback.
+
+    ``app`` is the already-resolved host (or agent carrying one); uses ``app.sm``
+    when provided, otherwise the ``core.session_manager.SessionStore`` singleton.
+    Callers pass a resolved host (e.g. ``ctx.app``), not a raw ToolContext.
+    """
+    from core.session_manager import SessionStore
+
+    return getattr(app, "sm", None) or SessionStore.get_instance()
 
 
 def format_line_pagination(

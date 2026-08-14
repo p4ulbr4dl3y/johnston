@@ -10,6 +10,7 @@ import httpx
 
 from tools.base import BaseTool, format_tool_error, truncate_output
 from tools.cancel import run_cancellable
+from tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -17,7 +18,8 @@ DEFAULT_USER_AGENT = (
     "Chrome/124.0.0.0 Safari/537.36 Johnston/0.1"
 )
 
-MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+# Backward-compat alias: the fetch cap is the shared tools-layer payload cap.
+MAX_RESPONSE_SIZE = MAX_TOOL_PAYLOAD_BYTES
 
 
 def _is_private_host(url: str) -> bool:
@@ -162,17 +164,24 @@ class WebFetchTool(BaseTool):
         if raw_mode:
             text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
         else:
-            if "application/pdf" in content_type or url.lower().endswith(".pdf"):
+            from tools.read import DOC_EXTENSIONS
+
+            url_path_ext = url.lower().split("?", 1)[0]
+            url_ext = url_path_ext.rsplit(".", 1)[-1] if "." in url_path_ext else ""
+            ext_map = {ext.lstrip("."): ext for ext in DOC_EXTENSIONS}
+            if "application/pdf" in content_type or url_ext == "pdf":
                 suffix = ".pdf"
             elif (
                 "application/vnd.openxmlformats-officedocument.wordprocessingml" in content_type
-                or url.lower().endswith(".docx")
+                or url_ext == "docx"
             ):
                 suffix = ".docx"
-            elif "application/vnd.openxmlformats-officedocument.spreadsheetml" in content_type or url.lower().endswith(
-                ".xlsx"
-            ):
+            elif "application/vnd.openxmlformats-officedocument.spreadsheetml" in content_type or url_ext == "xlsx":
                 suffix = ".xlsx"
+            elif url_ext in ext_map and url_ext != "pdf":
+                # Reuse the shared read DOC_EXTENSIONS table for the remaining
+                # convertible office formats (pptx, epub, ...).
+                suffix = ext_map[url_ext]
             else:
                 suffix = ".html"
 
@@ -180,6 +189,9 @@ class WebFetchTool(BaseTool):
                 text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
             else:
                 try:
+                    # run_cancellable auto-wires its own cancel_event into
+                    # _convert_content_to_md_sync (which accepts one), so a cancelled
+                    # fetch aborts the subprocess/worker promptly without explicit wiring.
                     text_content = await run_cancellable(_convert_content_to_md_sync, content_bytes, suffix)
                     text_content = _sanitize_web_content(text_content)
                 except Exception:

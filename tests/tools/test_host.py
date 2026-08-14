@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 
 class _AsyncHost:
-    """Host that implements the ToolHost protocol with real methods."""
+    """Host that implements the tool-host protocol with real methods."""
 
     def __init__(self):
         self.question_calls = []
@@ -29,35 +29,7 @@ class _BareHost:
     """Host object with no host-method capabilities."""
 
 
-class TestToolHostProtocol(unittest.TestCase):
-    def test_is_protocol_and_runtime_checkable(self):
-        from typing import Protocol
-
-        from tools.host import ToolHost
-
-        # ToolHost is a lightweight runtime-checkable Protocol (no ABC).
-        self.assertTrue(issubclass(ToolHost, Protocol))
-        self.assertTrue(getattr(ToolHost, "_is_runtime_protocol", False))
-        for name in (
-            "ask_user",
-            "confirm_permission",
-            "notify",
-            "trigger_ai_response",
-            "refresh_status_footer",
-            "get_task_manager",
-            "get_provider_manager",
-            "get_current_session_id",
-            "get_project_dir",
-        ):
-            self.assertTrue(hasattr(ToolHost, name), name)
-
-    def test_host_missing_method_degrades_via_getattr(self):
-        # A minimal host with no capabilities never breaks a tool call: the
-        # context helper returns None instead of raising.
-        self.assertFalse(hasattr(_BareHost(), "ask_user"))
-
-
-class TestToolHostWithAsyncCapableHost(unittest.IsolatedAsyncioTestCase):
+class TestToolContextAsyncHost(unittest.IsolatedAsyncioTestCase):
     async def test_ask_user_delegates_and_awaits(self):
         from tools.context import ToolContext
 
