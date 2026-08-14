@@ -330,15 +330,52 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         async def stream(prompt, attachments=None):
             yield ("queued_user_message", "Mid-turn", None, True)
 
-        app = await self._run(stream)
+        seen_events = []
+        ui_texts = []
+
+        def record(event):
+            seen_events.append(event.get("text"))
+
+        app = JohnstonApp()
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                _configure_connected(app, stream)
+                session = app.sm.create_main()
+                app.sm.get = MagicMock(return_value=session)
+                app.sm.create_main = MagicMock(return_value=session)
+                session.add_event = record
+                chat_view = app.query_one(ChatView)
+                chat_view.add_user_message = unittest.mock.AsyncMock(
+                    side_effect=lambda text, attachments=None: ui_texts.append(text)
+                )
+                app.generate_ai_response("Prompt")
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
+        # queued message recorded into transcript AND rendered to the UI
+        self.assertIn("Mid-turn", seen_events)
+        self.assertIn("Mid-turn", ui_texts)
 
     async def test_queued_user_message_no_show(self):
         async def stream(prompt, attachments=None):
             yield ("queued_user_message", "Mid-turn", None, False)
 
-        app = await self._run(stream)
+        ui_texts = []
+        app = JohnstonApp()
+        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+            async with app.run_test() as pilot:
+                await pilot.pause(0.1)
+                _configure_connected(app, stream)
+                chat_view = app.query_one(ChatView)
+                chat_view.add_user_message = unittest.mock.AsyncMock(
+                    side_effect=lambda text, attachments=None: ui_texts.append(text)
+                )
+                app.generate_ai_response("Prompt")
+                await self._wait_not_generating(pilot, app)
         self.assertFalse(app.is_generating)
+        # the initial prompt renders, but the queued (show=False) one must not
+        self.assertIn("Prompt", ui_texts)
+        self.assertNotIn("Mid-turn", ui_texts)
 
     async def test_checkpoint_exception_prints(self):
         async def stream(prompt, attachments=None):
