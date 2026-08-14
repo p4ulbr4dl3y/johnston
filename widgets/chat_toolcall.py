@@ -644,7 +644,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self._raw_bash_buffer += text
         if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
             self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
-        from core.tasks.output import process_carriage_returns
+        from core.infrastructure.tasks.output import process_carriage_returns
 
         cleaned = self._clean_bash_output(self._raw_bash_buffer)
         self.result_text = process_carriage_returns(cleaned)

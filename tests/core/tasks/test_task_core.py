@@ -9,10 +9,10 @@ import sys
 
 import pytest
 
-from core.tasks.manager import TaskManager
-from core.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
-from core.tasks.shell_task import ShellTask
-from core.tasks.task import TASK_KINDS, TaskStatus
+from core.infrastructure.tasks.manager import TaskManager
+from core.infrastructure.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
+from core.infrastructure.tasks.shell_task import ShellTask
+from core.infrastructure.tasks.task import TASK_KINDS, TaskStatus
 
 # ---------------------------------------------------------------------------
 # OutputBuffer

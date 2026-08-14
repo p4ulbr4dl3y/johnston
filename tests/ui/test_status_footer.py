@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.app import App, ComposeResult
 
-from core.tasks.manager import TaskManager
+from core.infrastructure.tasks.manager import TaskManager
 from widgets.status_footer import StatusFooter
 
 

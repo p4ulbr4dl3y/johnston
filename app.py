@@ -6,9 +6,9 @@ from widgets.patch import apply_textual_patches
 
 apply_textual_patches()
 
+from core.infrastructure.tasks.manager import TaskManager
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionStore
-from core.tasks.manager import TaskManager
 from widgets.mixins.actions import ActionsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.message_flow import MessageFlowMixin

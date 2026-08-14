@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from core.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
+from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
 from tools.base import BaseTool, format_tool_error, tail_output
 
 

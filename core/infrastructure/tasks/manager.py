@@ -7,7 +7,7 @@ and answers queries for the UI/footer.
 import asyncio
 from typing import Any, Dict
 
-from core.tasks.task import BaseTask
+from core.infrastructure.tasks.task import BaseTask
 
 
 class TaskManager:

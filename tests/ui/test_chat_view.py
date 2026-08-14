@@ -1659,7 +1659,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w.render_content()
         self.assertTrue(w.content_widget.display)
 
-        from core.tasks.manager import TaskManager
+        from core.infrastructure.tasks.manager import TaskManager
 
         empty_mgr = TaskManager()
         w2 = self._widget("shell", "")
