@@ -8,6 +8,7 @@ import httpx
 
 from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.defaults.providers import DEFAULT_JSON_PROVIDERS
+from core.models_catalog import cached_json_read, catalog, extract_context_length
 from core.platform_utils import atomic_write_json, read_json
 from core.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 
@@ -28,22 +29,13 @@ class ProviderManager:
         self._providers_file_path = ""
 
     def _cached_json(self, path: str, cache_attr: str, mtime_attr: str, file_attr: str, default: Any) -> Any:
-        """Reads a JSON file, returning a cached value when the file is unchanged (by mtime)."""
-        if not os.path.exists(path):
-            return default
-        try:
-            mtime = os.path.getmtime(path)
-            cached = getattr(self, cache_attr)
-            if cached and getattr(self, file_attr, "") == path and getattr(self, mtime_attr) == mtime:
-                return cached
-            data = read_json(path, default)
-            data = data if isinstance(data, dict) else {}
-            setattr(self, cache_attr, data)
-            setattr(self, mtime_attr, mtime)
-            setattr(self, file_attr, path)
-            return data
-        except Exception:
-            return default
+        """Reads a JSON file, returning a cached value when the file is unchanged (by mtime).
+
+        Delegates to the shared path+mtime JSON cache in models_catalog so the
+        duplicate caching logic is not maintained in two places.
+        """
+        data = cached_json_read(path, default)
+        return data if isinstance(data, dict) else {}
 
     def _get_config_data(self) -> dict:
         return self._cached_json(CONFIG_FILE, "_config_cache", "_config_mtime", "_config_file_path", {})
@@ -338,10 +330,7 @@ class ProviderManager:
                                 models.append(m_id)
                                 m_name = m.get("name")
                                 if m_name:
-                                    from core.models_catalog import catalog, extract_context_length
-
-                                    catalog._names[m_id] = m_name
-                                    catalog._names[m_id.split("/")[-1]] = m_name
+                                    catalog.update_model_names({m_id: m_name, m_id.split("/")[-1]: m_name})
                                 ctx_len = extract_context_length(m)
                                 if ctx_len:
                                     model_limits[m_id] = ctx_len
@@ -350,8 +339,6 @@ class ProviderManager:
 
         if models:
             try:
-                from core.models_catalog import catalog
-
                 catalog.save_cache()
             except Exception:
                 pass

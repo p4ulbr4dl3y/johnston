@@ -1,5 +1,4 @@
 import json
-import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
@@ -13,6 +12,7 @@ from core.adapters.base import (
     parse_sse_line,
     parse_tool_call_args,
 )
+from core.base_provider.tools import new_tool_call_id
 from core.thinking_effort import build_gemini_thinking_config
 
 
@@ -127,9 +127,12 @@ class GeminiAdapter(BaseApiAdapter):
             function_declarations = []
             for t in tools:
                 fn = t.get("function", {}) if isinstance(t.get("function"), dict) else {}
+                fn_name = fn.get("name", "")
+                if not fn_name:
+                    continue
                 function_declarations.append(
                     {
-                        "name": fn.get("name"),
+                        "name": fn_name,
                         "description": fn.get("description", ""),
                         "parameters": fn.get("parameters", {}),
                     }
@@ -159,7 +162,7 @@ class GeminiAdapter(BaseApiAdapter):
                                 yield (
                                     "adapter_tool_call",
                                     {
-                                        "id": f"call_{uuid.uuid4().hex[:8]}",
+                                        "id": new_tool_call_id(),
                                         "name": fc.get("name", ""),
                                         "arguments": normalize_tool_arguments_str(fc.get("args")),
                                     },

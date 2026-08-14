@@ -85,6 +85,14 @@ def extract_image_details(tcontent: Any) -> Optional[Tuple[str, str, str, str]]:
     return None
 
 
+def image_url_block(media_type: str, b64_data: str, detail: str = "high") -> Dict[str, Any]:
+    """Builds an OpenAI-style image_url content block with base64 data URI."""
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail},
+    }
+
+
 def _safe_int(val: Any) -> int:
     """Coerce a token count to int, tolerating NaN/Inf/None/non-numeric input."""
     if val is None or isinstance(val, bool):

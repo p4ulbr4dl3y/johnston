@@ -2,17 +2,19 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
+from asyncio import Queue
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.adapters.base import parse_tool_call_args
-from core.base_provider.compaction import CompactionMixin
+from core.adapters.base import extract_image_payload, image_url_block, parse_tool_call_args
+from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
-from core.base_provider.tools import ToolMixin
+from core.base_provider.tools import ToolMixin, build_prompt_context, new_tool_call_id
 from core.models_catalog import catalog
-from core.prompt_builder import DEFAULT_SYSTEM_PROMPT, PromptBuilder
+from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.token_util import estimate_tokens, parse_usage
 from core.tool_display import extract_tool_display
@@ -165,10 +167,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 media_type = img_dict.get("media_type", "image/jpeg")
                 b64_data = img_dict.get("base64")
                 detail_val = img_dict.get("detail", "high")
-                return {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail_val},
-                }
+                return image_url_block(media_type, b64_data, detail_val)
         except Exception as e:
             logger.warning("%s: %s", error_prefix, e)
         return None
@@ -191,11 +190,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     async def stream_steps(
         self, user_text: str, attachments: Optional[List[Any]] = None
     ) -> AsyncGenerator[Tuple[str, str, str], None]:
-        agent_role = getattr(self, "role", "worker")
-        allow_task = getattr(self, "allow_task", True)
-        m_name = catalog.get_model_display_name(
-            getattr(self, "provider_key", ""), getattr(self, "model", "")
-        ) or getattr(self, "model", "")
         # Kick off MCP tool warmup in the background WITHOUT blocking the first
         # user turn and WITHOUT cancelling it when that turn wins the race.
         # `ensure_tools_ready_async` coalesces concurrent callers and returns
@@ -210,21 +204,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)
             except Exception:
                 pass
-        is_subagent = getattr(self, "is_subagent", False)
-        builder = PromptBuilder(
-            self.system_prompt,
-            self.tools,
-            role=agent_role,
-            allow_task=allow_task,
-            model_name=m_name,
-            cwd=getattr(self, "cwd", None),
-            is_subagent=is_subagent,
-        )
-        sys_prompt = builder.build_system_prompt()
-        all_tools = builder.build_tools(
-            provider_key=getattr(self, "provider_key", "")
-        )
-        self._last_sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
+        sys_prompt, all_tools, sys_tokens = build_prompt_context(self)
+        self._last_sys_tokens = sys_tokens
 
         # Automatic context compaction when total context (system prompt + tools + history)
         # exceeds 75% of the context window. Counting history alone ignores the system
@@ -235,7 +216,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         threshold = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * CONTEXT_COMPACTION_THRESHOLD_RATIO)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
         compacted_this_turn = False
-        if len(self.history) > 4 and (estimate_tokens(self.history) + sys_overhead) > threshold:
+        if should_compact(len(self.history), sys_overhead, estimate_tokens(self.history), threshold):
             yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
             try:
                 success, _ = await self.compact_history()
@@ -351,7 +332,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                         yield ("thinking_end", f"{dt}", active_thought)
                                         thinking_started = False
                                     idx = len(tool_calls_dict)
-                                    tc_id = payload.get("id") or f"call_{idx}"
+                                    tc_id = payload.get("id") or new_tool_call_id(idx)
                                     tool_calls_dict[idx] = {
                                         "id": tc_id,
                                         "name": payload.get("name", ""),
@@ -396,8 +377,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             # Single producer task pulls chunks off the provider; the
                             # consumer polls the queue with a watchdog deadline so we
                             # keep per-chunk timeouts without creating a task per chunk.
-                            from asyncio import Queue
-
                             _chunk_queue: "Queue[Any]" = Queue(maxsize=8)
                             _DONE = object()
 
@@ -533,8 +512,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                         is_retryable = self._is_retryable_error(api_err)
                         if is_retryable and attempt < max_retries:
-                            import random
-
                             delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
                             jitter = random.uniform(0, 0.5 * delay)
                             actual_delay = delay + jitter
@@ -600,21 +577,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     t_name = tc["name"]
                     raw_args = tc["arguments"]
 
-                    try:
-                        # parse_tool_call_args (shared with adapters) normalizes the
-                        # tool-call payload but silently swallows malformed JSON into {}.
-                        # Validate first so the invalid-arguments error is surfaced.
-                        if raw_args.strip():
-                            json.loads(raw_args)
-                        _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
-                    except Exception as json_err:
-                        tool_result = format_tool_error(
-                            "invalid", detail=f"JSON arguments: {json_err}. Raw: {raw_args}", name=t_name
-                        )
-                        yield ("tool", t_name, t_name, {})
-                        yield ("tool_result", tool_result, "")
-                        messages.append({"role": "tool", "tool_call_id": t_id, "content": tool_result})
-                        continue
+                    # parse_tool_call_args (shared with adapters) parses the
+                    # arguments; malformed JSON is normalized to {} by design.
+                    _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
 
                     target = extract_tool_display(t_name, args)
                     yield ("tool", t_name, target, args)
@@ -638,17 +603,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             tool_result = format_tool_error("execute", detail=str(e), name=t_name)
 
                     display_result = tool_result
-                    if isinstance(tool_result, str) and (
-                        tool_result.startswith('{"type": "image"') or '"type": "image"' in tool_result[:40]
-                    ):
-                        try:
-                            parsed_img = json.loads(tool_result)
-                            if isinstance(parsed_img, dict) and parsed_img.get("type") == "image":
-                                display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
-                        except Exception:
-                            pass
-                    elif isinstance(tool_result, dict) and tool_result.get("type") == "image":
-                        display_result = tool_result.get("summary", f"[Image file: {tool_result.get('path')}]")
+                    parsed_img = extract_image_payload(tool_result)
+                    if parsed_img is not None and parsed_img.get("type") == "image":
+                        display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
 
                     yield ("tool_result", display_result, "")
 
