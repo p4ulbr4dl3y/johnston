@@ -55,8 +55,8 @@ class MessageFlowMixin:
         if show_in_ui:
             try:
                 self.notify("Message queued", severity="info")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Notify failed: %s", e)
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
@@ -96,14 +96,13 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from core.ai_generator import GenCanvas
+        from core.ai_generator import GenCanvas, ensure_provider_ready
         from core.ai_generator import generate_ai_response as _engine
 
         # ---- connectivity check (mixin-level) ----
-        act_k = self.pm.get_active_provider_key() if hasattr(self, "pm") else ""
-        is_connected = self.pm.is_provider_connected(act_k) if (hasattr(self, "pm") and act_k) else False
-        if not is_connected or not getattr(self.agent, "model", ""):
-            if not is_connected:
+        ready, needed = ensure_provider_ready(self.pm, self.agent)
+        if not ready:
+            if needed == "provider":
                 from widgets.commands import ProvidersCommand
 
                 await ProvidersCommand().execute(self)
@@ -140,8 +139,8 @@ class MessageFlowMixin:
         try:
             footer = self.query_one("#status-footer", StatusFooter)
             footer.set_generating(True)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Footer update failed: %s", e)
 
         try:
             await _engine(
@@ -159,20 +158,20 @@ class MessageFlowMixin:
             # partial widgets. We just need to reset mixin-level state and
             # drain the queue.
             pass
-        except Exception:
+        except Exception as e:
             # The engine already called canvas.notify for generic exceptions.
-            pass
+            logger.warning("AI generation failed: %s", e)
         finally:
             try:
                 footer = self.query_one("#status-footer", StatusFooter)
                 footer.set_generating(False)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Footer update failed: %s", e)
             try:
                 if getattr(self, "is_app_active", True):
                     await self.save_current_session_async(force=True)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Session save failed: %s", e)
             self.is_generating = False
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
@@ -206,5 +205,5 @@ class MessageFlowMixin:
                 self.message_queue.append((msg, False, None, curr_sid))
             else:
                 self.generate_ai_response(msg, show_in_ui=False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Background completion handling failed: %s", e)
