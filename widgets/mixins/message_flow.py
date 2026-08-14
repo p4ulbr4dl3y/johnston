@@ -191,10 +191,16 @@ class MessageFlowMixin:
                 val3 = step[3] if len(step) > 3 else None
 
                 if event_type == "queued_user_message":
-                    # Queued prompts are recorded into the transcript as user msgs;
-                    # do not feed the raw 4-tuple to record_subagent_step.
+                    # Queued prompts are recorded into the transcript as user msgs,
+                    # rendered to the chat view, and given their own git checkpoint.
                     session.add_event({"type": "user", "text": val1})
                     transcript_acc[0] = ""
+                    q_msg = val1
+                    q_atts = val2 if val2 else None
+                    q_show = val3 if val3 is not None else True
+                    if q_show:
+                        await chat_view.add_user_message(q_msg, attachments=q_atts)
+                    await self._create_git_checkpoint_async(chat_view)
                 else:
                     record_subagent_step(step, session, transcript_acc)
 
@@ -233,13 +239,6 @@ class MessageFlowMixin:
                         await self.save_current_session_async()
                     except Exception:
                         pass
-                elif event_type == "queued_user_message":
-                    q_msg = val1
-                    q_atts = val2 if val2 else None
-                    q_show = val3 if val3 is not None else True
-                    if q_show:
-                        await chat_view.add_user_message(q_msg, attachments=q_atts)
-                    await self._create_git_checkpoint_async(chat_view)
                 elif event_type == "bot_delta":
                     if val1:
                         if bot_msg is None:
