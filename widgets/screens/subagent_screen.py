@@ -5,6 +5,7 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Label
 
+from core.session_manager import is_ui_visible_user_message
 from widgets.chat_view import ChatView
 from widgets.status_footer import SubagentStatusFooter
 
@@ -106,7 +107,10 @@ class SubagentViewScreen(Screen[None]):
 
         if self.session:
             history_events = list(self.session.messages)
-            has_user_msg = any(isinstance(e, dict) and e.get("type") == "user" for e in history_events)
+            has_user_msg = any(
+                isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
+                for e in history_events
+            )
             if not has_user_msg and getattr(self.session, "prompt", None):
                 await chat_view.add_user_message(self.session.prompt, animate=False)
 
@@ -178,6 +182,8 @@ class SubagentViewScreen(Screen[None]):
         etype = evt.get("type")
 
         if etype == "user":
+            if not is_ui_visible_user_message(evt):
+                return
             await chat_view.add_user_message(evt.get("text", ""), animate=animate)
         elif etype == "thinking":
             txt = evt.get("text", "")

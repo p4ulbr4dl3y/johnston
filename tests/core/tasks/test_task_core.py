@@ -118,6 +118,39 @@ async def test_shell_task_move_to_background_sets_flag_and_event():
 
 
 @pytest.mark.asyncio
+async def test_shell_task_on_completed_only_when_background():
+    completed_calls = []
+
+    def on_completed(tid, cmd, out):
+        completed_calls.append((tid, cmd, out))
+
+    # Foreground task: on_completed must NOT be called
+    proc1 = await asyncio.create_subprocess_exec(
+        "echo", "foreground",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task1 = ShellTask(task_id="fg_task", command="echo foreground", process=proc1)
+    task1.start_reading(on_completed=on_completed)
+    await task1.wait()
+    assert len(completed_calls) == 0
+
+    # Background task: on_completed MUST be called
+    proc2 = await asyncio.create_subprocess_exec(
+        "echo", "background",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task2 = ShellTask(task_id="bg_task", command="echo background", process=proc2)
+    task2.is_background = True
+    task2.start_reading(on_completed=on_completed)
+    await task2.wait()
+    assert len(completed_calls) == 1
+    assert completed_calls[0][0] == "bg_task"
+    assert "background" in completed_calls[0][2]
+
+
+@pytest.mark.asyncio
 async def test_shell_task_widget_streaming_appends_output():
     class DummyWidget:
         def __init__(self):
