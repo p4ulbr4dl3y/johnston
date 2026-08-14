@@ -6,13 +6,13 @@ from widgets.patch import apply_textual_patches
 
 apply_textual_patches()
 
-from core.app_mixins.actions import ActionsMixin
-from core.app_mixins.lifecycle import LifecycleMixin
-from core.app_mixins.message_flow import MessageFlowMixin
-from core.app_mixins.session_persistence import SessionPersistenceMixin
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionStore
 from core.tasks.manager import TaskManager
+from widgets.mixins.actions import ActionsMixin
+from widgets.mixins.lifecycle import LifecycleMixin
+from widgets.mixins.message_flow import MessageFlowMixin
+from widgets.mixins.session_persistence import SessionPersistenceMixin
 
 
 class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, App):

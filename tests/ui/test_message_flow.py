@@ -1,4 +1,4 @@
-"""Coverage-focused tests for core/app_mixins/message_flow.py.
+"""Coverage-focused tests for widgets/mixins/message_flow.py.
 
 These tests exercise the stream event handling branches in generate_ai_response
 and helper methods, using a mounted real JohnstonApp with a stubbed agent
@@ -10,9 +10,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app import JohnstonApp
-from core.app_mixins.message_flow import MessageFlowMixin
 from core.base_provider import BaseAgent
 from widgets.chat_view import ChatView
+from widgets.mixins.message_flow import MessageFlowMixin
 
 
 def _configure_connected(app, stream_fn):
@@ -53,7 +53,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
@@ -66,7 +66,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
@@ -79,7 +79,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = True
@@ -92,7 +92,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.side_effect = Exception("boom")
                 await app._exec_slash_command("/help")
@@ -186,7 +186,7 @@ class TestChatInputSubmitted(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             with patch(
-                "core.app_mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 event = MagicMock()
                 event.value = "/help"
