@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any
 from urllib.parse import urlparse
 
@@ -6,6 +7,10 @@ import pygments
 from rich.text import Text
 
 from widgets.chat_markdown import TOKEN_COLORS
+
+HUNK_HEADER_RE = re.compile(
+    r"^@@\s+-\s*(\d+)(?:,\s*(\d+))?\s+\+\s*(\d+)(?:,\s*(\d+))?\s+@@"
+)
 
 EXTENSION_MAPPING = {
     "py": "python",
@@ -107,7 +112,6 @@ def generate_chunk_unified_diff(
 
     Uses git's patience diff when available, falling back to difflib.
     """
-    import re
 
     if not old_content and not new_content:
         return []
@@ -129,7 +133,7 @@ def generate_chunk_unified_diff(
 
     for i, line in enumerate(d_lines):
         if line.startswith("@@"):
-            h_m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@", line)
+            h_m = HUNK_HEADER_RE.match(line)
             if h_m:
                 old_cnt = h_m.group(2) or "1"
                 new_cnt = h_m.group(4) or "1"

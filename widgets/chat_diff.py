@@ -4,9 +4,7 @@ from typing import Any
 from pygments.lexers import get_lexer_by_name
 from rich.text import Span, Text
 
-from widgets.lexer_utils import guess_lexer_name, lex_block_to_line_texts
-
-_HUNK_REGEX = re.compile(r"^@@\s+-\s*(\d+)(?:,\d+)?\s+\+\s*(\d+)(?:,\d+)?\s+@@")
+from widgets.lexer_utils import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
 
 
 class DiffRenderable:
@@ -66,10 +64,10 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     current_new = 0
 
     for line in lines:
-        hunk_match = _HUNK_REGEX.match(line)
+        hunk_match = HUNK_HEADER_RE.match(line)
         if hunk_match:
             current_old = int(hunk_match.group(1))
-            current_new = int(hunk_match.group(2))
+            current_new = int(hunk_match.group(3))
             in_hunk = True
             continue
         if line.startswith("--- ") or line.startswith("+++ "):
@@ -167,10 +165,10 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
         if line.startswith("--- ") or line.startswith("+++ "):
             continue
 
-        hunk_match = _HUNK_REGEX.match(line)
+        hunk_match = HUNK_HEADER_RE.match(line)
         if hunk_match:
             old_line = int(hunk_match.group(1))
-            new_line = int(hunk_match.group(2))
+            new_line = int(hunk_match.group(3))
             in_hunk = True
             continue
 
