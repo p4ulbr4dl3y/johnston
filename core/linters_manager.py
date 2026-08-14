@@ -24,14 +24,14 @@ _linters_manager_instance: Optional["LintersManager"] = None
 
 
 def get_linters_manager() -> "LintersManager":
-    global _linters_manager_instance
-    if _linters_manager_instance is None:
-        _linters_manager_instance = LintersManager()
-    return _linters_manager_instance
+    """:func:`LintersManager.get_instance`; kept as an alias for existing callers."""
+    return LintersManager.get_instance()
 
 
 class LintersManager:
     """Manages linter presets, enabled state, install/uninstall, and availability."""
+
+    _instance: Optional["LintersManager"] = None
 
     def __init__(self, config_file: Optional[str] = None):
         self.config_file = os.path.realpath(config_file or GLOBAL_LINTERS_FILE)
@@ -39,6 +39,12 @@ class LintersManager:
         self._availability_ts: float = 0.0
         self._availability_ttl = 60.0  # seconds
         self.ensure_default_configs()
+
+    @classmethod
+    def get_instance(cls) -> "LintersManager":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     def ensure_default_configs(self):
         from core.config_helpers import ensure_json_config
@@ -109,7 +115,8 @@ class LintersManager:
             # System-style binary on PATH always wins (covers global installs of
             # otherwise npx-managed tools, e.g. global biome).
             cmd_bin = (preset.get("cmd") or [""])[0] or (preset.get("check") or [""])[0]
-            if cmd_bin and _cached_which(cmd_bin):
+            which = _cached_which(cmd_bin) if cmd_bin else None
+            if which:
                 self._availability[name] = True
                 continue
             if inst == "system":

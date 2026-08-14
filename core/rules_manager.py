@@ -1,10 +1,8 @@
 import os
-import time
 from typing import List, Optional
 
-from core.config import CONFIG_DIR
-from core.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
-from core.fs_signature import compute_dir_signature
+from core.frontmatter import parse_csv_list, parse_frontmatter
+from core.markdown_scanner import MarkdownScannerCache
 
 
 class RuleDefinition:
@@ -29,12 +27,9 @@ class RuleDefinition:
 class RulesManager:
     _instance: Optional["RulesManager"] = None
 
-    _CACHE_TTL = 2.0  # seconds
-
     def __init__(self):
         self.rules: List[RuleDefinition] = []
-        self._rules_cache_signature: Optional[tuple] = None
-        self._rules_cache_ts: float = 0.0
+        self._cache = MarkdownScannerCache(subpath="rules")
 
     @classmethod
     def get_instance(cls) -> "RulesManager":
@@ -44,35 +39,25 @@ class RulesManager:
 
     def load_rules(self, project_dir: Optional[str] = None, include_global: bool = True) -> List[RuleDefinition]:
         p_dir = project_dir or os.getcwd()
-        dirs = []
-        if include_global:
-            dirs.append((os.path.join(CONFIG_DIR, "rules"), "global"))
-        dirs.append((os.path.join(p_dir, ".johnston", "rules"), "project"))
 
-        now = time.time()
-        signature = compute_dir_signature(dirs, [".md", ".markdown"]) or ()
-        if (
-            signature is not None
-            and signature == self._rules_cache_signature
-            and (now - self._rules_cache_ts) < self._CACHE_TTL
-        ):
-            return list(self.rules)
+        def _build(_dirs, files):
+            rules: List[RuleDefinition] = []
+            for fpath, source in files:
+                rule = self._parse_rule_file(fpath, source)
+                if rule:
+                    rules.append(rule)
+            return rules
 
-        rules: List[RuleDefinition] = []
-        for fpath, source in iter_md_files(dirs):
-            rule = self._parse_rule_file(fpath, source)
-            if rule:
-                rules.append(rule)
-
-        self.rules = rules
-        self._rules_cache_signature = signature
-        self._rules_cache_ts = now
-        return rules
+        self.rules = self._cache.get(
+            project_dir=p_dir,
+            include_global=include_global,
+            build=_build,
+        )
+        return list(self.rules)
 
     def invalidate_cache(self) -> None:
         """Force the next load_rules/get_formatted_rules to re-scan from disk."""
-        self._rules_cache_signature = None
-        self._rules_cache_ts = 0.0
+        self._cache.invalidate()
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
         try:
