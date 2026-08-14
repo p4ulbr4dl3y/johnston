@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from core.tasks.manager import TaskManager
+from core.infrastructure.tasks.manager import TaskManager
 from widgets.chat_view import ChatView
 from widgets.commands import COMMAND_REGISTRY, handle_slash_command
 
@@ -463,7 +463,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_clears_background_tasks(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from core.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.shell_task import ShellTask
         from widgets.commands import NewCommand
 
         app = MockApp()
@@ -532,7 +532,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_shell_command_with_tasks(self):
         from unittest.mock import MagicMock
 
-        from core.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.shell_task import ShellTask
         from widgets.commands import ShellTasksCommand
 
         app = MockApp()

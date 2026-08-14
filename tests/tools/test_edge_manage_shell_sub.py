@@ -11,10 +11,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from core.infrastructure.tasks.manager import TaskManager
+from core.infrastructure.tasks.shell_task import ShellTask
+from core.infrastructure.tasks.task import TaskStatus
 from core.session_manager import SessionStore
-from core.tasks.manager import TaskManager
-from core.tasks.shell_task import ShellTask
-from core.tasks.task import TaskStatus
 from tools.context import ToolContext
 from tools.manage_shell import ManageShellTool
 from tools.manage_subagent import ManageSubagentTool

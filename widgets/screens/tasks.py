@@ -53,7 +53,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.set_interval(0.1, self.update_log)
 
     def update_log(self) -> None:
-        from core.tasks.output import process_carriage_returns, strip_ansi
+        from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 
         lines = self.bg_task.output.history
         if len(lines) > self.printed_count:

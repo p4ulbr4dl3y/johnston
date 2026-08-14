@@ -215,7 +215,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_manage_shell_tool(self):
         class DummyApp:
             def __init__(self):
-                from core.tasks.manager import TaskManager
+                from core.infrastructure.tasks.manager import TaskManager
 
                 self.task_manager = TaskManager()
 

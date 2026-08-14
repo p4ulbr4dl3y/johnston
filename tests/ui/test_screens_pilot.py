@@ -8,7 +8,7 @@ from textual.app import App
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-from core.tasks.manager import TaskManager
+from core.infrastructure.tasks.manager import TaskManager
 from widgets.screens.help import HelpScreen
 from widgets.screens.mcp import MCPScreen
 from widgets.screens.model import ModelScreen
@@ -188,7 +188,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         screen.update_tasks_list()
 
     async def test_task_console_screen_pilot(self):
-        from core.tasks.output import OutputBuffer
+        from core.infrastructure.tasks.output import OutputBuffer
 
         mock_task = MagicMock()
         mock_task.command = "python long_running_script.py"
