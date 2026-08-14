@@ -82,7 +82,9 @@ class InvokeSubagentTool(BaseTool):
             ctx.app.current_tool_widget.args["session_id"] = session_id
             setattr(ctx.app.current_tool_widget, "subagent_session_id", session_id)
 
-        parent_session_id = getattr(ctx.app, "current_session_id", None) if ctx.app else None
+        parent_session_id = ctx.session_id
+        if not isinstance(parent_session_id, str) or not parent_session_id:
+            parent_session_id = getattr(getattr(ctx, "app", None), "current_session_id", None)
         if ctx.app and getattr(ctx.app, "sm", None):
             store = ctx.app.sm
         else:
