@@ -3,14 +3,14 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from core.adapters.base import (
+from core.adapters.base import check_httpx_response_status
+from core.infrastructure.adapters.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
-    check_httpx_response_status,
+    new_tool_call_id,
     normalize_tool_arguments_str,
     parse_tool_call_args,
 )
-from core.base_provider.tools import new_tool_call_id
 from core.infrastructure.runtime.thinking_effort import build_ollama_thinking_payload
 
 

@@ -1,9 +1,8 @@
-import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
+from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog
 from core.prompt_builder import PromptBuilder
-from core.infrastructure.runtime.token_util import estimate_tokens
 
 
 class ToolMixin:
@@ -19,13 +18,6 @@ class ToolMixin:
 
         clean_name = self._canonical_tool_name(tool_name).lower()
         return role_tool_error(mode_def, clean_name)
-
-
-def new_tool_call_id(idx: Optional[int] = None) -> str:
-    """Returns a unique tool-call id, derived from a stream index or generated."""
-    if idx is None:
-        return f"call_{uuid.uuid4().hex[:8]}"
-    return f"call_{idx}"
 
 
 def build_prompt_context(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:

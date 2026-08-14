@@ -4,13 +4,13 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.adapters.base import (
+from core.infrastructure.adapters.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
     extract_image_details,
     image_url_block,
+    new_tool_call_id,
 )
-from core.base_provider.tools import new_tool_call_id
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
 
 
