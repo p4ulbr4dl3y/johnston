@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Dict, Type
 
 from tools.ask_user import AskUserTool
-from tools.base import BaseTool, format_tool_error
+from tools.base import BaseTool, _resolve_app, format_tool_error
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.invoke_subagent import InvokeSubagentTool
@@ -31,7 +31,6 @@ REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLA
 
 from tools.aliases import (  # noqa: E402  # re-export for downstream imports
     ALIAS_MAP,
-    EDIT_CHUNK_ALIAS_MAP,
     PARAM_ALIAS_MAP,
 )
 
@@ -95,25 +94,9 @@ def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
                 normalized[canonical] = v
 
     if resolved_name in ("multi_edit", "edit") and isinstance(normalized.get("edits"), list):
-        chunk_aliases = EDIT_CHUNK_ALIAS_MAP
-        normalized_edits = []
-        for chunk in normalized["edits"]:
-            if isinstance(chunk, dict):
-                c_norm = dict(chunk)
-                for ck, cv in list(chunk.items()):
-                    ck_l = ck[0].lower() + ck[1:] if ck else ck
-                    if ck in chunk_aliases:
-                        canon_c = chunk_aliases[ck]
-                    elif ck_l in chunk_aliases:
-                        canon_c = chunk_aliases[ck_l]
-                    else:
-                        continue
-                    if canon_c not in c_norm or c_norm[canon_c] is None:
-                        c_norm[canon_c] = cv
-                normalized_edits.append(c_norm)
-            else:
-                normalized_edits.append(chunk)
-        normalized["edits"] = normalized_edits
+        from tools.utils import normalize_chunk_aliases
+
+        normalized["edits"] = [normalize_chunk_aliases(chunk) for chunk in normalized["edits"]]
 
     return normalized
 
@@ -129,17 +112,14 @@ async def prompt_permission_confirmation(
     reason: str,
     perm_name: str | None = None,
 ) -> bool:
-    """Prompts the user for tool permission confirmation.
+    """Prompts the user for tool permission confirmation (backward-compat wrapper).
 
-    Returns True if the user granted access ('allow' or 'always_allow'), False otherwise.
-    Delegates to the host app's `confirm_permission` when available (UI hosts), and
-    denies otherwise (headless/CLI mode) so the tools layer stays UI-independent.
+    Delegates to the shared tools.base.confirm_permission which resolves a host
+    app via ``_resolve_app`` and denies otherwise (headless/CLI mode).
     """
-    confirm = getattr(app_obj, "confirm_permission", None)
-    if callable(confirm):
-        return await confirm(screen_name, args, reason, perm_name)
+    from tools.base import confirm_permission
 
-    return False
+    return await confirm_permission(screen_name, args, reason, perm_name, ctx_or_app=app_obj)
 
 
 async def check_and_confirm_permission(
@@ -162,10 +142,7 @@ async def check_and_confirm_permission(
     from core.permission_manager import PermissionManager
 
     pm = PermissionManager.get_instance()
-    if hasattr(context_or_app, "push_screen_wait"):
-        app_obj = context_or_app
-    else:
-        app_obj = getattr(context_or_app, "app", context_or_app)
+    app_obj = _resolve_app(context_or_app)
     if action is not None:
         action, reason = action, action_reason
     else:
@@ -209,8 +186,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     mcp_mgr = get_mcp_manager()
 
+    from tools.base import is_mock_manager
+
     # Check if the tool is an active MCP tool
-    if hasattr(mcp_mgr, "get_active_tools_async") and not type(mcp_mgr).__name__.endswith("Mock"):
+    if hasattr(mcp_mgr, "get_active_tools_async") and not is_mock_manager(mcp_mgr):
         res_or_coro = mcp_mgr.get_active_tools_async()
         active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
     else:
@@ -233,7 +212,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     from tools.base import check_mcp_role_policy
 
     ctx_or_app = context or app
-    policy_err = check_mcp_role_policy(ctx_or_app, [clean_name, resolved_name])
+    policy_err = check_mcp_role_policy(ctx_or_app, resolved_name)
     if policy_err:
         return policy_err
 

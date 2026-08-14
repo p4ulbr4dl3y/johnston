@@ -1,7 +1,7 @@
 import inspect
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from core.platform_utils import atomic_write_text
 from tools.context import ToolContext
@@ -19,6 +19,9 @@ __all__ = [
     "format_background_notification",
     "execute_mcp_tool",
     "check_mcp_role_policy",
+    "confirm_permission",
+    "_resolve_app",
+    "is_mock_manager",
     "BaseTool",
 ]
 
@@ -158,9 +161,9 @@ def _truncate_output_leading(text: str, max_chars: int) -> Tuple[str, int]:
 
     Shared leading-truncation step so callers only append their own footer text.
     """
-    truncated = text[:max_chars]
-    shown_lines = truncated.count("\n") + (1 if truncated else 0)
-    return truncated, shown_lines
+    from tools.utils import truncate_leading
+
+    return truncate_leading(text, max_chars)
 
 
 def truncate_output(
@@ -237,26 +240,72 @@ def truncate_output(
         return truncated + footer
 
 
-def check_mcp_role_policy(ctx_or_app: Any, targets: List[str]) -> Optional[str]:
+def _resolve_app(ctx_or_app: Any) -> Any:
+    """Unwrap a ToolContext/agent to the host app the tools call into.
+
+    Returns the host that implements the UI protocol methods (confirm_permission,
+    push_screen_wait...) or the object itself when it already is one. A host app is
+    recognised directly (it implements ``push_screen_wait``); otherwise a ``.app``
+    host link is unwrapped, falling back to the caller-supplied object so headless
+    callers degrade to themselves rather than to a dead ``.app`` mock.
+    """
+    from tools.context import ToolContext
+
+    if isinstance(ctx_or_app, ToolContext):
+        return ctx_or_app.app
+    if callable(getattr(ctx_or_app, "push_screen_wait", None)):
+        return ctx_or_app
+    return getattr(ctx_or_app, "app", None) or ctx_or_app
+
+
+def is_mock_manager(mgr: Any) -> bool:
+    """Return True if ``mgr`` is a test double (unittest.mock or ``*Mock`` name).
+
+    Managers wrapped by the stdlib ``unittest.mock`` module, or whose class name
+    ends with ``Mock``, should not take the async backend path. Covers both the
+    name-based heuristic (kept for suites that name double classes ``*Mock``) and
+    a true ``isinstance`` check for real mock objects.
+    """
+    try:
+        from unittest.mock import Mock
+    except Exception:  # pragma: no cover
+        return False
+    if isinstance(mgr, Mock):
+        return True
+    return type(mgr).__name__.endswith("Mock")
+
+
+def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[str]:
     """Checks the active role's tool policy for an MCP tool call.
 
     Returns an error string if the tool is disallowed by role policy, else None.
     """
     from core.role_registry import RoleRegistry, role_tool_error
 
-    if isinstance(ctx_or_app, ToolContext):
-        # Read the role from the host that the context wraps.
-        role_source = ctx_or_app.host if ctx_or_app.host is not None else None
-    else:
-        # Agents may carry a .app host link; unwrap it, falling back to the agent.
-        role_source = getattr(ctx_or_app, "app", None) or ctx_or_app
+    role_source = _resolve_app(ctx_or_app)
     role = getattr(role_source, "role", "worker") if role_source is not None else "worker"
     role_def = RoleRegistry.get_instance().get_role(str(role).lower())
-    for target in targets:
-        policy_err = role_tool_error(role_def, target)
-        if policy_err:
-            return policy_err
-    return None
+    return role_tool_error(role_def, target)
+
+
+async def confirm_permission(
+    screen_name: str,
+    args: Any,
+    reason: str,
+    perm_name: str | None = None,
+    ctx_or_app: Any = None,
+) -> bool:
+    """Prompt the user for a tool-permission confirmation via the host.
+
+    Delegates to the host app's ``confirm_permission`` when available (UI hosts)
+    and denies otherwise (headless/CLI mode) so the tools layer stays
+    UI-independent. ``ctx_or_app`` may be a ToolContext, agent, or host app; it is
+    unwrapped with ``_resolve_app`` before calling.
+    """
+    confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
+    if callable(confirm):
+        return await confirm(screen_name, args, reason, perm_name)
+    return False
 
 
 async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
@@ -270,7 +319,7 @@ async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, An
     kwargs: Dict[str, Any] = {}
     if target_server is not None:
         kwargs["target_server"] = target_server
-    if not type(mcp_mgr).__name__.endswith("Mock") and hasattr(mcp_mgr, "call_tool_async"):
+    if not is_mock_manager(mcp_mgr) and hasattr(mcp_mgr, "call_tool_async"):
         res_or_coro = mcp_mgr.call_tool_async(tool_name, arguments, **kwargs)
     else:
         res_or_coro = mcp_mgr.call_tool(tool_name, arguments, **kwargs)
@@ -296,6 +345,8 @@ class BaseTool:
                 fn["description"] = desc
 
     def _ensure_context(self, ctx_or_app: Any) -> ToolContext:
+        from tools.context import ToolContext
+
         if isinstance(ctx_or_app, ToolContext):
             return ctx_or_app
         if not ctx_or_app:
