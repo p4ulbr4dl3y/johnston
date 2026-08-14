@@ -5,14 +5,19 @@ background_task.py and shell.py: ANSI stripping, carriage-return collapsing,
 and a hard byte cap with a truncation marker.
 """
 
+import os
 import re
+import uuid
 from typing import List, Optional
+
+from core.config import LOGS_DIR
 
 __all__ = [
     "OutputBuffer",
     "strip_ansi",
     "process_carriage_returns",
     "tail_output",
+    "truncate_subagent_result",
 ]
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -102,3 +107,43 @@ def tail_output(text: str, max_chars: int = 2000) -> str:
     if not text or len(text) <= max_chars:
         return text
     return f"... [Output truncated, showing last {max_chars} chars]\n{text[-max_chars:]}"
+
+
+MAX_SUBAGENT_RESULT_CHARS = 15000
+
+
+def truncate_subagent_result(text: str, session_id: str = "") -> str:
+    """Clip a subagent's final result so a verbose subagent does not flood the
+    parent agent's context with a huge <task_result> block. The full session log
+    is saved on truncation and the path is returned in the hint.
+    """
+    text = (text or "").strip()
+    if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
+        return text
+
+    log_path = _write_result_log(text, session_id=session_id or "subagent") or "log file"
+    truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
+    shown_lines = truncated.count("\n") + (1 if truncated else 0)
+    next_line = shown_lines + 1
+    return (
+        truncated
+        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
+    )
+
+
+def _write_result_log(content: str, *, session_id: str = "") -> Optional[str]:
+    """Writes full output to a unique log file under LOGS_DIR and returns its path.
+
+    Returns None if logging is skipped (empty content) or the write fails.
+    """
+    if not (content or "").strip():
+        return None
+    filename = f"{session_id}-{uuid.uuid4().hex[:4]}.log"
+    log_path = os.path.join(LOGS_DIR, filename)
+    try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    except Exception:
+        return None
+    return log_path

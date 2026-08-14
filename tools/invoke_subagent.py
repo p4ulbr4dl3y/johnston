@@ -7,28 +7,6 @@ from core.infrastructure.errors import format_tool_error
 from core.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
-MAX_SUBAGENT_RESULT_CHARS = 15000
-
-
-def _truncate_subagent_result(text: str, session_id: str = "") -> str:
-    """Clip a subagent's final result so a verbose subagent does not flood the
-    parent agent's context with a huge <task_result> block. The full session log
-    is saved on truncation and the path is returned in the hint."""
-    from tools.base import _write_output_log
-    from tools.utils import truncate_leading
-
-    text = (text or "").strip()
-    if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
-        return text
-
-    log_path = _write_output_log(text, session_id=session_id or "subagent") or "log file"
-    truncated, shown_lines = truncate_leading(text, MAX_SUBAGENT_RESULT_CHARS)
-    next_line = shown_lines + 1
-    return (
-        truncated
-        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
-    )
-
 
 def _record_subagent_session(app: Any, session_id: str) -> None:
     """Associate a spawned subagent's session id with the host's current tool widget.
