@@ -211,7 +211,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # exceeds 75% of the context window. Counting history alone ignores the system
         # prompt / tool schema overhead (often 2-4k tokens), which would let the real
         # context silently overflow before this threshold ever triggers.
-        from core.defaults.config import CONTEXT_COMPACTION_THRESHOLD_RATIO, DEFAULT_CONTEXT_LIMIT
+        from core.domain.defaults.config import CONTEXT_COMPACTION_THRESHOLD_RATIO, DEFAULT_CONTEXT_LIMIT
 
         threshold = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * CONTEXT_COMPACTION_THRESHOLD_RATIO)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0

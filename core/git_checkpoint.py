@@ -4,9 +4,9 @@ import uuid
 from contextlib import contextmanager
 from typing import Generator, List, Optional
 
-from core.defaults.git_excludes import DEFAULT_EXCLUDES
-from core.infrastructure.runtime.git_utils import is_git_repository, run_git
+from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
 from core.infrastructure.platform.platform_utils import johnston_config_dir
+from core.infrastructure.runtime.git_utils import is_git_repository, run_git
 
 
 class GitCheckpointManager:

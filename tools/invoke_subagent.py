@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from typing import Any, Dict
 
-from core.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool, format_tool_error
 
