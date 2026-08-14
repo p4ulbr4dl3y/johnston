@@ -3,14 +3,7 @@ import logging
 import time
 from typing import Optional
 
-from widgets.chat_view import (
-    BotMessage,
-    ChatView,
-    EventDivider,
-    ThinkingWidget,
-    ToolCallWidget,
-    UserMessage,
-)
+from widgets.chat_view import ChatView
 
 logger = logging.getLogger(__name__)
 
@@ -117,45 +110,26 @@ class SessionPersistenceMixin:
         self.refresh_status_footer()
 
     def _get_current_session_data(self) -> Optional[dict]:
-        """Safely collect UI state on the main thread."""
-        try:
-            chat_view = self.query_one(ChatView)
-        except Exception:
+        """Collect session data from the transcript session store (source of truth).
+
+        The transcript (self.sm session .messages) is maintained on the SDK side
+        via record_subagent_step during generation, so persistence no longer reads
+        widget state. Title is derived from the first user message in the transcript.
+        """
+        session = self.sm.get(self.current_session_id, reload=False)
+        if not session:
             return None
 
-        user_msgs = chat_view.get_user_messages()
-        if not user_msgs:
-            return {"messages": []}
+        messages = list(session.messages)
 
-        first_msg = user_msgs[0][1]
-        title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
-
-        messages = []
-        for child in chat_view.children:
-            if isinstance(child, UserMessage):
-                messages.append({"type": "user", "text": child.raw_text})
-            elif isinstance(child, BotMessage):
-                messages.append({"type": "bot", "text": child.content})
-            elif isinstance(child, ThinkingWidget):
-                messages.append(
-                    {
-                        "type": "thinking",
-                        "duration": getattr(child, "duration_seconds", 0.0),
-                        "text": getattr(child, "thinking_text", ""),
-                    }
-                )
-            elif isinstance(child, ToolCallWidget):
-                messages.append(
-                    {
-                        "type": "tool",
-                        "tool_type": getattr(child, "tool_type", ""),
-                        "target": getattr(child, "target", ""),
-                        "result_text": getattr(child, "result_text", ""),
-                        "args": getattr(child, "args", {}),
-                    }
-                )
-            elif isinstance(child, EventDivider):
-                messages.append({"type": "event_divider", "text": getattr(child, "divider_title", "Session Compacted")})
+        title = ""
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get("type") == "user":
+                first_msg = msg.get("text", "")
+                title = first_msg[:30] + "..." if len(first_msg) > 30 else first_msg
+                break
+        if not title:
+            return None
 
         agent_history = getattr(self.agent, "history", [])
 

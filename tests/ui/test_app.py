@@ -315,15 +315,15 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_interrupted_divider_serialization(self):
         app = JohnstonApp()
         async with app.run_test():
-            chat_view = app.query_one(ChatView)
-            await chat_view.add_user_message("Hello")
-            divider = await chat_view.add_event_divider("Response Interrupted")
-            self.assertEqual(divider.divider_title, "Response Interrupted")
+            # Transcript (session.messages) is the source of truth for persistence.
+            sess = app.sm.create_main(app.current_session_id)
+            sess.add_event({"type": "user", "text": "Hello"})
+            sess.add_event({"type": "event_divider", "text": "Response Interrupted"})
 
             app.save_current_session()
-            sess = app.sm.get(app.current_session_id)
-            self.assertIsNotNone(sess)
-            msgs = sess.messages
+            saved = app.sm.get(app.current_session_id)
+            self.assertIsNotNone(saved)
+            msgs = saved.messages
             self.assertTrue(
                 any(m.get("type") == "event_divider" and m.get("text") == "Response Interrupted" for m in msgs)
             )
