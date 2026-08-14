@@ -1,5 +1,4 @@
 import json
-import uuid
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -14,6 +13,7 @@ from core.adapters.base import (
     parse_tool_call_args,
     sort_keys_recursive,
 )
+from core.base_provider.tools import new_tool_call_id
 from core.thinking_effort import build_anthropic_thinking_payload
 
 # Bounded LRU cache for deterministic tool-schema sorting. `sort_keys_recursive`
@@ -143,7 +143,7 @@ class AnthropicAdapter(BaseApiAdapter):
                     blocks.append(
                         {
                             "type": "tool_use",
-                            "id": tc.get("id") or f"call_{uuid.uuid4().hex[:8]}",
+                            "id": tc.get("id") or new_tool_call_id(),
                             "name": fn_name,
                             "input": args_obj,
                         }
@@ -255,7 +255,7 @@ class AnthropicAdapter(BaseApiAdapter):
                             yield (
                                 "adapter_tool_call",
                                 {
-                                    "id": tb["id"] or f"call_{uuid.uuid4().hex[:8]}",
+                                    "id": tb["id"] or new_tool_call_id(),
                                     "name": tb["name"],
                                     "arguments": tb["args_buf"] or "{}",
                                 },
