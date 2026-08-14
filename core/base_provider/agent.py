@@ -9,14 +9,19 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
 
-from core.adapters.base import extract_image_payload, image_url_block, parse_tool_call_args
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
-from core.base_provider.tools import ToolMixin, build_prompt_context, new_tool_call_id
-from core.models_catalog import catalog
-from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
+from core.base_provider.tools import ToolMixin, build_prompt_context
+from core.infrastructure.adapters.base import (
+    extract_image_payload,
+    image_url_block,
+    new_tool_call_id,
+    parse_tool_call_args,
+)
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
+from core.models_catalog import catalog
+from core.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.tool_display import extract_tool_display
 from tools.base import format_tool_error
 from tools.registry import execute_tool
