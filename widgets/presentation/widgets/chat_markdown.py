@@ -87,6 +87,8 @@ class CustomMarkdownTableContent(MarkdownTableContent):
                 )
             self.last_row = row_index
         await self.mount_all(new_cells)
+        for child in self.query(".cell"):
+            child.tooltip = None
 
     def on_mount(self) -> None:
         self.styles.grid_size_columns = len(self.headers)
