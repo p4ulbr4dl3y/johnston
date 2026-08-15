@@ -232,8 +232,8 @@ class StatusFooter(GitMetricsMixin, Static):
         try:
             import time
 
+            from core.application.skills.manager import SkillManager
             from core.infrastructure.mcp import get_mcp_manager
-            from core.skill_manager import SkillManager
 
             pm = getattr(self.app, "pm", None)
             pkey = pm.get_active_provider_key() if pm else "default"

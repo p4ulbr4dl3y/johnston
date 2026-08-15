@@ -3,7 +3,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
-from core.linters_manager import get_linters_manager
+from core.application.linters.manager import get_linters_manager
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import ModalSearchNavMixin
 from widgets.screens.constants import (

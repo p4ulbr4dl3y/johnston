@@ -3,7 +3,7 @@ import time
 
 from textual.widgets import OptionList
 
-from core.skill_manager import SkillManager
+from core.application.skills.manager import SkillManager
 from widgets.commands import COMMAND_REGISTRY
 
 

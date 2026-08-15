@@ -5,9 +5,9 @@ import platform
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.application.skills.manager import SkillManager
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
 from core.infrastructure.runtime.git_utils import run_git
-from core.skill_manager import SkillManager
 
 INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
 
@@ -108,7 +108,7 @@ def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     cwd selects the project rules directory so a subagent working in an isolated
     worktree sees its own `.johnston/rules` instead of the parent checkout's.
     """
-    from core.rules_manager import RulesManager
+    from core.application.rules.rules import RulesManager
 
     return RulesManager.get_instance().get_formatted_rules(role=role, project_dir=cwd)
 
@@ -201,8 +201,9 @@ class PromptBuilder:
         return sys_prompt
 
     def build_tools(self, provider_key: str = "") -> List[Dict[str, Any]]:
+        from core.domain.policies.role_policy import role_tool_error
         from core.infrastructure.mcp import get_mcp_manager
-        from core.role_registry import RoleRegistry, role_tool_error
+        from core.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_cached_tools()

@@ -1,8 +1,8 @@
 import os
 from typing import Any, Dict
 
+from core.application.linters.manager import get_linters_manager
 from core.infrastructure.errors import format_tool_error
-from core.linters_manager import get_linters_manager
 from tools.base import BaseTool, make_unified_diff, read_file_text, resolve_path, write_file_text
 from tools.cancel import run_cancellable
 

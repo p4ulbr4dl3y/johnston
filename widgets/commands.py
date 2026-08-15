@@ -18,8 +18,8 @@ from core.application.session.actions import (
     resume_session,
     rewind_session,
 )
+from core.application.skills.manager import SkillManager
 from core.models_catalog import catalog
-from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
 from widgets.modal_screens import (
@@ -520,7 +520,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
                 try:
                     with open(s["location"], "r", encoding="utf-8") as f:
                         raw_c = f.read()
-                    from core.skill_manager import parse_frontmatter
+                    from core.application.skills.manager import parse_frontmatter
 
                     _, body = parse_frontmatter(raw_c)
                     content = body.strip()

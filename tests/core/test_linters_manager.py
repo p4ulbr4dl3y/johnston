@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.linters_manager import PRESET_LINTERS, LintersManager, get_linters_manager
+from core.application.linters.manager import PRESET_LINTERS, LintersManager, get_linters_manager
 
 
 class TestLintersManager(unittest.TestCase):

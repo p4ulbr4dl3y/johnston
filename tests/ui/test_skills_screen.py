@@ -6,7 +6,7 @@ from textual.events import Key
 from textual.widgets import Input, Markdown, OptionList
 from textual.widgets.option_list import Option
 
-from core.skill_manager import SkillManager
+from core.application.skills.manager import SkillManager
 from widgets.screens.skills import SkillDetailScreen, SkillsScreen
 
 

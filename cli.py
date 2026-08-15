@@ -61,7 +61,7 @@ def print_models():
 
 def print_skills():
     """Print available skills to stdout"""
-    from core.skill_manager import SkillManager
+    from core.application.skills.manager import SkillManager
 
     skills = SkillManager().list_skills()
     print("Available Johnston Skills:")
@@ -142,7 +142,7 @@ def print_mcp():
 
 def print_linters():
     """Print configured linters to stdout"""
-    from core.linters_manager import get_linters_manager
+    from core.application.linters.manager import get_linters_manager
 
     mgr = get_linters_manager()
     linters = mgr.load_linters()
@@ -175,7 +175,7 @@ def print_linters():
 def print_rules():
     """Print active project instructions and rules summary to stdout"""
     from core.application.generation.prompt_builder import INSTRUCTION_FILES
-    from core.rules_manager import RulesManager
+    from core.application.rules.rules import RulesManager
 
     print("Active Rules & Project Instructions:")
     cwd = Path.cwd()

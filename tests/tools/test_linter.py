@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.linters_manager import LintersManager, _clean_output, _exec_cmd
+from core.application.linters.manager import LintersManager, _clean_output, _exec_cmd
 
 
 def fake_linter(name="ruff", exts=None, cmd=None, enabled=True, available=True):
@@ -24,15 +24,15 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
 
-    @patch("core.linters_manager.LintersManager.is_available", return_value=True)
+    @patch("core.application.linters.manager.LintersManager.is_available", return_value=True)
     async def test_non_existent_file(self, _avail):
         path = os.path.join(self.temp_dir.name, "non_existent.py")
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
         result = await lm.run_for(path)
         self.assertEqual(result, "")
 
-    @patch("core.linters_manager._exec_cmd")
-    @patch("core.linters_manager.LintersManager.is_available", return_value=True)
+    @patch("core.application.linters.manager._exec_cmd")
+    @patch("core.application.linters.manager.LintersManager.is_available", return_value=True)
     async def test_python_linter_error_reported(self, _avail, mock_exec_cmd):
         mock_exec_cmd.return_value = "file.py:1:1: F401 'os' imported but unused"
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
@@ -50,7 +50,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(cmd_arg[3], "E9,F")
         self.assertIn("F401", result)
 
-    @patch("core.linters_manager._exec_cmd")
+    @patch("core.application.linters.manager._exec_cmd")
     async def test_no_matching_linter(self, mock_exec_cmd):
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
         lm.get_for_extension = MagicMock(return_value=[])
@@ -61,7 +61,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "")
         mock_exec_cmd.assert_not_called()
 
-    @patch("core.linters_manager._exec_cmd")
+    @patch("core.application.linters.manager._exec_cmd")
     async def test_multiple_matching_linters_aggregate(self, mock_exec_cmd):
         mock_exec_cmd.side_effect = ["one error", "two error"]
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
@@ -75,7 +75,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertIn("one error", result)
         self.assertIn("two error", result)
 
-    @patch("core.linters_manager._exec_cmd")
+    @patch("core.application.linters.manager._exec_cmd")
     async def test_clean_lines_filtering_all_filtered(self, mock_exec_cmd):
         mock_exec_cmd.return_value = "Downloading dependency...\nBuilding wheel...\nAudited 5 packages"
         lm = LintersManager(config_file=os.path.join(self.temp_dir.name, "linters.json"))
@@ -86,7 +86,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         result = await lm.run_for(py_file)
         self.assertEqual(result, "")
 
-    @patch("core.linters_manager._exec_cmd")
+    @patch("core.application.linters.manager._exec_cmd")
     async def test_line_truncation_over_10_lines(self, mock_exec_cmd):
         many_errors = "\n".join([f"file.py:{i}:1: E101 error {i}" for i in range(15)])
         mock_exec_cmd.return_value = many_errors
@@ -145,7 +145,7 @@ class TestLinter(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(python.get("enabled"))
 
     def test_cached_which(self):
-        from core.linters_manager import _cached_which
+        from core.application.linters.manager import _cached_which
 
         _cached_which.cache_clear()
         res = _cached_which("python3") or _cached_which("python") or _cached_which("ls")

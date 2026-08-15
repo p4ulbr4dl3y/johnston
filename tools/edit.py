@@ -2,8 +2,8 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
+from core.application.linters.manager import get_linters_manager
 from core.infrastructure.errors import format_tool_error
-from core.linters_manager import get_linters_manager
 from tools.base import (
     BaseTool,
     make_unified_diff,

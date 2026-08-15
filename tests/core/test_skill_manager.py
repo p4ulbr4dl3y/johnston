@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import unittest
 
-from core.skill_manager import SkillManager, parse_frontmatter
+from core.application.skills.manager import SkillManager, parse_frontmatter
 
 
 class TestSkillManager(unittest.IsolatedAsyncioTestCase):

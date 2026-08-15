@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from core.rules_manager import RuleDefinition, RulesManager
+from core.application.rules.rules import RuleDefinition, RulesManager
 
 
 class TestRulesManager(unittest.TestCase):
