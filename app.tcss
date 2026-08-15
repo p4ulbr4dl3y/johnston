@@ -206,21 +206,29 @@ Markdown {
     padding: 0;
 }
 
-MarkdownParagraph {
-    height: auto;
-    margin: 1 0 0 0;
-    padding: 0;
-}
-
 MarkdownBlock {
     height: auto;
     margin: 0;
     padding: 0;
 }
 
-MarkdownBlockQuote MarkdownParagraph {
-    margin: 0;
+MarkdownParagraph {
+    height: auto;
+    margin: 1 0 0 0;
     padding: 0;
+}
+
+MarkdownBlockQuote MarkdownParagraph {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+MarkdownBulletList MarkdownParagraph,
+MarkdownOrderedList MarkdownParagraph,
+Markdown BulletList MarkdownParagraph,
+Markdown OrderedList MarkdownParagraph {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 MarkdownBlockQuote MarkdownBlockQuote {
@@ -234,15 +242,12 @@ MarkdownHeader {
     margin: 1 0 0 0;
 }
 
+MarkdownBulletList,
+MarkdownOrderedList,
 Markdown BulletList,
 Markdown OrderedList {
     height: auto;
     margin: 1 0;
-    padding: 0;
-}
-
-Markdown ListItem {
-    margin: 0;
     padding: 0;
 }
 
