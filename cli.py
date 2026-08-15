@@ -174,7 +174,7 @@ def print_linters():
 
 def print_rules():
     """Print active project instructions and rules summary to stdout"""
-    from core.prompt_builder import INSTRUCTION_FILES
+    from core.application.generation.prompt_builder import INSTRUCTION_FILES
     from core.rules_manager import RulesManager
 
     print("Active Rules & Project Instructions:")

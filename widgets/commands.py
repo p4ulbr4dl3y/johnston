@@ -3,8 +3,7 @@ import logging
 import os
 from typing import Any
 
-from core.models_catalog import catalog
-from core.provider_actions import (
+from core.application.provider.actions import (
     fetch_api_key_and_provider_info,
     fetch_grouped_models,
     get_current_thinking_effort,
@@ -12,13 +11,14 @@ from core.provider_actions import (
     set_provider_credentials,
     set_thinking_effort,
 )
-from core.session_actions import (
+from core.application.session.actions import (
     compact_session,
     get_rewind_git_stats,
     new_session,
     resume_session,
     rewind_session,
 )
+from core.models_catalog import catalog
 from core.skill_manager import SkillManager
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView

@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Tuple
 
+from core.application.generation.prompt_builder import PromptBuilder
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog
-from core.prompt_builder import PromptBuilder
 
 
 class ToolMixin:

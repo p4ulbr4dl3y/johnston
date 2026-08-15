@@ -75,7 +75,7 @@ class GitMetricsMixin:
     def _git_branch(self) -> str:
         """Return the current git branch name or '' when not in a repo."""
         try:
-            from core.prompt_builder import get_git_info
+            from core.application.generation.prompt_builder import get_git_info
 
             info = (get_git_info() or "").strip()
             if info.startswith("branch '"):

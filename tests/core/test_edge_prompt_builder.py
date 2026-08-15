@@ -1,4 +1,4 @@
-"""Edge-case tests for core.prompt_builder.
+"""Edge-case tests for core.application.generation.prompt_builder.
 
 Goal: find bugs in PromptBuilder / get_git_info / get_project_instructions_snippet /
 get_rules_snippet under empty/None/long/unicode/duplicate/unsorted input, plus
@@ -8,14 +8,14 @@ from unittest.mock import patch
 
 import pytest
 
-from core.prompt_builder import PromptBuilder, get_git_info, get_git_info_async, get_project_instructions_snippet
+from core.application.generation.prompt_builder import PromptBuilder, get_git_info, get_git_info_async, get_project_instructions_snippet
 
 
 @pytest.fixture(autouse=True)
 def _no_git_subprocess(monkeypatch):
     # Keep git subprocess deterministic/fast in edge tests.
-    monkeypatch.setattr("core.prompt_builder._compute_git_info", lambda cwd=None: "")
-    monkeypatch.setattr("core.prompt_builder.run_git", lambda *a, **k: None)
+    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", lambda cwd=None: "")
+    monkeypatch.setattr("core.application.generation.prompt_builder.run_git", lambda *a, **k: None)
 
 
 # ---------------------------------------------------------------------------
@@ -315,8 +315,8 @@ def test_git_info_cached_short_circuits(monkeypatch):
         calls.append(cwd)
         return "branch 'main'"
 
-    monkeypatch.setattr("core.prompt_builder._compute_git_info", fake_compute)
-    monkeypatch.setattr("core.prompt_builder._GIT_INFO_CACHE", {})
+    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", fake_compute)
+    monkeypatch.setattr("core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
     a = get_git_info()
     b = get_git_info()
     assert a == b == "branch 'main'"
@@ -333,8 +333,8 @@ async def test_git_info_async_cached(monkeypatch):
 
     # Patch the sync compute fn used inside get_git_info_async via to_thread;
     # count calls to prove the cache short-circuits the second call.
-    monkeypatch.setattr("core.prompt_builder._compute_git_info", fake_compute)
-    monkeypatch.setattr("core.prompt_builder._GIT_INFO_CACHE", {})
+    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", fake_compute)
+    monkeypatch.setattr("core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
     a = await get_git_info_async()
     b = await get_git_info_async()
     assert a == b == "branch 'dev'"
