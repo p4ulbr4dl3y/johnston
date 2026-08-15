@@ -1,6 +1,5 @@
 from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
 
-from core.config import CONFIG_FILE
 from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.domain.policies.permission_policy import (
     _BUILTIN_TOOLS,
@@ -8,6 +7,7 @@ from core.domain.policies.permission_policy import (
     _merge_perms,
     normalize_action,
 )
+from core.infrastructure.platform.paths import CONFIG_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 

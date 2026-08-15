@@ -8,8 +8,8 @@ from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
-from core import config
-from core.config import IMAGE_EXTENSIONS
+from core.infrastructure.platform import paths as config
+from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from widgets.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
@@ -217,7 +217,7 @@ class ChatInput(TextArea):
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
         import time
 
-        from core.config import TEMP_IMAGES_DIR
+        from core.infrastructure.platform.paths import TEMP_IMAGES_DIR
         from core.infrastructure.platform.platform_utils import get_clipboard_image_or_file
 
         file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)

@@ -11,7 +11,7 @@ import os
 import time
 from typing import Any, Callable, List, Optional, Tuple
 
-from core.config import CONFIG_DIR
+from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.runtime.frontmatter import iter_md_files
 from core.infrastructure.runtime.fs_signature import compute_dir_signature
 

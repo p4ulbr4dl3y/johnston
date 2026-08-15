@@ -5,7 +5,6 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core.config import PROJECTS_DIR
 from core.domain.entities.session import (
     MAIN_STATUS_ACTIVE,
     STATUS_CANCELLED,
@@ -16,6 +15,7 @@ from core.domain.entities.session import (
     _coerce_int,
     is_ui_visible_user_message,
 )
+from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 

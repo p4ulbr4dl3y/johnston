@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-with patch("core.config.CONFIG_DIR", "/dummy"), patch("core.config.CONFIG_FILE", "/dummy"):
+with patch("core.infrastructure.platform.paths.CONFIG_DIR", "/dummy"), patch("core.infrastructure.platform.paths.CONFIG_FILE", "/dummy"):
     from core.provider_manager import ProviderManager
 
 

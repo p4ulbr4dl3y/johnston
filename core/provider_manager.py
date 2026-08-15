@@ -6,8 +6,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from core.config import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
+from core.infrastructure.platform.paths import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from core.models_catalog import cached_json_read, catalog, extract_context_length

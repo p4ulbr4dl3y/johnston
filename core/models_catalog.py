@@ -13,7 +13,6 @@ from typing import Any, Dict, Iterable, Set
 
 import httpx
 
-from core.config import CONFIG_DIR
 from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
 from core.domain.policies.model_catalog_policy import (
     _RE_FUZZY_STRIP,
@@ -23,6 +22,7 @@ from core.domain.policies.model_catalog_policy import (
     extract_context_length,
     format_context_tokens,
 )
+from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)

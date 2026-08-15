@@ -11,8 +11,8 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.config import CONFIG_DIR
 from core.infrastructure.mcp.process_client import MCPProcessClient
+from core.infrastructure.platform.paths import CONFIG_DIR
 
 logger = logging.getLogger(__name__)
 

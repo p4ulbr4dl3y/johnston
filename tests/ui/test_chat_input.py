@@ -37,7 +37,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.tmp_file = os.path.join(self.tmp_dir.name, "prompt_history.json")
-        self.patcher = patch("core.config.PROMPT_HISTORY_FILE", self.tmp_file)
+        self.patcher = patch("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", self.tmp_file)
         self.patcher.start()
 
     async def asyncTearDown(self):
@@ -223,7 +223,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_history_persistence(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_history_file = os.path.join(tmpdir, "prompt_history.json")
-            with patch("core.config.PROMPT_HISTORY_FILE", tmp_history_file), patch("core.config.CONFIG_DIR", tmpdir):
+            with patch("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", tmp_history_file), patch("core.infrastructure.platform.paths.CONFIG_DIR", tmpdir):
                 ci = ChatInput()
                 self.assertEqual(ci.prompt_history, [])
 

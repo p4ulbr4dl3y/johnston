@@ -181,7 +181,7 @@ def get_clipboard_image_or_file() -> tuple[str | None, Any | None]:
         try:
             from PIL import Image
 
-            from core.config import TEMP_IMAGES_DIR
+            from core.infrastructure.platform.paths import TEMP_IMAGES_DIR
 
             out_dir = TEMP_IMAGES_DIR
             os.makedirs(out_dir, exist_ok=True)
