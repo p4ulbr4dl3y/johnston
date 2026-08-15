@@ -27,7 +27,32 @@ def apply_textual_patches() -> None:
             else:
                 raise
 
-    Screen._forward_event = _safe_forward_event
+    from rich.console import Console
+    from textual.selection import Selection
+    from textual.widgets import Static
+
+    _old_static_get_selection = getattr(Static, "_original_get_selection", Static.get_selection)
+    Static._original_get_selection = _old_static_get_selection
+
+    def _new_static_get_selection(self: Static, selection: Selection) -> tuple[str, str] | None:
+        result = _old_static_get_selection(self, selection)
+        if result is not None:
+            return result
+        try:
+            visual = self._render()
+            renderable = getattr(visual, "_renderable", visual)
+            console = getattr(getattr(self, "app", None), "console", None) or Console()
+            width = getattr(getattr(self, "size", None), "width", 0) or getattr(console, "width", 80)
+            lines = []
+            for line in console.render_lines(renderable, console.options.update(width=width, height=None, justify="left")):
+                lines.append("".join(seg.text for seg in line).rstrip())
+            text = "\n".join(lines)
+            extracted = selection.extract(text)
+            return (extracted, "\n") if extracted else None
+        except Exception:
+            return None
+
+    Static.get_selection = _new_static_get_selection
 
     from widgets.chat_markdown import _apply_chat_markdown_patches
 
