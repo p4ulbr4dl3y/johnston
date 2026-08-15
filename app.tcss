@@ -528,14 +528,35 @@ ModalScreen {
     margin-bottom: 1;
 }
 
-.modal-markdown-centered MarkdownHeader {
-    text-align: center;
+.modal-markdown-centered MarkdownHeader,
+.modal-markdown-centered MarkdownH1,
+.modal-markdown-centered MarkdownH2,
+.modal-markdown-centered MarkdownH3,
+.modal-markdown-centered MarkdownH4,
+.modal-markdown-centered MarkdownH5,
+.modal-markdown-centered MarkdownH6,
+#modal-dialog .modal-markdown-centered MarkdownHeader,
+#modal-dialog .modal-markdown-centered MarkdownH1,
+#modal-dialog .modal-markdown-centered MarkdownH2,
+#modal-dialog .modal-markdown-centered MarkdownH3,
+#modal-dialog .modal-markdown-centered MarkdownH4,
+#modal-dialog .modal-markdown-centered MarkdownH5,
+#modal-dialog .modal-markdown-centered MarkdownH6,
+#wizard-title MarkdownHeader,
+#wizard-title MarkdownH1,
+#wizard-title MarkdownH2,
+#wizard-title MarkdownH3 {
+    content-align: center middle !important;
+    text-align: center !important;
     color: #ffffff;
     margin: 0 0 1 0;
 }
 
-.modal-markdown-centered MarkdownParagraph {
-    text-align: center;
+.modal-markdown-centered MarkdownParagraph,
+#modal-dialog .modal-markdown-centered MarkdownParagraph,
+#wizard-title MarkdownParagraph {
+    content-align: center middle !important;
+    text-align: center !important;
     margin: 0;
 }
 
@@ -686,8 +707,8 @@ SubagentViewScreen {
 /* Unified Markdown Headers Styling (Clean bold white, no underlines, left aligned) */
 MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4, MarkdownH5, MarkdownH6,
 MarkdownHeader {
-    content-align: left top !important;
-    text-align: left !important;
+    content-align: left top;
+    text-align: left;
     text-style: bold;
     color: #ffffff;
     background: transparent;
