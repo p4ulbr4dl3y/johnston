@@ -7,7 +7,7 @@ from core.domain.policies.role_policy import (
     normalize_role_scope,
 )
 from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
-from core.markdown_scanner import MarkdownScannerCache
+from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
     "worker": AgentRole(
