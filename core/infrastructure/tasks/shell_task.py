@@ -55,12 +55,19 @@ class ShellTask(BaseTask):
         Streams every decoded chunk to a unique log under LOGS_DIR, bypassing the
         in-memory OutputBuffer cap. Returns the path, or None if logging was
         skipped (already open) or the file could not be created.
+
+        On first open any output already buffered in ``self.output`` is written
+        to the log so a latently-opened log (e.g. on timeout->background
+        conversion) is not missing the leading output.
         """
         if self._log is not None:
             return self.log_path
         self._log = OutputLog.create(self.task_id)
         if self._log.opened:
             self.log_path = self._log.path
+            backfill = "".join(self.output.history)
+            if backfill:
+                self._log.append(backfill)
             return self.log_path
         self._log = None
         return None
