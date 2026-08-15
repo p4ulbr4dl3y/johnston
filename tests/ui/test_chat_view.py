@@ -63,6 +63,7 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.01)
 
     async def test_streaming_bot_message_renders_markdown_only_once_at_end(self):
+        from rich.markdown import Markdown as RichMarkdown
         app = JohnstonApp()
 
         async with app.run_test() as pilot:
@@ -70,23 +71,23 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
             bot = await chat_view.add_bot_message(animate=False)
             await pilot.pause()
 
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
-                markdown_update.return_value = None
+            with patch.object(bot.stream_widget, "update") as stream_update:
                 for idx in range(100):
                     bot.set_stream_content(f"stream chunk {idx}")
 
                 await pilot.pause(0.1)
-                markdown_update.assert_not_awaited()
+                # During streaming it updates with plain strings
                 self.assertTrue(bot.stream_widget.display)
-                self.assertFalse(bot.md_widget.display)
 
                 await bot.finalize_stream()
 
-                markdown_update.assert_awaited_once_with("stream chunk 99")
-                self.assertFalse(bot.stream_widget.display)
-                self.assertTrue(bot.md_widget.display)
+                # On finalize it renders RichMarkdown
+                self.assertTrue(stream_update.called)
+                last_arg = stream_update.call_args[0][0]
+                self.assertIsInstance(last_arg, RichMarkdown)
 
     async def test_large_bot_message_uses_single_static_renderable(self):
+        from rich.markdown import Markdown as RichMarkdown
         app = JohnstonApp()
 
         async with app.run_test() as pilot:
@@ -95,12 +96,13 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             large_markdown = ("## Section\n\n- item\n\n" * 400).strip()
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
+            with patch.object(bot.stream_widget, "update") as stream_update:
                 await bot.set_final_content(large_markdown)
 
-            markdown_update.assert_not_awaited()
+            self.assertTrue(stream_update.called)
+            last_arg = stream_update.call_args[0][0]
+            self.assertIsInstance(last_arg, RichMarkdown)
             self.assertTrue(bot.stream_widget.display)
-            self.assertFalse(bot.md_widget.display)
 
     def test_clean_markdown_for_rendering(self):
         raw = (
@@ -591,17 +593,18 @@ class TestFormatEditDiff(unittest.TestCase):
 
 
 class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
-    async def test_set_final_content_large_message_uses_static_markdown(self):
+    async def test_set_final_content_renders_rich_markdown(self):
+        from rich.markdown import Markdown as RichMarkdown
         app = JohnstonApp()
         async with app.run_test() as pilot:
             chat_view = app.query_one(ChatView)
             bot = await chat_view.add_bot_message(animate=False)
             await pilot.pause()
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
-                await bot.set_final_content("## Big\n\n" * 300)
-            markdown_update.assert_not_awaited()
+            with patch.object(bot.stream_widget, "update") as stream_update:
+                await bot.set_final_content("## Hello\n\n- world")
+            self.assertTrue(stream_update.called)
+            self.assertIsInstance(stream_update.call_args[0][0], RichMarkdown)
             self.assertTrue(bot.stream_widget.display)
-            self.assertFalse(bot.md_widget.display)
 
     async def test_schedule_stream_update_runtime_error_and_flush_unattached(self):
         bot = BotMessage()
@@ -609,50 +612,19 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
             bot._schedule_stream_update()
         self.assertFalse(bot._stream_update_scheduled)
 
-    async def test_set_final_content_cancels_pending_render_task(self):
+    async def test_set_final_content_cancels_pending_handles(self):
         bot = BotMessage()
         handle = MagicMock()
         bot._stream_update_handle = handle
-        task = asyncio.Future()
-        bot._markdown_render_task = task
         await bot.set_final_content("small content")
         handle.cancel.assert_called_once()
-        self.assertTrue(task.cancelled())
-        self.assertIsNone(bot._pending_markdown_content)
+        self.assertFalse(bot._streaming)
 
-    async def test_schedule_markdown_render_reuses_existing_task(self):
+    async def test_render_rich_content_empty(self):
         bot = BotMessage()
-        task = asyncio.Future()
-        bot._markdown_render_task = task
-        bot._schedule_markdown_render("pending")
-        self.assertEqual(bot._pending_markdown_content, "pending")
-        task.cancel()
-        with self.assertRaises(asyncio.CancelledError):
-            await task
-
-    async def test_schedule_markdown_render_runtime_error_falls_back(self):
-        bot = BotMessage()
-        with patch("asyncio.create_task", side_effect=RuntimeError):
-            bot._schedule_markdown_render("fallback")
-        self.assertEqual(bot._pending_markdown_content, "fallback")
-
-    async def test_render_markdown_unattached_and_exceptions(self):
-        bot = BotMessage()
-        await bot._render_markdown("anything")
-        with patch.object(type(bot.md_widget), "is_attached", new_callable=PropertyMock, return_value=True):
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock, side_effect=Exception("boom")):
-                await bot._render_markdown("x")
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock, side_effect=asyncio.CancelledError()):
-                with self.assertRaises(asyncio.CancelledError):
-                    await bot._render_markdown("x")
-
-    async def test_drain_markdown_render_loops_until_empty(self):
-        bot = BotMessage()
-        with patch.object(bot, "_render_markdown", new_callable=AsyncMock) as render_mock:
-            bot._pending_markdown_content = "first"
-            await bot._drain_markdown_render()
-        render_mock.assert_awaited_once_with("first")
-        self.assertIsNone(bot._pending_markdown_content)
+        with patch.object(bot.stream_widget, "update") as update_mock:
+            bot._render_rich_content("")
+            update_mock.assert_called_once_with("")
 
     async def test_scroll_if_needed_handles_parent(self):
         from textual.containers import VerticalScroll
@@ -681,27 +653,17 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         bot = BotMessage()
         handle = MagicMock()
         bot._stream_update_handle = handle
-        task = MagicMock()
-        task.done.return_value = False
-        bot._markdown_render_task = task
         bot.on_unmount()
         handle.cancel.assert_called_once()
-        task.cancel.assert_called_once()
 
     async def test_reset_stream_clears_content_and_cancels_handles(self):
         bot = BotMessage()
         bot.content = "partial"
         handle = MagicMock()
         bot._stream_update_handle = handle
-        task = asyncio.Future()
-        bot._markdown_render_task = task
         await bot.reset_stream()
         self.assertEqual(bot.content, "")
         handle.cancel.assert_called_once()
-        self.assertTrue(task.cancelled())
-        self.assertIsNone(bot._pending_markdown_content)
-        self.assertFalse(bot.stream_widget.display)
-        self.assertFalse(bot.md_widget.display)
         self.assertFalse(bot._streaming)
 
     async def test_watch_content_streaming_schedules_update(self):
@@ -710,7 +672,7 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
             bot._streaming = True
             bot.set_stream_content("chunk")
             sched.assert_called()
-        with patch.object(bot, "_schedule_markdown_render") as render_mock:
+        with patch.object(bot, "_render_rich_content") as render_mock:
             bot._streaming = False
             bot._suppress_content_watch = True
             bot.content = "final"

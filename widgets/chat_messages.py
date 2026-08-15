@@ -5,9 +5,13 @@ from rich.rule import Rule
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Label, Markdown, Static
+from textual.widgets import Label, Static
 
-from widgets.chat_markdown import _handle_markdown_task_done, clean_markdown_for_rendering, safe_update_markdown
+from widgets.chat_markdown import (
+    CODE_THEME,
+    _apply_chat_markdown_patches,
+    clean_markdown_for_rendering,
+)
 
 
 class EventDivider(Static):
@@ -36,31 +40,25 @@ class UserMessage(Horizontal):
 
 
 class BotMessage(Vertical):
-    """AI message with full Markdown rendering"""
+    """AI message with Rich Markdown rendering"""
 
     can_focus = False
     content = reactive("")
-    MAX_INTERACTIVE_MARKDOWN_CHARS = 12000
-    MAX_INTERACTIVE_MARKDOWN_LINES = 250
 
     def __init__(self):
         super().__init__(classes="bot-msg")
         self.stream_widget = Static("", markup=False, classes="bot-msg-stream")
-        self.md_widget = Markdown("")
+        self.md_widget = self.stream_widget
         self._streaming = False
         self._stream_update_scheduled = False
         self._stream_update_handle: asyncio.TimerHandle | None = None
         self._suppress_content_watch = False
-        self._pending_markdown_content: str | None = None
-        self._markdown_render_task: asyncio.Task | None = None
-        self._render_failed = False
 
     def compose(self) -> ComposeResult:
         yield self.stream_widget
-        yield self.md_widget
 
     def on_mount(self) -> None:
-        self.stream_widget.display = False
+        self.stream_widget.display = True
 
     def watch_content(self, new_content: str) -> None:
         if self._suppress_content_watch:
@@ -68,22 +66,18 @@ class BotMessage(Vertical):
         if self._streaming:
             self._schedule_stream_update()
         else:
-            self._schedule_markdown_render(new_content)
+            self._render_rich_content(new_content)
 
     def append_stream_content(self, content: str) -> None:
         """Append a streaming delta to the message text."""
         if not self._streaming:
             self._streaming = True
-            self.stream_widget.display = True
-            self.md_widget.display = False
         self.content = self.content + content
 
     def set_stream_content(self, content: str) -> None:
         """Replace the streaming text with full content (no Markdown rebuild)."""
         if not self._streaming:
             self._streaming = True
-            self.stream_widget.display = True
-            self.md_widget.display = False
         self.content = content
 
     async def reset_stream(self) -> None:
@@ -98,20 +92,10 @@ class BotMessage(Vertical):
             self._stream_update_handle.cancel()
             self._stream_update_handle = None
         self._stream_update_scheduled = False
-        task = self._markdown_render_task
-        if task is not None and task is not asyncio.current_task() and not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        self._pending_markdown_content = None
         try:
             self.stream_widget.update("")
         except Exception:
             pass
-        self.stream_widget.display = False
-        self.md_widget.display = False
 
     def _schedule_stream_update(self) -> None:
         if self._stream_update_scheduled:
@@ -138,8 +122,17 @@ class BotMessage(Vertical):
         if self._stream_update_scheduled:
             self._flush_stream_update()
 
+    def _render_rich_content(self, content: str) -> None:
+        cleaned = clean_markdown_for_rendering(content)
+        if cleaned:
+            _apply_chat_markdown_patches()
+            self.stream_widget.update(RichMarkdown(cleaned, code_theme=CODE_THEME))
+        else:
+            self.stream_widget.update("")
+        self._scroll_if_needed()
+
     async def set_final_content(self, content: str) -> None:
-        """Render final Markdown once and wait until its widget tree is mounted."""
+        """Render final Rich Markdown once and update view."""
         self._suppress_content_watch = True
         try:
             self.content = content
@@ -149,70 +142,11 @@ class BotMessage(Vertical):
             self._stream_update_handle.cancel()
             self._stream_update_handle = None
         self._stream_update_scheduled = False
-        task = self._markdown_render_task
-        if task is not None and task is not asyncio.current_task() and not task.done():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        self._pending_markdown_content = None
-        cleaned = clean_markdown_for_rendering(content)
-        if (
-            len(cleaned) > self.MAX_INTERACTIVE_MARKDOWN_CHARS
-            or cleaned.count("\n") > self.MAX_INTERACTIVE_MARKDOWN_LINES
-        ):
-            self.stream_widget.update(RichMarkdown(cleaned))
-            self._streaming = False
-            self.stream_widget.display = True
-            self.md_widget.display = False
-            self._scroll_if_needed()
-            return
-        self._render_failed = False
-        await self._render_markdown(content)
         self._streaming = False
-        if self._render_failed:
-            self._render_failed = False
-            self.stream_widget.update(clean_markdown_for_rendering(content))
-            self.stream_widget.display = True
-            self.md_widget.display = False
-        else:
-            self.stream_widget.display = False
-            self.md_widget.display = True
-        self._scroll_if_needed()
+        self._render_rich_content(content)
 
     async def finalize_stream(self, content: str | None = None) -> None:
         await self.set_final_content(self.content if content is None else content)
-
-    def _schedule_markdown_render(self, content: str) -> None:
-        """Coalesce compatibility assignments so only one Markdown render runs."""
-        self._pending_markdown_content = content
-        if self._markdown_render_task is not None and not self._markdown_render_task.done():
-            return
-        try:
-            self._markdown_render_task = asyncio.create_task(self._drain_markdown_render())
-            self._markdown_render_task.add_done_callback(_handle_markdown_task_done)
-        except RuntimeError:
-            safe_update_markdown(self.md_widget, content, on_done=self._scroll_if_needed)
-
-    async def _drain_markdown_render(self) -> None:
-        while self._pending_markdown_content is not None:
-            content = self._pending_markdown_content
-            self._pending_markdown_content = None
-            await self._render_markdown(content)
-        self._scroll_if_needed()
-
-    async def _render_markdown(self, content: str) -> None:
-        if not self.md_widget.is_attached:
-            self._render_failed = True
-            return
-        cleaned = clean_markdown_for_rendering(content)
-        try:
-            await self.md_widget.update(cleaned)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self._render_failed = True
 
     def _scroll_if_needed(self) -> None:
         try:
@@ -228,9 +162,6 @@ class BotMessage(Vertical):
         if self._stream_update_handle is not None:
             self._stream_update_handle.cancel()
             self._stream_update_handle = None
-        task = self._markdown_render_task
-        if task is not None and not task.done():
-            task.cancel()
 
 
 class ThinkingWidget(Vertical):
