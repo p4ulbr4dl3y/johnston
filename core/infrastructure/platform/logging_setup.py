@@ -9,7 +9,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from core.config import LOGS_DIR
+from core.infrastructure.platform.paths import LOGS_DIR
 
 LOG_FILE = os.path.join(LOGS_DIR, "johnston.log")
 _MAX_BYTES = 5 * 1024 * 1024

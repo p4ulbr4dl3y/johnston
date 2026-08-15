@@ -207,7 +207,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         self.assertIsNone(SubagentWorktreeManager.attach_worktree(non_git, "s1", "branch-x"))
 
     def test_attach_worktree_existing_path_returns_it(self):
-        from core.config import WORKTREES_DIR
+        from core.infrastructure.platform.paths import WORKTREES_DIR
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-existing")
         os.makedirs(wt_path, exist_ok=True)
@@ -235,7 +235,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_attach_worktree_success(self):
         from unittest.mock import patch
 
-        from core.config import WORKTREES_DIR
+        from core.infrastructure.platform.paths import WORKTREES_DIR
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-ok")
         os.makedirs(wt_path, exist_ok=True)

@@ -7,7 +7,7 @@ try:
 except ImportError:  # pragma: no cover - Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
-from core.config import CONFIG_DIR
+from core.infrastructure.platform.paths import CONFIG_DIR
 from core.provider_manager import ProviderManager
 
 

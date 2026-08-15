@@ -114,7 +114,7 @@ def _write_output_log(
 
     import uuid
 
-    from core.config import LOGS_DIR
+    from core.infrastructure.platform.paths import LOGS_DIR
 
     if session_id:
         seed = f"{session_id}-{uuid.uuid4().hex[:4]}"

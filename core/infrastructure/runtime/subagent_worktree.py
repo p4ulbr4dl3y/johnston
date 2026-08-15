@@ -2,7 +2,7 @@ import os
 import shutil
 from typing import Optional, Tuple
 
-from core.config import WORKTREES_DIR
+from core.infrastructure.platform.paths import WORKTREES_DIR
 from core.infrastructure.runtime.git_utils import is_git_repository, run_git
 
 

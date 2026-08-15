@@ -10,7 +10,7 @@ import re
 import uuid
 from typing import List, Optional
 
-from core.config import LOGS_DIR
+from core.infrastructure.platform.paths import LOGS_DIR
 
 __all__ = [
     "OutputBuffer",

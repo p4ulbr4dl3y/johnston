@@ -184,7 +184,7 @@ class TestClipboardRetrieval(unittest.TestCase):
         tmp_dir = tempfile.mkdtemp()
         res = subprocess.CompletedProcess([], 0, stdout="FILE:/tmp/clip.png\n")
         with (
-            patch("core.config.TEMP_IMAGES_DIR", tmp_dir),
+            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
             patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
@@ -199,7 +199,7 @@ class TestClipboardRetrieval(unittest.TestCase):
         Image.new("RGB", (4, 4), "red").save(clip_file, format="PNG")
         res = subprocess.CompletedProcess([], 0, stdout="DATA\n")
         with (
-            patch("core.config.TEMP_IMAGES_DIR", tmp_dir),
+            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("os.getpid", return_value=12345),
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
@@ -216,7 +216,7 @@ class TestClipboardRetrieval(unittest.TestCase):
         Image.new("RGB", (2, 2)).save(clip_file, format="PNG")
         res = subprocess.CompletedProcess([], 0, stdout="DATA\n")
         with (
-            patch("core.config.TEMP_IMAGES_DIR", tmp_dir),
+            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("os.getpid", return_value=999),
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
@@ -230,7 +230,7 @@ class TestClipboardRetrieval(unittest.TestCase):
     def test_get_clipboard_macos_jxa_raises(self):
         tmp_dir = tempfile.mkdtemp()
         with (
-            patch("core.config.TEMP_IMAGES_DIR", tmp_dir),
+            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
             patch("core.infrastructure.platform.platform_utils.subprocess.run", side_effect=OSError("osascript failed")),
@@ -243,7 +243,7 @@ class TestClipboardRetrieval(unittest.TestCase):
         tmp_dir = tempfile.mkdtemp()
         res = subprocess.CompletedProcess([], 0, stdout="")
         with (
-            patch("core.config.TEMP_IMAGES_DIR", tmp_dir),
+            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch(
                 "core.infrastructure.platform.platform_utils.shutil.which",
