@@ -9,7 +9,6 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.permission_manager import PermissionManager
-from core.tool_helpers import get_all_tool_types
 from widgets.screens.base_modal import BaseModalScreen, status_tag
 from widgets.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.screens.constants import (
@@ -20,6 +19,7 @@ from widgets.screens.constants import (
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
 )
+from widgets.tool_helpers import get_all_tool_types
 
 _SELECTABLE_TYPES = ("tool",)
 
