@@ -236,6 +236,21 @@ core/
 | Пустой мёртвый стаб `core/tool_helpers.py` | LOW | ✅ Удалён (0 потребителей, все юзают `widgets.tool_helpers`) |
 | `import *` без `__all__` в re-export `subagent_worktree.py` | LOW | ✅ Исправлено: явный импорт + `__all__` |
 
+### Доводка (фаза 12): миграция 4 flat-модулей в слои + ревью
+
+После финализации фаз 1-11 выполнена доводка: 4 плоских модуля переехали в слои (`config.py`→`paths.py`, `config_helpers.py`→`config/`, `markdown_scanner.py`→`runtime/`, `subagent_stream.py`→`application/session/stream.py`), все потребители переведены на канонические пути, старые пути — тонкие re-export стабы. Прогнано независимое ревью (read-only explorer).
+
+**Вердикт доводки: 4/5** — чистый, полный рефакторинг.
+
+| Проблема | Sev | Статус |
+|---|---|---|
+| `domain/policies/role_policy.py` импортировал `core.infrastructure.errors` (косвенно через стаб к `domain.defaults.errors`) — строгое «domain: 0 deps on infrastructure» нарушено | MED | ✅ Исправлено: прямой импорт `core.domain.defaults.errors`; `core/domain/` теперь полностью свободен от `core.infrastructure.*` |
+| Ни одного устаревшего patch/mock-таргета в тестах (все переведены на канонические пути) | - | ✅OK |
+| LOW: `tests/core/test_edge_subagent_stream.py` docstring + legacy-путь через стаб `core.subagent_stream` | LOW | ⚠️ Оставлено (работает через re-export; только стиль) |
+| `truncate_subagent_result` не задвоен — остался в `infrastructure/tasks/output.py`, stream лениво импортирует | - | ✅OK |
+
+**Что отлично:** полный перевод всех потребителей (core/tools/widgets/cli/tests) на канонические пути, корректный ретаргет тестовых patch-таргетов на новые модули, тонкие стабы в едином стиле, отсутствие дублирования/мёртвого кода, сохранение сигнатур и поведения.
+
 **Что отлично отмечено ревьюером:** фазы подготовки (ленивые tools-импорты вынесены в функции), разрыв цикла `base_provider⇄adapters`, полная очистка `prompt_builder→tools`, автономность `base_provider`, чистота новых domain-модулей (`entities/session`, `policies/{permission,model_catalog}`), сохранение сигнатур (`extract_context_length`, `format_tool_error`), отсутствие дублирования/мёртвого кода.
 
 **Уточнение к допустимым core→tools:** после всех фиксов полный core→tools сводится к двум санкционированным точкам: composition-root `provider_manager` + рендер-хелпер `application/display.py`. `domain` остаётся строго чистым слоем (0 зависимостей на infrastructure/application/tools).
