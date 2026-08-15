@@ -230,89 +230,9 @@ class StatusFooter(GitMetricsMixin, Static):
 
     def refresh_footer(self) -> None:
         try:
-            import time
+            from widgets.app.status_state import build_status_kwargs
 
-            from core.application.skills.manager import SkillManager
-            from core.infrastructure.mcp import get_mcp_manager
-
-            pm = getattr(self.app, "pm", None)
-            pkey = pm.get_active_provider_key() if pm else "default"
-            agent = getattr(self.app, "agent", None)
-            model_name = getattr(agent, "model", "")
-            providers = pm.load_providers() if pm else {}
-            provider_info = providers.get(pkey, {}) if isinstance(providers, dict) else {}
-            provider_display = provider_info.get("name", pkey) if provider_info else pkey
-            is_connected = pm.is_provider_connected(pkey, provider_info) if (pm and pkey) else False
-            clean_model = catalog.get_model_display_name(pkey, model_name)
-            if not clean_model:
-                clean_model = "[Select model: /models]"
-            if pm and hasattr(pm, "get_provider_thinking_effort"):
-                effort_val = pm.get_provider_thinking_effort(pkey, model_name)
-            else:
-                effort_val = getattr(agent, "thinking_effort", None)
-            thinking_effort = display_thinking_effort(effort_val)
-            metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
-
-            now = time.time()
-            if not hasattr(self, "_cached_skills") or (now - getattr(self, "_skills_cache_time", 0) > 5.0):
-                all_skills = SkillManager().list_skills(include_hidden=True)
-                skills_total = len(all_skills)
-                skills_visible = sum(1 for s in all_skills if not s.get("hidden"))
-                self._cached_skills = (skills_visible, skills_total)
-                self._skills_cache_time = now
-            skills_visible, skills_total = getattr(self, "_cached_skills", (0, 0))
-
-            if not hasattr(self, "_cached_mcp_servers") or (now - getattr(self, "_mcp_cache_time", 0) > 5.0):
-                self._cached_mcp_servers = get_mcp_manager().load_servers()
-                self._mcp_cache_time = now
-            mcp_servers = self._cached_mcp_servers
-
-            # Count only servers that are actually loading (enabled, stdio
-            # command) and of those, only the ones that finished loading: a
-            # running client that discovered tools and has no error. Pending or
-            # errored servers don't count, so while loading the footer flips to
-            # the spinner.
-            mcp_total = 0
-            for s in mcp_servers:
-                if s.get("url") and not s.get("command"):
-                    continue
-                mcp_total += 1
-            mcp_active = self._active_mcp_count(mcp_servers)
-            from core.infrastructure.runtime.task_collection import collect_current_tasks
-
-            bg_tasks, sessions = collect_current_tasks(self.app, getattr(self.app, "current_session_id", None))
-
-            active_bg_tasks = len(
-                [t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)]
-            )
-
-            subagents_active = len([s for s in sessions if getattr(s, "status", "") == "running"])
-            subagents_total = len(sessions)
-
-            agent_role = getattr(agent, "role", "worker")
-
-            kwargs = {
-                "provider_key": pkey,
-                "provider_display": provider_display,
-                "is_connected": is_connected,
-                "model_name": model_name,
-                "clean_model": clean_model,
-                "agent_role": agent_role,
-                "directory": os.getcwd(),
-                "active_bg_tasks": active_bg_tasks,
-                "subagents_active": subagents_active,
-                "subagents_total": subagents_total,
-                "context_used": metrics.get("context_used", 0),
-                "total_tokens": metrics.get("total_tokens", 0),
-                "context_window": metrics.get("context", "128k"),
-                "context_limit": metrics.get("context_limit", 128000),
-                "cost_usd": metrics.get("cost_usd", 0.0),
-                "thinking_effort": thinking_effort,
-                "skills_visible": skills_visible,
-                "skills_total": skills_total,
-                "mcp_active": mcp_active,
-                "mcp_total": mcp_total,
-            }
+            kwargs = build_status_kwargs(self.app, widget=self)
             self._last_status_args = kwargs
             self.update_status(**kwargs)
         except Exception:
@@ -322,51 +242,10 @@ class StatusFooter(GitMetricsMixin, Static):
         """Render footer for a subagent session using its own agent/dir/branch/metrics."""
         self._subagent_session = session
         try:
-            agent = getattr(session, "agent", None)
-            app_agent = getattr(self.app, "agent", None) if self.app else None
-            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
-            effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
-            thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
-            metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
-            provider_key = (
-                getattr(agent, "provider_key", "")
-                if agent
-                else (getattr(app_agent, "provider_key", "") if app_agent else "")
-            )
-
-            pm = getattr(self.app, "pm", None)
-            if not provider_key and pm:
-                provider_key = pm.get_active_provider_key()
-            providers = pm.load_providers() if pm else {}
-            provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
-            provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
-            is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False
-
-            model_name = (
-                getattr(agent, "model", "")
-                if agent
-                else (getattr(app_agent, "model", "") if app_agent else provider_info.get("model", ""))
-            )
-            clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
-            if not clean_model:
-                clean_model = "[Select model: /models]"
-
-            directory = getattr(session, "project_dir", "") or os.path.basename(os.path.realpath(os.getcwd()))
-            if os.path.basename(directory) != directory:
-                directory = os.path.basename(os.path.normpath(directory)) or directory
-
-            context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0)
-            total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0)
-            cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
-            context_limit = (
-                metrics.get("context_limit")
-                or getattr(agent, "context_limit", None)
-                or getattr(app_agent, "context_limit", 128000)
-                or 128000
-            )
-            context_window = metrics.get("context") or format_context_tokens(context_limit)
+            from widgets.app.status_state import build_subagent_status_kwargs
 
             # Live spinner while the subagent session is still streaming/running.
+            # (widget manages spinner timer state; aggregation stays in status_state)
             is_running = getattr(session, "status", "") == "running"
             if is_running and not self.is_generating:
                 self.is_generating = True
@@ -379,24 +258,13 @@ class StatusFooter(GitMetricsMixin, Static):
                     self._spinner_timer = None
                 self._spinner_idx = 0
 
-            role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
-            role_formatted += role.capitalize()
-
-            self._render_subagent(
-                role_formatted=role_formatted,
-                provider_display=provider_display or provider_key.capitalize(),
-                clean_model=clean_model or "[Select model: /models]",
-                is_connected=is_connected,
-                model_name=model_name,
-                context_used=context_used,
-                total_tokens=total_tokens,
-                context_limit=context_limit,
-                context_window=context_window,
-                cost_usd=cost_usd,
-                thinking_effort=thinking_effort,
-                directory=directory,
-                branch_name=getattr(session, "branch_name", ""),
+            kwargs = build_subagent_status_kwargs(
+                self.app,
+                session,
+                spinner_running=self.is_generating,
+                spinner_idx=self._spinner_idx,
             )
+            self._render_subagent(*kwargs, branch_name=getattr(session, "branch_name", ""))
         except Exception:
             pass
 
