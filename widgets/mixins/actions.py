@@ -15,16 +15,9 @@ class ActionsMixin:
         """Toggle agent role across all registered roles (builtin, global, project)"""
         if not hasattr(self, "agent") or not self.agent:
             return
-        from core.role_registry import RoleRegistry
+        from widgets.app.role_service import toggle_agent_role
 
-        roles_dict = RoleRegistry.get_instance().list_roles(scope="main")
-        available_roles = list(roles_dict.keys())
-        curr = getattr(self.agent, "role", "worker").lower()
-        next_idx = (available_roles.index(curr) + 1) % len(available_roles) if curr in available_roles else 0
-        new_role = available_roles[next_idx]
-        self.agent.role = new_role
-        self.role = new_role
-        self.refresh_status_footer()
+        toggle_agent_role(self)
 
     def action_toggle_expand(self) -> None:
         """Toggle expand on all expandable widgets in chat"""

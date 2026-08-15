@@ -96,8 +96,7 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from core.application.generation.ai_generator import GenCanvas, ensure_provider_ready
-        from core.application.generation.ai_generator import generate_ai_response as _engine
+        from core.application.generation.ai_generator import ensure_provider_ready
 
         # ---- connectivity check (mixin-level) ----
         ready, needed = ensure_provider_ready(self.pm, self.agent)
@@ -121,15 +120,11 @@ class MessageFlowMixin:
 
         # ---- build canvas ----
         project_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
+        from widgets.app.ai_controller import build_gen_canvas, run_ai_generation
 
-        canvas = GenCanvas(
-            add_user_message=lambda text, atts: chat_view.add_user_message(text, attachments=atts),
-            add_thinking_widget=chat_view.add_thinking_widget,
-            add_tool_call=lambda name, desc, args: chat_view.add_tool_call(name, desc, args=args),
-            register_tool_widget=_register_tool_widget(self),
-            add_bot_message=chat_view.add_bot_message,
-            add_event_divider=chat_view.add_event_divider,
-            get_user_messages=chat_view.get_user_messages,
+        canvas = build_gen_canvas(
+            chat_view,
+            on_tool_widget=_register_tool_widget(self),
             refresh_status_footer=self.refresh_status_footer,
             notify=self.notify,
             save_session=lambda: self.save_current_session_async(),
@@ -143,7 +138,7 @@ class MessageFlowMixin:
             logger.warning("Footer update failed: %s", e)
 
         try:
-            await _engine(
+            await run_ai_generation(
                 self.agent,
                 session,
                 canvas,
