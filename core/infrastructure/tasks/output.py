@@ -14,6 +14,8 @@ from core.infrastructure.platform.paths import LOGS_DIR
 
 __all__ = [
     "OutputBuffer",
+    "OutputLog",
+    "make_log_path",
     "strip_ansi",
     "process_carriage_returns",
     "tail_output",
@@ -109,6 +111,89 @@ def tail_output(text: str, max_chars: int = 2000) -> str:
     return f"... [Output truncated, showing last {max_chars} chars]\n{text[-max_chars:]}"
 
 
+# ---------------------------------------------------------------------------
+# Task output log
+# ---------------------------------------------------------------------------
+
+
+def make_log_path(prefix: str = "", unique: bool = True) -> Optional[str]:
+    """Build a log path under LOGS_DIR for a ``prefix``.
+
+    Central generator so every caller (tool snapshots and the background task
+    logger) shares one filename scheme and directory bootstrap. When ``unique``
+    is True a short random suffix keeps multiple snapshots (e.g. same session_id)
+    from colliding; callers with a native-unique prefix (like a ``task_id``) pass
+    ``unique=False`` for a clean, predictable name. Returns None if the directory
+    could not be created / path is unusable.
+    """
+    prefix = re.sub(r"[/\\]+", "_", (prefix or "task").strip()) or "task"
+    filename = prefix + (f"-{uuid.uuid4().hex[:4]}" if unique else "") + ".log"
+    log_path = os.path.join(LOGS_DIR, filename)
+    try:
+        os.makedirs(LOGS_DIR, exist_ok=True)
+        return log_path
+    except Exception:
+        return None
+
+
+class OutputLog:
+    """Streams raw task output to a log file under LOGS_DIR.
+
+    Unlike the snapshot helpers (truncate_subagent_result / truncate_output),
+    this appends decoded chunks as they arrive, so a long-running background
+    process logs its entire output without any in-memory cap. The file handle is
+    held open until ``close`` and flushed per chunk so the tail is durably
+    observable on disk.
+    """
+
+    def __init__(self, path: str = "") -> None:
+        self.path = path
+        self._file = None
+        self._closed = False
+        if path:
+            try:
+                self._file = open(path, "w", encoding="utf-8")
+            except Exception:
+                self._file = None
+
+    @classmethod
+    def create(cls, prefix: str = "") -> "OutputLog":
+        """Open a fresh log for ``prefix``, or return a closed no-op on failure."""
+        try:
+            path = make_log_path(prefix, unique=False) or ""
+        except Exception:
+            path = ""
+        return cls(path)
+
+    @property
+    def opened(self) -> bool:
+        return self._file is not None
+
+    def append(self, text: str) -> None:
+        if self._file is None or self._closed:
+            return
+        try:
+            self._file.write(text)
+            self._file.flush()
+        except Exception:
+            pass
+
+    def close(self) -> None:
+        if self._file is not None:
+            try:
+                self._file.close()
+            except Exception:
+                pass
+            self._file = None
+        self._closed = True
+
+    def __enter__(self) -> "OutputLog":
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+
 MAX_SUBAGENT_RESULT_CHARS = 15000
 
 
@@ -138,10 +223,10 @@ def _write_result_log(content: str, *, session_id: str = "") -> Optional[str]:
     """
     if not (content or "").strip():
         return None
-    filename = f"{session_id}-{uuid.uuid4().hex[:4]}.log"
-    log_path = os.path.join(LOGS_DIR, filename)
+    log_path = make_log_path(session_id or "subagent")
+    if not log_path:
+        return None
     try:
-        os.makedirs(LOGS_DIR, exist_ok=True)
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(content)
     except Exception:

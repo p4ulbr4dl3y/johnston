@@ -5,6 +5,7 @@ real short subprocess, and SubagentTask mapping/kill over a mock AgentSession.
 """
 
 import asyncio
+import os
 import sys
 
 import pytest
@@ -209,7 +210,110 @@ async def test_shell_task_widget_streaming_strips_ansi():
 # ---------------------------------------------------------------------------
 
 
-def test_task_kind_literals():
+@pytest.mark.asyncio
+async def test_shell_task_file_log_writes_full_output(monkeypatch, tmp_path):
+    """Background file log captures full output beyond the memory cap."""
+    # Point the log helper into a tmp dir via its own module constant.
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+
+    task = ShellTask(task_id="tlog", command="echo hi", process=None)
+    path = task.open_log()
+    assert path is not None
+    # Log while "running"
+    task.is_background = True
+    task._log.append("hello from file log\n")
+    task._log.append("line2\n")
+    content = open(task.log_path).read()
+    assert "hello from file log" in content
+    assert "line2" in content
+    task.close_log()
+    assert task.log_path is not None
+    # file persists on disk after close
+    assert "line2" in open(task.log_path).read()
+
+
+@pytest.mark.asyncio
+async def test_shell_task_open_log_twice_is_idempotent(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    task = ShellTask(task_id="tlog2", command="echo", process=None)
+    p1 = task.open_log()
+    p2 = task.open_log()
+    assert p1 == p2
+    task.close_log()
+
+
+# ---------------------------------------------------------------------------
+# OutputLog
+# ---------------------------------------------------------------------------
+
+
+def test_output_log_streams_and_closes(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    log = _out.OutputLog.create("build")
+    assert log.opened
+    assert log.path and os.path.exists(log.path)
+    log.append("chunk1\n")
+    log.append("chunk2\n")
+    log.close()
+    assert not log.opened
+    content = open(log.path).read()
+    assert "chunk1\nchunk2\n" in content
+
+
+def test_output_log_append_after_close_is_noop(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    log = _out.OutputLog.create("x")
+    log.append("a\n")
+    log.close()
+    log.append("b\n")
+    log.close()  # idempotent
+    assert "a\n" in open(log.path).read()
+    assert "b\n" not in open(log.path).read()
+
+
+def test_output_log_create_failure_returns_closed_noop(monkeypatch):
+    import core.infrastructure.tasks.output as _out
+
+    def _boom(*_a, **_k):
+        raise OSError("no permissions")
+
+    monkeypatch.setattr(_out, "make_log_path", _boom)
+    log = _out.OutputLog.create("x")
+    assert not log.opened
+    log.append("ignored")
+    log.close()
+
+
+def test_make_log_path_sanitizes_prefix(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    path = _out.make_log_path("some/project\\name")
+    assert path is not None
+    assert os.path.dirname(path) == str(tmp_path)
+    assert "/" not in os.path.basename(path)
+    assert "\\" not in os.path.basename(path)
+    assert path.endswith(".log")
+
+
+def test_make_log_path_non_unique_keeps_bare_prefix(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    path = _out.make_log_path("shell_1", unique=False)
+    assert path == os.path.join(str(tmp_path), "shell_1.log")
+
+
+@pytest.mark.asyncio
+async def test_task_kind_literals():
     assert ("shell", "subagent") == TASK_KINDS
     assert TaskStatus.RUNNING.value == "running"
 

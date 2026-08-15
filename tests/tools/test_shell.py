@@ -118,6 +118,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, ctx=mock_app)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("running:", res)
+            self.assertIn("Full Output Log:", res)
             mock_ctx.add_background_task.assert_called_once()
 
     async def test_create_windows_process_powershell(self):
