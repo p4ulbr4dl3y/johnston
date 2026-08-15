@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import pygments
 from rich.text import Text
 
-from widgets.chat_markdown import TOKEN_COLORS
+from widgets.presentation.widgets.chat_markdown import TOKEN_COLORS
 
 HUNK_HEADER_RE = re.compile(
     r"^@@\s+-\s*(\d+)(?:,\s*(\d+))?\s+\+\s*(\d+)(?:,\s*(\d+))?\s+@@"

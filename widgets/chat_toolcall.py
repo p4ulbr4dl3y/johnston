@@ -10,14 +10,14 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
-from widgets.chat_diff import format_edit_diff
-from widgets.chat_markdown import (
+from widgets.lexer_utils import guess_lexer_name
+from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.widgets.chat_markdown import (
     CODE_THEME,
     TransparentSyntax,
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.lexer_utils import guess_lexer_name
 from widgets.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 
 _MISSING = object()

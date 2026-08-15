@@ -5,8 +5,8 @@ The implementation lives in focused modules under ``widgets/`` (see
 ``widgets.chat_tools`` import paths working.
 """
 
-from widgets.chat_diff import DiffRenderable, format_edit_diff
 from widgets.chat_toolcall import ToolCallWidget, ToolScrollBox
+from widgets.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
 
 __all__ = [
     "DiffRenderable",

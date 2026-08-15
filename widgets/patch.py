@@ -122,6 +122,6 @@ def apply_textual_patches() -> None:
 
     RichVisual.render_strips = _new_rich_visual_render_strips
 
-    from widgets.chat_markdown import _apply_chat_markdown_patches
+    from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
     _apply_chat_markdown_patches()

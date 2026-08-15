@@ -6,8 +6,8 @@ The implementation lives in focused modules under ``widgets/`` (see
 import paths working.
 """
 
-from widgets.chat_container import ChatView
-from widgets.chat_markdown import (
+from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_markdown import (
     CustomMarkdownFence,
     CustomMarkdownTable,
     CustomMarkdownTableContent,
@@ -18,9 +18,9 @@ from widgets.chat_markdown import (
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
-from widgets.chat_tools import DiffRenderable, ToolCallWidget, ToolScrollBox, format_edit_diff
-from widgets.chat_welcome import WelcomeWidget
+from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
+from widgets.presentation.widgets.chat_tools import DiffRenderable, ToolCallWidget, ToolScrollBox, format_edit_diff
+from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 __all__ = [
     "BotMessage",
