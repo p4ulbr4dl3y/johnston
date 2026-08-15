@@ -4,18 +4,18 @@ import asyncio
 
 import pytest
 
-from core.session_manager import (
-    STATUS_CANCELLED,
-    STATUS_COMPLETED,
-    STATUS_ERROR,
-    AgentSession,
-)
-from core.subagent_stream import (
+from core.application.session.stream import (
     apply_subagent_role,
     cancel_running_subagents,
     merge_subagent_metrics,
     record_subagent_step,
     run_subagent_stream_bg,
+)
+from core.session_manager import (
+    STATUS_CANCELLED,
+    STATUS_COMPLETED,
+    STATUS_ERROR,
+    AgentSession,
 )
 
 

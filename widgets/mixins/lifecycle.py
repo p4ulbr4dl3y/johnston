@@ -68,7 +68,7 @@ class LifecycleMixin:
         except Exception as err:
             logger.debug(f"Background task cleanup error: {err}")
         try:
-            from core.subagent_stream import cancel_running_subagents
+            from core.application.session.stream import cancel_running_subagents
 
             cancel_running_subagents(self.sm)
         except Exception as err:

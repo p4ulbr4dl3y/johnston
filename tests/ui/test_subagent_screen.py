@@ -91,7 +91,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(sess.messages[0]["text"], "Hello world")
 
     def test_record_subagent_step_canonical_format(self):
-        from core.subagent_stream import record_subagent_step
+        from core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-canon", "canonical", "prompt")
         acc = [""]
@@ -115,7 +115,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "Final answer")
 
     def test_record_subagent_step_multistep_tools_no_accumulation(self):
-        from core.subagent_stream import record_subagent_step
+        from core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-multi", "multistep", "prompt")
         acc = [""]
@@ -149,7 +149,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "All done!")
 
     def test_record_subagent_step_bot_reset(self):
-        from core.subagent_stream import record_subagent_step
+        from core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-reset", "reset", "prompt")
         acc = [""]
@@ -166,7 +166,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "clean reply")
 
     def test_record_subagent_step_thinking_info_and_outro(self):
-        from core.subagent_stream import record_subagent_step
+        from core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-info", "info", "prompt")
         acc = [""]
