@@ -6,9 +6,6 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from core.infrastructure.tasks.manager import TaskManager
-from core.infrastructure.tasks.shell_task import ShellTask
-from core.infrastructure.tasks.task import TaskStatus
 from core.infrastructure.runtime.thinking_effort import (
     GEMINI_25_THINKING_BUDGET_BY_EFFORT,
     SUPPORTED_THINKING_EFFORTS,
@@ -19,6 +16,9 @@ from core.infrastructure.runtime.thinking_effort import (
     display_thinking_effort,
     normalize_thinking_effort,
 )
+from core.infrastructure.tasks.manager import TaskManager
+from core.infrastructure.tasks.shell_task import ShellTask
+from core.infrastructure.tasks.task import TaskStatus
 
 
 # ---------------------------------------------------------------------------

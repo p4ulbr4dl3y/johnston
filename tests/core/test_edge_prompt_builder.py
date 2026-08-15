@@ -8,7 +8,12 @@ from unittest.mock import patch
 
 import pytest
 
-from core.application.generation.prompt_builder import PromptBuilder, get_git_info, get_git_info_async, get_project_instructions_snippet
+from core.application.generation.prompt_builder import (
+    PromptBuilder,
+    get_git_info,
+    get_git_info_async,
+    get_project_instructions_snippet,
+)
 
 
 @pytest.fixture(autouse=True)

@@ -1,17 +1,9 @@
-"""Centralized error formatting helpers for the infrastructure layer."""
+"""Backwards-compatible re-export of error formatting helpers.
+
+Canonical location: ``core.domain.defaults.errors`` (pure domain string
+helpers). Kept for backward compatibility — callers should import directly
+from the domain module.
+"""
+from core.domain.defaults.errors import format_tool_error as format_tool_error
 
 __all__ = ["format_tool_error"]
-
-
-def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
-    """Unified error prefix for tool/agent messages.
-
-    Produces `ERR: <kind> '<name>': <detail>` (or `ERR: <kind>` when both name
-    and detail are empty). Matches the existing de-facto `ERR:` convention.
-    """
-    base = f"ERR: {kind}"
-    if name:
-        base += f" '{name}'"
-    if detail:
-        base += f": {detail}"
-    return base
