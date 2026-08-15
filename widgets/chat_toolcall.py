@@ -32,7 +32,6 @@ def _strip_hints_and_background(text: str) -> str:
     cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", cleaned)
     cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
     cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
-    cleaned = re.sub(r"Use (manage_shell|ManageShell) to inspect[^\n]*", "", cleaned)
     return cleaned.strip()
 
 
