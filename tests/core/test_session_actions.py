@@ -2,7 +2,7 @@
 import asyncio
 import unittest
 
-from core.session_actions import (
+from core.application.session.actions import (
     compact_session,
     new_session,
     resume_session,

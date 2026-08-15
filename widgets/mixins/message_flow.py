@@ -96,8 +96,8 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from core.ai_generator import GenCanvas, ensure_provider_ready
-        from core.ai_generator import generate_ai_response as _engine
+        from core.application.generation.ai_generator import GenCanvas, ensure_provider_ready
+        from core.application.generation.ai_generator import generate_ai_response as _engine
 
         # ---- connectivity check (mixin-level) ----
         ready, needed = ensure_provider_ready(self.pm, self.agent)

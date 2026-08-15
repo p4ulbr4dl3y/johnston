@@ -62,7 +62,7 @@ class AgentRole:
 
 
 # Single source of truth for role/mode tool-policy checks. Used by
-# role_tool_error, AgentRole.is_tool_allowed, roles/tools, and prompt_builder so
+# role_tool_error, AgentRole.is_tool_allowed, roles/tools, and application.generation.prompt_builder so
 # disallowed, read_only, allowed_tools, and subagent exclusions are honored in
 # one place.
 def _tool_policy_result(

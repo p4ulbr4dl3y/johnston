@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.infrastructure.mcp import MCPManager
-from core.prompt_builder import PromptBuilder
+from core.application.generation.prompt_builder import PromptBuilder
 
 
 class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):

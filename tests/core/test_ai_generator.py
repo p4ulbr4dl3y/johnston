@@ -1,10 +1,10 @@
-"""Focused unit tests for the Textual-free AI generation engine core/ai_generator.py."""
+"""Focused unit tests for the Textual-free AI generation engine core/application/generation/ai_generator.py."""
 
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.ai_generator import GenCanvas, generate_ai_response
+from core.application.generation.ai_generator import GenCanvas, generate_ai_response
 
 
 class _FakeAgent:

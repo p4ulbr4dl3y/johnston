@@ -119,7 +119,7 @@ class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
 
 class TestPromptBuilderCwd(unittest.TestCase):
     def test_system_prompt_shows_agent_cwd(self):
-        from core.prompt_builder import PromptBuilder
+        from core.application.generation.prompt_builder import PromptBuilder
 
         with tempfile.TemporaryDirectory() as base:
             with open(os.path.join(base, "AGENTS.md"), "w", encoding="utf-8") as f:
@@ -132,7 +132,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
 
     def test_system_prompt_loads_project_rules_from_cwd(self):
         """Project rules (.johnston/rules) are read from the agent cwd, not main checkout."""
-        from core.prompt_builder import PromptBuilder
+        from core.application.generation.prompt_builder import PromptBuilder
 
         with tempfile.TemporaryDirectory() as base:
             rules_dir = os.path.join(base, ".johnston", "rules")
@@ -147,7 +147,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
 
 class TestGetRulesSnippetCwd(unittest.TestCase):
     def test_get_rules_snippet_respects_cwd(self):
-        from core.prompt_builder import get_rules_snippet
+        from core.application.generation.prompt_builder import get_rules_snippet
 
         with tempfile.TemporaryDirectory() as main, tempfile.TemporaryDirectory() as wt:
             proj_rules = os.path.join(wt, ".johnston", "rules")

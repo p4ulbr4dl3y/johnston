@@ -1,6 +1,6 @@
 import unittest
 
-from core.prompt_builder import PromptBuilder
+from core.application.generation.prompt_builder import PromptBuilder
 
 
 class TestPromptBuilder(unittest.TestCase):
