@@ -2,7 +2,7 @@
 
 Targets run_git / make_git_diff (core/git_utils.py) and the JSON config
 read/write path (core.infrastructure.platform.platform_utils.read_json / atomic_write_json,
-core.config_helpers.ensure_json_config, ProviderManager._read_config).
+core.infrastructure.config.config_helpers.ensure_json_config, ProviderManager._read_config).
 Does NOT duplicate tests/core/test_git_utils.py.
 """
 
@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.config_helpers import ensure_json_config
+from core.infrastructure.config.config_helpers import ensure_json_config
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.git_utils import make_git_diff, run_git
 from core.provider_manager import ProviderManager
