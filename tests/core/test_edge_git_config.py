@@ -14,8 +14,8 @@ from unittest.mock import patch
 import pytest
 
 from core.config_helpers import ensure_json_config
-from core.infrastructure.runtime.git_utils import make_git_diff, run_git
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.runtime.git_utils import make_git_diff, run_git
 from core.provider_manager import ProviderManager
 
 

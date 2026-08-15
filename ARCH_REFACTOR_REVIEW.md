@@ -1,6 +1,6 @@
 # ARCH_REFACTOR_REVIEW.md
 
-> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-11). Core полностью очищен от зависимостей на tools (кроме composition-root). Слоистая архитектура реализована. Тесты зелёные (2295 passed, ruff чист).
+> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-11). Core очищен от зависимостей на tools, кроме composition-root `provider_manager` и presentation-хелпера `application/display.py` (рендер tool-chips, см. ниже). Слоистая архитектура реализована. Тесты зелёные (2295 passed, ruff чист).
 
 ## Итоговое состояние
 
@@ -14,12 +14,14 @@
 **Выполнены все фазы:**
 - 1: переезд листьев в слои
 - 2: break цикла adapters
-- 3-7: переезд утилит + DI core→tools (0 импортов)
+- 3-7: переезд утилит + DI core→tools (0 импортов), кроме рендер-хелпера
 - 8-9: оркестраторы в application/, политики в domain/
 - 10-11: git_checkpoint/storage, subagent_worktree/runtime, tool_*/application, permission+model+session политики/сущности в domain/
 
-**Что осталось ре-export-обёртками (тонкие):** `git_checkpoint.py`, `subagent_worktree.py`, `tool_display.py`, `tool_helpers.py`.
+**Что осталось ре-export-обёртками (тонкие):** `git_checkpoint.py`, `subagent_worktree.py`, `tool_display.py`, `infrastructure/errors.py`.
 **Жирные классы/корни (логика вынесена, классы остались):** `session_manager`, `models_catalog`, `role_registry`, `permission_manager`, `provider_manager` — их полная миграция требует точечного плана и не даст существенной выгоды сейчас.
+
+**> Последующий хвост после финализации:** пустой мёртвый стаб `core/tool_helpers.py` удалён (0 потребителей).
 
 **Известный pre-existing баг:** `tests/ui/test_message_flow.py` виснет (UI-тест Textual, не связан с рефакторингом).
 
@@ -33,7 +35,7 @@
 - ✅ **Фаза 6 — DI permission/role:** `permission_manager`, `role_registry` больше не импортят `tools.registry`. Wiring в `app.py`.
 - ✅ **Фаза 7 — `subagent_stream`:** `_truncate_subagent_result` → `core.infrastructure.tasks.output.truncate_subagent_result`.
 
-**Итог зависимостей:** `core→tools` импортов нет (кроме composition-root `provider_manager`). Циклы разорваны.
+**Итог зависимостей:** `core→tools` импортов нет, кроме двух санкционированных: composition-root `provider_manager` и presentation-хелпер `application/display.py` (рендер tool-chips для UI — им пользуется движок агента для генерации `tool_result`-label, потому это не виджет, а слой ядра). Циклы разорваны. `domain` остаётся чистым слоем ниже всех.
 
 ## 1. Архитектурный анализ
 
@@ -219,3 +221,20 @@ core/
 ---
 
 **Итог:** движение от плоского `core/` с мягкими циклами к трёхслойному `domain → application → infrastructure`, инструменты за границей через протоколы.
+
+---
+
+## 7. Результаты независимого ревью (explorer-ревьюер, read-only)
+
+Проведено внешнее ревью качества рефакторинга. **Вердикт: 4/5 — устойчивый, чистый рефакторинг.** Найдены 4 мелких хвоста (HIGH — нет):
+
+| Проблема | Seve | Статус |
+|---|---|---|
+| `domain/policies/role_policy.py` → `infrastructure.errors` (нарушение домен-чистоты) | MED | ✅ Исправлено: `format_tool_error` перенесён в `domain/defaults/errors.py`; `infrastructure/errors.py` стал re-export |
+| `application/display.py` лениво тянет `tools.registry` (core→tools вне composition-root) | MED | ✅ Легализовано в доке как санкционированный рендер-хелпер (им пользуется движок агента для `tool_result`-label, поэтому не виджет) |
+| Пустой мёртвый стаб `core/tool_helpers.py` | LOW | ✅ Удалён (0 потребителей, все юзают `widgets.tool_helpers`) |
+| `import *` без `__all__` в re-export `subagent_worktree.py` | LOW | ✅ Исправлено: явный импорт + `__all__` |
+
+**Что отлично отмечено ревьюером:** фазы подготовки (ленивые tools-импорты вынесены в функции), разрыв цикла `base_provider⇄adapters`, полная очистка `prompt_builder→tools`, автономность `base_provider`, чистота новых domain-модулей (`entities/session`, `policies/{permission,model_catalog}`), сохранение сигнатур (`extract_context_length`, `format_tool_error`), отсутствие дублирования/мёртвого кода.
+
+**Уточнение к допустимым core→tools:** после всех фиксов полный core→tools сводится к двум санкционированным точкам: composition-root `provider_manager` + рендер-хелпер `application/display.py`. `domain` остаётся строго чистым слоем (0 зависимостей на infrastructure/application/tools).

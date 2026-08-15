@@ -4,7 +4,6 @@ import unittest
 
 from core.domain.policies.role_policy import AgentRole, normalize_role_scope, role_tool_error
 from core.role_registry import (
-    BUILTIN_ROLES,
     RoleRegistry,
 )
 
