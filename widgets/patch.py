@@ -27,8 +27,32 @@ def apply_textual_patches() -> None:
             else:
                 raise
 
+    Screen._forward_event = _safe_forward_event
+
+    from textual.geometry import Offset
+
+    _old_get_widget_and_offset_at = getattr(Screen, "_original_get_widget_and_offset_at", Screen.get_widget_and_offset_at)
+    Screen._original_get_widget_and_offset_at = _old_get_widget_and_offset_at
+
+    def _new_get_widget_and_offset_at(self: Screen, x: int, y: int) -> tuple[Widget | None, Offset | None]:
+        widget, offset = _old_get_widget_and_offset_at(self, x, y)
+        if widget is not None and offset is None and not widget.is_container and widget.allow_select:
+            try:
+                region = widget.region
+                offset = Offset(x - region.x, y - region.y)
+            except Exception:
+                pass
+        return widget, offset
+
+    Screen.get_widget_and_offset_at = _new_get_widget_and_offset_at
+
+    from typing import Any
+
     from rich.console import Console
+    from rich.style import Style as RichStyle
     from textual.selection import Selection
+    from textual.strip import Strip
+    from textual.visual import RenderOptions, RichVisual
     from textual.widgets import Static
 
     _old_static_get_selection = getattr(Static, "_original_get_selection", Static.get_selection)
@@ -41,8 +65,14 @@ def apply_textual_patches() -> None:
         try:
             visual = self._render()
             renderable = getattr(visual, "_renderable", visual)
-            console = getattr(getattr(self, "app", None), "console", None) or Console()
-            width = getattr(getattr(self, "size", None), "width", 0) or getattr(console, "width", 80)
+            try:
+                console = self.app.console
+            except Exception:
+                console = Console()
+            try:
+                width = self.size.width or getattr(console, "width", 80)
+            except Exception:
+                width = getattr(console, "width", 80)
             lines = []
             for line in console.render_lines(renderable, console.options.update(width=width, height=None, justify="left")):
                 lines.append("".join(seg.text for seg in line).rstrip())
@@ -53,6 +83,44 @@ def apply_textual_patches() -> None:
             return None
 
     Static.get_selection = _new_static_get_selection
+
+    _old_rich_visual_render_strips = getattr(RichVisual, "_original_render_strips", RichVisual.render_strips)
+    RichVisual._original_render_strips = _old_rich_visual_render_strips
+
+    def _new_rich_visual_render_strips(
+        self: RichVisual, width: int, height: int | None, style: Any, options: RenderOptions
+    ) -> list[Strip]:
+        strips = _old_rich_visual_render_strips(self, width, height, style, options)
+        if options.selection is not None:
+            selection = options.selection
+            sel_style = options.selection_style
+            if sel_style is not None and getattr(sel_style, "rich_style", None):
+                rich_sel_style = sel_style.rich_style
+            else:
+                rich_sel_style = RichStyle(reverse=True)
+
+            styled_strips = []
+            for y, strip in enumerate(strips):
+                span = selection.get_span(y)
+                if span is not None and strip.cell_length > 0:
+                    start_x, end_x = span
+                    start_x = max(0, min(strip.cell_length, start_x))
+                    if end_x == -1 or end_x >= strip.cell_length:
+                        before = strip.crop(0, start_x)
+                        selected = strip.crop(start_x, strip.cell_length).apply_style(rich_sel_style)
+                        styled_strips.append(Strip.join([before, selected]))
+                    else:
+                        end_x = max(start_x, min(strip.cell_length, end_x))
+                        before = strip.crop(0, start_x)
+                        selected = strip.crop(start_x, end_x).apply_style(rich_sel_style)
+                        after = strip.crop(end_x, strip.cell_length)
+                        styled_strips.append(Strip.join([before, selected, after]))
+                else:
+                    styled_strips.append(strip)
+            return styled_strips
+        return strips
+
+    RichVisual.render_strips = _new_rich_visual_render_strips
 
     from widgets.chat_markdown import _apply_chat_markdown_patches
 
