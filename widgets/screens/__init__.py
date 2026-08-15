@@ -4,7 +4,6 @@ from widgets.presentation.screens import (  # noqa: F401
     base_selection,
     constants,
     help,
-    linters,
     mcp,
     model,
     permission_confirm,

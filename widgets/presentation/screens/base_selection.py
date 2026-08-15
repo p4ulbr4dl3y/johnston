@@ -52,7 +52,7 @@ class HeaderWrapOptionList(OptionList):
 class ModalSearchNavMixin:
     """Shared up/down navigation from the search Input to the OptionList.
 
-    Used by the linters / MCP / permissions / skills modals which are not
+    Used by the MCP / permissions / skills modals which are not
     ``BaseSelectionScreen`` subclasses but share the same key handling.
     """
 

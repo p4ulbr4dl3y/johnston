@@ -2,7 +2,6 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
-from core.application.linters.manager import get_linters_manager
 from core.infrastructure.errors import format_tool_error
 from tools.base import (
     BaseTool,
@@ -316,8 +315,7 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
     except Exception as e:
         return format_tool_error("file", detail=str(e), name=path)
 
-    linter_output = await get_linters_manager().run_for(path)
-    return diff_output + linter_output
+    return diff_output
 
 
 class EditTool(BaseTool):

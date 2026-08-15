@@ -1,32 +1,11 @@
-import asyncio
 import os
-import shutil
 import tempfile
 import unittest
 
-from core.application.linters.manager import LintersManager
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
-
-
-async def _ruff_runnable(timeout: float = 10.0) -> bool:
-    """True if `uvx ruff --version` succeeds (ruff installed or installable)."""
-    if not shutil.which("uvx"):
-        return False
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "uvx",
-            "ruff",
-            "--version",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        await asyncio.wait_for(proc.wait(), timeout=timeout)
-        return proc.returncode == 0
-    except Exception:
-        return False
 
 
 class MockAgent:
@@ -238,50 +217,6 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Command with output and exit code
         res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
         self.assertIn("error msg", res_err)
-
-    async def test_linter_tool(self):
-        # Isolated manager backed by a temp config so the test never depends on
-        # the real ~/.johnston/linters.json (where the python preset may be disabled).
-        linter_cfg = os.path.join(self.test_dir, "linters.json")
-        with open(linter_cfg, "w", encoding="utf-8") as f:
-            f.write('{"linters": {"python": {"enabled": true}}}')
-        manager = LintersManager(config_file=linter_cfg)
-
-        # The python preset runs `uvx ruff`; skip on machines where ruff is not
-        # actually runnable (cold uvx cache / no network) instead of failing.
-        if not await _ruff_runnable():
-            self.skipTest("ruff (via uvx) not runnable on this machine; skipping linter integration test")
-
-        syntax_path = os.path.join(self.test_dir, "syntax.py")
-        with open(syntax_path, "w", encoding="utf-8") as f:
-            f.write("def broken(:\n    pass\n")
-
-        syntax_res = await manager.run_for(syntax_path)
-        self.assertIn("ERR:", syntax_res)
-        self.assertIn("invalid-syntax", syntax_res)
-
-        undefined_path = os.path.join(self.test_dir, "undefined.py")
-        with open(undefined_path, "w", encoding="utf-8") as f:
-            f.write("print(missing_name)\n")
-
-        undefined_res = await manager.run_for(undefined_path)
-        self.assertIn("ERR:", undefined_res)
-        self.assertIn("F821", undefined_res)
-
-        long_line_path = os.path.join(self.test_dir, "long_line.py")
-        long_value = "a" * 160
-        with open(long_line_path, "w", encoding="utf-8") as f:
-            f.write(f"value = '{long_value}'\nprint(value)\n")
-
-        long_line_res = await manager.run_for(long_line_path)
-        self.assertEqual("", long_line_res)
-
-        import_order_path = os.path.join(self.test_dir, "import_order.py")
-        with open(import_order_path, "w", encoding="utf-8") as f:
-            f.write("import sys\nimport os\n\nprint(os.name, sys.version)\n")
-
-        import_order_res = await manager.run_for(import_order_path)
-        self.assertEqual("", import_order_res)
 
     async def test_tool_aliases_and_case(self):
         from tools.registry import execute_tool

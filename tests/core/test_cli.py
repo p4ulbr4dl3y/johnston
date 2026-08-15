@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, mock_open, patch
 
 from cli import (
     get_version,
-    print_linters,
     print_mcp,
     print_models,
     print_roles,
@@ -180,43 +179,6 @@ class TestCLIAdvanced(unittest.TestCase):
         out = f.getvalue()
         self.assertIn("R1 [rule] [project]", out)
         self.assertIn("Roles: worker, explorer", out)
-
-    def test_print_linters_empty(self):
-        f = io.StringIO()
-        with patch("core.application.linters.manager.get_linters_manager") as mock_get:
-            mgr = MagicMock()
-            mgr.load_linters.return_value = []
-            mgr.scan_available.return_value = {}
-            mock_get.return_value = mgr
-            with redirect_stdout(f):
-                print_linters()
-        self.assertIn("No linters configured", f.getvalue())
-
-    def test_print_linters_with_items(self):
-        f = io.StringIO()
-        with patch("core.application.linters.manager.get_linters_manager") as mock_get:
-            mgr = MagicMock()
-            mgr.load_linters.return_value = [
-                {
-                    "name": "ruff",
-                    "label": "Ruff",
-                    "scope": "project",
-                    "enabled": True,
-                    "extensions": ["py"],
-                    "cmd": ["ruff", "check"],
-                },
-                {"name": "eslint", "scope": "preset", "enabled": False, "extensions": [], "cmd": []},
-            ]
-            mgr.scan_available.return_value = {"ruff": True, "eslint": False}
-            mock_get.return_value = mgr
-            with redirect_stdout(f):
-                print_linters()
-        out = f.getvalue()
-        self.assertIn("Ruff [project] [enabled] [available]", out)
-        self.assertIn("py", out)
-        self.assertIn("ruff check", out)
-        self.assertIn("eslint [preset] [disabled] [unavailable]", out)
-        self.assertIn("(none)", out)
 
     def test_print_models_no_key_no_models_skipped(self):
         f = io.StringIO()
@@ -457,15 +419,6 @@ class TestMainFlags(unittest.TestCase):
     def test_main_subagents_flag(self):
         with patch("sys.argv", ["johnston", "--subagents"]):
             with patch("cli.print_subagents"):
-                with self.assertRaises(SystemExit) as cm:
-                    from cli import main
-
-                    main()
-        self.assertEqual(cm.exception.code, 0)
-
-    def test_main_linters_flag(self):
-        with patch("sys.argv", ["johnston", "--linters"]):
-            with patch("cli.print_linters"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
 

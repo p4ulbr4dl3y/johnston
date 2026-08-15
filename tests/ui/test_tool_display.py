@@ -85,7 +85,7 @@ class TestToolDisplay(unittest.TestCase):
             "create",
             "foo.py",
             args={"path": "foo.py", "content": "def bar(): pass"},
-            result_text="OK: file 'foo.py' updated.\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass\n[Linter Feedback]: F821 undefined name",
+            result_text="OK: file 'foo.py' updated.\n\n--- a/foo.py\n+++ b/foo.py\n@@ -1,1 +1,1 @@\n-def foo(): pass\n+def bar(): pass\n",
         )
         w_diff.is_expanded = True
         w_diff.render_content()
@@ -107,12 +107,11 @@ class TestToolDisplay(unittest.TestCase):
             "edit",
             "code.py",
             args={"target_file": "code.py", "target_content": "a", "replacement_content": "b"},
-            result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n[Linter Feedback]: F841 unused variable\n[Hint: Some system hint]",
+            result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n[Hint: Some system hint]",
         )
         diff_renderable = widget._format_edit_diff(widget.result_text, "code.py")
         formatted_text = "\n".join(t.plain for t in diff_renderable.formatted_lines)
         self.assertNotIn("OK: file", formatted_text)
-        self.assertNotIn("[Linter Feedback]", formatted_text)
         self.assertNotIn("[Hint:", formatted_text)
 
     def test_format_edit_diff_monotonic_line_numbers(self):

@@ -140,38 +140,6 @@ def print_mcp():
             print()
 
 
-def print_linters():
-    """Print configured linters to stdout"""
-    from core.application.linters.manager import get_linters_manager
-
-    mgr = get_linters_manager()
-    linters = mgr.load_linters()
-    availability = mgr.scan_available()
-    print("Configured Linters:")
-    if not linters:
-        print(f"  No linters configured ({CONFIG_DIR}/linters.json)")
-        return
-
-    for idx, lint in enumerate(linters):
-        name = lint.get("name", "unnamed")
-        label = lint.get("label") or name
-        scope = f"[{lint.get('scope', 'preset')}]"
-        enabled = lint.get("enabled", False)
-        available = availability.get(name, False)
-        status = "[enabled]" if enabled else "[disabled]"
-        avail = "[available]" if available else "[unavailable]"
-
-        exts = lint.get("extensions") or []
-        ext_str = f" | {', '.join(exts)}" if exts else ""
-        cmd = lint.get("cmd") or []
-        cmd_str = " ".join(cmd) if cmd else "(none)"
-
-        print(f"  * {label} {scope} {status} {avail}{ext_str}")
-        print(f"    Command: {cmd_str}")
-        if idx < len(linters) - 1:
-            print()
-
-
 def print_rules():
     """Print active project instructions and rules summary to stdout"""
     from core.application.generation.prompt_builder import INSTRUCTION_FILES
@@ -270,7 +238,6 @@ def main():
     parser.add_argument("--roles", action="store_true", help="List available agent roles (main + subagents)")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
     parser.add_argument("--subagents", action="store_true", help="List available subagent roles and sessions")
-    parser.add_argument("--linters", action="store_true", help="List configured linters")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
     args = parser.parse_args()
@@ -301,10 +268,6 @@ def main():
 
     if args.subagents:
         print_subagents()
-        sys.exit(0)
-
-    if args.linters:
-        print_linters()
         sys.exit(0)
 
     app = JohnstonApp(
