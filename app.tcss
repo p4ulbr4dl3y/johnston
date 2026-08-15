@@ -206,11 +206,9 @@ Markdown {
     padding: 0;
 }
 
-
-
 MarkdownParagraph {
     height: auto;
-    margin: 0;
+    margin: 1 0 0 0;
     padding: 0;
 }
 
@@ -236,14 +234,14 @@ MarkdownHeader {
     margin: 1 0 0 0;
 }
 
-Markdown BulletList {
+Markdown BulletList,
+Markdown OrderedList {
     height: auto;
-    margin: 0;
+    margin: 1 0;
     padding: 0;
 }
 
-Markdown OrderedList {
-    height: auto;
+Markdown ListItem {
     margin: 0;
     padding: 0;
 }
@@ -681,13 +679,16 @@ SubagentViewScreen {
 }
 
 /* Unified Markdown Headers Styling (Clean bold white, no underlines, left aligned) */
-MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4, MarkdownH5, MarkdownH6 {
-    text-align: left;
+MarkdownH1, MarkdownH2, MarkdownH3, MarkdownH4, MarkdownH5, MarkdownH6,
+MarkdownHeader {
+    content-align: left top !important;
+    text-align: left !important;
     text-style: bold;
     color: #ffffff;
     background: transparent;
     border: none;
     margin: 1 0 0 0;
+    padding: 0;
 }
 
 /* Markdown Table Styling - Clean Monochrome Slate header and borders */
