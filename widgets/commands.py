@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from typing import Any
 
 from core.application.provider.actions import (
@@ -454,96 +453,10 @@ COMMAND_CLASSES = [
 ]
 
 
-COMMAND_REGISTRY = {}
-for cls in COMMAND_CLASSES:
-    COMMAND_REGISTRY[cls.name] = cls
-    for alias in getattr(cls, "aliases", []):
-        COMMAND_REGISTRY[alias] = cls
-
-
-async def handle_slash_command(app, command_text: str) -> bool:
-    """Executes command if registered or skill found. Returns True if handled."""
-    if not command_text:
-        return False
-    words = command_text.strip().split()
-    if not words:
-        return False
-
-    cmd_name = words[0].lower()
-
-    # Normalization of Cyrillic homoglyphs to Latin (to handle layout errors)
-    homoglyphs = {
-        "а": "a",
-        "в": "b",
-        "е": "e",
-        "к": "k",
-        "м": "m",
-        "н": "h",
-        "о": "o",
-        "р": "p",
-        "с": "c",
-        "т": "t",
-        "у": "y",
-        "х": "x",
-    }
-    normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
-
-    if command_text.strip().startswith("/") and normalized_name in COMMAND_REGISTRY:
-        cmd_instance = COMMAND_REGISTRY[normalized_name]()
-        await cmd_instance.execute(app)
-        return True
-
-    # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
-    words = command_text.strip().split()
-    sm = SkillManager()
-    loaded_skills = []
-    other_words = []
-
-    for w in words:
-        if w.startswith("/"):
-            raw_sname = w[1:].lower()
-            norm_sname = "".join(homoglyphs.get(c, c) for c in raw_sname)
-            skill = sm.get_skill(norm_sname)
-            if skill:
-                if skill not in loaded_skills:
-                    loaded_skills.append(skill)
-            else:
-                other_words.append(w)
-        else:
-            other_words.append(w)
-
-    if loaded_skills:
-        skill_blocks = []
-        for s in loaded_skills:
-            content = s.get("content", "").strip()
-            if not content and s.get("location") and os.path.exists(s["location"]):
-                try:
-                    with open(s["location"], "r", encoding="utf-8") as f:
-                        raw_c = f.read()
-                    from core.application.skills.manager import parse_frontmatter
-
-                    _, body = parse_frontmatter(raw_c)
-                    content = body.strip()
-                except Exception:
-                    content = ""
-            skill_blocks.append(f'<SKILL path="{s.get("location", "")}">\n{content}\n</SKILL>')
-
-        skills_content = "\n\n".join(skill_blocks)
-        user_request = " ".join(other_words).strip()
-        if user_request:
-            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}\n\nUser request: {user_request}"
-        else:
-            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}"
-
-        try:
-            from widgets.chat_view import ChatView
-
-            chat_view = app.query_one(ChatView)
-
-            asyncio.create_task(chat_view.add_user_message(command_text))
-            app.trigger_ai_response(prompt, show_in_ui=False)
-        except Exception:
-            app.trigger_ai_response(prompt, show_in_ui=True)
-        return True
-
-    return False
+# Registry building + dispatch now live in widgets.app.dispatch, keyed off
+# COMMAND_CLASSES above. Re-export the registry and handler for back-compat.
+from widgets.app.dispatch import (  # noqa: E402, F401
+    COMMAND_REGISTRY,
+    build_command_registry,
+    handle_slash_command,
+)
