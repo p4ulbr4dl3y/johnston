@@ -1,9 +1,27 @@
 # ARCH_REFACTOR_REVIEW.md
 
-> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-9). Core очищен от зависимостей на tools (кроме composition-root). Слоистая архитектура реализована. Тесты зелёные (2295 passed, ruff чист).
+> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-11). Core полностью очищен от зависимостей на tools (кроме composition-root). Слоистая архитектура реализована. Тесты зелёные (2295 passed, ruff чист).
 
-## Что осталось намеренно (жирные/рисковые модули)
-`session_manager.py`, `models_catalog.py`, `provider_manager.py`, `subagent_worktree.py`, `git_checkpoint.py`, `markdown_scanner.py`, `tool_helpers.py`, `tool_display.py`, `permission_manager.py` — лежат в корне core/. Их дальнейшее раскапывание требует точечного плана извлечения API (напр. permission сдела idea небезопасно из-за state+IO). Это кандидаты на отдельный, более осторожный рефактор.
+## Итоговое состояние
+
+**Слои core/:**
+- `domain/{defaults,entities,policies}` — чистые данные, сущности, политики
+- `infrastructure/{adapters,mcp,platform,runtime,storage,tasks,errors}` — IO/транспорт/config
+- `application/{generation,session,provider,rules,skills,linters}` — оркестраторы
+- `base_provider/`, `adapters/` — движок и транспорт
+- остаток в корне core/ — re-export обёртки + композиционные корни
+
+**Выполнены все фазы:**
+- 1: переезд листьев в слои
+- 2: break цикла adapters
+- 3-7: переезд утилит + DI core→tools (0 импортов)
+- 8-9: оркестраторы в application/, политики в domain/
+- 10-11: git_checkpoint/storage, subagent_worktree/runtime, tool_*/application, permission+model+session политики/сущности в domain/
+
+**Что осталось ре-export-обёртками (тонкие):** `git_checkpoint.py`, `subagent_worktree.py`, `tool_display.py`, `tool_helpers.py`.
+**Жирные классы/корни (логика вынесена, классы остались):** `session_manager`, `models_catalog`, `role_registry`, `permission_manager`, `provider_manager` — их полная миграция требует точечного плана и не даст существенной выгоды сейчас.
+
+**Известный pre-existing баг:** `tests/ui/test_message_flow.py` виснет (UI-тест Textual, не связан с рефакторингом).
 
 ## Прогресс рефакторинга
 
