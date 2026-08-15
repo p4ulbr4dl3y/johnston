@@ -332,7 +332,7 @@ class _DisplayNamesDict(dict):
     }
 
     def get(self, key, default=None):
-        from core.tool_helpers import normalize_tool_name
+        from widgets.tool_helpers import normalize_tool_name
 
         canonical = normalize_tool_name(key)
         if canonical in self.CANONICAL_NAMES:
@@ -344,7 +344,7 @@ class _SystemToolsSet(set):
     def __contains__(self, item):
         if not isinstance(item, str):
             return False
-        from core.tool_helpers import is_system_tool, normalize_tool_name
+        from widgets.tool_helpers import is_system_tool, normalize_tool_name
 
         lower = item.lower()
         canonical = normalize_tool_name(lower)
@@ -387,7 +387,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     }
 
     def is_expandable(self) -> bool:
-        from core.tool_helpers import normalize_tool_name
+        from widgets.tool_helpers import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
         if canonical == "ask_user":
@@ -411,7 +411,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
-        from core.tool_helpers import normalize_tool_name
+        from widgets.tool_helpers import normalize_tool_name
 
         self.tool_type = tool_type
         self.canonical_tool = normalize_tool_name(tool_type)
@@ -518,7 +518,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "ask_user",
         ):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
-            from core.tool_display import extract_tool_display
+            from core.application.display import extract_tool_display
 
             project_dir = None
             try:
@@ -546,7 +546,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.canonical_tool in ("invoke_subagent", "ask_user"):
             if self.canonical_tool == "invoke_subagent":
                 args = self.args if isinstance(self.args, dict) else {}
-                from core.tool_helpers import normalize_tool_args
+                from widgets.tool_helpers import normalize_tool_args
 
                 nargs = normalize_tool_args(self.canonical_tool, args)
                 session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
@@ -655,7 +655,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         try:
             self.content_widget.display = True
             self.md_widget.display = False
-            from core.tool_helpers import normalize_tool_args
+            from widgets.tool_helpers import normalize_tool_args
 
             nargs = normalize_tool_args(self.canonical_tool, self.args)
             file_path = nargs.get("path") or nargs.get("target_file") or self.target
@@ -685,7 +685,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 else:
                     content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
                     if content is None:
-                        from core.tool_helpers import read_file_content
+                        from widgets.tool_helpers import read_file_content
 
                         content = read_file_content(file_path)
 
@@ -795,7 +795,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
 
                     if not clean_code.strip() and fpath:
-                        from core.tool_helpers import read_file_content
+                        from widgets.tool_helpers import read_file_content
 
                         disk_content = read_file_content(fpath)
                         if disk_content is not None:

@@ -9,6 +9,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optiona
 
 from openai import AsyncOpenAI
 
+from core.application.display import extract_tool_display
 from core.application.generation.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
@@ -23,7 +24,6 @@ from core.infrastructure.errors import format_tool_error
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.models_catalog import catalog
-from core.tool_display import extract_tool_display
 
 logger = logging.getLogger(__name__)
 
