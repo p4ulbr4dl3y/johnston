@@ -177,10 +177,36 @@ async def generate_ai_response(
                     # Stream whitespace deltas too so trailing chars aren't dropped.
                     bot_handle.append_stream_content(val1)
             elif event_type == "bot_reset":
+                # Explicit stream reset: drop partial text.
+                if bot_handle is not None:
+                    try:
+                        await bot_handle.reset_stream()
+                    except Exception:  # noqa: BLE001
+                        pass
+            elif event_type == "retry":
                 # A retry restarts the reply from scratch: drop partial text.
                 if bot_handle is not None:
                     try:
                         await bot_handle.reset_stream()
+                    except Exception:  # noqa: BLE001
+                        pass
+                if canvas.notify:
+                    attempt = val1
+                    max_retries = val2
+                    delay = val3 or 0.0
+                    err = step[4] if len(step) > 4 else None
+                    err_msg = str(err).lower() if err else ""
+                    is_rate_limit = (
+                        "rate limit" in err_msg
+                        or "429" in err_msg
+                        or getattr(err, "status_code", None) == 429
+                    )
+                    reason = "Rate limit reached" if is_rate_limit else "Provider error"
+                    try:
+                        canvas.notify(
+                            f"{reason}: retrying in {max(1, int(round(delay)))}s (attempt {attempt}/{max_retries})",
+                            severity="warning",
+                        )
                     except Exception:  # noqa: BLE001
                         pass
             elif event_type in ("bot_text", "outro"):

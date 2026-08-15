@@ -521,13 +521,18 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                         is_retryable = self._is_retryable_error(api_err)
                         if is_retryable and attempt < max_retries:
-                            delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
-                            jitter = random.uniform(0, 0.5 * delay)
-                            actual_delay = delay + jitter
+                            retry_after = self._extract_retry_after(api_err)
+                            if retry_after is not None and retry_after > 0:
+                                actual_delay = min(max_retry_delay, max(retry_delay, retry_after))
+                            else:
+                                delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
+                                jitter = random.uniform(0, 0.5 * delay)
+                                actual_delay = delay + jitter
                             if full_assistant_text:
                                 # Signal the UI to drop the partially-streamed text so the
                                 # retried attempt starts from a blank reply (no duplication).
                                 yield ("bot_reset", "", "")
+                            yield ("retry", attempt, max_retries, actual_delay, api_err)
                             yield (
                                 "thinking",
                                 f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...",

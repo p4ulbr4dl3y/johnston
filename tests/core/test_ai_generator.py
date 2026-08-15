@@ -28,7 +28,11 @@ def _canvas(**overrides):
         add_user_message=AsyncMock(),
         add_thinking_widget=AsyncMock(return_value=MagicMock()),
         add_tool_call=AsyncMock(return_value=MagicMock()),
-        add_bot_message=AsyncMock(return_value=MagicMock(content="")),
+        add_bot_message=AsyncMock(
+            return_value=MagicMock(
+                content="", finalize_stream=AsyncMock(), reset_stream=AsyncMock(), flush_pending_stream=MagicMock()
+            )
+        ),
         add_event_divider=AsyncMock(),
         get_user_messages=MagicMock(return_value=[("0", "hi")]),
         refresh_status_footer=MagicMock(),
@@ -167,3 +171,22 @@ async def test_event_divider_refreshes_footer():
     )
     canvas.add_event_divider.assert_awaited_once_with("Compacted")
     canvas.refresh_status_footer.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_retry_notifies_canvas_with_warning():
+    canvas = _canvas()
+
+    async def stream(prompt, attachments=None):
+        yield ("retry", 1, 3, 5.0, Exception("Rate limit exceeded"))
+        yield ("bot_text", "done", "")
+
+    await generate_ai_response(
+        _FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi"
+    )
+    canvas.notify.assert_called_once()
+    msg, kw = canvas.notify.call_args[0][0], canvas.notify.call_args[1]
+    assert "Rate limit reached" in msg
+    assert "retrying in 5s (attempt 1/3)" in msg
+    assert kw.get("severity") == "warning"
+
