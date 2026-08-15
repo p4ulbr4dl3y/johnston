@@ -99,6 +99,26 @@ def format_api_error(err: Exception) -> str:
 class ErrorHandlingMixin:
     """Mixin providing retry-classification and vision-error handling for BaseAgent."""
 
+    def _extract_retry_after(self, err: Exception) -> Optional[float]:
+        """Extracts suggested retry delay in seconds from response headers or error context."""
+        if err is None:
+            return None
+        try:
+            response = getattr(err, "response", None)
+            headers = getattr(response, "headers", None) if response is not None else None
+            if headers is not None:
+                if "retry-after-ms" in headers:
+                    val = float(headers["retry-after-ms"])
+                    if val > 0:
+                        return val / 1000.0
+                if "retry-after" in headers:
+                    val = float(headers["retry-after"])
+                    if val > 0:
+                        return val
+        except (ValueError, TypeError):
+            pass
+        return None
+
     def _is_retryable_error(self, err: Exception) -> bool:
         if err is None:
             return False
