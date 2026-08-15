@@ -688,6 +688,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         from widgets.tool_helpers import read_file_content
 
                         content = read_file_content(file_path)
+                    if content is None and raw_text:
+                        content = raw_text
 
                     if content is not None:
                         content = content.rstrip("\r\n")

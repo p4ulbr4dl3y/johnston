@@ -206,6 +206,34 @@ def _new_markdown_init(self, *args, **kwargs):
 _old_markdown_block_get_style = MarkdownBlock._get_style
 
 
+JOHNSTON_RICH_MARKDOWN_STYLES = {
+    "markdown.paragraph": "#f4f4f5",
+    "markdown.text": "#f4f4f5",
+    "markdown.h1": "bold #ffffff",
+    "markdown.h1.border": "bold #ffffff",
+    "markdown.h2": "bold #ffffff",
+    "markdown.h3": "bold #ffffff",
+    "markdown.h4": "bold #ffffff",
+    "markdown.h5": "bold #ffffff",
+    "markdown.h6": "bold #a1a1aa",
+    "markdown.code": "#ffffff on #27272a",
+    "markdown.code_block": "#f4f4f5 on #27272a",
+    "markdown.block_quote": "#e4e4e7 on #18181b",
+    "markdown.list": "#a1a1aa",
+    "markdown.item": "#f4f4f5",
+    "markdown.item.bullet": "bold #a1a1aa",
+    "markdown.item.number": "bold #a1a1aa",
+    "markdown.table.border": "#27272a",
+    "markdown.table.header": "bold #ffffff",
+    "markdown.hr": "#27272a",
+    "markdown.link": "underline #60a5fa",
+    "markdown.link_url": "underline #60a5fa",
+    "markdown.em": "italic #f4f4f5",
+    "markdown.strong": "bold #ffffff",
+    "markdown.s": "strike #71717a",
+}
+
+
 def _apply_chat_markdown_patches() -> None:
     """Applies Textual Markdown monkey-patches (custom theme, blocks, renderers).
 
@@ -221,6 +249,98 @@ def _apply_chat_markdown_patches() -> None:
     HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
     HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
     HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
+
+    from rich.default_styles import DEFAULT_STYLES
+    from rich.markdown import Heading
+    from rich.style import Style as RichStyle
+    from rich.theme import Theme
+    from textual._context import active_app
+    from textual.app import App
+
+    Heading.LEVEL_ALIGN = {"h1": "left", "h2": "left", "h3": "left", "h4": "left", "h5": "left", "h6": "left"}
+    for k, v in JOHNSTON_RICH_MARKDOWN_STYLES.items():
+        DEFAULT_STYLES[k] = RichStyle.parse(v)
+
+    theme = Theme(JOHNSTON_RICH_MARKDOWN_STYLES)
+    _old_app_init = App.__init__
+
+    def _new_app_init(self, *args, **kwargs):
+        _old_app_init(self, *args, **kwargs)
+        if getattr(self, "console", None):
+            self.console.push_theme(theme)
+
+    App.__init__ = _new_app_init
+
+    try:
+        current = active_app.get()
+        if current and getattr(current, "console", None):
+            current.console.push_theme(theme)
+    except Exception:
+        pass
+
+    from rich.markdown import Markdown as RichMarkdown
+    from rich.markdown import TextElement
+
+    class CustomRichCodeBlock(TextElement):
+        """Rich Markdown CodeBlock matching Johnston theme and #18181b background."""
+
+        style_name = "markdown.code_block"
+
+        @classmethod
+        def create(cls, markdown: Any, token: Any) -> "CustomRichCodeBlock":
+            node_info = token.info or ""
+            lexer_name = node_info.partition(" ")[0]
+            return cls(lexer_name or "text", markdown.code_theme)
+
+        def __init__(self, lexer_name: str, theme: str) -> None:
+            self.lexer_name = lexer_name
+            self.theme = theme
+
+        def __rich_console__(self, console: Any, options: Any) -> Any:
+            code = str(self.text).rstrip()
+            syntax = Syntax(
+                code,
+                self.lexer_name,
+                theme=self.theme,
+                word_wrap=True,
+                background_color="#18181b",
+                padding=(0, 1),
+            )
+            yield syntax
+
+    from rich import box
+    from rich.markdown import TableElement
+    from rich.table import Table
+
+    class CustomRichTableElement(TableElement):
+        """Full-width Markdown table with preserved column justification and border styling."""
+
+        def __rich_console__(self, console: Any, options: Any) -> Any:
+            table = Table(
+                box=box.SIMPLE,
+                pad_edge=False,
+                style="markdown.table.border",
+                show_edge=True,
+                collapse_padding=True,
+                expand=True,
+            )
+
+            if self.header is not None and self.header.row is not None:
+                for column in self.header.row.cells:
+                    heading = column.content.copy()
+                    heading.stylize("markdown.table.header")
+                    table.add_column(heading, justify=getattr(column, "justify", "default"))
+
+            if self.body is not None:
+                for row in self.body.rows:
+                    row_content = [element.content for element in row.cells]
+                    table.add_row(*row_content)
+
+            yield table
+
+    RichMarkdown.elements["fence"] = CustomRichCodeBlock
+    RichMarkdown.elements["code_block"] = CustomRichCodeBlock
+    RichMarkdown.elements["table_open"] = CustomRichTableElement
 
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
