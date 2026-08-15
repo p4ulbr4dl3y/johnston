@@ -1,6 +1,6 @@
 # ARCH_REFACTOR_REVIEW.md
 
-> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-11). Core очищен от зависимостей на tools, кроме composition-root `provider_manager` и presentation-хелпера `application/display.py` (рендер tool-chips, см. ниже). Слоистая архитектура реализована. Тесты зелёные (2295 passed, ruff чист).
+> **СТАТУС (финальный):** Рефакторинг выполнен (фазы 1-11) **+ доводка: 4 плоских модуля мигрированы в слои** (`config.py`→`infrastructure/platform/paths.py`, `config_helpers.py`→`infrastructure/config/config_helpers.py`, `markdown_scanner.py`→`infrastructure/runtime/markdown_scanner.py`, `subagent_stream.py`→`application/session/stream.py`; дома-стабы остались re-export). Core очищен от зависимостей на tools, кроме composition-root `provider_manager` и presentation-хелпера `application/display.py` (рендер tool-chips, см. ниже). Слоистая архитектура реализована. Тесты зелёные (2357 passed, ruff чист).
 
 ## Итоговое состояние
 
@@ -18,7 +18,7 @@
 - 8-9: оркестраторы в application/, политики в domain/
 - 10-11: git_checkpoint/storage, subagent_worktree/runtime, tool_*/application, permission+model+session политики/сущности в domain/
 
-**Что осталось ре-export-обёртками (тонкие):** `git_checkpoint.py`, `subagent_worktree.py`, `tool_display.py`, `infrastructure/errors.py`.
+**Что осталось ре-export-обёртками (тонкие):** `config.py`, `config_helpers.py`, `markdown_scanner.py`, `subagent_stream.py`, `git_checkpoint.py`, `subagent_worktree.py`, `tool_display.py`, `infrastructure/errors.py`.
 **Жирные классы/корни (логика вынесена, классы остались):** `session_manager`, `models_catalog`, `role_registry`, `permission_manager`, `provider_manager` — их полная миграция требует точечного плана и не даст существенной выгоды сейчас.
 
 **> Последующий хвост после финализации:** пустой мёртвый стаб `core/tool_helpers.py` удалён (0 потребителей).
@@ -34,6 +34,7 @@
 - ✅ **Фаза 5 — DI core→tools (агент):** `execute_tool`, `get_default_tools`, `process_image_file_sync`, `normalize_tool_name` инъекции в `BaseAgent`/`ToolMixin`. Сборочный узел в `provider_manager.py`.
 - ✅ **Фаза 6 — DI permission/role:** `permission_manager`, `role_registry` больше не импортят `tools.registry`. Wiring в `app.py`.
 - ✅ **Фаза 7 — `subagent_stream`:** `_truncate_subagent_result` → `core.infrastructure.tasks.output.truncate_subagent_result`.
+- ✅ **Фаза 12 — доводка flat-модулей в слои:** `config.py` → `infrastructure/platform/paths.py`; `config_helpers.py` → `infrastructure/config/`; `markdown_scanner.py` → `infrastructure/runtime/`; `subagent_stream.py` → `application/session/stream.py`. Все потребители (core/tools/widgets/cli/tests) переведены на канонические пути; старые пути — тонкие re-export стабы. Патч-таргеты тестов перенесены на новые пути. Корень `core/` освобождён от плоских utility-модулей.
 
 **Итог зависимостей:** `core→tools` импортов нет, кроме двух санкционированных: composition-root `provider_manager` и presentation-хелпер `application/display.py` (рендер tool-chips для UI — им пользуется движок агента для генерации `tool_result`-label, потому это не виджет, а слой ядра). Циклы разорваны. `domain` остаётся чистым слоем ниже всех.
 
