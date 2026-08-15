@@ -80,7 +80,7 @@ class MCPManager:
         self._servers_cache = []
 
     def ensure_default_configs(self):
-        from core.config_helpers import ensure_json_config
+        from core.infrastructure.config.config_helpers import ensure_json_config
 
         ensure_json_config(self.global_file, {"mcpServers": {}})
 
