@@ -1323,7 +1323,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         with (
-            patch("widgets.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
@@ -1335,7 +1335,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("manage_shell", "t", args={"description": "desc"})
         event = MagicMock()
         with (
-            patch("widgets.screens.subagent_screen.SubagentViewScreen"),
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen"),
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
@@ -1440,7 +1440,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         with (
-            patch("widgets.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")),
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")),
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
