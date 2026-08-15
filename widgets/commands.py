@@ -72,7 +72,7 @@ class NewCommand(BaseCommand):
             await app.task_manager.kill_all()
 
         def cancel_subagents():
-            from core.subagent_stream import cancel_running_subagents
+            from core.application.session.stream import cancel_running_subagents
             cancel_running_subagents(app.sm)
 
         new_id = await new_session(
