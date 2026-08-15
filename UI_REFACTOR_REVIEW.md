@@ -130,5 +130,5 @@ widgets/
 | Фаза 3 — хелперы → utils | ✅ пройдено |
 | Фаза 4 — состояние → app/ | 🔄 4b message_flow+actions+session_persistence |
 | Фаза 5 — диспетчер commands | ✅ пройдено |
-| Фаза 6 — composition root (app.py) | ⬜ не начато |
+| Фаза 6 — composition root (app.py) | ✅ пройдено |
 | Фаза 7 — уборка стабов, финал | ⬜ не начато |
