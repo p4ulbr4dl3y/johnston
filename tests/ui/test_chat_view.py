@@ -260,6 +260,18 @@ class TestMarkdownHelpers(unittest.TestCase):
         self.assertEqual(table._headers, headers)
         self.assertEqual(table._rows, rows)
 
+    def test_markdown_blocks_table_open_is_patched(self):
+        from textual.widgets import Markdown
+
+        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+
+        _apply_chat_markdown_patches()
+        self.assertIs(Markdown.BLOCKS["table_open"], CustomMarkdownTable)
+        self.assertIs(Markdown.BLOCKS["table_open"], CustomMarkdownTable)
+        instance = Markdown("")
+        self.assertIs(instance.BLOCKS["table_open"], CustomMarkdownTable)
+        self.assertIs(instance.BLOCKS, Markdown.BLOCKS)
+
     def test_custom_markdown_table_content_compose_update_rows_mount(self):
         from rich.text import Text
         from textual.widgets import Static
