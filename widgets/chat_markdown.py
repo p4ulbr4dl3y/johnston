@@ -308,8 +308,39 @@ def _apply_chat_markdown_patches() -> None:
             )
             yield syntax
 
+    from rich import box
+    from rich.markdown import TableElement
+    from rich.table import Table
+
+    class CustomRichTableElement(TableElement):
+        """Full-width Markdown table with preserved column justification and border styling."""
+
+        def __rich_console__(self, console: Any, options: Any) -> Any:
+            table = Table(
+                box=box.SIMPLE,
+                pad_edge=False,
+                style="markdown.table.border",
+                show_edge=True,
+                collapse_padding=True,
+                expand=True,
+            )
+
+            if self.header is not None and self.header.row is not None:
+                for column in self.header.row.cells:
+                    heading = column.content.copy()
+                    heading.stylize("markdown.table.header")
+                    table.add_column(heading, justify=getattr(column, "justify", "default"))
+
+            if self.body is not None:
+                for row in self.body.rows:
+                    row_content = [element.content for element in row.cells]
+                    table.add_row(*row_content)
+
+            yield table
+
     RichMarkdown.elements["fence"] = CustomRichCodeBlock
     RichMarkdown.elements["code_block"] = CustomRichCodeBlock
+    RichMarkdown.elements["table_open"] = CustomRichTableElement
 
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
