@@ -124,7 +124,7 @@ class InvokeSubagentTool(BaseTool):
         # BEFORE creating the session so session.role captures the canonically
         # applied role (apply_subagent_role falls back to 'worker' for empty,
         # unknown, or main-only roles), not the raw caller-supplied subagent_type.
-        from core.subagent_stream import configure_subagent_agent
+        from core.application.session.stream import configure_subagent_agent
 
         applied_role = configure_subagent_agent(
             subagent, subagent_type, app=ctx.app, project_dir=project_dir
@@ -144,7 +144,7 @@ class InvokeSubagentTool(BaseTool):
         session.agent = subagent
         session.add_event({"type": "user", "text": prompt})
 
-        from core.subagent_stream import run_subagent_stream_bg
+        from core.application.session.stream import run_subagent_stream_bg
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
             project_dir, wt_path, wt_branch, is_followup=False

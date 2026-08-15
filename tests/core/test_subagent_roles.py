@@ -80,8 +80,8 @@ class TestSubagentApplyRole(unittest.TestCase):
         must substitute the worker definition instead of using it verbatim."""
         import tempfile
 
+        from core.application.session.stream import apply_subagent_role
         from core.role_registry import RoleRegistry
-        from core.subagent_stream import apply_subagent_role
 
         registry = RoleRegistry.get_instance()
         definition = registry.get_role("orchestrator")
@@ -104,7 +104,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
         subagent object while preserving identity plumbing."""
         import types
 
-        from core.subagent_stream import _apply_provider_config
+        from core.application.session.stream import _apply_provider_config
 
         class _FakeRebuilt:
             def __init__(self):
