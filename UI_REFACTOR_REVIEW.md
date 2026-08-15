@@ -128,7 +128,7 @@ widgets/
 | Фаза 1 — чистые виджеты → presentation/widgets | ✅ пройдено |
 | Фаза 2 — screens → presentation/screens | ✅ пройдено |
 | Фаза 3 — хелперы → utils | ✅ пройдено |
-| Фаза 4 — состояние → app/ | ⬜ не начато |
+| Фаза 4 — состояние → app/ | 🔄 4a status_footer+command_suggestions |
 | Фаза 5 — диспетчер commands | ⬜ не начато |
 | Фаза 6 — composition root (app.py) | ⬜ не начато |
 | Фаза 7 — уборка стабов, финал | ⬜ не начато |

@@ -3,13 +3,7 @@ import time
 
 from textual.widgets import OptionList
 
-from core.application.skills.manager import SkillManager
-from widgets.commands import COMMAND_REGISTRY
-
-
-def get_all_command_suggestions() -> list[tuple[str, str]]:
-    """Gets list of (command_name, description) for registered commands and skills with 10s cache."""
-    return CommandSuggestions.get_all_command_suggestions()
+from widgets.app.command_provider import get_all_command_suggestions
 
 
 class CommandSuggestions(OptionList):
@@ -18,9 +12,9 @@ class CommandSuggestions(OptionList):
     can_focus = False
     ALLOW_SELECT = True
 
-    _command_suggestions_cache: list[tuple[str, str]] = []
-    _command_suggestions_cache_time: float = 0.0
-
+    # Cache delegating to the app-layer provider. Keep a thin module-level
+    # shim so `from widgets.command_suggestions import get_all_command_suggestions`
+    # keeps working (see module top).
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.mode: str | None = None  # "command" or "file"
@@ -31,34 +25,8 @@ class CommandSuggestions(OptionList):
 
     @classmethod
     def get_all_command_suggestions(cls) -> list[tuple[str, str]]:
-        """Gets list of (command_name, description) for registered commands and skills with 10s cache"""
-        now = time.time()
-        if cls._command_suggestions_cache and (now - cls._command_suggestions_cache_time < 10.0):
-            return cls._command_suggestions_cache
-
-        suggestions = []
-        registered = set()
-
-        for name, cmd in COMMAND_REGISTRY.items():
-            desc = cmd.description if name == cmd.name else f"Alias for {cmd.name}"
-            suggestions.append((name, desc))
-            registered.add(name)
-
-        try:
-            sm = SkillManager()
-            skills = sm.list_skills()
-            for s in skills:
-                s_cmd = f"/{s['name']}"
-                if s_cmd not in registered:
-                    desc = f"Skill: {s['description']}" if s.get("description") else f"Skill: {s['name']}"
-                    suggestions.append((s_cmd, desc))
-                    registered.add(s_cmd)
-        except Exception:
-            pass
-
-        cls._command_suggestions_cache = suggestions
-        cls._command_suggestions_cache_time = now
-        return suggestions
+        """Gets list of (command_name, description) for registered commands and skills with 10s cache."""
+        return get_all_command_suggestions()
 
     def get_workspace_files(self) -> list[str]:
         """Gets relative file paths list in current project with 5s caching"""
