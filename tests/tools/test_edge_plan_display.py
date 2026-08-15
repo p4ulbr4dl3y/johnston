@@ -1,7 +1,8 @@
 """Edge-case tests for update_plan tool and tool_display rendering (bug hunting)."""
 import unittest
 
-from core.tool_display import _truncate, extract_tool_display
+from core.application.display import truncate
+from core.tool_display import extract_tool_display
 from tools.update_plan import UpdatePlanTool
 
 
@@ -190,11 +191,11 @@ class TestToolDisplayEdge(unittest.TestCase):
         self.assertIsInstance(res2, str)
 
     def test_truncate_non_string(self):
-        self.assertEqual(_truncate(None), "")
-        self.assertEqual(_truncate(123), "123")
-        # NOTE: 0 is falsy so _truncate(0) returns "" (minor quirk, unreachable in real use)
-        self.assertEqual(_truncate(0), "")
-        self.assertEqual(_truncate(""), "")
+        self.assertEqual(truncate(None), "")
+        self.assertEqual(truncate(123), "123")
+        # NOTE: 0 is falsy so truncate(0) returns "" (minor quirk, unreachable in real use)
+        self.assertEqual(truncate(0), "")
+        self.assertEqual(truncate(""), "")
 
     def test_default_tool_name_return_when_no_match(self):
         # numeric value falls through to last-resort numeric pick
