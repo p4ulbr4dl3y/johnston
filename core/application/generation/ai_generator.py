@@ -269,6 +269,6 @@ async def _handle_interruption(
 
 def record_subagent_step(step: tuple, session: Any, text_accumulator: list) -> None:
     """Delegate to the canonical subagent step recorder (URL kept for clarity)."""
-    from core.subagent_stream import record_subagent_step as _rs
+    from core.application.session.stream import record_subagent_step as _rs
 
     _rs(step, session, text_accumulator)
