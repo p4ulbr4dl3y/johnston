@@ -2,13 +2,12 @@ from typing import Any, Dict
 
 from core.infrastructure.errors import format_tool_error
 from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
-from core.infrastructure.tasks.output import tail_output
 from tools.base import BaseTool
 
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Manage background shell processes: list, status, kill, send_input."
+    description = "Manage background shell processes: list, send_input, kill."
     schema = {
         "type": "function",
         "function": {
@@ -16,7 +15,7 @@ class ManageShellTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_input"]},
+                    "action": {"type": "string", "enum": ["list", "send_input", "kill"]},
                     "task_id": {"type": "string", "description": "Background task ID"},
                     "input": {"type": "string", "description": "Input text for send_input"},
                 },
@@ -43,29 +42,6 @@ class ManageShellTool(BaseTool):
 
         if action == "list":
             return list_lines(tasks)
-
-        elif action == "status":
-            if not task_id:
-                return format_tool_error("params", name="task_id", detail="required for 'status'")
-            t = find_any(tasks, task_id)
-            if t is None:
-                return not_found_message(task_id, tasks, "background")
-            out = t.get_formatted_output() if hasattr(t, "get_formatted_output") else "".join(t.output)
-            out = tail_output(out, 4000)
-            log_hint = (
-                f"\nFull Output Log: {t.log_path} [use shell 'tail {t.log_path}' for the latest lines]"
-                if getattr(t, "log_path", None)
-                else ""
-            )
-            if t.is_running:
-                return (
-                    f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n"
-                    f"Recent Output:\n{out or '(No output yet)'}{log_hint}\n\n"
-                    "Note: If Recent Output shows an interactive prompt (e.g., asking for input, confirmation [y/N], or 'Press RETURN'), "
-                    f"you may call manage_shell(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{t.task_id}') to abort. "
-                    "Otherwise, STOP calling manage_shell(status) in a loop and end your turn now."
-                )
-            return f"{t.task_id} FINISHED\nCommand: {t.command}\nRecent Output:\n{out or '(No output yet)'}{log_hint}"
 
         elif action in ("send_input", "input"):
             if not task_id:
@@ -99,4 +75,4 @@ class ManageShellTool(BaseTool):
                     return format_tool_error("kill", detail=str(e), name=task_id)
             return format_tool_error("notrunning", name=task_id)
 
-        return format_tool_error("action", detail="use 'list', 'status', 'kill', or 'send_input'", name=action)
+        return format_tool_error("action", detail="use 'list', 'send_input', or 'kill'", name=action)

@@ -37,7 +37,7 @@ class TestToolSchemas(unittest.TestCase):
         params = ManageShellTool.schema["function"]["parameters"]
         self.assertEqual(
             params["properties"]["action"]["enum"],
-            ["list", "status", "kill", "send_input"],
+            ["list", "send_input", "kill"],
         )
         self.assertIn("action", params["required"])
 

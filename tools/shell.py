@@ -31,14 +31,15 @@ def _format_background_task_response(
 ) -> str:
     """Formats a background task status response with a manage hint."""
     log_hint = f"\nFull Output Log: {log_path} [live; use shell 'tail {log_path}' for the latest lines]" if log_path else ""
+    tail_advice = " Stop polling; completion arrives as [System Notification]. End turn."
     if recent_output_str is None:
         return (
-            f"[Background Task ID: {task_id}] running: '{cmd}'.{log_hint} "
-            f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
+            f"[Background Task ID: {task_id}] running: '{cmd}'.{log_hint}{tail_advice}"
+            f" Do not wait; use manage_shell(send_input/kill, task_id='{task_id}') to respond/abort."
         )
     return (
-        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}{log_hint}\n"
-        f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
+        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}{log_hint}{tail_advice}"
+        f" Do not wait; use manage_shell(send_input/kill, task_id='{task_id}') to respond/abort."
     )
 
 

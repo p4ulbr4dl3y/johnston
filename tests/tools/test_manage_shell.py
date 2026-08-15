@@ -61,44 +61,15 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("t2", res)
         self.assertIn("FINISHED", res)
 
-    async def test_status_missing_task_id(self):
-        tool = ManageShellTool()
-        mock_app = self._make_app([])
-        res = await tool.execute({"action": "status"}, ctx=mock_app)
-        self.assertIn("ERR", res)
-        self.assertIn("task_id", res)
-
-    async def test_status_task_not_found(self):
-        tool = ManageShellTool()
-        mock_app = self._make_app([])
-        res = await tool.execute({"action": "status", "task_id": "ghost"}, ctx=mock_app)
-        self.assertIn("ERR: notfound 'ghost'", res)
-
-    async def test_status_running_task(self):
+    async def test_status_action_removed(self):
+        # 'status' was dropped from manage_shell: full/tail output now lives in
+        # the file log, so a dedicated status branch is redundant with 'list'.
+        self.assertNotIn("status", ManageShellTool.schema["function"]["parameters"]["properties"]["action"]["enum"])
         tool = ManageShellTool()
         t = _make_task("t-run", "npm build", output=["Building...\n", "Done\n"])
         mock_app = self._make_app([t])
         res = await tool.execute({"action": "status", "task_id": "t-run"}, ctx=mock_app)
-        self.assertIn("t-run", res)
-        self.assertIn("RUNNING", res)
-        self.assertIn("npm build", res)
-        self.assertIn("Building...", res)
-
-    async def test_status_includes_log_path(self):
-        tool = ManageShellTool()
-        t = _make_task("t-log", "npm build", output=["Building...\n"])
-        t.log_path = "/fake/logs/out.log"
-        mock_app = self._make_app([t])
-        res = await tool.execute({"action": "status", "task_id": "t-log"}, ctx=mock_app)
-        self.assertIn("Full Output Log", res)
-        self.assertIn("/fake/logs/out.log", res)
-
-    async def test_status_truncates_long_output(self):
-        tool = ManageShellTool()
-        t = _make_task("t-big", "big cmd", output=["x" * 5000])
-        mock_app = self._make_app([t])
-        res = await tool.execute({"action": "status", "task_id": "t-big"}, ctx=mock_app)
-        self.assertIn("truncated", res)
+        self.assertIn("ERR: action 'status'", res)
 
     async def test_kill_missing_task_id(self):
         tool = ManageShellTool()

@@ -1225,7 +1225,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "[Background Task ID: 42] Command running\n"
             "Command is running in the background\n"
             "You will be notified automatically\n"
-            "Use manage_shell to inspect\n"
             "real output"
         )
         cleaned = widget._clean_bash_output(text)
