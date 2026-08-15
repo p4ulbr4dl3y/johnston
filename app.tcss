@@ -206,29 +206,29 @@ Markdown {
     padding: 0;
 }
 
+MarkdownParagraph {
+    height: auto;
+    margin: 0;
+    padding: 0;
+}
+
 MarkdownBlock {
     height: auto;
     margin: 0;
     padding: 0;
 }
 
-MarkdownParagraph {
-    height: auto;
-    margin: 1 0 0 0;
-    padding: 0;
-}
-
 MarkdownBlockQuote MarkdownParagraph {
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0;
+    padding: 0;
 }
 
 MarkdownBulletList MarkdownParagraph,
 MarkdownOrderedList MarkdownParagraph,
 Markdown BulletList MarkdownParagraph,
 Markdown OrderedList MarkdownParagraph {
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0;
+    padding: 0;
 }
 
 MarkdownBlockQuote MarkdownBlockQuote {
@@ -247,7 +247,7 @@ MarkdownOrderedList,
 Markdown BulletList,
 Markdown OrderedList {
     height: auto;
-    margin: 1 0;
+    margin: 0;
     padding: 0;
 }
 
