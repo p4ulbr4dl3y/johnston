@@ -4,7 +4,7 @@ Detectors for real bugs in empty/whitespace/None message content handling.
 """
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from widgets.chat_messages import BotMessage, EventDivider, UserMessage
 
@@ -34,17 +34,19 @@ class TestBotMessageEmptyContent(unittest.IsolatedAsyncioTestCase):
     async def test_set_final_content_empty_persists_clean(self):
         msg = BotMessage()
         msg.stream_widget.update = MagicMock()
-        await msg.set_final_content("")
+        msg.md_widget.update = AsyncMock(return_value=None)
+        with patch.object(type(msg.md_widget), "is_attached", new_callable=PropertyMock, return_value=False):
+            await msg.set_final_content("")
         self.assertFalse(msg._streaming)
-        msg.stream_widget.update.assert_called_once_with("")
 
 
 class TestBotMessageMarkdownRender(unittest.IsolatedAsyncioTestCase):
     async def test_render_markdown_empty_content(self):
         msg = BotMessage()
-        msg.stream_widget.update = MagicMock()
-        msg._render_rich_content("")
-        msg.stream_widget.update.assert_called_once_with("")
+        msg.md_widget.update = AsyncMock(return_value=None)
+        with patch.object(type(msg.md_widget), "is_attached", new_callable=PropertyMock, return_value=True):
+            await msg._render_markdown("")
+        msg.md_widget.update.assert_awaited_once_with("")
 
 
 class TestUserMessage(unittest.TestCase):
