@@ -51,7 +51,7 @@ Always run uv instead of pip.""")
                 f.write("Rule text")
 
             rm = RulesManager()
-            with patch("core.markdown_scanner.CONFIG_DIR", tmpdir):
+            with patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", tmpdir):
                 proj_rules_dir = os.path.join(tmpdir, ".johnston", "rules")
                 os.makedirs(os.path.dirname(proj_rules_dir), exist_ok=True)
                 os.symlink(rules_dir, proj_rules_dir)
