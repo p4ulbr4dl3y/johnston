@@ -1,6 +1,6 @@
 # UI_REFACTOR_REVIEW.md
 
-> **СТАТУС:** план готов, рефакторинг не начат. Исследование выполнено read-only explorer-ом. Core уже отрефакторен в слои `domain → application → infrastructure` (см. ARCH_REFACTOR_REVIEW.md). Эта задача — аналог для UI (`widgets/`, `app.py`, `app.tcss`, `cli.py`).
+> **СТАТУС (финальный):** Рефакторинг UI выполнен (фазы 0-7). Виджеты разложены: presentation/ (рендер), app/ (состояние+диспетчеры+composition root), utils/ (хелперы), mixins/ (тонкие), screens→presentation/screens. Корень widgets/ — re-export стабы для исторических путей. Тесты зелёные (2295 passed, ruff чист).
 
 ## 1. Ключевые наблюдения
 
@@ -131,4 +131,4 @@ widgets/
 | Фаза 4 — состояние → app/ | 🔄 4b message_flow+actions+session_persistence |
 | Фаза 5 — диспетчер commands | ✅ пройдено |
 | Фаза 6 — composition root (app.py) | ✅ пройдено |
-| Фаза 7 — уборка стабов, финал | ⬜ не начато |
+| Фаза 7 — уборка стабов, финал | ✅ пройдено |
