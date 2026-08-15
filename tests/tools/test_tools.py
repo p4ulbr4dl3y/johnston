@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from core.linters_manager import LintersManager
+from core.application.linters.manager import LintersManager
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.read import ReadTool

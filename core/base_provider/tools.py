@@ -15,7 +15,7 @@ class ToolMixin:
         return (tool_name or "").strip().lower()
 
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> str | None:
-        from core.role_registry import role_tool_error
+        from core.domain.policies.role_policy import role_tool_error
 
         clean_name = self._canonical_tool_name(tool_name).lower()
         return role_tool_error(mode_def, clean_name)

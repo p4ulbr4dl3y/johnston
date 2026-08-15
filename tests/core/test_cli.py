@@ -150,7 +150,7 @@ class TestCLIAdvanced(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (pathlib.Path(tmp) / "AGENTS.md").write_text("hello")
             with patch("pathlib.Path.cwd", return_value=pathlib.Path(tmp)):
-                with patch("core.rules_manager.RulesManager") as mock_cls:
+                with patch("core.application.rules.rules.RulesManager") as mock_cls:
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = []
                     mock_cls.get_instance.return_value = rules_mgr
@@ -167,7 +167,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             with patch("pathlib.Path.cwd", return_value=pathlib.Path(tmp)):
-                with patch("core.rules_manager.RulesManager") as mock_cls:
+                with patch("core.application.rules.rules.RulesManager") as mock_cls:
                     rule = MagicMock()
                     rule.name = "R1"
                     rule.source = "project"
@@ -183,7 +183,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_linters_empty(self):
         f = io.StringIO()
-        with patch("core.linters_manager.get_linters_manager") as mock_get:
+        with patch("core.application.linters.manager.get_linters_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_linters.return_value = []
             mgr.scan_available.return_value = {}
@@ -194,7 +194,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_linters_with_items(self):
         f = io.StringIO()
-        with patch("core.linters_manager.get_linters_manager") as mock_get:
+        with patch("core.application.linters.manager.get_linters_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_linters.return_value = [
                 {
@@ -257,7 +257,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_skills_empty(self):
         f = io.StringIO()
-        with patch("core.skill_manager.SkillManager") as mock_cls:
+        with patch("core.application.skills.manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = []
             with redirect_stdout(f):
                 print_skills()
@@ -265,7 +265,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_skills_with_hidden(self):
         f = io.StringIO()
-        with patch("core.skill_manager.SkillManager") as mock_cls:
+        with patch("core.application.skills.manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = [
                 {"name": "a", "scope": "global", "hidden": True},
                 {"name": "b", "scope": "project"},
@@ -350,7 +350,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             with patch("pathlib.Path.cwd", return_value=__import__("pathlib").Path(tmp)):
-                with patch("core.rules_manager.RulesManager") as mock_cls:
+                with patch("core.application.rules.rules.RulesManager") as mock_cls:
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = []
                     mock_cls.get_instance.return_value = rules_mgr

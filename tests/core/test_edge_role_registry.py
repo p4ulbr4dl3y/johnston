@@ -10,12 +10,11 @@ import time
 
 import pytest
 
+from core.domain.policies.role_policy import normalize_role_scope, role_tool_error
 from core.role_registry import (
     BUILTIN_ROLES,
     AgentRole,
     RoleRegistry,
-    normalize_role_scope,
-    role_tool_error,
 )
 
 

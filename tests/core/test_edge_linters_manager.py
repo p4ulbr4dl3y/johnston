@@ -1,4 +1,4 @@
-"""Edge-case tests for core/linters_manager.py.
+"""Edge-case tests for core/application/linters/manager.py.
 
 Focus: injection safety, timeout, non-zero/killed exit codes, unicode/binary
 output, empty/giant output, bad path types, unsupported extensions, missing
@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.linters_manager import LintersManager, _exec_cmd
+from core.application.linters.manager import LintersManager, _exec_cmd
 
 
 def _make_manager(tmp_path):
@@ -312,7 +312,7 @@ async def test_run_one_cancellation_not_swallowed(tmp_path):
         raise asyncio.CancelledError()
 
     with patch.object(m, "render_cmd", return_value=["echo", "hi"]), patch(
-        "core.linters_manager._exec_cmd", side_effect=_raising_cancel
+        "core.application.linters.manager._exec_cmd", side_effect=_raising_cancel
     ):
         with pytest.raises(asyncio.CancelledError):
             await m._run_one(lint, str(tmp_path / "x.py"))
