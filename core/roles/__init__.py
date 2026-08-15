@@ -1,6 +1,6 @@
 """Role configuration for subagents, decomposed into pure, testable steps.
 
-The old ``apply_subagent_role`` monolith in core/subagent_stream.py combined
+The old ``apply_subagent_role`` monolith in core/application/session/stream.py (housed previously at core/subagent_stream.py) combined
 four unrelated concerns: role resolution + fallback, provider switching, tool
 filtering with a hardened shell description, and system-prompt/model wiring.
 This package splits that into small functions so each concern is independently
