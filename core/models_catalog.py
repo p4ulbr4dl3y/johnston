@@ -7,28 +7,28 @@ from models.dev and OpenRouter catalog APIs with local cache fallbacks.
 import asyncio
 import logging
 import os
-import re
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Iterable, Optional, Set
+from typing import Any, Dict, Iterable, Set
 
 import httpx
 
 from core.config import CONFIG_DIR
 from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+from core.domain.policies.model_catalog_policy import (
+    _RE_FUZZY_STRIP,
+    _RE_TOKEN_SPLIT,
+    MODELS_DEV_URL,
+    OPENROUTER_MODELS_URL,
+    extract_context_length,
+    format_context_tokens,
+)
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 logger = logging.getLogger(__name__)
 
-MODELS_DEV_URL = "https://models.dev/api.json"
-OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
-
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_catalog_cache.json")
 CACHE_TTL = 86400  # 24 hours
-
-# Precompiled regexes (avoids recompilation on every _resolve_catalog_key call).
-_RE_FUZZY_STRIP = re.compile(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)")
-_RE_TOKEN_SPLIT = re.compile(r"[a-z0-9]+")
 
 # Upper bound on the in-memory model-match cache to prevent unbounded growth.
 _MATCH_CACHE_MAX = 1000
@@ -69,40 +69,6 @@ def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:
     cache.move_to_end(key)
     while len(cache) > _MATCH_CACHE_MAX:
         cache.popitem(last=False)
-
-
-def extract_context_length(model: dict) -> Optional[int]:
-    """Extracts context length from an OpenRouter model dict.
-
-    Consolidates the source fields across OpenRouter API responses
-    (context_length, top_provider.context_length, context_window,
-    max_context_length). Returns int, or None when absent/invalid.
-    """
-    ctx = (
-        model.get("context_length")
-        or (model.get("top_provider", {}) or {}).get("context_length")
-        or model.get("context_window")
-        or model.get("max_context_length")
-    )
-    if ctx and isinstance(ctx, (int, float)):
-        return int(ctx)
-    return None
-
-
-def format_context_tokens(tokens: int) -> str:
-    if tokens >= 1_000_000:
-        val = tokens / 1_000_000
-        if val % 1 == 0:
-            return f"{int(val)}M"
-        if round(val, 1) == 1.0:
-            return "1M"
-        return f"{val:.1f}M"
-    elif tokens >= 1_000:
-        val = tokens / 1_000
-        if val >= 100 or val % 1 == 0:
-            return f"{int(val)}k"
-        return f"{val:.1f}k"
-    return str(tokens)
 
 
 class ModelsCatalog:
@@ -466,3 +432,7 @@ catalog = ModelsCatalog()
 def get_context_window(provider_id: str, model_id: str) -> str:
     limit = catalog.get_context_limit(provider_id, model_id)
     return format_context_tokens(limit)
+
+
+# Backwards-compatible re-exports: pure helpers/constants moved to
+# core.domain.policies.model_catalog_policy.
