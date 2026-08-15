@@ -199,6 +199,7 @@ def _new_markdown_init(self, *args, **kwargs):
     # Reference the live BLOCKS mapping so any Markdown widget created before the
     # global patch still picks up the patched table/fence block classes.
     self.BLOCKS = Markdown.BLOCKS
+    self.BLOCKS["table_open"] = CustomMarkdownTable
     _old_markdown_init(self, *args, **kwargs)
 
 
@@ -358,7 +359,7 @@ def _apply_chat_markdown_patches() -> None:
 
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
-    Markdown.BLOCKS["table"] = CustomMarkdownTable
+    Markdown.BLOCKS["table_open"] = CustomMarkdownTable
 
     Markdown.__init__ = _new_markdown_init
 
