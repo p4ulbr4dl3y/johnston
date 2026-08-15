@@ -7,7 +7,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
 
-from widgets.chat_markdown import (
+from widgets.presentation.widgets.chat_markdown import (
     CODE_THEME,
     _apply_chat_markdown_patches,
     clean_markdown_for_rendering,

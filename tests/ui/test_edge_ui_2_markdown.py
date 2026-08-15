@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from rich.text import Text
 
-from widgets.chat_markdown import CustomMarkdownTableContent
+from widgets.presentation.widgets.chat_markdown import CustomMarkdownTableContent
 
 
 class TestCustomMarkdownTableContentEmptyRows(unittest.IsolatedAsyncioTestCase):

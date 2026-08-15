@@ -36,7 +36,7 @@ class TestPatchAllowSelect(unittest.TestCase):
 
 class TestWelcomeWidget(unittest.TestCase):
     def test_banner_update_small_width(self):
-        from widgets.chat_welcome import WelcomeWidget
+        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
         widget = WelcomeWidget()
         logo_mock = type("Logo", (), {"update": lambda *a, **k: None})()
@@ -46,7 +46,7 @@ class TestWelcomeWidget(unittest.TestCase):
         self.assertEqual(logo_mock.text if hasattr(logo_mock, "text") else None, None)
 
     def test_banner_update_missing_logo_is_noop(self):
-        from widgets.chat_welcome import WelcomeWidget
+        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
         widget = WelcomeWidget()
         widget.query_one = lambda *a, **k: (_ for _ in ()).throw(Exception("missing"))

@@ -5,7 +5,7 @@ White-box checks on unclosed fences and hard-to-parse content.
 
 import unittest
 
-from widgets.chat_markdown import clean_markdown_for_rendering
+from widgets.presentation.widgets.chat_markdown import clean_markdown_for_rendering
 
 
 class TestCleanMarkdownEdgeCases(unittest.TestCase):

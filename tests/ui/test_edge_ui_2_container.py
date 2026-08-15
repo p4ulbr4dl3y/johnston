@@ -6,9 +6,9 @@ Message-list edge cases: welcome state, rollback bounds, dedup.
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from widgets.chat_container import ChatView
-from widgets.chat_messages import UserMessage
-from widgets.chat_welcome import WelcomeWidget
+from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_messages import UserMessage
+from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 
 class TestChatViewWelcome(unittest.TestCase):

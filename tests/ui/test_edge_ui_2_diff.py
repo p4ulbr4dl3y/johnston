@@ -5,7 +5,7 @@ Detectors for real ordering bugs when old and new hunk line counts differ.
 
 import unittest
 
-from widgets.chat_diff import DiffRenderable, format_edit_diff
+from widgets.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
 
 
 class TestDiffRenderable(unittest.TestCase):

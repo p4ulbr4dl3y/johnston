@@ -116,7 +116,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertNotIn("[Hint:", formatted_text)
 
     def test_format_edit_diff_monotonic_line_numbers(self):
-        from widgets.chat_diff import format_edit_diff
+        from widgets.presentation.widgets.chat_diff import format_edit_diff
 
         diff_text = (
             "--- a/main.py\n"
@@ -145,7 +145,7 @@ class TestToolDisplay(unittest.TestCase):
 
 
     def test_format_edit_diff_unspaced_context_lines(self):
-        from widgets.chat_diff import format_edit_diff
+        from widgets.presentation.widgets.chat_diff import format_edit_diff
 
         diff_text = (
             "--- a/prompts.py\n"
