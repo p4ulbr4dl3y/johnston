@@ -84,6 +84,15 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("npm build", res)
         self.assertIn("Building...", res)
 
+    async def test_status_includes_log_path(self):
+        tool = ManageShellTool()
+        t = _make_task("t-log", "npm build", output=["Building...\n"])
+        t.log_path = "/fake/logs/out.log"
+        mock_app = self._make_app([t])
+        res = await tool.execute({"action": "status", "task_id": "t-log"}, ctx=mock_app)
+        self.assertIn("Full Output Log", res)
+        self.assertIn("/fake/logs/out.log", res)
+
     async def test_status_truncates_long_output(self):
         tool = ManageShellTool()
         t = _make_task("t-big", "big cmd", output=["x" * 5000])

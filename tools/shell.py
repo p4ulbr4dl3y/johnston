@@ -26,15 +26,18 @@ def _new_task_id() -> str:
     return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
-def _format_background_task_response(task_id: str, cmd: str, recent_output_str: str = None) -> str:
+def _format_background_task_response(
+    task_id: str, cmd: str, recent_output_str: str = None, log_path: str = None
+) -> str:
     """Formats a background task status response with a manage hint."""
+    log_hint = f"\nFull Output Log: {log_path} [live; use shell 'tail {log_path}' for the latest lines]" if log_path else ""
     if recent_output_str is None:
         return (
-            f"[Background Task ID: {task_id}] running: '{cmd}'. "
+            f"[Background Task ID: {task_id}] running: '{cmd}'.{log_hint} "
             f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
         )
     return (
-        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}\n"
+        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}{log_hint}\n"
         f"manage_shell(send_input/kill, task_id='{task_id}') to respond/abort. End turn."
     )
 
@@ -181,10 +184,11 @@ class ShellTool(BaseTool):
 
         if run_in_bg:
             task.is_background = True
+            task.open_log()
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback)
 
-            return _format_background_task_response(task_id, cmd)
+            return _format_background_task_response(task_id, cmd, log_path=task.log_path)
 
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
@@ -205,13 +209,13 @@ class ShellTool(BaseTool):
 
             if task.background_event.is_set() or task.is_background:
                 task.is_background = True
-
+                task.open_log()
                 raw_out = task.get_formatted_output()
                 if raw_out.strip():
                     recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
                 else:
                     recent_output_str = "\n\nRecent Output: (No output yet)"
-                return _format_background_task_response(task_id, cmd, recent_output_str)
+                return _format_background_task_response(task_id, cmd, recent_output_str, task.log_path)
 
             if task.read_task:
                 try:
@@ -225,13 +229,13 @@ class ShellTool(BaseTool):
             return _truncate_output(res)
         except asyncio.TimeoutError:
             task.is_background = True
-
+            task.open_log()
             raw_out = task.get_formatted_output()
             if raw_out.strip():
                 recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
             else:
                 recent_output_str = "\n\nRecent Output: (No output yet)"
-            return _format_background_task_response(task_id, cmd, recent_output_str)
+            return _format_background_task_response(task_id, cmd, recent_output_str, task.log_path)
         except asyncio.CancelledError:
             if "task" in locals() and task:
                 task.kill_sync()

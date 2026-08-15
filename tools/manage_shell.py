@@ -52,14 +52,20 @@ class ManageShellTool(BaseTool):
                 return not_found_message(task_id, tasks, "background")
             out = t.get_formatted_output() if hasattr(t, "get_formatted_output") else "".join(t.output)
             out = tail_output(out, 4000)
+            log_hint = (
+                f"\nFull Output Log: {t.log_path} [use shell 'tail {t.log_path}' for the latest lines]"
+                if getattr(t, "log_path", None)
+                else ""
+            )
             if t.is_running:
                 return (
-                    f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}\n\n"
+                    f"Task ID: {t.task_id}\nStatus: RUNNING\nCommand: {t.command}\n"
+                    f"Recent Output:\n{out or '(No output yet)'}{log_hint}\n\n"
                     "Note: If Recent Output shows an interactive prompt (e.g., asking for input, confirmation [y/N], or 'Press RETURN'), "
                     f"you may call manage_shell(action='send_input', task_id='{t.task_id}', input='...') to answer it, or manage_shell(action='kill', task_id='{t.task_id}') to abort. "
                     "Otherwise, STOP calling manage_shell(status) in a loop and end your turn now."
                 )
-            return f"{t.task_id} FINISHED\nCommand: {t.command}\n\nRecent Output:\n{out or '(No output yet)'}"
+            return f"{t.task_id} FINISHED\nCommand: {t.command}\nRecent Output:\n{out or '(No output yet)'}{log_hint}"
 
         elif action in ("send_input", "input"):
             if not task_id:

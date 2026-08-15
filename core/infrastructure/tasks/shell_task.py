@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 from core.infrastructure.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import decode_output, terminate_process
-from core.infrastructure.tasks.output import OutputBuffer, strip_ansi
+from core.infrastructure.tasks.output import OutputBuffer, OutputLog, strip_ansi
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
 
 _TASK_TERMINATED_BY_USER = "\n[Task terminated by user]\n"
@@ -45,6 +45,30 @@ class ShellTask(BaseTask):
         self.read_task: Optional[asyncio.Task] = None
         self.background_event = asyncio.Event()
         self._done: Optional[asyncio.Future] = None
+        # File log for background tasks (full output, no memory cap).
+        self.log_path: Optional[str] = None
+        self._log: Optional[OutputLog] = None
+
+    def open_log(self) -> Optional[str]:
+        """Enable full-output file logging (used for background tasks).
+
+        Streams every decoded chunk to a unique log under LOGS_DIR, bypassing the
+        in-memory OutputBuffer cap. Returns the path, or None if logging was
+        skipped (already open) or the file could not be created.
+        """
+        if self._log is not None:
+            return self.log_path
+        self._log = OutputLog.create(self.task_id)
+        if self._log.opened:
+            self.log_path = self._log.path
+            return self.log_path
+        self._log = None
+        return None
+
+    def close_log(self) -> None:
+        if self._log is not None:
+            self._log.close()
+            self._log = None
 
     def _done_future(self) -> asyncio.Future:
         if self._done is None:
@@ -59,6 +83,7 @@ class ShellTask(BaseTask):
     def move_to_background(self) -> None:
         self.is_background = True
         self.background_event.set()
+        self.open_log()
 
     def get_formatted_output(self) -> str:
         """Return the fully formatted output (truncation marker + stripped text)."""
@@ -91,6 +116,8 @@ class ShellTask(BaseTask):
 
         def _append_chunk(text: str) -> None:
             self.output.append(text)
+            if self._log is not None:
+                self._log.append(text)
             if self.widget is not None:
                 func = getattr(
                     self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None)
@@ -129,6 +156,7 @@ class ShellTask(BaseTask):
                 pass
             finally:
                 self.close_pty()
+                self.close_log()
                 self._mark_terminated()
 
                 if self.process is not None:
@@ -192,6 +220,7 @@ class ShellTask(BaseTask):
         self.was_killed = True
         self.is_background = False
         self.close_pty()
+        self.close_log()
         if self.process is not None:
             await terminate_process(self.process)
         if self.read_task is not None and not self.read_task.done():
@@ -204,6 +233,7 @@ class ShellTask(BaseTask):
         self.was_killed = True
         self.is_background = False
         self.close_pty()
+        self.close_log()
         if self.process is not None:
             try:
                 pid = getattr(self.process, "pid", None)
