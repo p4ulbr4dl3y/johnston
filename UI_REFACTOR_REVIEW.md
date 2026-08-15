@@ -126,7 +126,7 @@ widgets/
 |---|---|
 | Фаза 0 — контрольный базлайн | ✅ пройдено (2295 passed, 0 failed) |
 | Фаза 1 — чистые виджеты → presentation/widgets | ✅ пройдено |
-| Фаза 2 — screens → presentation/screens | ⬜ не начато |
+| Фаза 2 — screens → presentation/screens | ✅ пройдено |
 | Фаза 3 — хелперы → utils | ⬜ не начато |
 | Фаза 4 — состояние → app/ | ⬜ не начато |
 | Фаза 5 — диспетчер commands | ⬜ не начато |

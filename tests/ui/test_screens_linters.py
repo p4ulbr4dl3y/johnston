@@ -58,7 +58,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
         return mgr
 
     async def test_linters_screen_pilot(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -86,7 +86,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
 
     async def test_linters_search_filter_and_no_match(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -108,7 +108,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("*No matching linters found*", opt_list.get_option_at_index(0).prompt)
 
     async def test_linters_screen_no_linters_configured(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = MagicMock()
             mock_mgr.load_linters.return_value = []
             mock_mgr.scan_available.return_value = {}
@@ -123,7 +123,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("*No linters configured*", opt_list.get_option_at_index(0).prompt)
 
     async def test_linters_quit_app_and_mount_focus_exception(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -148,7 +148,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
                     screen.on_mount()
 
     def test_on_key_down_sets_highlight_when_none(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -168,7 +168,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
             event.stop.assert_called_once()
 
     def test_on_key_up_calls_cursor_up(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -185,7 +185,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
             opt_list.action_cursor_up.assert_called_once()
 
     def test_on_key_query_one_exception_swallowed(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -193,7 +193,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen._on_key(MagicMock(key="down"))  # must not raise
 
     def test_input_submitted_no_name_returns(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -207,7 +207,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
             mock_mgr.set_enabled.assert_not_called()
 
     def test_option_selected_toggles_linter(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = self._mock_mgr()
             mock_get.return_value = mock_mgr
             screen = LintersScreen()
@@ -224,7 +224,7 @@ class TestLintersScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(opt_list.highlighted, 1)
 
     def test_option_selected_no_name_returns(self):
-        with patch("widgets.screens.linters.get_linters_manager") as mock_get:
+        with patch("widgets.presentation.screens.linters.get_linters_manager") as mock_get:
             mock_mgr = MagicMock()
             mock_mgr.load_linters.return_value = [{"label": "Ghost"}]
             mock_mgr.scan_available.return_value = {}

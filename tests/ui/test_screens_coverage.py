@@ -50,7 +50,7 @@ async def run_mounted(screen, test):
 
 class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     def _make_screen(self, mgr):
-        with patch("widgets.screens.mcp.get_mcp_manager") as mock_get:
+        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
             mock_get.return_value = mgr
             return MCPScreen()
 
@@ -162,7 +162,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         # schedules a mock coroutine instead of a real one (avoids an unraised
         # "coroutine never awaited" warning when the test finishes).
         screen._warmup_tools = AsyncMock()
-        with patch("widgets.screens.mcp.asyncio.create_task", return_value=MagicMock()):
+        with patch("widgets.presentation.screens.mcp.asyncio.create_task", return_value=MagicMock()):
             screen.on_mount()
 
     async def test_warmup_tools_success_mounted(self):

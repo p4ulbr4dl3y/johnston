@@ -86,7 +86,7 @@ class TestTaskScreens(unittest.TestCase):
 
 
 class TestMCPScreen(unittest.TestCase):
-    @patch("widgets.screens.mcp.get_mcp_manager")
+    @patch("widgets.presentation.screens.mcp.get_mcp_manager")
     def test_init(self, mock_get_mgr):
         mock_mgr = MagicMock()
         mock_get_mgr.return_value = mock_mgr
@@ -169,7 +169,7 @@ class TestApiKeyInputScreen(unittest.TestCase):
 
 
 class TestSkillScreens(unittest.TestCase):
-    @patch("widgets.screens.skills.SkillManager")
+    @patch("widgets.presentation.screens.skills.SkillManager")
     def test_detail_init(self, _):
         from widgets.screens.skills import SkillDetailScreen
 
@@ -177,7 +177,7 @@ class TestSkillScreens(unittest.TestCase):
         s = SkillDetailScreen(skill)
         self.assertEqual(s.skill, skill)
 
-    @patch("widgets.screens.skills.SkillManager")
+    @patch("widgets.presentation.screens.skills.SkillManager")
     def test_detail_bindings(self, _):
         from widgets.screens.skills import SkillDetailScreen
 
@@ -185,7 +185,7 @@ class TestSkillScreens(unittest.TestCase):
         self.assertIn("escape", keys)
         self.assertIn("enter", keys)
 
-    @patch("widgets.screens.skills.SkillManager")
+    @patch("widgets.presentation.screens.skills.SkillManager")
     def test_list_init_with_skills(self, mock_sm_cls):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [
@@ -202,7 +202,7 @@ class TestSkillScreens(unittest.TestCase):
         self.assertIn("skill-b", s.options[1])
         self.assertIn("VISIBLE", s.options[1])
 
-    @patch("widgets.screens.skills.SkillManager")
+    @patch("widgets.presentation.screens.skills.SkillManager")
     def test_list_init_no_skills(self, mock_sm_cls):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = []
@@ -212,7 +212,7 @@ class TestSkillScreens(unittest.TestCase):
         s = SkillsScreen()
         self.assertEqual(s.options, [])
 
-    @patch("widgets.screens.skills.SkillManager")
+    @patch("widgets.presentation.screens.skills.SkillManager")
     def test_skills_screen_toggle_hidden(self, mock_sm_cls):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [{"name": "skill-a", "scope": "global", "hidden": True}]

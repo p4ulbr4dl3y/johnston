@@ -552,7 +552,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
                 identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
                 try:
-                    from widgets.screens.subagent_screen import SubagentViewScreen
+                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
                     self.app.push_screen(SubagentViewScreen(identifier))
                 except Exception:
