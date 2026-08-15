@@ -246,6 +246,25 @@ async def test_shell_task_open_log_twice_is_idempotent(monkeypatch, tmp_path):
     task.close_log()
 
 
+@pytest.mark.asyncio
+async def test_shell_task_open_log_backfills_buffered_output(monkeypatch, tmp_path):
+    """Late-opened log (e.g. timeout -> background) is not missing leading output."""
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    task = ShellTask(task_id="tlog3", command="echo", process=None)
+    # Buffered output arrives before the log is opened.
+    task.output.append("early line\n")
+    task.output.append("mid line\n")
+
+    path = task.open_log()
+    assert path is not None
+    content = open(task.log_path).read()
+    assert "early line" in content
+    assert "mid line" in content
+    task.close_log()
+
+
 # ---------------------------------------------------------------------------
 # OutputLog
 # ---------------------------------------------------------------------------

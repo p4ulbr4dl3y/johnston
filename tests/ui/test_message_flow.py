@@ -1030,7 +1030,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
                 app.on_background_shell_completed("t1", "ls", "x" * 5000)
             self.assertEqual(len(sent), 1)
             self.assertIn("truncated", sent[0])
-            self.assertIn("x" * 2000, sent[0])
+            self.assertIn("x" * 4000, sent[0])
+            self.assertNotIn("x" * 5000, sent[0].strip(" \n[].<>"))
 
 
 if __name__ == "__main__":
