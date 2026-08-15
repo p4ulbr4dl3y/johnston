@@ -101,7 +101,7 @@ class ActionsMixin:
 
         selected_text = self.screen.get_selected_text()
         if selected_text and selected_text.strip():
-            banner_signatures = ["|_|", "\\__\\___/", "___ _| |_", "_  ___ |", "johnston"]
+            banner_signatures = ["|_|", "\\__\\___/", "___ _| |_", "_  ___ |"]
             if any(sig in selected_text for sig in banner_signatures):
                 self.screen.clear_selection()
                 return
