@@ -10,6 +10,5 @@
 - `johnston --roles`: List available agent roles (execution modes + subagents).
 - `johnston --rules`: Display active rules and project instructions (`AGENTS.md`, `CLAUDE.md`, `.johnston/rules/`).
 - `johnston --subagents`: List available subagent roles (builtin + custom).
-- `johnston --linters`: List configured linters and their availability (`ruff`, `eslint`, `rustc`, etc.).
 - `johnston --resume <session_id>`: Resume a previous conversation session.
 - `johnston -v` / `johnston --version`: Show Johnston application version.

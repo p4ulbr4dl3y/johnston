@@ -1,7 +1,6 @@
 import os
 from typing import Any, Dict
 
-from core.application.linters.manager import get_linters_manager
 from core.infrastructure.errors import format_tool_error
 from tools.base import BaseTool, make_unified_diff, read_file_text, resolve_path, write_file_text
 from tools.cancel import run_cancellable
@@ -56,7 +55,6 @@ class CreateTool(BaseTool):
 
         try:
             await run_cancellable(write_file_text, path, content)
-            linter_output = await get_linters_manager().run_for(path)
 
             if file_existed:
                 diff_text = make_unified_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
@@ -71,8 +69,8 @@ class CreateTool(BaseTool):
                     diff_text = "\n".join(diff_lines)
 
                 diff_part = f"\n\n{diff_text.strip()}" if diff_text.strip() else ""
-                return f"file '{path}' updated.{diff_part}{linter_output}"
+                return f"file '{path}' updated.{diff_part}"
             else:
-                return f"file '{path}' created.{linter_output}"
+                return f"file '{path}' created."
         except Exception as e:
             return format_tool_error("file", detail=str(e), name=path)

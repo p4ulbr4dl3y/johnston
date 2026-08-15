@@ -40,9 +40,6 @@ class DiffRenderable:
 
 
 def format_edit_diff(diff_text: str, file_path: str) -> Any:
-    if "[Linter Feedback]:" in diff_text:
-        diff_text = diff_text.split("[Linter Feedback]:")[0].strip()
-
     diff_text = re.sub(
         r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE
     ).strip()

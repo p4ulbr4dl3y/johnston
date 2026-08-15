@@ -461,11 +461,6 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("old = 1", text)
         self.assertIn("new = 2", text)
 
-    def test_format_edit_diff_linter_feedback_and_success_prefix(self):
-        diff = "[Linter Feedback]:\nsome linter noise\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
-        result = format_edit_diff(diff, "f.py")
-        self.assertNotIn("Linter", result.plain)
-
         diff2 = "Success: file 'f.py' updated\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
         result2 = format_edit_diff(diff2, "f.py")
         self.assertNotIn("Success", result2.plain)

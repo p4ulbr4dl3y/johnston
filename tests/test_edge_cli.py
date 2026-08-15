@@ -56,13 +56,6 @@ class TestCLIEdgeMain(unittest.TestCase):
         ver = get_version()
         self.assertIsInstance(ver, str)
 
-    @patch("sys.argv", ["johnston", "--linters"])
-    def test_main_linters_failure_preserves_traceback_semantics(self):
-        """A linter listing error must not be silently swallowed into a crash."""
-        with patch("cli.print_linters", side_effect=RuntimeError("boom")):
-            with self.assertRaises(RuntimeError):
-                main()
-
 
 class TestCLIEdgeResumeTip(unittest.TestCase):
     @patch("sys.argv", ["johnston"])
