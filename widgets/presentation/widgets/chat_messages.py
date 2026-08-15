@@ -1,6 +1,5 @@
 import asyncio
 
-from rich.markdown import Markdown as RichMarkdown
 from rich.rule import Rule
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -8,8 +7,6 @@ from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
 
 from widgets.presentation.widgets.chat_markdown import (
-    CODE_THEME,
-    _apply_chat_markdown_patches,
     clean_markdown_for_rendering,
     safe_update_markdown,
 )
@@ -55,9 +52,6 @@ class BotMessage(Vertical):
     can_focus = False
     content = reactive("")
 
-    MAX_INTERACTIVE_MARKDOWN_LINES = 300
-    MAX_INTERACTIVE_MARKDOWN_CHARS = 12000
-
     def __init__(self):
         super().__init__(classes="bot-msg")
         self.stream_widget = Static("", markup=False, classes="bot-msg-stream")
@@ -68,7 +62,6 @@ class BotMessage(Vertical):
         self._suppress_content_watch = False
         self._markdown_render_task: asyncio.Task | None = None
         self._pending_markdown_content: str | None = None
-        self._render_failed = False
 
     def compose(self) -> ComposeResult:
         yield self.stream_widget
@@ -177,30 +170,10 @@ class BotMessage(Vertical):
             except asyncio.CancelledError:
                 pass
         self._pending_markdown_content = None
-        cleaned = clean_markdown_for_rendering(content)
-        if (
-            len(cleaned) > self.MAX_INTERACTIVE_MARKDOWN_CHARS
-            or cleaned.count("\n") > self.MAX_INTERACTIVE_MARKDOWN_LINES
-        ):
-            _apply_chat_markdown_patches()
-            self.stream_widget.update(RichMarkdown(cleaned, code_theme=CODE_THEME))
-            self._streaming = False
-            self.stream_widget.display = True
-            self.md_widget.display = False
-            self._scroll_if_needed()
-            return
-        self._render_failed = False
         await self._render_markdown(content)
         self._streaming = False
-        if self._render_failed:
-            self._render_failed = False
-            _apply_chat_markdown_patches()
-            self.stream_widget.update(RichMarkdown(cleaned, code_theme=CODE_THEME))
-            self.stream_widget.display = True
-            self.md_widget.display = False
-        else:
-            self.stream_widget.display = False
-            self.md_widget.display = True
+        self.stream_widget.display = False
+        self.md_widget.display = True
         self._scroll_if_needed()
 
     async def finalize_stream(self, content: str | None = None) -> None:
@@ -226,7 +199,6 @@ class BotMessage(Vertical):
 
     async def _render_markdown(self, content: str) -> None:
         if not self.md_widget.is_attached:
-            self._render_failed = True
             return
         cleaned = clean_markdown_for_rendering(content)
         try:
@@ -234,7 +206,7 @@ class BotMessage(Vertical):
         except asyncio.CancelledError:
             raise
         except Exception:
-            self._render_failed = True
+            pass
 
     def _scroll_if_needed(self) -> None:
         try:

@@ -86,7 +86,7 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(bot.stream_widget.display)
                 self.assertTrue(bot.md_widget.display)
 
-    async def test_large_bot_message_uses_single_static_renderable(self):
+    async def test_large_bot_message_renders_via_interactive_markdown(self):
         app = JohnstonApp()
 
         async with app.run_test() as pilot:
@@ -98,9 +98,9 @@ class TestChatView(unittest.IsolatedAsyncioTestCase):
             with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
                 await bot.set_final_content(large_markdown)
 
-            markdown_update.assert_not_awaited()
-            self.assertTrue(bot.stream_widget.display)
-            self.assertFalse(bot.md_widget.display)
+            markdown_update.assert_awaited_once()
+            self.assertFalse(bot.stream_widget.display)
+            self.assertTrue(bot.md_widget.display)
 
     def test_clean_markdown_for_rendering(self):
         raw = (
@@ -598,18 +598,6 @@ class TestFormatEditDiff(unittest.TestCase):
 
 
 class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
-    async def test_set_final_content_large_message_uses_static_markdown(self):
-        app = JohnstonApp()
-        async with app.run_test() as pilot:
-            chat_view = app.query_one(ChatView)
-            bot = await chat_view.add_bot_message(animate=False)
-            await pilot.pause()
-            with patch.object(bot.md_widget, "update", new_callable=AsyncMock) as markdown_update:
-                await bot.set_final_content("## Big\n\n" * 300)
-            markdown_update.assert_not_awaited()
-            self.assertTrue(bot.stream_widget.display)
-            self.assertFalse(bot.md_widget.display)
-
     async def test_schedule_stream_update_runtime_error_and_flush_unattached(self):
         bot = BotMessage()
         with patch("asyncio.get_running_loop", side_effect=RuntimeError):
