@@ -239,7 +239,7 @@ MarkdownBlockQuote MarkdownBlockQuote {
 }
 
 MarkdownHeader {
-    margin: 1 0 0 0;
+    margin: 1 0 1 0;
 }
 
 MarkdownBulletList,
@@ -692,7 +692,7 @@ MarkdownHeader {
     color: #ffffff;
     background: transparent;
     border: none;
-    margin: 1 0 0 0;
+    margin: 1 0 1 0;
     padding: 0;
 }
 
