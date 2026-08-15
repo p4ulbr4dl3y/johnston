@@ -338,9 +338,23 @@ def _apply_chat_markdown_patches() -> None:
 
             yield table
 
+    from rich.markdown import BlockQuote
+
+    class CustomRichBlockQuote(BlockQuote):
+        """Rich Markdown BlockQuote matching Johnston card theme #18181b and padding (0, 1)."""
+
+        def __rich_console__(self, console: Any, options: Any) -> Any:
+            render_options = options.update(width=options.max_width)
+            style = RichStyle.parse("on #18181b #e4e4e7")
+            lines = console.render_lines(self.elements, render_options, style=style)
+            for line in lines:
+                yield from line
+                yield Segment.line()
+
     RichMarkdown.elements["fence"] = CustomRichCodeBlock
     RichMarkdown.elements["code_block"] = CustomRichCodeBlock
     RichMarkdown.elements["table_open"] = CustomRichTableElement
+    RichMarkdown.elements["blockquote_open"] = CustomRichBlockQuote
 
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
