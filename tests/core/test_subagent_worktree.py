@@ -193,7 +193,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
             patch(
-                "core.subagent_worktree.run_git",
+                "core.infrastructure.runtime.subagent_worktree.run_git",
                 return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
             ),
         ):
@@ -225,7 +225,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
             patch(
-                "core.subagent_worktree.run_git",
+                "core.infrastructure.runtime.subagent_worktree.run_git",
                 return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
             ),
         ):
@@ -243,7 +243,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             with (
                 patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
                 patch(
-                    "core.subagent_worktree.run_git",
+                    "core.infrastructure.runtime.subagent_worktree.run_git",
                     return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr=""),
                 ),
             ):
@@ -273,7 +273,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
-            patch("core.subagent_worktree.run_git", side_effect=fake_run),
+            patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run),
         ):
             diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 self.repo_dir, self.repo_dir, "branch-x"
@@ -285,7 +285,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_get_worktree_diff_summary_exception(self):
         from unittest.mock import patch
 
-        with patch("core.subagent_worktree.run_git", side_effect=Exception("boom")):
+        with patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=Exception("boom")):
             diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 self.repo_dir, self.repo_dir, "branch-x"
             )
