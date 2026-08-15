@@ -192,10 +192,21 @@ class MessageFlowMixin:
         if not getattr(self, "is_app_active", True):
             return
         try:
-            from core.infrastructure.tasks.output import tail_output
-            from tools.base import format_background_notification
+            from tools.base import format_background_notification, truncate_output
 
-            msg = format_background_notification("Background shell", command_str, task_id, tail_output(result, 2000))
+            msg = format_background_notification(
+                "Background shell",
+                command_str,
+                task_id,
+                truncate_output(
+                    result,
+                    max_chars=4000,
+                    hint="Pipe output to grep/head/tail if complete log is needed.",
+                    tool_name="shell",
+                    from_end=True,
+                    save_log=False,
+                ),
+            )
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:
                 self.message_queue.append((msg, False, None, curr_sid))
