@@ -19,7 +19,6 @@ build/
 # Local folders
 .serena/
 .johnston/
-scripts/
 probe.txt
 
 
