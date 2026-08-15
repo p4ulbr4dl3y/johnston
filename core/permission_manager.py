@@ -2,38 +2,19 @@ from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
 
 from core.config import CONFIG_FILE
 from core.domain.defaults.config import DEFAULT_PERMISSIONS
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
-
-# Builtin tools that are NOT covered by an explicit config entry fall back to
-# the configured default action (ask/deny). MCP tools (not in this set) default
-# to 'allow'. Used as the fallback when no builtin_tool_names frozenset is
-# injected via DI.
-_BUILTIN_TOOLS = frozenset(
-    {
-        "read",
-        "create",
-        "edit",
-        "multi_edit",
-        "replace_file_content",
-        "multi_replace_file_content",
-        "write_to_file",
-        "glob",
-        "grep",
-        "list",
-        "shell",
-        "ask_user",
-        "web_fetch",
-        "web_search",
-        "invoke_subagent",
-        "manage_subagent",
-    }
+from core.domain.policies.permission_policy import (
+    _BUILTIN_TOOLS,
+    VALID_ACTIONS,
+    _merge_perms,
+    normalize_action,
 )
+from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 
 class PermissionManager:
     """Manages tool execution permissions (allow, ask, deny) with config cascade."""
 
-    VALID_ACTIONS = {"allow", "ask", "deny"}
+    VALID_ACTIONS = VALID_ACTIONS
 
     _instance: Optional["PermissionManager"] = None
 
@@ -55,16 +36,12 @@ class PermissionManager:
     @staticmethod
     def normalize_action(action: str, default: str = "ask") -> str:
         """Normalizes an action to 'allow'/'ask'/'deny'. Invalid values fall back to default."""
-        if isinstance(action, str):
-            cleaned = action.strip().lower()
-            if cleaned in PermissionManager.VALID_ACTIONS:
-                return cleaned
-        return default
+        return normalize_action(action, default)
 
     def set_session_override(self, tool_name: str, action: str) -> None:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
-        normalized = self.normalize_action(action)
-        if normalized in self.VALID_ACTIONS:
+        normalized = normalize_action(action)
+        if normalized in VALID_ACTIONS:
             canonical = self._normalize_name(tool_name or "")
             self.session_overrides[canonical] = normalized
 
@@ -127,19 +104,9 @@ class PermissionManager:
         # 2. Global config (~/.johnston/config.json)
         global_cfg = self._load_json_config(CONFIG_FILE)
         global_perms = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
-        self._merge_perms(merged, global_perms)
+        _merge_perms(merged, global_perms)
 
         return merged
-
-    def _merge_perms(self, base: Dict[str, Any], override: Dict[str, Any]) -> None:
-        if not override:
-            return
-        if "default" in override and isinstance(override["default"], str):
-            base["default"] = self.normalize_action(override["default"])
-        if "tools" in override and isinstance(override["tools"], dict):
-            for t, act in override["tools"].items():
-                if isinstance(act, str):
-                    base["tools"][t.lower()] = self.normalize_action(act)
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         """
@@ -172,8 +139,8 @@ class PermissionManager:
             perms_cfg = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
             raw_default = perms_cfg.get("default")
             if raw_default is not None:
-                norm_default = self.normalize_action(raw_default)
-                if norm_default in self.VALID_ACTIONS:
+                norm_default = normalize_action(raw_default)
+                if norm_default in VALID_ACTIONS:
                     return norm_default, f"MCP tool '{canonical_name}' applies configured default '{norm_default}'"
                 return "deny", f"Invalid default configured; MCP tool '{canonical_name}' fails closed"
             return "allow", f"MCP tool default for '{canonical_name}'"
@@ -181,4 +148,4 @@ class PermissionManager:
         # 4. Fallback to default
         default_action = effective_perms.get("default", "ask")
         # Fail-closed: any unexpected value becomes 'ask' (user confirmation), never silent 'allow'.
-        return self.normalize_action(default_action), f"Default permission fallback for '{canonical_name}'"
+        return normalize_action(default_action), f"Default permission fallback for '{canonical_name}'"
