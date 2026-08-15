@@ -278,6 +278,39 @@ def _apply_chat_markdown_patches() -> None:
     except Exception:
         pass
 
+    from rich.markdown import Markdown as RichMarkdown
+    from rich.markdown import TextElement
+
+    class CustomRichCodeBlock(TextElement):
+        """Rich Markdown CodeBlock matching Johnston theme and #18181b background."""
+
+        style_name = "markdown.code_block"
+
+        @classmethod
+        def create(cls, markdown: Any, token: Any) -> "CustomRichCodeBlock":
+            node_info = token.info or ""
+            lexer_name = node_info.partition(" ")[0]
+            return cls(lexer_name or "text", markdown.code_theme)
+
+        def __init__(self, lexer_name: str, theme: str) -> None:
+            self.lexer_name = lexer_name
+            self.theme = theme
+
+        def __rich_console__(self, console: Any, options: Any) -> Any:
+            code = str(self.text).rstrip()
+            syntax = Syntax(
+                code,
+                self.lexer_name,
+                theme=self.theme,
+                word_wrap=True,
+                background_color="#18181b",
+                padding=(0, 1),
+            )
+            yield syntax
+
+    RichMarkdown.elements["fence"] = CustomRichCodeBlock
+    RichMarkdown.elements["code_block"] = CustomRichCodeBlock
+
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     Markdown.BLOCKS["table"] = CustomMarkdownTable
