@@ -87,8 +87,6 @@ class CustomMarkdownTableContent(MarkdownTableContent):
                 )
             self.last_row = row_index
         await self.mount_all(new_cells)
-        for child in self.query(".cell"):
-            child.tooltip = None
 
     def on_mount(self) -> None:
         self.styles.grid_size_columns = len(self.headers)
@@ -198,10 +196,9 @@ _old_markdown_init = Markdown.__init__
 def _new_markdown_init(self, *args, **kwargs):
     if "parser_factory" not in kwargs or kwargs["parser_factory"] is None:
         kwargs["parser_factory"] = _custom_markdown_parser_factory
-    self.BLOCKS = dict(self.BLOCKS)
-    self.BLOCKS["fence"] = CustomMarkdownFence
-    self.BLOCKS["code_block"] = CustomMarkdownFence
-    self.BLOCKS["table"] = CustomMarkdownTable
+    # Reference the live BLOCKS mapping so any Markdown widget created before the
+    # global patch still picks up the patched table/fence block classes.
+    self.BLOCKS = Markdown.BLOCKS
     _old_markdown_init(self, *args, **kwargs)
 
 
