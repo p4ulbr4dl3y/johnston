@@ -472,7 +472,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/connect", COMMAND_REGISTRY)
 
     def test_alias_suggestions_formatting(self):
-        from widgets.command_suggestions import get_all_command_suggestions
+        from widgets.app.command_provider import get_all_command_suggestions
 
         commands_dict = dict(get_all_command_suggestions())
         self.assertIn("/providers", commands_dict)

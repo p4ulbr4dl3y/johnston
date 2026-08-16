@@ -12,9 +12,8 @@ class CommandSuggestions(OptionList):
     can_focus = False
     ALLOW_SELECT = True
 
-    # Cache delegating to the app-layer provider. Keep a thin module-level
-    # shim so `from widgets.command_suggestions import get_all_command_suggestions`
-    # keeps working (see module top).
+    # Required by CommandSuggestions to render slash commands. Delegates to the
+    # app-layer provider (imported at module top).
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.mode: str | None = None  # "command" or "file"
@@ -23,8 +22,8 @@ class CommandSuggestions(OptionList):
         self._cached_files: list[str] = []
         self._cache_time: float = 0.0
 
-    @classmethod
-    def get_all_command_suggestions(cls) -> list[tuple[str, str]]:
+    @staticmethod
+    def get_all_command_suggestions() -> list[tuple[str, str]]:
         """Gets list of (command_name, description) for registered commands and skills with 10s cache."""
         return get_all_command_suggestions()
 
