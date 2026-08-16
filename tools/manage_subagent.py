@@ -101,6 +101,9 @@ class ManageSubagentTool(BaseTool):
                 if not hasattr(session, "pending_messages"):
                     session.pending_messages = []
                 session.pending_messages.append(message)
+                from tools.invoke_subagent import _mark_subagent_running
+
+                _mark_subagent_running(ctx.app, session.id, text=f"follow-up queued for {session.id}")
                 return f"queued for {session.id}"
 
             try:
@@ -174,6 +177,9 @@ class ManageSubagentTool(BaseTool):
                 )
                 session.async_task = bg_task
 
+                from tools.invoke_subagent import _mark_subagent_running
+
+                _mark_subagent_running(ctx.app, session.id, text=f"follow-up sent to {session.id}")
                 return f"message sent to {session.id}"
             except Exception as err:
                 session.finish(STATUS_ERROR, str(err))

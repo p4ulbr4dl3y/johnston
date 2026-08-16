@@ -467,7 +467,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         elif is_error:
             self.status = "error"
         else:
-            self.status = "done"
+            self.status = "error" if self._is_explicit_error(cleaned) else "done"
 
         if self.tool_type in ("shell", "Shell", "bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
@@ -519,6 +519,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         self.status = "cancelled"
         self.result_text = "[Tool call interrupted or cancelled]"
+        self.render_header()
+
+    def mark_running(self, text: str = "") -> None:
+        """Mark the tool card as running (yellow) with optional status text.
+
+        Set by the tools layer when a subagent follow-up is dispatched so the
+        invoke_subagent card returns to a yellow "working" state instead of
+        staying green after a send_message. ``text`` is only applied for
+        invoke_subagent cards; other tool types just flip to running.
+        """
+        self.status = "running"
+        if text:
+            self.result_text = text.strip()
         self.render_header()
 
     DISPLAY_NAMES = _DisplayNamesDict()

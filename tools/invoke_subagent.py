@@ -37,6 +37,31 @@ def _record_subagent_session(app: Any, session_id: str) -> None:
     reg[session_id] = widget
 
 
+def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
+    """Flip the host's invoke_subagent widget for ``session_id`` back to running (yellow).
+
+    Used when a follow-up (``manage_subagent send_message``) is dispatched: the
+    subagent is now working again, so its card should leave the green "done"
+    state until the background completion callback repaints it to a final color.
+    Safe no-op in headless environments (no app / no widget / widget without a
+    ``mark_running`` hook).
+    """
+    if app is None:
+        return
+    reg = getattr(app, "_subagent_tools", None)
+    if not isinstance(reg, dict):
+        return
+    widget = reg.get(session_id)
+    if widget is None:
+        return
+    mark = getattr(widget, "mark_running", None)
+    if callable(mark):
+        try:
+            mark(text=text)
+        except Exception:
+            pass
+
+
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (

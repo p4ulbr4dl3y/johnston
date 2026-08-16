@@ -310,5 +310,100 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: context 'sub-done': no active agent", res)
 
 
+class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
+    """Regression: a successful send_message must flip the invoke_subagent widget
+    back to running; on error it must not."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.store = _make_store(self.temp_dir.name)
+        self._old_instance = SessionStore._instance
+        SessionStore._instance = self.store
+
+    async def asyncTearDown(self):
+        SessionStore._instance = self._old_instance
+
+    def _mk_subagent(self, sid, role="worker", status="running"):
+        return self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id=sid,
+            role=role,
+            description="Task",
+            prompt="prompt",
+            status=status,
+        )
+
+    def _app_with_widget(self, sess):
+        """Build a mock app whose _subagent_tools registry maps sid -> spy widget."""
+        spy = MagicMock()
+        spy.mark_running = MagicMock()
+        spy.set_result = MagicMock()
+        app = MagicMock()
+        app._subagent_tools = {sess.id: spy}
+        app.current_session_id = None
+        app.project_dir = None
+        app.agent = None
+        app.sm = self.store
+        app.pm = MagicMock()
+        return app, spy
+
+    async def test_send_message_sync_marks_widget_running(self):
+        sess = self._mk_subagent("sub-run")
+        app, spy = self._app_with_widget(sess)
+
+        class MockSubagent:
+            async def stream_steps(self, message):
+                yield ("bot_text", "reply")
+
+        app.pm.create_active_agent.return_value = MockSubagent()
+
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "send_message", "session_id": "sub-run", "message": "hi"}, ctx=app)
+        self.assertIn("message sent to sub-run", res)
+        spy.mark_running.assert_called_once()
+        self.assertIn("sub-run", spy.mark_running.call_args.kwargs.get("text", ""))
+
+    async def test_send_message_queued_marks_widget_running(self):
+        sess = self._mk_subagent("sub-queue")
+        app, spy = self._app_with_widget(sess)
+        not_done = MagicMock()
+        not_done.done.return_value = False
+        sess.async_task = not_done
+
+        tool = ManageSubagentTool()
+        res = await tool.execute(
+            {"action": "send_message", "session_id": "sub-queue", "message": "again"}, ctx=app
+        )
+        self.assertIn("queued for sub-queue", res)
+        spy.mark_running.assert_called_once()
+        self.assertIn("sub-queue", spy.mark_running.call_args.kwargs.get("text", ""))
+
+    async def test_send_message_error_does_not_mark_running(self):
+        sess = self._mk_subagent("sub-err")
+        app, spy = self._app_with_widget(sess)
+        app.pm.create_active_agent.side_effect = RuntimeError("boom")
+
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "send_message", "session_id": "sub-err", "message": "hi"}, ctx=app)
+        self.assertIn("ERR: subagent_setup", res)
+        spy.mark_running.assert_not_called()
+
+    async def test_send_message_no_widget_is_noop(self):
+        sess = self._mk_subagent("sub-noreg")
+        app, _ = self._app_with_widget(sess)
+        del app._subagent_tools
+
+        class MockSubagent:
+            async def stream_steps(self, message):
+                yield ("bot_text", "reply")
+
+        app.pm.create_active_agent.return_value = MockSubagent()
+
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "send_message", "session_id": "sub-noreg", "message": "hi"}, ctx=app)
+        self.assertIn("message sent to sub-noreg", res)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -102,5 +102,30 @@ class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
         self.assertEqual(widget.status, "error")
 
 
+class TestEdgeToolCallMarkRunning(unittest.TestCase):
+    def test_mark_running_sets_yellow_status(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        self.assertEqual(widget.status, "running")
+        widget.set_result("the bug is fixed")
+        self.assertEqual(widget.status, "done")
+        widget.mark_running(text="follow-up sent to subagent-abc")
+        self.assertEqual(widget.status, "running")
+        self.assertEqual(widget.result_text, "follow-up sent to subagent-abc")
+
+    def test_mark_running_no_text_keeps_result(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget.set_result("result text")
+        widget.mark_running()
+        self.assertEqual(widget.status, "running")
+        self.assertEqual(widget.result_text, "result text")
+
+    def test_mark_running_on_non_subagent_tool(self):
+        widget = ToolCallWidget("read", "f.py")
+        widget.set_result("content")
+        widget.mark_running(text="working")
+        self.assertEqual(widget.status, "running")
+        self.assertEqual(widget.result_text, "working")
+
+
 if __name__ == "__main__":
     unittest.main()
