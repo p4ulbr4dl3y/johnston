@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from core.infrastructure.mcp import MCPManager
-from widgets.commands import COMMAND_REGISTRY
+from widgets.app.dispatch import COMMAND_REGISTRY
 
 
 class TestMCPManager(unittest.TestCase):

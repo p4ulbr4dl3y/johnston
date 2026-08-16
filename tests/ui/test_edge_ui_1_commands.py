@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
     async def _call(self, text, app=None):
         app = app or MagicMock()
-        from widgets.commands import handle_slash_command
+        from widgets.app.dispatch import handle_slash_command
 
         return await handle_slash_command(app, text), app
 
@@ -19,7 +19,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(handled)
 
     async def test_none_command_returns_false(self):
-        from widgets.commands import handle_slash_command
+        from widgets.app.dispatch import handle_slash_command
 
         self.assertFalse(await handle_slash_command(MagicMock(), None))
 
@@ -29,7 +29,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
 
     async def test_registered_command_executes_with_args(self):
         app = MagicMock()
-        with patch("widgets.commands.COMMAND_REGISTRY", {"/known": MagicMock()}) as registry:
+        with patch("widgets.app.dispatch.COMMAND_REGISTRY", {"/known": MagicMock()}) as registry:
             inst = AsyncMock()
             registry["/known"].return_value = inst
             handled, _ = await self._call("/known arg1 arg2", app)
@@ -43,7 +43,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_whitespace_between_args(self):
         # "cmd  arg" with double space must split to earliest command word.
-        with patch("widgets.commands.COMMAND_REGISTRY", {}):
+        with patch("widgets.app.dispatch.COMMAND_REGISTRY", {}):
             handled, _ = await self._call("/xyz  arg")
         self.assertFalse(handled)
 

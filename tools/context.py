@@ -101,21 +101,21 @@ class ToolContext:
 
     @property
     def task_manager(self) -> Any | None:
-        """Host task manager via legacy attribute or protocol method fallback."""
+        """Host task manager attribute (or protocol method fallback)."""
         if not self.host:
             return None
         return getattr(self.host, "task_manager", None)
 
     @property
     def provider_manager(self) -> Any | None:
-        """Host provider manager (``pm``) via legacy attribute."""
+        """Host provider manager (``pm``) attribute."""
         if not self.host:
             return None
         return getattr(self.host, "pm", None)
 
     @property
     def session_id(self) -> str | None:
-        """Current session id via legacy attribute."""
+        """Current session id attribute."""
         if not self.host:
             return None
         return getattr(self.host, "current_session_id", None)

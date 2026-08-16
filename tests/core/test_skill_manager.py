@@ -101,7 +101,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(re_hidden_state)
 
     def test_skills_command_registered(self):
-        from widgets.commands import COMMAND_REGISTRY
+        from widgets.app.dispatch import COMMAND_REGISTRY
 
         self.assertIn("/skills", COMMAND_REGISTRY)
 
@@ -136,7 +136,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("helper", skill_names)
 
     async def test_skill_slash_command_execution(self):
-        from widgets.commands import handle_slash_command
+        from widgets.app.dispatch import handle_slash_command
 
         try:
             from tests.core.test_commands import MockApp
@@ -153,7 +153,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("configure MCP", app.ai_prompts[0][0])
 
     async def test_multi_skill_slash_command_execution(self):
-        from widgets.commands import handle_slash_command
+        from widgets.app.dispatch import handle_slash_command
 
         try:
             from tests.core.test_commands import MockApp

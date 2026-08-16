@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import unittest
 
-from core.git_checkpoint import GitCheckpointManager
+from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
 class TestGitCheckpointManager(unittest.TestCase):

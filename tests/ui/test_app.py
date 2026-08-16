@@ -24,7 +24,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.focus()
 
             # 1. Test /help
-            from widgets.commands import handle_slash_command
+            from widgets.app.dispatch import handle_slash_command
 
             await handle_slash_command(app, "/help")
             await pilot.pause(0.2)
@@ -191,7 +191,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
         fake_att = MagicMock()
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -229,7 +229,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             await asyncio.sleep(5.0)
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -302,7 +302,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o"]}})
         async with app.run_test() as pilot:
-            from widgets.commands import handle_slash_command
+            from widgets.app.dispatch import handle_slash_command
 
             await handle_slash_command(app, "/models")
             await pilot.pause(0.2)
@@ -357,7 +357,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             if False:
                 yield
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -433,7 +433,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             raise ValueError("API call failed")
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -471,7 +471,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async def queued_event_stream(prompt, attachments=None):
             yield ("queued_user_message", "Mid-turn queued message", None, True)
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=mock_checkpoint):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=mock_checkpoint):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
