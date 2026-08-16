@@ -69,14 +69,15 @@ class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
                 f.write("alias read content")
 
             res = await execute_tool("read_file", {"path": path})
-            self.assertIn("alias read content", res)
+            self.assertIn("alias read content", res.content)
         finally:
             if os.path.exists(path):
                 os.unlink(path)
 
     async def test_execute_tool_unknown_tool_is_reported(self):
         res = await execute_tool("xyz_unknown_tool_123", {})
-        self.assertEqual(res, "ERR: unknown 'xyz_unknown_tool_123'")
+        self.assertEqual(res.content, "ERR: unknown 'xyz_unknown_tool_123'")
+        self.assertTrue(res.is_error)
 
 
 if __name__ == "__main__":

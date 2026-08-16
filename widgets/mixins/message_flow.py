@@ -223,9 +223,9 @@ class MessageFlowMixin:
     def _update_background_shell_widget(self, task_id: str, result: str) -> None:
         """Repaint the linked shell tool card once a background task finishes.
 
-        The widget keeps the ``running`` (yellow) status until here; we flip it to
-        done/error based on the explicit ``ERR:`` convention. No-op when the task
-        or its widget is unavailable.
+        The widget keeps the ``running`` (yellow) status until here; we flip it
+        based on the shell task's terminal status. No-op when the task or its
+        widget is unavailable.
         """
         mgr = getattr(self, "task_manager", None)
         if mgr is None:
@@ -238,8 +238,13 @@ class MessageFlowMixin:
         if widget is None:
             return
         try:
-            is_error = (result or "").lstrip().lower().startswith("err:")
-            widget.set_result(result or "(no output)", is_error=is_error)
+            task_status = (getattr(getattr(task, "status"), "value", None) or "").lower()
+            status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed") else None)
+            if status is not None:
+                widget.set_result(result or "(no output)", status=status)
+            else:
+                is_error = (result or "").lstrip().lower().startswith("err:")
+                widget.set_result(result or "(no output)", is_error=is_error)
         except Exception as e:
             logger.warning("Background shell widget update failed: %s", e)
 
@@ -259,7 +264,9 @@ class MessageFlowMixin:
             status = (status or "").lower()
             if status == "cancelled":
                 widget.mark_cancelled()
+            elif status == "error":
+                widget.set_result(result or "(no output)", status="error")
             else:
-                widget.set_result(result or "(no output)", is_error=(status == "error"))
+                widget.set_result(result or "(no output)", status="done")
         except Exception as e:
             logger.warning("Subagent tool completion handling failed: %s", e)

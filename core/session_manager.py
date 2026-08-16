@@ -106,6 +106,9 @@ class AgentSession:
             and "result_text" not in last
         ):
             last["result_text"] = event["result_text"]
+            for key in ("status", "is_error", "returncode"):
+                if key in event:
+                    last[key] = event[key]
         else:
             if etype == "tool" and last and last.get("type") == "bot" and not last.get("text", "").strip():
                 self.messages.pop()

@@ -93,8 +93,14 @@ class TestUnifiedErrorReturns(unittest.TestCase):
                 # Only flag plain name calls (function call only) — ignore others.
                 if isinstance(value, ast.Call):
                     fname = value.func
+                    # Factory calls that structure ERR content (ToolResult.error) and
+                    # raw ToolResult construction are canonical by definition.
+                    if isinstance(fname, ast.Attribute) and fname.attr == "error" and isinstance(
+                        fname.value, ast.Name
+                    ) and fname.value.id == "ToolResult":
+                        continue
                     if isinstance(fname, ast.Name):
-                        if fname.id == "format_tool_error":
+                        if fname.id in ("format_tool_error", "ToolResult"):
                             continue
                         offenders.append((name, handler.lineno, f"return {fname.id}(...)"))
                     # e.g. `return not_found_message(...)` — allow names ending in _error/_message

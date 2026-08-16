@@ -65,9 +65,10 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
             self._mode(),
         ):
             res = await execute_tool("recent_tool", {"arg": 1})
-        self.assertIn("ERR: mcp 'recent_tool'", res)
-        self.assertIn("failed to list active tools", res)
-        self.assertIn("broken transport", res)
+        self.assertIn("ERR: mcp 'recent_tool'", res.content)
+        self.assertIn("failed to list active tools", res.content)
+        self.assertIn("broken transport", res.content)
+        self.assertTrue(res.is_error)
 
     async def test_capabilities_exception_wrapped(self):
         mock_mgr = MagicMock()
@@ -80,9 +81,9 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
             self._mode(),
         ):
             res = await execute_tool("gh__search", {"q": "x"})
-        self.assertIn("ERR: mcp 'gh__search'", res)
-        self.assertIn("failed to resolve capabilities", res)
-        self.assertIn("policy crash", res)
+        self.assertIn("ERR: mcp 'gh__search'", res.content)
+        self.assertIn("failed to resolve capabilities", res.content)
+        self.assertIn("policy crash", res.content)
 
 
 class TestAskUserCancellationRaises(unittest.IsolatedAsyncioTestCase):

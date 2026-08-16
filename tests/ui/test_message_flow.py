@@ -1074,7 +1074,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             widget = MagicMock()
             app._subagent_tools["s1"] = widget
             app.on_subagent_tool_completed("s1", "completed", "ok result")
-            widget.set_result.assert_called_once_with("ok result", is_error=False)
+            widget.set_result.assert_called_once_with("ok result", status="done")
 
     async def test_subagent_completed_widget_error(self):
         from unittest.mock import MagicMock
@@ -1084,7 +1084,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             widget = MagicMock()
             app._subagent_tools["s1"] = widget
             app.on_subagent_tool_completed("s1", "error", "boom")
-            widget.set_result.assert_called_once_with("boom", is_error=True)
+            widget.set_result.assert_called_once_with("boom", status="error")
 
     async def test_subagent_completed_widget_cancelled(self):
         from unittest.mock import MagicMock

@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Tuple
 
 from core.application.generation.prompt_builder import PromptBuilder
@@ -14,7 +15,28 @@ class ToolMixin:
             return normalizer(tool_name or "")
         return (tool_name or "").strip().lower()
 
-    def _tool_policy_error(self, tool_name: str, mode_def: Any) -> str | None:
+    def _normalize_tool_result(self, result: Any) -> Any:
+        """Normalize a raw tool result into a :class:`ToolResult`.
+
+        Accepts ``ToolResult`` (returned as-is), a raw ``ERR:`` string (kept
+        verbatim and marked as an explicit error), a dict/list (JSON-serialized
+        so the model message stays a string), ``None`` -> empty, and any other
+        value -> ``str()``. Guarantees a plain string ``content`` for the model.
+        """
+        from core.domain.defaults.errors import ToolResult
+
+        if isinstance(result, ToolResult):
+            return result
+        if result is None:
+            return ToolResult.done("")
+        if isinstance(result, (dict, list)):
+            return ToolResult.done(json.dumps(result, ensure_ascii=False))
+        text = str(result)
+        if text.lstrip().lower().startswith("err:"):
+            return ToolResult(content=text, is_error=True, status="error")
+        return ToolResult.done(text)
+
+    def _tool_policy_error(self, tool_name: str, mode_def: Any) -> Any:
         from core.domain.policies.role_policy import role_tool_error
 
         clean_name = self._canonical_tool_name(tool_name).lower()

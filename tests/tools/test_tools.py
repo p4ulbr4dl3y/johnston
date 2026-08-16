@@ -225,21 +225,21 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Alias Content"})
-        self.assertIn("file", res_create)
+        self.assertIn("file", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Test alias "write" -> "create"
         file_path2 = os.path.join(self.test_dir, "write_test.txt")
         res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
-        self.assertIn("file", res_write)
+        self.assertIn("file", res_write.content)
 
         # Test alias "cat" -> "read"
         res_cat = await execute_tool("cat", {"path": file_path2})
-        self.assertIn("Write Content", res_cat)
+        self.assertIn("Write Content", res_cat.content)
 
         # Test canonical shell tool
         res_shell = await execute_tool("shell", {"command": "echo 'shell command'"})
-        self.assertIn("shell command", res_shell)
+        self.assertIn("shell command", res_shell.content)
 
     async def test_read_tool_max_size_limit(self):
         tool = ReadTool()

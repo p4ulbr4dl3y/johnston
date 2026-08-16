@@ -1053,9 +1053,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget2b.status, "error")
         widget3 = ToolCallWidget("read", "f.py", result_text="ok")
         self.assertEqual(widget3.status, "done")
-        # Explicit is_error flag takes precedence (error even without ERR:).
-        widget4 = ToolCallWidget("read", "f.py", args={"is_error": True})
-        self.assertEqual(widget4.status, "error")
         # "Error:" alone is not the explicit convention -> done.
         widget5 = ToolCallWidget("read", "f.py", result_text="Error: boom")
         self.assertEqual(widget5.status, "done")

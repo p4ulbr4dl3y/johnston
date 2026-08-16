@@ -197,7 +197,12 @@ class SubagentViewScreen(Screen[None]):
         elif etype == "tool":
             if "result_text" in evt and not evt.get("tool_type"):
                 if self.current_tool_widget:
-                    self.current_tool_widget.set_result(evt.get("result_text", ""))
+                    self.current_tool_widget.set_result(
+                        evt.get("result_text", ""),
+                        is_error=bool(evt.get("is_error", False)),
+                        status=evt.get("status"),
+                        returncode=evt.get("returncode"),
+                    )
             else:
                 if self.bot_msg:
                     if not self.bot_msg.content.strip():
@@ -214,6 +219,8 @@ class SubagentViewScreen(Screen[None]):
                     evt.get("target", ""),
                     result_text=evt.get("result_text", ""),
                     args=evt.get("args", {}),
+                    status=evt.get("status"),
+                    returncode=evt.get("returncode"),
                     animate=animate,
                 )
         elif etype == "bot":

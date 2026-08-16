@@ -1,7 +1,8 @@
 import inspect
+import json
 from typing import Any, Dict, Type
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
@@ -132,10 +133,10 @@ async def check_and_confirm_permission(
     *,
     action: str | None = None,
     action_reason: str = "",
-) -> str | None:
+) -> ToolResult | None:
     """
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
-    Returns None if allowed, or error message string if denied/cancelled.
+    Returns None if allowed, or an error ToolResult if denied/cancelled.
 
     When `action` is provided (e.g. a caller that already evaluated role
     policy), the PermissionManager check is skipped and the given action is used.
@@ -150,7 +151,7 @@ async def check_and_confirm_permission(
         action, reason = pm.check_permission(target_perm_name, args)
 
     if action == "deny":
-        return format_tool_error("denied", name=display_name, detail="by permission policy")
+        return ToolResult.error("denied", name=display_name, detail="by permission policy")
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             screen_name = confirm_tool_name or target_perm_name
@@ -158,13 +159,15 @@ async def check_and_confirm_permission(
                 app_obj, screen_name, args, reason, perm_name=target_perm_name
             )
             if not confirmed:
-                return format_tool_error("denied", name=display_name, detail="by user")
+                return ToolResult.error("denied", name=display_name, detail="by user")
         else:
-            return format_tool_error("denied", name=display_name, detail=f"requires user confirmation ({reason})")
+            return ToolResult.error(
+                "denied", name=display_name, detail=f"requires user confirmation ({reason})"
+            )
     return None
 
 
-async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> str:
+async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> ToolResult:
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
     resolved_name = normalize_tool_name(raw_name)
@@ -179,9 +182,9 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if err:
                 return err
 
-            return await tool_inst.execute(args, ctx)
+            return await _wrap_execute(tool_inst.execute(args, ctx))
         except Exception as e:
-            return format_tool_error("execute", detail=str(e), name=name)
+            return ToolResult.error("execute", detail=str(e), name=name)
 
     from core.infrastructure.mcp import get_mcp_manager
 
@@ -198,7 +201,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             active_mcp_tools = mcp_mgr.get_active_tools() or []
         is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
     except Exception as e:
-        return format_tool_error("mcp", detail=f"failed to list active tools: {e}", name=name)
+        return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
 
     if not is_mcp:
         # Short-circuit: only check the capability lookup when the name wasn't
@@ -208,7 +211,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if mcp_mgr.get_capabilities_for_exposed_tool(name):
                 is_mcp = True
         except Exception as e:
-            return format_tool_error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
+            return ToolResult.error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
 
     if not is_mcp:
         import difflib
@@ -219,7 +222,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             resolved_target = ALIAS_MAP.get(matches[0], matches[0])
             desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
             hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
-        return format_tool_error("unknown", detail=hint.strip(), name=name)
+        return ToolResult.error("unknown", detail=hint.strip(), name=name)
 
     from tools.base import check_mcp_role_policy
 
@@ -246,8 +249,33 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args)
         if mcp_res is not None:
-            return mcp_res
+            return await _wrap_execute(mcp_res)
     except Exception as e:
-        return format_tool_error("mcp", detail=str(e), name=name)
+        return ToolResult.error("mcp", detail=str(e), name=name)
 
-    return format_tool_error("unknown", name=name)
+    return ToolResult.error("unknown", name=name)
+
+
+async def _wrap_execute(result: Any) -> ToolResult:
+    """Wrap a raw tool ``execute()`` result into a :class:`ToolResult`.
+
+    Accepts one result value (already awaited) or an awaitable. Tools still
+    return ``str``/``None``/dict etc.; any value already carrying the ``ERR:``
+    convention is treated as an explicit error.
+    """
+    if inspect.isawaitable(result):
+        result = await result
+    if isinstance(result, ToolResult):
+        return result
+    if result is None:
+        return ToolResult.done("")
+    if isinstance(result, Exception):
+        return ToolResult.error("execute", detail=str(result))
+    if isinstance(result, (dict, list)):
+        return ToolResult.done(json.dumps(result, ensure_ascii=False))
+    text = str(result)
+    if text.lstrip().lower().startswith("err:"):
+        # Already carries the canonical ``ERR:`` convention - keep verbatim,
+        # just mark it as an explicit error.
+        return ToolResult(content=text, is_error=True, status="error")
+    return ToolResult.done(text)
