@@ -11,6 +11,7 @@ from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
 from widgets.lexer_utils import guess_lexer_name
+from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.presentation.widgets.chat_markdown import (
     CODE_THEME,
@@ -18,7 +19,6 @@ from widgets.presentation.widgets.chat_markdown import (
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 
 _MISSING = object()
 

@@ -218,6 +218,17 @@ class RewindCommand(BaseCommand):
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
+                try:
+                    if hasattr(app, "workers"):
+                        for w in app.workers:
+                            if getattr(w, "is_running", False):
+                                w.cancel()
+                except Exception:
+                    pass
+                app.is_generating = False
+                if hasattr(app, "message_queue"):
+                    app.message_queue.clear()
+
                 def rollback_ui(target_idx: int) -> None:
                     chat_view.rollback_to(target_idx)
 
@@ -264,6 +275,16 @@ class ResumeCommand(BaseCommand):
 
         def on_resume_selected(selected_sid: str) -> None:
             if selected_sid:
+                try:
+                    if hasattr(app, "workers"):
+                        for w in app.workers:
+                            if getattr(w, "is_running", False):
+                                w.cancel()
+                except Exception:
+                    pass
+                app.is_generating = False
+                if hasattr(app, "message_queue"):
+                    app.message_queue.clear()
                 resume_session(app.sm, selected_sid)
                 app.load_session_ui(selected_sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
@@ -381,15 +402,29 @@ class CompactCommand(BaseCommand):
             if divider and hasattr(divider, "update_title"):
                 divider.update_title(title)
 
-        success, msg = await compact_session(
-            app.agent,
-            save_session_cb=save_cb,
-            on_begin=on_begin,
-            on_divider_update=on_divider_update,
-            refresh_footer_cb=lambda: app.refresh_status_footer(),
-        )
-        if not success:
-            app.notify(msg or "Context compaction failed", severity="warning")
+        try:
+            success, msg = await compact_session(
+                app.agent,
+                save_session_cb=save_cb,
+                on_begin=on_begin,
+                on_divider_update=on_divider_update,
+                refresh_footer_cb=lambda: app.refresh_status_footer(),
+            )
+            if not success:
+                app.notify(msg or "Context compaction failed", severity="warning")
+        finally:
+            app.is_generating = False
+            if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):
+                next_item = app._pop_queued_for_current_session()
+                if next_item is not None:
+                    asyncio.create_task(app._process_queued_message(next_item[0], next_item[1], next_item[2]))
+            elif getattr(app, "message_queue", None):
+                next_item = app.message_queue.pop(0)
+                prompt = next_item[0]
+                show_in_ui = next_item[1] if len(next_item) > 1 else True
+                kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
+                if hasattr(app, "trigger_ai_response"):
+                    app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
 
 class PermissionsCommand(BaseCommand):
