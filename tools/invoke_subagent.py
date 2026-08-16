@@ -32,9 +32,10 @@ def _record_subagent_session(app: Any, session_id: str) -> None:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        f"Launch an autonomous subagent for a bounded subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
-        "Returns <task_result>. branch='<name>' runs the subagent on that git branch: if it matches "
-        "the current branch it works in the main tree, otherwise in an isolated worktree."
+        f"Launch an autonomous subagent in the background for a bounded subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+        "Returns session_id immediately. When finished, final output is delivered automatically via a "
+        "[System Notification] message. branch='<name>' runs on that git branch (main tree if matching current branch, "
+        "otherwise in an isolated worktree)."
     )
     schema = {
         "type": "function",
