@@ -33,11 +33,6 @@ class PermissionManager:
             cls._instance = cls()
         return cls._instance
 
-    @staticmethod
-    def normalize_action(action: str, default: str = "ask") -> str:
-        """Normalizes an action to 'allow'/'ask'/'deny'. Invalid values fall back to default."""
-        return normalize_action(action, default)
-
     def set_session_override(self, tool_name: str, action: str) -> None:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
         normalized = normalize_action(action)
