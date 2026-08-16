@@ -55,14 +55,10 @@ def generate_chunk_unified_diff(
 
 
 def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "edit") -> str:
-    """Generates unified diff text from tool arguments via the registry alias resolver."""
+    """Generates unified diff text from tool arguments."""
     if not isinstance(args, dict):
         return ""
-    from tools.registry import normalize_tool_args
-
-    norm = normalize_tool_args(tool_name, args)
-
-    chunks = norm.get("edits")
+    chunks = args.get("edits")
     diff_parts = []
     if chunks and isinstance(chunks, list):
         for chunk in chunks:
@@ -73,9 +69,9 @@ def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "
                 if old_c or new_c:
                     diff_parts.extend(generate_chunk_unified_diff(old_c, new_c, file_path, start_l))
     else:
-        old_s = norm.get("old_str", "")
-        new_s = norm.get("new_str", "")
-        start_l = norm.get("start_line") or 1
+        old_s = args.get("old_str", "")
+        new_s = args.get("new_str", "")
+        start_l = args.get("start_line") or 1
         if old_s or new_s:
             diff_parts.extend(generate_chunk_unified_diff(old_s, new_s, file_path, start_l))
 

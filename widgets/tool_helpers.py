@@ -6,8 +6,6 @@ on critical paths or from performing side-effect normalization during ``__init__
 Pure presentation helpers (e.g. :func:`read_file_content`) are re-exported from
 :mod:`widgets.utils.file_reader` to preserve historical import paths.
 """
-from typing import Any, Dict
-
 from widgets.utils.file_reader import read_file_content  # noqa: F401
 
 
@@ -16,13 +14,6 @@ def normalize_tool_name(name: str) -> str:
     from tools.registry import normalize_tool_name as _registry_normalize
 
     return _registry_normalize(name)
-
-
-def normalize_tool_args(tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-    """Wrapper around ``tools.registry.normalize_tool_args``."""
-    from tools.registry import normalize_tool_args as _registry_normalize_args
-
-    return _registry_normalize_args(tool_name, args)
 
 
 def is_system_tool(tool_type: str) -> bool:

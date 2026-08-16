@@ -66,10 +66,8 @@ class PermissionConfirmScreen(ModalScreen[str]):
         return ""
 
     def compose(self) -> ComposeResult:
-        from tools.registry import normalize_tool_args
-
-        nargs = normalize_tool_args(self.tool_name, self.args)
-        target_path = nargs.get("path") or nargs.get("target_file") or ""
+        nargs = self.args if isinstance(self.args, dict) else {}
+        target_path = nargs.get("path") or ""
 
         if self.tool_name in ("create", "write", "write_to_file"):
             file_exists = bool(target_path and os.path.isfile(target_path))
@@ -85,7 +83,7 @@ class PermissionConfirmScreen(ModalScreen[str]):
             url = nargs.get("url") or ""
             action_desc = f"Agent wants to fetch `{url or 'URL'}`"
         elif self.tool_name in ("invoke_subagent", "subagent"):
-            role = nargs.get("type") or nargs.get("subagent_type") or "Subagent"
+            role = nargs.get("type") or "Subagent"
             prompt = nargs.get("prompt") or ""
             if prompt:
                 action_desc = f"Agent wants to launch subagent `{role}` with prompt:"

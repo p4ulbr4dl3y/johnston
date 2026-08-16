@@ -9,28 +9,6 @@ DEFAULT_LINE_WINDOW = 800
 MAX_TOOL_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-def normalize_chunk_aliases(chunk: dict) -> dict:
-    """Normalize an edit replacement chunk's field names to canonical keys.
-
-    Resolves the shared EDIT_CHUNK_ALIAS_MAP (old_str/target_content/...,
-    new_str/replacement_content/..., start/end_line, allow_multiple) so the
-    registry's arg normalizer and edit.py's chunk consumer agree on one format.
-    """
-    from tools.aliases import EDIT_CHUNK_ALIAS_MAP
-
-    if not isinstance(chunk, dict):
-        return chunk
-    norm = dict(chunk)
-    for ck, cv in list(chunk.items()):
-        ck_l = ck[0].lower() + ck[1:] if ck else ck
-        canon = EDIT_CHUNK_ALIAS_MAP.get(ck) or EDIT_CHUNK_ALIAS_MAP.get(ck_l)
-        if canon is None:
-            continue
-        if canon not in norm or norm[canon] is None:
-            norm[canon] = cv
-    return norm
-
-
 def truncate_leading(text: str, max_chars: int) -> tuple[str, int]:
     """Clip ``text`` to its leading ``max_chars`` and report the shown line count.
 

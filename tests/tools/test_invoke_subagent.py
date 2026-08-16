@@ -72,7 +72,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "search codebase", "subagent_type": "explorer", "branch": "main"})
+        await tool.execute({"prompt": "search codebase", "type": "explorer", "branch": "main"})
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
@@ -106,7 +106,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "run task", "subagent_type": "worker", "branch": "main"})
+        await tool.execute({"prompt": "run task", "type": "worker", "branch": "main"})
 
         self.assertTrue(mock_agent.is_subagent)
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]

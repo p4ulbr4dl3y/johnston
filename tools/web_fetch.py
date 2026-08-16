@@ -101,9 +101,7 @@ class WebFetchTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("web_fetch", args)
+        args = args or {}
         url = (args.get("url") or "").strip()
         if not url:
             return format_tool_error("params", name="url", detail="required")

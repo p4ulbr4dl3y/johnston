@@ -233,13 +233,20 @@ class TestEditToolFiles(_Base):
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read('файл пробел "кавычки".txt'), "данные\n")
 
-    async def test_edit_start_end_alias_keys(self):
-        # schema advertises start/end; after normalize they map to start_line/end_line
+    async def test_edit_start_end_line_keys(self):
+        # schema uses start_line/end_line which the code reads directly
         tool = EditTool()
         p = self.write("s.txt", "a\nb\nb\nc\n")
-        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3})
+        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start_line": 3, "end_line": 3})
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("s.txt"), "a\nb\nB\nc\n")
+
+    async def test_edit_start_end_alias_keys_rejected(self):
+        # start/end are no longer aliased to start_line/end_line.
+        tool = EditTool()
+        p = self.write("s2.txt", "a\nb\nb\nc\n")
+        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3})
+        self.assertIn("ERR:", res)
 
     async def test_edit_empty_file_target_not_found(self):
         tool = EditTool()
@@ -355,12 +362,12 @@ class TestCreateTool(_Base):
             os.chmod(p, stat.S_IRUSR | stat.S_IWUSR)
 
     async def test_create_ignores_alias_keys(self):
-        # create.py does NOT call normalize_tool_args (unlike edit/multi_edit), so
-        # alias keys like target_file / code are not mapped. Documenting behavior.
+        # create reads only canonical 'path'/'content'; alias keys like
+        # target_file/code are not mapped. Documenting strict behavior.
         tool = CreateTool()
         p = os.path.join(self.tmp, "alias.txt")
         res = await tool.execute({"target_file": p, "code": "hello"})
-        # If aliases were honored the file would exist; currently resolve_path(None) -> cwd dir.
+        # Without alias normalization resolve_path(None) -> cwd dir.
         self.assertIn("ERR:", res)
         self.assertFalse(os.path.exists(p))
 

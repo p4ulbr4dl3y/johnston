@@ -54,7 +54,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write("old")
-        res = await tool.execute({"path": target, "target_content": "old", "replacement_content": "new"})
+        res = await tool.execute({"path": target, "old_str": "old", "new_str": "new"})
         self.assertNotIn("ERR:", res)
         self.assertIn("-old", res)
         self.assertIn("+new", res)
@@ -165,13 +165,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Edit on directory error
         res_edit_dir = await tool.execute(
-            {"target_file": self.test_dir, "target_content": "a", "replacement_content": "b"}
+            {"path": self.test_dir, "old_str": "a", "new_str": "b"}
         )
         self.assertIn("is a directory", res_edit_dir)
 
         # Successful edit
         res = await tool.execute(
-            {"target_file": file_path, "target_content": "return 42", "replacement_content": "return 100"}
+            {"path": file_path, "old_str": "return 42", "new_str": "return 100"}
         )
         self.assertIn("-    return 42", res)
         self.assertIn("+    return 100", res)
@@ -183,7 +183,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write("msg = “hello”\n")
         await read_tool.execute({"path": file_path})
         await tool.execute(
-            {"target_file": file_path, "target_content": 'msg = "hello"', "replacement_content": 'msg = "world"'}
+            {"path": file_path, "old_str": 'msg = "hello"', "new_str": 'msg = "world"'}
         )
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "msg = ”world”\n")
@@ -192,12 +192,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("line1\nline2\nline3\n")
         await read_tool.execute({"path": file_path})
-        await tool.execute({"target_file": file_path, "target_content": "line2", "replacement_content": ""})
+        await tool.execute({"path": file_path, "old_str": "line2", "new_str": ""})
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "line1\nline3\n")
 
         # Old string not found error
-        res_not_found = await tool.execute({"path": file_path, "old_string": "non_existent_text", "new_string": "abc"})
+        res_not_found = await tool.execute({"path": file_path, "old_str": "non_existent_text", "new_str": "abc"})
         self.assertIn("ERR:", res_not_found)
         self.assertIn("not found", res_not_found)
 
@@ -205,7 +205,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("dup\ndup\n")
         await read_tool.execute({"path": file_path})
-        res_dup = await tool.execute({"path": file_path, "old_string": "dup", "new_string": "unique"})
+        res_dup = await tool.execute({"path": file_path, "old_str": "dup", "new_str": "unique"})
         self.assertIn("matches 2 occurrences", res_dup)
 
     async def test_shell_tool(self):
@@ -218,24 +218,27 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
         self.assertIn("error msg", res_err)
 
-    async def test_tool_aliases_and_case(self):
+    async def test_tool_case_and_canonical(self):
         from tools.registry import execute_tool
 
-        file_path = os.path.join(self.test_dir, "alias_test.txt")
+        file_path = os.path.join(self.test_dir, "case_test.txt")
 
         # Test capitalized tool name "Create"
-        res_create = await execute_tool("Create", {"path": file_path, "content": "Alias Content"})
+        res_create = await execute_tool("Create", {"path": file_path, "content": "Case Content"})
         self.assertIn("file", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
-        # Test alias "write" -> "create"
-        file_path2 = os.path.join(self.test_dir, "write_test.txt")
+        # Aliases are no longer resolved: 'write' is unknown, only 'create' works.
+        file_path2 = os.path.join(self.test_dir, "case_test2.txt")
         res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
-        self.assertIn("file", res_write.content)
+        self.assertIn("ERR: unknown 'write'", res_write.content)
+        self.assertFalse(os.path.exists(file_path2))
 
-        # Test alias "cat" -> "read"
-        res_cat = await execute_tool("cat", {"path": file_path2})
-        self.assertIn("Write Content", res_cat.content)
+        # Similar alias 'cat' is also unknown; canonical 'read' returns content.
+        res_cat = await execute_tool("cat", {"path": file_path})
+        self.assertIn("ERR: unknown 'cat'", res_cat.content)
+        res_read = await execute_tool("Read", {"path": file_path})
+        self.assertIn("Case Content", res_read.content)
 
         # Test canonical shell tool
         res_shell = await execute_tool("shell", {"command": "echo 'shell command'"})
@@ -302,9 +305,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Replace val = 1 only on line 2 (start_line=2, end_line=2)
         res = await tool.execute(
             {
-                "target_file": file_path,
-                "target_content": "val = 1",
-                "replacement_content": "val = 42",
+                "path": file_path,
+                "old_str": "val = 1",
+                "new_str": "val = 42",
                 "start_line": 2,
                 "end_line": 2,
             }
@@ -328,9 +331,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Search for target_line = 3 in lines 1-2 when multiple exist in file
         res = await tool.execute(
             {
-                "target_file": file_path,
-                "target_content": "target_line = 3",
-                "replacement_content": "target_line = 99",
+                "path": file_path,
+                "old_str": "target_line = 3",
+                "new_str": "target_line = 99",
                 "start_line": 1,
                 "end_line": 2,
             }
@@ -350,9 +353,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Range 1-2 does not include unique_target = 42 (line 3), but fallback succeeds because it is unique!
         res = await tool.execute(
             {
-                "target_file": file_path,
-                "target_content": "unique_target = 42",
-                "replacement_content": "unique_target = 100",
+                "path": file_path,
+                "old_str": "unique_target = 42",
+                "new_str": "unique_target = 100",
                 "start_line": 1,
                 "end_line": 2,
             }
@@ -364,9 +367,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Start line out of bounds, but target unique in file -> fallback succeeds!
         res_oob = await tool.execute(
             {
-                "target_file": file_path,
-                "target_content": "unique_target = 100",
-                "replacement_content": "unique_target = 200",
+                "path": file_path,
+                "old_str": "unique_target = 100",
+                "new_str": "unique_target = 200",
                 "start_line": 50,
                 "end_line": 60,
             }
@@ -384,12 +387,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # target_content is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
+        # old_str is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
         res = await tool.execute(
             {
-                "target_file": file_path,
-                "target_content": "    a = 1\n    b = 2\n    c = 3",
-                "replacement_content": "    a = 10\n    b = 20\n    c = 30",
+                "path": file_path,
+                "old_str": "    a = 1\n    b = 2\n    c = 3",
+                "new_str": "    a = 10\n    b = 20\n    c = 30",
                 "start_line": 2,
                 "end_line": 3,
             }
@@ -409,10 +412,10 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = MultiEditTool()
         res = await tool.execute(
             {
-                "target_file": file_path,
-                "replacement_chunks": [
-                    {"start_line": 1, "end_line": 2, "target_content": "return 1", "replacement_content": "return 100"},
-                    {"start_line": 4, "end_line": 5, "target_content": "return 2", "replacement_content": "return 200"},
+                "path": file_path,
+                "edits": [
+                    {"start_line": 1, "end_line": 2, "old_str": "return 1", "new_str": "return 100"},
+                    {"start_line": 4, "end_line": 5, "old_str": "return 2", "new_str": "return 200"},
                 ],
             }
         )

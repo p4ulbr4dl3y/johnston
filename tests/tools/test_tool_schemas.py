@@ -59,17 +59,17 @@ class TestToolSchemas(unittest.TestCase):
 
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
-    async def test_execute_tool_resolves_file_aliases(self):
+    async def test_execute_tool_read_by_canonical_name(self):
         from core.permission_manager import PermissionManager
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         fd, path = tempfile.mkstemp(dir=os.getcwd())
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write("alias read content")
+                f.write("canonical read content")
 
-            res = await execute_tool("read_file", {"path": path})
-            self.assertIn("alias read content", res.content)
+            res = await execute_tool("read", {"path": path})
+            self.assertIn("canonical read content", res.content)
         finally:
             if os.path.exists(path):
                 os.unlink(path)

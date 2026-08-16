@@ -172,7 +172,7 @@ async def test_role_falls_back_or_accepts(role, monkeypatch):
     try:
         args = {"prompt": "do thing", "description": "t", "branch": "main"}
         if role is not None:
-            args["subagent_type"] = role
+            args["type"] = role
         await tool.execute(args)
         sess = store.list(kind="subagent")[0]
         # canonical agent role is worker for unknown/blank input
@@ -201,7 +201,7 @@ async def test_main_scope_role_falls_back_to_worker(monkeypatch):
 
     store, app, tool, tmp = _make_env(agent)
     try:
-        await tool.execute({"prompt": "do thing", "description": "t", "subagent_type": "orchestrator", "branch": "main"})
+        await tool.execute({"prompt": "do thing", "description": "t", "type": "orchestrator", "branch": "main"})
         sess = store.list(kind="subagent")[0]
         # main-only role must fall back to worker on the agent, not run as main
         assert agent.role == "worker", "main-only role must fall back to worker, not spawn as main"
@@ -242,7 +242,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
     store, app, tool, tmp = _make_env(agent)
     try:
         with pytest.raises(ValueError, match="not connected"):
-            await tool.execute({"prompt": "do", "description": "t", "subagent_type": "heavymetal", "branch": "main"})
+            await tool.execute({"prompt": "do", "description": "t", "type": "heavymetal", "branch": "main"})
         # Fixed: role is applied BEFORE session creation, so a failed role
         # (provider not connected) no longer persists an orphan 'running' session.
         running = [s for s in store.list(kind="subagent") if s.status == "running"]

@@ -85,9 +85,7 @@ class ShellTool(BaseTool):
         return _rebuild_tool(self.schema)
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("shell", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
         cmd = (args.get("command") or "").strip()
 
@@ -112,7 +110,7 @@ class ShellTool(BaseTool):
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         p = await self._create_std_process(cmd, env, cwd=proc_cwd)
 
-        run_in_bg = bool(args.get("run_in_background", False))
+        run_in_bg = bool(args.get("background", False))
 
         # Synchronous execution mode for subagents (no background task)
         if ctx.is_subagent:
