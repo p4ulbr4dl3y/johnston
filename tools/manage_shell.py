@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
 from tools.base import BaseTool
 
@@ -31,7 +31,7 @@ class ManageShellTool(BaseTool):
         task_id = (args.get("task_id") or "").strip()
 
         tasks = ctx.background_tasks
-        if not tasks and not ctx.app:
+        if not tasks and not ctx.host:
             return format_tool_error("manager", name="none", detail="available")
 
         # Scope to the current session, matching the tasks screen and status footer.

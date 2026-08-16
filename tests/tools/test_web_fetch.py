@@ -96,11 +96,11 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_oversize_content_length_rejected(self, mock_client_cls):
         # A Content-Length header above the cap must be rejected before the body is
         # streamed into memory, preventing OOM on oversized responses.
-        from tools.web_fetch import MAX_RESPONSE_SIZE
+        from tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
         response = MagicMock()
         response.status_code = 200
-        response.headers = {"content-type": "text/html", "content-length": str(MAX_RESPONSE_SIZE + 1)}
+        response.headers = {"content-type": "text/html", "content-length": str(MAX_TOOL_PAYLOAD_BYTES + 1)}
         response.raise_for_status = MagicMock()
 
         cm = MagicMock()
@@ -158,8 +158,8 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     @patch("httpx.AsyncClient")
     async def test_fetch_streamed_oversize_rejected(self, mock_client_cls):
         # A chunked response without a Content-Length header must still be
-        # capped at MAX_RESPONSE_SIZE while streaming.
-        from tools.web_fetch import MAX_RESPONSE_SIZE
+        # capped at MAX_TOOL_PAYLOAD_BYTES while streaming.
+        from tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
         response = MagicMock()
         response.status_code = 200
@@ -167,7 +167,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         response.raise_for_status = MagicMock()
 
         async def _aiter_bytes():
-            yield b"x" * MAX_RESPONSE_SIZE
+            yield b"x" * MAX_TOOL_PAYLOAD_BYTES
             yield b"overflow"
 
         response.aiter_bytes = _aiter_bytes

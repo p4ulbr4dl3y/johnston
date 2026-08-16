@@ -29,11 +29,6 @@ class ToolContext:
             if os.path.isdir(abs_cwd):
                 self.cwd = abs_cwd
 
-    @property
-    def app(self) -> Any:
-        """Backward-compat alias for the host object (same as ``self.host``)."""
-        return self.host
-
     # ------------------------------------------------------------------ #
     # Host delegation helpers. Each call is guarded so a host that lacks a
     # capability degrades gracefully (returns None / no-op / empty).

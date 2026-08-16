@@ -23,7 +23,8 @@ import httpx
 
 from tools.ask_user import AskUserTool
 from tools.cancel import run_cancellable
-from tools.web_fetch import MAX_RESPONSE_SIZE, WebFetchTool
+from tools.utils import MAX_TOOL_PAYLOAD_BYTES
+from tools.web_fetch import WebFetchTool
 
 
 # --------------------------------------------------------------------------- #
@@ -174,7 +175,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_chunked_body_over_cap(self, mock_cls):
         # Chunked (no Content-Length) oversized body must be stopped mid-stream.
         async def _aiter():
-            yield b"a" * MAX_RESPONSE_SIZE
+            yield b"a" * MAX_TOOL_PAYLOAD_BYTES
             yield b"aaa"
 
         cm = _mk_stream_client(b"", "text/html", headers={"content-type": "text/html"})

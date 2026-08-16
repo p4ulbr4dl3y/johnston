@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import BaseTool
 
 
@@ -92,7 +92,7 @@ class AskUserTool(BaseTool):
         if not validated_questions:
             return format_tool_error("params", name="questions", detail="missing or invalid")
 
-        if not callable(getattr(ctx.app, "ask_user", None)):
+        if not callable(getattr(ctx.host, "ask_user", None)):
             return format_tool_error("context", name="app", detail="unavailable")
         try:
             return await ctx.ask_user(validated_questions)
@@ -101,10 +101,10 @@ class AskUserTool(BaseTool):
             # any pending wizard state, then re-raise so cooperative cancellation
             # propagates. The model-facing "cancelled by user" string is produced by
             # the host's ask_user() (widgets/mixins/actions.py) for a voluntary Esc.
-            if hasattr(ctx.app, "_pending_ask_user"):
-                setattr(ctx.app, "_pending_ask_user", None)
+            if hasattr(ctx.host, "_pending_ask_user"):
+                setattr(ctx.host, "_pending_ask_user", None)
             raise
         except Exception as e:
-            if hasattr(ctx.app, "_pending_ask_user"):
-                setattr(ctx.app, "_pending_ask_user", None)
+            if hasattr(ctx.host, "_pending_ask_user"):
+                setattr(ctx.host, "_pending_ask_user", None)
             return format_tool_error("prompt", detail=str(e))

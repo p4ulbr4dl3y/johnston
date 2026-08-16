@@ -5,7 +5,7 @@ import time
 from collections import deque
 from typing import Any, Dict
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import (
     decode_output,
     is_windows,
@@ -176,7 +176,7 @@ class ShellTool(BaseTool):
                 raise
 
         task_id = _new_task_id()
-        target_widget = getattr(ctx.app, "current_tool_widget", None) if ctx.app else None
+        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         curr_sid = ctx.session_id
         task = ShellTask(
             task_id,
@@ -185,7 +185,7 @@ class ShellTool(BaseTool):
             widget=target_widget,
             session_id=curr_sid,
         )
-        callback = getattr(ctx.app, "on_background_shell_completed", None) if ctx.app else None
+        callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
 
         if run_in_bg:
             task.is_background = True
@@ -253,7 +253,7 @@ class ShellTool(BaseTool):
             raise
         finally:
             if "task" in locals() and task and not getattr(task, "is_background", False):
-                app_obj = getattr(ctx, "app", None)
+                app_obj = getattr(ctx, "host", None)
                 mgr = getattr(app_obj, "task_manager", None) if app_obj is not None else None
                 if mgr is None:
                     mgr = getattr(ctx, "task_manager", None)

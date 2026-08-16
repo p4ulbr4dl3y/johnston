@@ -100,7 +100,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_command_timeout_moved_to_background(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -204,7 +204,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_explicit_run_in_background(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -238,7 +238,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_move_to_background_during_execution(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -267,7 +267,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.task_manager = TaskManager()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
         mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
 
@@ -394,7 +394,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_move_to_background_with_large_output_truncated(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -422,7 +422,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_timeout_moved_to_background_with_output(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -448,7 +448,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_timeout_moved_to_background_with_large_output(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -508,7 +508,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_execute_cancelled_cleans_up_task(self):
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()
@@ -531,7 +531,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         # raw process, and a failing p.kill() must be swallowed.
         mock_app = MagicMock()
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
 
         mock_p = MagicMock()

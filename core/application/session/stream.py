@@ -71,17 +71,6 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
 
 
-def _apply_provider_config(subagent: Any, provider_key: str) -> None:
-    """Rebind an existing subagent agent to a different provider in place.
-
-    Delegates to core.roles.provider.rebind_provider (kept here for backward
-    compatibility with callers/tests that imported this from this module).
-    """
-    from core.roles.provider import rebind_provider
-
-    rebind_provider(subagent, provider_key)
-
-
 def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, project_dir: Optional[str] = None) -> Any:
     """Configures a subagent agent: binds the app, marks it as a subagent, and
     applies its role (system prompt, model, tool filtering).
@@ -115,8 +104,8 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
             return v
         return default
 
-    if context.app and getattr(context.app, "agent", None):
-        main_agent = context.app.agent
+    if context.host and getattr(context.host, "agent", None):
+        main_agent = context.host.agent
         last_in = _val(subagent, "_merged_tokens_input", 0)
         last_out = _val(subagent, "_merged_tokens_output", 0)
         last_tot = _val(subagent, "_merged_total_tokens", 0)

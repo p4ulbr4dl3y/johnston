@@ -64,23 +64,6 @@ def get_default_tools() -> list[Dict[str, Any]]:
     return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
 
 
-async def prompt_permission_confirmation(
-    app_obj: Any,
-    screen_name: str,
-    args: Dict[str, Any],
-    reason: str,
-    perm_name: str | None = None,
-) -> bool:
-    """Prompts the user for tool permission confirmation (backward-compat wrapper).
-
-    Delegates to the shared tools.base.confirm_permission which resolves a host
-    app via ``_resolve_app`` and denies otherwise (headless/CLI mode).
-    """
-    from tools.base import confirm_permission
-
-    return await confirm_permission(screen_name, args, reason, perm_name, ctx_or_app=app_obj)
-
-
 async def check_and_confirm_permission(
     target_perm_name: str,
     display_name: str,
@@ -93,6 +76,7 @@ async def check_and_confirm_permission(
     Returns None if allowed, or an error ToolResult if denied/cancelled.
     """
     from core.permission_manager import PermissionManager
+    from tools.base import confirm_permission
 
     pm = PermissionManager.get_instance()
     app_obj = _resolve_app(context_or_app)
@@ -103,9 +87,7 @@ async def check_and_confirm_permission(
     elif action == "ask":
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             screen_name = confirm_tool_name or target_perm_name
-            confirmed = await prompt_permission_confirmation(
-                app_obj, screen_name, args, reason, perm_name=target_perm_name
-            )
+            confirmed = await confirm_permission(screen_name, args, reason, target_perm_name, ctx_or_app=app_obj)
             if not confirmed:
                 return ToolResult.error("denied", name=display_name, detail="by user")
         else:

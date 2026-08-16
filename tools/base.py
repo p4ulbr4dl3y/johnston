@@ -230,7 +230,7 @@ def _resolve_app(ctx_or_app: Any) -> Any:
     from tools.context import ToolContext
 
     if isinstance(ctx_or_app, ToolContext):
-        return ctx_or_app.app
+        return ctx_or_app.host
     if callable(getattr(ctx_or_app, "push_screen_wait", None)):
         return ctx_or_app
     return getattr(ctx_or_app, "app", None) or ctx_or_app

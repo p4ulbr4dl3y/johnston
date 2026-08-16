@@ -1,6 +1,6 @@
 import unittest
 
-from core.tool_display import extract_tool_display
+from core.application.display import extract_tool_display
 
 
 class TestToolDisplay(unittest.TestCase):

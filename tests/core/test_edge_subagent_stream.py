@@ -1,4 +1,4 @@
-"""Edge-case tests for core/subagent_stream.py — hunting for implementation bugs."""
+"""Edge-case tests for the stream helpers in core/application/session/stream.py."""
 
 import asyncio
 
@@ -152,8 +152,8 @@ class _FakeApp:
 
 
 class _FakeCtx:
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, host):
+        self.host = host
 
 
 class TestMergeMetrics:
@@ -251,7 +251,7 @@ class FakeStore:
 
 class FakeCtx:
     def __init__(self):
-        self.app = _FakeApp(FakeAgent())
+        self.host = _FakeApp(FakeAgent())
         self.refreshed = 0
         self.messages = []
         self.subagent_statuses = []
@@ -354,7 +354,7 @@ class TestRunStream:
         ctx = FakeCtx()
         store = FakeStore()
         await run_subagent_stream_bg(sub, "p", sess, ctx, store)
-        assert ctx.app.agent.tokens_input == 42
+        assert ctx.host.agent.tokens_input == 42
 
     @pytest.mark.asyncio
     async def test_merged_metrics_visible_via_parent_get_metrics(self):
@@ -370,7 +370,7 @@ class TestRunStream:
 
         parent_agent = FakeAgent()
         ctx = FakeCtx()  # has refresh_status; reuse its FakeAgent holder
-        ctx.app = _FakeApp(parent_agent)
+        ctx.host = _FakeApp(parent_agent)
 
         await run_subagent_stream_bg(sub, "p", sess, ctx, store)
 
@@ -468,20 +468,20 @@ class TestSafeSaves:
     def test_error_logged_not_swallowed(self, caplog):
         import logging as _logging
 
-        from core import subagent_stream
+        from core.application.session.stream import _safe_save
 
         s = make_session()
         with caplog.at_level(_logging.ERROR):
             with pytest.raises(OSError):
-                subagent_stream._safe_save(FailingStore(), s)
+                _safe_save(FailingStore(), s)
         assert "Failed to save subagent session" in caplog.text
 
     def test_error_propagates_to_caller(self):
-        from core import subagent_stream
+        from core.application.session.stream import _safe_save
 
         s = make_session()
         with pytest.raises(OSError):
-            subagent_stream._safe_save(FailingStore(), s)
+            _safe_save(FailingStore(), s)
 
     @pytest.mark.asyncio
     async def test_save_failure_not_left_completed(self):

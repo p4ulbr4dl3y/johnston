@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import unittest
 
-from core.subagent_worktree import SubagentWorktreeManager
+from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
 
 class TestSubagentWorktreeManager(unittest.TestCase):

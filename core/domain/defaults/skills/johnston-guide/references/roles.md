@@ -23,8 +23,6 @@ System prompt instructions for the role...
 - `subagent`: usable only as `type` in `invoke_subagent`.
 - `main`: usable only as main agent execution role (not a subagent).
 
-Legacy spellings `main_only` / `subagent_only` are still accepted and normalized.
-
 ## Frontmatter Fields
 - `name`: Role identifier (defaults to filename).
 - `description`: Summary of purpose.

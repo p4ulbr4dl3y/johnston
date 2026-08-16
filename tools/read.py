@@ -6,16 +6,13 @@ import time
 from collections import OrderedDict
 from typing import Any, Callable, Dict, Tuple
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
 from tools.utils import DEFAULT_LINE_WINDOW, MAX_TOOL_PAYLOAD_BYTES
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
-
-# Backward-compat alias: read's size cap is the shared tools-layer payload cap.
-MAX_FILE_SIZE = MAX_TOOL_PAYLOAD_BYTES
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
@@ -236,8 +233,6 @@ class ReadTool(BaseTool):
                     "path": {"type": "string", "description": "File path"},
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "start": {"type": "integer", "description": "Alias for start_line"},
-                    "end": {"type": "integer", "description": "Alias for end_line"},
                     "content_offset": {
                         "type": "integer",
                         "description": "Byte offset (only for single-line or huge binary/log files)",
@@ -303,8 +298,10 @@ class ReadTool(BaseTool):
 
         try:
             file_size = os.path.getsize(path)
-            if file_size > MAX_FILE_SIZE:
-                return format_tool_error("file", detail=f"exceeds {MAX_FILE_SIZE // (1024 * 1024)}MB", name=path)
+            if file_size > MAX_TOOL_PAYLOAD_BYTES:
+                return format_tool_error(
+                    "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=path
+                )
         except OSError as e:
             return format_tool_error("check", detail=str(e), name=path)
 

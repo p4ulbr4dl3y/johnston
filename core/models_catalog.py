@@ -432,7 +432,3 @@ catalog = ModelsCatalog()
 def get_context_window(provider_id: str, model_id: str) -> str:
     limit = catalog.get_context_limit(provider_id, model_id)
     return format_context_tokens(limit)
-
-
-# Backwards-compatible re-exports: pure helpers/constants moved to
-# core.domain.policies.model_catalog_policy.

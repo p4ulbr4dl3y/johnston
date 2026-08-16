@@ -21,8 +21,8 @@ class TestRoleRegistry(unittest.TestCase):
         self.assertTrue(roles["explorer"].read_only)
         self.assertEqual(roles["orchestrator"].name, "Orchestrator")
         self.assertEqual(roles["orchestrator"].scope, "main")
-        self.assertEqual(normalize_role_scope("main_only"), "main")
-        self.assertEqual(normalize_role_scope("subagent_only"), "subagent")
+        self.assertEqual(normalize_role_scope("main_only"), "main_only")
+        self.assertEqual(normalize_role_scope("subagent_only"), "subagent_only")
         self.assertEqual(normalize_role_scope("any"), "any")
 
     def test_custom_role_parsing(self):

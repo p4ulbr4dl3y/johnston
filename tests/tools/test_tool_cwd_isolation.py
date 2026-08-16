@@ -36,7 +36,7 @@ class TestToolContextCwdIsolation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as base:
             agent = make_agent(host, cwd=base, is_subagent=True)
             ctx = ToolContext(agent)
-            self.assertIs(ctx.app, host)
+            self.assertIs(ctx.host, host)
             self.assertTrue(ctx.is_subagent)
             self.assertEqual(ctx.cwd, os.path.realpath(base))
 
@@ -44,7 +44,7 @@ class TestToolContextCwdIsolation(unittest.TestCase):
         host = MockTextualApp()
         agent = make_agent(host, cwd="/definitely/not/a/real/dir", is_subagent=True)
         ctx = ToolContext(agent)
-        self.assertIs(ctx.app, host)
+        self.assertIs(ctx.host, host)
         self.assertTrue(ctx.is_subagent)
         self.assertIsNone(ctx.cwd)
 
@@ -52,7 +52,7 @@ class TestToolContextCwdIsolation(unittest.TestCase):
         host = MockTextualApp()
         agent = make_agent(host)
         ctx = ToolContext(agent)
-        self.assertIs(ctx.app, host)
+        self.assertIs(ctx.host, host)
         self.assertFalse(ctx.is_subagent)
         self.assertIsNone(ctx.cwd)
 

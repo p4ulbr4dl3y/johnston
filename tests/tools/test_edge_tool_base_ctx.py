@@ -7,7 +7,7 @@ import os
 import tempfile
 import unittest
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.tasks.output import tail_output
 from tools.base import (
     BaseTool,
@@ -167,7 +167,7 @@ class TestBaseToolEdge(unittest.TestCase):
         t = BaseTool()
         ctx = t._ensure_context(None)
         self.assertIsInstance(ctx, ToolContext)
-        self.assertIsNone(ctx.app)
+        self.assertIsNone(ctx.host)
 
     def test_ensure_context_tool_context_passthrough(self):
         ctx = ToolContext(None)
@@ -179,7 +179,7 @@ class TestBaseToolEdge(unittest.TestCase):
 
         fake = FakeApp()
         ctx = BaseTool()._ensure_context(fake)
-        self.assertIs(ctx.app, fake)
+        self.assertIs(ctx.host, fake)
 
 
 class TestToolContextEdge(unittest.TestCase):
@@ -189,8 +189,8 @@ class TestToolContextEdge(unittest.TestCase):
 
         agent = Agent()
         ctx = ToolContext(agent)
-        # agent has no host app -> falls back to keeping the agent as ctx.app
-        self.assertIs(ctx.app, agent)
+        # agent has no host app -> falls back to keeping the agent as ctx.host
+        self.assertIs(ctx.host, agent)
         self.assertEqual(ctx.background_tasks, [])
         ctx.refresh_status()  # should not raise
 

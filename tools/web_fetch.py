@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 import httpx
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import BaseTool, truncate_output
 from tools.cancel import run_cancellable
 from tools.utils import MAX_TOOL_PAYLOAD_BYTES
@@ -18,9 +18,6 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36 Johnston/0.1"
 )
-
-# Backward-compat alias: the fetch cap is the shared tools-layer payload cap.
-MAX_RESPONSE_SIZE = MAX_TOOL_PAYLOAD_BYTES
 
 
 def _is_private_host(url: str) -> bool:
@@ -135,9 +132,9 @@ class WebFetchTool(BaseTool):
                     cl = response.headers.get("content-length")
                     if cl:
                         try:
-                            if int(cl) > MAX_RESPONSE_SIZE:
+                            if int(cl) > MAX_TOOL_PAYLOAD_BYTES:
                                 return format_tool_error(
-                                    "file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024 * 1024)}MB", name=url
+                                    "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
                                 )
                         except ValueError:
                             pass
@@ -147,9 +144,9 @@ class WebFetchTool(BaseTool):
                     chunks = []
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
-                        if total > MAX_RESPONSE_SIZE:
+                        if total > MAX_TOOL_PAYLOAD_BYTES:
                             return format_tool_error(
-                                "file", detail=f"exceeds {MAX_RESPONSE_SIZE // (1024 * 1024)}MB", name=url
+                                "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
                             )
                         chunks.append(chunk)
                     content_bytes = b"".join(chunks)
