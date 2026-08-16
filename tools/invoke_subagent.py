@@ -94,13 +94,11 @@ class InvokeSubagentTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("invoke_subagent", args)
         ctx = self._ensure_context(ctx)
+        args = args or {}
         prompt = args.get("prompt", "").strip()
         description = args.get("description", prompt[:30] or "subagent task").strip()
-        subagent_type = args.get("subagent_type", "worker").strip().lower()
+        subagent_type = args.get("type", "worker").strip().lower()
         branch_name = args.get("branch", "").strip()
 
         if not prompt:

@@ -25,10 +25,8 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(res, '"Which framework?"')
 
     def test_subagent_description(self):
-        res = extract_tool_display("subagent", {"description": "find bugs", "prompt": "long prompt"})
+        res = extract_tool_display("invoke_subagent", {"description": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, '"find bugs"')
-        res2 = extract_tool_display("invoke_subagent", {"description": "find bugs", "prompt": "long prompt"})
-        self.assertEqual(res2, '"find bugs"')
 
     def test_manage_shell_action_and_id(self):
         res = extract_tool_display("manage_shell", {"action": "status", "task_id": "shell_123"})
@@ -106,7 +104,7 @@ class TestToolDisplay(unittest.TestCase):
         widget = ToolCallWidget(
             "edit",
             "code.py",
-            args={"target_file": "code.py", "target_content": "a", "replacement_content": "b"},
+            args={"path": "code.py"},
             result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n[Hint: Some system hint]",
         )
         diff_renderable = widget._format_edit_diff(widget.result_text, "code.py")

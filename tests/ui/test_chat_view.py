@@ -1535,7 +1535,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         )
         w3.render_content()
 
-        w4 = self._widget("edit", "", args={"old_string": "old", "new_string": "new", "StartLine": 1})
+        w4 = self._widget("edit", "", args={"old_str": "old", "new_str": "new", "start_line": 1})
         w4.render_content()
 
         w5 = self._widget("edit", "", args={})

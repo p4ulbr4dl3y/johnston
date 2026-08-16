@@ -57,7 +57,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
         # Test valid Edit
-        res_edit = await execute_tool("edit", {"path": file_path, "old_string": "line2", "new_string": "line_two"})
+        res_edit = await execute_tool("edit", {"path": file_path, "old_str": "line2", "new_str": "line_two"})
         self.assertIn("line2", res_edit.content)  # check diff contains old text
         self.assertIn("line_two", res_edit.content)  # check diff contains new text
 
@@ -81,7 +81,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3"})
 
         res_edit = await execute_tool(
-            "edit", {"path": file_path, "old_string": "missing_line", "new_string": "replacement"}
+            "edit", {"path": file_path, "old_str": "missing_line", "new_str": "replacement"}
         )
         self.assertIn("ERR: match: exact block not found", res_edit.content)
 
@@ -90,7 +90,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "duplicate\nmiddle\nduplicate"})
 
         res_edit = await execute_tool(
-            "edit", {"path": file_path, "old_string": "duplicate", "new_string": "replacement"}
+            "edit", {"path": file_path, "old_str": "duplicate", "new_str": "replacement"}
         )
         self.assertIn("matches 2 occurrences", res_edit.content)
 
@@ -253,7 +253,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "subagent", {"prompt": "do research", "description": "research task", "branch": "main"}, app=app
+            "invoke_subagent", {"prompt": "do research", "description": "research task", "branch": "main"}, app=app
         )
         self.assertIn("subagent 'research task' launched", res.content)
 
@@ -295,7 +295,9 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "subagent", {"prompt": "bg task", "description": "bg job", "background": True, "branch": "main"}, app=app
+            "invoke_subagent",
+            {"prompt": "bg task", "description": "bg job", "branch": "main"},
+            app=app,
         )
         self.assertIn("subagent 'bg job' launched", res.content)
         sessions = _store.list(kind="subagent")

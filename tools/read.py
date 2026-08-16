@@ -251,9 +251,7 @@ class ReadTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("read", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
         if raw_path.startswith("http://") or raw_path.startswith("https://"):

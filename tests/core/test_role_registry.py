@@ -98,7 +98,7 @@ You run tests and report coverage.""")
         self.assertIsNotNone(role_tool_error(role_ro, "edit"))
         self.assertIsNone(role_tool_error(role_ro, "read"))
 
-    def test_alias_resolution_in_is_tool_allowed(self):
+    def test_tool_name_normalizer_no_alias_resolution(self):
         from tools.registry import normalize_tool_name
 
         role_ro = AgentRole(
@@ -109,13 +109,18 @@ You run tests and report coverage.""")
             tool_name_normalizer=normalize_tool_name,
         )
 
-        # Alias 'subagent' resolves to 'invoke_subagent' via ALIAS_MAP -> blocked
-        self.assertIsNotNone(role_ro.is_tool_allowed("subagent"))
-        # Without a normalizer, aliases are not resolved and 'subagent' is allowed
+        # normalize_tool_name no longer resolves aliases: 'subagent' is not in the
+        # disallowed list (which holds 'invoke_subagent'), so it is allowed.
+        self.assertIsNone(role_ro.is_tool_allowed("subagent"))
+        # Without a normalizer the result is the same (identity on lowercase).
         role_no_norm = AgentRole(key="reviewer", name="Reviewer", read_only=True, disallowed_tools=["invoke_subagent"])
         self.assertIsNone(role_no_norm.is_tool_allowed("subagent"))
-        # Alias 'write_file' resolves to write tools -> blocked in read_only
-        self.assertIsNotNone(role_ro.is_tool_allowed("write_file"))
+        # Canonical 'invoke_subagent' is blocked by the disallowed list.
+        self.assertIsNotNone(role_ro.is_tool_allowed("invoke_subagent"))
+        # 'write_file' is not a recognized write tool alias anymore, so read_only
+        # does not block it; canonical 'create' is still blocked.
+        self.assertIsNone(role_ro.is_tool_allowed("write_file"))
+        self.assertIsNotNone(role_ro.is_tool_allowed("create"))
 
     def test_scope_filtering(self):
         reg = RoleRegistry.get_instance()

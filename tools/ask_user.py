@@ -58,9 +58,7 @@ class AskUserTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("ask_user", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
         questions_list = args.get("questions")
 

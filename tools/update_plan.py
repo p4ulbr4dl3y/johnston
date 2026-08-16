@@ -41,9 +41,7 @@ class UpdatePlanTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("update_plan", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
         raw_plan = args.get("plan")
         explanation = str(args.get("explanation") or "").strip()

@@ -214,7 +214,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True}, ctx=mock_app)
+            res = await self.tool.execute({"command": "tail -f log.txt", "background": True}, ctx=mock_app)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("moved to background.", res)
             mock_ctx.add_background_task.assert_called_once()
@@ -230,7 +230,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True})
+            res = await self.tool.execute({"command": "tail -f log.txt", "background": True})
             self.assertIn("ERR: background 'shell'", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()

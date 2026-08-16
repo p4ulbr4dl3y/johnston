@@ -599,9 +599,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.canonical_tool in ("invoke_subagent", "ask_user"):
             if self.canonical_tool == "invoke_subagent":
                 args = self.args if isinstance(self.args, dict) else {}
-                from widgets.tool_helpers import normalize_tool_args
-
-                nargs = normalize_tool_args(self.canonical_tool, args)
+                nargs = args
                 session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
                 identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
                 try:
@@ -708,10 +706,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         try:
             self.content_widget.display = True
             self.md_widget.display = False
-            from widgets.tool_helpers import normalize_tool_args
-
-            nargs = normalize_tool_args(self.canonical_tool, self.args)
-            file_path = nargs.get("path") or nargs.get("target_file") or self.target
+            nargs = self.args if isinstance(self.args, dict) else {}
+            file_path = nargs.get("path") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
                 if self.status == "error" or self._is_explicit_error(raw_text):

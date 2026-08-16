@@ -31,15 +31,10 @@ TOOL_CLASSES = [
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLASSES}
 
-from tools.aliases import (  # noqa: E402  # re-export for downstream imports
-    ALIAS_MAP,
-    PARAM_ALIAS_MAP,
-)
-
 
 def _build_close_match_candidates() -> list[str]:
-    """Sorted list of all tool/alias names used for fuzzy-matching unknown tools."""
-    return sorted(set(REGISTRY.keys()) | set(ALIAS_MAP.keys()))
+    """Sorted list of all tool names used for fuzzy-matching unknown tools."""
+    return sorted(set(REGISTRY.keys()))
 
 
 # Precomputed candidate list for fuzzy tool-name suggestions. Rebuilt lazily if the
@@ -48,59 +43,21 @@ _CLOSE_MATCH_CANDIDATES: list[str] = _build_close_match_candidates()
 
 
 def _close_match_candidates() -> list[str]:
-    """Return the cached candidate list, invalidating it if REGISTRY/ALIAS_MAP grew."""
-    if len(_CLOSE_MATCH_CANDIDATES) == len(REGISTRY) + len(ALIAS_MAP):
+    """Return the cached candidate list, invalidating it if REGISTRY grew."""
+    if len(_CLOSE_MATCH_CANDIDATES) == len(REGISTRY):
         return _CLOSE_MATCH_CANDIDATES
     _CLOSE_MATCH_CANDIDATES[:] = _build_close_match_candidates()
     return _CLOSE_MATCH_CANDIDATES
 
 
 def normalize_tool_name(name: str) -> str:
-    """Normalizes a tool name or alias to its canonical name using ALIAS_MAP.
+    """Normalizes a tool name for case/whitespace-insensitive dispatch.
 
-    Resolves alias chains recursively (guard against cycles) and maps empty/None
-    alias values back to the requested name instead of returning a dead value.
+    Strip + lowercase only. No alias resolution.
     """
     if not name:
         return ""
-    clean = name.strip().lower()
-    seen: set[str] = set()
-    while clean not in REGISTRY and clean in ALIAS_MAP:
-        if clean in seen:
-            break
-        seen.add(clean)
-        target = ALIAS_MAP.get(clean)
-        if not isinstance(target, str) or not target.strip():
-            break
-        clean = target.strip().lower()
-    return clean
-
-
-def normalize_tool_args(tool_name: str, args: dict | None) -> Dict[str, Any]:
-    """Normalizes tool argument names to canonical names using PARAM_ALIAS_MAP."""
-    if not args or not isinstance(args, dict):
-        return {}
-
-    resolved_name = normalize_tool_name(tool_name)
-    param_aliases = PARAM_ALIAS_MAP.get(resolved_name, {})
-
-    normalized = dict(args)
-    for k, v in list(args.items()):
-        canon_key = k
-        if k not in param_aliases:
-            # Case-insensitive fallback (e.g. PascalCase -> lowercase)
-            canon_key = k.lower()
-        if canon_key in param_aliases:
-            canonical = param_aliases[canon_key]
-            if canonical not in normalized or normalized[canonical] is None:
-                normalized[canonical] = v
-
-    if resolved_name in ("multi_edit", "edit") and isinstance(normalized.get("edits"), list):
-        from tools.utils import normalize_chunk_aliases
-
-        normalized["edits"] = [normalize_chunk_aliases(chunk) for chunk in normalized["edits"]]
-
-    return normalized
+    return name.strip().lower()
 
 
 def get_default_tools() -> list[Dict[str, Any]]:
@@ -219,9 +176,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         matches = difflib.get_close_matches(clean_name, _close_match_candidates(), n=2, cutoff=0.4)
         hint = ""
         if matches:
-            resolved_target = ALIAS_MAP.get(matches[0], matches[0])
-            desc_str = f" (target: {resolved_target})" if resolved_target != matches[0] else ""
-            hint = f" [Hint: Did you mean '{matches[0]}'{desc_str}?]"
+            hint = f" [Hint: Did you mean '{matches[0]}'?]"
         return ToolResult.error("unknown", detail=hint.strip(), name=name)
 
     from tools.base import check_mcp_role_policy

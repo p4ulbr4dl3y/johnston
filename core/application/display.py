@@ -63,11 +63,9 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
         return truncate(f'"{desc}"') if desc else tool_name
 
     if name in ("manage_shell", "manage_subagent"):
-        from tools.registry import normalize_tool_args
-
-        nargs = normalize_tool_args(name, args)
+        nargs = args if isinstance(args, dict) else {}
         act = nargs.get("action") or ""
-        tid = nargs.get("task_id") or ""
+        tid = nargs.get("task_id") or nargs.get("session_id") or ""
         if act and tid:
             if act in ("send_input", "send_message"):
                 verb = "send message to" if act == "send_message" else "send input to"

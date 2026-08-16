@@ -65,8 +65,8 @@ class TestToolExpansion(unittest.TestCase):
             result_text=diff_text,
             args={
                 "path": "test.py",
-                "old_string": "def multiply(a, b):",
-                "new_string": "def multiply(a: float, b: float) -> float:\n    return a * b",
+                "old_str": "def multiply(a, b):",
+                "new_str": "def multiply(a: float, b: float) -> float:\n    return a * b",
             },
         )
         widget.toggle_expanded()
@@ -123,7 +123,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="edit",
             target="test.py",
             result_text=error_text,
-            args={"path": "test.py", "target_content": "foo", "replacement_content": "bar"},
+            args={"path": "test.py", "old_str": "foo", "new_str": "bar"},
         )
         widget.set_result(error_text)
         self.assertEqual(widget.status, "error")
@@ -228,10 +228,10 @@ class TestToolExpansion(unittest.TestCase):
             target="index.html",
             result_text="Successfully replaced content.",
             args={
-                "TargetFile": "index.html",
-                "TargetContent": "const form = document.getElementById('cta-form');",
-                "ReplacementContent": "// CTA form handler\nconst form = document.getElementById('cta-form');",
-                "StartLine": 330,
+                "path": "index.html",
+                "old_str": "const form = document.getElementById('cta-form');",
+                "new_str": "// CTA form handler\nconst form = document.getElementById('cta-form');",
+                "start_line": 330,
             },
         )
         widget.toggle_expanded()
@@ -248,10 +248,10 @@ class TestToolExpansion(unittest.TestCase):
             target="app.py",
             result_text="",
             args={
-                "TargetFile": "app.py",
-                "ReplacementChunks": [
-                    {"TargetContent": "x = 1", "ReplacementContent": "x = 10", "StartLine": 15},
-                    {"TargetContent": "y = 2", "ReplacementContent": "y = 20", "StartLine": 45},
+                "path": "app.py",
+                "edits": [
+                    {"old_str": "x = 1", "new_str": "x = 10", "start_line": 15},
+                    {"old_str": "y = 2", "new_str": "y = 20", "start_line": 45},
                 ],
             },
         )

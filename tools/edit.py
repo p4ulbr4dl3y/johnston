@@ -96,7 +96,7 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
             return (
                 f"\n\n[Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
                 f"{snippet_str}\n"
-                f"[Re-try with target_content matching this snippet and pass start_line={start_snip}, end_line={end_snip}]"
+                f"[Re-try with old_str matching this snippet and pass start_line={start_snip}, end_line={end_snip}]"
             )
     return ""
 
@@ -105,21 +105,18 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
     if not raw_chunks:
         raise ValueError(format_tool_error("params", "no replacement chunks provided"))
 
-    from tools.utils import normalize_chunk_aliases
-
     parsed_chunks = []
     for idx, c in enumerate(raw_chunks, start=1):
-        c = normalize_chunk_aliases(c)
         target = c.get("old_str")
         if target is None:
-            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'old_str' or 'target_content'"))
+            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'old_str'"))
 
         if target == "":
-            raise ValueError(format_tool_error("params", f"chunk {idx} old_str (target_content) cannot be empty"))
+            raise ValueError(format_tool_error("params", f"chunk {idx} old_str cannot be empty"))
 
         replacement = c.get("new_str")
         if replacement is None:
-            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'new_str' or 'replacement_content'"))
+            raise ValueError(format_tool_error("params", f"chunk {idx} missing 'new_str'"))
 
         s_line_int = try_int(c.get("start_line"))
         e_line_int = try_int(c.get("end_line"))
@@ -331,9 +328,9 @@ class EditTool(BaseTool):
                     "path": {"type": "string", "description": "File path"},
                     "old_str": {"type": "string", "description": "Code block to replace"},
                     "new_str": {"type": "string", "description": "New code block"},
-                    "start": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end": {"type": "integer", "description": "End line (inclusive)"},
-                    "multiple": {"type": "boolean", "description": "Allow multiple matches"},
+                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                    "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"},
                 },
                 "required": ["path", "old_str", "new_str"],
             },
@@ -341,11 +338,9 @@ class EditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("edit", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
-        path = args.get("path") or args.get("target_file", "")
+        path = args.get("path") or ""
         chunks = args.get("edits")
         if chunks and isinstance(chunks, list):
             return await _execute_edit_helper(path, chunks, cwd=ctx.cwd)
@@ -381,9 +376,9 @@ class MultiEditTool(BaseTool):
                             "properties": {
                                 "old_str": {"type": "string", "description": "Exact text to replace"},
                                 "new_str": {"type": "string", "description": "New code block"},
-                                "start": {"type": "integer", "description": "Start line (1-indexed)"},
-                                "end": {"type": "integer", "description": "End line (inclusive)"},
-                                "multiple": {"type": "boolean", "description": "Allow multiple matches"},
+                                "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
+                                "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                                "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"},
                             },
                         },
                     },
@@ -394,10 +389,8 @@ class MultiEditTool(BaseTool):
     }
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
-        from tools.registry import normalize_tool_args
-
-        args = normalize_tool_args("multi_edit", args)
+        args = args or {}
         ctx = self._ensure_context(ctx)
-        path = args.get("path") or args.get("target_file", "")
+        path = args.get("path") or ""
         raw_chunks = args.get("edits") or []
         return await _execute_edit_helper(path, raw_chunks, cwd=ctx.cwd)
