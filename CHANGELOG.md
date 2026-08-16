@@ -7,6 +7,113 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.22.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.21.0...johnston-v0.22.0) (2026-08-16)
+
+
+### Features
+
+* **linters:** disable presets by default (opt-in) ([3cd5aa8](https://github.com/p4ulbr4dl3y/johnston/commit/3cd5aa8c83c4b25c8a733a5ee36d606530884372))
+* **prompts:** adopt evidence-first verification and disciplined role prompts ([5ab8cca](https://github.com/p4ulbr4dl3y/johnston/commit/5ab8cca95f1209a2ca1746a961eabf23b03f243b))
+* **providers:** handle retry-after header and notify user on provider retry ([e9cbde8](https://github.com/p4ulbr4dl3y/johnston/commit/e9cbde86ec834120308e711e64a4dc3ef99be86d))
+* **roles:** add batch subagent role definition guideline to orchestrator ([e129d4b](https://github.com/p4ulbr4dl3y/johnston/commit/e129d4b7717ab9b47e3acc3fc8c08739f07ad626))
+* **roles:** support per-role provider override for subagents ([6f6d52c](https://github.com/p4ulbr4dl3y/johnston/commit/6f6d52cdfab69f959fac2bf4f620b1a59cc20ccd))
+* **screens:** group mcp and skills modals by scope ([8472b4f](https://github.com/p4ulbr4dl3y/johnston/commit/8472b4f7708ce0130d54d770ebec77bd7becb3ba))
+* **screens:** group tasks by running/completed status ([e184c9f](https://github.com/p4ulbr4dl3y/johnston/commit/e184c9f7381a37aeddfb1154d98744b516efd952))
+* **screens:** keep group headers visible on option wrap ([8860972](https://github.com/p4ulbr4dl3y/johnston/commit/8860972891f1469b77749615b751b0e1f6751da6))
+* **subagent:** add status footer and info bar to subagent screen ([6135c76](https://github.com/p4ulbr4dl3y/johnston/commit/6135c76118a93e0a6370afc9a980be2108819cbe))
+* **subagent:** compact footer with effort and dot separators ([060adec](https://github.com/p4ulbr4dl3y/johnston/commit/060adecba9df1887e9ca8b2858e81126f0a70873))
+* **subagent:** show agent info in input slot with footer ([4ed8d4b](https://github.com/p4ulbr4dl3y/johnston/commit/4ed8d4b9e55755c5cd1398f54b54204455338020))
+* **subagents:** queue follow-up messages like main agent ([41f7fd6](https://github.com/p4ulbr4dl3y/johnston/commit/41f7fd6cbb2fb43cfa6037a9b99cc7b4cc213cd3))
+* **suggest:** include directories in file suggestions ([578666e](https://github.com/p4ulbr4dl3y/johnston/commit/578666e046e9189ca30b40b18d89c108eb19c827))
+* **tools:** log background shell output to file, tail in responses ([d27d53d](https://github.com/p4ulbr4dl3y/johnston/commit/d27d53d30118b829b8f58eba1f3a56125cfe8728))
+* **tools:** tailor shell tool schema for subagents to enforce synchronous execution ([5cb6ce6](https://github.com/p4ulbr4dl3y/johnston/commit/5cb6ce693964cf9e74a789bbd66a630b3e11bea4))
+* **ui:** add /shell command for background shell tasks ([428fb9f](https://github.com/p4ulbr4dl3y/johnston/commit/428fb9f0d3474376e34ad3be0e5e05b051fa9b75))
+* **ui:** allow down arrow in write-in input to jump to first option in ask user modal ([d42e322](https://github.com/p4ulbr4dl3y/johnston/commit/d42e3228200b617972d551b5de642963e17c8341))
+* **ui:** expand Rich Markdown tables to full width with preserved column alignment ([4aa9fad](https://github.com/p4ulbr4dl3y/johnston/commit/4aa9fad7655da7fd7f6ba697b0e3207d7aa3a616))
+* **ui:** fullscreen subagent screen and richer footers ([30a09f0](https://github.com/p4ulbr4dl3y/johnston/commit/30a09f0540d20108e4f23692d6276064f3c904da))
+* **ui:** human-like confirm messages for manage_subagent, update_plan, ask_user ([c6140d2](https://github.com/p4ulbr4dl3y/johnston/commit/c6140d2046d7dffc71e470f8cff032530e665b17))
+* **ui:** human-like labels for manage_shell/subagent send actions ([0d0c745](https://github.com/p4ulbr4dl3y/johnston/commit/0d0c745c423938fc5e91db21e50aa55704711d3a))
+* **ui:** replace /tasks with /subagents, subagent-only modal ([6d62c48](https://github.com/p4ulbr4dl3y/johnston/commit/6d62c4824b45db8405f24c0f2bd4b089df9bd63e))
+
+
+### Bug Fixes
+
+* **agent:** drop retry partial text, run duplicate tool calls, surface adapter thinking ([6dafa71](https://github.com/p4ulbr4dl3y/johnston/commit/6dafa715b862527b8048425fa1bcfd7bb308e12e))
+* **chat:** treat empty bot message as continuity for sequential tool calls ([697118f](https://github.com/p4ulbr4dl3y/johnston/commit/697118f1d9d803134607422fbe6d3eff33f1d5d3))
+* context limit type, pagination bounds, read DoS, MCP process leak/stop crash ([0bfe60a](https://github.com/p4ulbr4dl3y/johnston/commit/0bfe60a8a53619038ee09ba3464644f5fab6f220))
+* **core:** align role_tool_error with allowed_tools, drop dead output_limits ([0471430](https://github.com/p4ulbr4dl3y/johnston/commit/0471430b23aaf7e7a8ef1323b6bfc5e9eeab8190))
+* **core:** handle frontmatter comment/None, empty subagent step, cleanup_fn safety ([06bda92](https://github.com/p4ulbr4dl3y/johnston/commit/06bda9291bfb032decfb96d4ff18da852f3483ae))
+* **core:** role scope whitespace, prompt None/schema types, linter path/exit safety ([37c0f6a](https://github.com/p4ulbr4dl3y/johnston/commit/37c0f6a68655291e7ce32d0a02881f83dca91abc))
+* **core:** surface session save errors, re-raise cancel ([aca611c](https://github.com/p4ulbr4dl3y/johnston/commit/aca611cb777e2caf6e198d0395e82827ac9f6f07))
+* **flow:** release is_generating when interrupt lands before stream loop ([fc791bd](https://github.com/p4ulbr4dl3y/johnston/commit/fc791bd6f2b774aa72092eaa56e33fbafed9f42d))
+* **markdown:** patch table_open block to disable cell tooltips ([1091d10](https://github.com/p4ulbr4dl3y/johnston/commit/1091d10e161e1cc5084f53c97067a603d7cfd4c4))
+* **markdown:** suppress cell tooltips during streaming rows ([de35d27](https://github.com/p4ulbr4dl3y/johnston/commit/de35d27a0b5e15bd03d92a7e97163786902afd06))
+* **markdown:** use live BLOCKS mapping so table tooltips stay suppressed ([2b4b488](https://github.com/p4ulbr4dl3y/johnston/commit/2b4b488f2c8759e2d0f798dd42d337568c77dadc))
+* **mcp:** guard tool call races, join reader thread, reset clients on project change, group prompt snippet by server ([412ab5f](https://github.com/p4ulbr4dl3y/johnston/commit/412ab5fdc31e2dbd9092307dec15efd0548733e6))
+* **mcp:** start background warmup on app mount and fix footer status polling ([9c2b451](https://github.com/p4ulbr4dl3y/johnston/commit/9c2b451d511165ce8933284471a3c12981390bf0))
+* None-safe shell/manage args, alias chain resolution, adapter NaN keys ([e8b0c15](https://github.com/p4ulbr4dl3y/johnston/commit/e8b0c15fe2382c68823a6b3ed3db2fab72a1d04a))
+* permission fail-closed, session path traversal, symlink/readonly write safety ([e446b5b](https://github.com/p4ulbr4dl3y/johnston/commit/e446b5b7c1274eeec3045c90a2e433cb7d02572e))
+* **provider:** log provider-config save errors, dedupe parsers ([eb51793](https://github.com/p4ulbr4dl3y/johnston/commit/eb517934632e6d4e7a308a00c40759460b753e35))
+* **roles:** clarify branch is required on invoke_subagent ([39101fd](https://github.com/p4ulbr4dl3y/johnston/commit/39101fd706d87688d7a94d17059e257d1cd0690a))
+* **security:** web_fetch SSRF/XSS, tool_display secret leak, session role/null/typed fields ([81accf9](https://github.com/p4ulbr4dl3y/johnston/commit/81accf9cb00e46e1e787508049348312b7149b06))
+* **skills:** include skill file path in invoked skill block ([5a49565](https://github.com/p4ulbr4dl3y/johnston/commit/5a49565f616ff96a3dd00c326f9f58a4f90ace73))
+* **subagents:** mark invoke_subagent card running on send_message ([e478323](https://github.com/p4ulbr4dl3y/johnston/commit/e478323da6e1358da9d42176dbeb6845bd4b9f5d))
+* **tasks:** backfill buffered output when background log opens late ([008f6d3](https://github.com/p4ulbr4dl3y/johnston/commit/008f6d35f4f65bb210fed8e257555981c72a2104))
+* **tasks:** notify background shell completion only when in background and hide system messages in ui restore ([43b1cdd](https://github.com/p4ulbr4dl3y/johnston/commit/43b1cdddf585eedb30875861db29a70300b9294c))
+* **tests:** adapt to dead-code removal and markdown_scanner ([118162a](https://github.com/p4ulbr4dl3y/johnston/commit/118162acbaf1e3d9d163e5051338e5bcbc19fbe8))
+* **tests:** import truncate from application.display in plan display test ([aa3d7a9](https://github.com/p4ulbr4dl3y/johnston/commit/aa3d7a92d78cfd7e0b08ed4a5e6e5ef0daa6352b))
+* **tests:** update run_git patch paths for moved subagent_worktree ([591ecab](https://github.com/p4ulbr4dl3y/johnston/commit/591ecabad4a51493544cd9159762306b7c06475e))
+* **tools:** cooperative cancellation for blocking to_thread tool work ([5c6ca9a](https://github.com/p4ulbr4dl3y/johnston/commit/5c6ca9a60d2095e98175e0936a798ada392c762e))
+* **tools:** decode Windows console output and fix cross-platform tests ([cd4dbaa](https://github.com/p4ulbr4dl3y/johnston/commit/cd4dbaab92baf1d04bd5294c53cccea36257ae9c))
+* **tools:** support fallback to raw_text for syntax highlighting in create tool widget ([1912e97](https://github.com/p4ulbr4dl3y/johnston/commit/1912e97ea45a2c33c57a77d1f6a23a1eeca7c63b))
+* **ui:** center markdown headers in modal dialogs while keeping chat headers left-aligned ([3598001](https://github.com/p4ulbr4dl3y/johnston/commit/3598001bccd9eb1d19271f3faba0f39a90e65272))
+* **ui:** count disabled servers in mcp_total to show 0/N when servers are disabled ([a99e086](https://github.com/p4ulbr4dl3y/johnston/commit/a99e0869fbff88bece7848a7c88b527fc283374c))
+* **ui:** don't expand error/cancelled tool cards except shell ([474d9da](https://github.com/p4ulbr4dl3y/johnston/commit/474d9dae17c1c7df394936226b8b291710fad976))
+* **ui:** ensure uniform 1-line margin after all headings in Textual Markdown ([bd1d33a](https://github.com/p4ulbr4dl3y/johnston/commit/bd1d33a903dde22c9d942a4d1189052daf640577))
+* **ui:** fix list items baseline and paragraph margin inside lists ([a959212](https://github.com/p4ulbr4dl3y/johnston/commit/a9592127913328cdbd14a25edae17945de67304b))
+* **ui:** flush pending stream before tool call so last char isn't dropped ([c97834d](https://github.com/p4ulbr4dl3y/johnston/commit/c97834de7146e4723b345bfd49e3ae46eb3b8918))
+* **ui:** format status footer directory paths with real home expansion ([1f27e43](https://github.com/p4ulbr4dl3y/johnston/commit/1f27e43674609397ff95f5502f122d490002b15b))
+* **ui:** harden widget/screen edge cases; fix markdown table, tool-call rendering, input sanitization ([0531a9c](https://github.com/p4ulbr4dl3y/johnston/commit/0531a9c5797151278dbf7632b0464a69b9d536b4))
+* **ui:** harmonize Textual Markdown and Rich Markdown alignment and spacing ([f754f0a](https://github.com/p4ulbr4dl3y/johnston/commit/f754f0ad0cd3be6cf2fe498a4a7a2419b1bd0009))
+* **ui:** keep MCP footer count live after warmup ([48e748d](https://github.com/p4ulbr4dl3y/johnston/commit/48e748d7f898f2981408394e9ac32d33fdb366c6))
+* **ui:** keep MCP indicator in status footer showing 0 when no servers enabled ([7a58f30](https://github.com/p4ulbr4dl3y/johnston/commit/7a58f3051829e924de244895eac5a09e3cd0896a))
+* **ui:** mark interrupted tool call as cancelled instead of stuck running ([0ec229d](https://github.com/p4ulbr4dl3y/johnston/commit/0ec229dd01aab3e9769dd71b56f11b9c0440bc50))
+* **ui:** patch Screen.get_widget_and_offset_at and RichVisual.render_strips for mouse drag selection on Rich renderables ([dd403c4](https://github.com/p4ulbr4dl3y/johnston/commit/dd403c4c0d56853e6110a3608629a4dd673aae53))
+* **ui:** preserve git branch and diff metrics in status footer ([80172ea](https://github.com/p4ulbr4dl3y/johnston/commit/80172ea09c668d98e4f85bbe58a42f9ba686a70e))
+* **ui:** properly push Johnston monochrome theme to Textual App console and left-align headings ([15a94d0](https://github.com/p4ulbr4dl3y/johnston/commit/15a94d044c799d9e3af77868acab60c8a58a8e1b))
+* **ui:** remove empty leading separator in permissions modal ([e1ddb43](https://github.com/p4ulbr4dl3y/johnston/commit/e1ddb43450031983387112017eb8c78a33a4af3c))
+* **ui:** repaint invoke_subagent tool card on completion ([dc4b7d7](https://github.com/p4ulbr4dl3y/johnston/commit/dc4b7d73751ca93bbee124fb7d5bd1a3a614ac3f))
+* **ui:** repaint shell tool widget on background completion ([cc60146](https://github.com/p4ulbr4dl3y/johnston/commit/cc601463fa71ab034d72b66717687f1329e48e0f))
+* **ui:** reset is_generating and handle message queue on rewind, resume, and compact ([629d1c1](https://github.com/p4ulbr4dl3y/johnston/commit/629d1c1d5c58f021f0ca4af700511b05785b1857))
+* **ui:** restore compact original margins (margin 0 for paragraphs and lists) ([938da11](https://github.com/p4ulbr4dl3y/johnston/commit/938da119abb94d94da943c95cc613e1a73df7319))
+* **ui:** restore MCP server highlight on modal reopen ([4d5d3d6](https://github.com/p4ulbr4dl3y/johnston/commit/4d5d3d62f5dfa5a73faf43f0542ca383f66c17c8))
+* **ui:** show subagent's own data in subagent status footer ([b8a08e9](https://github.com/p4ulbr4dl3y/johnston/commit/b8a08e97a404cec58435ed5b334e7b714c1722c2))
+* **ui:** support text selection and clipboard copying on Static with Rich renderables ([4377869](https://github.com/p4ulbr4dl3y/johnston/commit/43778696a9bcc79c4df120ee350d7beed372f686))
+* **ui:** truncate background shell output via truncate_output, backfill test ([77542fd](https://github.com/p4ulbr4dl3y/johnston/commit/77542fd2bf4343af0d50a0edde8078efba74c330))
+* **ui:** unify all heading styles (h1..h6) across Textual Markdown and Rich Markdown ([b929436](https://github.com/p4ulbr4dl3y/johnston/commit/b929436a17277ba49e1c3e855d9dbf56382f8dc3))
+* **ui:** unify code block background to dark zinc [#18181](https://github.com/p4ulbr4dl3y/johnston/issues/18181)b in Rich Markdown ([4f306f1](https://github.com/p4ulbr4dl3y/johnston/commit/4f306f1bf69316b53057594303c0a452dce9aef7))
+* **ui:** unify subagent status footer and fix stream metrics ([5cb02e8](https://github.com/p4ulbr4dl3y/johnston/commit/5cb02e8839ed888ce32f9fe4fb3cdfc9bec4d6f5))
+* **ui:** use error color for cancelled tool call ([fa5e39f](https://github.com/p4ulbr4dl3y/johnston/commit/fa5e39f19f8278eb48dab3b2c5e241c91c3896ca))
+* **ui:** use old line number for removed lines in diff viewer ([5c74391](https://github.com/p4ulbr4dl3y/johnston/commit/5c74391cd5c0810a85efb1f751a20572f9666b3d))
+* **ui:** use Textual Markdown for interactive selection in BotMessage with Rich fallback ([8eac005](https://github.com/p4ulbr4dl3y/johnston/commit/8eac005db14af77d675459f5dbbbcc4c224deb23))
+
+
+### Performance Improvements
+
+* eliminate O(n^2) stream build and cache hot paths ([2ea40ea](https://github.com/p4ulbr4dl3y/johnston/commit/2ea40eab171c11afb9474aa915d4c5ffa3a89a6f))
+* **ui:** migrate BotMessage to direct RichMarkdown rendering with synchronized theme ([c4f8f73](https://github.com/p4ulbr4dl3y/johnston/commit/c4f8f73932671de1d035a1609adba65fbcb34318))
+
+
+### Documentation
+
+* **agents:** remove scripts/ mention and ignore rule ([61d9c44](https://github.com/p4ulbr4dl3y/johnston/commit/61d9c44e6cfff2c7703c52ee7026c12e25ddd80e))
+* correct stale session module docstring ([b0af5a1](https://github.com/p4ulbr4dl3y/johnston/commit/b0af5a10e201bfaf28d091472cb87df995d49bfd))
+* final refactor status (phases 1-11) ([cb65ba4](https://github.com/p4ulbr4dl3y/johnston/commit/cb65ba478ffe5f15f3d327b665e5e1995957e0fc))
+* final refactor status in ARCH_REFACTOR_REVIEW.md ([b6febae](https://github.com/p4ulbr4dl3y/johnston/commit/b6febae59e9fb8be35d17bb2485feb5d81f3916b))
+* **roles:** trim redundant applicability clause from builtin role descriptions ([c4ab5bd](https://github.com/p4ulbr4dl3y/johnston/commit/c4ab5bd5a53f404f0922b9a886aee020ce9db43b))
+* **skills:** fix johnston-guide references; filter dotfiles in skill loader ([f6ff5c5](https://github.com/p4ulbr4dl3y/johnston/commit/f6ff5c5ad6da5a717ae43ae5ee2a2e0f0aab8f1f))
+* **ui:** finalize UI refactor review (phase 7) ([7e050c8](https://github.com/p4ulbr4dl3y/johnston/commit/7e050c8b3be456223d7ace6693dadde325aeaaba))
+
 ## [0.21.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.20.0...johnston-v0.21.0) (2026-08-10)
 
 
