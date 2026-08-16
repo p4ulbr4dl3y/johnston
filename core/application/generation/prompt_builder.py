@@ -232,6 +232,11 @@ class PromptBuilder:
         ):
             filtered_tools.append(self.subagent_schema)
 
+        if self.is_subagent:
+            from core.roles.tools import _rebuild_tool
+
+            filtered_tools = [_rebuild_tool(t) for t in filtered_tools]
+
         allowed_tools = filtered_tools
 
         def _sort_tool_schema(tool_dict: Dict[str, Any]) -> Dict[str, Any]:
