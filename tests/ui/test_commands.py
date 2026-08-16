@@ -157,6 +157,36 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.agent.total_tokens, 0)
         self.assertEqual(app.agent.cost_usd, 0.0)
         self.assertTrue(app.status_refreshed)
+        self.assertFalse(getattr(app, "is_generating", False))
+
+    async def test_rewind_command_clears_queue_and_resets_generating(self):
+        from widgets.commands import RewindCommand
+
+        app = MockApp()
+        app.is_generating = True
+        app.message_queue = [("Queued msg", True)]
+        app.agent.history = [{"role": "user", "content": "First"}]
+        app.chat_view.get_user_messages = lambda: [(0, "First")]
+        app.chat_view.rollback_to = lambda idx: None
+
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: None,
+                "text": "First",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+        app.push_screen = lambda screen, callback: callback(0)
+        await cmd.execute(app)
+
+        self.assertFalse(app.is_generating)
+        self.assertEqual(app.message_queue, [])
 
     async def test_rewind_command_partial_history_preserved(self):
         from widgets.commands import RewindCommand
@@ -220,6 +250,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(agent.compact_called)
         self.assertEqual(len(app.chat_view.dividers), 1)
         self.assertEqual(app.chat_view.dividers[0].divider_title, "Session Compacted (12k → 2k tokens)")
+        self.assertFalse(getattr(app, "is_generating", False))
 
     async def test_compact_command_queues_and_drains_input(self):
         class QueuingMockAgent(MockAgent):
@@ -247,10 +278,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         handled = await handle_slash_command(app, "/compact")
         self.assertTrue(handled)
         self.assertTrue(agent.compact_called)
-        # /compact does not drain the queue; it drains on the agent's next step.
-        self.assertEqual(len(triggered), 0)
-        self.assertEqual(len(app.message_queue), 1)
-        self.assertEqual(app.message_queue[0][0], "Queued prompt during compact")
+        self.assertFalse(app.is_generating)
+        self.assertEqual(len(triggered), 1)
+        self.assertEqual(triggered[0], ("Queued prompt during compact", True))
+        self.assertEqual(len(app.message_queue), 0)
 
     async def test_compact_command_cancellation_updates_divider(self):
         import asyncio
@@ -546,6 +577,28 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
         app.notify.assert_not_called()
         app.push_screen.assert_called_once()
+
+    async def test_resume_command_clears_queue_and_resets_generating(self):
+        from unittest.mock import MagicMock
+
+        from widgets.commands import ResumeCommand
+
+        app = MockApp()
+        app.is_generating = True
+        app.message_queue = [("Queued prompt", True)]
+        app.sm = MagicMock()
+        app.sm.list_main_sessions.return_value = [{"id": "sess_1", "title": "Sess 1"}]
+        app.load_session_ui = MagicMock()
+        mock_input = MagicMock()
+        app.query_one = lambda target, default=None: mock_input
+
+        cmd = ResumeCommand()
+        app.push_screen = lambda screen, callback: callback("sess_1")
+        await cmd.execute(app)
+
+        self.assertFalse(app.is_generating)
+        self.assertEqual(app.message_queue, [])
+        app.load_session_ui.assert_called_once_with("sess_1")
 
 
 if __name__ == "__main__":
