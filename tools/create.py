@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import BaseTool, make_unified_diff, read_file_text, resolve_path, write_file_text
 from tools.cancel import run_cancellable
 

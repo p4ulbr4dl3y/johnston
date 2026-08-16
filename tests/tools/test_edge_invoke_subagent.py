@@ -495,7 +495,7 @@ async def test_save_fails_mid_stream_does_not_escape():
 
 @pytest.mark.asyncio
 async def test_no_parent_session_id_uses_global_running_scan():
-    """BUG: when ctx.app has no current_session_id the tool scans ALL subagent
+    """BUG: when ctx.host has no current_session_id the tool scans ALL subagent
     sessions regardless of parent, so unrelated running sessions from another
     parent/agent count against this parent's concurrency cap."""
     agent = _agent_with_stream(_gen_ok)

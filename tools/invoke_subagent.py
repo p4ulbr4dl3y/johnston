@@ -3,8 +3,8 @@ import uuid
 from typing import Any, Dict
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.infrastructure.errors import format_tool_error
-from core.subagent_worktree import SubagentWorktreeManager
+from core.domain.defaults.errors import format_tool_error
+from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
 
@@ -110,14 +110,14 @@ class InvokeSubagentTool(BaseTool):
         session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args = {**args, "session_id": session_id}
 
-        _record_subagent_session(ctx.app, session_id)
+        _record_subagent_session(ctx.host, session_id)
 
         parent_session_id = ctx.session_id
         if not isinstance(parent_session_id, str) or not parent_session_id:
-            parent_session_id = getattr(getattr(ctx, "app", None), "current_session_id", None)
+            parent_session_id = getattr(getattr(ctx, "host", None), "current_session_id", None)
         from tools.utils import get_session_store
 
-        store = get_session_store(ctx.app)
+        store = get_session_store(ctx.host)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
         active_sessions = (
@@ -159,7 +159,7 @@ class InvokeSubagentTool(BaseTool):
         from core.application.session.stream import configure_subagent_agent
 
         applied_role = configure_subagent_agent(
-            subagent, subagent_type, app=ctx.app, project_dir=project_dir
+            subagent, subagent_type, app=ctx.host, project_dir=project_dir
         )
         canonical_role = getattr(subagent, "role", None) or getattr(applied_role, "key", None) or "worker"
 

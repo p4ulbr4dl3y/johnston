@@ -27,7 +27,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_app.current_session_id = "sess-main"
         mock_app.sm = self.store
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.background_tasks = []
         tool._ensure_context = lambda app=None: mock_ctx
 
@@ -64,7 +64,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_agent.stream_steps.return_value = (x for x in [])
 
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.create_agent.return_value = mock_agent
         mock_ctx.background_tasks = []
         mock_app.sm = self.store
@@ -98,7 +98,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_agent.stream_steps.return_value = (x for x in [])
 
         mock_ctx = MagicMock()
-        mock_ctx.app = mock_app
+        mock_ctx.host = mock_app
         mock_ctx.create_agent.return_value = mock_agent
         mock_ctx.background_tasks = []
         mock_app.sm = self.store

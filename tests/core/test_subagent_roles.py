@@ -99,12 +99,12 @@ class TestSubagentApplyRole(unittest.TestCase):
 
 
 class TestSubagentApplyProvider(unittest.TestCase):
-    def test_apply_provider_config_rebinds_in_place(self):
-        """_apply_provider_config must swap provider fields onto the existing
+    def test_rebind_provider_in_place(self):
+        """rebind_provider must swap provider fields onto the existing
         subagent object while preserving identity plumbing."""
         import types
 
-        from core.application.session.stream import _apply_provider_config
+        from core.roles.provider import rebind_provider
 
         class _FakeRebuilt:
             def __init__(self):
@@ -131,7 +131,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
         import unittest.mock as mock
 
         with mock.patch("core.provider_manager.ProviderManager", return_value=fake_pm):
-            _apply_provider_config(agent, "clinepass")
+            rebind_provider(agent, "clinepass")
 
         self.assertEqual(agent.provider_key, "clinepass")
         self.assertEqual(agent.base_url, "https://api.cline.bot/api/v1")

@@ -37,8 +37,8 @@ class TestNormalizeScope:
 
     def test_unknown_scope_passthrough(self):
         assert normalize_role_scope("bogus") == "bogus"
-        assert normalize_role_scope("main_only") == "main"
-        assert normalize_role_scope("subagent_only") == "subagent"
+        assert normalize_role_scope("main_only") == "main_only"
+        assert normalize_role_scope("subagent_only") == "subagent_only"
 
     def test_non_string_scope_raises(self):
         # AgentRole.__init__ calls normalize_role_scope(scope); an int scope

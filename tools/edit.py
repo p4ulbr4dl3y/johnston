@@ -2,7 +2,7 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import (
     BaseTool,
     make_unified_diff,

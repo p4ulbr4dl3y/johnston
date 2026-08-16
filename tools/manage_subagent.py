@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from core.session_manager import (
     STATUS_CANCELLED,
     STATUS_ERROR,
@@ -44,7 +44,7 @@ class ManageSubagentTool(BaseTool):
         session_id = (args.get("session_id") or "").strip()
         message = (args.get("message") or "").strip()
 
-        store = self._get_store(ctx.app)
+        store = self._get_store(ctx.host)
 
         curr_session_id = ctx.session_id
 
@@ -101,7 +101,7 @@ class ManageSubagentTool(BaseTool):
                 session.pending_messages.append(message)
                 from tools.invoke_subagent import _mark_subagent_running
 
-                _mark_subagent_running(ctx.app, session.id, text=f"follow-up queued for {session.id}")
+                _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
                 return f"queued for {session.id}"
 
             try:
@@ -119,7 +119,7 @@ class ManageSubagentTool(BaseTool):
                         configure_subagent_agent(
                             subagent,
                             session.role,
-                            app=ctx.app,
+                            app=ctx.host,
                             project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
                         )
                         session.agent = subagent
@@ -128,7 +128,7 @@ class ManageSubagentTool(BaseTool):
                 # keeps working on its own branch/cwd instead of silently falling back
                 # to the parent checkout (worktree is removed on completion).
                 if subagent and session.project_dir and session.branch_name:
-                    from core.subagent_worktree import SubagentWorktreeManager
+                    from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
                     project_dir = SubagentWorktreeManager.ensure_worktree_available(session, parent_dir=ctx.project_dir)
                     subagent.project_dir = project_dir
@@ -145,7 +145,7 @@ class ManageSubagentTool(BaseTool):
                 session.add_event({"type": "status_change", "status": "running"})
 
                 from core.application.session.stream import run_subagent_stream_bg
-                from core.subagent_worktree import SubagentWorktreeManager
+                from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
                 from tools.base import format_background_notification
 
                 cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
@@ -177,7 +177,7 @@ class ManageSubagentTool(BaseTool):
 
                 from tools.invoke_subagent import _mark_subagent_running
 
-                _mark_subagent_running(ctx.app, session.id, text=f"follow-up sent to {session.id}")
+                _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
                 return f"message sent to {session.id}"
             except Exception as err:
                 session.finish(STATUS_ERROR, str(err))

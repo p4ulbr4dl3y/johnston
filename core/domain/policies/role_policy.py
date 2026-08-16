@@ -4,18 +4,10 @@ from typing import Any, Callable, List, Optional, Tuple
 from core.domain.defaults.errors import ToolResult, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
 
-# Legacy scope aliases -> canonical names. Kept indefinitely so existing role
-# files (and persisted sessions) keep working after the rename.
-_SCOPE_ALIASES = {
-    "main_only": "main",
-    "subagent_only": "subagent",
-}
-
 
 def normalize_role_scope(scope: str) -> str:
     """Normalize a role scope value to its canonical short name."""
-    clean = (scope or "").strip().lower() or "any"
-    return _SCOPE_ALIASES.get(clean, clean)
+    return (scope or "").strip().lower() or "any"
 
 
 class AgentRole:

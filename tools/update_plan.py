@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import BaseTool
 
 
@@ -67,10 +67,10 @@ class UpdatePlanTool(BaseTool):
             return format_tool_error("params", name="plan", detail="items need 'step'/'status'")
 
         # Store active plan in app state if app exists
-        if ctx.app:
-            setattr(ctx.app, "current_plan", validated_plan)
-            setattr(ctx.app, "current_plan_explanation", explanation)
-            on_plan_update = getattr(ctx.app, "on_plan_update", None)
+        if ctx.host:
+            setattr(ctx.host, "current_plan", validated_plan)
+            setattr(ctx.host, "current_plan_explanation", explanation)
+            on_plan_update = getattr(ctx.host, "on_plan_update", None)
             if callable(on_plan_update):
                 try:
                     on_plan_update(validated_plan, explanation)

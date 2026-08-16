@@ -77,10 +77,10 @@ async def test_file_no_trailing_newline_counts_as_line(tmp_path, ctx):
 
 @pytest.mark.asyncio
 async def test_huge_file_rejected(tmp_path, ctx, monkeypatch):
-    """File larger than MAX_FILE_SIZE must be rejected before reading."""
+    """File larger than the payload cap must be rejected before reading."""
     from tools import read
 
-    monkeypatch.setattr(read, "MAX_FILE_SIZE", 100)
+    monkeypatch.setattr(read, "MAX_TOOL_PAYLOAD_BYTES", 100)
     p = wb(tmp_path, "big.txt", b"x" * 1000)
     res = await ReadTool().execute({"path": p}, ctx=ctx)
     assert "ERR:" in res

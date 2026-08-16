@@ -1,6 +1,6 @@
 from typing import Any
 
-from core.infrastructure.errors import format_tool_error
+from core.domain.defaults.errors import format_tool_error
 from tools.base import try_int
 
 DEFAULT_LINE_WINDOW = 800
@@ -25,7 +25,7 @@ def get_session_store(app: Any) -> Any:
 
     ``app`` is the already-resolved host (or agent carrying one); uses ``app.sm``
     when provided, otherwise the ``core.session_manager.SessionStore`` singleton.
-    Callers pass a resolved host (e.g. ``ctx.app``), not a raw ToolContext.
+    Callers pass a resolved host (e.g. ``ctx.host``), not a raw ToolContext.
     """
     from core.session_manager import SessionStore
 
