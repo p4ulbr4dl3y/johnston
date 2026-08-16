@@ -106,7 +106,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/skills", COMMAND_REGISTRY)
 
     def test_skill_command_suggestions(self):
-        from widgets.command_suggestions import get_all_command_suggestions
+        from widgets.app.command_provider import get_all_command_suggestions
 
         suggestions = get_all_command_suggestions()
         cmd_names = [name for name, _ in suggestions]
