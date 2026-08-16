@@ -3,6 +3,7 @@ import datetime
 import os
 import platform
 import time
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.application.skills.manager import SkillManager
@@ -20,6 +21,44 @@ __all__ = [
 
 _GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
 _GIT_INFO_CACHE_TTL = 30.0
+
+_PROJECT_INSTR_CACHE_MAX = 64
+_STABLE_CORE_CACHE_MAX = 256
+_TOOLS_CACHE_MAX = 32
+
+# (realpath cwd) -> (mtime/size signature, snippet). Invalidates when any
+# instruction file appears/disappears or its mtime changes.
+_PROJECT_INSTRUCTION_CACHE: Dict[str, Tuple[tuple, str]] = {}
+
+# Semantic cache for the stable (non-volatile) prefix of the system prompt.
+# Keyed by the assembled stable parts so it only rebuilds when roles / rules /
+# skills / instructions / mcp tool map actually change.
+_STABLE_CORE_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
+
+# Reused SkillManager instances keyed by project dir, so the agent loop does not
+# re-provision/re-scan skills on every turn.
+_SKILL_MANAGERS: Dict[str, SkillManager] = {}
+
+# Pre-sorted tool schema cache keyed by a content identity (tool object ids +
+# role flags). build_tools deepcopy+sorts only on cache miss.
+_TOOLS_CACHE: "OrderedDict[tuple, List[Dict[str, Any]]]" = OrderedDict()
+
+
+def _cache_set(cache, key, value, max_size: int) -> None:
+    cache[key] = value
+    cache.move_to_end(key)
+    while len(cache) > max_size:
+        cache.popitem(last=False)
+
+
+def _get_skill_manager(cwd: Optional[str]) -> SkillManager:
+    key = os.path.realpath(cwd) if cwd else os.getcwd()
+    mgr = _SKILL_MANAGERS.get(key)
+    if mgr is None:
+        mgr = SkillManager(project_dir=key)
+        _SKILL_MANAGERS[key] = mgr
+    return mgr
+
 
 
 def _cached_git_info(cwd: Optional[str] = None) -> Optional[str]:
@@ -81,11 +120,37 @@ def _compute_git_info(cwd: str = None) -> str:
     return ""
 
 
-def get_project_instructions_snippet(cwd: str = None) -> str:
-    """Reads INSTRUCTION_FILES from a working directory."""
-    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
-    found_snippets = []
+def _project_instr_signature(cwd: str) -> tuple:
+    """Cheap (name, mtime_ns, size) signature for every instruction file present.
 
+    Detects additions, removals and edits without re-reading file contents.
+    """
+    entries = []
+    for name in INSTRUCTION_FILES:
+        fpath = os.path.join(cwd, name)
+        try:
+            st = os.stat(fpath)
+            entries.append((name, st.st_mtime_ns, st.st_size))
+        except OSError:
+            positions = {e[0] for e in entries}
+            if name not in positions:
+                entries.append((name, 0, 0))
+    return tuple(entries)
+
+
+def get_project_instructions_snippet(cwd: str = None) -> str:
+    """Reads INSTRUCTION_FILES from a working directory.
+
+    Cached per-directory by an mtime/size signature; files are only re-read
+    when they change, so the agent loop does not re-open disk files every turn.
+    """
+    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
+    sig = _project_instr_signature(cwd)
+    cached = _PROJECT_INSTRUCTION_CACHE.get(cwd)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+
+    found_snippets = []
     for name in INSTRUCTION_FILES:
         filepath = os.path.join(cwd, name)
         if os.path.isfile(filepath):
@@ -99,7 +164,11 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
             except Exception:
                 pass
 
-    return "\n\n".join(found_snippets)
+    result = "\n\n".join(found_snippets)
+    if len(_PROJECT_INSTRUCTION_CACHE) >= _PROJECT_INSTR_CACHE_MAX:
+        dict.popitem(_PROJECT_INSTRUCTION_CACHE, last=False)
+    _PROJECT_INSTRUCTION_CACHE[cwd] = (sig, result)
+    return result
 
 
 def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
@@ -143,7 +212,7 @@ class PromptBuilder:
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
-        skills_snippet = SkillManager().get_system_prompt_snippet()
+        skills_snippet = _get_skill_manager(self.cwd).get_system_prompt_snippet()
         subagents_snippet = (
             "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
         )
@@ -163,11 +232,28 @@ class PromptBuilder:
 
         env_block = "\n".join(env_lines)
 
-        project_snippet = get_project_instructions_snippet(self.cwd)
-        rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
+        stable_core = self._build_stable_core(mcp_snippet, skills_snippet, subagents_snippet)
 
         # Stable prefix first (cacheable across turns); volatile env metadata
         # last so the longest possible stable prefix can be prompt-cached.
+        sys_prompt = stable_core
+
+        # Volatile metadata last: time/git change every turn, so keeping them at
+        # the tail preserves the stable cached prefix for provider prompt caching.
+        sys_prompt = f"{sys_prompt}\n\n{env_block}"
+
+        return sys_prompt
+
+    def _build_stable_core(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
+        """Assemble + cache the stable (non-volatile) system-prompt prefix.
+
+        Only rebuilds when the parts it depends on change: base prompt, role
+        definition, project instructions, rules, skills, subagents or the MCP
+        snippet. Volatile environment metadata (date/git) stays out of this
+        build so it stays cacheable across turns.
+        """
+        from core.role_registry import RoleRegistry
+
         sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
         if "{model_name}" in sys_prompt:
             model_label = (
@@ -176,6 +262,39 @@ class PromptBuilder:
                 else "an expert AI software engineer"
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
+
+        project_snippet = get_project_instructions_snippet(self.cwd)
+        rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
+
+        role_def = None
+        if not self.is_subagent:
+            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
+            if getattr(role_def, "prompt", None):
+                sys_prompt += f"\n\n{role_def.prompt}"
+
+        # Cache key from the stable components. role_def is represented by its
+        # content so the cache invalidates when the role definition changes even
+        # if registry internals were refreshed in place.
+        def _ident(obj):
+            if obj is None:
+                return None
+            return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
+
+        key = (
+            sys_prompt,
+            project_snippet,
+            rules_snippet,
+            skills_snippet,
+            subagents_snippet,
+            mcp_snippet,
+            self.role,
+            _ident(role_def),
+        )
+
+        cached = _STABLE_CORE_CACHE.get(key)
+        if cached is not None:
+            return cached
+
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
@@ -187,17 +306,7 @@ class PromptBuilder:
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        if not self.is_subagent:
-            from core.role_registry import RoleRegistry
-
-            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=cwd)
-            if role_def.prompt:
-                sys_prompt += f"\n\n{role_def.prompt}"
-
-        # Volatile metadata last: time/git change every turn, so keeping them at
-        # the tail preserves the stable cached prefix for provider prompt caching.
-        sys_prompt = f"{sys_prompt}\n\n{env_block}"
-
+        _cache_set(_STABLE_CORE_CACHE, key, sys_prompt, _STABLE_CORE_CACHE_MAX)
         return sys_prompt
 
     def build_tools(self, provider_key: str = "") -> List[Dict[str, Any]]:
@@ -257,6 +366,19 @@ class PromptBuilder:
                         params["required"] = req
             return t
 
+        # Identity key lets us reuse the last pre-sorted build when the tool
+        # objects (and role flags) are unchanged this turn, skipping the
+        # per-schema deepcopy + re-sort. A fresh build always happens after any
+        # tool swap because old object ids drop out of the key. Copies are
+        # returned so callers mutating the schemas cannot corrupt the cache.
+        import copy
+
+        key = (tuple(id(t) for t in allowed_tools), self.is_subagent, self.allow_task)
+        cached = _TOOLS_CACHE.get(key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+
         sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]
         sorted_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
-        return sorted_tools
+        _cache_set(_TOOLS_CACHE, key, sorted_tools, _TOOLS_CACHE_MAX)
+        return copy.deepcopy(sorted_tools)

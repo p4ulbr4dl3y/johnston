@@ -4,8 +4,54 @@ import os
 import shutil
 import signal
 import subprocess
+import threading
 from pathlib import Path
 from typing import Any
+
+_FSYNC_EXECUTOR = None
+_FSYNC_EXECUTOR_LOCK = threading.Lock()
+
+
+def _fsync_executor():
+    """Shared single-thread daemon executor for background fsync calls."""
+    global _FSYNC_EXECUTOR
+    if _FSYNC_EXECUTOR is None:
+        with _FSYNC_EXECUTOR_LOCK:
+            if _FSYNC_EXECUTOR is None:
+                from concurrent.futures import ThreadPoolExecutor
+
+                _FSYNC_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="johnston-fsync")
+    return _FSYNC_EXECUTOR
+
+
+def _fsync_path_async(path: str) -> None:
+    """Open the file and fsync it on a background thread.
+
+    Runs after os.replace so the visible path is already updated; the fsync only
+    hardens durability (survives a crash/power-loss) without blocking the event
+    loop. A failure is swallowed — the write already succeeded.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        _fsync_executor().submit(_do_fsync, fd)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
+def _do_fsync(fd: int) -> None:
+    try:
+        os.fsync(fd)
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
 
 
 def is_windows() -> bool:
@@ -36,8 +82,11 @@ def atomic_write_text(path: str, content: str) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
             f.flush()
-            os.fsync(f.fileno())
         os.replace(tmp_path, path)
+        # fsync moved out-of-band (background thread) so session saves do not
+        # stall the event loop on every write. Atomicity (mkstemp + os.replace)
+        # is preserved; only durability is hardened asynchronously.
+        _fsync_path_async(path)
     except Exception:
         if os.path.exists(tmp_path):
             try:

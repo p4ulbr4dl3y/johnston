@@ -26,8 +26,8 @@ When performing specific configuration tasks, inspect ONLY the relevant referenc
 5. **LLM Providers & Keys**: [references/providers.md](file://references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
 
-6. **Custom & Builtin Tools**: [references/tools.md](file://references/tools.md)
-   - Builtin tool execution, shell permissions, and adding custom tools.
+6. **Builtin Tools**: [references/tools.md](file://references/tools.md)
+   - Builtin tool execution, shell permissions, and per-tool permission config.
 
 ## Token Optimization & Execution Rules
 

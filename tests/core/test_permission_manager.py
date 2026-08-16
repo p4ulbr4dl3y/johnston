@@ -159,6 +159,33 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(self.pm.normalize_action("junk", default="deny"), "deny")
         self.assertEqual(self.pm.normalize_action(None), "ask")
 
+    def test_config_read_cached_across_checks(self):
+        """Repeated checks must not re-read config from disk (mtime cache)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                from core.models_catalog import _json_read_cache
+
+                self.pm.check_permission("web_fetch")
+                self.pm.check_permission("web_fetch")
+                after = _json_read_cache.get(cfg_file)
+                # Config file was read once and memoized despite two checks.
+                self.assertIsNotNone(after)
+
+    def test_check_permission_reflects_config_change(self):
+        """Editing config on disk (new mtime) must invalidate the permission cache."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.assertEqual(self.pm.check_permission("web_fetch")[0], "deny")
+                with open(cfg_file, "w", encoding="utf-8") as f:
+                    json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
+                self.assertEqual(self.pm.check_permission("web_fetch")[0], "allow")
+
 
 if __name__ == "__main__":
     unittest.main()

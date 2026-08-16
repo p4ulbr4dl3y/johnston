@@ -164,8 +164,9 @@ class CompactionMixin:
         sys_overhead: int,
         threshold: int,
     ) -> Tuple[List[Dict[str, Any]], bool]:
-        current_context = sys_overhead + estimate_tokens(messages[1:])
-        if not should_compact(len(messages) - 1, sys_overhead, estimate_tokens(messages[1:]), threshold):
+        history_tokens = estimate_tokens(messages[1:])
+        current_context = sys_overhead + history_tokens
+        if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
             self.last_context_tokens = current_context
             return messages, False
 

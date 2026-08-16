@@ -3,6 +3,7 @@ Token estimation and usage calculation utilities
 """
 
 import json
+from collections import OrderedDict
 from typing import Any, Dict
 
 # ~4 chars/token BPE density for ASCII text.
@@ -67,23 +68,91 @@ def _estimate_text_tokens(text: str) -> int:
     return max(0, round(cost))
 
 
+# Memo cache for non-string inputs that get serialized (json.dumps) before counting.
+# Histories are passed to estimate_tokens repeatedly within a turn (compaction guard,
+# prompt-token estimate, status-footer refresh), and re-serializing an unchanged
+# history on each call is pure waste. The key is a cheap (<len,  type-id, content>
+# derived) signature and the memoized value is the already-computed token int, so
+# the cache never holds the (potentially large) input object itself in memory.
+# OrderedDict + maxsize evicts the least-recently-used entry, keeping the cache
+# bounded. Entries where two distinct objects have identical serialized content are
+# safe to alias because token estimation is a pure, deterministic function of the
+# serialized text.
+_CACHE_STR_KEY_MAX = 20000
+_ESTIMATE_CACHE_MAXSIZE = 256
+_estimate_cache: "OrderedDict[tuple, int]" = OrderedDict()
+
+
+def _estimate_cache_key(input_val: Any) -> tuple:
+    """Build a cheap, hashable cache key for a serializable input.
+
+    Strings use a len-limited tuple; all other inputs use a type/length/content
+    signature (repr of a dict is its ordered key pointers, which is stable for a
+    given list[dict] history as long as that history object is unmutated).
+    """
+    if isinstance(input_val, str):
+        return ("str", len(input_val), input_val[: _CACHE_STR_KEY_MAX])
+    try:
+        length = len(input_val)
+    except TypeError:
+        return (type(input_val).__name__, repr(input_val))
+    except OverflowError:
+        return ("big", type(input_val).__name__)
+    if length > _CACHE_STR_KEY_MAX:
+        return ("big", type(input_val).__name__)
+    return ("val", type(input_val).__name__, length, repr(input_val))
+
+
 def estimate_tokens(input_val: Any) -> int:
     """
     Estimate token count using a character-class-aware heuristic.
     ASCII is ~4 chars/token; Cyrillic ~2 chars/token; CJK ~1.4 chars/token.
     Supports strings, dicts, lists, or primitive types.
+
+    Results for non-string inputs are memoized in a small LRU cache keyed by a
+    content signature. Because histories are *mutated* in place between calls, the
+    key is rebuilt from the (cheap) len+repr each time and only matches when the
+    input is truly unchanged, so stale cached values are never served.
     """
     if input_val is None:
         return 0
-    if not isinstance(input_val, str):
-        try:
-            text = json.dumps(input_val, ensure_ascii=False)
-        except Exception:
-            text = str(input_val)
-    else:
-        text = input_val
+    if isinstance(input_val, str):
+        # Immutable: always safe to memoize. Empty/large strings skip the cache
+        # (empty is trivial; huge strings rarely repeat and would cost memory).
+        if input_val and len(input_val) <= _CACHE_STR_KEY_MAX:
+            key = _estimate_cache_key(input_val)
+            cached = _estimate_cache.get(key)
+            if cached is not None:
+                _estimate_cache.move_to_end(key)
+                return cached
+            val = _estimate_text_tokens(input_val)
+            _estimate_cache[key] = val
+        else:
+            val = _estimate_text_tokens(input_val)
+        return val
 
-    return _estimate_text_tokens(text)
+    # Non-string: serialize then count. Only memoized when the content signature
+    # is exact; "big" (overflow/oversize) inputs bail straight through so distinct
+    # large objects never alias the same cache slot.
+    key = _estimate_cache_key(input_val)
+    cached = _estimate_cache.get(key)
+    if cached is not None:
+        _estimate_cache.move_to_end(key)
+        return cached
+    try:
+        text = json.dumps(input_val, ensure_ascii=False)
+    except Exception:
+        text = str(input_val)
+    val = _estimate_text_tokens(text)
+    if key[0] != "big":
+        _estimate_cache[key] = val
+    _trim_cache()
+    return val
+
+
+def _trim_cache() -> None:
+    while len(_estimate_cache) > _ESTIMATE_CACHE_MAXSIZE:
+        _estimate_cache.popitem(last=False)
 
 
 def parse_usage(usage: Any) -> Dict[str, int]:

@@ -4,6 +4,7 @@ Goal: find bugs in PromptBuilder / get_git_info / get_project_instructions_snipp
 get_rules_snippet under empty/None/long/unicode/duplicate/unsorted input, plus
 consistency and mutation invariants.
 """
+import os
 from unittest.mock import patch
 
 import pytest
@@ -184,6 +185,18 @@ def test_build_tools_deterministic_same_input():
     assert b1.build_tools() == b2.build_tools()
 
 
+def test_build_tools_cache_isolated_from_caller_mutation():
+    """Mutating a returned (cached) schema must not corrupt the next call."""
+    base = [{"function": {"name": "t", "parameters": {"properties": {"z": {}, "a": {}}}}}]
+    b = PromptBuilder("p", list(base), role="worker", allow_task=False)
+    first = b.build_tools()
+    # Mutate the returned nested dict aggressively.
+    first[0]["function"]["parameters"]["properties"]["a"]["x"] = "polluted"
+    second = b.build_tools()
+    assert "x" not in second[0]["function"]["parameters"]["properties"]["a"]
+    assert list(second[0]["function"]["parameters"]["properties"]) == ["a", "z"]
+
+
 def test_build_tools_subagent_excluded_tools():
     """Subagent must drop SUBAGENT_EXCLUDED_TOOLS (invoke_subagent etc)."""
     base = [
@@ -307,6 +320,25 @@ def test_project_snippet_no_side_effect_on_cwd(tmp_path):
     (tmp_path / "AGENTS.md").write_text("hi")
     get_project_instructions_snippet(str(tmp_path))
     assert (tmp_path / "AGENTS.md").read_text() == "hi"
+
+
+def test_project_snippet_cached_until_mtime_change(tmp_path):
+    """Re-reading unchanged files must hit the cache; editing invalidates it."""
+    import core.application.generation.prompt_builder as pb
+
+    (tmp_path / "AGENTS.md").write_text("v1")
+    key = os.path.realpath(str(tmp_path))
+    pb._PROJECT_INSTRUCTION_CACHE.pop(key, None)
+
+    out1 = pb.get_project_instructions_snippet(str(tmp_path))
+    out2 = pb.get_project_instructions_snippet(str(tmp_path))
+    assert out1 == out2 == "## Project Instructions (AGENTS.md)\nv1"
+
+    # Cache populated for this cwd after the reads.
+    # Editing the file changes its mtime/size signature -> next read re-reads.
+    (tmp_path / "AGENTS.md").write_text("v2-longer-content")
+    out3 = pb.get_project_instructions_snippet(str(tmp_path))
+    assert "v2-longer-content" in out3
 
 
 # ---------------------------------------------------------------------------

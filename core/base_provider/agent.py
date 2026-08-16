@@ -277,7 +277,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
                         mq[:] = kept
 
-                full_assistant_text = ""
                 step_usage = None
                 prompt_tokens_est = estimate_tokens(messages)
                 max_retries = getattr(self, "max_retries", 3)
@@ -297,11 +296,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     attempt += 1
                     full_assistant_parts = []
                     active_thought_parts = []
-                    full_assistant_text = ""
                     step_usage = None
                     tool_calls_dict = {}
                     tool_call_arg_parts: Dict[int, List[str]] = {}
-                    active_thought = ""
                     thinking_started = False
                     thinking_t0 = time.time()
 
@@ -322,10 +319,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if tag == "adapter_text":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
                                         thinking_started = False
                                     full_assistant_parts.append(payload)
-                                    full_assistant_text = "".join(full_assistant_parts)
                                     yield ("bot_delta", payload, "")
                                 elif tag == "adapter_thought":
                                     if not thinking_started:
@@ -333,12 +329,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                         thinking_started = True
                                         thinking_t0 = time.time()
                                     active_thought_parts.append(payload)
-                                    active_thought = "".join(active_thought_parts)
                                     yield ("thinking_delta", payload, "")
                                 elif tag == "adapter_tool_call":
                                     if thinking_started:
                                         dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", active_thought)
+                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
                                         thinking_started = False
                                     idx = len(tool_calls_dict)
                                     tc_id = payload.get("id") or new_tool_call_id(idx)
@@ -454,22 +449,20 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                             thinking_started = True
                                             thinking_t0 = time.time()
                                         active_thought_parts.append(str(reasoning))
-                                        active_thought = "".join(active_thought_parts)
                                         yield ("thinking_delta", str(reasoning), "")
 
                                     if delta.content:
                                         if thinking_started:
                                             dt = time.time() - thinking_t0
-                                            yield ("thinking_end", f"{dt}", active_thought)
+                                            yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
                                             thinking_started = False
                                         full_assistant_parts.append(delta.content)
-                                        full_assistant_text = "".join(full_assistant_parts)
                                         yield ("bot_delta", delta.content, "")
 
                                     if delta.tool_calls:
                                         if thinking_started:
                                             dt = time.time() - thinking_t0
-                                            yield ("thinking_end", f"{dt}", active_thought)
+                                            yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
                                             thinking_started = False
 
                                         for tc in delta.tool_calls:
@@ -499,8 +492,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         for _idx, _parts in tool_call_arg_parts.items():
                             tool_calls_dict[_idx]["arguments"] = "".join(_parts)
                         output_est = (
-                            estimate_tokens(full_assistant_text)
-                            + estimate_tokens(active_thought)
+                            estimate_tokens("".join(full_assistant_parts))
+                            + estimate_tokens("".join(active_thought_parts))
                             + estimate_tokens(tool_calls_dict)
                         )
                         self._accumulate_usage(
@@ -528,7 +521,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
                                 jitter = random.uniform(0, 0.5 * delay)
                                 actual_delay = delay + jitter
-                            if full_assistant_text:
+                            if full_assistant_parts:
                                 # Signal the UI to drop the partially-streamed text so the
                                 # retried attempt starts from a blank reply (no duplication).
                                 yield ("bot_reset", "", "")
@@ -545,8 +538,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         raise api_err
 
                 output_tokens_est = (
-                    estimate_tokens(full_assistant_text)
-                    + estimate_tokens(active_thought)
+                    estimate_tokens("".join(full_assistant_parts))
+                    + estimate_tokens("".join(active_thought_parts))
                     + estimate_tokens(tool_calls_dict)
                 )
                 self._accumulate_usage(
@@ -555,12 +548,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 if thinking_started:
                     dt = time.time() - thinking_t0
-                    yield ("thinking_end", f"{dt}", active_thought)
+                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
                     thinking_started = False
 
                 if not tool_calls_dict:
-                    messages.append({"role": "assistant", "content": full_assistant_text})
-                    yield ("bot_text", full_assistant_text, "")
+                    full_assistant_text_final = "".join(full_assistant_parts)
+                    messages.append({"role": "assistant", "content": full_assistant_text_final})
+                    yield ("bot_text", full_assistant_text_final, "")
                     # If user messages were queued during this turn, keep going
                     # so the next while-iteration drains them as new steps.
                     if self._has_queued_messages():
@@ -574,7 +568,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 assistant_tool_msg = {
                     "role": "assistant",
-                    "content": full_assistant_text or None,
+                    "content": "".join(full_assistant_parts) or None,
                     "tool_calls": [
                         {
                             "id": tc["id"],

@@ -15,6 +15,14 @@ from core.models_catalog import cached_json_read, catalog, extract_context_lengt
 logger = logging.getLogger(__name__)
 
 
+def _file_mtime(path: str) -> float:
+    """Best-effort file mtime (0.0 when missing) for cache-signature checks."""
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return 0.0
+
+
 class ProviderManager:
     def __init__(self):
         self.invalidate_cache()
@@ -27,6 +35,7 @@ class ProviderManager:
         self._providers_cache = {}
         self._providers_mtime = 0.0
         self._providers_file_path = ""
+        self._providers_memo = {}
 
     def _cached_json(self, path: str, cache_attr: str, mtime_attr: str, file_attr: str, default: Any) -> Any:
         """Reads a JSON file, returning a cached value when the file is unchanged (by mtime).
@@ -92,11 +101,20 @@ class ProviderManager:
         self.invalidate_cache()
 
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
-        """Loads providers from JSON definitions"""
-        providers = {}
+        """Loads providers from JSON definitions (memoized until source files change)."""
         disabled_set = set(self.get_disabled_providers())
+        # Memo-key: include_disabled + source-file mtimes + disabled set. The
+        # result is reused across the many per-turn / footer-render calls and
+        # invalidated after any set_* mutation or external config change.
+        cfg_mtime = _file_mtime(CONFIG_FILE)
+        providers_mtime = _file_mtime(PROVIDERS_JSON_FILE)
+        cache_key = (include_disabled, cfg_mtime, providers_mtime, tuple(sorted(disabled_set)))
+        cached = self._providers_memo.get(cache_key)
+        if cached is not None:
+            return cached
 
         json_providers = self._load_json_providers()
+        providers = {}
         for pkey, pdata in json_providers.items():
             if not include_disabled and pkey in disabled_set:
                 continue
@@ -119,7 +137,9 @@ class ProviderManager:
                 "max_retry_delay": pdata.get("max_retry_delay", 10.0),
                 "disabled": pkey in disabled_set,
             }
-
+        if len(self._providers_memo) >= 16:
+            dict.popitem(self._providers_memo, last=False)
+        self._providers_memo[cache_key] = providers
         return providers
 
     def get_active_provider_key(self) -> str:
