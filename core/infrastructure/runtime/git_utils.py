@@ -39,6 +39,23 @@ def is_git_repository(cwd: Optional[str] = None) -> bool:
     return res.returncode == 0 and res.stdout.strip() == "true"
 
 
+def format_git_branch_info(cwd: Optional[str] = None) -> str:
+    """Returns a human-readable git context string for a working directory.
+
+    ``branch '<name>'`` when on a branch, ``detached HEAD (<sha>)`` when not,
+    or ``""`` when the directory is not a git repo. Pure git-format knowledge
+    kept in infrastructure (used by the prompt builder's system prompt).
+    """
+    res = run_git(["branch", "--show-current"], cwd=cwd, timeout=1)
+    if res.returncode == 0 and res.stdout.strip():
+        return f"branch '{res.stdout.strip()}'"
+
+    rev_res = run_git(["rev-parse", "--short", "HEAD"], cwd=cwd, timeout=1)
+    if rev_res.returncode == 0 and rev_res.stdout.strip():
+        return f"detached HEAD ({rev_res.stdout.strip()})"
+    return ""
+
+
 def _content_to_text(content: str | list[str]) -> str:
     """Converts content to raw text, preserving a bare trailing newline."""
     if isinstance(content, list):

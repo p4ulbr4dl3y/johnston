@@ -17,10 +17,12 @@ from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
 from core.domain.policies.model_catalog_policy import (
     _RE_FUZZY_STRIP,
     _RE_TOKEN_SPLIT,
+    format_context_tokens,
+)
+from core.infrastructure.adapters.models_source import (
     MODELS_DEV_URL,
     OPENROUTER_MODELS_URL,
     extract_context_length,
-    format_context_tokens,
 )
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json

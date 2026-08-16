@@ -19,9 +19,11 @@ from core.application.generation.prompt_builder import (
 
 @pytest.fixture(autouse=True)
 def _no_git_subprocess(monkeypatch):
-    # Keep git subprocess deterministic/fast in edge tests.
+    # Keep git formatting deterministic/fast in edge tests.
     monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", lambda cwd=None: "")
-    monkeypatch.setattr("core.application.generation.prompt_builder.run_git", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "core.infrastructure.runtime.git_utils.format_git_branch_info", lambda cwd=None: ""
+    )
 
 
 # ---------------------------------------------------------------------------

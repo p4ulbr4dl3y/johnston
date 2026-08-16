@@ -78,13 +78,23 @@ class RulesManager:
         except Exception:
             return None
 
+    def get_active_rules(
+        self, role: str = "worker", project_dir: Optional[str] = None
+    ) -> List[RuleDefinition]:
+        """Return the ``RuleDefinition`` objects active for ``role``.
+
+        Data-only: leaves Markdown assembly (``### Rule: ...``) to the prompt
+        builder so this application module does not own rendering output.
+        """
+        rules = self.load_rules(project_dir=project_dir)
+        return [r for r in rules if r.is_active_for_roles(role)]
+
     def get_formatted_rules(
         self, role: str = "worker", project_dir: Optional[str] = None
     ) -> str:
-        rules = self.load_rules(project_dir=project_dir)
+        rules = self.get_active_rules(role=role, project_dir=project_dir)
         matching = []
         for r in rules:
-            if r.is_active_for_roles(role):
-                matching.append(f"### Rule: {r.name}\n{r.content}")
+            matching.append(f"### Rule: {r.name}\n{r.content}")
 
         return "\n\n".join(matching)

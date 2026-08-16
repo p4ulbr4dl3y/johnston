@@ -1,3 +1,10 @@
+"""Presentational tool-call display helpers (textual chip labels).
+
+Moved out of ``core/application/display.py``: this module produces UI-facing
+markup (escape_markup / extract_tool_display). Domain and application must not
+own rendering-format output, so these helpers live in the infrastructure
+presentation area consumed by core widgets and UI tests.
+"""
 import re
 from typing import Any, Dict
 

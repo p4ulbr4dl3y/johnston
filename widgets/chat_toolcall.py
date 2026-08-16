@@ -569,7 +569,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "ask_user",
         ):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
-            from core.application.display import extract_tool_display
+            from core.infrastructure.presentation.tool_display import extract_tool_display
 
             project_dir = None
             try:

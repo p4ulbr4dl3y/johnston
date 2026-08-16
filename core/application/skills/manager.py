@@ -257,8 +257,16 @@ class SkillManager:
         except Exception:
             return skill.get("hidden", False)
 
+    def get_system_prompt_skills(self) -> List[Dict[str, Any]]:
+        """Return non-hidden skills for the system prompt.
+
+        Data-only: leaves Markdown bullet assembly to the prompt builder so this
+        application module does not own rendering output.
+        """
+        return self.list_skills(include_hidden=False, for_system_prompt=True)
+
     def get_system_prompt_snippet(self) -> str:
-        skills = self.list_skills(include_hidden=False, for_system_prompt=True)
+        skills = self.get_system_prompt_skills()
         if not skills:
             return ""
 

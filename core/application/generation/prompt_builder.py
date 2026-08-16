@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.application.skills.manager import SkillManager
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
-from core.infrastructure.runtime.git_utils import run_git
 
 INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
 
@@ -112,14 +111,9 @@ async def get_git_info_async(cwd: str = None) -> str:
 
 
 def _compute_git_info(cwd: str = None) -> str:
-    res = run_git(["branch", "--show-current"], cwd=cwd, timeout=1)
-    if res.returncode == 0 and res.stdout.strip():
-        return f"branch '{res.stdout.strip()}'"
+    from core.infrastructure.runtime.git_utils import format_git_branch_info
 
-    rev_res = run_git(["rev-parse", "--short", "HEAD"], cwd=cwd, timeout=1)
-    if rev_res.returncode == 0 and rev_res.stdout.strip():
-        return f"detached HEAD ({rev_res.stdout.strip()})"
-    return ""
+    return format_git_branch_info(cwd=cwd)
 
 
 def _project_instr_signature(cwd: str) -> tuple:
@@ -181,7 +175,10 @@ def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     """
     from core.application.rules.rules import RulesManager
 
-    return RulesManager.get_instance().get_formatted_rules(role=role, project_dir=cwd)
+    rules = RulesManager.get_instance().get_active_rules(role=role, project_dir=cwd)
+    from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
+
+    return format_rules_markdown(rules)
 
 
 class PromptBuilder:
@@ -214,7 +211,9 @@ class PromptBuilder:
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
-        skills_snippet = _get_skill_manager(self.cwd).get_system_prompt_snippet()
+        from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
+
+        skills_snippet = format_skills_markdown(_get_skill_manager(self.cwd).get_system_prompt_skills())
         subagents_snippet = (
             "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
         )

@@ -6,32 +6,10 @@ easy reuse and testing.
 """
 
 import re
-from typing import Optional
-
-MODELS_DEV_URL = "https://models.dev/api.json"
-OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 # Precompiled regexes (avoids recompilation on every matching call).
 _RE_FUZZY_STRIP = re.compile(r"(?i)[-_](mlx|4bit|8bit|16bit|gguf|q\d_[k0-9_]+|fp\d+|instruct|it|v\d+[\d\.]*)")
 _RE_TOKEN_SPLIT = re.compile(r"[a-z0-9]+")
-
-
-def extract_context_length(model: dict) -> Optional[int]:
-    """Extracts context length from an OpenRouter model dict.
-
-    Consolidates the source fields across OpenRouter API responses
-    (context_length, top_provider.context_length, context_window,
-    max_context_length). Returns int, or None when absent/invalid.
-    """
-    ctx = (
-        model.get("context_length")
-        or (model.get("top_provider", {}) or {}).get("context_length")
-        or model.get("context_window")
-        or model.get("max_context_length")
-    )
-    if ctx and isinstance(ctx, (int, float)):
-        return int(ctx)
-    return None
 
 
 def format_context_tokens(tokens: int) -> str:

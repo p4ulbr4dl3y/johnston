@@ -1,7 +1,7 @@
 """Edge-case tests for update_plan tool and tool_display rendering (bug hunting)."""
 import unittest
 
-from core.application.display import extract_tool_display, truncate
+from core.infrastructure.presentation.tool_display import extract_tool_display, truncate
 from tools.update_plan import UpdatePlanTool
 
 

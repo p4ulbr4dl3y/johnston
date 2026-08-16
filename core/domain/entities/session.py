@@ -50,14 +50,3 @@ def _coerce_float(val: Any) -> float:
     except (ValueError, TypeError):
         return 0.0
 
-
-def is_ui_visible_user_message(msg: dict) -> bool:
-    """Return True if a user message should be rendered in the ChatView UI."""
-    if not isinstance(msg, dict):
-        return False
-    if msg.get("show_in_ui") is False:
-        return False
-    text = msg.get("text", "")
-    if text.startswith(("[System Notification]", "[System Note:")):
-        return False
-    return True
