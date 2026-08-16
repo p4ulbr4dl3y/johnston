@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
+from core.domain.defaults.errors import parse_tool_result_step
 
 logger = logging.getLogger(__name__)
 
@@ -167,10 +168,15 @@ async def generate_ai_response(
                     canvas.register_tool_widget(tool_handle)
             elif event_type == "tool_result":
                 if tool_handle:
-                    is_error = step[3] if len(step) > 3 else False
-                    status = step[4] if len(step) > 4 else None
-                    returncode = step[5] if len(step) > 5 else None
-                    tool_handle.set_result(val1, is_error=is_error, status=status, returncode=returncode)
+                    parsed_tool_result = parse_tool_result_step(step)
+                    tool_handle.set_result(
+                        val1,
+                        is_error=parsed_tool_result.is_error,
+                        status=parsed_tool_result.status.value
+                        if parsed_tool_result.status is not None
+                        else None,
+                        returncode=parsed_tool_result.returncode,
+                    )
                 try:
                     await canvas.save_session()
                 except Exception:  # noqa: BLE001

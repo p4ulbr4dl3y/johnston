@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool, make_unified_diff, read_file_text, resolve_path, write_file_text
 from tools.cancel import run_cancellable
 
@@ -24,7 +24,7 @@ class CreateTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         path = resolve_path(args.get("path"), cwd=ctx.cwd)
@@ -44,7 +44,7 @@ class CreateTool(BaseTool):
 
         file_existed, old_content = await run_cancellable(_probe)
         if not file_existed and old_content == "isdir":
-            return format_tool_error("file", name=path, detail="is a directory")
+            return ToolResult.error("file", name=path, detail="is a directory")
 
         content = (args.get("content") or "")
         if isinstance(content, bytes):
@@ -67,8 +67,8 @@ class CreateTool(BaseTool):
                     diff_text = "\n".join(diff_lines)
 
                 diff_part = f"\n\n{diff_text.strip()}" if diff_text.strip() else ""
-                return f"file '{path}' updated.{diff_part}"
+                return ToolResult.done(f"file '{path}' updated.{diff_part}")
             else:
-                return f"file '{path}' created."
+                return ToolResult.done(f"file '{path}' created.")
         except Exception as e:
-            return format_tool_error("file", detail=str(e), name=path)
+            return ToolResult.error("file", detail=str(e), name=path)

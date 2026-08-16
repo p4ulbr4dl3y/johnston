@@ -9,44 +9,44 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
     async def test_plan_none_and_empty(self):
         t = UpdatePlanTool()
         for bad in (None, [], (), {}):
-            res = await t.execute({"plan": bad})
+            res = str(await t.execute({"plan": bad}))
             self.assertIn("ERR:", res, f"plan={bad!r} should error")
 
     async def test_plan_non_list(self):
         t = UpdatePlanTool()
         for bad in ("x", 5, {1: 2}, "text"):
-            res = await t.execute({"plan": bad})
+            res = str(await t.execute({"plan": bad}))
             self.assertIn("ERR:", res)
 
     async def test_item_none_and_non_dict(self):
         t = UpdatePlanTool()
         for item in (None, "str", 5, True, [1]):
-            res = await t.execute({"plan": [item, {"step": "ok", "status": "pending"}]})
+            res = str(await t.execute({"plan": [item, {"step": "ok", "status": "pending"}]}))
             # non-dict items silently skipped
             self.assertIn("plan updated (0/1 completed)", res)
 
     async def test_all_items_invalid_no_valid_plan(self):
         t = UpdatePlanTool()
-        res = await t.execute({"plan": [None, "x", 5]})
+        res = str(await t.execute({"plan": [None, "x", 5]}))
         self.assertIn("ERR:", res)
 
     async def test_missing_step_or_status_keys(self):
         t = UpdatePlanTool()
         # step missing entirely -> item dropped -> no valid plan -> error
-        res = await t.execute({"plan": [{"status": "completed"}]})
+        res = str(await t.execute({"plan": [{"status": "completed"}]}))
         self.assertIn("ERR:", res)
         # step present, status missing -> status defaults to pending
-        res2 = await t.execute({"plan": [{"step": "s2"}]})
+        res2 = str(await t.execute({"plan": [{"step": "s2"}]}))
         self.assertIn("plan updated (0/1 completed)", res2)
 
     async def test_missing_status_defaults_to_pending(self):
         t = UpdatePlanTool()
-        res = await t.execute({"plan": [{"step": "only step"}]})
+        res = str(await t.execute({"plan": [{"step": "only step"}]}))
         self.assertIn("0/1 completed", res)
 
     async def test_invalid_statuses_coerced_to_pending(self):
         t = UpdatePlanTool()
-        res = await t.execute(
+        res = str(await t.execute(
             {
                 "plan": [
                     {"step": "a", "status": "done"},       # not allowed per schema enum
@@ -56,14 +56,14 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
                     {"step": "e", "status": ""},
                 ]
             }
-        )
+        ))
         # expected: 1 completed (case-insensitive), 4 pending
         self.assertIn("1/5 completed", res)
 
     async def test_multiple_in_progress_should_be_rejected(self):
         """BUG: doc says 'Max one step in_progress at a time' but NOT enforced."""
         t = UpdatePlanTool()
-        res = await t.execute(
+        res = str(await t.execute(
             {
                 "plan": [
                     {"step": "a", "status": "in_progress"},
@@ -71,7 +71,7 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
                     {"step": "c", "status": "in_progress"},
                 ]
             }
-        )
+        ))
         # Documented invariant violated: three in_progress accepted silently.
         self.assertNotIn("ERR:", res)
         self.assertIn("0/3 completed", res)
@@ -85,25 +85,25 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
             {"step": "identical task", "status": "in_progress"},
             {"step": "identical task", "status": "pending"},
         ]
-        res = await t.execute({"plan": steps})
+        res = str(await t.execute({"plan": steps}))
         # completion count should be 1 (only the unicode one)
         self.assertIn("1/5 completed", res)
 
     async def test_step_text_numeric_or_bool(self):
         t = UpdatePlanTool()
         # step given as number/bool -> coerced to string
-        res = await t.execute({"plan": [{"step": 12, "status": "pending"}]})
+        res = str(await t.execute({"plan": [{"step": 12, "status": "pending"}]}))
         self.assertIn("plan updated (0/1 completed)", res)
 
     async def test_empty_step_text_skipped(self):
         t = UpdatePlanTool()
-        res = await t.execute({"plan": [{"step": "   ", "status": "in_progress"}, {"step": "", "status": "in_progress"}]})
+        res = str(await t.execute({"plan": [{"step": "   ", "status": "in_progress"}, {"step": "", "status": "in_progress"}]}))
         self.assertIn("ERR:", res)  # all empty -> invalid
 
     async def test_explanation_none_types(self):
         t = UpdatePlanTool()
         for expl in (None, "", "  ", 123, False):
-            res = await t.execute({"plan": [{"step": "s", "status": "pending"}], "explanation": expl})
+            res = str(await t.execute({"plan": [{"step": "s", "status": "pending"}], "explanation": expl}))
             self.assertIn("plan updated (0/1 completed)", res)
 
     async def test_persist_state_between_calls(self):
@@ -129,7 +129,7 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
     async def test_broken_item_with_weird_fields(self):
         t = UpdatePlanTool()
         # step as nested dict -> str() coercion, must not crash
-        res = await t.execute({"plan": [{"step": {"nested": "dict"}, "status": "pending"}]})
+        res = str(await t.execute({"plan": [{"step": {"nested": "dict"}, "status": "pending"}]}))
         self.assertIn("plan updated (0/1 completed)", res)
 
 

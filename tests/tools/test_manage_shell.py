@@ -32,7 +32,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
     async def test_list_no_tasks(self):
         tool = ManageShellTool()
         mock_app = self._make_app([])
-        res = await tool.execute({"action": "list"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "list"}, ctx=mock_app))
         self.assertIn("no tasks active", res)
 
     async def test_list_scoped_to_current_session(self):
@@ -43,7 +43,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         t2.session_id = "sess-B"
         mock_app = self._make_app([t1, t2])
         mock_app.current_session_id = "sess-A"
-        res = await tool.execute({"action": "list"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "list"}, ctx=mock_app))
         self.assertIn("t1", res)
         self.assertIn("echo hi", res)
         self.assertNotIn("t2", res)
@@ -54,7 +54,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         t1 = _make_task("t1", "echo hello")
         t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
         mock_app = self._make_app([t1, t2])
-        res = await tool.execute({"action": "list"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "list"}, ctx=mock_app))
         self.assertIn("Active Background Tasks", res)
         self.assertIn("t1", res)
         self.assertIn("RUNNING", res)
@@ -68,20 +68,20 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         t = _make_task("t-run", "npm build", output=["Building...\n", "Done\n"])
         mock_app = self._make_app([t])
-        res = await tool.execute({"action": "status", "task_id": "t-run"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "status", "task_id": "t-run"}, ctx=mock_app))
         self.assertIn("ERR: action 'status'", res)
 
     async def test_kill_missing_task_id(self):
         tool = ManageShellTool()
         mock_app = self._make_app([])
-        res = await tool.execute({"action": "kill"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "kill"}, ctx=mock_app))
         self.assertIn("ERR", res)
         self.assertIn("task_id", res)
 
     async def test_kill_task_not_found(self):
         tool = ManageShellTool()
         mock_app = self._make_app([])
-        res = await tool.execute({"action": "kill", "task_id": "ghost"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "kill", "task_id": "ghost"}, ctx=mock_app))
         self.assertIn("ERR: notfound 'ghost'", res)
 
     async def test_kill_running_task(self):
@@ -94,7 +94,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
         t.kill = _fake_kill
         mock_app = self._make_app([t])
-        res = await tool.execute({"action": "kill", "task_id": "t-kill"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "kill", "task_id": "t-kill"}, ctx=mock_app))
         self.assertIn("t-kill killed", res)
         self.assertFalse(t.is_running)
 
@@ -102,19 +102,19 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         t = _make_task("t-done", "echo hi", status=TaskStatus.COMPLETED)
         mock_app = self._make_app([t])
-        res = await tool.execute({"action": "kill", "task_id": "t-done"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "kill", "task_id": "t-done"}, ctx=mock_app))
         self.assertIn("ERR: notrunning", res)
 
     async def test_unknown_action(self):
         tool = ManageShellTool()
         mock_app = self._make_app([])
-        res = await tool.execute({"action": "bogus"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "bogus"}, ctx=mock_app))
         self.assertIn("ERR: action 'bogus'", res)
         self.assertIn("bogus", res)
 
     async def test_no_task_manager_no_app(self):
         tool = ManageShellTool()
-        res = await tool.execute({"action": "list"})
+        res = str(await tool.execute({"action": "list"}))
         self.assertIn("ERR: manager 'none'", res)
 
 

@@ -2,7 +2,7 @@ import difflib
 import os
 from typing import Any, Dict, List, Tuple
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult, format_tool_error
 from tools.base import (
     BaseTool,
     make_unified_diff,
@@ -279,15 +279,15 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
     return new_content, diff_output
 
 
-async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> str:
+async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> ToolResult:
     path = resolve_path(path_arg, cwd=cwd)
 
-    def _validate() -> str | None:
-        """Sync existence/type checks run off the event loop. Returns an error string or None."""
+    def _validate() -> ToolResult | None:
+        """Sync existence/type checks run off the event loop. Returns an error ToolResult or None."""
         if not path or not os.path.exists(path):
-            return format_tool_error("file", name=path, detail="not found")
+            return ToolResult.error("file", name=path, detail="not found")
         if os.path.isdir(path):
-            return format_tool_error("file", name=path, detail="is a directory")
+            return ToolResult.error("file", name=path, detail="is a directory")
         return None
 
     validate_err = await run_cancellable(_validate)
@@ -303,16 +303,13 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
     try:
         diff_output = await run_cancellable(_do_edit)
     except (UnicodeDecodeError, UnicodeEncodeError) as ue:
-        return format_tool_error("file", detail=str(ue), name=path)
+        return ToolResult.error("file", detail=str(ue), name=path)
     except ValueError as ve:
-        message = str(ve)
-        # apply_chunk_replacements raises ValueError only via format_tool_error, but
-        # guard against any bare message leaking out unformatted.
-        return message if message.startswith("ERR:") else format_tool_error("params", detail=message)
+        return ToolResult.error("params", detail=str(ve))
     except Exception as e:
-        return format_tool_error("file", detail=str(e), name=path)
+        return ToolResult.error("file", detail=str(e), name=path)
 
-    return diff_output
+    return ToolResult.done(diff_output)
 
 
 class EditTool(BaseTool):
@@ -337,7 +334,7 @@ class EditTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         path = args.get("path") or ""
@@ -388,7 +385,7 @@ class MultiEditTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         path = args.get("path") or ""

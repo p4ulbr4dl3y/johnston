@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 
 
@@ -57,7 +57,7 @@ class AskUserTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         questions_list = args.get("questions")
@@ -73,7 +73,7 @@ class AskUserTool(BaseTool):
             ]
 
         if not questions_list or not isinstance(questions_list, list):
-            return format_tool_error("params", name="questions", detail="missing or invalid")
+            return ToolResult.error("params", name="questions", detail="missing or invalid")
 
         validated_questions = []
         for q in questions_list:
@@ -90,12 +90,12 @@ class AskUserTool(BaseTool):
             )
 
         if not validated_questions:
-            return format_tool_error("params", name="questions", detail="missing or invalid")
+            return ToolResult.error("params", name="questions", detail="missing or invalid")
 
         if not callable(getattr(ctx.host, "ask_user", None)):
-            return format_tool_error("context", name="app", detail="unavailable")
+            return ToolResult.error("context", name="app", detail="unavailable")
         try:
-            return await ctx.ask_user(validated_questions)
+            return ToolResult.done(await ctx.ask_user(validated_questions))
         except asyncio.CancelledError:
             # A real task cancellation (e.g. the agent run being interrupted): clear
             # any pending wizard state, then re-raise so cooperative cancellation
@@ -107,4 +107,4 @@ class AskUserTool(BaseTool):
         except Exception as e:
             if hasattr(ctx.host, "_pending_ask_user"):
                 setattr(ctx.host, "_pending_ask_user", None)
-            return format_tool_error("prompt", detail=str(e))
+            return ToolResult.error("prompt", detail=str(e))

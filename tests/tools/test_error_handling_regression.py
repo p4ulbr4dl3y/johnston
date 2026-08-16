@@ -27,7 +27,7 @@ class TestEditBareValueError(unittest.IsolatedAsyncioTestCase):
         with open(self.path, "w", encoding="utf-8") as f:
             f.write(content)
         res = await edit._execute_edit_helper(self.path, [chunk], cwd=self._tmp.name)
-        self.assertIn(expected_substr, res)
+        self.assertIn(expected_substr, str(res))
         return res
 
     async def test_bare_valueerror_wrapped_as_params_error(self):
@@ -40,7 +40,7 @@ class TestEditBareValueError(unittest.IsolatedAsyncioTestCase):
             f.write("x = 1\n")
         with patch.object(edit, "read_file_text", new=boom):
             res = await edit._execute_edit_helper(self.path, [{"old_str": "x", "new_str": "y"}], cwd=self._tmp.name)
-        self.assertEqual(res, "ERR: params: some bare rejection text")
+        self.assertEqual(str(res), "ERR: params: some bare rejection text")
 
     async def test_preformatted_valueerror_passthrough(self):
         # A ValueError already formatted with format_tool_error must be returned

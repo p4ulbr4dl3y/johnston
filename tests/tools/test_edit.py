@@ -69,7 +69,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    pass\n")
 
-        res = await tool.execute({"path": file_path, "old_str": "def foo():", "new_str": "def bar():"})
+        res = str(await tool.execute({"path": file_path, "old_str": "def foo():", "new_str": "def bar():"}))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "def bar():\n    pass\n")
@@ -80,7 +80,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("a = 1\nb = 2\nc = 3\n")
 
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "edits": [
@@ -88,7 +88,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
                     {"old_str": "c = 3", "new_str": "c = 30"},
                 ],
             }
-        )
+        ))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "a = 10\nb = 2\nc = 30\n")

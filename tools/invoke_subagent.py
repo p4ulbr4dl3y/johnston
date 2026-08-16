@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Dict
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
@@ -93,7 +93,7 @@ class InvokeSubagentTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         ctx = self._ensure_context(ctx)
         args = args or {}
         prompt = args.get("prompt", "").strip()
@@ -102,10 +102,10 @@ class InvokeSubagentTool(BaseTool):
         branch_name = args.get("branch", "").strip()
 
         if not prompt:
-            return format_tool_error("params", name="prompt", detail="required")
+            return ToolResult.error("params", name="prompt", detail="required")
 
         if not branch_name:
-            return format_tool_error("params", name="branch", detail="required")
+            return ToolResult.error("params", name="branch", detail="required")
 
         session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
         args = {**args, "session_id": session_id}
@@ -125,13 +125,13 @@ class InvokeSubagentTool(BaseTool):
         )
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
-            return format_tool_error(
+            return ToolResult.error(
                 "limit", detail=f"{MAX_CONCURRENT_SUBAGENTS} concurrent max; wait or manage_subagent(action='kill')"
             )
 
         subagent = ctx.create_agent()
         if not subagent:
-            return format_tool_error("context", name="app", detail="unavailable")
+            return ToolResult.error("context", name="app", detail="unavailable")
 
         wt_path = None
         wt_branch = None
@@ -206,4 +206,4 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        return f"subagent '{description}' launched (session_id: {session_id})"
+        return ToolResult.done(f"subagent '{description}' launched (session_id: {session_id})")

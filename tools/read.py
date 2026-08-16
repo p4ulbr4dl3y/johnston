@@ -6,7 +6,7 @@ import time
 from collections import OrderedDict
 from typing import Any, Callable, Dict, Tuple
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
@@ -245,7 +245,7 @@ class ReadTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
@@ -266,7 +266,7 @@ class ReadTool(BaseTool):
                 elif entries:
                     sample = sorted(entries)[:5]
                     hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
-            return format_tool_error("file", detail="not found" + hint, name=path)
+            return ToolResult.error("file", detail="not found" + hint, name=path)
 
         if os.path.isdir(path):
             try:
@@ -292,18 +292,18 @@ class ReadTool(BaseTool):
                 else:
                     content = "\n".join(formatted) if formatted else "(empty directory)"
 
-                return f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
+                return ToolResult.done(f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}")
             except Exception as e:
-                return format_tool_error("listing", detail=str(e), name=path)
+                return ToolResult.error("listing", detail=str(e), name=path)
 
         try:
             file_size = os.path.getsize(path)
             if file_size > MAX_TOOL_PAYLOAD_BYTES:
-                return format_tool_error(
+                return ToolResult.error(
                     "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=path
                 )
         except OSError as e:
-            return format_tool_error("check", detail=str(e), name=path)
+            return ToolResult.error("check", detail=str(e), name=path)
 
         ext = os.path.splitext(path)[1].lower()
 
@@ -318,9 +318,9 @@ class ReadTool(BaseTool):
             try:
                 detail_arg = args.get("detail")
                 image_json = await run_cancellable(process_image_file_sync, path, detail_arg)
-                return image_json
+                return ToolResult.done(image_json)
             except Exception as e:
-                return format_tool_error("image", detail=str(e), name=path)
+                return ToolResult.error("image", detail=str(e), name=path)
 
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
@@ -328,7 +328,7 @@ class ReadTool(BaseTool):
                 md_text = await run_cancellable(convert_doc_to_markdown_sync, path)
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
             except Exception as e:
-                return format_tool_error("doc", detail=str(e), name=path)
+                return ToolResult.error("doc", detail=str(e), name=path)
         else:
             try:
                 content_offset = args.get("content_offset")
@@ -376,7 +376,7 @@ class ReadTool(BaseTool):
 
                 lines = await run_cancellable(_read_file_lines, path, content_offset, start_line_int, end_line_int)
             except Exception as e:
-                return format_tool_error("file", detail=str(e), name=path)
+                return ToolResult.error("file", detail=str(e), name=path)
 
         from tools.utils import format_line_pagination
 
@@ -387,12 +387,14 @@ class ReadTool(BaseTool):
         else:
             window_lines, total_lines, window_start = lines, None, None
 
-        return format_line_pagination(
-            window_lines,
-            start_line=start_line,
-            end_line=end_line,
-            total_lines=total_lines,
-            window_start=window_start,
-            max_chars=100000,
-            path=path,
+        return ToolResult.done(
+            format_line_pagination(
+                window_lines,
+                start_line=start_line,
+                end_line=end_line,
+                total_lines=total_lines,
+                window_start=window_start,
+                max_chars=100000,
+                path=path,
+            )
         )

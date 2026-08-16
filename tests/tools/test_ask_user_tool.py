@@ -43,18 +43,18 @@ class TestRecommendedSorting(unittest.TestCase):
 class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
     async def test_no_app_returns_error(self):
         tool = AskUserTool()
-        res = await tool.execute({"questions": [{"question_text": "Test?", "options": ["a"]}]})
+        res = str(await tool.execute({"questions": [{"question_text": "Test?", "options": ["a"]}]}))
         self.assertIn("ERR", res)
         self.assertIn("ERR: context 'app': unavailable", res)
 
     async def test_no_questions_returns_error(self):
         tool = AskUserTool()
-        res = await tool.execute({})
+        res = str(await tool.execute({}))
         self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
     async def test_invalid_questions_type_returns_error(self):
         tool = AskUserTool()
-        res = await tool.execute({"questions": "invalid"})
+        res = str(await tool.execute({"questions": "invalid"}))
         self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
     async def test_single_question_fallback(self):
@@ -62,10 +62,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Pick one\nAnswer: blue")
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"question": "Pick one", "options": ["red", "blue"]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("Question: Pick one", res)
         self.assertIn("Answer: blue", res)
         mock_app.ask_user.assert_awaited_once()
@@ -75,10 +75,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Choose\nAnswer: x")
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"question_text": "Choose", "choices": ["x", "y"]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("Answer: x", res)
         mock_app.ask_user.assert_awaited_once()
 
@@ -86,20 +86,20 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(side_effect=RuntimeError("no display available"))
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Pick one", "options": ["red", "blue"]}]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("ERR: prompt:", res)
 
     async def test_successful_interactive_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Choose item\nAnswer: Option A")
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Choose item", "options": ["Option A", "Option B"]}]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("Question: Choose item", res)
         self.assertIn("Answer: Option A", res)
 
@@ -107,17 +107,17 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="cancelled by user")
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Cancel this?", "options": []}]},
             ctx=mock_app,
-        )
+        ))
         self.assertEqual(res, "cancelled by user")
 
     async def test_unknown_status_cancels(self):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="cancelled by user")
-        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=mock_app)
+        res = str(await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=mock_app))
         self.assertIn("cancelled by user", res)
 
     async def test_execute_sorts_options_before_display(self):
@@ -129,10 +129,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             return "Question: Q\nAnswer: Yes"
 
         mock_app.ask_user = fake_ask_user
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("Yes", res)
 
     async def test_minimized_flow_resumed_by_callback(self):
@@ -147,10 +147,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             return "Question: Choice?\nAnswer: Opt1"
 
         mock_app.ask_user = fake_ask_user
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Choice?", "options": ["Opt1"]}]},
             ctx=mock_app,
-        )
+        ))
         self.assertIn("Question: Choice?", res)
         self.assertIn("Answer: Opt1", res)
 

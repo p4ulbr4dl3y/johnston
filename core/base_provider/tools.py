@@ -23,7 +23,7 @@ class ToolMixin:
         so the model message stays a string), ``None`` -> empty, and any other
         value -> ``str()``. Guarantees a plain string ``content`` for the model.
         """
-        from core.domain.defaults.errors import ToolResult
+        from core.domain.defaults.errors import ToolResult, ToolResultStatus
 
         if isinstance(result, ToolResult):
             return result
@@ -33,7 +33,7 @@ class ToolMixin:
             return ToolResult.done(json.dumps(result, ensure_ascii=False))
         text = str(result)
         if text.lstrip().lower().startswith("err:"):
-            return ToolResult(content=text, is_error=True, status="error")
+            return ToolResult(content=text, status=ToolResultStatus.ERROR)
         return ToolResult.done(text)
 
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> Any:

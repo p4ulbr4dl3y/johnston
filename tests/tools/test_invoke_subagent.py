@@ -43,7 +43,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # Attempt to spawn one more
-        res = await tool.execute({"prompt": "another task", "description": "Over limit", "branch": "main"})
+        res = str(await tool.execute({"prompt": "another task", "description": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
     async def test_explore_subagent_tool_filtering(self):

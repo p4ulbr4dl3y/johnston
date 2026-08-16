@@ -118,7 +118,7 @@ class TestApplyChunks(_Base):
         p = os.path.join(self.tmp, "surr.txt")
         with open(p, "w", encoding="utf-8") as f:
             f.write("abc\n")
-        res = await tool.execute({"path": p, "old_str": "abc", "new_str": "\ud800abc"})
+        res = str(await tool.execute({"path": p, "old_str": "abc", "new_str": "\ud800abc"}))
         self.assertIn("ERR:", res)
         # Original content must be unchanged (atomic write must not have fired).
         self.assertEqual(open(p, encoding="utf-8").read(), "abc\n")
@@ -130,21 +130,21 @@ class TestApplyChunks(_Base):
 class TestEditToolFiles(_Base):
     async def test_edit_nonexistent_returns_err(self):
         tool = EditTool()
-        res = await tool.execute({"path": "missing.txt", "old_str": "a", "new_str": "b"})
+        res = str(await tool.execute({"path": "missing.txt", "old_str": "a", "new_str": "b"}))
         self.assertIn("ERR:", res)
         self.assertIn("not found", res)
 
     async def test_edit_empty_old_str_returns_err(self):
         tool = EditTool()
         p = self.write("f.txt", "hello\n")
-        res = await tool.execute({"path": p, "old_str": "", "new_str": "x"})
+        res = str(await tool.execute({"path": p, "old_str": "", "new_str": "x"}))
         self.assertIn("ERR:", res)
         self.assertIn("cannot be empty", res)
 
     async def test_edit_missing_new_str_is_delete(self):
         tool = EditTool()
         p = self.write("f.txt", "line1\nTOK\nline3\n")
-        res = await tool.execute({"path": p, "old_str": "TOK"})
+        res = str(await tool.execute({"path": p, "old_str": "TOK"}))
         self.assertIn("TOK", res)  # diff shows removal
         self.assertEqual(self.read("f.txt"), "line1\nline3\n")
 
@@ -156,7 +156,7 @@ class TestEditToolFiles(_Base):
         full = os.path.join(self.tmp, "bin.bin")
         with open(full, "wb") as f:
             f.write(b"\xff\xfe\x80\x81\x00\x01")
-        res = await tool.execute({"path": full, "old_str": "abc", "new_str": "def"})
+        res = str(await tool.execute({"path": full, "old_str": "abc", "new_str": "def"}))
         self.assertIn("ERR:", res)  # RED: currently returns raw decode error w/o prefix
 
     async def test_edit_readonly_file_clobbers(self):
@@ -167,7 +167,7 @@ class TestEditToolFiles(_Base):
         p = self.write("ro.txt", "keepme\nold\n")
         os.chmod(p, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)  # 0444 read-only
         try:
-            res = await tool.execute({"path": p, "old_str": "old", "new_str": "new"})
+            res = str(await tool.execute({"path": p, "old_str": "old", "new_str": "new"}))
         finally:
             os.chmod(p, stat.S_IRUSR | stat.S_IWUSR)
         # RED: current code reports success and rewrites the read-only file.
@@ -183,7 +183,7 @@ class TestEditToolFiles(_Base):
         target = self.write("real.txt", "hello world\n")
         link = os.path.join(self.tmp, "link.txt")
         os.symlink(target, link)
-        res = await tool.execute({"path": link, "old_str": "world", "new_str": "there"})
+        res = str(await tool.execute({"path": link, "old_str": "world", "new_str": "there"}))
         self.assertNotIn("ERR:", res)
         # RED: target is left untouched (symlink replaced instead of followed).
         self.assertEqual(self.read("real.txt"), "hello there\n")
@@ -191,23 +191,23 @@ class TestEditToolFiles(_Base):
     async def test_edit_directory_returns_err(self):
         tool = EditTool()
         os.makedirs(os.path.join(self.tmp, "adir"), exist_ok=True)
-        res = await tool.execute({"path": os.path.join(self.tmp, "adir"), "old_str": "a", "new_str": "b"})
+        res = str(await tool.execute({"path": os.path.join(self.tmp, "adir"), "old_str": "a", "new_str": "b"}))
         self.assertIn("is a directory", res)
 
     async def test_edit_none_path_returns_err(self):
         tool = EditTool()
-        res = await tool.execute({"path": None, "old_str": "a", "new_str": "b"})
+        res = str(await tool.execute({"path": None, "old_str": "a", "new_str": "b"}))
         self.assertIn("ERR:", res)
 
     async def test_edit_missing_path_returns_err(self):
         tool = EditTool()
-        res = await tool.execute({"old_str": "a", "new_str": "b"})
+        res = str(await tool.execute({"old_str": "a", "new_str": "b"}))
         self.assertIn("ERR:", res)
 
     async def test_edit_relative_path(self):
         tool = EditTool()
         self.write("rel.txt", "alpha\n")
-        res = await tool.execute({"path": "rel.txt", "old_str": "alpha", "new_str": "beta"})
+        res = str(await tool.execute({"path": "rel.txt", "old_str": "alpha", "new_str": "beta"}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("rel.txt"), "beta\n")
 
@@ -218,7 +218,7 @@ class TestEditToolFiles(_Base):
         with open(outside, "w", encoding="utf-8") as f:
             f.write("outside\n")
         try:
-            res = await tool.execute({"path": outside, "old_str": "outside", "new_str": "inside"})
+            res = str(await tool.execute({"path": outside, "old_str": "outside", "new_str": "inside"}))
             self.assertNotIn("ERR:", res)
             with open(outside, "r", encoding="utf-8") as f:
                 self.assertEqual(f.read(), "inside\n")
@@ -229,7 +229,7 @@ class TestEditToolFiles(_Base):
     async def test_edit_unicode_cyrillic_path(self):
         tool = EditTool()
         p = self.write("файл пробел \"кавычки\".txt", "data\n")
-        res = await tool.execute({"path": p, "old_str": "data", "new_str": "данные"})
+        res = str(await tool.execute({"path": p, "old_str": "data", "new_str": "данные"}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read('файл пробел "кавычки".txt'), "данные\n")
 
@@ -237,7 +237,7 @@ class TestEditToolFiles(_Base):
         # schema uses start_line/end_line which the code reads directly
         tool = EditTool()
         p = self.write("s.txt", "a\nb\nb\nc\n")
-        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start_line": 3, "end_line": 3})
+        res = str(await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start_line": 3, "end_line": 3}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("s.txt"), "a\nb\nB\nc\n")
 
@@ -245,20 +245,20 @@ class TestEditToolFiles(_Base):
         # start/end are no longer aliased to start_line/end_line.
         tool = EditTool()
         p = self.write("s2.txt", "a\nb\nb\nc\n")
-        res = await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3})
+        res = str(await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3}))
         self.assertIn("ERR:", res)
 
     async def test_edit_empty_file_target_not_found(self):
         tool = EditTool()
         p = self.write("empty.txt", "")
-        res = await tool.execute({"path": p, "old_str": "x", "new_str": "y"})
+        res = str(await tool.execute({"path": p, "old_str": "x", "new_str": "y"}))
         self.assertIn("ERR:", res)
 
     async def test_edit_permutation_preserves_curly_straight(self):
         # old_str straight quotes, file has curly -> should preserve curly style
         tool = EditTool()
         p = self.write("q.txt", 'msg = "hello"\n')
-        res = await tool.execute({"path": p, "old_str": 'msg = "hello"', "new_str": 'msg = "world"'})
+        res = str(await tool.execute({"path": p, "old_str": 'msg = "hello"', "new_str": 'msg = "world"'}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("q.txt"), 'msg = "world"\n')
 
@@ -270,27 +270,27 @@ class TestCreateTool(_Base):
     async def test_create_none_content_writes_empty(self):
         tool = CreateTool()
         p = os.path.join(self.tmp, "c.txt")
-        res = await tool.execute({"path": p, "content": None})
+        res = str(await tool.execute({"path": p, "content": None}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(open(p, encoding="utf-8").read(), "")
 
     async def test_create_missing_content_writes_empty(self):
         tool = CreateTool()
         p = os.path.join(self.tmp, "c2.txt")
-        res = await tool.execute({"path": p})
+        res = str(await tool.execute({"path": p}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(open(p, encoding="utf-8").read(), "")
 
     async def test_create_path_none_returns_err(self):
         tool = CreateTool()
-        res = await tool.execute({"path": None, "content": "x"})
+        res = str(await tool.execute({"path": None, "content": "x"}))
         self.assertIn("ERR:", res)
 
     async def test_create_binary_content_no_crash(self):
         # Fixed: bytes content no longer raises at create.py:48; decoded safely.
         tool = CreateTool()
         p = os.path.join(self.tmp, "c.bin")
-        res = await tool.execute({"path": p, "content": b"\x00\x01binary"})
+        res = str(await tool.execute({"path": p, "content": b"\x00\x01binary"}))
         self.assertIn("created", res)
 
     async def test_create_parent_path_is_file_returns_err(self):
@@ -299,7 +299,7 @@ class TestCreateTool(_Base):
         with open(os.path.join(self.tmp, "p", "blocker"), "w", encoding="utf-8") as f:
             f.write("i am a file, not a dir")
         target = os.path.join(self.tmp, "p", "blocker", "child.txt")
-        res = await tool.execute({"path": target, "content": "x"})
+        res = str(await tool.execute({"path": target, "content": "x"}))
         self.assertIn("ERR:", res)
         # The blocker file must NOT be clobbered.
         self.assertEqual(open(os.path.join(self.tmp, "p", "blocker"), encoding="utf-8").read(), "i am a file, not a dir")
@@ -311,7 +311,7 @@ class TestCreateTool(_Base):
         os.chmod(ro_dir, stat.S_IRUSR | stat.S_IXUSR)  # read+exec only, no write
         try:
             target = os.path.join(ro_dir, "x.txt")
-            res = await tool.execute({"path": target, "content": "x"})
+            res = str(await tool.execute({"path": target, "content": "x"}))
             self.assertIn("ERR:", res)
         finally:
             os.chmod(ro_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
@@ -319,7 +319,7 @@ class TestCreateTool(_Base):
     async def test_create_unicode_cyrillic_path(self):
         tool = CreateTool()
         p = os.path.join(self.tmp, "папка", "файл — имя.txt")
-        res = await tool.execute({"path": p, "content": "привет"})
+        res = str(await tool.execute({"path": p, "content": "привет"}))
         self.assertNotIn("ERR:", res)
         self.assertTrue(os.path.exists(p))
         self.assertEqual(open(p, encoding="utf-8").read(), "привет")
@@ -328,7 +328,7 @@ class TestCreateTool(_Base):
         tool = CreateTool()
         p = os.path.join(self.tmp, "big.txt")
         content = "x" * 200_000
-        res = await tool.execute({"path": p, "content": content})
+        res = str(await tool.execute({"path": p, "content": content}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(len(open(p, encoding="utf-8").read()), 200_000)
 
@@ -341,7 +341,7 @@ class TestCreateTool(_Base):
     async def test_create_overwrites_existing_file_and_returns_diff(self):
         tool = CreateTool()
         p = self.write("ov.txt", "original\n")
-        res = await tool.execute({"path": p, "content": "replaced\n"})
+        res = str(await tool.execute({"path": p, "content": "replaced\n"}))
         self.assertNotIn("ERR:", res)
         self.assertIn("updated", res)
         # create strips trailing \r\n (tools/create.py:48), so no trailing newline preserved
@@ -355,7 +355,7 @@ class TestCreateTool(_Base):
         p = self.write("rov.txt", "old\n")
         os.chmod(p, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
         try:
-            res = await tool.execute({"path": p, "content": "new\n"})
+            res = str(await tool.execute({"path": p, "content": "new\n"}))
             # RED: current code reports success and overwrites the read-only file.
             self.assertIn("ERR:", res)
         finally:
@@ -366,7 +366,7 @@ class TestCreateTool(_Base):
         # target_file/code are not mapped. Documenting strict behavior.
         tool = CreateTool()
         p = os.path.join(self.tmp, "alias.txt")
-        res = await tool.execute({"target_file": p, "code": "hello"})
+        res = str(await tool.execute({"target_file": p, "code": "hello"}))
         # Without alias normalization resolve_path(None) -> cwd dir.
         self.assertIn("ERR:", res)
         self.assertFalse(os.path.exists(p))

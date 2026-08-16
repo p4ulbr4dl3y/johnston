@@ -81,7 +81,7 @@ async def test_status_none_task_id_should_not_crash(tool):
     """Bug B1: task_id=None -> AttributeError on .strip() (tools/manage_shell.py:28)."""
     app = _shell_app([])
     try:
-        res = await tool.execute({"action": "status", "task_id": None}, ctx=app)
+        res = str(await tool.execute({"action": "status", "task_id": None}, ctx=app))
     except AttributeError as exc:
         import inspect
 
@@ -99,7 +99,7 @@ async def test_status_none_task_id_should_not_crash(tool):
 async def test_send_input_none_task_id_should_not_crash(tool):
     app = _shell_app([])
     try:
-        res = await tool.execute({"action": "send_input", "task_id": None, "input": "x"}, ctx=app)
+        res = str(await tool.execute({"action": "send_input", "task_id": None, "input": "x"}, ctx=app))
     except AttributeError as exc:
         pytest.fail(f"BUG: send_input task_id=None crashed: {exc}")
     assert isinstance(res, str)
@@ -108,7 +108,7 @@ async def test_send_input_none_task_id_should_not_crash(tool):
 async def test_kill_none_task_id_should_not_crash(tool):
     app = _shell_app([])
     try:
-        res = await tool.execute({"action": "kill", "task_id": None}, ctx=app)
+        res = str(await tool.execute({"action": "kill", "task_id": None}, ctx=app))
     except AttributeError as exc:
         pytest.fail(f"BUG: kill task_id=None crashed: {exc}")
     assert isinstance(res, str)
@@ -121,7 +121,7 @@ async def test_status_action_removed(tool):
     t = _task("tdone", running=False, session="s1")
     app = _shell_app([t], session="s1")
     for kwargs in ({"action": "status", "task_id": "tdone"}, {"action": "status"}):
-        res = await tool.execute(kwargs, ctx=app)
+        res = str(await tool.execute(kwargs, ctx=app))
         assert "ERR: action 'status'" in res
 
 
@@ -130,7 +130,7 @@ async def test_status_action_removed(tool):
 async def test_kill_task_not_running_is_notrunning_error(tool):
     t = _task("tk1", running=False, session="s1")
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "kill", "task_id": "tk1"}, ctx=app)
+    res = str(await tool.execute({"action": "kill", "task_id": "tk1"}, ctx=app))
     assert "notrunning" in res
 
 
@@ -146,11 +146,11 @@ async def test_double_kill_running_task_is_idempotent(tool):
 
     t.kill = fake_kill
     app = _shell_app([t], session="s1")
-    r1 = await tool.execute({"action": "kill", "task_id": "tk2"}, ctx=app)
+    r1 = str(await tool.execute({"action": "kill", "task_id": "tk2"}, ctx=app))
     assert "killed" in r1
     # Simulate engine marking it dead.
     t.status = TaskStatus.COMPLETED
-    r2 = await tool.execute({"action": "kill", "task_id": "tk2"}, ctx=app)
+    r2 = str(await tool.execute({"action": "kill", "task_id": "tk2"}, ctx=app))
     assert "notrunning" in r2
     assert called["n"] == 1
 
@@ -167,7 +167,7 @@ async def test_kill_task_whose_process_already_exited_no_crash(tool):
     t.session_id = "s1"
     t.kill = fake_kill
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "kill", "task_id": "tk3"}, ctx=app)
+    res = str(await tool.execute({"action": "kill", "task_id": "tk3"}, ctx=app))
     assert "killed" in res
     assert not t.is_running
 
@@ -180,7 +180,7 @@ async def test_kill_exception_is_soft_error(tool):
 
     t.kill = boom
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "kill", "task_id": "tk4"}, ctx=app)
+    res = str(await tool.execute({"action": "kill", "task_id": "tk4"}, ctx=app))
     assert "ERR" in res
     assert "kill denied" in res
     # tool leaves is_running alone on failure
@@ -192,7 +192,7 @@ async def test_kill_exception_is_soft_error(tool):
 async def test_send_input_not_running_is_error(tool):
     t = _task("tst", running=False, session="s1")
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "send_input", "task_id": "tst", "input": "x"}, ctx=app)
+    res = str(await tool.execute({"action": "send_input", "task_id": "tst", "input": "x"}, ctx=app))
     assert "notrunning" in res
 
 
@@ -209,7 +209,7 @@ async def test_send_input_empty_input_still_writes_newline(tool):
     t = ShellTask("tsempty", "read name", proc)
     t.session_id = "s1"
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "send_input", "task_id": "tsempty", "input": ""}, ctx=app)
+    res = str(await tool.execute({"action": "send_input", "task_id": "tsempty", "input": ""}, ctx=app))
     assert "OK: input sent" in res
     mock_stdin.write.assert_called_once_with(b"\n")
 
@@ -225,7 +225,7 @@ async def test_send_input_task_without_stdin(tool):
 
     t.send_input = _send
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "send_input", "task_id": "tsnoproc", "input": "x"}, ctx=app)
+    res = str(await tool.execute({"action": "send_input", "task_id": "tsnoproc", "input": "x"}, ctx=app))
     assert res == "HANDLED"
 
 
@@ -236,7 +236,7 @@ async def test_list_many_tasks_preserves_input_order(tool):
     for i in range(50):
         tasks.append(_task(f"t{i}", running=(i % 2 == 0), session="s1"))
     app = _shell_app(tasks, session="s1")
-    res = await tool.execute({"action": "list"}, ctx=app)
+    res = str(await tool.execute({"action": "list"}, ctx=app))
     # order preserved as registered
     first_occ = [res.index(fid) for fid in ("t0", "t1", "t2")]
     assert first_occ == sorted(first_occ)
@@ -247,7 +247,7 @@ async def test_list_filtered_by_status_contains_only_finished_when_one_running(t
     t_run = _task("run", running=True, session="s1")
     t_fin = _task("fin", running=False, session="s1")
     app = _shell_app([t_run, t_fin], session="s1")
-    res = await tool.execute({"action": "list"}, ctx=app)
+    res = str(await tool.execute({"action": "list"}, ctx=app))
     assert "RUNNING" in res
     assert "FINISHED" in res
 
@@ -262,7 +262,7 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, monk
     app = _shell_app([t1, t2], session="s1")
     # Race: t1 finishes right before manage runs.
     t1.status = TaskStatus.COMPLETED
-    res = await tool.execute({"action": "list"}, ctx=app)
+    res = str(await tool.execute({"action": "list"}, ctx=app))
     assert "tbkg" in res  # still listed as FINISHED (no crash)
     assert "FINISHED" in res
 
@@ -270,7 +270,7 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, monk
 async def test_kill_running_background_task(tool):
     t = _task("tbk", running=True, session="s1")
     app = _shell_app([t], session="s1")
-    res = await tool.execute({"action": "kill", "task_id": "tbk"}, ctx=app)
+    res = str(await tool.execute({"action": "kill", "task_id": "tbk"}, ctx=app))
     assert "killed" in res
     assert not t.is_running
 
@@ -279,7 +279,7 @@ async def test_kill_running_background_task(tool):
 
 async def test_unknown_action_returns_error_not_crash(tool):
     app = _shell_app([])
-    res = await tool.execute({"action": "explode"}, ctx=app)
+    res = str(await tool.execute({"action": "explode"}, ctx=app))
     assert "ERR: action" in res
     assert "explode" in res
 
@@ -359,16 +359,16 @@ def _ctx(app):
 
 async def test_send_message_empty_whitespace_soft(sub_tool, store):
     _mk("sws")
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sws", "message": "   "}, ctx=_ctx(_SmApp(store))
-    )
+    ))
     assert "ERR: params" in res
 
 
 async def test_send_message_to_nonexistent_soft(sub_tool, store):
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "ghost", "message": "hi"}, ctx=_ctx(_SmApp(store))
-    )
+    ))
     assert "notfound" in res
 
 
@@ -379,9 +379,9 @@ async def test_send_message_to_completed_session_not_crash(sub_tool, store):
     agent = _SimpleAgent()
     agent._resp = "post-done reply"
     app = _SmApp(store, agent_factory=lambda: agent)
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sfin", "message": "again"}, ctx=_ctx(app)
-    )
+    ))
     assert isinstance(res, str)
     assert "message sent to sfin" in res
     assert sess.status in ("running",)
@@ -398,9 +398,9 @@ async def test_send_message_background_nonblocking_does_not_complete(sub_tool, s
     sess = _mk("sbgn", status="running", background=True)
     agent = _SimpleAgent()
     app = _SmApp(store, agent_factory=lambda: agent)
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sbgn", "message": "bg hi", "background": True}, ctx=_ctx(app)
-    )
+    ))
     assert "message sent to sbgn" in res
     assert sess.status == "running"  # not finished synchronously
     assert sess.async_task is not None
@@ -414,9 +414,9 @@ async def test_send_message_default_background_dispatch(sub_tool, store):
     sess = _mk("sdflt", status="running", background=True)
     agent = _SimpleAgent()
     app = _SmApp(store, agent_factory=lambda: agent)
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sdflt", "message": "hi"}, ctx=_ctx(app)
-    )
+    ))
     assert "message sent to sdflt" in res
     assert sess.status == "running"
     if sess.async_task:
@@ -429,16 +429,16 @@ async def test_send_message_no_agent_available_soft(sub_tool, store):
     """Both session.agent None and ctx cannot create one -> soft context error."""
     _mk("snoagent", status="running")
     app = _SmApp(store, agent_factory=lambda: None)
-    res = await sub_tool.execute(
+    res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "snoagent", "message": "hi"}, ctx=_ctx(app)
-    )
+    ))
     assert "ERR: context" in res
 
 
 async def test_subagent_status_action_removed(sub_tool, store):
     """'status' was dropped from manage_subagent; it must not dispatch."""
     _mk("sgone", status="running")
-    res = await sub_tool.execute({"action": "status", "session_id": "sgone"})
+    res = str(await sub_tool.execute({"action": "status", "session_id": "sgone"}))
     assert "ERR: action 'status'" in res
 
 
@@ -447,12 +447,12 @@ async def test_subagent_status_action_removed(sub_tool, store):
 
 async def test_kill_completed_session_soft(sub_tool, store):
     _mk("skdone", status="completed")
-    res = await sub_tool.execute({"action": "kill", "session_id": "skdone"})
+    res = str(await sub_tool.execute({"action": "kill", "session_id": "skdone"}))
     assert "already in" in res
 
 
 async def test_kill_nonexistent_soft(sub_tool, store):
-    res = await sub_tool.execute({"action": "kill", "session_id": "ghost"})
+    res = str(await sub_tool.execute({"action": "kill", "session_id": "ghost"}))
     assert "notfound" in res
 
 
@@ -460,16 +460,16 @@ async def test_kill_running_with_no_async_task(sub_tool, store):
     """Kill a running session whose async_task is None (never started) must not crash."""
     sess = _mk("sknone", status="running")
     assert sess.async_task is None
-    res = await sub_tool.execute({"action": "kill", "session_id": "sknone"})
+    res = str(await sub_tool.execute({"action": "kill", "session_id": "sknone"}))
     assert "terminated" in res
     assert sess.status == "cancelled"
 
 
 async def test_kill_twice_idempotent(sub_tool, store):
     _mk("sk2", status="running")
-    r1 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
+    r1 = str(await sub_tool.execute({"action": "kill", "session_id": "sk2"}))
     assert "terminated" in r1
-    r2 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
+    r2 = str(await sub_tool.execute({"action": "kill", "session_id": "sk2"}))
     assert "already in" in r2
 
 
@@ -477,7 +477,7 @@ async def test_kill_twice_idempotent(sub_tool, store):
 
 
 async def test_list_no_subagents_no_crash(sub_tool, store):
-    res = await sub_tool.execute({"action": "list"})
+    res = str(await sub_tool.execute({"action": "list"}))
     assert "No subagent sessions found" in res
     assert "Roles" not in res
 
@@ -489,7 +489,7 @@ async def test_list_filters_by_parent(sub_tool, store):
     _mk("sp2", parent="parent-b")
     app = _SmApp(store, current_session_id="parent-a")
     app.sm = store
-    res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
+    res = str(await sub_tool.execute({"action": "list"}, ctx=_ctx(app)))
     assert "sp1a" in res
     assert "sp1b" in res
     assert "sp2" not in res
@@ -499,7 +499,7 @@ async def test_list_all_flag_ignores_parent(sub_tool, store):
     _mk("sp1a", parent="parent-a")
     _mk("sp2", parent="parent-b")
     app = _SmApp(store, current_session_id="parent-a")
-    res = await sub_tool.execute({"action": "list", "all": True}, ctx=_ctx(app))
+    res = str(await sub_tool.execute({"action": "list", "all": True}, ctx=_ctx(app)))
     assert "sp1a" in res
     assert "sp2" in res
 
@@ -507,7 +507,7 @@ async def test_list_all_flag_ignores_parent(sub_tool, store):
 async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
-    res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
+    res = str(await sub_tool.execute({"action": "list"}, ctx=_ctx(app)))
     assert "No subagent sessions found" in res
     # parent scoping means sip not listed under parent-zzz
     assert "sip" not in res
@@ -564,7 +564,7 @@ async def test_double_send_message_two_background_tasks(sub_tool, store):
 
 async def test_unknown_subagent_action_soft(sub_tool, store):
     _mk("subunk")
-    res = await sub_tool.execute({"action": "explode", "session_id": "subunk"})
+    res = str(await sub_tool.execute({"action": "explode", "session_id": "subunk"}))
     assert "ERR: action" in res
     assert "explode" in res
 

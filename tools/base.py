@@ -338,5 +338,5 @@ class BaseTool:
         """Returns tool schema, optionally tailored for subagents."""
         return self.schema
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> "ToolResult":
         raise NotImplementedError

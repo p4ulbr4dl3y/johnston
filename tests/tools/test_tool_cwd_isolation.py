@@ -87,7 +87,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
         tool = ShellTool()
         with tempfile.TemporaryDirectory() as base:
             ctx = ToolContext(None, is_subagent=True, cwd=base)
-            res = await tool.execute({"command": "pwd"}, ctx)
+            res = str(await tool.execute({"command": "pwd"}, ctx))
             self.assertIn(os.path.realpath(base), res)
 
     async def test_shell_uses_cwd_from_agent(self):
@@ -97,7 +97,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as base:
             host = MockTextualApp()
             agent = make_agent(host, cwd=base, is_subagent=True)
-            res = await tool.execute({"command": "pwd"}, agent)
+            res = str(await tool.execute({"command": "pwd"}, agent))
             self.assertIn(os.path.realpath(base), res)
 
 
@@ -109,7 +109,7 @@ class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as base:
             host = MockTextualApp()
             agent = make_agent(host, cwd=base, is_subagent=True)
-            res = await tool.execute({"path": "subdir/newfile.txt", "content": "hello"}, agent)
+            res = str(await tool.execute({"path": "subdir/newfile.txt", "content": "hello"}, agent))
             self.assertNotIn("ERR:", res, res)
             target = os.path.join(base, "subdir", "newfile.txt")
             self.assertTrue(os.path.isfile(target))

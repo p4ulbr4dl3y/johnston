@@ -33,9 +33,9 @@ class TestManageShellInput(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         mock_app = self._make_app(bg_task)
 
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, ctx=mock_app
-        )
+        ))
         self.assertIn("OK: input sent to task_interactive", res)
         mock_stdin.write.assert_called_once_with(b"John Doe\n")
 
@@ -47,5 +47,5 @@ class TestManageShellInput(unittest.IsolatedAsyncioTestCase):
         tool = ManageShellTool()
         mock_app = self._make_app(bg_task)
 
-        res = await tool.execute({"action": "send_input", "task_id": "task_finished", "input": "test"}, ctx=mock_app)
+        res = str(await tool.execute({"action": "send_input", "task_id": "task_finished", "input": "test"}, ctx=mock_app))
         self.assertIn("ERR: notrunning 'task_finished'", res)

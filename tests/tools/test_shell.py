@@ -26,15 +26,15 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(tid1, tid2)
 
     async def test_sleep_chain_no_remainder(self):
-        res = await self.tool.execute({"command": "sleep 0.001"})
+        res = str(await self.tool.execute({"command": "sleep 0.001"}))
         self.assertEqual(res, "slept 0.001s")
 
     async def test_sleep_chain_with_remainder(self):
-        res = await self.tool.execute({"command": "sleep 0.001 && echo after_sleep"})
+        res = str(await self.tool.execute({"command": "sleep 0.001 && echo after_sleep"}))
         self.assertIn("after_sleep", res)
 
     async def test_standard_pipe_execution(self):
-        res = await self.tool.execute({"command": "echo std_pipe_test"})
+        res = str(await self.tool.execute({"command": "echo std_pipe_test"}))
         self.assertIn("std_pipe_test", res)
 
     async def test_windows_execution_branch(self):
@@ -49,7 +49,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.is_windows", return_value=True),
             patch.object(ShellTool, "_create_windows_process", return_value=mock_p) as mock_win_proc,
         ):
-            res = await self.tool.execute({"command": "dir"})
+            res = str(await self.tool.execute({"command": "dir"}))
             mock_win_proc.assert_called_once()
             self.assertIsNotNone(res)
 
@@ -89,12 +89,12 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             mock_bg_cls.return_value = mock_task
 
             with patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for):
-                res = await self.tool.execute({"command": "echo test"})
+                res = str(await self.tool.execute({"command": "echo test"}))
                 self.assertIn("normal_timeout_output", res)
 
     async def test_normal_execution_empty_output(self):
         # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
-        res = await self.tool.execute({"command": "true" if os.name != "nt" else "cd ."})
+        res = str(await self.tool.execute({"command": "true" if os.name != "nt" else "cd ."}))
         self.assertEqual(res, "(no output)")
 
     async def test_command_timeout_moved_to_background(self):
@@ -115,7 +115,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, ctx=mock_app)
+            res = str(await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, ctx=mock_app))
             self.assertIn("[Background Task ID:", res)
             self.assertIn("moved to background.", res)
             self.assertIn("Full Log:", res)
@@ -168,7 +168,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx = MagicMock()
         mock_ctx.is_subagent = True
 
-        res = await self.tool.execute({"command": "echo subagent_test", "timeout": 10}, ctx=mock_ctx)
+        res = str(await self.tool.execute({"command": "echo subagent_test", "timeout": 10}, ctx=mock_ctx))
         self.assertIn("subagent_test", res)
         mock_ctx.add_background_task.assert_not_called()
 
@@ -196,7 +196,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
+            res = str(await self.tool.execute({"command": "run_long_task", "timeout": 5}))
             self.assertIn("ERR: timeout 'shell': timed out after 5s", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
@@ -214,7 +214,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "tail -f log.txt", "background": True}, ctx=mock_app)
+            res = str(await self.tool.execute({"command": "tail -f log.txt", "background": True}, ctx=mock_app))
             self.assertIn("[Background Task ID:", res)
             self.assertIn("moved to background.", res)
             mock_ctx.add_background_task.assert_called_once()
@@ -230,7 +230,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "tail -f log.txt", "background": True})
+            res = str(await self.tool.execute({"command": "tail -f log.txt", "background": True}))
             self.assertIn("ERR: background 'shell'", res)
             mock_term.assert_called_once()
             mock_ctx.add_background_task.assert_not_called()
@@ -259,7 +259,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
             registered_bg_task.move_to_background()
 
-            res = await exec_task
+            res = str(await exec_task)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("moved to background.", res)
 
@@ -272,17 +272,17 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
 
         with patch.object(ShellTool, "_ensure_context", return_value=mock_ctx):
-            res = await self.tool.execute({"command": "echo test_sync_cleanup"}, ctx=mock_app)
+            res = str(await self.tool.execute({"command": "echo test_sync_cleanup"}, ctx=mock_app))
             self.assertIn("test_sync_cleanup", res)
             # Sync task should be dropped from the manager after finishing
             self.assertEqual(len([t for t in mock_app.task_manager]), 0)
 
     async def test_invalid_timeout_value_falls_back_to_default(self):
-        res = await self.tool.execute({"command": "echo hi", "timeout": "abc"})
+        res = str(await self.tool.execute({"command": "echo hi", "timeout": "abc"}))
         self.assertIn("hi", res)
 
     async def test_sleep_chain_exceeds_timeout(self):
-        res = await self.tool.execute({"command": "sleep 5", "timeout": 1})
+        res = str(await self.tool.execute({"command": "sleep 5", "timeout": 1}))
         self.assertEqual(res, "ERR: reject: sleep 5.0s exceeds timeout 1s")
 
     async def test_subagent_no_stdout_stream(self):
@@ -305,7 +305,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch.object(ShellTool, "_create_std_process", return_value=mock_p),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "true"}, ctx=mock_ctx)
+            res = str(await self.tool.execute({"command": "true"}, ctx=mock_ctx))
         self.assertEqual(res, "(no output)")
 
     async def test_subagent_read_task_drain_timeout(self):
@@ -333,7 +333,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "true"}, ctx=mock_ctx)
+            res = str(await self.tool.execute({"command": "true"}, ctx=mock_ctx))
         self.assertEqual(res, "(no output)")
 
     async def test_subagent_timeout_read_task_exception_ignored(self):
@@ -361,7 +361,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             patch("tools.shell.terminate_process", new_callable=AsyncMock),
             patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
         ):
-            res = await self.tool.execute({"command": "run_long_task", "timeout": 5})
+            res = str(await self.tool.execute({"command": "run_long_task", "timeout": 5}))
         self.assertIn("ERR: timeout 'shell': timed out after 5s", res)
 
     async def test_subagent_shell_execution_cancelled(self):
@@ -415,7 +415,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             registered_bg_task.output.append("y" * 2500)
             registered_bg_task.move_to_background()
 
-            res = await exec_task
+            res = str(await exec_task)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("[Output truncated, showing last 2000 chars]", res)
 
@@ -441,7 +441,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
             registered_bg_task.output.append("short output")
 
-            res = await exec_task
+            res = str(await exec_task)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("Recent Output:\nshort output", res)
 
@@ -467,7 +467,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             registered_bg_task = mock_ctx.add_background_task.call_args[0][0]
             registered_bg_task.output.append("z" * 2500)
 
-            res = await exec_task
+            res = str(await exec_task)
             self.assertIn("[Background Task ID:", res)
             self.assertIn("[Output truncated, showing last 2000 chars]", res)
 
@@ -502,7 +502,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             mock_bg_cls.return_value = mock_task
 
             with patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for):
-                res = await self.tool.execute({"command": "echo test"})
+                res = str(await self.tool.execute({"command": "echo test"}))
                 self.assertIn("drained_output", res)
 
     async def test_execute_cancelled_cleans_up_task(self):
@@ -566,7 +566,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)
 
-        res = await self.tool.execute({"command": "echo session_allowed"}, ctx=mock_app)
+        res = str(await self.tool.execute({"command": "echo session_allowed"}, ctx=mock_app))
         self.assertIn("session_allowed", res)
         pm.clear_session_overrides()
 

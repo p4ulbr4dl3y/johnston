@@ -5,7 +5,7 @@ import time
 from collections import deque
 from typing import Any, Dict
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.platform.platform_utils import (
     decode_output,
     is_windows,
@@ -84,7 +84,7 @@ class ShellTool(BaseTool):
 
         return _rebuild_tool(self.schema)
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         cmd = (args.get("command") or "").strip()
@@ -100,10 +100,10 @@ class ShellTool(BaseTool):
             sec = float(m.group(1))
             remainder = (m.group(2) or "").strip()
             if sec > timeout:
-                return format_tool_error("reject", detail=f"sleep {sec}s exceeds timeout {timeout}s")
+                return ToolResult.error("reject", detail=f"sleep {sec}s exceeds timeout {timeout}s")
             await asyncio.sleep(sec)
             if not remainder:
-                return f"slept {sec}s"
+                return ToolResult.done(f"slept {sec}s")
             cmd = remainder
 
         env = shell_env()
@@ -116,7 +116,7 @@ class ShellTool(BaseTool):
         if ctx.is_subagent:
             if run_in_bg:
                 await terminate_process(p)
-                return format_tool_error("background", name="shell")
+                return ToolResult.error("background", name="shell")
 
             output_chunks = deque()
             output_size = 0
@@ -159,8 +159,8 @@ class ShellTool(BaseTool):
                         pass
                 res = process_carriage_returns(strip_ansi(_flush_raw()))
                 if not res.strip():
-                    return "(no output)"
-                return _truncate_output(res)
+                    return ToolResult.done("(no output)")
+                return ToolResult.done(_truncate_output(res))
             except asyncio.TimeoutError:
                 await terminate_process(p)
                 if read_task:
@@ -170,7 +170,7 @@ class ShellTool(BaseTool):
                         pass
                 raw_out = process_carriage_returns(strip_ansi(_flush_raw()))
                 partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-                return format_tool_error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
+                return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
             except asyncio.CancelledError:
                 await terminate_process(p)
                 raise
@@ -193,7 +193,7 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback)
 
-            return _format_background_task_response(task_id, cmd, log_path=task.log_path)
+            return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, log_path=task.log_path))
 
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
@@ -220,7 +220,7 @@ class ShellTool(BaseTool):
                     recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
                 else:
                     recent_output_str = "\n\nRecent Output: (No output yet)"
-                return _format_background_task_response(task_id, cmd, recent_output_str, task.log_path)
+                return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, recent_output_str, task.log_path))
 
             if task.read_task:
                 try:
@@ -230,8 +230,8 @@ class ShellTool(BaseTool):
             task.close_pty()
             res = task.get_formatted_output()
             if not res.strip():
-                return "(no output)"
-            return _truncate_output(res)
+                return ToolResult.done("(no output)")
+            return ToolResult.done(_truncate_output(res))
         except asyncio.TimeoutError:
             task.is_background = True
             task.open_log()
@@ -240,7 +240,7 @@ class ShellTool(BaseTool):
                 recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
             else:
                 recent_output_str = "\n\nRecent Output: (No output yet)"
-            return _format_background_task_response(task_id, cmd, recent_output_str, task.log_path)
+            return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, recent_output_str, task.log_path))
         except asyncio.CancelledError:
             if "task" in locals() and task:
                 task.kill_sync()

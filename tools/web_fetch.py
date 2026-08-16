@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 import httpx
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool, truncate_output
 from tools.cancel import run_cancellable
 from tools.utils import MAX_TOOL_PAYLOAD_BYTES
@@ -97,17 +97,17 @@ class WebFetchTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         url = (args.get("url") or "").strip()
         if not url:
-            return format_tool_error("params", name="url", detail="required")
+            return ToolResult.error("params", name="url", detail="required")
 
         if not (url.startswith("http://") or url.startswith("https://")):
-            return format_tool_error("scheme", name=url, detail="must be http(s)")
+            return ToolResult.error("scheme", name=url, detail="must be http(s)")
 
         if _is_private_host(url):
-            return format_tool_error("blocked", name=url, detail="private/loopback address is not allowed")
+            return ToolResult.error("blocked", name=url, detail="private/loopback address is not allowed")
 
         raw_mode = bool(args.get("raw", False))
 
@@ -133,7 +133,7 @@ class WebFetchTool(BaseTool):
                     if cl:
                         try:
                             if int(cl) > MAX_TOOL_PAYLOAD_BYTES:
-                                return format_tool_error(
+                                return ToolResult.error(
                                     "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
                                 )
                         except ValueError:
@@ -145,17 +145,17 @@ class WebFetchTool(BaseTool):
                     async for chunk in response.aiter_bytes():
                         total += len(chunk)
                         if total > MAX_TOOL_PAYLOAD_BYTES:
-                            return format_tool_error(
+                            return ToolResult.error(
                                 "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
                             )
                         chunks.append(chunk)
                     content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
-            return format_tool_error("http", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
+            return ToolResult.error("http", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
         except httpx.TimeoutException:
-            return format_tool_error("timeout", name=url)
+            return ToolResult.error("timeout", name=url)
         except Exception as e:
-            return format_tool_error("fetch", detail=str(e), name=url)
+            return ToolResult.error("fetch", detail=str(e), name=url)
 
         if raw_mode:
             text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
@@ -193,8 +193,10 @@ class WebFetchTool(BaseTool):
                 except Exception:
                     text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
 
-        return truncate_output(
-            text_content,
-            max_chars=8000,
-            tool_name="web_fetch",
+        return ToolResult.done(
+            truncate_output(
+                text_content,
+                max_chars=8000,
+                tool_name="web_fetch",
+            )
         )

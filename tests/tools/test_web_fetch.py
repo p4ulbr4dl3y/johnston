@@ -43,12 +43,12 @@ def _make_stream_client(content_bytes, content_type="text/html", status_code=200
 class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_url_scheme(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": "ftp://example.com"})
+        res = str(await tool.execute({"url": "ftp://example.com"}))
         self.assertIn("ERR: scheme 'ftp://example.com': must be http(s)", res)
 
     async def test_missing_url(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": ""})
+        res = str(await tool.execute({"url": ""}))
         self.assertIn("ERR: params 'url': required", res)
 
     @patch("httpx.AsyncClient")
@@ -57,7 +57,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "text/html; charset=utf-8")
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com"})
+        res = str(await tool.execute({"url": "https://example.com"}))
 
         self.assertIn("Web Page", res)
         self.assertIn("Test paragraph", res)
@@ -68,7 +68,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "text/html")
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com", "raw": True})
+        res = str(await tool.execute({"url": "https://example.com", "raw": True}))
 
         self.assertIn("<div>Raw HTML</div>", res)
 
@@ -78,7 +78,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "application/json", url="https://api.example.com/data")
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://api.example.com/data"})
+        res = str(await tool.execute({"url": "https://api.example.com/data"}))
 
         self.assertIn('{"status": "ok"}', res)
 
@@ -88,7 +88,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
                 b"", "text/html", status_code=404, url="https://example.com/404"
             )
             tool = WebFetchTool()
-            res = await tool.execute({"url": "https://example.com/404"})
+            res = str(await tool.execute({"url": "https://example.com/404"}))
 
         self.assertIn("ERR: http 'https://example.com/404': 404 Not Found", res)
 
@@ -114,7 +114,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = client
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/big"})
+        res = str(await tool.execute({"url": "https://example.com/big"}))
         self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
@@ -124,7 +124,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = mock_client
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/long"})
+        res = str(await tool.execute({"url": "https://example.com/long"}))
 
         self.assertIn("Output truncated at 8000 chars", res)
         self.assertIn("Full output saved to", res)
@@ -152,7 +152,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         }
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/x"})
+        res = str(await tool.execute({"url": "https://example.com/x"}))
         self.assertIn("plain body", res)
 
     @patch("httpx.AsyncClient")
@@ -183,7 +183,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = client
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/big"})
+        res = str(await tool.execute({"url": "https://example.com/big"}))
         self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
@@ -195,7 +195,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = client
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com"})
+        res = str(await tool.execute({"url": "https://example.com"}))
         self.assertEqual(res, "ERR: timeout 'https://example.com'")
 
     @patch("httpx.AsyncClient")
@@ -207,7 +207,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = client
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com"})
+        res = str(await tool.execute({"url": "https://example.com"}))
         self.assertIn("ERR: fetch 'https://example.com': connection refused", res)
 
     @patch("httpx.AsyncClient")
@@ -217,7 +217,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "application/pdf")
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/doc.pdf"})
+        res = str(await tool.execute({"url": "https://example.com/doc.pdf"}))
         self.assertIn("%PDF-1.4 fake body", res)
 
     @patch("httpx.AsyncClient")
@@ -229,7 +229,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         )
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/doc.docx"})
+        res = str(await tool.execute({"url": "https://example.com/doc.docx"}))
         self.assertIn("PK\x03\x04 fake docx", res)
 
     @patch("httpx.AsyncClient")
@@ -241,7 +241,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         )
 
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/data.xlsx"})
+        res = str(await tool.execute({"url": "https://example.com/data.xlsx"}))
         self.assertIn("PK\x03\x04 fake xlsx", res)
 
 

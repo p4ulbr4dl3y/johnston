@@ -21,7 +21,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "sleep 0.05"}, ctx=mock_app)
+        res = str(await tool.execute({"command": "sleep 0.05"}, ctx=mock_app))
         self.assertIn("slept 0.05s", res)
 
     async def test_sleep_chain(self):
@@ -29,7 +29,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.tool_context = ToolContext(mock_app)
 
-        res = await tool.execute({"command": "sleep 0.05 && echo 'done'"}, ctx=mock_app)
+        res = str(await tool.execute({"command": "sleep 0.05 && echo 'done'"}, ctx=mock_app))
         self.assertIn("done", res)
 
     async def test_empty_output_command(self):
@@ -38,7 +38,7 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
         mock_app.tool_context = ToolContext(mock_app)
 
         # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
-        res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."}, ctx=mock_app)
+        res = str(await tool.execute({"command": "true" if os.name != "nt" else "cd ."}, ctx=mock_app))
         self.assertIn("(no output)", res)
 
 

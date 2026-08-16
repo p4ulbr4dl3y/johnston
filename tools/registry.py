@@ -2,7 +2,7 @@ import inspect
 import json
 from typing import Any, Dict, Type
 
-from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
@@ -187,9 +187,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 async def _wrap_execute(result: Any) -> ToolResult:
     """Wrap a raw tool ``execute()`` result into a :class:`ToolResult`.
 
-    Accepts one result value (already awaited) or an awaitable. Tools still
-    return ``str``/``None``/dict etc.; any value already carrying the ``ERR:``
-    convention is treated as an explicit error.
+    Accepts one result value (already awaited) or an awaitable. Tools now return
+    structured ``ToolResult`` objects, which pass through unchanged; raw ``str``/
+    ``None``/dict values (e.g. MCP adapter output) are normalized by inspecting
+    the ``ERR:`` prefix convention, never treated as errors otherwise.
     """
     if inspect.isawaitable(result):
         result = await result
@@ -203,7 +204,5 @@ async def _wrap_execute(result: Any) -> ToolResult:
         return ToolResult.done(json.dumps(result, ensure_ascii=False))
     text = str(result)
     if text.lstrip().lower().startswith("err:"):
-        # Already carries the canonical ``ERR:`` convention - keep verbatim,
-        # just mark it as an explicit error.
-        return ToolResult(content=text, is_error=True, status="error")
+        return ToolResult(content=text, status=ToolResultStatus.ERROR)
     return ToolResult.done(text)

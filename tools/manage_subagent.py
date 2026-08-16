@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any, Dict
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from core.domain.entities.session import STATUS_CANCELLED, STATUS_ERROR
 from core.session_manager import SessionStore
 from tools.base import BaseTool
@@ -34,7 +34,7 @@ class ManageSubagentTool(BaseTool):
 
         return get_session_store(app)
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         action = (args.get("action") or "").strip().lower()
@@ -54,24 +54,24 @@ class ManageSubagentTool(BaseTool):
                     store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
                 )
             if not target_sessions:
-                return "No subagent sessions found for current session."
+                return ToolResult.done("No subagent sessions found for current session.")
             lines = ["Active/Past Subagent Sessions:"]
             for sess in target_sessions:
                 lines.append(
                     f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Description: {sess.description}"
                 )
-            return "\n".join(lines)
+            return ToolResult.done("\n".join(lines))
 
         if not session_id:
-            return format_tool_error("params", name="session_id", detail=f"required for '{action}'")
+            return ToolResult.error("params", name="session_id", detail=f"required for '{action}'")
 
         session = store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
         if not session:
-            return format_tool_error("notfound", name=session_id)
+            return ToolResult.error("notfound", name=session_id)
 
         elif action == "kill":
             if session.status != "running":
-                return f"{session.id} already in '{session.status}'"
+                return ToolResult.done(f"{session.id} already in '{session.status}'")
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -82,11 +82,11 @@ class ManageSubagentTool(BaseTool):
             session.finish(STATUS_CANCELLED, "Cancelled via manage_subagent tool")
             store.save(session)
 
-            return f"{session.id} terminated"
+            return ToolResult.done(f"{session.id} terminated")
 
         elif action == "send_message":
             if not message:
-                return format_tool_error("params", name="message", detail="required for 'send_message'")
+                return ToolResult.error("params", name="message", detail="required for 'send_message'")
 
             # Mirror the main agent's semantics: a follow-up can be sent in any
             # status. If the subagent is currently busy (live async_task), the
@@ -99,7 +99,7 @@ class ManageSubagentTool(BaseTool):
                 from tools.invoke_subagent import _mark_subagent_running
 
                 _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
-                return f"queued for {session.id}"
+                return ToolResult.done(f"queued for {session.id}")
 
             try:
                 subagent = session.agent
@@ -132,7 +132,7 @@ class ManageSubagentTool(BaseTool):
                     subagent.cwd = project_dir
 
                 if not subagent:
-                    return format_tool_error("context", name=session.id, detail="no active agent")
+                    return ToolResult.error("context", name=session.id, detail="no active agent")
 
                 session.status = "running"
                 if not hasattr(session, "pending_messages"):
@@ -175,11 +175,11 @@ class ManageSubagentTool(BaseTool):
                 from tools.invoke_subagent import _mark_subagent_running
 
                 _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
-                return f"message sent to {session.id}"
+                return ToolResult.done(f"message sent to {session.id}")
             except Exception as err:
                 session.finish(STATUS_ERROR, str(err))
                 store.save(session)
-                return format_tool_error("subagent_setup", detail=str(err), name=session.id)
+                return ToolResult.error("subagent_setup", detail=str(err), name=session.id)
 
         else:
-            return format_tool_error("action", detail="valid: list, kill, send_message", name=action)
+            return ToolResult.error("action", detail="valid: list, kill, send_message", name=action)

@@ -14,16 +14,16 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
                 {"step": "Run pytest suite", "status": "pending"},
             ],
         }
-        res = await tool.execute(args)
+        res = str(await tool.execute(args))
         self.assertIn("plan updated (1/3 completed)", res)
         self.assertIn("Refactoring module for safety", res)
 
     async def test_update_plan_tool_invalid_payload(self):
         tool = UpdatePlanTool()
-        res_empty = await tool.execute({"plan": []})
+        res_empty = str(await tool.execute({"plan": []}))
         self.assertIn("ERR:", res_empty)
 
-        res_malformed = await tool.execute({"plan": "not a list"})
+        res_malformed = str(await tool.execute({"plan": "not a list"}))
         self.assertIn("ERR:", res_malformed)
 
     async def test_update_plan_normalization_and_skipping(self):
@@ -37,12 +37,12 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
                 {"step": "Completed item", "status": "completed"},
             ]
         }
-        res = await tool.execute(args)
+        res = str(await tool.execute(args))
         self.assertIn("plan updated (1/3 completed)", res)
 
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
-        res = await tool.execute({"plan": ["invalid", {"step": ""}]})
+        res = str(await tool.execute({"plan": ["invalid", {"step": ""}]}))
         self.assertIn("ERR: params 'plan': items need", res)
 
     async def test_update_plan_app_integration(self):
@@ -57,13 +57,13 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
 
         app = MockApp()
         tool = UpdatePlanTool()
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "explanation": "App update test",
                 "plan": [{"step": "Step 1", "status": "in_progress"}],
             },
             ctx=app,
-        )
+        ))
         self.assertIn("plan updated (0/1 completed)", res)
         self.assertTrue(app.updated)
         self.assertEqual(app.current_plan_explanation, "App update test")
@@ -76,10 +76,10 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
 
         app = MockAppFaulty()
         tool = UpdatePlanTool()
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"plan": [{"step": "Step 1", "status": "completed"}]},
             ctx=app,
-        )
+        ))
         self.assertIn("plan updated (1/1 completed)", res)
 
 

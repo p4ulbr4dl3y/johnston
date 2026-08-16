@@ -74,41 +74,41 @@ def _mk_client(cm):
 class TestWebFetchUrlEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_url_none(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": None})
+        res = str(await tool.execute({"url": None}))
         self.assertIn("ERR", res)
 
     async def test_url_whitespace_only(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": "   "})
+        res = str(await tool.execute({"url": "   "}))
         self.assertIn("required", res)
 
     async def test_url_not_a_url_plain_string(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": "example dot com nothing"})
+        res = str(await tool.execute({"url": "example dot com nothing"}))
         self.assertIn("must be http(s)", res)
 
     async def test_ftp_scheme_rejected(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": "ftp://host/file"})
+        res = str(await tool.execute({"url": "ftp://host/file"}))
         self.assertIn("must be http(s)", res)
 
     async def test_file_scheme_rejected(self):
         tool = WebFetchTool()
-        res = await tool.execute({"url": "file:///etc/passwd"})
+        res = str(await tool.execute({"url": "file:///etc/passwd"}))
         self.assertIn("must be http(s)", res)
         self.assertNotIn("root:", res)
 
     async def test_uppercase_scheme_rejected(self):
         # startswith is case-sensitive; HTTP:// (all caps) is not normalized.
         tool = WebFetchTool()
-        res = await tool.execute({"url": "HTTP://example.com"})
+        res = str(await tool.execute({"url": "HTTP://example.com"}))
         self.assertIn("must be http(s)", res)
 
     @patch("httpx.AsyncClient")
     async def test_unicode_url(self, mock_cls):
         mock_cls.return_value = _mk_client(_mk_stream_client(b"<p>hi</p>", "text/html"))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://пример.рф/тест"})
+        res = str(await tool.execute({"url": "https://пример.рф/тест"}))
         self.assertIn("hi", res)
 
     @patch("httpx.AsyncClient")
@@ -118,7 +118,7 @@ class TestWebFetchUrlEdgeCases(unittest.IsolatedAsyncioTestCase):
         client.stream.side_effect = ValueError("Invalid URL")
         mock_cls.return_value = client
         tool = WebFetchTool()
-        res = await tool.execute({"url": "http://example.com /etc/passwd"})
+        res = str(await tool.execute({"url": "http://example.com /etc/passwd"}))
         self.assertTrue(res.startswith("ERR"), res)
 
 
@@ -132,7 +132,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         client.stream.side_effect = httpx.ConnectError("[Errno 61] Connection refused")
         mock_cls.return_value = client
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com"})
+        res = str(await tool.execute({"url": "https://example.com"}))
         self.assertIn("ERR: fetch", res)
 
     @patch("httpx.AsyncClient")
@@ -143,14 +143,14 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         )
         mock_cls.return_value = client
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://no-such-host.invalid"})
+        res = str(await tool.execute({"url": "https://no-such-host.invalid"}))
         self.assertIn("ERR", res)
 
     @patch("httpx.AsyncClient")
     async def test_server_5xx(self, mock_cls):
         mock_cls.return_value = _mk_client(_mk_stream_client(b"oops", "text/html", status_code=500))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/boom"})
+        res = str(await tool.execute({"url": "https://example.com/boom"}))
         self.assertIn("ERR: http", res)
         self.assertIn("500", res)
 
@@ -159,7 +159,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         # An empty body (204-like) must return cleanly, not crash convert.
         mock_cls.return_value = _mk_client(_mk_stream_client(b"", "text/html"))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/empty"})
+        res = str(await tool.execute({"url": "https://example.com/empty"}))
         self.assertIsInstance(res, str)
 
     @patch("httpx.AsyncClient")
@@ -167,7 +167,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         # raw mode on non-UTF8 bytes must not crash decode.
         mock_cls.return_value = _mk_client(_mk_stream_client(b"\xff\xfe\x00\x80abc", "application/octet-stream"))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/blob", "raw": True})
+        res = str(await tool.execute({"url": "https://example.com/blob", "raw": True}))
         self.assertIsInstance(res, str)
         self.assertIn("abc", res)
 
@@ -182,7 +182,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         cm.__aenter__.return_value.aiter_bytes = _aiter
         mock_cls.return_value = _mk_client(cm)
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/chunked-big"})
+        res = str(await tool.execute({"url": "https://example.com/chunked-big"}))
         self.assertIn("exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
@@ -192,7 +192,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         mock_cls.return_value = _mk_client(_mk_stream_client(b"ok", "text/plain"))
         tool = WebFetchTool()
         for t in (None, 0, -5):
-            res = await tool.execute({"url": "https://example.com/t", "timeout": t})
+            res = str(await tool.execute({"url": "https://example.com/t", "timeout": t}))
             self.assertIn("ok", res)
 
 
@@ -210,7 +210,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         resp = _mk_stream_client(b"root:x:0:0::/root:/bin/bash\n", "text/plain")
         mock_cls.return_value = _mk_client(resp)
         tool = WebFetchTool()
-        res = await tool.execute({"url": "http://127.0.0.1:8080/etc/passwd"})
+        res = str(await tool.execute({"url": "http://127.0.0.1:8080/etc/passwd"}))
         self.assertIn("ERR", res)
         self.assertIn("blocked", res)
 
@@ -221,7 +221,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         resp = _mk_stream_client(body, "application/json")
         mock_cls.return_value = _mk_client(resp)
         tool = WebFetchTool()
-        res = await tool.execute({"url": "http://169.254.169.254/latest/meta-data/"})
+        res = str(await tool.execute({"url": "http://169.254.169.254/latest/meta-data/"}))
         self.assertIn("blocked", res)
 
     @patch("httpx.AsyncClient")
@@ -234,7 +234,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         for host in ("http://localhost/", "http://[::1]/", "http://10.0.0.5/"):
             with self.subTest(host=host):
-                res = await tool.execute({"url": host + "flag"})
+                res = str(await tool.execute({"url": host + "flag"}))
                 self.assertIn("blocked", res)
 
     def test_redirect_following_has_host_allowlist(self):
@@ -250,7 +250,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         resp = _mk_stream_client(b"authed", "text/plain")
         mock_cls.return_value = _mk_client(resp)
         tool = WebFetchTool()
-        res = await tool.execute({"url": "http://user:pass@example.com/"})
+        res = str(await tool.execute({"url": "http://user:pass@example.com/"}))
         self.assertIn("authed", res)
         url_arg = mock_cls.return_value.stream.call_args.args[1]
         self.assertIn("user:pass@", url_arg)
@@ -262,7 +262,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         script = b'<html><body><script>alert(document.cookie)</script></body></html>'
         mock_cls.return_value = _mk_client(_mk_stream_client(script, "text/html"))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/x", "raw": True})
+        res = str(await tool.execute({"url": "https://example.com/x", "raw": True}))
         self.assertNotIn("<script>", res)
 
     @patch("httpx.AsyncClient")
@@ -272,7 +272,7 @@ class TestWebFetchSecurityBugs(unittest.IsolatedAsyncioTestCase):
         script = b'some text <script>window.location="https://evil"</script> more'
         mock_cls.return_value = _mk_client(_mk_stream_client(script, "text/plain"))
         tool = WebFetchTool()
-        res = await tool.execute({"url": "https://example.com/x"})
+        res = str(await tool.execute({"url": "https://example.com/x"}))
         self.assertNotIn("<script>", res)
 
 
@@ -285,14 +285,14 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_question_arg(self):
         tool = self._tool()
-        res = await tool.execute({})
+        res = str(await tool.execute({}))
         self.assertIn("ERR", res)
 
     async def test_empty_question_text_skipped(self):
         tool = self._tool()
         app = MagicMock()
         app.ask_user = AsyncMock(return_value="ok")
-        res = await tool.execute({"questions": [{"question_text": "", "options": ["a"]}]}, ctx=app)
+        res = str(await tool.execute({"questions": [{"question_text": "", "options": ["a"]}]}, ctx=app))
         self.assertIn("missing or invalid", res)
 
     async def test_all_questions_invalid_returns_error(self):
@@ -301,7 +301,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         tool = self._tool()
         app = MagicMock()
         app.ask_user = AsyncMock(return_value="ok")
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "questions": [
                     "not a dict",
@@ -311,7 +311,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
                 ]
             },
             ctx=app,
-        )
+        ))
         self.assertIn("missing or invalid", res)
         app.ask_user.assert_not_awaited()
 
@@ -321,7 +321,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         tool = self._tool()
         app = MagicMock()
         del app.ask_user  # no ask_user attribute at all
-        res = await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app)
+        res = str(await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app))
         self.assertIn("ERR: context 'app': unavailable", res)
 
     async def test_many_options_forwarded_uncapped(self):
@@ -336,9 +336,9 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         app = MagicMock()
         app.ask_user = fake
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Q", "options": [f"o{i}" for i in range(500)]}]}, ctx=app
-        )
+        ))
         self.assertEqual(seen["n"], 500)
         self.assertIn("a", res)
 
@@ -366,16 +366,16 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         app = MagicMock()
         app.ask_user = fake
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"questions": [{"question_text": "Q", "options": ["a", None, 5, ["b"]]}]}, ctx=app
-        )
+        ))
         self.assertEqual(seen["opts"], ["a", "None", "5", "['b']"])
         self.assertIn("x", res)
 
     async def test_single_question_with_none_options(self):
         # Single-question fallback where options are missing must not crash.
         tool = self._tool()
-        res = await tool.execute({"question": "Only text?"}, ctx=MagicMock(app=MagicMock()))
+        res = str(await tool.execute({"question": "Only text?"}, ctx=MagicMock(app=MagicMock())))
         self.assertIn("ERR", res)
 
 

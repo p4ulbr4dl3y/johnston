@@ -95,7 +95,7 @@ def _agent_with_stream(gen):
 
 
 async def _launch_and_wait(tool, args, app, store, wait=True):
-    res = await tool.execute(args)
+    res = str(await tool.execute(args))
     running = [s for s in store.list(kind="subagent") if s.status == "running"]
     task = running[0].async_task if running else None
     if wait and task is not None:
@@ -113,7 +113,7 @@ async def _launch_and_wait(tool, args, app, store, wait=True):
 async def test_missing_or_blank_prompt_returns_error(args):
     store, app, tool, tmp = _make_env(_agent_with_stream(_empty_gen))
     try:
-        res = await tool.execute(args)
+        res = str(await tool.execute(args))
         assert res.startswith("ERR: params 'prompt': required")
         assert store.list(kind="subagent") == []  # nothing spawned
     finally:
@@ -261,7 +261,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
 async def test_create_agent_returns_none():
     store, app, tool, tmp = _make_env(None)
     try:
-        res = await tool.execute({"prompt": "do", "description": "t", "branch": "main"})
+        res = str(await tool.execute({"prompt": "do", "description": "t", "branch": "main"}))
         assert res.startswith("ERR: context")
         assert store.list(kind="subagent") == []
     finally:
@@ -506,7 +506,7 @@ async def test_no_parent_session_id_uses_global_running_scan():
             store.create_subagent(
                 parent_id=f"other-parent-{i}", role="worker", description=f"foreign {i}", prompt="p", status="running"
             )
-        res = await tool.execute({"prompt": "hi", "description": "t", "branch": "main"})
+        res = str(await tool.execute({"prompt": "hi", "description": "t", "branch": "main"}))
         assert "ERR: limit" in res, (
             "BUG: got no limit error, yet this parent has ZERO running and all "
             "running sessions belong to other parents/windows"
@@ -614,7 +614,7 @@ async def test_launch_return_contains_description_and_id():
 async def test_error_format_matches_err_convention():
     store, app, tool, tmp = _make_env(_agent_with_stream(_gen_ok))
     try:
-        res = await tool.execute({"prompt": "  "})
+        res = str(await tool.execute({"prompt": "  "}))
         assert res == "ERR: params 'prompt': required", res
     finally:
         tmp.cleanup()

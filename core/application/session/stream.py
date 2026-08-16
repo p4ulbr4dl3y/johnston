@@ -8,6 +8,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
+from core.domain.defaults.errors import parse_tool_result_step
 from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING
 from core.session_manager import AgentSession
 
@@ -48,16 +49,14 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         targs = val3 if isinstance(val3, dict) else {}
         session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
     elif etype == "tool_result":
-        is_error = step[3] if len(step) > 3 else False
-        status = step[4] if len(step) > 4 else None
-        returncode = step[5] if len(step) > 5 else None
-        event = {"type": "tool", "result_text": val1}
-        if status is not None:
-            event["status"] = status
-        if bool(is_error):
+        parsed = parse_tool_result_step(step)
+        event = {"type": "tool", "result_text": val1 or parsed.content}
+        if parsed.status is not None:
+            event["status"] = parsed.status.value
+        if parsed.is_error:
             event["is_error"] = True
-        if returncode is not None:
-            event["returncode"] = returncode
+        if parsed.returncode is not None:
+            event["returncode"] = parsed.returncode
         session.add_event(event)
     elif etype == "bot_delta":
         text_accumulator[0] = text_accumulator[0] + val1

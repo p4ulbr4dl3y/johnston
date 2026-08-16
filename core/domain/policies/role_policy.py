@@ -1,7 +1,7 @@
 """Pure role policy: AgentRole model and tool-permission checks. No IO."""
 from typing import Any, Callable, List, Optional, Tuple
 
-from core.domain.defaults.errors import ToolResult, format_tool_error
+from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
 
 
@@ -115,4 +115,4 @@ def role_tool_error(
     )
     if reason is None:
         return None
-    return ToolResult(content=reason, is_error=True, status="error")
+    return ToolResult(content=reason, status=ToolResultStatus.ERROR)

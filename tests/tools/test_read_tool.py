@@ -203,12 +203,12 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             f.write("banana")
 
         # Close match hint
-        res_match = await tool.execute({"path": os.path.join(parent_dir, "applc.txt")})
+        res_match = str(await tool.execute({"path": os.path.join(parent_dir, "applc.txt")}))
         self.assertIn("Did you mean one of these in", res_match)
         self.assertIn("apple.txt", res_match)
 
         # No match hint (fallback sample files list)
-        res_sample = await tool.execute({"path": os.path.join(parent_dir, "1234567890")})
+        res_sample = str(await tool.execute({"path": os.path.join(parent_dir, "1234567890")}))
         self.assertIn("Files available in", res_sample)
         self.assertIn("apple.txt", res_sample)
 
@@ -217,7 +217,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         empty_dir = os.path.join(self.test_dir, "empty_dir")
         os.makedirs(empty_dir, exist_ok=True)
 
-        res = await tool.execute({"path": empty_dir})
+        res = str(await tool.execute({"path": empty_dir}))
         self.assertIn("(empty directory)", res)
 
     async def test_read_directory_with_subdirs(self):
@@ -227,14 +227,14 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(os.path.join(parent_dir, "file.txt"), "w") as f:
             f.write("text")
 
-        res = await tool.execute({"path": parent_dir})
+        res = str(await tool.execute({"path": parent_dir}))
         self.assertIn("child_folder/", res)
         self.assertIn("file.txt", res)
 
     async def test_read_directory_exception(self):
         tool = ReadTool()
         with patch("os.listdir", side_effect=PermissionError("Permission denied")):
-            res = await tool.execute({"path": self.test_dir})
+            res = str(await tool.execute({"path": self.test_dir}))
             self.assertIn("ERR: listing", res)
 
     async def test_read_file_getsize_oserror(self):
@@ -244,7 +244,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             f.write("content")
 
         with patch("os.path.getsize", side_effect=OSError("Disk read error")):
-            res = await tool.execute({"path": file_path})
+            res = str(await tool.execute({"path": file_path}))
             self.assertIn("ERR: check", res)
 
     async def test_read_doc_conversion_error(self):
@@ -254,7 +254,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             f.write("not a real docx")
 
         with patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("Doc convert fail")):
-            res = await tool.execute({"path": doc_path})
+            res = str(await tool.execute({"path": doc_path}))
             self.assertIn("ERR: doc", res)
 
     async def test_read_content_offset_parsing_and_error(self):
@@ -264,16 +264,16 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             f.write(b"0123456789ABCDEF")
 
         # Valid offset
-        res_offset = await tool.execute({"path": file_path, "content_offset": 10})
+        res_offset = str(await tool.execute({"path": file_path, "content_offset": 10}))
         self.assertIn("ABCDEF", res_offset)
 
         # Invalid string content_offset -> fallback to 0
-        res_invalid_offset = await tool.execute({"path": file_path, "content_offset": "invalid_number"})
+        res_invalid_offset = str(await tool.execute({"path": file_path, "content_offset": "invalid_number"}))
         self.assertIn("0123456789ABCDEF", res_invalid_offset)
 
         # File read exception inside _read_file_lines
         with patch("builtins.open", side_effect=IOError("Read error")):
-            res_err = await tool.execute({"path": file_path})
+            res_err = str(await tool.execute({"path": file_path}))
             self.assertIn("ERR: file", res_err)
 
     async def test_read_start_line_offsets_window(self):
@@ -282,7 +282,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w") as f:
             f.write("line 1\nline 2\nline 3\nline 4\n")
 
-        res = await tool.execute({"path": file_path, "start_line": 3})
+        res = str(await tool.execute({"path": file_path, "start_line": 3}))
         self.assertIn("line 3", res)
         self.assertNotIn("line 1", res)
 
@@ -293,14 +293,14 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w") as f:
             f.write("line 1\nline 2\nline 3\nline 4\n")
 
-        res = await tool.execute({"path": file_path, "offset": 3})
+        res = str(await tool.execute({"path": file_path, "offset": 3}))
         self.assertIn("line 1", res)
 
     @patch("tools.web_fetch.WebFetchTool.execute")
     async def test_read_http_url_delegates_to_web_fetch(self, mock_web_execute):
         mock_web_execute.return_value = "# Web Page Content"
         tool = ReadTool()
-        res = await tool.execute({"path": "https://example.com/page.html"})
+        res = str(await tool.execute({"path": "https://example.com/page.html"}))
 
         self.assertEqual(res, "# Web Page Content")
         mock_web_execute.assert_called_once()

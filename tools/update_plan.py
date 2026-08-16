@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 
 
@@ -40,14 +40,14 @@ class UpdatePlanTool(BaseTool):
         },
     }
 
-    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_plan = args.get("plan")
         explanation = str(args.get("explanation") or "").strip()
 
         if not raw_plan or not isinstance(raw_plan, list):
-            return format_tool_error("params", name="plan", detail="must be non-empty")
+            return ToolResult.error("params", name="plan", detail="must be non-empty")
 
         validated_plan: List[Dict[str, str]] = []
         for idx, item in enumerate(raw_plan, start=1):
@@ -64,7 +64,7 @@ class UpdatePlanTool(BaseTool):
             validated_plan.append({"step": step_text, "status": status})
 
         if not validated_plan:
-            return format_tool_error("params", name="plan", detail="items need 'step'/'status'")
+            return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
 
         # Store active plan in app state if app exists
         if ctx.host:
@@ -83,4 +83,4 @@ class UpdatePlanTool(BaseTool):
         if explanation:
             summary += f" {explanation}"
 
-        return summary
+        return ToolResult.done(summary)

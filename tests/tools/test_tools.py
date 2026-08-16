@@ -44,7 +44,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
     async def test_create_allows_johnston_config(self):
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "config.json")
-        res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
+        res = str(await tool.execute({"path": target, "content": '{"permissions": {}}'}))
         self.assertIn("file", res)
         self.assertTrue(os.path.exists(target))
 
@@ -54,7 +54,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8") as f:
             f.write("old")
-        res = await tool.execute({"path": target, "old_str": "old", "new_str": "new"})
+        res = str(await tool.execute({"path": target, "old_str": "old", "new_str": "new"}))
         self.assertNotIn("ERR:", res)
         self.assertIn("-old", res)
         self.assertIn("+new", res)
@@ -72,27 +72,27 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n")
 
         # Full read
-        res = await tool.execute({"path": file_path})
+        res = str(await tool.execute({"path": file_path}))
         self.assertIn("Line 1", res)
         self.assertIn("Line 5", res)
 
         # Range read
-        res_range = await tool.execute({"path": file_path, "start_line": 2, "end_line": 4})
+        res_range = str(await tool.execute({"path": file_path, "start_line": 2, "end_line": 4}))
         self.assertIn("Lines 2-4", res_range)
         self.assertIn("Line 2", res_range)
         self.assertNotIn("Line 5", res_range)
 
         # Start line out of bounds
-        res_oob = await tool.execute({"path": file_path, "start_line": 50})
+        res_oob = str(await tool.execute({"path": file_path, "start_line": 50}))
         self.assertIn("exceeds total file line count", res_oob)
         self.assertIn("[Hint:", res_oob)
 
         # Non-existent file
-        res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
+        res_err = str(await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")}))
         self.assertIn("ERR:", res_err)
 
         # Directory read (should auto-list directory contents with hint)
-        dir_res = await tool.execute({"path": self.test_dir})
+        dir_res = str(await tool.execute({"path": self.test_dir}))
         self.assertIn("is a directory", dir_res)
         self.assertIn("sample.txt", dir_res)
         self.assertIn("Hint:", dir_res)
@@ -103,7 +103,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         for i in range(70):
             with open(os.path.join(large_dir, f"file_{i:02d}.txt"), "w") as f:
                 f.write("test")
-        large_dir_res = await tool.execute({"path": large_dir})
+        large_dir_res = str(await tool.execute({"path": large_dir}))
         self.assertIn("items truncated", large_dir_res)
         self.assertIn("Total: 70 items", large_dir_res)
 
@@ -112,7 +112,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             ext_f.write("External content")
             ext_path = ext_f.name
         try:
-            ext_res = await tool.execute({"path": ext_path})
+            ext_res = str(await tool.execute({"path": ext_path}))
             self.assertIn("External content", ext_res)
         finally:
             if os.path.exists(ext_path):
@@ -122,7 +122,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         html_path = os.path.join(self.test_dir, "doc.html")
         with open(html_path, "w", encoding="utf-8") as f:
             f.write("<h1>Test HTML</h1>")
-        res_html = await tool.execute({"path": html_path})
+        res_html = str(await tool.execute({"path": html_path}))
         self.assertIn("<h1>Test HTML</h1>", res_html)
 
         # PDF document format via markitdown conversion
@@ -133,7 +133,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
 
         with patch("tools.read.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
-            res_pdf = await tool.execute({"path": pdf_path})
+            res_pdf = str(await tool.execute({"path": pdf_path}))
             self.assertIn("Converted PDF Header", res_pdf)
 
     async def test_create_tool(self):
@@ -141,18 +141,18 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         file_path = os.path.join(self.test_dir, "nested", "new_file.txt")
 
         # Create file in non-existent directory
-        res = await tool.execute({"path": file_path, "content": "Hello World"})
+        res = str(await tool.execute({"path": file_path, "content": "Hello World"}))
         self.assertIn("file", res)
         self.assertTrue(os.path.exists(file_path))
 
         # Update existing file (should return diff and updated status)
-        res_update = await tool.execute({"path": file_path, "content": "Hello Universe"})
+        res_update = str(await tool.execute({"path": file_path, "content": "Hello Universe"}))
         self.assertIn("file", res_update)
         self.assertIn("-Hello World", res_update)
         self.assertIn("+Hello Universe", res_update)
 
         # Create file over existing directory error
-        res_dir_err = await tool.execute({"path": self.test_dir, "content": "Hello World"})
+        res_dir_err = str(await tool.execute({"path": self.test_dir, "content": "Hello World"}))
         self.assertIn("is a directory", res_dir_err)
 
     async def test_edit_tool(self):
@@ -164,15 +164,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await read_tool.execute({"path": file_path})
 
         # Edit on directory error
-        res_edit_dir = await tool.execute(
+        res_edit_dir = str(await tool.execute(
             {"path": self.test_dir, "old_str": "a", "new_str": "b"}
-        )
+        ))
         self.assertIn("is a directory", res_edit_dir)
 
         # Successful edit
-        res = await tool.execute(
+        res = str(await tool.execute(
             {"path": file_path, "old_str": "return 42", "new_str": "return 100"}
-        )
+        ))
         self.assertIn("-    return 42", res)
         self.assertIn("+    return 100", res)
         with open(file_path, "r", encoding="utf-8") as f:
@@ -197,7 +197,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(f.read(), "line1\nline3\n")
 
         # Old string not found error
-        res_not_found = await tool.execute({"path": file_path, "old_str": "non_existent_text", "new_str": "abc"})
+        res_not_found = str(await tool.execute({"path": file_path, "old_str": "non_existent_text", "new_str": "abc"}))
         self.assertIn("ERR:", res_not_found)
         self.assertIn("not found", res_not_found)
 
@@ -205,17 +205,17 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("dup\ndup\n")
         await read_tool.execute({"path": file_path})
-        res_dup = await tool.execute({"path": file_path, "old_str": "dup", "new_str": "unique"})
+        res_dup = str(await tool.execute({"path": file_path, "old_str": "dup", "new_str": "unique"}))
         self.assertIn("matches 2 occurrences", res_dup)
 
     async def test_shell_tool(self):
         tool = ShellTool()
         # Successful command execution
-        res = await tool.execute({"command": "echo 'hello shell'"})
+        res = str(await tool.execute({"command": "echo 'hello shell'"}))
         self.assertIn("hello shell", res)
 
         # Command with output and exit code
-        res_err = await tool.execute({"command": "echo 'error msg' >&2; exit 1"})
+        res_err = str(await tool.execute({"command": "echo 'error msg' >&2; exit 1"}))
         self.assertIn("error msg", res_err)
 
     async def test_tool_case_and_canonical(self):
@@ -252,7 +252,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
 
         with patch("os.path.getsize", return_value=20 * 1024 * 1024):
-            res = await tool.execute({"path": file_path})
+            res = str(await tool.execute({"path": file_path}))
             self.assertIn("exceeds 10MB", res)
 
     async def test_format_line_pagination_string_args(self):
@@ -290,7 +290,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = AskUserTool()
         # Invalid questions structure
-        res = await tool.execute({"questions": [{"invalid_key": "foo"}]})
+        res = str(await tool.execute({"questions": [{"invalid_key": "foo"}]}))
         self.assertIn("ERR: params 'questions': missing or invalid", res)
 
     async def test_replace_file_content_line_range(self):
@@ -303,7 +303,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Replace val = 1 only on line 2 (start_line=2, end_line=2)
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "val = 1",
@@ -311,7 +311,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "start_line": 2,
                 "end_line": 2,
             }
-        )
+        ))
         self.assertIn("-val = 1", res)
         self.assertIn("+val = 42", res)
 
@@ -329,7 +329,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Search for target_line = 3 in lines 1-2 when multiple exist in file
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "target_line = 3",
@@ -337,7 +337,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "start_line": 1,
                 "end_line": 2,
             }
-        )
+        ))
         self.assertIn("ERR: match: target not found in specified range", res)
         self.assertIn("matches multiple occurrences (2)", res)
 
@@ -351,7 +351,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # Range 1-2 does not include unique_target = 42 (line 3), but fallback succeeds because it is unique!
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "unique_target = 42",
@@ -359,13 +359,13 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "start_line": 1,
                 "end_line": 2,
             }
-        )
+        ))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertIn("unique_target = 100", f.read())
 
         # Start line out of bounds, but target unique in file -> fallback succeeds!
-        res_oob = await tool.execute(
+        res_oob = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "unique_target = 100",
@@ -373,7 +373,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "start_line": 50,
                 "end_line": 60,
             }
-        )
+        ))
         self.assertNotIn("ERR:", res_oob)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertIn("unique_target = 200", f.read())
@@ -388,7 +388,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = EditTool()
         # old_str is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "    a = 1\n    b = 2\n    c = 3",
@@ -396,7 +396,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "start_line": 2,
                 "end_line": 3,
             }
-        )
+        ))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -410,7 +410,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await ReadTool().execute({"path": file_path})
 
         tool = MultiEditTool()
-        res = await tool.execute(
+        res = str(await tool.execute(
             {
                 "path": file_path,
                 "edits": [
@@ -418,7 +418,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                     {"start_line": 4, "end_line": 5, "old_str": "return 2", "new_str": "return 200"},
                 ],
             }
-        )
+        ))
         self.assertIn("return 100", res)
         self.assertIn("return 200", res)
 
@@ -435,7 +435,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.writelines(lines)
 
         tool = ReadTool()
-        res = await tool.execute({"path": file_path})
+        res = str(await tool.execute({"path": file_path}))
         self.assertIn("=== Lines 1-800 of 1000", res)
         self.assertIn("[Hint: File has 1000 lines. Use start_line=801 end_line=1000 to read next chunk.]", res)
         self.assertIn("Line 800", res)
@@ -470,7 +470,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         img.save(img_path, format="PNG")
 
         tool = ReadTool()
-        res = await tool.execute({"path": img_path})
+        res = str(await tool.execute({"path": img_path}))
         data = json.loads(res)
         self.assertEqual(data["type"], "image")
         self.assertEqual(data["path"], img_path)
@@ -490,12 +490,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = ReadTool()
         # low detail -> max 512px
-        res_low = await tool.execute({"path": img_path, "detail": "low"})
+        res_low = str(await tool.execute({"path": img_path, "detail": "low"}))
         data_low = json.loads(res_low)
         self.assertEqual(data_low["dimensions"], [512, 512])
 
         # high detail -> max 2048px
-        res_high = await tool.execute({"path": img_path, "detail": "high"})
+        res_high = str(await tool.execute({"path": img_path, "detail": "high"}))
         data_high = json.loads(res_high)
         self.assertEqual(data_high["dimensions"], [2048, 2048])
 
@@ -505,7 +505,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write(b"not an image file binary junk")
 
         tool = ReadTool()
-        res = await tool.execute({"path": corrupt_path})
+        res = str(await tool.execute({"path": corrupt_path}))
         self.assertIn("ERR: image", res)
 
 
