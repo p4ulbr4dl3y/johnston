@@ -188,10 +188,15 @@ class MessageFlowMixin:
         self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
-        """Callback when background shell command finishes"""
+        """Callback when background shell command finishes.
+
+        Updates the linked tool widget's status (spinner -> done/error) so the
+        card no longer stays yellow after the process exits.
+        """
         if not getattr(self, "is_app_active", True):
             return
         try:
+            self._update_background_shell_widget(task_id, result)
             from tools.base import format_background_notification, truncate_output
 
             msg = format_background_notification(
@@ -214,3 +219,26 @@ class MessageFlowMixin:
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception as e:
             logger.warning("Background completion handling failed: %s", e)
+
+    def _update_background_shell_widget(self, task_id: str, result: str) -> None:
+        """Repaint the linked shell tool card once a background task finishes.
+
+        The widget keeps the ``running`` (yellow) status until here; we flip it to
+        done/error based on the explicit ``ERR:`` convention. No-op when the task
+        or its widget is unavailable.
+        """
+        mgr = getattr(self, "task_manager", None)
+        if mgr is None:
+            return
+        task = next(
+            (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
+            None,
+        )
+        widget = getattr(task, "widget", None) if task is not None else None
+        if widget is None:
+            return
+        try:
+            is_error = (result or "").lstrip().lower().startswith("err:")
+            widget.set_result(result or "(no output)", is_error=is_error)
+        except Exception as e:
+            logger.warning("Background shell widget update failed: %s", e)

@@ -1033,6 +1033,39 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertIn("x" * 4000, sent[0])
             self.assertNotIn("x" * 5000, sent[0].strip(" \n[].<>"))
 
+    async def test_completed_updates_widget_done(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            widget = MagicMock()
+            task = ShellTask("t1", "ls", widget=widget)
+            app.task_manager.register(task)
+            with patch.object(app, "generate_ai_response"):
+                app.on_background_shell_completed("t1", "ls", "some output")
+            widget.set_result.assert_called_once_with("some output", is_error=False)
+
+    async def test_completed_updates_widget_error(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            widget = MagicMock()
+            task = ShellTask("t1", "ls", widget=widget)
+            app.task_manager.register(task)
+            with patch.object(app, "generate_ai_response"):
+                app.on_background_shell_completed("t1", "ls", "ERR: command failed")
+            widget.set_result.assert_called_once_with("ERR: command failed", is_error=True)
+
+    async def test_completed_no_widget_noop(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            app.on_background_shell_completed("missing", "ls", "out")
+            self.assertEqual(len(app.message_queue), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
