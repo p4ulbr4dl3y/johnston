@@ -211,7 +211,7 @@ class RewindCommand(BaseCommand):
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
         msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path)
-        checkpoints_enabled = any(stat for _, _, stat in msgs_with_stats)
+        checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
 
         def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
@@ -400,15 +400,15 @@ class CompactCommand(BaseCommand):
                 divider.update_title(title)
 
         try:
-            success, msg = await compact_session(
+            outcome = await compact_session(
                 app.agent,
                 save_session_cb=save_cb,
                 on_begin=on_begin,
                 on_divider_update=on_divider_update,
                 refresh_footer_cb=lambda: app.refresh_status_footer(),
             )
-            if not success:
-                app.notify(msg or "Context compaction failed", severity="warning")
+            if not outcome.success:
+                app.notify(outcome.message or "Context compaction failed", severity="warning")
         finally:
             app.is_generating = False
             if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):

@@ -34,9 +34,9 @@ def get_all_command_suggestions() -> list[tuple[str, str]]:
         sm = SkillManager()
         skills = sm.list_skills()
         for s in skills:
-            s_cmd = f"/{s['name']}"
+            s_cmd = f"/{s.name}"
             if s_cmd not in registered:
-                desc = f"Skill: {s['description']}" if s.get("description") else f"Skill: {s['name']}"
+                desc = f"Skill: {s.description}" if s.description else f"Skill: {s.name}"
                 suggestions.append((s_cmd, desc))
                 registered.add(s_cmd)
     except Exception:

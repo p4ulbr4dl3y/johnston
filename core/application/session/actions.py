@@ -5,11 +5,76 @@ Callers (commands.py) handle UI orchestration (push_screen, callback, focus, not
 """
 import asyncio
 import logging
-from typing import Any, Callable
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Optional
 
 from core.session_manager import SessionStore
 
 logger = logging.getLogger(__name__)
+
+
+class CompactionStatus(Enum):
+    """Terminal outcome of a compaction attempt."""
+
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class CompactionTokens:
+    """Structured token counts reported by the compactor summary."""
+
+    before: Optional[int] = None
+    after: Optional[int] = None
+
+
+@dataclass
+class CompactionOutcome:
+    """Structured result of a session compaction, parsed once from the compactor."""
+
+    status: CompactionStatus
+    message: str = ""
+    title: str = ""
+    tokens: CompactionTokens = None
+
+    @property
+    def success(self) -> bool:
+        return self.status == CompactionStatus.COMPLETED
+
+
+def _parse_compaction_tokens(msg: str) -> CompactionTokens:
+    """Parse the ``(X → Y tokens)`` section of a compaction message exactly once.
+
+    The compactor currently reports tokens inside a parenthesised tail
+    (e.g. ``... (12,345 → 6,789 tokens)``). Called in a single place so the
+    string-parse is not duplicated across the application layer.
+    """
+    import re
+
+    if "(" not in msg or ")" not in msg:
+        return CompactionTokens()
+    tokens_info = msg[msg.find("(") + 1: msg.rfind(")")]
+    # Match standalone token quantities like 1,234 / 12k / 3M (not the word "tokens").
+    nums = []
+    for part in tokens_info.split("→"):
+        text = part.strip()
+        mult = 1
+        m = re.search(r"[\d.,]+\s*[kKmM]?", text)
+        if m:
+            raw = m.group(0)
+            num = "".join(ch for ch in raw if ch.isdigit())
+            if not num:
+                continue
+            if raw.lower().rstrip().endswith("m"):
+                mult = 1_000_000
+            elif raw.lower().rstrip().endswith("k"):
+                mult = 1_000
+            nums.append(int(num) * mult)
+    if len(nums) >= 2:
+        return CompactionTokens(before=nums[0], after=nums[1])
+    return CompactionTokens()
 
 
 # ---------------------------------------------------------------------------
@@ -77,10 +142,11 @@ async def compact_session(
     on_begin: Callable[[], None],
     on_divider_update: Callable[[str], None],
     refresh_footer_cb: Callable[[], None],
-) -> tuple[bool, str]:
+) -> CompactionOutcome:
     """Compact agent history.
 
-    Calls ``agent.compact_history()`` and returns (success, message).
+    Calls ``agent.compact_history()`` and returns a structured
+    :class:`CompactionOutcome` (status/message/title/tokens).
     UI side-effects (divider creation, save, is_generating flag) are left
     to the caller via callbacks so this stays pure-core.
 
@@ -91,29 +157,33 @@ async def compact_session(
       divider title in the UI.
     * ``refresh_footer_cb`` — called after successful compaction to refresh
       the status footer.
-
-    Returns (success, title_or_msg).
     """
     if not agent:
-        return False, "No active agent found"
+        return CompactionOutcome(status=CompactionStatus.FAILED, message="No active agent found")
 
     if not hasattr(agent, "compact_history"):
-        return False, "Active agent does not support context compaction"
+        return CompactionOutcome(
+            status=CompactionStatus.FAILED, message="Active agent does not support context compaction"
+        )
 
     on_begin()
 
     try:
         success, msg = await agent.compact_history()
         if success:
+            tokens = _parse_compaction_tokens(msg)
             title = "Session Compacted"
-            if msg and "(" in msg and ")" in msg:
-                tokens_info = msg[msg.find("(") + 1: msg.rfind(")")]
-                title = f"Session Compacted ({tokens_info})"
+            if tokens.after is not None:
+                title = f"Session Compacted ({msg[msg.find('(') + 1: msg.rfind(')')]})"
+            outcome = CompactionOutcome(
+                status=CompactionStatus.COMPLETED, message=msg, title=title, tokens=tokens
+            )
             on_divider_update(title)
             refresh_footer_cb()
         else:
+            outcome = CompactionOutcome(status=CompactionStatus.FAILED, message=msg)
             on_divider_update(f"Compaction Failed: {msg}")
-        return success, msg
+        return outcome
     except asyncio.CancelledError:
         on_divider_update("Compaction Cancelled")
         raise
@@ -125,19 +195,28 @@ async def compact_session(
 # get_rewind_git_stats
 # ---------------------------------------------------------------------------
 
+@dataclass
+class RewindEntry:
+    """A single rollback candidate: index, user message text and git stat."""
+
+    index: int
+    text: str
+    git_stats: str = ""
+
+
 async def get_rewind_git_stats(
     current_session_id: str | None,
     user_msgs: list[tuple[int, str]],
     project_path: str | None,
-) -> list[tuple[int, str, str]]:
+) -> list[RewindEntry]:
     """Fetch git-checkpoint stats for each user message in the rewind list.
 
-    Returns list of (child_idx, text, git_stat) where git_stat is a formatted
+    Returns a list of :class:`RewindEntry` where ``git_stats`` is a formatted
     string like '+12 / -4', 'no changes', or ''.
     """
     from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
-    msgs_with_stats: list[tuple[int, str, str]] = []
+    msgs_with_stats: list[RewindEntry] = []
     checkpoints_enabled = False
 
     try:
@@ -161,9 +240,9 @@ async def get_rewind_git_stats(
             stats_map = {}
         for seq_idx, (child_idx, text) in enumerate(user_msgs):
             stat = stats_map.get(seq_idx) or ""
-            msgs_with_stats.append((child_idx, text, stat))
+            msgs_with_stats.append(RewindEntry(index=child_idx, text=text, git_stats=stat))
     else:
-        msgs_with_stats = [(child_idx, text, "") for child_idx, text in user_msgs]
+        msgs_with_stats = [RewindEntry(index=child_idx, text=text) for child_idx, text in user_msgs]
 
     return msgs_with_stats
 

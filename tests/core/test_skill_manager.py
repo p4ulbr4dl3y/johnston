@@ -51,7 +51,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
                 f.write("---\nname: custom-test\ndescription: Project test skill\n---\nRun tests.")
 
             skills = sm.list_skills()
-            names = [s["name"] for s in skills]
+            names = [s.name for s in skills]
             self.assertIn("code-reviewer", names)
             self.assertIn("custom-test", names)
         finally:
@@ -68,7 +68,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
 
         skills = sm.list_skills()
         self.assertEqual(len(skills), 1)
-        self.assertEqual(skills[0]["scope"], "global")
+        self.assertEqual(skills[0].scope.value, "global")
 
     def test_hidden_skills(self):
         sm = SkillManager(project_dir=self.test_dir)
@@ -78,23 +78,23 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             f.write("---\nname: secret-skill\ndescription: Hidden skill\nhidden: true\n---\nSecret body.")
 
         # By default list_skills includes hidden skills for UI
-        ui_names = [s["name"] for s in sm.list_skills(include_hidden=True)]
+        ui_names = [s.name for s in sm.list_skills(include_hidden=True)]
         self.assertIn("secret-skill", ui_names)
 
         # for_system_prompt=True excludes hidden skills
-        prompt_names = [s["name"] for s in sm.list_skills(include_hidden=False, for_system_prompt=True)]
+        prompt_names = [s.name for s in sm.list_skills(include_hidden=False, for_system_prompt=True)]
         self.assertNotIn("secret-skill", prompt_names)
 
         # get_skill loads secret-skill by default
         hidden_skill = sm.get_skill("secret-skill")
         self.assertIsNotNone(hidden_skill)
-        self.assertEqual(hidden_skill["name"], "secret-skill")
+        self.assertEqual(hidden_skill.name, "secret-skill")
 
         # Test toggle_hidden
         new_hidden_state = sm.toggle_hidden("secret-skill")
         self.assertFalse(new_hidden_state)
         updated_skill = sm.get_skill("secret-skill")
-        self.assertFalse(updated_skill["hidden"])
+        self.assertFalse(updated_skill.hidden)
 
         # Toggle back to hidden
         re_hidden_state = sm.toggle_hidden("secret-skill")
@@ -131,7 +131,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         with open(os.path.join(p_skill_dir, "references", "helper.md"), "w") as f:
             f.write("---\nname: helper\ndescription: Helper doc\n---\nHelper body.")
 
-        skill_names = [s["name"] for s in sm.list_skills(include_hidden=True)]
+        skill_names = [s.name for s in sm.list_skills(include_hidden=True)]
         self.assertIn("complex-skill", skill_names)
         self.assertNotIn("helper", skill_names)
 

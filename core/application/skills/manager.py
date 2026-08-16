@@ -7,6 +7,8 @@ Supports YAML frontmatter parsing from SKILL.md and *.md files.
 import logging
 import os
 import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
@@ -21,6 +23,36 @@ GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
 
 
+class SkillScope(Enum):
+    """Domain scope of a discovered skill."""
+
+    GLOBAL = "global"
+    PROJECT = "project"
+
+
+@dataclass
+class Skill:
+    """Structured representation of a discovered skill."""
+
+    name: str
+    description: str
+    location: str
+    content: str
+    scope: SkillScope
+    hidden: bool
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to the dict shape previously emitted for UI/JSON consumers."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "location": self.location,
+            "content": self.content,
+            "scope": self.scope.value,
+            "hidden": self.hidden,
+        }
+
+
 class SkillManager:
     _dirs_ensured: bool = False
 
@@ -31,7 +63,7 @@ class SkillManager:
         self.global_dir = GLOBAL_SKILLS_DIR
         self.project_dir_skills = os.path.join(self.project_dir, PROJECT_SKILLS_DIR_NAME)
         self._scan_signature: Optional[tuple] = None
-        self._scan_cache: Optional[List[Dict[str, Any]]] = None
+        self._scan_cache: Optional[List[Skill]] = None
         self._scan_ts: float = 0.0
         if not SkillManager._dirs_ensured:
             self.ensure_dirs()
@@ -65,7 +97,7 @@ class SkillManager:
         self,
         include_hidden: bool = True,
         for_system_prompt: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Skill]:
         """
         Discovers skills in global and project directories.
         Project skills override global skills with the same name.
@@ -88,9 +120,7 @@ class SkillManager:
 
         result = []
         for s in skills:
-            if for_system_prompt and s.get("hidden"):
-                continue
-            if not include_hidden and s.get("hidden"):
+            if (for_system_prompt or not include_hidden) and s.hidden:
                 continue
             result.append(s)
         return result
@@ -116,11 +146,10 @@ class SkillManager:
 
     def _scan_skills(self) -> tuple:
         """Scans both skill trees in a single walk, returning (skills, signature).
-
         The signature is computed from the same walk that discovers skills, so a
         cache miss costs exactly one full tree traversal instead of two or three.
         """
-        skills_map: Dict[str, Dict[str, Any]] = {}
+        skills_map: Dict[str, Skill] = {}
         signature_entries: List[tuple] = []
         real_global = os.path.realpath(self.global_dir)
         real_project = os.path.realpath(self.project_dir_skills)
@@ -178,14 +207,14 @@ class SkillManager:
 
                 is_hidden = hidden_val in ("true", "1", "yes") or user_invocable_val in ("false", "0", "no")
 
-                skills_map[name] = {
-                    "name": name,
-                    "description": desc,
-                    "location": filepath,
-                    "content": body.strip(),
-                    "scope": scope,
-                    "hidden": is_hidden,
-                }
+                skills_map[name] = Skill(
+                    name=name,
+                    description=desc,
+                    location=filepath,
+                    content=body.strip(),
+                    scope=SkillScope(scope),
+                    hidden=is_hidden,
+                )
 
         skills = list(skills_map.values())
         return skills, tuple(signature_entries)
@@ -196,10 +225,10 @@ class SkillManager:
         self._scan_cache = None
         self._scan_ts = 0.0
 
-    def get_skill(self, name: str, include_hidden: bool = True) -> Optional[Dict[str, Any]]:
+    def get_skill(self, name: str, include_hidden: bool = True) -> Optional[Skill]:
         skills = self.list_skills(include_hidden=include_hidden)
         for s in skills:
-            if s["name"].lower() == name.lower():
+            if s.name.lower() == name.lower():
                 return s
         return None
 
@@ -209,15 +238,15 @@ class SkillManager:
         Returns True if now hidden, False if visible.
         """
         skill = self.get_skill(name, include_hidden=True)
-        if not skill or not skill.get("location"):
+        if not skill or not skill.location:
             return False
 
-        filepath = skill["location"]
+        filepath = skill.location
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            is_currently_hidden = skill.get("hidden", False)
+            is_currently_hidden = skill.hidden
             new_hidden = not is_currently_hidden
 
             if content.startswith("---"):
@@ -255,9 +284,9 @@ class SkillManager:
 
             return new_hidden
         except Exception:
-            return skill.get("hidden", False)
+            return skill.hidden
 
-    def get_system_prompt_skills(self) -> List[Dict[str, Any]]:
+    def get_system_prompt_skills(self) -> List[Skill]:
         """Return non-hidden skills for the system prompt.
 
         Data-only: leaves Markdown bullet assembly to the prompt builder so this
@@ -274,9 +303,9 @@ class SkillManager:
         project_skills = []
 
         for s in skills:
-            desc = f": {s['description']}" if s["description"] else ""
-            line = f"- `{s['name']}`{desc}"
-            if s.get("scope") == "project":
+            desc = f": {s.description}" if s.description else ""
+            line = f"- `{s.name}`{desc}"
+            if s.scope == SkillScope.PROJECT:
                 project_skills.append(line)
             else:
                 global_skills.append(line)

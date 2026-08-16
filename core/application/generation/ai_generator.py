@@ -13,12 +13,21 @@ import logging
 import math
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
 from core.domain.defaults.errors import parse_tool_result_step
 
 logger = logging.getLogger(__name__)
+
+
+class ProviderReadyState(Enum):
+    """State of provider/model readiness before generating a response."""
+
+    READY = "ready"
+    NEEDS_PROVIDER = "provider"
+    NEEDS_MODEL = "model"
 
 
 @dataclass
@@ -42,22 +51,21 @@ class GenCanvas:
     save_session: Callable[..., Any] = field(default=None)
 
 
-def ensure_provider_ready(pm: Any, agent: Any) -> tuple[bool, str]:
+def ensure_provider_ready(pm: Any, agent: Any) -> Optional[ProviderReadyState]:
     """Check provider connection and model config.
 
-    Returns (ready, needs_ui) where:
-    - ready: True if provider connected and model set
-    - needs_ui: empty if ready, otherwise "provider" or "model"
+    Returns None when ready, otherwise a :class:`ProviderReadyState` indicating
+    which UI screen the caller should offer (provider or model selection).
 
     Pure-core helper — no widget/Textual imports.
     """
     act_k = pm.get_active_provider_key() if hasattr(pm, "get_active_provider_key") else ""
     is_connected = pm.is_provider_connected(act_k) if (hasattr(pm, "is_provider_connected") and act_k) else False
     if not is_connected:
-        return False, "provider"
+        return ProviderReadyState.NEEDS_PROVIDER
     if not getattr(agent, "model", ""):
-        return False, "model"
-    return True, ""
+        return ProviderReadyState.NEEDS_MODEL
+    return ProviderReadyState.READY
 
 
 async def _create_git_checkpoint_async(

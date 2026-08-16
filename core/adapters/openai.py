@@ -36,17 +36,16 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
                 img_info = extract_image_details(curr_msg.get("content", ""))
 
                 if img_info:
-                    summary_text, media_type, b64_data, detail_val = img_info
                     tool_msg = dict(curr_msg)
-                    tool_msg["content"] = summary_text
+                    tool_msg["content"] = img_info.summary
                     tool_batch.append(tool_msg)
 
                     pending_user_images.append(
                         {
                             "role": "user",
                             "content": [
-                                {"type": "text", "text": f"Image preview ({summary_text}):"},
-                                image_url_block(media_type, b64_data, detail_val),
+                                {"type": "text", "text": f"Image preview ({img_info.summary}):"},
+                                image_url_block(img_info.media_type, img_info.base64, img_info.detail),
                             ],
                         }
                     )

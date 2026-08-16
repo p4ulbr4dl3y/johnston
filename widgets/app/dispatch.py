@@ -87,10 +87,10 @@ async def handle_slash_command(app, command_text: str) -> bool:
     if loaded_skills:
         skill_blocks = []
         for s in loaded_skills:
-            content = s.get("content", "").strip()
-            if not content and s.get("location") and os.path.exists(s["location"]):
+            content = s.content.strip()
+            if not content and s.location and os.path.exists(s.location):
                 try:
-                    with open(s["location"], "r", encoding="utf-8") as f:
+                    with open(s.location, "r", encoding="utf-8") as f:
                         raw_c = f.read()
                     from core.application.skills.manager import parse_frontmatter
 
@@ -98,7 +98,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
                     content = body.strip()
                 except Exception:
                     content = ""
-            skill_blocks.append(f'<SKILL path="{s.get("location", "")}">\n{content}\n</SKILL>')
+            skill_blocks.append(f'<SKILL path="{s.location}">\n{content}\n</SKILL>')
 
         skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()

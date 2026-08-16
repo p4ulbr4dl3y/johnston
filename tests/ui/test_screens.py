@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from core.application.skills.manager import Skill, SkillScope
 from widgets.presentation.screens.ask_user import ConfirmScreen
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.help import HelpScreen
@@ -189,8 +190,8 @@ class TestSkillScreens(unittest.TestCase):
     def test_list_init_with_skills(self, mock_sm_cls):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [
-            {"name": "skill-a", "scope": "global"},
-            {"name": "skill-b", "scope": "project"},
+            Skill("skill-a", "", "", "", SkillScope.GLOBAL, False),
+            Skill("skill-b", "", "", "", SkillScope.PROJECT, False),
         ]
         mock_sm_cls.return_value = mock_sm
         from widgets.presentation.screens.skills import SkillsScreen
@@ -215,7 +216,7 @@ class TestSkillScreens(unittest.TestCase):
     @patch("widgets.presentation.screens.skills.SkillManager")
     def test_skills_screen_toggle_hidden(self, mock_sm_cls):
         mock_sm = MagicMock()
-        mock_sm.list_skills.return_value = [{"name": "skill-a", "scope": "global", "hidden": True}]
+        mock_sm.list_skills.return_value = [Skill("skill-a", "", "", "", SkillScope.GLOBAL, True)]
         mock_sm.toggle_hidden.return_value = False
         mock_sm_cls.return_value = mock_sm
         from widgets.presentation.screens.skills import SkillsScreen

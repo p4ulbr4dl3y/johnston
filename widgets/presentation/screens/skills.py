@@ -63,9 +63,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
     def __init__(self):
         super().__init__()
         self.sm = SkillManager()
-        self.skills: list[Dict[str, Any]] = []
+        self.skills = []
         self.options: list[str] = []
-        self.filtered_skills: list[Dict[str, Any]] = []
+        self.filtered_skills: list = []
         self.filtered_options: list[str] = []
         self.search_query = ""
         self.load_skills()
@@ -74,9 +74,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         self.skills = self.sm.list_skills(include_hidden=True)
         self.options = []
         for s in self.skills:
-            stat_t = status_tag("HIDDEN" if s.get("hidden") else "VISIBLE")
-            self.options.append(f"   {stat_t} {s['name']}")
-        self.filtered_skills = list(self.skills)
+            stat_t = status_tag("HIDDEN" if s.hidden else "VISIBLE")
+            self.options.append(f"   {stat_t} {s.name}")
+        self.filtered_skills = [s.to_dict() for s in self.skills]
         self.filtered_options = list(self.options)
 
     def compose(self) -> ComposeResult:
@@ -109,9 +109,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         for scope in ("global", "project"):
             group = []
             for s, opt in zip(self.skills, self.options):
-                if s.get("scope") != scope:
+                if s.scope.value != scope:
                     continue
-                if not q or q in s.get("name", "").lower() or q in s.get("description", "").lower() or q in scope:
+                if not q or q in s.name.lower() or q in s.description.lower() or q in scope:
                     group.append((s, opt))
             if not group:
                 continue
@@ -122,7 +122,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             self.filtered_skills.append(None)
             self.filtered_options.append(Option(scope.capitalize(), disabled=True))
             for s, opt in group:
-                self.filtered_skills.append(s)
+                self.filtered_skills.append(s.to_dict())
                 self.filtered_options.append(opt)
 
         try:

@@ -89,19 +89,18 @@ class AnthropicAdapter(BaseApiAdapter):
                 img_info = extract_image_details(msg.get("content", ""))
 
                 if img_info:
-                    summary_text, media_type, b64_data, _ = img_info
                     pending_tools.append(
                         {
                             "type": "tool_result",
                             "tool_use_id": tc_id,
                             "content": [
-                                {"type": "text", "text": summary_text},
+                                {"type": "text", "text": img_info.summary},
                                 {
                                     "type": "image",
                                     "source": {
                                         "type": "base64",
-                                        "media_type": media_type,
-                                        "data": b64_data,
+                                        "media_type": img_info.media_type,
+                                        "data": img_info.base64,
                                     },
                                 },
                             ],

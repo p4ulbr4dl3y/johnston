@@ -1,5 +1,6 @@
 from rich.markup import escape
 
+from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 
 
@@ -8,13 +9,13 @@ class RewindScreen(BaseSelectionScreen[int]):
 
     def __init__(
         self,
-        user_messages: list[tuple[int, str]] | list[tuple[int, str, str]],
+        user_messages: list[RewindEntry],
         checkpoints_enabled: bool = True,
     ):
         options = []
         for msg in user_messages:
-            text = msg[1] if len(msg) > 1 else ""
-            diff_stat = msg[2] if len(msg) > 2 else ""
+            text = msg.text
+            diff_stat = msg.git_stats
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
             max_text_len = 28
@@ -31,6 +32,6 @@ class RewindScreen(BaseSelectionScreen[int]):
 
         title = "### **Select Message to Rollback To**"
 
-        items = [m[0] if len(m) > 0 else -1 for m in user_messages]
+        items = [m.index for m in user_messages]
         default_val = items[-1] if items else -1
         super().__init__(title=title, options=options, items=items, default_value=default_val)

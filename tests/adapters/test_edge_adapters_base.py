@@ -8,6 +8,7 @@ import json
 import pytest
 
 from core.adapters.base import (
+    ImageDetails,
     build_adapter_usage_event,
     check_httpx_response_status,
     extract_image_details,
@@ -111,25 +112,25 @@ class TestExtractImage:
 
     def test_image_details_defaults(self):
         res = extract_image_details({"type": "image", "base64": "QUFB"})
-        assert res == ("[Image content]", "image/jpeg", "QUFB", "high")
+        assert res == ImageDetails("[Image content]", "image/jpeg", "QUFB", "high")
 
     def test_image_details_custom(self):
         res = extract_image_details(
             {"type": "image", "base64": "QUFB", "summary": "pic", "media_type": "image/png", "detail": "low"}
         )
-        assert res[:3] == ("pic", "image/png", "QUFB")
-        assert res[3] == "low"
+        assert (res.summary, res.media_type, res.base64) == ("pic", "image/png", "QUFB")
+        assert res.detail == "low"
 
     def test_str_image_payload(self):
         payload = json.dumps({"type": "image", "base64": "QUFB", "media_type": "image/jpeg"})
-        assert extract_image_details(payload) == ("[Image content]", "image/jpeg", "QUFB", "high")
+        assert extract_image_details(payload) == ImageDetails("[Image content]", "image/jpeg", "QUFB", "high")
 
     def test_malformed_str_image_payload(self):
         assert extract_image_payload('{"type": "image"') is None
 
     def test_unicode_base64_roundtrip(self):
         res = extract_image_details({"type": "image", "base64": "8J+ZgSB0ZXN0", "summary": "фото 😀"})
-        assert res[0] == "фото 😀"
+        assert res.summary == "фото 😀"
 
 
 # --------------------------------------------------------------------------- #

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.providers import ProvidersScreen
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.rewind import RewindScreen
@@ -21,17 +22,16 @@ class TestResumeEdge(unittest.TestCase):
 
 
 class TestRewindEdge(unittest.TestCase):
-    def test_short_tuple_index_guard(self):
-        """A 2-element message tuple is valid; a 1-element tuple (malformed)
-        must not raise IndexError."""
+    def test_short_rewind_entry_index(self):
+        """A RewindEntry is the structured input; no malformed-tuple handling."""
         try:
-            s = RewindScreen([(1,)])
+            s = RewindScreen([RewindEntry(1, "")])
         except IndexError as exc:
-            self.fail(f"1-element tuple raised IndexError: {exc}")
+            self.fail(f"single RewindEntry raised IndexError: {exc}")
         self.assertEqual(len(s.raw_items), 1)
 
     def test_empty_message_uses_placeholder(self):
-        s = RewindScreen([(0, "")])
+        s = RewindScreen([RewindEntry(0, "")])
         self.assertIn("(empty message)", s.raw_options[0])
 
 

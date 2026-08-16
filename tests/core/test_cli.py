@@ -12,6 +12,7 @@ from cli import (
     print_skills,
     print_subagents,
 )
+from core.application.skills.manager import Skill, SkillScope
 
 
 class TestCLI(unittest.TestCase):
@@ -229,8 +230,8 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with patch("core.application.skills.manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = [
-                {"name": "a", "scope": "global", "hidden": True},
-                {"name": "b", "scope": "project"},
+                Skill("a", "", "", "", SkillScope.GLOBAL, True),
+                Skill("b", "", "", "", SkillScope.PROJECT, False),
             ]
             with redirect_stdout(f):
                 print_skills()

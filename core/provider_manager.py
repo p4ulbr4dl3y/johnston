@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import time
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -14,6 +15,92 @@ from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_t
 from core.models_catalog import cached_json_read, catalog
 
 logger = logging.getLogger(__name__)
+
+
+# Single source of default values for provider agent tuning knobs. These were
+# previously duplicated across create_agent_for_provider and fetch_models fallback.
+DEFAULT_CHUNK_TIMEOUT = 30.0
+DEFAULT_MAX_RETRIES = 3
+DEFAULT_RETRY_DELAY = 1.0
+DEFAULT_RETRY_BACKOFF = 2.0
+DEFAULT_MAX_RETRY_DELAY = 10.0
+DEFAULT_MAX_TOKENS = 8192
+
+
+@dataclass
+class ProviderDef:
+    """Structured description of a provider parsed from its JSON definition."""
+
+    key: str
+    name: str
+    base_url: str = ""
+    model: str = ""
+    models: List[str] = field(default_factory=list)
+    fetch_models: bool = True
+    api_type: str = "openai"
+    headers: Optional[Dict[str, Any]] = None
+    extra_body: Optional[Dict[str, Any]] = None
+    reasoning_effort: Optional[str] = None
+    chunk_timeout: float = DEFAULT_CHUNK_TIMEOUT
+    max_tokens: Optional[int] = None
+    max_retries: int = DEFAULT_MAX_RETRIES
+    retry_delay: float = DEFAULT_RETRY_DELAY
+    retry_backoff: float = DEFAULT_RETRY_BACKOFF
+    max_retry_delay: float = DEFAULT_MAX_RETRY_DELAY
+    disabled: bool = False
+    api_key: str = ""
+    requires_key: Optional[bool] = None
+
+    @classmethod
+    def from_dict(cls, key: str, data: Dict[str, Any], *, disabled: bool = False) -> "ProviderDef":
+        """Build a ProviderDef from a raw provider JSON dict, applying defaults."""
+        return cls(
+            key=key,
+            name=data.get("name") or key,
+            base_url=data.get("base_url") or "",
+            model=data.get("model") or "",
+            models=list(data.get("models") or []),
+            fetch_models=bool(data.get("fetch_models", True)),
+            api_type=data.get("api_type") or "openai",
+            headers=data.get("headers"),
+            extra_body=data.get("extra_body"),
+            reasoning_effort=data.get("reasoning_effort"),
+            chunk_timeout=float(data.get("chunk_timeout") or DEFAULT_CHUNK_TIMEOUT),
+            max_tokens=data.get("max_tokens"),
+            max_retries=int(data.get("max_retries") or DEFAULT_MAX_RETRIES),
+            retry_delay=float(data.get("retry_delay") or DEFAULT_RETRY_DELAY),
+            retry_backoff=float(data.get("retry_backoff") or DEFAULT_RETRY_BACKOFF),
+            max_retry_delay=float(data.get("max_retry_delay") or DEFAULT_MAX_RETRY_DELAY),
+            disabled=disabled,
+            api_key=data.get("api_key") or "",
+            requires_key=data.get("requires_key"),
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to the dict shape previously returned by load_providers."""
+        return {
+            "key": self.key,
+            "name": self.name,
+            "base_url": self.base_url,
+            "model": self.model,
+            "models": list(self.models),
+            "fetch_models": self.fetch_models,
+            "api_type": self.api_type,
+            "headers": self.headers,
+            "extra_body": self.extra_body,
+            "reasoning_effort": self.reasoning_effort,
+            "chunk_timeout": self.chunk_timeout,
+            "max_tokens": self.max_tokens,
+            "max_retries": self.max_retries,
+            "retry_delay": self.retry_delay,
+            "retry_backoff": self.retry_backoff,
+            "max_retry_delay": self.max_retry_delay,
+            "disabled": self.disabled,
+        }
+
+    def models_fallback(self) -> List[str]:
+        """Resolve the fallback model list (explicit models, else default model)."""
+        return list(self.models) if self.models else ([self.model] if self.model else [])
 
 
 def _file_mtime(path: str) -> float:
@@ -111,29 +198,19 @@ class ProviderManager:
         for pkey, pdata in json_providers.items():
             if not include_disabled and pkey in disabled_set:
                 continue
-            providers[pkey] = {
-                "key": pkey,
-                "name": pdata.get("name", pkey),
-                "base_url": pdata.get("base_url", ""),
-                "model": pdata.get("model", ""),
-                "models": pdata.get("models", []),
-                "fetch_models": pdata.get("fetch_models", True),
-                "api_type": pdata.get("api_type", "openai"),
-                "headers": pdata.get("headers"),
-                "extra_body": pdata.get("extra_body"),
-                "reasoning_effort": pdata.get("reasoning_effort"),
-                "chunk_timeout": pdata.get("chunk_timeout", 30.0),
-                "max_tokens": pdata.get("max_tokens"),
-                "max_retries": pdata.get("max_retries", 3),
-                "retry_delay": pdata.get("retry_delay", 1.0),
-                "retry_backoff": pdata.get("retry_backoff", 2.0),
-                "max_retry_delay": pdata.get("max_retry_delay", 10.0),
-                "disabled": pkey in disabled_set,
-            }
+            providers[pkey] = ProviderDef.from_dict(pkey, pdata, disabled=pkey in disabled_set).to_dict()
         if len(self._providers_memo) >= 16:
             dict.popitem(self._providers_memo, last=False)
         self._providers_memo[cache_key] = providers
         return providers
+
+    def load_provider_def(self, provider_key: str) -> Optional[ProviderDef]:
+        """Return a structured ProviderDef for a provider (or None if unknown)."""
+        providers = self.load_providers(include_disabled=True)
+        pdata = providers.get(provider_key)
+        if pdata is None:
+            return None
+        return ProviderDef.from_dict(provider_key, pdata, disabled=pdata.get("disabled", False))
 
     def get_active_provider_key(self) -> str:
         return self._get_config_data().get("active_provider", "")
@@ -222,9 +299,8 @@ class ProviderManager:
         return ""
 
     def create_agent_for_provider(self, provider_key: str):
-        providers = self.load_providers()
-        target_provider = providers.get(provider_key, {})
-        pkey_str = target_provider.get("key", provider_key)
+        pdef = self.load_provider_def(provider_key)
+        pkey_str = pdef.key if pdef else (provider_key or "")
         stored_key = self.get_api_key(pkey_str) if pkey_str else ""
         model_val = self.get_provider_model(provider_key) if provider_key else ""
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val) if provider_key else EFFORT_AUTO
@@ -235,21 +311,21 @@ class ProviderManager:
         from tools.registry import execute_tool, get_default_tools, normalize_tool_name
 
         agent = BaseAgent(
-            api_key=stored_key or target_provider.get("api_key", ""),
+            api_key=stored_key or (pdef.api_key if pdef else ""),
             model=model_val,
-            base_url=target_provider.get("base_url", ""),
+            base_url=pdef.base_url if pdef else "",
             provider_key=pkey_str,
-            api_type=target_provider.get("api_type", "openai"),
-            headers=target_provider.get("headers"),
-            extra_body=target_provider.get("extra_body"),
-            reasoning_effort=target_provider.get("reasoning_effort"),
+            api_type=pdef.api_type if pdef else "openai",
+            headers=pdef.headers if pdef else None,
+            extra_body=pdef.extra_body if pdef else None,
+            reasoning_effort=pdef.reasoning_effort if pdef else None,
             thinking_effort=thinking_effort,
-            chunk_timeout=target_provider.get("chunk_timeout", 30.0),
-            max_tokens=target_provider.get("max_tokens") or 8192,
-            max_retries=target_provider.get("max_retries", 3),
-            retry_delay=target_provider.get("retry_delay", 1.0),
-            retry_backoff=target_provider.get("retry_backoff", 2.0),
-            max_retry_delay=target_provider.get("max_retry_delay", 10.0),
+            chunk_timeout=pdef.chunk_timeout if pdef else DEFAULT_CHUNK_TIMEOUT,
+            max_tokens=(pdef.max_tokens if pdef else None) or DEFAULT_MAX_TOKENS,
+            max_retries=pdef.max_retries if pdef else DEFAULT_MAX_RETRIES,
+            retry_delay=pdef.retry_delay if pdef else DEFAULT_RETRY_DELAY,
+            retry_backoff=pdef.retry_backoff if pdef else DEFAULT_RETRY_BACKOFF,
+            max_retry_delay=pdef.max_retry_delay if pdef else DEFAULT_MAX_RETRY_DELAY,
             tool_executor=execute_tool,
             default_tools_provider=get_default_tools,
             image_processor=process_image_file_sync,
@@ -282,17 +358,16 @@ class ProviderManager:
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:
         """Returns cached list of provider models (TTL = 24h) or performs HTTP request"""
-        providers = self.load_providers()
-        if provider_key not in providers:
+        pdef = self.load_provider_def(provider_key)
+        if pdef is None:
             return []
 
-        pdata = providers[provider_key]
-        base_url = pdata.get("base_url")
-        api_key = self.get_api_key(provider_key) or pdata.get("api_key")
+        base_url = pdef.base_url
+        api_key = self.get_api_key(provider_key) or pdef.api_key
 
         # If provider has explicit static models list, return it directly
-        if pdata.get("models"):
-            return list(pdata["models"])
+        if pdef.models:
+            return list(pdef.models)
 
         CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
         os.makedirs(CACHE_DIR, exist_ok=True)
@@ -305,11 +380,11 @@ class ProviderManager:
                     os.remove(cache_path)
                 except Exception:
                     pass
-            return pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
+            return pdef.models_fallback()
 
         # 1. Non-blocking fast path when force_refresh is False
         if not force_refresh:
-            fallback = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
+            fallback = pdef.models_fallback()
             cached_models = []
             if os.path.exists(cache_path):
                 cdata = read_json(cache_path, {})
@@ -336,7 +411,7 @@ class ProviderManager:
         # 2. Request models via provider HTTP API
         models = []
         model_limits = {}
-        should_fetch = pdata.get("fetch_models", True)
+        should_fetch = pdef.fetch_models
         if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -367,7 +442,7 @@ class ProviderManager:
 
         # Universal fallback to configured models list or default model
         if not models:
-            models = pdata.get("models") or ([pdata["model"]] if pdata.get("model") else [])
+            models = pdef.models_fallback()
 
         # Save to cache (including empty/fallback lists with 5-minute TTL)
         try:

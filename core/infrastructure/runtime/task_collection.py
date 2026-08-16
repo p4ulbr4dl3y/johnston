@@ -5,11 +5,20 @@ of shell background tasks + subagent sessions for the active session. This
 helper keeps that logic in one place.
 """
 
-from typing import Any, List, Tuple
+from dataclasses import dataclass
+from typing import Any, List
 
 
-def collect_current_tasks(app, current_session_id: str) -> Tuple[List[Any], List[Any]]:
-    """Return (shell tasks, subagent sessions) for the current session.
+@dataclass
+class TaskCollection:
+    """Filtered current-session shell tasks and subagent sessions."""
+
+    shell_tasks: List[Any]
+    subagent_tasks: List[Any]
+
+
+def collect_current_tasks(app, current_session_id: str) -> TaskCollection:
+    """Return a :class:`TaskCollection` for the current session.
 
     Shell tasks come from the app's TaskManager and are filtered by
     ``session_id`` when a session is active, otherwise all are returned.
@@ -33,4 +42,4 @@ def collect_current_tasks(app, current_session_id: str) -> Tuple[List[Any], List
         if current_session_id
         else store.list(kind="subagent")
     )
-    return bg_tasks, sessions
+    return TaskCollection(shell_tasks=bg_tasks, subagent_tasks=sessions)

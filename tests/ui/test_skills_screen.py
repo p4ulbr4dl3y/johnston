@@ -6,7 +6,7 @@ from textual.events import Key
 from textual.widgets import Input, Markdown, OptionList
 from textual.widgets.option_list import Option
 
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import Skill, SkillManager, SkillScope
 from widgets.presentation.screens.skills import SkillDetailScreen, SkillsScreen
 
 
@@ -27,22 +27,22 @@ class DummyHostApp(App[None]):
 
 def sample_skills():
     return [
-        {
-            "name": "reviewer",
-            "description": "Review the codebase for issues",
-            "location": "/skills/reviewer/SKILL.md",
-            "content": "Review code",
-            "scope": "global",
-            "hidden": False,
-        },
-        {
-            "name": "test-runner",
-            "description": "Run the test suite",
-            "location": "/skills/test-runner/SKILL.md",
-            "content": "Run tests",
-            "scope": "project",
-            "hidden": True,
-        },
+        Skill(
+            name="reviewer",
+            description="Review the codebase for issues",
+            location="/skills/reviewer/SKILL.md",
+            content="Review code",
+            scope=SkillScope.GLOBAL,
+            hidden=False,
+        ),
+        Skill(
+            name="test-runner",
+            description="Run the test suite",
+            location="/skills/test-runner/SKILL.md",
+            content="Run tests",
+            scope=SkillScope.PROJECT,
+            hidden=True,
+        ),
     ]
 
 

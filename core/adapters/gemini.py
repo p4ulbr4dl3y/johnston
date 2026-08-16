@@ -70,10 +70,9 @@ class GeminiAdapter(BaseApiAdapter):
                 img_info = extract_image_details(msg.get("content", ""))
 
                 if img_info:
-                    summary_text, media_type, b64_data, _ = img_info
-                    pending_tools.append({"functionResponse": {"name": name, "response": {"result": summary_text}}})
-                    pending_tools.append({"text": f"Image preview ({summary_text}):"})
-                    pending_tools.append({"inlineData": {"mimeType": media_type, "data": b64_data}})
+                    pending_tools.append({"functionResponse": {"name": name, "response": {"result": img_info.summary}}})
+                    pending_tools.append({"text": f"Image preview ({img_info.summary}):"})
+                    pending_tools.append({"inlineData": {"mimeType": img_info.media_type, "data": img_info.base64}})
                     continue
 
                 tcontent = msg.get("content", "")

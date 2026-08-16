@@ -2,6 +2,7 @@ from typing import Any
 
 from core.infrastructure.adapters.base import (
     BaseApiAdapter,
+    ImageDetails,
     _safe_int,
     build_adapter_usage_event,
     extract_image_details,
@@ -16,6 +17,7 @@ from core.infrastructure.adapters.base import (
 
 __all__ = [
     "BaseApiAdapter",
+    "ImageDetails",
     "_safe_int",
     "build_adapter_usage_event",
     "extract_image_details",

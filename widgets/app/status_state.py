@@ -53,7 +53,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     ):
         all_skills = SkillManager().list_skills(include_hidden=True)
         skills_total = len(all_skills)
-        skills_visible = sum(1 for s in all_skills if not s.get("hidden"))
+        skills_visible = sum(1 for s in all_skills if not s.hidden)
         widget._cached_skills = (skills_visible, skills_total)
         widget._skills_cache_time = now
     skills_visible, skills_total = getattr(widget, "_cached_skills", (0, 0))
@@ -77,7 +77,9 @@ def build_status_kwargs(app, widget=None) -> dict:
         mcp_total += 1
     mcp_active = widget._active_mcp_count(mcp_servers) if widget is not None else 0
 
-    bg_tasks, sessions = collect_current_tasks(app, getattr(app, "current_session_id", None))
+    tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
+    bg_tasks = tasks.shell_tasks
+    sessions = tasks.subagent_tasks
 
     active_bg_tasks = len(
         [t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)]

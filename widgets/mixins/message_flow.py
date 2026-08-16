@@ -96,12 +96,12 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from core.application.generation.ai_generator import ensure_provider_ready
+        from core.application.generation.ai_generator import ProviderReadyState, ensure_provider_ready
 
         # ---- connectivity check (mixin-level) ----
-        ready, needed = ensure_provider_ready(self.pm, self.agent)
-        if not ready:
-            if needed == "provider":
+        state = ensure_provider_ready(self.pm, self.agent)
+        if state is not ProviderReadyState.READY:
+            if state is ProviderReadyState.NEEDS_PROVIDER:
                 from widgets.commands import ProvidersCommand
 
                 await ProvidersCommand().execute(self)

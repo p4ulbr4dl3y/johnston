@@ -69,10 +69,9 @@ def print_skills():
         print(f"  No skills found ({CONFIG_DIR}/skills/ or .johnston/skills/)")
         return
     for s in skills:
-        scope = f"[{s.get('scope', 'global')}]"
-        hidden = " [hidden]" if s.get("hidden") else ""
-        name = s.get("name", "unnamed")
-        print(f"  * {name} {scope}{hidden}")
+        scope = f"[{s.scope.value}]"
+        hidden = " [hidden]" if s.hidden else ""
+        print(f"  * {s.name} {scope}{hidden}")
 
 
 def print_mcp():

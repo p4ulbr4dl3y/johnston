@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 
@@ -76,15 +77,25 @@ def extract_image_payload(tcontent: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def extract_image_details(tcontent: Any) -> Optional[Tuple[str, str, str, str]]:
-    """Extracts (summary_text, media_type, base64_data, detail) from image tool content if present."""
+@dataclass(frozen=True)
+class ImageDetails:
+    """Structured image metadata extracted from tool content."""
+
+    summary: str
+    media_type: str
+    base64: str
+    detail: str
+
+
+def extract_image_details(tcontent: Any) -> Optional[ImageDetails]:
+    """Extract structured image details from image tool content if present."""
     parsed_img = extract_image_payload(tcontent)
     if parsed_img and parsed_img.get("base64"):
         summary_text = parsed_img.get("summary", "[Image content]")
         media_type = parsed_img.get("media_type", "image/jpeg")
         b64_data = parsed_img.get("base64")
         detail_val = parsed_img.get("detail", "high")
-        return summary_text, media_type, b64_data, detail_val
+        return ImageDetails(summary=summary_text, media_type=media_type, base64=b64_data, detail=detail_val)
     return None
 
 

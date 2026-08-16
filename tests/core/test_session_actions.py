@@ -76,7 +76,7 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
         footer = []
         saved = []
 
-        success, msg = await compact_session(
+        outcome = await compact_session(
             agent,
             save_session_cb=lambda: saved.append(True),
             on_begin=lambda: begin.append(True),
@@ -84,12 +84,30 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
             refresh_footer_cb=lambda: footer.append(True),
         )
 
-        self.assertTrue(success)
+        self.assertTrue(outcome.success)
         self.assertTrue(agent.compact_called)
+        self.assertEqual(outcome.status.value, "completed")
         self.assertEqual(begin, [True])
         self.assertEqual(divider, ["Session Compacted"])
         self.assertEqual(footer, [True])
         self.assertEqual(saved, [True])
+
+    async def test_compact_success_with_tokens(self):
+        class Agent(MockAgent):
+            async def compact_history(self):
+                return True, "History compacted successfully (12,000 → 3,000 tokens)"
+
+        outcome = await compact_session(
+            Agent(),
+            save_session_cb=lambda: None,
+            on_begin=lambda: None,
+            on_divider_update=lambda _t: None,
+            refresh_footer_cb=lambda: None,
+        )
+        self.assertTrue(outcome.success)
+        self.assertEqual(outcome.tokens.before, 12000)
+        self.assertEqual(outcome.tokens.after, 3000)
+        self.assertEqual(outcome.title, "Session Compacted (12,000 → 3,000 tokens)")
 
     async def test_compact_failure(self):
         class FailAgent(MockAgent):
@@ -101,7 +119,7 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
         saved = []
         footer = []
 
-        success, msg = await compact_session(
+        outcome = await compact_session(
             agent,
             save_session_cb=lambda: saved.append(True),
             on_begin=lambda: None,
@@ -109,22 +127,24 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
             refresh_footer_cb=lambda: footer.append(True),
         )
 
-        self.assertFalse(success)
+        self.assertFalse(outcome.success)
+        self.assertEqual(outcome.status.value, "failed")
+        self.assertEqual(outcome.message, "Compaction failed (some err)")
         self.assertEqual(divider, ["Compaction Failed: Compaction failed (some err)"])
         self.assertEqual(saved, [True])
         self.assertEqual(footer, [])
 
     async def test_compact_no_agent(self):
         divider = []
-        success, msg = await compact_session(
+        outcome = await compact_session(
             None,
             save_session_cb=lambda: None,
             on_begin=lambda: None,
             on_divider_update=divider.append,
             refresh_footer_cb=lambda: None,
         )
-        self.assertFalse(success)
-        self.assertEqual(msg, "No active agent found")
+        self.assertFalse(outcome.success)
+        self.assertEqual(outcome.message, "No active agent found")
 
     async def test_compact_cancelled_saves_and_updates_divider(self):
         class CancelAgent(MockAgent):

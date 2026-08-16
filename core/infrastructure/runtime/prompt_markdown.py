@@ -6,14 +6,17 @@ The prompt builder (which by definition assembles the system prompt) is the sole
 consumer of these formatters, so the resulting system prompt is unchanged.
 """
 
-from typing import Any, Dict, List
+from typing import Any, List
 
 
-def format_skills_markdown(skills: List[Dict[str, Any]]) -> str:
-    """Build the ``## Skills`` block for the system prompt from skill dicts.
+def format_skills_markdown(skills: List[Any]) -> str:
+    """Build the ``## Skills`` block for the system prompt from skill objects.
 
-    Returns ``""`` when there are no skills. Produces the exact Markdown shape
-    previously emitted by the SkillManager.
+    ``skills`` are structured ``Skill`` objects (name/description/scope attrs);
+    accepts any object exposing those attributes so the infrastructure formatter
+    stays decoupled from the application layer. Returns ``""`` when there are no
+    skills. Produces the exact Markdown shape previously emitted by the
+    SkillManager.
     """
     if not skills:
         return ""
@@ -22,9 +25,10 @@ def format_skills_markdown(skills: List[Dict[str, Any]]) -> str:
     project_skills = []
 
     for s in skills:
-        desc = f": {s['description']}" if s["description"] else ""
-        line = f"- `{s['name']}`{desc}"
-        if s.get("scope") == "project":
+        desc = f": {s.description}" if s.description else ""
+        line = f"- `{s.name}`{desc}"
+        scope_val = getattr(s.scope, "value", s.scope)
+        if scope_val == "project":
             project_skills.append(line)
         else:
             global_skills.append(line)

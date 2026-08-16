@@ -6,18 +6,28 @@ file contents.
 """
 
 import os
+from dataclasses import dataclass
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
-# (mtime_ns, size) pairs are what callers actually consume for caching. The
-# path is kept for stable ordering, not compared for equality.
-SignatureEntry = Tuple[str, int, int]
+
+@dataclass(frozen=True)
+class SignatureEntry:
+    """A single ``(path, mtime_ns, size)`` filesystem signature entry.
+
+    ``mtime_ns`` and ``size`` are what callers actually consume for caching.
+    The path is kept for stable ordering, not compared for equality.
+    """
+
+    path: str
+    mtime_ns: int
+    size: int
 
 
 def compute_dir_signature(
     dirs: Sequence[Union[str, Tuple[str, object]]],
     extensions: Optional[Sequence[str]] = None,
 ) -> Optional[Tuple[SignatureEntry, ...]]:
-    """Collects (path, mtime_ns, size) for files under ``dirs``.
+    """Collects ``SignatureEntry`` for files under ``dirs``.
 
     - Only files whose name ends with one of ``extensions`` are included
       (when ``extensions`` is None every file is included).
@@ -43,7 +53,7 @@ def compute_dir_signature(
                 if not os.path.isfile(fpath):
                     continue
                 st = os.stat(fpath)
-                entries.append((fpath, st.st_mtime_ns, st.st_size))
+                entries.append(SignatureEntry(fpath, st.st_mtime_ns, st.st_size))
         except OSError:
             continue
     return tuple(entries) if entries else None
@@ -62,8 +72,8 @@ def compute_dir_signature_hash(
     if signature is None:
         return None
     acc = 0
-    for path, mtime_ns, size in signature:
-        acc ^= hash((path, mtime_ns, size))
+    for entry in signature:
+        acc ^= hash((entry.path, entry.mtime_ns, entry.size))
     return acc
 
 
@@ -98,7 +108,7 @@ def compute_dir_signature_recursive(
                         st = os.stat(fpath)
                     except OSError:
                         continue
-                    entries.append((fpath, st.st_mtime_ns, st.st_size))
+                    entries.append(SignatureEntry(fpath, st.st_mtime_ns, st.st_size))
         except OSError:
             continue
     return tuple(entries)
