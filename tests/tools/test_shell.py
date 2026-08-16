@@ -117,8 +117,8 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         ):
             res = await self.tool.execute({"command": "echo timeout_test", "timeout": 1}, ctx=mock_app)
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("running:", res)
-            self.assertIn("Full Output Log:", res)
+            self.assertIn("moved to background.", res)
+            self.assertIn("Full Log:", res)
             mock_ctx.add_background_task.assert_called_once()
 
     async def test_create_windows_process_powershell(self):
@@ -216,7 +216,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         ):
             res = await self.tool.execute({"command": "tail -f log.txt", "run_in_background": True}, ctx=mock_app)
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("running:", res)
+            self.assertIn("moved to background.", res)
             mock_ctx.add_background_task.assert_called_once()
 
     async def test_subagent_explicit_run_in_background_rejected(self):
@@ -261,7 +261,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
             res = await exec_task
             self.assertIn("[Background Task ID:", res)
-            self.assertIn("running:", res)
+            self.assertIn("moved to background.", res)
 
     async def test_sync_task_cleaned_up_from_background_tasks(self):
         mock_app = MagicMock()

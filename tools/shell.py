@@ -29,18 +29,11 @@ def _new_task_id() -> str:
 def _format_background_task_response(
     task_id: str, cmd: str, recent_output_str: str = None, log_path: str = None
 ) -> str:
-    """Formats a background task status response with a manage hint."""
-    log_hint = f"\nFull Output Log: {log_path} [live; use shell 'tail {log_path}' for the latest lines]" if log_path else ""
-    tail_advice = " Stop polling; completion arrives as [System Notification]. End turn."
+    """Formats a background task status response."""
+    log_hint = f"\nFull Log: {log_path} (live; inspect via tail/grep)" if log_path else ""
     if recent_output_str is None:
-        return (
-            f"[Background Task ID: {task_id}] running: '{cmd}'.{log_hint}{tail_advice}"
-            f" Do not wait; use manage_shell(send_input/kill, task_id='{task_id}') to respond/abort."
-        )
-    return (
-        f"[Background Task ID: {task_id}] running: '{cmd}'.{recent_output_str}{log_hint}{tail_advice}"
-        f" Do not wait; use manage_shell(send_input/kill, task_id='{task_id}') to respond/abort."
-    )
+        return f"[Background Task ID: {task_id}] '{cmd}' moved to background.{log_hint}"
+    return f"[Background Task ID: {task_id}] '{cmd}' moved to background.{recent_output_str}{log_hint}"
 
 
 def _truncate_output(res: str) -> str:
@@ -56,7 +49,10 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Run a terminal command. Moves to background past timeout (default 120s). Destructive commands confirm."
+        "Run a terminal command. If command runs longer than timeout or 'background: true', "
+        "it moves to background and returns a task_id and log path immediately. "
+        "Output streams live to the log file. When finished, full output is delivered "
+        "automatically via a [System Notification] message."
     )
 
     schema = {
@@ -71,7 +67,10 @@ class ShellTool(BaseTool):
                         "description": "Terminal command to run (resolved relative to current working directory, cwd)",
                     },
                     "timeout": {"type": "integer", "description": "Timeout in seconds (default 120, max 600)"},
-                    "background": {"type": "boolean", "description": "Run command in background immediately"},
+                    "background": {
+                        "type": "boolean",
+                        "description": "Run asynchronously. Returns task_id immediately; completion arrives via System Notification.",
+                    },
                 },
                 "required": ["command"],
             },
