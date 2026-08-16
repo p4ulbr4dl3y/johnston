@@ -21,9 +21,6 @@ class _AsyncHost:
         self.confirmed = True
         return True
 
-    def get_current_session_id(self):
-        return "sess-X"
-
 
 class _BareHost:
     """Host object with no host-method capabilities."""

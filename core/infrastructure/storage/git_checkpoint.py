@@ -282,39 +282,6 @@ class GitCheckpointManager:
                 pass
 
     @classmethod
-    def get_diff_stats(
-        cls,
-        session_id: str,
-        message_index: int,
-        project_path: Optional[str] = None,
-    ) -> Optional[str]:
-        """Calculates line changes (+additions / -deletions) between target checkpoint and current workspace.
-
-        Returns string formatted like '+12 / -4', 'no changes', or None if checkpoint doesn't exist.
-        """
-        shadow_dir, cwd = cls._get_shadow_dir(project_path)
-        if not cls.is_git_repo(cwd):
-            return None
-
-        ref_name = cls.get_ref_name(session_id, message_index)
-        rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir)
-        if rev_res.returncode != 0:
-            return None
-        commit_sha = rev_res.stdout.strip()
-
-        with cls._shadow_index_env(shadow_dir, cwd) as env:
-            run_git(["add", "-A"], cwd=cwd, env=env)
-            diff_res = run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env)
-            if diff_res.returncode != 0:
-                return None
-
-            added, deleted = cls._parse_numstat(diff_res.stdout)
-
-            if added == 0 and deleted == 0:
-                return "no changes"
-            return f"+{added} / -{deleted}"
-
-    @classmethod
     def get_diff_stats_batch(
         cls,
         session_id: str,
@@ -360,12 +327,3 @@ class GitCheckpointManager:
                     results[msg_idx] = f"+{added} / -{deleted}"
 
         return results
-
-    @classmethod
-    def delete_session_checkpoints(
-        cls,
-        session_id: str,
-        project_path: Optional[str] = None,
-    ) -> None:
-        """Deletes all checkpoints for given session."""
-        cls.purge_checkpoints_after(session_id, -1, project_path=project_path)

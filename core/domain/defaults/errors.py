@@ -55,10 +55,6 @@ class ToolResult:
         )
 
     @classmethod
-    def running(cls, content: str = "") -> "ToolResult":
-        return cls(content=content or "", is_error=False, status="running", returncode=None)
-
-    @classmethod
     def cancelled(cls, content: str = "") -> "ToolResult":
         return cls(content=content or "", is_error=False, status="cancelled", returncode=None)
 

@@ -29,15 +29,9 @@ class ProviderManager:
         self.ensure_config_dir()
 
     def invalidate_cache(self):
-        self._config_cache = {}
-        self._config_mtime = 0
-        self._config_file_path = ""
-        self._providers_cache = {}
-        self._providers_mtime = 0.0
-        self._providers_file_path = ""
         self._providers_memo = {}
 
-    def _cached_json(self, path: str, cache_attr: str, mtime_attr: str, file_attr: str, default: Any) -> Any:
+    def _cached_json(self, path: str, default: Any) -> Any:
         """Reads a JSON file, returning a cached value when the file is unchanged (by mtime).
 
         Delegates to the shared path+mtime JSON cache in models_catalog so the
@@ -47,7 +41,7 @@ class ProviderManager:
         return data if isinstance(data, dict) else {}
 
     def _get_config_data(self) -> dict:
-        return self._cached_json(CONFIG_FILE, "_config_cache", "_config_mtime", "_config_file_path", {})
+        return self._cached_json(CONFIG_FILE, {})
 
     def _read_config(self) -> dict:
         """Reads CONFIG_FILE, falling back to {} on missing/corrupt file."""
@@ -72,9 +66,7 @@ class ProviderManager:
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         providers = dict(DEFAULT_JSON_PROVIDERS)
-        data = self._cached_json(
-            PROVIDERS_JSON_FILE, "_providers_cache", "_providers_mtime", "_providers_file_path", {}
-        )
+        data = self._cached_json(PROVIDERS_JSON_FILE, {})
         if isinstance(data, dict):
             try:
                 for k, v in data.items():
