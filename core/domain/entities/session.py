@@ -1,7 +1,6 @@
 """Pure session domain constants and trivial helpers.
 
-No IO, no agent access. Imported by core.session_manager and re-exported there
-to keep existing consumers working.
+No IO, no agent access. Imported directly by consumers across core and UI.
 """
 
 from typing import Any
