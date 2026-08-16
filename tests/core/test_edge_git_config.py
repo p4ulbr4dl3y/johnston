@@ -19,6 +19,21 @@ from core.infrastructure.runtime.git_utils import make_git_diff, run_git
 from core.provider_manager import ProviderManager
 
 
+def test_atomic_write_text_with_background_fsync(tmp_path):
+    """atomic_write_text must persist content; fsync hardening is done on a
+    background thread so the write returns without blocking the caller."""
+    from core.infrastructure.platform import platform_utils
+
+    target = str(tmp_path / "note.txt")
+    platform_utils.atomic_write_text(target, "hello fsync")
+    assert os.path.exists(target)
+    with open(target, encoding="utf-8") as f:
+        assert f.read() == "hello fsync"
+
+    # Ensure the background fsync executor exists after a write.
+    assert platform_utils._FSYNC_EXECUTOR is not None
+
+
 def make_repo(tmp_path):
     """Initializes a real git repo in tmp_path, returns the path."""
     repo = tmp_path / "repo"

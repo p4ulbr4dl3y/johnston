@@ -137,6 +137,31 @@ class TestProviderManager(unittest.TestCase):
         res = asyncio.run(self.pm.fetch_models_grouped(force_refresh=True, connected_only=False))
         self.assertIn("openai", res)
 
+    def test_load_providers_memo_reuses_result(self):
+        """Repeated load_providers() must reuse one memoized dict (no re-merge)."""
+        with patch.object(self.pm, "_load_json_providers", wraps=self.pm._load_json_providers) as spy:
+            p1 = self.pm.load_providers()
+            p2 = self.pm.load_providers()
+            self.assertIs(p1, p2)  # memoized, same object (read-only usage)
+            self.assertEqual(spy.call_count, 1)
+
+    def test_load_providers_memo_invalidated_by_providers_file(self):
+        """External change to providers.json (mtime) must invalidate the memo."""
+        providers_file = os.path.join(self.test_dir, "providers.json")
+        with open(providers_file, "w", encoding="utf-8") as f:
+            json.dump({"pp": {"key": "pp", "name": "PP", "base_url": "", "models": []}}, f)
+
+        p1 = self.pm.load_providers()
+        self.assertIsNotNone(p1.get("pp"))
+
+        # Rewrite with updated provider name; mtime change invalidates the memo.
+        with open(providers_file, "w", encoding="utf-8") as f:
+            json.dump({"pp": {"key": "pp", "name": "PP2", "base_url": "", "models": []}}, f)
+
+        p2 = self.pm.load_providers()
+        self.assertEqual(p2["pp"]["name"], "PP2")
+        self.assertIsNot(p1, p2)
+
 
 if __name__ == "__main__":
     unittest.main()

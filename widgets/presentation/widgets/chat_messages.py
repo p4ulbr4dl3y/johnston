@@ -62,6 +62,8 @@ class BotMessage(Vertical):
         self._suppress_content_watch = False
         self._markdown_render_task: asyncio.Task | None = None
         self._pending_markdown_content: str | None = None
+        self._stream_parts: list[str] = []
+        self._joined_content: str | None = None
 
     def compose(self) -> ComposeResult:
         yield self.stream_widget
@@ -89,7 +91,9 @@ class BotMessage(Vertical):
             self._streaming = True
             self.stream_widget.display = True
             self.md_widget.display = False
-        self.content = self.content + content
+        self._stream_parts.append(content)
+        self._joined_content = None
+        self.content = self._join_stream_content()
 
     def set_stream_content(self, content: str) -> None:
         """Replace the streaming text with full content (no Markdown rebuild)."""
@@ -97,7 +101,15 @@ class BotMessage(Vertical):
             self._streaming = True
             self.stream_widget.display = True
             self.md_widget.display = False
-        self.content = content
+        self._stream_parts = [content]
+        self._joined_content = None
+        self.content = self._join_stream_content()
+
+    def _join_stream_content(self) -> str:
+        """Join pending stream parts into a single string (lazy-cached)."""
+        if self._joined_content is None:
+            self._joined_content = "".join(self._stream_parts)
+        return self._joined_content
 
     async def reset_stream(self) -> None:
         """Clear partial streamed text on retry so the new attempt starts blank."""

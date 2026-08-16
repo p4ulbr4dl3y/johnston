@@ -149,9 +149,40 @@ class StatusFooter(GitMetricsMixin, Static):
             if getattr(self, "_subagent_session", None):
                 self.update_subagent_footer(self._subagent_session)
         elif hasattr(self, "_last_status_args"):
-            self.update_status(**self._last_status_args)
+            # Only the spinner frame changed: redraw cheaply from cached rows
+            # instead of rebuilding git/table data on every tick.
+            self._render_stream_frame()
         else:
             self.refresh_footer()
+
+    def _render_stream_frame(self) -> None:
+        """Redraw only the animated frame from cached status rows (no git/rebuild)."""
+        if not self.is_generating or self.is_subagent:
+            return
+        rows = getattr(self, "_last_grid_rows", None)
+        if rows is None:
+            return
+        try:
+            frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
+            grid = Table.grid(expand=True)
+            grid.add_column(justify="left")
+            grid.add_column(justify="right")
+            for i, (left, right) in enumerate(rows):
+                if i == 0:
+                    left = self._swap_frame(left, frame)
+                grid.add_row(left, right)
+            self.update(grid)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _swap_frame(left: str, frame: str) -> str:
+        """Replace the old spinner char in the cached left cell with the new frame."""
+        try:
+            idx = left.index("]") + 1
+            return left[:idx] + frame + left[idx + 1 :]
+        except Exception:
+            return left
 
     def on_mount(self) -> None:
         if not self.is_subagent:
@@ -415,6 +446,11 @@ class StatusFooter(GitMetricsMixin, Static):
             if row3:
                 grid.add_row(row3)
             grid.add_row("", "")
+            cells = [(row1,), (row2,)]
+            if row3:
+                cells.append((row3,))
+            cells.append(("",))
+            self._last_grid_cells = cells
             self.update(grid)
             return
         else:
@@ -486,6 +522,12 @@ class StatusFooter(GitMetricsMixin, Static):
             grid.add_row(row3_left, row3_right)
             grid.add_row("", "")
 
+            self._last_grid_cells = [
+                (row1_left, row1_right),
+                (row2_left, row2_right),
+                (row3_left, row3_right),
+                ("", ""),
+            ]
             self.update(grid)
             return
 

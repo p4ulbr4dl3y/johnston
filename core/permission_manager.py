@@ -8,7 +8,7 @@ from core.domain.policies.permission_policy import (
     normalize_action,
 )
 from core.infrastructure.platform.paths import CONFIG_FILE
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import atomic_write_json
 
 
 class PermissionManager:
@@ -59,7 +59,9 @@ class PermissionManager:
         self.session_overrides.clear()
 
     def _load_json_config(self, filepath: str) -> Dict[str, Any]:
-        data = read_json(filepath, {})
+        from core.models_catalog import cached_json_read
+
+        data = cached_json_read(filepath, {})
         return data if isinstance(data, dict) else {}
 
     def update_permission(self, target_type: str, target_name: str, action: str) -> None:
