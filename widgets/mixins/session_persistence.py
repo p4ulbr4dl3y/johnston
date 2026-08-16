@@ -44,6 +44,8 @@ class SessionPersistenceMixin:
                             await chat_view.add_user_message(text, animate=False)
                         elif mtype == "bot":
                             text = msg.get("text", "")
+                            if not text.strip():
+                                continue
                             bm = await chat_view.add_bot_message(animate=False)
                             await bm.set_final_content(text)
                         elif mtype == "thinking":

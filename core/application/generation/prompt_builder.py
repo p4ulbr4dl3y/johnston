@@ -87,6 +87,8 @@ def get_git_info(cwd: str = None) -> str:
     if cached is not None:
         return cached
 
+    last_known = _GIT_INFO_CACHE.get(key, (0, ""))[1]
+
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -97,7 +99,7 @@ def get_git_info(cwd: str = None) -> str:
             loop.create_task(get_git_info_async(cwd=cwd))
         except Exception:
             pass
-        return _GIT_INFO_CACHE.get(key, (0, ""))[1] if cached is not None else ""
+        return last_known
     return _cache_git_info(key, _compute_git_info(cwd))
 
 

@@ -165,12 +165,20 @@ class StatusFooter(GitMetricsMixin, Static):
         try:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
             grid = Table.grid(expand=True)
-            grid.add_column(justify="left")
-            grid.add_column(justify="right")
-            for i, (left, right) in enumerate(rows):
-                if i == 0:
-                    left = self._swap_frame(left, frame)
-                grid.add_row(left, right)
+            if rows and len(rows[0]) == 1:
+                grid.add_column(justify="left")
+                for i, row in enumerate(rows):
+                    cell = row[0]
+                    if i == 0:
+                        cell = self._swap_frame(cell, frame)
+                    grid.add_row(cell)
+            else:
+                grid.add_column(justify="left")
+                grid.add_column(justify="right")
+                for i, (left, right) in enumerate(rows):
+                    if i == 0:
+                        left = self._swap_frame(left, frame)
+                    grid.add_row(left, right)
             self.update(grid)
         except Exception:
             pass
@@ -316,7 +324,7 @@ class StatusFooter(GitMetricsMixin, Static):
         branch_name: str = "",
     ) -> None:
         """Footer for the subagent screen: role/model, context/tokens, dir/branch."""
-        branch = branch_name or self._git_branch()
+        branch = branch_name or self._git_branch(cwd=directory)
         grid = _build_subagent_grid(
             role_formatted=role_formatted,
             provider_display=provider_display,
@@ -331,7 +339,7 @@ class StatusFooter(GitMetricsMixin, Static):
             thinking_effort=thinking_effort,
             directory=directory,
             branch=branch,
-            git_diff_stats=self._git_diff_stats,
+            git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
         )
         self.update(grid)
 
@@ -407,7 +415,7 @@ class StatusFooter(GitMetricsMixin, Static):
         is_compact = width > 0 and width < 75
 
         if is_compact:
-            branch = self._git_branch()
+            branch = self._git_branch(cwd=directory)
 
             row1_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
@@ -418,7 +426,7 @@ class StatusFooter(GitMetricsMixin, Static):
             row2_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row2_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
-            diff_text = self._git_diff_stats()
+            diff_text = self._git_diff_stats(cwd=directory)
             if diff_text:
                 row2_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
             row2_parts.append(f"[{THEME_SECONDARY}]{total_tokens:,}t[/]")
@@ -450,11 +458,11 @@ class StatusFooter(GitMetricsMixin, Static):
             if row3:
                 cells.append((row3,))
             cells.append(("",))
-            self._last_grid_cells = cells
+            self._last_grid_rows = cells
             self.update(grid)
             return
         else:
-            branch = self._git_branch()
+            branch = self._git_branch(cwd=directory)
 
             # Line 1: [role • provider › model]  [skills • mcp]
             row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
@@ -497,7 +505,7 @@ class StatusFooter(GitMetricsMixin, Static):
             row3_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
             if branch:
                 row3_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
-            diff_text = self._git_diff_stats()
+            diff_text = self._git_diff_stats(cwd=directory)
             if diff_text:
                 row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
             row3_left = "  •  ".join(row3_left_parts)
@@ -522,7 +530,7 @@ class StatusFooter(GitMetricsMixin, Static):
             grid.add_row(row3_left, row3_right)
             grid.add_row("", "")
 
-            self._last_grid_cells = [
+            self._last_grid_rows = [
                 (row1_left, row1_right),
                 (row2_left, row2_right),
                 (row3_left, row3_right),
@@ -673,7 +681,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
             role_formatted += role.capitalize()
 
-            branch = getattr(session, "branch_name", "") or self._git_branch()
+            branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
             grid = _build_subagent_grid(
                 role_formatted=role_formatted,
                 provider_display=provider_display,
@@ -688,7 +696,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
                 thinking_effort=thinking_effort,
                 directory=directory,
                 branch=branch,
-                git_diff_stats=self._git_diff_stats,
+                git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
             )
 
             self.update(grid)

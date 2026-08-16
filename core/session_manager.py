@@ -107,6 +107,8 @@ class AgentSession:
         ):
             last["result_text"] = event["result_text"]
         else:
+            if etype == "tool" and last and last.get("type") == "bot" and not last.get("text", "").strip():
+                self.messages.pop()
             self.messages.append(event)
             self.updated_at = _now()
 
