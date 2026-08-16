@@ -20,19 +20,16 @@ from core.application.session.actions import (
 from core.application.skills.manager import SkillManager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
-from widgets.modal_screens import (
-    HelpScreen,
-    MCPScreen,
-    ModelScreen,
-    ResumeScreen,
-    RewindScreen,
-    ShellTasksScreen,
-    SkillsScreen,
-    SubagentsScreen,
-    ThinkingEffortScreen,
-)
+from widgets.presentation.screens.constants import MESSAGE_INPUT
+from widgets.presentation.screens.help import HelpScreen
+from widgets.presentation.screens.mcp import MCPScreen
+from widgets.presentation.screens.model import ModelScreen
+from widgets.presentation.screens.resume import ResumeScreen
+from widgets.presentation.screens.rewind import RewindScreen
+from widgets.presentation.screens.skills import SkillsScreen
+from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
+from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.screens.constants import MESSAGE_INPUT
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +93,7 @@ class ProvidersCommand(BaseCommand):
     description = "Manage AI providers (API keys, active status, enable/disable)"
 
     async def execute(self, app) -> None:
-        from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
+        from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
 
         def open_providers_screen(focus_key: str | None = None) -> None:
             provs = app.pm.load_providers(include_disabled=True)
@@ -433,7 +430,7 @@ class PermissionsCommand(BaseCommand):
     description = "Manage tool permissions (allow, ask, deny)"
 
     async def execute(self, app) -> None:
-        from widgets.screens.permissions import PermissionsScreen
+        from widgets.presentation.screens.permissions import PermissionsScreen
 
         app.push_screen(PermissionsScreen())
 
@@ -444,7 +441,7 @@ class QuestionsCommand(BaseCommand):
     description = "Resume pending user questions wizard"
 
     async def execute(self, app) -> None:
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         if hasattr(app, "screen") and isinstance(app.screen, AskUserWizardScreen):
             if hasattr(app, "notify"):

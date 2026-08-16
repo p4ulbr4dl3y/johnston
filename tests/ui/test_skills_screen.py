@@ -7,7 +7,7 @@ from textual.widgets import Input, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.skills.manager import SkillManager
-from widgets.screens.skills import SkillDetailScreen, SkillsScreen
+from widgets.presentation.screens.skills import SkillDetailScreen, SkillsScreen
 
 
 class DummyHostApp(App[None]):

@@ -30,7 +30,7 @@ class TestThinkingEffortResolver(unittest.TestCase):
         self.assertIsNone(build_gemini_thinking_config("gemini-1.5-pro", "high"))
 
     def test_thinking_effort_screen_marks_active_but_highlights_auto(self):
-        from widgets.screens.thinking_effort import ThinkingEffortScreen
+        from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
 
         screen = ThinkingEffortScreen("medium")
 

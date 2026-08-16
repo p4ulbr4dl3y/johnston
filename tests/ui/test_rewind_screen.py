@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.screens.rewind import RewindScreen
+from widgets.presentation.screens.rewind import RewindScreen
 
 
 class TestRewindScreen(unittest.TestCase):

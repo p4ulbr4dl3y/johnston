@@ -4,7 +4,7 @@ from unittest.mock import patch
 from textual.app import App
 from textual.widgets.option_list import Option
 
-from widgets.screens.model import ModelScreen
+from widgets.presentation.screens.model import ModelScreen
 
 
 class TestModelScreenBuildData(unittest.TestCase):

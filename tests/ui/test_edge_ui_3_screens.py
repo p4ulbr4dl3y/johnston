@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from widgets.screens.providers import ProvidersScreen
-from widgets.screens.resume import ResumeScreen
-from widgets.screens.rewind import RewindScreen
+from widgets.presentation.screens.providers import ProvidersScreen
+from widgets.presentation.screens.resume import ResumeScreen
+from widgets.presentation.screens.rewind import RewindScreen
 
 
 class TestResumeEdge(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestProvidersEdge(unittest.TestCase):
 
 class TestConfirmCancelPath(unittest.TestCase):
     def test_confirm_cancel_dismisses_cancelled(self):
-        from widgets.modal_screens import ConfirmScreen
+        from widgets.presentation.screens.ask_user import ConfirmScreen
 
         s = ConfirmScreen("summary")
         with patch.object(s, "dismiss") as dismiss:
@@ -65,7 +65,7 @@ class TestConfirmCancelPath(unittest.TestCase):
         dismiss.assert_called_once_with("cancelled")
 
     def test_confirm_enter_debounced_bypass(self):
-        from widgets.modal_screens import ConfirmScreen
+        from widgets.presentation.screens.ask_user import ConfirmScreen
 
         s = ConfirmScreen("summary")
         with patch.object(s, "dismiss") as dismiss:

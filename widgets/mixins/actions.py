@@ -132,7 +132,7 @@ class ActionsMixin:
         layer so that the tools layer stays independent of Textual widgets.
         """
         from core.permission_manager import PermissionManager
-        from widgets.screens.permission_confirm import PermissionConfirmScreen
+        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         pm = PermissionManager.get_instance()
         screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
@@ -166,7 +166,7 @@ class ActionsMixin:
         Owned by the app layer so the tools layer stays independent of Textual widgets.
         Returns the selected answer string, or "cancelled by user" on cancel/error.
         """
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()

@@ -8,7 +8,7 @@ from textual.app import App
 from textual.events import Key
 
 from widgets.app.dispatch import COMMAND_REGISTRY
-from widgets.screens.permissions import PermissionsScreen
+from widgets.presentation.screens.permissions import PermissionsScreen
 
 
 class DummyHostApp(App[None]):

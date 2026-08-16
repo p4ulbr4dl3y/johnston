@@ -10,7 +10,7 @@ from textual.widgets import TextArea
 
 from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
-from widgets.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
+from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
