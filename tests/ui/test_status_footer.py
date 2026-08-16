@@ -343,4 +343,46 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         self.assertIn("...", res)
         self.assertTrue(res.startswith("~/"))
 
+    def test_render_stream_frame_normal_and_compact(self):
+        footer = StatusFooter()
+        footer.is_generating = True
+        footer._spinner_idx = 1
+
+        # Test normal 2-column rows
+        footer._last_grid_rows = [("[bold #5eead4]Action[/]", "Right"), ("Ctx", "Tokens")]
+        with patch.object(footer, "update") as mock_update:
+            footer._render_stream_frame()
+            mock_update.assert_called_once()
+
+        # Test compact 1-column rows
+        footer._last_grid_rows = [("[bold #5eead4]Action[/]",), ("Row2",)]
+        with patch.object(footer, "update") as mock_update:
+            footer._render_stream_frame()
+            mock_update.assert_called_once()
+
+    async def test_git_branch_preserves_last_known_on_async_refresh(self):
+        footer = StatusFooter()
+        footer._branch_text = "main"
+        footer._branch_cwd = "/some/dir"
+        footer._branch_time = 0.0
+
+        # When get_git_info returns empty during async refresh
+        with patch("core.application.generation.prompt_builder.get_git_info", return_value=""):
+            branch = footer._git_branch(cwd="/some/dir")
+            self.assertEqual(branch, "main")
+
+    def test_git_diff_stats_with_cwd_and_fallback(self):
+        footer = StatusFooter()
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="5\t2\tfile.py\n")
+            res = footer._compute_diff_sync(cwd="/custom/path")
+            self.assertEqual(res, "+5 / -2")
+            mock_run.assert_called_with(
+                ["git", "diff", "HEAD", "--numstat"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                cwd="/custom/path",
+            )
+
 

@@ -202,6 +202,26 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertFalse(is_ui_visible_user_message(None))
 
 
+    def test_add_event_prunes_empty_bot_message_before_tool(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.add_event({"type": "bot", "text": "   \n\n  "})
+        self.assertEqual(len(sess.messages), 1)
+        sess.add_event({"type": "tool", "tool_type": "shell", "target": "ls"})
+        self.assertEqual(len(sess.messages), 1)
+        self.assertEqual(sess.messages[0]["type"], "tool")
+
+    def test_add_event_keeps_non_empty_bot_message_before_tool(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.add_event({"type": "bot", "text": "Вот 5 яблок\n"})
+        self.assertEqual(len(sess.messages), 1)
+        sess.add_event({"type": "tool", "tool_type": "shell", "target": "ls"})
+        self.assertEqual(len(sess.messages), 2)
+        self.assertEqual(sess.messages[0]["type"], "bot")
+        self.assertEqual(sess.messages[1]["type"], "tool")
+
+
 if __name__ == "__main__":
     unittest.main()
 

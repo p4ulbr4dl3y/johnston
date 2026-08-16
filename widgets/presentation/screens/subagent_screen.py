@@ -218,8 +218,12 @@ class SubagentViewScreen(Screen[None]):
                 )
         elif etype == "bot":
             txt = evt.get("text", "")
+            if not animate and not txt.strip():
+                return
             if txt:
                 if self.bot_msg is None:
+                    if not animate and not txt.strip():
+                        return
                     self.bot_msg = await chat_view.add_bot_message(animate=animate)
                 if evt.get("final") or not animate:
                     await self.bot_msg.set_final_content(txt)
