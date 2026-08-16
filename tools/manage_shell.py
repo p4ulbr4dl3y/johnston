@@ -7,7 +7,7 @@ from tools.base import BaseTool
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Manage background shell processes: list, send_input, kill."
+    description = "Interact with active background processes (send stdin or kill)."
     schema = {
         "type": "function",
         "function": {
