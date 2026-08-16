@@ -105,7 +105,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "duplicating that context across N subagents.\n"
             "5. DO NOT chain subagents recursively or delegate delegation — subagents "
             "cannot spawn subagents. You are the only orchestrator.\n"
-            "6. Use `manage_subagent(action='status')` sparingly to check on background work; "
+            "6. Use `manage_subagent(action='list')` sparingly to check on background work; "
             "never poll it in a loop. End your turn and let notifications arrive instead.\n\n"
             "### Integration Rules\n"
             "1. Collect and synthesize each subagent's <task_result> into a coherent "

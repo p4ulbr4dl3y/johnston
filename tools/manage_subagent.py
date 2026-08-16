@@ -12,7 +12,7 @@ from tools.base import BaseTool
 
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
-    description = "Manage active and historical subagents: list, status, kill, send_message."
+    description = "Manage active and historical subagents: list, kill, send_message."
     schema = {
         "type": "function",
         "function": {
@@ -20,7 +20,7 @@ class ManageSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "status", "kill", "send_message"]},
+                    "action": {"type": "string", "enum": ["list", "kill", "send_message"]},
                     "session_id": {"type": "string", "description": "Target subagent session_id"},
                     "message": {"type": "string", "description": "Follow-up message for subagent"},
                 },
@@ -70,33 +70,6 @@ class ManageSubagentTool(BaseTool):
         session = store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
         if not session:
             return format_tool_error("notfound", name=session_id)
-
-        if action == "status":
-            lines = [
-                f"Subagent Status ({session.id}):",
-                f"• Description: {session.description}",
-                f"• Status: {session.status.upper()}",
-                f"• Type: {session.role}",
-            ]
-
-            if session.status == "running":
-                lines.append("\nRecent Events Log:")
-                recent = session.messages[-15:]
-                for evt in recent:
-                    etype = evt.get("type")
-                    if etype == "user":
-                        lines.append(f"  [User]: {evt.get('text')}")
-                    elif etype == "bot":
-                        lines.append(f"  [Bot]: {evt.get('text')[:150]}...")
-                    elif etype == "tool":
-                        lines.append(f"  [Tool]: {evt.get('tool_type')} ({evt.get('target')})")
-                    elif etype == "status_change":
-                        lines.append(f"  [Status]: {evt.get('status')}")
-
-                lines.append(
-                    "\nNote: Subagent is still running. STOP calling manage_subagent(status) in a loop and end your turn now."
-                )
-            return "\n".join(lines)
 
         elif action == "kill":
             if session.status != "running":
@@ -205,4 +178,4 @@ class ManageSubagentTool(BaseTool):
                 return format_tool_error("subagent_setup", detail=str(err), name=session.id)
 
         else:
-            return format_tool_error("action", detail="valid: list, status, kill, send_message", name=action)
+            return format_tool_error("action", detail="valid: list, kill, send_message", name=action)
