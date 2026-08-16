@@ -1,8 +1,25 @@
 """Pure role policy: AgentRole model and tool-permission checks. No IO."""
+from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
+
+
+class RoleScope(str, Enum):
+    """The agent contexts a role applies to."""
+
+    BOTH = "any"
+    MAIN = "main"
+    SUBAGENT = "subagent"
+
+
+class RoleSource(str, Enum):
+    """Where a role definition originates."""
+
+    BUILTIN = "builtin"
+    GLOBAL = "global"
+    PROJECT = "project"
 
 
 def normalize_role_scope(scope: str) -> str:

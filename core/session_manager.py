@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import uuid
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from core.domain.entities.session import (
@@ -16,6 +17,30 @@ from core.infrastructure.platform.platform_utils import atomic_write_json, read_
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 
 logger = logging.getLogger(__name__)
+
+
+class SessionKind(str, Enum):
+    """Type of an AgentSession record: a main chat session or a subagent task."""
+
+    MAIN = "main"
+    SUBAGENT = "subagent"
+
+
+class MessageType(str, Enum):
+    """Canonical event/message types stored in session.messages.
+
+    Persisted as plain strings (``.value``) so on-disk JSON stays compatible.
+    Raw inbound events are dicts with a ``"type"`` field; enum values are used
+    at construction/coalescing boundaries.
+    """
+
+    BOT = "bot"
+    BOT_RESET = "bot_reset"
+    THINKING = "thinking"
+    TOOL = "tool"
+    STATUS_CHANGE = "status_change"
+    USER = "user"
+
 
 
 def _now() -> float:
@@ -33,7 +58,7 @@ class AgentSession:
     def __init__(
         self,
         session_id: str,
-        kind: str = "main",
+        kind: SessionKind = SessionKind.MAIN,
         parent_id: Optional[str] = None,
         role: str = "worker",
         status: str = MAIN_STATUS_ACTIVE,
@@ -44,7 +69,7 @@ class AgentSession:
         updated_at: Optional[float] = None,
     ):
         self.id = session_id
-        self.kind = kind  # "main" | "subagent"
+        self.kind = kind
         self.parent_id = parent_id
         self.role = role
         self.status = status
@@ -83,22 +108,22 @@ class AgentSession:
         etype = event.get("type", "")
         last = self.messages[-1] if self.messages else None
 
-        if etype == "bot" and last and last.get("type") == "bot":
+        if etype == MessageType.BOT and last and last.get("type") == MessageType.BOT:
             last["text"] = event.get("text", "")
             if event.get("final"):
                 last["final"] = True
-        elif etype == "bot_reset" and last and last.get("type") == "bot":
+        elif etype == MessageType.BOT_RESET and last and last.get("type") == MessageType.BOT:
             last["text"] = ""
             last.pop("final", None)
-        elif etype == "thinking" and last and last.get("type") == "thinking" and "duration" not in last:
+        elif etype == MessageType.THINKING and last and last.get("type") == MessageType.THINKING and "duration" not in last:
             last["text"] = event.get("text", "")
             if event.get("duration") is not None:
                 last["duration"] = event["duration"]
         elif (
-            etype == "tool"
+            etype == MessageType.TOOL
             and "result_text" in event
             and last
-            and last.get("type") == "tool"
+            and last.get("type") == MessageType.TOOL
             and "result_text" not in last
         ):
             last["result_text"] = event["result_text"]
@@ -106,7 +131,7 @@ class AgentSession:
                 if key in event:
                     last[key] = event[key]
         else:
-            if etype == "tool" and last and last.get("type") == "bot" and not last.get("text", "").strip():
+            if etype == MessageType.TOOL and last and last.get("type") == MessageType.BOT and not last.get("text", "").strip():
                 self.messages.pop()
             self.messages.append(event)
             self.updated_at = _now()
@@ -132,7 +157,7 @@ class AgentSession:
 
     def finish(self, status: str, error_msg: str = "") -> None:
         self.status = status
-        self.add_event({"type": "status_change", "status": status, "error": error_msg})
+        self.add_event({"type": MessageType.STATUS_CHANGE.value, "status": status, "error": error_msg})
 
     # -- persistence -------------------------------------------------------
 
@@ -142,7 +167,7 @@ class AgentSession:
             history = self.agent_history
         return {
             "id": self.id,
-            "kind": self.kind,
+            "kind": self.kind.value,
             "parent_id": self.parent_id,
             "role": self.role,
             "status": self.status,
@@ -164,9 +189,14 @@ class AgentSession:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentSession":
+        raw_kind = data.get("kind", SessionKind.MAIN.value)
+        try:
+            kind = SessionKind(raw_kind)
+        except ValueError:
+            kind = SessionKind.MAIN
         sess = cls(
             session_id=data.get("id", ""),
-            kind=data.get("kind", "main"),
+            kind=kind,
             parent_id=data.get("parent_id"),
             role=data.get("role", "worker"),
             status=data.get("status", MAIN_STATUS_ACTIVE),
@@ -268,7 +298,7 @@ class SessionStore:
     def create_main(self, session_id: Optional[str] = None, role: str = "worker") -> AgentSession:
         sess = AgentSession(
             session_id=session_id or self.generate_session_id(),
-            kind="main",
+            kind=SessionKind.MAIN,
             role=role,
             status=MAIN_STATUS_ACTIVE,
             project_key=self.project_key,
@@ -290,7 +320,7 @@ class SessionStore:
     ) -> AgentSession:
         sess = AgentSession(
             session_id=subagent_id or self.generate_subagent_id(),
-            kind="subagent",
+            kind=SessionKind.SUBAGENT,
             parent_id=parent_id,
             role=role,
             status=status,
@@ -351,7 +381,7 @@ class SessionStore:
                 sessions.setdefault(sid, sess)
         result = list(sessions.values())
         if kind:
-            result = [s for s in result if s.kind == kind]
+            result = [s for s in result if s.kind == SessionKind(kind)]
         return result
 
     def _load_disk_sessions(self) -> Dict[str, AgentSession]:
@@ -457,7 +487,7 @@ class SessionStore:
 
     def save(self, sess: AgentSession) -> None:
         try:
-            if sess.kind == "subagent":
+            if sess.kind == SessionKind.SUBAGENT:
                 os.makedirs(self._subagent_dir(sess.parent_id), exist_ok=True)
                 fpath = self._subagent_path(sess.parent_id, sess.id)
             else:
@@ -470,7 +500,7 @@ class SessionStore:
 
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)
-        if sess and sess.kind == "main":
+        if sess and sess.kind == SessionKind.MAIN:
             import shutil
 
             shutil.rmtree(self._subagent_dir(session_id), ignore_errors=True)

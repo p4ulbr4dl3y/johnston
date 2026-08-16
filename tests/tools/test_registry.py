@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from core.domain.policies.permission_policy import PermissionAction, PermissionDecision
 from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_name
 
 
@@ -53,7 +54,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(REGISTRY["multi_edit"], MultiEditTool)
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("allow", "")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
         with (
             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch.object(MultiEditTool, "execute", new=AsyncMock(return_value="MULTI_EDIT_OK")),
@@ -178,7 +179,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_tool_permission_denied(self):
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
             self.assertEqual(res.content, "ERR: denied 'read': by permission policy")
@@ -187,7 +188,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res.content)
@@ -197,7 +198,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res.content)
@@ -207,7 +208,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=False)
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "Confirm please")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"}, app=mock_app)
         self.assertEqual(res.content, "ERR: denied 'read': by user")
@@ -215,7 +216,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_permission_ask_no_app(self):
         # No interactive app available -> fall back to a textual denial.
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("ask", "No interactive app")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "No interactive app")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res.content, "ERR: denied 'read': requires user confirmation (No interactive app)")
@@ -243,7 +244,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
 
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
 
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
@@ -262,7 +263,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp_mgr.call_tool.return_value = "MCP ALLOWED OUTPUT"
 
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("allow", "")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
 
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
@@ -281,7 +282,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
 
         mock_pm = MagicMock()
-        mock_pm.check_permission.return_value = ("deny", "Policy blocks it")
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
 
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),

@@ -1,9 +1,11 @@
-from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, Optional
 
 from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.domain.policies.permission_policy import (
     _BUILTIN_TOOLS,
     VALID_ACTIONS,
+    PermissionAction,
+    PermissionDecision,
     _merge_perms,
     normalize_action,
 )
@@ -105,28 +107,35 @@ class PermissionManager:
 
         return merged
 
-    def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
+    def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> PermissionDecision:
         """
         Evaluates permission for executing a tool.
 
-        Returns (action, reason) where action is 'allow', 'ask', or 'deny'.
+        Returns a PermissionDecision(action, reason) where action is
+        PermissionAction.ALLOW/ASK/DENY.
         """
         raw_tool = (tool_name or "").strip().lower()
         canonical_name = self._normalize_name(raw_tool)
         # Fail-closed: an empty/absent tool name must never grant execution.
         if not canonical_name:
-            return "deny", "No tool name given"
+            return PermissionDecision(PermissionAction.DENY, "No tool name given")
 
         effective_perms = self.get_effective_permissions()
 
         # 1. Check runtime session overrides
         if canonical_name in self.session_overrides:
-            return self.session_overrides[canonical_name], f"Session override for '{canonical_name}'"
+            return PermissionDecision(
+                PermissionAction(self.session_overrides[canonical_name]),
+                f"Session override for '{canonical_name}'",
+            )
 
         # 2. Check tool-specific config
         tools_cfg = effective_perms.get("tools", {})
         if canonical_name in tools_cfg:
-            return tools_cfg[canonical_name], f"Explicit tool permission for '{canonical_name}'"
+            return PermissionDecision(
+                PermissionAction(tools_cfg[canonical_name]),
+                f"Explicit tool permission for '{canonical_name}'",
+            )
 
         # 3. MCP tools (not in the builtin registry) default to 'allow' so that
         #    connected servers work out of the box; explicit config still applies.
@@ -138,11 +147,22 @@ class PermissionManager:
             if raw_default is not None:
                 norm_default = normalize_action(raw_default)
                 if norm_default in VALID_ACTIONS:
-                    return norm_default, f"MCP tool '{canonical_name}' applies configured default '{norm_default}'"
-                return "deny", f"Invalid default configured; MCP tool '{canonical_name}' fails closed"
-            return "allow", f"MCP tool default for '{canonical_name}'"
+                    return PermissionDecision(
+                        PermissionAction(norm_default),
+                        f"MCP tool '{canonical_name}' applies configured default '{norm_default}'",
+                    )
+                return PermissionDecision(
+                    PermissionAction.DENY,
+                    f"Invalid default configured; MCP tool '{canonical_name}' fails closed",
+                )
+            return PermissionDecision(
+                PermissionAction.ALLOW, f"MCP tool default for '{canonical_name}'"
+            )
 
         # 4. Fallback to default
         default_action = effective_perms.get("default", "ask")
         # Fail-closed: any unexpected value becomes 'ask' (user confirmation), never silent 'allow'.
-        return normalize_action(default_action), f"Default permission fallback for '{canonical_name}'"
+        return PermissionDecision(
+            PermissionAction(normalize_action(default_action)),
+            f"Default permission fallback for '{canonical_name}'",
+        )

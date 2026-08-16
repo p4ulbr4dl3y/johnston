@@ -75,24 +75,25 @@ async def check_and_confirm_permission(
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
     Returns None if allowed, or an error ToolResult if denied/cancelled.
     """
+    from core.domain.policies.permission_policy import PermissionAction
     from core.permission_manager import PermissionManager
     from tools.base import confirm_permission
 
     pm = PermissionManager.get_instance()
     app_obj = _resolve_app(context_or_app)
-    action, reason = pm.check_permission(target_perm_name, args)
+    decision = pm.check_permission(target_perm_name, args)
 
-    if action == "deny":
+    if decision.action == PermissionAction.DENY:
         return ToolResult.error("denied", name=display_name, detail="by permission policy")
-    elif action == "ask":
+    elif decision.action == PermissionAction.ASK:
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             screen_name = confirm_tool_name or target_perm_name
-            confirmed = await confirm_permission(screen_name, args, reason, target_perm_name, ctx_or_app=app_obj)
+            confirmed = await confirm_permission(screen_name, args, decision.reason, target_perm_name, ctx_or_app=app_obj)
             if not confirmed:
                 return ToolResult.error("denied", name=display_name, detail="by user")
         else:
             return ToolResult.error(
-                "denied", name=display_name, detail=f"requires user confirmation ({reason})"
+                "denied", name=display_name, detail=f"requires user confirmation ({decision.reason})"
             )
     return None
 

@@ -3,6 +3,8 @@ from typing import Callable, Dict, Optional
 
 from core.domain.policies.role_policy import (
     AgentRole,
+    RoleScope,
+    RoleSource,
     normalize_role_scope,
 )
 from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
@@ -144,10 +146,10 @@ class RoleRegistry:
         if not scope:
             return self.roles
         clean_scope = normalize_role_scope(scope)
-        return {k: v for k, v in self.roles.items() if v.scope in ("any", clean_scope)}
+        return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, clean_scope)}
 
     def list_subagent_roles(self) -> Dict[str, AgentRole]:
-        return {k: v for k, v in self.roles.items() if v.scope in ("any", "subagent")}
+        return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, RoleScope.SUBAGENT)}
 
     def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
         self.load_roles(project_dir=project_dir)
@@ -164,11 +166,11 @@ class RoleRegistry:
             prov_info = f" (provider: {role.provider})" if role.provider else ""
             desc = f": {role.description}" if role.description else ""
             line = f"- `{role.key}`{desc}{tools_info}{prov_info}"
-            if role.source == "builtin":
+            if role.source == RoleSource.BUILTIN:
                 builtins.append(line)
-            elif role.source == "global":
+            elif role.source == RoleSource.GLOBAL:
                 globals_list.append(line)
-            elif role.source == "project":
+            elif role.source == RoleSource.PROJECT:
                 project_list.append(line)
 
         lines = ["## Subagents (use as `type` in `invoke_subagent`)"]

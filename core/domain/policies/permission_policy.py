@@ -1,8 +1,28 @@
 """Pure permission policy helpers (no state, no IO)."""
 
+from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict
 
-VALID_ACTIONS = {"allow", "ask", "deny"}
+
+class PermissionAction(str, Enum):
+    """Outcome of a tool permission check."""
+
+    ALLOW = "allow"
+    ASK = "ask"
+    DENY = "deny"
+
+
+VALID_ACTIONS = frozenset(action.value for action in PermissionAction)
+
+
+@dataclass(frozen=True)
+class PermissionDecision:
+    """Result of a tool permission check: the action and a human-readable reason."""
+
+    action: PermissionAction
+    reason: str
+
 
 # Builtin tools that are NOT covered by an explicit config entry fall back to
 # the configured default action (ask/deny). MCP tools (not in this set) default

@@ -3,13 +3,32 @@
 No IO, no agent access. Imported directly by consumers across core and UI.
 """
 
+from enum import Enum
 from typing import Any
 
-MAIN_STATUS_ACTIVE = "active"
-SUBAGENT_STATUS_RUNNING = "running"
-STATUS_COMPLETED = "completed"
-STATUS_CANCELLED = "cancelled"
-STATUS_ERROR = "error"
+
+class SessionStatus(str, Enum):
+    """Canonical session lifecycle statuses.
+
+    ``str, Enum`` so the persisted/rendered value is the plain string
+    (``.value``) and comparisons against ``str`` literals keep working.
+    """
+
+    ACTIVE = "active"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    ERROR = "error"
+
+
+# Compatible aliases for the legacy module-level constants. Consumers rely on
+# these plain strings (JSON persistence, UI rendering), so they stay ``.value``.
+MAIN_STATUS_ACTIVE = SessionStatus.ACTIVE.value
+SUBAGENT_STATUS_RUNNING = SessionStatus.RUNNING.value
+STATUS_COMPLETED = SessionStatus.COMPLETED.value
+STATUS_CANCELLED = SessionStatus.CANCELLED.value
+STATUS_ERROR = SessionStatus.ERROR.value
+
 
 
 def _coerce_int(val: Any) -> int:

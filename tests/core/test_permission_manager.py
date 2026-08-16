@@ -20,34 +20,34 @@ class TestPermissionManager(unittest.TestCase):
 
     def test_default_permissions(self):
         # Builtin read defaults to 'allow' (default action is allow)
-        action, _ = self.pm.check_permission("read")
+        action = self.pm.check_permission("read").action
         self.assertEqual(action, "allow")
 
         # Builtin create explicitly defaults to 'ask'
-        action, _ = self.pm.check_permission("create")
+        action = self.pm.check_permission("create").action
         self.assertEqual(action, "ask")
 
         # Builtin edit/multi_edit explicitly default to 'ask'
-        action, _ = self.pm.check_permission("edit")
+        action = self.pm.check_permission("edit").action
         self.assertEqual(action, "ask")
-        action, _ = self.pm.check_permission("multi_edit")
+        action = self.pm.check_permission("multi_edit").action
         self.assertEqual(action, "ask")
 
         # Builtin shell explicitly defaults to 'ask'
-        action, _ = self.pm.check_permission("shell", {"command": "ls"})
+        action = self.pm.check_permission("shell", {"command": "ls"}).action
         self.assertEqual(action, "ask")
 
         # Other builtin tools fall back to the default 'allow'
-        action, _ = self.pm.check_permission("web_fetch")
+        action = self.pm.check_permission("web_fetch").action
         self.assertEqual(action, "allow")
-        action, _ = self.pm.check_permission("ask_user")
+        action = self.pm.check_permission("ask_user").action
         self.assertEqual(action, "allow")
 
     def test_mcp_tools_default_allow(self):
         # MCP tools (not in the builtin registry) default to 'allow'
-        action, reason = self.pm.check_permission("gh__search")
-        self.assertEqual(action, "allow")
-        self.assertIn("MCP tool default", reason)
+        decision = self.pm.check_permission("gh__search")
+        self.assertEqual(decision.action, "allow")
+        self.assertIn("MCP tool default", decision.reason)
 
         # An explicit config entry still wins over the MCP default
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -55,15 +55,15 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"gh__search": "deny"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                action, _ = self.pm.check_permission("gh__search")
+                action = self.pm.check_permission("gh__search").action
                 self.assertEqual(action, "deny")
 
     def test_session_override(self):
-        action_before, _ = self.pm.check_permission("web_fetch")
+        action_before = self.pm.check_permission("web_fetch").action
         self.assertEqual(action_before, "allow")
 
         self.pm.set_session_override("web_fetch", "deny")
-        action_after, _ = self.pm.check_permission("web_fetch")
+        action_after = self.pm.check_permission("web_fetch").action
         self.assertEqual(action_after, "deny")
 
     def test_global_tool_permissions_override(self):
@@ -82,11 +82,11 @@ class TestPermissionManager(unittest.TestCase):
 
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
                 # Explicit tool permission -> allow for safe command
-                action_exec, _ = self.pm.check_permission("shell", {"command": "echo hi"})
+                action_exec = self.pm.check_permission("shell", {"command": "echo hi"}).action
                 self.assertEqual(action_exec, "allow")
 
                 # Explicit tool permission -> deny
-                action_net, _ = self.pm.check_permission("web_fetch")
+                action_net = self.pm.check_permission("web_fetch").action
                 self.assertEqual(action_net, "deny")
 
     def test_fail_closed_on_invalid_action_values(self):
@@ -96,7 +96,7 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"shell": "BOGUS"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                action, _ = self.pm.check_permission("shell", {"command": "echo hi"})
+                action = self.pm.check_permission("shell", {"command": "echo hi"}).action
                 self.assertEqual(action, "ask", "invalid action value must fail closed to 'ask', not 'allow'")
 
         # Whitespace around a valid action is tolerated (normalized), not silently treated as junk.
@@ -105,7 +105,7 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": " allow "}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                action, _ = self.pm.check_permission("web_fetch")
+                action = self.pm.check_permission("web_fetch").action
                 self.assertEqual(action, "allow")
 
         # Default junk action (builtin tool not covered by explicit setting -> falls back to default)
@@ -114,7 +114,7 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"default": "WHATEVER"}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                action, _ = self.pm.check_permission("read")
+                action = self.pm.check_permission("read").action
                 self.assertEqual(action, "ask")
 
         # MCP tool with junk default -> ask (fail-closed), not the allow default
@@ -123,16 +123,16 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"default": "WHATEVER"}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                action, _ = self.pm.check_permission("gh__search")
+                action = self.pm.check_permission("gh__search").action
                 self.assertEqual(action, "ask")
 
     def test_session_override_invalid_action_ignored(self):
         self.pm.set_session_override("web_fetch", "bogus")
-        action, _ = self.pm.check_permission("web_fetch")
+        action = self.pm.check_permission("web_fetch").action
         self.assertEqual(action, "ask", "invalid session override must be ignored")
 
         self.pm.set_session_override("web_fetch", " ALLOW ")
-        action, _ = self.pm.check_permission("web_fetch")
+        action = self.pm.check_permission("web_fetch").action
         self.assertEqual(action, "allow", "valid action with whitespace must normalize")
 
     def test_update_permission_validation(self):
@@ -150,7 +150,7 @@ class TestPermissionManager(unittest.TestCase):
                 self.pm.update_permission("tool", "web_fetch", "deny")
 
                 # Tool permission persisted globally
-                action, _ = self.pm.check_permission("web_fetch")
+                action = self.pm.check_permission("web_fetch").action
                 self.assertEqual(action, "deny")
 
     def test_normalize_action(self):
@@ -182,10 +182,10 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                self.assertEqual(self.pm.check_permission("web_fetch")[0], "deny")
+                self.assertEqual(self.pm.check_permission("web_fetch").action, "deny")
                 with open(cfg_file, "w", encoding="utf-8") as f:
                     json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
-                self.assertEqual(self.pm.check_permission("web_fetch")[0], "allow")
+                self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
 
 
 if __name__ == "__main__":

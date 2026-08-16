@@ -69,13 +69,13 @@ def _write_session_json(store, name, data):
 def test_check_permission_none_or_empty_tool_name_grants_allow(pm):
     """None/empty tool name must NOT be granted 'allow' (security). BUG."""
     pm_obj, _ = pm
-    action, _ = pm_obj.check_permission(None)
+    action = pm_obj.check_permission(None).action
     assert action == "deny", (
         "check_permission(None) returns %r — empty tool name is treated as an "
         "MCP tool and defaults to 'allow' (permission_manager.py:149-154). "
         "A missing tool name must fail closed."
     )
-    action2, _ = pm_obj.check_permission("")
+    action2 = pm_obj.check_permission("").action
     assert action2 == "deny", (
         "check_permission('') returns %r — same empty-name allow bypass."
     )
@@ -86,7 +86,7 @@ def test_mcp_default_deny_is_ignored(pm):
     pm_obj, cfg = pm
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"default": "deny"}}, f)
-    action, _ = pm_obj.check_permission("gh__search")
+    action = pm_obj.check_permission("gh__search").action
     assert action == "deny", (
         "MCP tool with global default 'deny' returns %r — permission_manager.py:149-154 "
         "only fail-closes on INVALID default, but ignores a valid 'deny'. "
@@ -99,7 +99,7 @@ def test_builtin_default_deny_is_respected(pm):
     pm_obj, cfg = pm
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"default": "deny"}}, f)
-    action, _ = pm_obj.check_permission("read")
+    action = pm_obj.check_permission("read").action
     assert action == "deny"
 
 
@@ -109,7 +109,7 @@ def test_wildcard_config_is_literal_not_glob(pm):
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"tools": {"*": "deny", "read*": "deny"}}}, f)
     # 'read' is not matched by literal '*' or 'read*'
-    action, _ = pm_obj.check_permission("read")
+    action = pm_obj.check_permission("read").action
     assert action == "allow"
 
 
@@ -119,9 +119,9 @@ def test_regex_special_char_config_is_literal_and_not_injected(pm):
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"tools": {"shell.(x)": "deny", "file.com": "ask"}}}, f)
     # None of these special names collide with real tools -> no crash, no match.
-    action, _ = pm_obj.check_permission("shell")
+    action = pm_obj.check_permission("shell").action
     assert action == "ask"
-    action2, _ = pm_obj.check_permission("file.com")
+    action2 = pm_obj.check_permission("file.com").action
     assert action2 == "ask"
 
 
@@ -129,7 +129,7 @@ def test_deny_explicit_beats_default_allow(pm):
     pm_obj, cfg = pm
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
-    action, _ = pm_obj.check_permission("web_fetch")
+    action = pm_obj.check_permission("web_fetch").action
     assert action == "deny"
 
 
@@ -138,7 +138,7 @@ def test_session_override_beats_config(pm):
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
     pm_obj.set_session_override("web_fetch", "deny")
-    action, _ = pm_obj.check_permission("web_fetch")
+    action = pm_obj.check_permission("web_fetch").action
     assert action == "deny"
 
 
@@ -146,24 +146,24 @@ def test_case_insensitive_and_trailing_space_toolname(pm):
     pm_obj, cfg = pm
     with open(cfg, "w", encoding="utf-8") as f:
         json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
-    action, _ = pm_obj.check_permission("  WEB_FETCH  ")
+    action = pm_obj.check_permission("  WEB_FETCH  ").action
     assert action == "deny"
 
 
 def test_empty_override_cleared_recheck(pm):
     pm_obj, cfg = pm
     pm_obj.set_session_override("web_fetch", "deny")
-    assert pm_obj.check_permission("web_fetch")[0] == "deny"
+    assert pm_obj.check_permission("web_fetch").action == "deny"
     # cache invalidation / re-evaluation after clear
     pm_obj.clear_session_overrides()
-    assert pm_obj.check_permission("web_fetch")[0] == "allow"
+    assert pm_obj.check_permission("web_fetch").action == "allow"
 
 
 def test_update_permission_overwrites_and_removes_duplicates(pm):
     pm_obj, cfg = pm
     pm_obj.update_permission("tool", "web_fetch", "deny")
     pm_obj.update_permission("tool", "web_fetch", "allow")  # overwrite
-    action, _ = pm_obj.check_permission("web_fetch")
+    action = pm_obj.check_permission("web_fetch").action
     assert action == "allow"
     data = json.load(open(cfg, encoding="utf-8"))
     assert data["permissions"]["tools"]["web_fetch"] == "allow"
@@ -172,7 +172,7 @@ def test_update_permission_overwrites_and_removes_duplicates(pm):
 def test_update_permission_trailing_slash_and_uppercase(pm):
     pm_obj, cfg = pm
     pm_obj.update_permission("tool", "  WEB_FETCH  ", "deny")
-    action, _ = pm_obj.check_permission("WEB_FETCH")
+    action = pm_obj.check_permission("WEB_FETCH").action
     assert action == "deny"
 
 
