@@ -1,7 +1,7 @@
 """Pure role policy: AgentRole model and tool-permission checks. No IO."""
 from typing import Any, Callable, List, Optional, Tuple
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
 
 # Legacy scope aliases -> canonical names. Kept indefinitely so existing role
@@ -53,8 +53,8 @@ class AgentRole:
     def system_prompt(self) -> str:
         return self.prompt
 
-    def is_tool_allowed(self, tool_name: str) -> Optional[str]:
-        """Returns an error string if this role disables tool_name, else None."""
+    def is_tool_allowed(self, tool_name: str) -> Optional[ToolResult]:
+        """Returns an error ToolResult if this role disables tool_name, else None."""
         return role_tool_error(self, tool_name, tool_name_normalizer=getattr(self, "tool_name_normalizer", None))
 
 
@@ -106,14 +106,14 @@ def _tool_policy_result(
 
 
 # Canonical predicate for "is this tool allowed for the role?". Returns None when
-# allowed, or an error string describing the denial.
+# allowed, or an error ToolResult describing the denial.
 def role_tool_error(
     role_def: Any,
     tool_name: str,
     is_subagent: bool = False,
     tool_name_normalizer: Optional[Callable[[str], str]] = None,
-) -> Optional[str]:
-    """Return an error string if role_def denies tool_name, else None."""
+) -> Optional[ToolResult]:
+    """Return an error ToolResult if role_def denies tool_name, else None."""
     if not role_def:
         return None
     if tool_name_normalizer is None:
@@ -121,4 +121,6 @@ def role_tool_error(
     _, reason = _tool_policy_result(
         role_def, tool_name, is_subagent=is_subagent, tool_name_normalizer=tool_name_normalizer
     )
-    return reason
+    if reason is None:
+        return None
+    return ToolResult(content=reason, is_error=True, status="error")

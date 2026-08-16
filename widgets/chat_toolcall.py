@@ -259,15 +259,6 @@ class ParsingMixin:
             return False
         return text.lstrip().lower().startswith("err:")
 
-    def _init_status_from_result(self, result_text: str) -> str:
-        if result_text:
-            return "error" if self._is_explicit_error(result_text) else "done"
-        return "running"
-
-    def _has_explicit_arg_error(self) -> bool:
-        """Explicit `is_error` flag supplied on the tool's arguments takes precedence."""
-        return bool(isinstance(self.args, dict) and self.args.get("is_error"))
-
     def _get_status_color(self) -> str:
         if self.status == "running":
             return "#e5c07b"
@@ -404,7 +395,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "ask_user")
 
     def __init__(
-        self, tool_type: str, target: str, result_text: str = "", is_sequential: bool = False, args: dict = None
+        self,
+        tool_type: str,
+        target: str,
+        result_text: str = "",
+        is_sequential: bool = False,
+        args: dict = None,
+        status: str = None,
+        returncode: int = None,
     ):
         classes = f"tool-call tool-{(tool_type or '').lower()}"
         if is_sequential:
@@ -419,8 +417,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.target = target
         self.result_text = result_text
         self.args = args or {}
+        self.returncode = returncode
         self.is_expanded = False
-        self.status = self._init_status_from_result(result_text) if not self._has_explicit_arg_error() else "error"
+        if status is not None:
+            self.status = status
+        else:
+            self.status = "error" if self._is_explicit_error(result_text) else ("running" if not result_text else "done")
 
         is_clickable = self.is_clickable_header()
         header_cls = f"{TOOL_HEADER} {TOOL_HEADER_EXPANDABLE}" if is_clickable else TOOL_HEADER
@@ -448,8 +450,25 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.md_widget.display = False
         self.render_header()
 
-    def set_result(self, result_text: str, is_error: bool = False) -> None:
+    def set_result(
+        self,
+        result_text: str,
+        is_error: bool = False,
+        status: str = None,
+        returncode: int = None,
+    ) -> None:
+        if not isinstance(result_text, str):
+            result_text = json.dumps(result_text, ensure_ascii=False) if result_text is not None else ""
         cleaned = (result_text or "").strip()
+        if status is not None:
+            self.status = status
+            if returncode is not None:
+                self.returncode = returncode
+        elif is_error:
+            self.status = "error"
+        else:
+            self.status = "done"
+
         if self.tool_type in ("shell", "Shell", "bash", "Bash"):
             if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
                 self.status = "running"
@@ -463,8 +482,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             # done/error/cancelled. Only a terminal failure text marks it red.
             self.result_text = cleaned
             is_launch = " launched (session_id: " in cleaned
-            if is_error or self._is_explicit_error(cleaned):
-                self.status = "error"
+            if self.status == "error":
                 self.render_header()
                 if self.is_expanded:
                     self.render_content()
@@ -479,11 +497,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         else:
             self.result_text = cleaned
-
-        if is_error or self._is_explicit_error(cleaned):
-            self.status = "error"
-        else:
-            self.status = "done"
 
         if not self.is_clickable_header():
             self.is_expanded = False

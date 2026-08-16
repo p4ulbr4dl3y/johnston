@@ -47,7 +47,17 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         targs = val3 if isinstance(val3, dict) else {}
         session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
     elif etype == "tool_result":
-        session.add_event({"type": "tool", "result_text": val1})
+        is_error = step[3] if len(step) > 3 else False
+        status = step[4] if len(step) > 4 else None
+        returncode = step[5] if len(step) > 5 else None
+        event = {"type": "tool", "result_text": val1}
+        if status is not None:
+            event["status"] = status
+        if bool(is_error):
+            event["is_error"] = True
+        if returncode is not None:
+            event["returncode"] = returncode
+        session.add_event(event)
     elif etype == "bot_delta":
         text_accumulator[0] = text_accumulator[0] + val1
         session.add_event({"type": "bot", "text": text_accumulator[0]})

@@ -251,13 +251,13 @@ class TestExecuteToolEdge:
         from tools.registry import execute_tool
 
         res = await execute_tool(None, None)
-        assert res.startswith("ERR: unknown")
+        assert res.content.startswith("ERR: unknown")
 
     async def test_execute_empty_name(self):
         from tools.registry import execute_tool
 
         res = await execute_tool("", None)
-        assert res.startswith("ERR: unknown")
+        assert res.content.startswith("ERR: unknown")
 
     async def test_execute_chained_alias_reaches_canonical(self):
         """BUG: chained alias (zz_chain -> cat -> read) is not fully resolved;
@@ -269,7 +269,7 @@ class TestExecuteToolEdge:
         ALIAS_MAP["zz_chain"] = "cat"
         try:
             res = await execute_tool("zz_chain", {"path": "nonexistent_abc_123.txt"})
-            assert "ERR: unknown" not in res
+            assert "ERR: unknown" not in res.content
         finally:
             del ALIAS_MAP["zz_chain"]
 
@@ -282,7 +282,7 @@ class TestExecuteToolEdge:
         REGISTRY["zz_dummy"] = _DummyTool
         try:
             res = await execute_tool("zz_dummy", {})
-            assert res == "DUMMY_OK"
+            assert res.content == "DUMMY_OK"
         finally:
             del REGISTRY["zz_dummy"]
 
@@ -301,6 +301,6 @@ class TestExecuteToolEdge:
         REGISTRY["zz_boom"] = _Boom
         try:
             res = await execute_tool("zz_boom", {})
-            assert "ERR: execute" in res and "boom" in res
+            assert "ERR: execute" in res.content and "boom" in res.content
         finally:
             del REGISTRY["zz_boom"]

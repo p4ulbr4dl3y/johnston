@@ -7,6 +7,7 @@ import unittest
 import unittest.mock
 
 from core.base_provider import BaseAgent
+from core.domain.defaults.errors import ToolResult
 from tools.registry import execute_tool
 
 
@@ -38,17 +39,18 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("file", res_create)
+        self.assertIn("file", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
         res_read = await execute_tool("read", {"path": file_path})
-        self.assertIn("hello world", res_read)
+        self.assertIn("hello world", res_read.content)
 
     async def test_read_missing_file(self):
         file_path = os.path.join(self.test_dir, "missing.txt")
         res_read = await execute_tool("read", {"path": file_path})
-        self.assertIn("ERR: file", res_read)
+        self.assertIn("ERR: file", res_read.content)
+        self.assertTrue(res_read.is_error)
 
     async def test_edit_tool(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
@@ -56,8 +58,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test valid Edit
         res_edit = await execute_tool("edit", {"path": file_path, "old_string": "line2", "new_string": "line_two"})
-        self.assertIn("line2", res_edit)  # check diff contains old text
-        self.assertIn("line_two", res_edit)  # check diff contains new text
+        self.assertIn("line2", res_edit.content)  # check diff contains old text
+        self.assertIn("line_two", res_edit.content)  # check diff contains new text
 
         # Verify content
         with open(file_path, "r") as f:
@@ -69,10 +71,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
 
         res_read = await execute_tool("read", {"path": file_path, "start_line": 2, "end_line": 3})
-        self.assertIn("Lines 2-3", res_read)
-        self.assertIn("2 | line2", res_read)
-        self.assertIn("3 | line3", res_read)
-        self.assertNotIn("line1", res_read)
+        self.assertIn("Lines 2-3", res_read.content)
+        self.assertIn("2 | line2", res_read.content)
+        self.assertIn("3 | line3", res_read.content)
+        self.assertNotIn("line1", res_read.content)
 
     async def test_edit_missing_text(self):
         file_path = os.path.join(self.test_dir, "edit_test.txt")
@@ -81,7 +83,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_edit = await execute_tool(
             "edit", {"path": file_path, "old_string": "missing_line", "new_string": "replacement"}
         )
-        self.assertIn("ERR: match: exact block not found", res_edit)
+        self.assertIn("ERR: match: exact block not found", res_edit.content)
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")
@@ -90,12 +92,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_edit = await execute_tool(
             "edit", {"path": file_path, "old_string": "duplicate", "new_string": "replacement"}
         )
-        self.assertIn("matches 2 occurrences", res_edit)
+        self.assertIn("matches 2 occurrences", res_edit.content)
 
     async def test_shell_tool_sync(self):
         # Sync shell execution
         res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
-        self.assertEqual(res_shell.strip(), "hello shell")
+        self.assertEqual(res_shell.content.strip(), "hello shell")
 
     def test_compact_command_registered(self):
         from widgets.commands import COMMAND_REGISTRY
@@ -221,7 +223,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertIn("no tasks active", res_list)
+        self.assertIn("no tasks active", res_list.content)
 
     async def test_task_tool_foreground(self):
         import tempfile
@@ -253,7 +255,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool(
             "subagent", {"prompt": "do research", "description": "research task", "branch": "main"}, app=app
         )
-        self.assertIn("subagent 'research task' launched", res)
+        self.assertIn("subagent 'research task' launched", res.content)
 
     async def test_task_tool_background(self):
         import tempfile
@@ -295,7 +297,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool(
             "subagent", {"prompt": "bg task", "description": "bg job", "background": True, "branch": "main"}, app=app
         )
-        self.assertIn("subagent 'bg job' launched", res)
+        self.assertIn("subagent 'bg job' launched", res.content)
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].description, "bg job")
@@ -945,7 +947,8 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
         role_def = AgentRole("explorer", "Explorer", read_only=True, disallowed_tools=["write_file", "create", "edit"])
         err = agent._tool_policy_error("write_file", role_def)
         self.assertIsNotNone(err)
-        self.assertIn("disabled in Explorer role", err)
+        self.assertTrue(err.is_error)
+        self.assertIn("disabled in Explorer role", err.content)
 
     async def test_disallowed_tools_blocks_aliases(self):
         from core.role_registry import AgentRole
@@ -955,7 +958,7 @@ class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
         role_def = AgentRole("locked", "Locked", disallowed_tools=["shell"])
         err = agent._tool_policy_error("shell", role_def)
         self.assertIsNotNone(err)
-        self.assertIn("disabled in Locked role", err)
+        self.assertIn("disabled in Locked role", err.content)
 
 
 class _Chunk:
@@ -1403,12 +1406,18 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         ) as mock_create:
             mock_create.side_effect = [first, second]
             agent.tool_executor = unittest.mock.AsyncMock()
-            with unittest.mock.patch.object(agent, "_tool_policy_error", return_value="blocked by policy"):
+            with unittest.mock.patch.object(
+                agent,
+                "_tool_policy_error",
+                return_value=ToolResult.error("denied", name="shell", detail="blocked by policy"),
+            ):
                 events = []
                 async for evt in agent.stream_steps("run shell"):
                     events.append(evt)
 
-        self.assertIn(("tool_result", "blocked by policy", ""), events)
+        self.assertIn(
+            ("tool_result", "ERR: denied 'shell': blocked by policy", "", True, "error", None), events
+        )
         agent.tool_executor.assert_not_called()
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 

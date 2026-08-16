@@ -14,13 +14,13 @@ from core.application.generation.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin, build_prompt_context
+from core.domain.defaults.errors import ToolResult
 from core.infrastructure.adapters.base import (
     extract_image_payload,
     image_url_block,
     new_tool_call_id,
     parse_tool_call_args,
 )
-from core.infrastructure.errors import format_tool_error
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.models_catalog import catalog
@@ -599,7 +599,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                     policy_err = self._tool_policy_error(t_name, role_def)
                     if policy_err:
-                        tool_result = policy_err
+                        tool_result: Any = policy_err
                     else:
                         tool_result = None
 
@@ -608,24 +608,30 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             try:
                                 tool_result = await self.tool_executor(t_name, args, self)
                             except Exception as e:
-                                tool_result = format_tool_error("execute", detail=str(e), name=t_name)
+                                tool_result = ToolResult.error("execute", detail=str(e), name=t_name)
                         else:
-                            tool_result = format_tool_error("error", "tool_executor not provided", t_name)
+                            tool_result = ToolResult.error("error", "tool_executor not provided", t_name)
 
+                    resolved = self._normalize_tool_result(tool_result)
+
+                    source_for_image = resolved.content if isinstance(tool_result, ToolResult) else tool_result
                     display_result = tool_result
-                    parsed_img = extract_image_payload(tool_result)
+                    parsed_img = extract_image_payload(source_for_image)
                     if parsed_img is not None and parsed_img.get("type") == "image":
                         display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
+                    elif isinstance(tool_result, ToolResult):
+                        display_result = resolved.content or ""
 
-                    yield ("tool_result", display_result, "")
+                    yield (
+                        "tool_result",
+                        display_result,
+                        "",
+                        resolved.is_error,
+                        resolved.status,
+                        resolved.returncode,
+                    )
 
-                    content_str = tool_result
-                    if isinstance(tool_result, (dict, list)):
-                        content_str = json.dumps(tool_result, ensure_ascii=False)
-                    elif tool_result is None:
-                        content_str = ""
-
-                    messages.append({"role": "tool", "tool_call_id": t_id, "content": content_str})
+                    messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 
                 self.history = messages[1:]
                 messages, compacted_in_loop = (

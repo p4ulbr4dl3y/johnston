@@ -83,7 +83,14 @@ class ChatView(VerticalScroll):
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     async def add_tool_call(
-        self, tool_type: str, target: str, result_text: str = "", args: dict = None, animate: bool = True
+        self,
+        tool_type: str,
+        target: str,
+        result_text: str = "",
+        args: dict = None,
+        animate: bool = True,
+        status: str = None,
+        returncode: int = None,
     ) -> ToolCallWidget:
         last_child = None
         for child in reversed(self.children):
@@ -92,7 +99,15 @@ class ChatView(VerticalScroll):
             last_child = child
             break
         is_seq = bool(last_child and isinstance(last_child, ToolCallWidget))
-        widget = ToolCallWidget(tool_type, target, result_text=result_text, is_sequential=is_seq, args=args)
+        widget = ToolCallWidget(
+            tool_type,
+            target,
+            result_text=result_text,
+            is_sequential=is_seq,
+            args=args,
+            status=status,
+            returncode=returncode,
+        )
         should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 

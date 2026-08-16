@@ -165,7 +165,10 @@ async def generate_ai_response(
                     canvas.register_tool_widget(tool_handle)
             elif event_type == "tool_result":
                 if tool_handle:
-                    tool_handle.set_result(val1)
+                    is_error = step[3] if len(step) > 3 else False
+                    status = step[4] if len(step) > 4 else None
+                    returncode = step[5] if len(step) > 5 else None
+                    tool_handle.set_result(val1, is_error=is_error, status=status, returncode=returncode)
                 try:
                     await canvas.save_session()
                 except Exception:  # noqa: BLE001

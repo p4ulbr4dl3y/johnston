@@ -58,7 +58,15 @@ class SessionPersistenceMixin:
                             target = msg.get("target", "")
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
-                            await chat_view.add_tool_call(ttype, target, result_text=rtext, args=targs, animate=False)
+                            await chat_view.add_tool_call(
+                                ttype,
+                                target,
+                                result_text=rtext,
+                                args=targs,
+                                status=msg.get("status"),
+                                returncode=msg.get("returncode"),
+                                animate=False,
+                            )
                         elif mtype == "event_divider":
                             ctxt = msg.get("text", "Session Compacted")
                             await chat_view.add_event_divider(ctxt, animate=False)

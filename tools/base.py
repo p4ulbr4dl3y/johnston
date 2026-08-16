@@ -3,6 +3,7 @@ import json
 import os
 from typing import Any, Dict, Optional, Tuple
 
+from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import atomic_write_text
 from tools.context import ToolContext
 
@@ -252,10 +253,10 @@ def is_mock_manager(mgr: Any) -> bool:
     return type(mgr).__name__.endswith("Mock")
 
 
-def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[str]:
+def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[ToolResult]:
     """Checks the active role's tool policy for an MCP tool call.
 
-    Returns an error string if the tool is disallowed by role policy, else None.
+    Returns an error ToolResult if the tool is disallowed by role policy, else None.
     """
     from core.domain.policies.role_policy import role_tool_error
     from core.role_registry import RoleRegistry
