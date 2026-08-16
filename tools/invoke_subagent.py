@@ -15,6 +15,9 @@ def _record_subagent_session(app: Any, session_id: str) -> None:
     read ``session_id`` from the current tool widget to launch the subagent view on
     click. This helper is the single tools-side touchpoint for that coupling; the
     widget access itself cannot be fully isolated without touching the UI zone.
+
+    Also registers the widget in the host's subagent-tool registry so the
+    background completion callback can repaint the card (yellow -> green/red).
     """
     if app is None:
         return
@@ -27,6 +30,11 @@ def _record_subagent_session(app: Any, session_id: str) -> None:
         setattr(widget, "subagent_session_id", session_id)
     except Exception:
         pass
+    reg = getattr(app, "_subagent_tools", None)
+    if not isinstance(reg, dict):
+        reg = {}
+        app._subagent_tools = reg
+    reg[session_id] = widget
 
 
 class InvokeSubagentTool(BaseTool):

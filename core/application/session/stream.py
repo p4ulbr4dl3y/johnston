@@ -251,6 +251,7 @@ async def run_subagent_stream_bg(
                 pass
         merge_subagent_metrics(subagent, ctx)
         ctx.refresh_status()
+        ctx.mark_subagent_status(session_id or session.id, session.status, acc[0])
 
         if notification_template:
             sid = session_id or session.id

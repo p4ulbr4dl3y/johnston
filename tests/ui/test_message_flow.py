@@ -1066,6 +1066,43 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             app.on_background_shell_completed("missing", "ls", "out")
             self.assertEqual(len(app.message_queue), 0)
 
+    async def test_subagent_completed_widget_done(self):
+        from unittest.mock import MagicMock
+
+        app = JohnstonApp()
+        async with app.run_test():
+            widget = MagicMock()
+            app._subagent_tools["s1"] = widget
+            app.on_subagent_tool_completed("s1", "completed", "ok result")
+            widget.set_result.assert_called_once_with("ok result", is_error=False)
+
+    async def test_subagent_completed_widget_error(self):
+        from unittest.mock import MagicMock
+
+        app = JohnstonApp()
+        async with app.run_test():
+            widget = MagicMock()
+            app._subagent_tools["s1"] = widget
+            app.on_subagent_tool_completed("s1", "error", "boom")
+            widget.set_result.assert_called_once_with("boom", is_error=True)
+
+    async def test_subagent_completed_widget_cancelled(self):
+        from unittest.mock import MagicMock
+
+        app = JohnstonApp()
+        async with app.run_test():
+            widget = MagicMock()
+            app._subagent_tools["s1"] = widget
+            app.on_subagent_tool_completed("s1", "cancelled")
+            widget.mark_cancelled.assert_called_once()
+
+    async def test_subagent_completed_unknown_widget_noop(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            # No widget registered for this session: must not raise.
+            app.on_subagent_tool_completed("missing", "completed", "out")
+            self.assertEqual(len(app.message_queue), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

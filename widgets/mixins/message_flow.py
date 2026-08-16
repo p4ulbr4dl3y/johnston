@@ -242,3 +242,24 @@ class MessageFlowMixin:
             widget.set_result(result or "(no output)", is_error=is_error)
         except Exception as e:
             logger.warning("Background shell widget update failed: %s", e)
+
+    def on_subagent_tool_completed(self, session_id: str, status: str, result: str = "") -> None:
+        """Callback when a background subagent finishes.
+
+        Repaints the linked invoke_subagent tool card (yellow running) to its
+        terminal color: green (done), red (error), or red/struck (cancelled).
+        """
+        if not getattr(self, "is_app_active", True):
+            return
+        try:
+            reg = getattr(self, "_subagent_tools", None)
+            widget = reg.get(session_id) if isinstance(reg, dict) else None
+            if widget is None:
+                return
+            status = (status or "").lower()
+            if status == "cancelled":
+                widget.mark_cancelled()
+            else:
+                widget.set_result(result or "(no output)", is_error=(status == "error"))
+        except Exception as e:
+            logger.warning("Subagent tool completion handling failed: %s", e)
