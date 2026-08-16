@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.widgets import Button
 
-from widgets.chat_view import CustomMarkdownFence
+from widgets.presentation.widgets.chat_markdown import CustomMarkdownFence
 
 
 class TestCodeBlockCopy(unittest.TestCase):

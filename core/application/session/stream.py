@@ -8,7 +8,8 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
-from core.session_manager import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING, AgentSession
+from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING
+from core.session_manager import AgentSession
 
 
 def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:

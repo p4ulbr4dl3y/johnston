@@ -5,7 +5,8 @@ from textual import events
 from textual.widgets import Select
 
 from widgets.chat_input import ChatInput
-from widgets.chat_view import ChatView, WelcomeWidget
+from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 
 class ActionsMixin:

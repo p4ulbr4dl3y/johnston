@@ -8,7 +8,8 @@ from rich.syntax import Syntax
 from rich.text import Text
 from textual._context import active_app
 
-from widgets.chat_view import DiffRenderable, ToolCallWidget
+from widgets.chat_toolcall import ToolCallWidget
+from widgets.presentation.widgets.chat_diff import DiffRenderable
 
 
 class TestToolExpansion(unittest.TestCase):
@@ -320,7 +321,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("2 │ [/dim]b = 'test'", formatted)
 
     def test_thinking_widget_toggle_expand(self):
-        from widgets.chat_view import ThinkingWidget
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
 
         tw = ThinkingWidget("Thinking about problem...")
         tw.finish_thinking(2.5, "Detailed thought process...")
@@ -363,7 +364,8 @@ class TestToolExpansion(unittest.TestCase):
     def test_chat_view_toggle_expand(self):
         from unittest.mock import PropertyMock, patch
 
-        from widgets.chat_view import ChatView, ThinkingWidget
+        from widgets.presentation.widgets.chat_container import ChatView
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
 
         chat_view = ChatView(show_welcome=False)
         tw = ThinkingWidget("Some deep thought")

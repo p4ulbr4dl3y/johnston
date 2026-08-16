@@ -7,8 +7,8 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, Static
 
-from widgets.chat_toolcall import build_synthetic_create_diff
-from widgets.chat_view import ToolScrollBox, format_edit_diff
+from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
+from widgets.presentation.widgets.chat_diff import format_edit_diff
 
 
 class PermissionConfirmScreen(ModalScreen[str]):

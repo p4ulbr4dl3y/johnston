@@ -10,7 +10,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
-from widgets.lexer_utils import guess_lexer_name
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.presentation.widgets.chat_markdown import (
@@ -19,6 +18,7 @@ from widgets.presentation.widgets.chat_markdown import (
     safe_update_markdown,
     to_snake_case,
 )
+from widgets.utils.lexer import guess_lexer_name
 
 _MISSING = object()
 
@@ -734,7 +734,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 else:
                     content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
                     if content is None:
-                        from widgets.tool_helpers import read_file_content
+                        from widgets.utils.file_reader import read_file_content
 
                         content = read_file_content(file_path)
                     if content is None and raw_text:
@@ -846,7 +846,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
 
                     if not clean_code.strip() and fpath:
-                        from widgets.tool_helpers import read_file_content
+                        from widgets.utils.file_reader import read_file_content
 
                         disk_content = read_file_content(fpath)
                         if disk_content is not None:

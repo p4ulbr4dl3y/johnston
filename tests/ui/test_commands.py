@@ -3,7 +3,7 @@ import unittest
 
 from core.infrastructure.tasks.manager import TaskManager
 from widgets.app.dispatch import COMMAND_REGISTRY, handle_slash_command
-from widgets.chat_view import ChatView
+from widgets.presentation.widgets.chat_container import ChatView
 
 
 class MockAgent:

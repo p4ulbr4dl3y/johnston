@@ -1,17 +1,10 @@
-"""Re-export stub keeping historical import paths.
+"""Edit diff builders for tool rendering.
 
-Pure presentation helpers live in :mod:`widgets.utils.lexer`; the edit diff
-builders ``generate_chunk_unified_diff`` / ``build_edit_diff_text`` are kept
-here because they drag in ``core``/``tools`` (forbidden in ``widgets/utils/``).
+The lexer helpers live in :mod:`widgets.utils.lexer`; the edit diff
+builders ``generate_chunk_unified_diff`` / ``build_edit_diff_text``
+live here because they drag in ``core``/``tools`` (forbidden in ``widgets/utils/``).
 """
-import pygments  # noqa: F401  (kept so `widgets.lexer_utils.pygments` resolves for patching)
-
-from widgets.utils.lexer import (  # noqa: F401
-    EXTENSION_MAPPING,
-    HUNK_HEADER_RE,
-    guess_lexer_name,
-    lex_block_to_line_texts,
-)
+from widgets.utils.lexer import HUNK_HEADER_RE
 
 
 def generate_chunk_unified_diff(

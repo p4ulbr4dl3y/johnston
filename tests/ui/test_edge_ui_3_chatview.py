@@ -7,7 +7,8 @@ class TestChatViewEdge(unittest.IsolatedAsyncioTestCase):
     async def test_empty_state_shows_welcome(self):
         app = JohnstonApp()
         async with app.run_test():
-            from widgets.chat_view import ChatView, WelcomeWidget
+            from widgets.presentation.widgets.chat_container import ChatView
+            from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
             chat_view = app.query_one(ChatView)
             welcome = list(chat_view.query(WelcomeWidget))
@@ -36,7 +37,7 @@ class TestChatViewEdge(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test() as pilot:
             chat_view = app.query_one("ChatView")
-            from widgets.chat_view import ToolCallWidget
+            from widgets.chat_toolcall import ToolCallWidget
 
             tool = await chat_view.add_tool_call("read", "f.py", None)
             await pilot.pause()

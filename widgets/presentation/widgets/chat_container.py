@@ -2,9 +2,9 @@ import asyncio
 
 from textual.containers import VerticalScroll
 
+from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
-from widgets.presentation.widgets.chat_tools import ToolCallWidget
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 

@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.session_manager import SessionStore, is_ui_visible_user_message
+from core.domain.entities.session import is_ui_visible_user_message
+from core.session_manager import SessionStore
 
 
 def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore:

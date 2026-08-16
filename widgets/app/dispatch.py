@@ -108,7 +108,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
             prompt = f"The following skill(s) have been invoked:\n\n{skills_content}"
 
         try:
-            from widgets.chat_view import ChatView
+            from widgets.presentation.widgets.chat_container import ChatView
 
             chat_view = app.query_one(ChatView)
 

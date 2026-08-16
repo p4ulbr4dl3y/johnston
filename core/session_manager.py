@@ -7,13 +7,9 @@ from typing import Any, Dict, List, Optional
 
 from core.domain.entities.session import (
     MAIN_STATUS_ACTIVE,
-    STATUS_CANCELLED,
-    STATUS_COMPLETED,
-    STATUS_ERROR,
     SUBAGENT_STATUS_RUNNING,
     _coerce_float,
     _coerce_int,
-    is_ui_visible_user_message,
 )
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
@@ -548,20 +544,5 @@ class SessionStore:
                     return sess
 
         return None
-
-
-# Re-export pure domain constants/helpers for existing consumers.
-import core.domain.entities.session as _session_entities  # noqa: E402,F401
-
-__all__ = [
-    "MAIN_STATUS_ACTIVE",
-    "STATUS_CANCELLED",
-    "STATUS_COMPLETED",
-    "STATUS_ERROR",
-    "SUBAGENT_STATUS_RUNNING",
-    "_coerce_float",
-    "_coerce_int",
-    "is_ui_visible_user_message",
-]
 
 

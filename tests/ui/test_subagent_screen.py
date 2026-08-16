@@ -324,7 +324,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.chat_view import ThinkingWidget, ToolCallWidget
+            from widgets.chat_toolcall import ToolCallWidget
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
 
             tw = screen.query_one(ThinkingWidget)
             tc = screen.query_one(ToolCallWidget)
@@ -346,7 +347,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.chat_view import ToolCallWidget
+            from widgets.chat_toolcall import ToolCallWidget
             from widgets.presentation.widgets.chat_messages import UserMessage
 
             um = screen.query_one(UserMessage)

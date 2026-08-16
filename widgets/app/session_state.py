@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from core.session_manager import is_ui_visible_user_message
+from core.domain.entities.session import is_ui_visible_user_message
 
 
 def collect_session_data(app: Any) -> Optional[dict]:

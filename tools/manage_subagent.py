@@ -2,11 +2,8 @@ import asyncio
 from typing import Any, Dict
 
 from core.domain.defaults.errors import format_tool_error
-from core.session_manager import (
-    STATUS_CANCELLED,
-    STATUS_ERROR,
-    SessionStore,
-)
+from core.domain.entities.session import STATUS_CANCELLED, STATUS_ERROR
+from core.session_manager import SessionStore
 from tools.base import BaseTool
 
 

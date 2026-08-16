@@ -4,7 +4,7 @@ from typing import Any
 from pygments.lexers import get_lexer_by_name
 from rich.text import Span, Text
 
-from widgets.lexer_utils import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
+from widgets.utils.lexer import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
 
 
 class DiffRenderable:

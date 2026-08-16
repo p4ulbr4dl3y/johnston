@@ -3,11 +3,9 @@
 Keeps ``widgets/chat_toolcall.py`` from importing ``tools.registry`` directly
 on critical paths or from performing side-effect normalization during ``__init__``.
 
-Pure presentation helpers (e.g. :func:`read_file_content`) are re-exported from
-:mod:`widgets.utils.file_reader` to preserve historical import paths.
+Pure presentation helpers (e.g. ``read_file_content``) live in
+:mod:`widgets.utils.file_reader`.
 """
-from widgets.utils.file_reader import read_file_content  # noqa: F401
-
 
 def normalize_tool_name(name: str) -> str:
     """Wrapper around ``tools.registry.normalize_tool_name``."""
