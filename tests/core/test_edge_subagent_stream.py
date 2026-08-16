@@ -254,12 +254,16 @@ class FakeCtx:
         self.app = _FakeApp(FakeAgent())
         self.refreshed = 0
         self.messages = []
+        self.subagent_statuses = []
 
     def refresh_status(self):
         self.refreshed += 1
 
     def trigger_ai_response(self, msg):
         self.messages.append(msg)
+
+    def mark_subagent_status(self, session_id, status, result=""):
+        self.subagent_statuses.append((session_id, status, result))
 
 
 class FakeStreamCompleteSubagent(FakeSubagent):
@@ -277,6 +281,8 @@ class TestRunStream:
         assert result == "hi"
         assert sess.status == STATUS_COMPLETED  # uses string "completed"
         assert store.saved == [sess]
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_COMPLETED
 
     @pytest.mark.asyncio
     async def test_cancelled_error_sets_cancelled_status(self):
@@ -288,6 +294,8 @@ class TestRunStream:
         assert result == "[Subagent cancelled]"
         assert sess.status == STATUS_CANCELLED
         assert store.saved == [sess]
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_CANCELLED
 
     @pytest.mark.asyncio
     async def test_generic_exception_sets_error_status_with_prefix(self):
@@ -299,6 +307,8 @@ class TestRunStream:
         assert result == "[MyPrefix: boom]"
         assert sess.status == STATUS_ERROR
         assert store.saved == [sess]
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
 
     @pytest.mark.asyncio
     async def test_cleanup_fn_raises_does_not_mask_result(self):

@@ -3,6 +3,7 @@ from widgets.patch import apply_textual_patches
 apply_textual_patches()
 
 from pathlib import Path
+from typing import Any
 
 from textual.app import App
 
@@ -43,6 +44,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.pm = ProviderManager()
         self.sm = SessionStore()
         self.task_manager = TaskManager(self)
+        self._subagent_tools: dict[str, Any] = {}
         self.agent = self.pm.create_active_agent()
         self.role = getattr(self.agent, "role", "worker") if self.agent else "worker"
         if self.agent:

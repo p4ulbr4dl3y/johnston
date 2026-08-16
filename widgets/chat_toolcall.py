@@ -457,6 +457,26 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return
             if cleaned:
                 self.result_text = cleaned
+        elif self.canonical_tool == "invoke_subagent":
+            # Launching a subagent is asynchronous: keep the card yellow
+            # ("running") until the background completion callback flips it to
+            # done/error/cancelled. Only a terminal failure text marks it red.
+            self.result_text = cleaned
+            is_launch = " launched (session_id: " in cleaned
+            if is_error or self._is_explicit_error(cleaned):
+                self.status = "error"
+                self.render_header()
+                if self.is_expanded:
+                    self.render_content()
+            elif is_launch:
+                self.status = "running"
+                self.render_header()
+            else:
+                self.status = "done"
+                self.render_header()
+                if self.is_expanded:
+                    self.render_content()
+            return
         else:
             self.result_text = cleaned
 

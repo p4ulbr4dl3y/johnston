@@ -96,6 +96,14 @@ class ToolContext:
         if self.host:
             self._host_call("refresh_status_footer")
 
+    def mark_subagent_status(self, session_id: str, status: str, result: str = "") -> None:
+        """Notify the host that a background subagent finished with ``status``.
+
+        The host (UI zone) repaints the linked invoke_subagent tool card from
+        running (yellow) to done/error/cancelled. No-op when unsupported.
+        """
+        self._host_call("on_subagent_tool_completed", session_id, status, result)
+
     @property
     def task_manager(self) -> Any | None:
         """Host task manager via legacy attribute or protocol method fallback."""

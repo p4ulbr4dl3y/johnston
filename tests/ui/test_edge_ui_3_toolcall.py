@@ -78,5 +78,29 @@ class TestEdgeToolCallStatus(unittest.TestCase):
         self.assertEqual(widget.status, "done")
 
 
+class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
+    def test_launch_result_is_running_yellow(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
+        self.assertEqual(widget.status, "running")
+
+    def test_final_result_is_done_green(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
+        widget.set_result("the bug is fixed")
+        self.assertEqual(widget.status, "done")
+
+    def test_launch_error_is_red(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget.set_result("ERR: provider unavailable", is_error=True)
+        self.assertEqual(widget.status, "error")
+
+    def test_final_error_is_red(self):
+        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget.set_result("subagent 'x' launched (session_id: subagent-abc)")
+        widget.set_result("Subagent error: boom", is_error=True)
+        self.assertEqual(widget.status, "error")
+
+
 if __name__ == "__main__":
     unittest.main()
