@@ -245,16 +245,19 @@ class ParsingMixin:
             return syntax
         return None
 
-    def _is_explicit_error(self, text: str) -> bool:
-        """True only when the tool result carries the explicit `ERR:` convention.
+    def _is_error(self, text: str) -> bool:
+        """True only when the tool card carries the `status == "error"` state.
 
-        The tools layer localizes all failures through ``format_tool_error`` whose
-        canonical prefix is ``ERR:``. Instead of guessing errors by matching
-        pattern keywords (`Traceback`, `error:`, `fatal:`, ...) across arbitrary
-        output, we treat only that explicit marker as authoritative. Combined with
-        the explicit ``is_error`` flag passed by the caller, there is no heuristic
-        classification of tool output.
+        The presentation layer never parses result text to classify a tool's
+        outcome: status is received as a structured field from the stream event
+        (``is_error``/``status``). The text is left untouched for display. This
+        helper is kept for the render paths so the "error branch" is reached for
+        both the card's error status and any legacy inline ``ERR:`` marker that
+        predates structured status (e.g. legacy session reloads that never
+        persisted a status).
         """
+        if self.status in ("error", "cancelled"):
+            return True
         if not text:
             return False
         return text.lstrip().lower().startswith("err:")
@@ -431,7 +434,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if status is not None:
             self.status = status
         else:
-            self.status = "error" if self._is_explicit_error(result_text) else ("running" if not result_text else "done")
+            # Status is a structured input (from the stream event or session
+            # reload), never derived from result text. Default to "running" when
+            # the tool has no result yet, "done" when it already has output.
+            self.status = "running" if not result_text else "done"
 
         is_clickable = self.is_clickable_header()
         header_cls = f"{TOOL_HEADER} {TOOL_HEADER_EXPANDABLE}" if is_clickable else TOOL_HEADER
@@ -466,6 +472,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         status: str = None,
         returncode: int = None,
     ) -> None:
+        """Apply a tool's terminal/streamed result to the card.
+
+        Status comes in structurally (``status``/``is_error`` from the stream
+        event); the widget never classifies result text to derive it. The text is
+        kept as-is for display. When neither flag is provided we fall back to
+        ``is_error`` (callers pass it directly) and finally to the existing card
+        state so a completion that omits status keeps its prior color.
+        """
         if not isinstance(result_text, str):
             result_text = json.dumps(result_text, ensure_ascii=False) if result_text is not None else ""
         cleaned = (result_text or "").strip()
@@ -476,33 +490,16 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         elif is_error:
             self.status = "error"
         else:
-            self.status = "error" if self._is_explicit_error(cleaned) else "done"
+            self.status = "done"
 
         if self.tool_type in ("shell", "Shell", "bash", "Bash"):
-            if "[Background Task ID:" in cleaned or "Command is running in the background" in cleaned:
-                self.status = "running"
-                self.render_header()
-                return
             if cleaned:
                 self.result_text = cleaned
         elif self.canonical_tool == "invoke_subagent":
-            # Launching a subagent is asynchronous: keep the card yellow
-            # ("running") until the background completion callback flips it to
-            # done/error/cancelled. Only a terminal failure text marks it red.
             self.result_text = cleaned
-            is_launch = " launched (session_id: " in cleaned
-            if self.status == "error":
-                self.render_header()
-                if self.is_expanded:
-                    self.render_content()
-            elif is_launch:
-                self.status = "running"
-                self.render_header()
-            else:
-                self.status = "done"
-                self.render_header()
-                if self.is_expanded:
-                    self.render_content()
+            self.render_header()
+            if self.is_expanded:
+                self.render_content()
             return
         else:
             self.result_text = cleaned
@@ -711,7 +708,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             file_path = nargs.get("path") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._is_explicit_error(raw_text):
+                if self._is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 elif raw_text and (
                     "@@" in raw_text
@@ -770,7 +767,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 "multi_replace",
             ):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._is_explicit_error(raw_text):
+                if self._is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 else:
                     diff_text = raw_text
@@ -786,7 +783,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
             elif self.tool_type in ("update_plan", "Plan", "plan"):
                 raw_text = (self.result_text or "").strip()
-                if self.status == "error" or self._is_explicit_error(raw_text):
+                if self._is_error(raw_text):
                     self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
                 else:
                     plan_items = self.args.get("plan") or []
@@ -797,7 +794,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.content_widget.update(self._format_ask_user_display())
             elif self.tool_type in ("web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
-                if self._is_explicit_error(raw_text):
+                if self._is_error(raw_text):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                     self.content_widget.display = True
@@ -837,7 +834,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         self.content_widget.display = False
             elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
-                if self._is_explicit_error(raw_text):
+                if self._is_error(raw_text):
                     t = Text(raw_text.strip(), style="bold #ffffff")
                     self.content_widget.update(t)
                     self.content_widget.display = True

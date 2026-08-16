@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Dict
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
@@ -206,4 +206,11 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        return ToolResult.done(f"subagent '{description}' launched (session_id: {session_id})")
+        # Launching is asynchronous: the subagent session is now running in the
+        # background, so the ToolResult carries RUNNING status. The presentation
+        # reads this structured status (yellow card) instead of guessing from the
+        # text. The completion callback later repaints it to DONE/ERROR/CANCELLED.
+        return ToolResult(
+            status=ToolResultStatus.RUNNING,
+            content=f"subagent '{description}' launched (session_id: {session_id})",
+        )

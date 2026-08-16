@@ -1035,29 +1035,33 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
 
     async def test_completed_updates_widget_done(self):
         from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
             app.is_generating = False
             widget = MagicMock()
             task = ShellTask("t1", "ls", widget=widget)
+            task.status = TaskStatus.COMPLETED
             app.task_manager.register(task)
             with patch.object(app, "generate_ai_response"):
                 app.on_background_shell_completed("t1", "ls", "some output")
-            widget.set_result.assert_called_once_with("some output", is_error=False)
+            widget.set_result.assert_called_once_with("some output", status="done")
 
     async def test_completed_updates_widget_error(self):
         from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
             app.is_generating = False
             widget = MagicMock()
             task = ShellTask("t1", "ls", widget=widget)
+            task.status = TaskStatus.ERROR
             app.task_manager.register(task)
             with patch.object(app, "generate_ai_response"):
                 app.on_background_shell_completed("t1", "ls", "ERR: command failed")
-            widget.set_result.assert_called_once_with("ERR: command failed", is_error=True)
+            widget.set_result.assert_called_once_with("ERR: command failed", status="error")
 
     async def test_completed_no_widget_noop(self):
         app = JohnstonApp()

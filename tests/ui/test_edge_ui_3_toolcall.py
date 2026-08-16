@@ -72,6 +72,21 @@ class TestEdgeToolCallStatus(unittest.TestCase):
         widget.set_result(None)
         self.assertEqual(widget.status, "done")
 
+    def test_set_result_status_is_structured_not_parsed(self):
+        """Status arrives as a field; result text is never classified to derive it.
+        A shell background payload only becomes ``running`` when status says so,
+        and a plain error-like string stays ``done`` without a structured flag."""
+        widget = ToolCallWidget("shell", "ls")
+        widget.set_result("Command is running in the background [Background Task ID: shell_1]")
+        self.assertEqual(widget.status, "done")
+        widget.set_result("[Background Task ID: shell_1] moved to background", status="running")
+        self.assertEqual(widget.status, "running")
+
+    def test_set_result_error_via_flag(self):
+        widget = ToolCallWidget("shell", "ls")
+        widget.set_result("ERR: provider unavailable", is_error=True)
+        self.assertEqual(widget.status, "error")
+
     def test_mark_cancelled_when_not_running_noop(self):
         widget = ToolCallWidget("read", "f.py", "already done")
         widget.mark_cancelled()
@@ -79,26 +94,32 @@ class TestEdgeToolCallStatus(unittest.TestCase):
 
 
 class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
-    def test_launch_result_is_running_yellow(self):
+    def test_launch_result_is_running_when_status_running(self):
+        """Invoke-subagent status comes from the event ('launched' is status
+        RUNNING because the subagent runs in the background, not parsed from
+        text). A bare set_result with no status still defaults to done."""
         widget = ToolCallWidget("invoke_subagent", "task", args={})
-        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
+        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)", status="running")
         self.assertEqual(widget.status, "running")
+        widget2 = ToolCallWidget("invoke_subagent", "task", args={})
+        widget2.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
+        self.assertEqual(widget2.status, "done")
 
     def test_final_result_is_done_green(self):
         widget = ToolCallWidget("invoke_subagent", "task", args={})
-        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
+        widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)", status="running")
         widget.set_result("the bug is fixed")
         self.assertEqual(widget.status, "done")
 
     def test_launch_error_is_red(self):
         widget = ToolCallWidget("invoke_subagent", "task", args={})
-        widget.set_result("ERR: provider unavailable", is_error=True)
+        widget.set_result("ERR: provider unavailable", status="error")
         self.assertEqual(widget.status, "error")
 
     def test_final_error_is_red(self):
         widget = ToolCallWidget("invoke_subagent", "task", args={})
-        widget.set_result("subagent 'x' launched (session_id: subagent-abc)")
-        widget.set_result("Subagent error: boom", is_error=True)
+        widget.set_result("subagent 'x' launched (session_id: subagent-abc)", status="running")
+        widget.set_result("Subagent error: boom", status="error")
         self.assertEqual(widget.status, "error")
 
 

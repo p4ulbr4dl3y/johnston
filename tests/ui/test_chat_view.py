@@ -1042,14 +1042,16 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget = ToolCallWidget("read", "a\n\n b \t c")
         self.assertEqual(widget.target, "a b c")
         self.assertEqual(widget.status, "running")
-        # Only the explicit `ERR:` convention marks an error (no pattern guessing).
+        # Status is a structured input, never parsed from result text: a plain
+        # "Error:" line stays done unless a status/is_error is passed.
         widget2 = ToolCallWidget("shell", "cmd", result_text="Error: failed")
         self.assertEqual(widget2.status, "done")
         widget2b = ToolCallWidget("shell", "cmd", result_text="ERR: execute 'shell': boom")
-        self.assertEqual(widget2b.status, "error")
+        self.assertEqual(widget2b.status, "done")
         widget3 = ToolCallWidget("read", "f.py", result_text="ok")
         self.assertEqual(widget3.status, "done")
-        # "Error:" alone is not the explicit convention -> done.
+        widget4 = ToolCallWidget("read", "f.py", result_text="ERR: boom", status="error")
+        self.assertEqual(widget4.status, "error")
         widget5 = ToolCallWidget("read", "f.py", result_text="Error: boom")
         self.assertEqual(widget5.status, "done")
 
@@ -1095,17 +1097,24 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertIsNotNone(truncated)
         self.assertIsNone(widget._format_json_result("plain text"))
 
-    def test_is_explicit_error(self):
+    def test_is_error(self):
         widget = ToolCallWidget("shell", "cmd")
-        # Only the explicit `ERR:` prefix is an error (case/padding-insensitive).
-        self.assertTrue(widget._is_explicit_error("ERR: boom"))
-        self.assertTrue(widget._is_explicit_error("  err: boom"))
-        self.assertFalse(widget._is_explicit_error("Error: boom"))
-        self.assertFalse(widget._is_explicit_error("Traceback (most recent call last):\n..."))
-        self.assertFalse(widget._is_explicit_error("Permission denied"))
-        self.assertFalse(widget._is_explicit_error("Command failed"))
-        self.assertFalse(widget._is_explicit_error("all good"))
-        self.assertFalse(widget._is_explicit_error(""))
+        # Render helper drives the "error branch" off the structured card status;
+        # the text itself is never the source of classification.
+        widget.status = "error"
+        self.assertTrue(widget._is_error("success output"))
+        widget.status = "cancelled"
+        self.assertTrue(widget._is_error("partial output"))
+        widget.status = "done"
+        self.assertFalse(widget._is_error("all good"))
+        # Legacy inline `ERR:` marker still routes to the error branch even when
+        # no structured status was persisted (legacy session reloads).
+        self.assertTrue(widget._is_error("  err: boom"))
+        self.assertFalse(widget._is_error("Error: boom"))
+        self.assertFalse(widget._is_error("Traceback (most recent call last):\n..."))
+        self.assertFalse(widget._is_error("Permission denied"))
+        self.assertFalse(widget._is_error("Command failed"))
+        self.assertFalse(widget._is_error(""))
 
     def test_get_status_color(self):
         widget = ToolCallWidget("shell", "cmd")
@@ -1290,7 +1299,11 @@ class TestToolCallWidgetRendering(unittest.TestCase):
 
     def test_set_result_shell_background(self):
         widget = self._widget("shell", "cmd")
-        widget.set_result("Command is running in the background", is_error=False)
+        # Status comes from the event: background text alone doesn't set running.
+        widget.set_result("Command is running in the background")
+        self.assertEqual(widget.status, "done")
+        # Structured RUNNING status flips the card yellow.
+        widget.set_result("Command is running in the background", status="running")
         self.assertEqual(widget.status, "running")
 
     def test_set_result_error_and_nonexpandable(self):

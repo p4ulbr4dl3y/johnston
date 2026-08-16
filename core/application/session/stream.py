@@ -284,7 +284,7 @@ def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int
 
     cancelled = 0
     for sess in sessions:
-        if getattr(sess, "status", "") != "running":
+        if getattr(sess, "status", "") != SUBAGENT_STATUS_RUNNING:
             continue
         async_task = getattr(sess, "async_task", None)
         if async_task and not async_task.done():

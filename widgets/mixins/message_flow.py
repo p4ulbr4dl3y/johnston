@@ -239,12 +239,9 @@ class MessageFlowMixin:
             return
         try:
             task_status = (getattr(getattr(task, "status"), "value", None) or "").lower()
-            status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed") else None)
+            status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else None)
             if status is not None:
                 widget.set_result(result or "(no output)", status=status)
-            else:
-                is_error = (result or "").lstrip().lower().startswith("err:")
-                widget.set_result(result or "(no output)", is_error=is_error)
         except Exception as e:
             logger.warning("Background shell widget update failed: %s", e)
 

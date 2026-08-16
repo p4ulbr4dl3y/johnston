@@ -126,7 +126,7 @@ class TestToolExpansion(unittest.TestCase):
             result_text=error_text,
             args={"path": "test.py", "old_str": "foo", "new_str": "bar"},
         )
-        widget.set_result(error_text)
+        widget.set_result(error_text, status="error")
         self.assertEqual(widget.status, "error")
         # Error results are feedback for the agent, not user content — not expandable.
         self.assertFalse(widget.is_expandable())
@@ -160,7 +160,7 @@ class TestToolExpansion(unittest.TestCase):
             result_text=error_text,
             args={"path": "/some/dir", "content": "some content"},
         )
-        widget.set_result(error_text)
+        widget.set_result(error_text, status="error")
         self.assertEqual(widget.status, "error")
         # Error results are feedback for the agent, not user content — not expandable.
         self.assertFalse(widget.is_expandable())
@@ -174,7 +174,7 @@ class TestToolExpansion(unittest.TestCase):
     def test_update_plan_error_display(self):
         error_text = "ERR: 'plan' must be non-empty"
         widget = ToolCallWidget(tool_type="update_plan", target="plan", result_text=error_text, args={"plan": []})
-        widget.set_result(error_text)
+        widget.set_result(error_text, status="error")
         self.assertEqual(widget.status, "error")
         # Error results are feedback for the agent, not user content — not expandable.
         self.assertFalse(widget.is_expandable())
