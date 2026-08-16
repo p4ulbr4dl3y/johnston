@@ -5,7 +5,7 @@ import copy
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 
 HARDENED_SHELL_DESCRIPTION = (
-    "Run a synchronous terminal command with a configurable timeout (default 60s, max 300s). "
+    "Run a synchronous terminal command with a configurable timeout (default 120s, max 600s). "
     "Processes terminate on timeout. Always use non-interactive flags (e.g. -y, --non-interactive) to prevent hanging."
 )
 
@@ -15,7 +15,8 @@ def apply_role_tools(subagent, definition) -> None:
 
     Disables nested subagent spawning, background task management, UI questions,
     and applies the role's read-only/allowed/disallowed lists. The shell tool's
-    description is replaced with a non-interactive, timeout-bound variant.
+    description is replaced with a non-interactive, timeout-bound variant and
+    background execution is stripped.
     """
     subagent.allow_task = False
     subagent.tools = [
@@ -39,5 +40,8 @@ def _rebuild_tool(t) -> dict:
     if isinstance(t, dict) and t.get("function", {}).get("name") == "shell":
         t_copy = copy.deepcopy(t)
         t_copy["function"]["description"] = HARDENED_SHELL_DESCRIPTION
+        params = t_copy.get("function", {}).get("parameters", {})
+        if isinstance(params, dict) and "properties" in params and isinstance(params["properties"], dict):
+            params["properties"].pop("background", None)
         return t_copy
     return t

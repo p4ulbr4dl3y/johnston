@@ -77,6 +77,13 @@ class ShellTool(BaseTool):
         },
     }
 
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        if not is_subagent:
+            return self.schema
+        from core.roles.tools import _rebuild_tool
+
+        return _rebuild_tool(self.schema)
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         from tools.registry import normalize_tool_args
 

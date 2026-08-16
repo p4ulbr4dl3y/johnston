@@ -333,5 +333,9 @@ class BaseTool:
         # subagent flag, and working directory (cwd/project_dir) it carries.
         return ToolContext(app=ctx_or_app)
 
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        """Returns tool schema, optionally tailored for subagents."""
+        return self.schema
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> str:
         raise NotImplementedError

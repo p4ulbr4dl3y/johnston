@@ -137,6 +137,17 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertNotIn("## Subagents (use as `subagent_type`", prompt)
         self.assertIn("## Environment Metadata", prompt)
 
+    def test_build_tools_subagent_hardens_shell(self):
+        from tools.shell import ShellTool
+
+        builder = PromptBuilder("Test", [ShellTool().schema], role="worker", is_subagent=True)
+        tools = builder.build_tools()
+        shell = next((t for t in tools if t.get("function", {}).get("name") == "shell"), None)
+        self.assertIsNotNone(shell)
+        props = shell["function"]["parameters"]["properties"]
+        self.assertNotIn("background", props)
+        self.assertIn("synchronous", shell["function"]["description"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()

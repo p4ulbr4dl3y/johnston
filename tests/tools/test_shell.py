@@ -570,6 +570,21 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("session_allowed", res)
         pm.clear_session_overrides()
 
+    def test_shell_get_schema_main(self):
+        schema = self.tool.get_schema(is_subagent=False)
+        params = schema["function"]["parameters"]["properties"]
+        self.assertIn("background", params)
+        self.assertIn("command", params)
+        self.assertIn("timeout", params)
+
+    def test_shell_get_schema_subagent(self):
+        schema = self.tool.get_schema(is_subagent=True)
+        params = schema["function"]["parameters"]["properties"]
+        self.assertNotIn("background", params)
+        self.assertIn("command", params)
+        self.assertIn("timeout", params)
+        self.assertIn("synchronous", schema["function"]["description"].lower())
+
 
 if __name__ == "__main__":
     unittest.main()
