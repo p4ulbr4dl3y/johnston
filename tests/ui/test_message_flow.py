@@ -260,7 +260,7 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
 class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def _run(self, stream_fn, setup=None):
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream_fn)
@@ -337,7 +337,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             seen_events.append(event.get("text"))
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -362,7 +362,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
 
         ui_texts = []
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -382,7 +382,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             yield ("queued_user_message", "Mid-turn", None, True)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=Exception("boom")):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=Exception("boom")):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -397,7 +397,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             raise ValueError("API failed")
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -414,7 +414,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             yield ("bot_text", "hello", "")
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=Exception("boom")):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=Exception("boom")):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -436,7 +436,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             if calls["n"] >= 2:
                 raise Exception("boom")
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -457,7 +457,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             if calls["n"] >= 2:
                 raise Exception("boom")
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -471,7 +471,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             yield ("bot_text", "hello", "")
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -505,7 +505,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -531,7 +531,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         generation instead of being queued against a dead one."""
         app = JohnstonApp()
         ran = []
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
 
@@ -573,7 +573,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -597,7 +597,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -625,7 +625,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -651,7 +651,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -678,7 +678,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -706,7 +706,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -759,7 +759,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             yield ("tool", "bash", "run", {"cmd": "ls"})
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -778,7 +778,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(30.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -899,7 +899,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             if calls["n"] >= 2:
                 raise Exception("boom")
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -915,7 +915,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(5.0)
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -939,7 +939,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             raise ValueError("API failed")
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -960,7 +960,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             yield ("bot_text", "done", "")
 
         app = JohnstonApp()
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)
@@ -988,7 +988,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
             if calls["n"] >= 3:
                 raise Exception("boom")
 
-        with patch("core.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 _configure_connected(app, stream)

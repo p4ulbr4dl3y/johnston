@@ -3,9 +3,9 @@ import logging
 
 from textual import events, work
 
+from widgets.app.dispatch import handle_slash_command
 from widgets.chat_input import ChatInput
 from widgets.chat_view import ChatView
-from widgets.commands import handle_slash_command
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger(__name__)

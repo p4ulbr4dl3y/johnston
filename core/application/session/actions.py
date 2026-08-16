@@ -135,7 +135,7 @@ async def get_rewind_git_stats(
     Returns list of (child_idx, text, git_stat) where git_stat is a formatted
     string like '+12 / -4', 'no changes', or ''.
     """
-    from core.git_checkpoint import GitCheckpointManager
+    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
     msgs_with_stats: list[tuple[int, str, str]] = []
     checkpoints_enabled = False
@@ -236,7 +236,7 @@ def rewind_session(
     if curr_sid:
         async def _restore_git_bg():
             try:
-                from core.git_checkpoint import GitCheckpointManager
+                from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
                 await asyncio.to_thread(
                     GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
                 )

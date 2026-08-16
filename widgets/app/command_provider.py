@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 
 from core.application.skills.manager import SkillManager
-from widgets.commands import COMMAND_REGISTRY
+from widgets.app.dispatch import COMMAND_REGISTRY
 
 _command_suggestions_cache: list[tuple[str, str]] = []
 _command_suggestions_cache_time: float = 0.0

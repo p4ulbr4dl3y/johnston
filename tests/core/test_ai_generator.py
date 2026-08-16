@@ -91,7 +91,7 @@ async def test_user_message_not_rendered_when_hidden():
 
 @pytest.mark.asyncio
 async def test_git_checkpoint_called_for_queued_message():
-    from core import git_checkpoint
+    from core.infrastructure.storage import git_checkpoint
 
     created = []
     real_create = git_checkpoint.GitCheckpointManager.create_checkpoint

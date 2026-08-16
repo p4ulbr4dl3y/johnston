@@ -6,8 +6,8 @@ import unittest
 from unittest import mock
 
 from core.application.rules.rules import RuleDefinition, RulesManager
-from core.git_checkpoint import GitCheckpointManager
 from core.infrastructure.runtime.git_utils import run_git
+from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
 def _write_rule(project_dir, fname, content):

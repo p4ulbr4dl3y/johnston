@@ -475,12 +475,3 @@ COMMAND_CLASSES = [
     PermissionsCommand,
     QuestionsCommand,
 ]
-
-
-# Registry building + dispatch now live in widgets.app.dispatch, keyed off
-# COMMAND_CLASSES above. Re-export the registry and handler for back-compat.
-from widgets.app.dispatch import (  # noqa: E402, F401
-    COMMAND_REGISTRY,
-    build_command_registry,
-    handle_slash_command,
-)

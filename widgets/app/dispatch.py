@@ -5,10 +5,8 @@ Owns building ``COMMAND_REGISTRY`` from ``COMMAND_CLASSES`` and the
 ``widgets.commands`` (they are bound to screen imports there); this module only
 wires/executes them.
 
-To avoid an import cycle (``widgets.commands`` re-exports the registry/handler
-from here after binding ``COMMAND_CLASSES``), ``COMMAND_CLASSES`` is imported
-lazily, and the registry is read from ``widgets.commands`` at handle time so
-tests patching ``widgets.commands.COMMAND_REGISTRY`` keep working.
+``COMMAND_CLASSES`` is imported lazily to avoid an import cycle (command
+classes are bound to screens in ``widgets.commands``); the registry lives here.
 """
 from __future__ import annotations
 
@@ -35,10 +33,7 @@ COMMAND_REGISTRY = build_command_registry()
 
 async def handle_slash_command(app, command_text: str) -> bool:
     """Executes command if registered or skill found. Returns True if handled."""
-    from widgets import commands as _commands
-
-    # Read registry from widgets.commands so patches against that name apply here.
-    registry = _commands.COMMAND_REGISTRY
+    registry = COMMAND_REGISTRY
 
     if not command_text:
         return False

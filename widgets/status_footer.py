@@ -605,10 +605,6 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
 
         self._render_footer()
 
-    def update_subagent_footer(self, session) -> None:
-        """Alias for update_session for compatibility."""
-        self.update_session(session)
-
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
         self._render_footer()

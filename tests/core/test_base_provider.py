@@ -100,7 +100,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res_shell.content.strip(), "hello shell")
 
     def test_compact_command_registered(self):
-        from widgets.commands import COMMAND_REGISTRY
+        from widgets.app.dispatch import COMMAND_REGISTRY
 
         self.assertIn("/compact", COMMAND_REGISTRY)
 

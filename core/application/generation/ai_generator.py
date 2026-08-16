@@ -15,6 +15,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
+from core.application.session.stream import record_subagent_step
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,7 +65,7 @@ async def _create_git_checkpoint_async(
     project_path: Optional[str],
 ) -> None:
     """Persist the session and snapshot a shadow git checkpoint for the newest user message."""
-    from core.git_checkpoint import GitCheckpointManager
+    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
     try:
         await canvas.save_session()
@@ -294,10 +296,3 @@ async def _handle_interruption(
             tool_handle.mark_cancelled()
         except Exception:  # noqa: BLE001
             pass
-
-
-def record_subagent_step(step: tuple, session: Any, text_accumulator: list) -> None:
-    """Delegate to the canonical subagent step recorder (URL kept for clarity)."""
-    from core.application.session.stream import record_subagent_step as _rs
-
-    _rs(step, session, text_accumulator)
