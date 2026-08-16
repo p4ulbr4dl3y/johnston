@@ -50,9 +50,7 @@ class ManageSubagentTool(BaseTool):
             if show_all:
                 target_sessions = store.list(kind="subagent")
             else:
-                target_sessions = (
-                    store.get_subagents_for_parent(curr_session_id) if curr_session_id else store.list(kind="subagent")
-                )
+                target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
             if not target_sessions:
                 return ToolResult.done("No subagent sessions found for current session.")
             lines = ["Active/Past Subagent Sessions:"]

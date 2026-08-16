@@ -120,9 +120,7 @@ class InvokeSubagentTool(BaseTool):
         store = get_session_store(ctx.host)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
-        active_sessions = (
-            store.get_subagents_for_parent(parent_session_id) if parent_session_id else store.list(kind="subagent")
-        )
+        active_sessions = store.children(parent_session_id) if parent_session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
         if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
             return ToolResult.error(

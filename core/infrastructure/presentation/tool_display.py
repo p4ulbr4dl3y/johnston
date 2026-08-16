@@ -45,8 +45,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
     """
     from tools.registry import normalize_tool_name
 
-    raw_name = (tool_name or "").lower()
-    name = normalize_tool_name(raw_name)
+    name = normalize_tool_name(tool_name)
     args = args or {}
 
     if name == "ask_user":

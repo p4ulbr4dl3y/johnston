@@ -76,11 +76,11 @@ You run tests and report coverage.""")
 
 class TestSubagentApplyRole(unittest.TestCase):
     def test_main_scope_role_falls_back_to_worker(self):
-        """A main-only role must never run as a subagent; apply_subagent_role
+        """A main-only role must never run as a subagent; configure_subagent_agent
         must substitute the worker definition instead of using it verbatim."""
         import tempfile
 
-        from core.application.session.stream import apply_subagent_role
+        from core.application.session.stream import configure_subagent_agent
         from core.role_registry import RoleRegistry
 
         registry = RoleRegistry.get_instance()
@@ -93,7 +93,7 @@ class TestSubagentApplyRole(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             agent = _FakeAgent()
             agent.tools = []
-            apply_subagent_role(agent, "orchestrator", project_dir=tmpdir)
+            configure_subagent_agent(agent, "orchestrator", app=None, project_dir=tmpdir)
             # The subagent must end up bound to the worker role, not orchestrator.
             self.assertEqual(agent.role, "worker")
 

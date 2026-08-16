@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Tuple
 
 from core.application.generation.prompt_builder import PromptBuilder
 from core.infrastructure.runtime.token_util import estimate_tokens
+from core.infrastructure.runtime.tool_name import normalize_tool_name
 from core.models_catalog import catalog
 
 
@@ -13,7 +14,7 @@ class ToolMixin:
         normalizer = getattr(self, "tool_name_normalizer", None)
         if normalizer:
             return normalizer(tool_name or "")
-        return (tool_name or "").strip().lower()
+        return normalize_tool_name(tool_name)
 
     def _normalize_tool_result(self, result: Any) -> Any:
         """Normalize a raw tool result into a :class:`ToolResult`.

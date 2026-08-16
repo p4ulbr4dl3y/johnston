@@ -12,7 +12,7 @@ import time
 from typing import Any, Callable, List, Optional, Tuple
 
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.infrastructure.runtime.frontmatter import iter_md_files
+from core.infrastructure.runtime.frontmatter import MD_EXTENSIONS, iter_md_files
 from core.infrastructure.runtime.fs_signature import compute_dir_signature
 
 _CACHE_TTL = 2.0  # seconds
@@ -61,7 +61,7 @@ class MarkdownScannerCache:
         build: Optional[Callable[[MarkdownDirs, List[Tuple[str, str]]], Any]] = None,
     ) -> Any:
         dirs = build_markdown_dirs(project_dir, include_global=include_global, subpath=self.subpath)
-        signature = compute_dir_signature(dirs, [".md", ".markdown"]) or ()
+        signature = compute_dir_signature(dirs, MD_EXTENSIONS) or ()
         now = time.time()
         if (
             self._signature is not None

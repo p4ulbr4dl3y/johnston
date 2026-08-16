@@ -37,9 +37,5 @@ def collect_current_tasks(app, current_session_id: str) -> TaskCollection:
         from core.session_manager import SessionStore
 
         store = SessionStore.get_instance()
-    sessions = (
-        store.get_subagents_for_parent(current_session_id)
-        if current_session_id
-        else store.list(kind="subagent")
-    )
+    sessions = store.children(current_session_id) if current_session_id else store.list(kind="subagent")
     return TaskCollection(shell_tasks=bg_tasks, subagent_tasks=sessions)

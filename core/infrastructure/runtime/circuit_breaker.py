@@ -1,5 +1,14 @@
 import time
+from enum import Enum
 from typing import Dict
+
+
+class CircuitState(str, Enum):
+    """Circuit breaker lifecycle state for a provider."""
+
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
 
 
 class CircuitBreakerOpenError(Exception):
@@ -20,26 +29,26 @@ class CircuitBreaker:
         self.failure_threshold = failure_threshold
         self.cooldown_seconds = cooldown_seconds
         self._failures: Dict[str, int] = {}
-        self._state: Dict[str, str] = {}  # "CLOSED", "OPEN", "HALF_OPEN"
+        self._state: Dict[str, CircuitState] = {}
         self._opened_at: Dict[str, float] = {}
 
-    def get_state(self, provider_key: str) -> str:
-        state = self._state.get(provider_key, "CLOSED")
-        if state == "OPEN":
+    def get_state(self, provider_key: str) -> CircuitState:
+        state = self._state.get(provider_key, CircuitState.CLOSED)
+        if state == CircuitState.OPEN:
             opened_time = self._opened_at.get(provider_key, 0.0)
             if time.time() - opened_time >= self.cooldown_seconds:
-                self._state[provider_key] = "HALF_OPEN"
-                return "HALF_OPEN"
+                self._state[provider_key] = CircuitState.HALF_OPEN
+                return CircuitState.HALF_OPEN
         return state
 
     def allow_request(self, provider_key: str) -> bool:
         state = self.get_state(provider_key)
-        if state in ("CLOSED", "HALF_OPEN"):
+        if state in (CircuitState.CLOSED, CircuitState.HALF_OPEN):
             return True
         return False
 
     def remaining_cooldown(self, provider_key: str) -> float:
-        if self.get_state(provider_key) != "OPEN":
+        if self.get_state(provider_key) != CircuitState.OPEN:
             return 0.0
         opened_time = self._opened_at.get(provider_key, time.time())
         elapsed = time.time() - opened_time
@@ -47,20 +56,20 @@ class CircuitBreaker:
 
     def record_success(self, provider_key: str):
         self._failures[provider_key] = 0
-        self._state[provider_key] = "CLOSED"
+        self._state[provider_key] = CircuitState.CLOSED
         self._opened_at.pop(provider_key, None)
 
     def record_failure(self, provider_key: str):
         current_state = self.get_state(provider_key)
-        if current_state == "HALF_OPEN":
-            self._state[provider_key] = "OPEN"
+        if current_state == CircuitState.HALF_OPEN:
+            self._state[provider_key] = CircuitState.OPEN
             self._opened_at[provider_key] = time.time()
             return
 
         failures = self._failures.get(provider_key, 0) + 1
         self._failures[provider_key] = failures
         if failures >= self.failure_threshold:
-            self._state[provider_key] = "OPEN"
+            self._state[provider_key] = CircuitState.OPEN
             self._opened_at[provider_key] = time.time()
 
 

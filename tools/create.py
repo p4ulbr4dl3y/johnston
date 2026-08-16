@@ -2,7 +2,8 @@ import os
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool, make_unified_diff, read_file_text, resolve_path, write_file_text
+from core.infrastructure.runtime.git_utils import make_git_diff
+from tools.base import BaseTool, read_file_text, resolve_path, write_file_text
 from tools.cancel import run_cancellable
 
 
@@ -55,7 +56,7 @@ class CreateTool(BaseTool):
             await run_cancellable(write_file_text, path, content)
 
             if file_existed:
-                diff_text = make_unified_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
+                diff_text = make_git_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
                 if not diff_text:
                     new_lines = content.splitlines()
                     cnt = len(new_lines) or 1

@@ -4,6 +4,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
+from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 
 class RoleScope(str, Enum):
@@ -87,7 +88,7 @@ def _tool_policy_result(
     """
     if not tool_name:
         return True, None
-    clean = (tool_name or "").strip().lower()
+    clean = normalize_tool_name(tool_name)
     if clean.startswith("functions."):
         clean = clean.split(".", 1)[1]
 

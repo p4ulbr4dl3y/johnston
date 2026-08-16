@@ -80,16 +80,6 @@ def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, proj
     """
     subagent.app = app
     subagent.is_subagent = True
-    return apply_subagent_role(subagent, role_key, project_dir=project_dir)
-
-
-def apply_subagent_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
-    """Applies a role definition to a subagent agent.
-
-    Thin facade delegating to the decomposed core.roles package (resolution,
-    provider switching, tool filtering, prompt/model wiring). Kept as the
-    public entry point used by invoke_subagent and manage_subagent follow-ups.
-    """
     from core.roles import apply_role
 
     return apply_role(subagent, role_key, project_dir=project_dir)
@@ -278,7 +268,7 @@ def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int
     cancellation lives here instead of a parallel in-memory task registry.
     """
     if parent_id:
-        sessions = store.get_subagents_for_parent(parent_id)
+        sessions = store.children(parent_id)
     else:
         sessions = store.list(kind="subagent")
 

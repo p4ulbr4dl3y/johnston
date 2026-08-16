@@ -480,9 +480,6 @@ class SessionStore:
     def children(self, parent_id: str) -> List[AgentSession]:
         return [s for s in self.list() if s.parent_id == parent_id]
 
-    def get_subagents_for_parent(self, parent_id: str) -> List[AgentSession]:
-        return self.children(parent_id)
-
     # -- save/delete -------------------------------------------------------
 
     def save(self, sess: AgentSession) -> None:

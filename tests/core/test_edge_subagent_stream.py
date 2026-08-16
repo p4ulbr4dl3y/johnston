@@ -5,8 +5,8 @@ import asyncio
 import pytest
 
 from core.application.session.stream import (
-    apply_subagent_role,
     cancel_running_subagents,
+    configure_subagent_agent,
     merge_subagent_metrics,
     record_subagent_step,
     run_subagent_stream_bg,
@@ -507,7 +507,7 @@ class TestSafeSaves:
 
 
 # ---------------------------------------------------------------------------
-# apply_subagent_role
+# configure_subagent_agent
 # ---------------------------------------------------------------------------
 
 
@@ -571,7 +571,7 @@ class TestApplyRole:
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"orchestrator": main_role, "worker": worker_role})
         sub = FakeSubagentAgent(tools=[_tool("shell")])
-        returned = apply_subagent_role(sub, "orchestrator")
+        returned = configure_subagent_agent(sub, "orchestrator")
         assert sub.role == "worker"
         assert returned.scope != "main"
 
@@ -581,7 +581,7 @@ class TestApplyRole:
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
         sub = FakeSubagentAgent(tools=[_tool("shell")])
-        returned = apply_subagent_role(sub, "does_not_exist_xyz")
+        returned = configure_subagent_agent(sub, "does_not_exist_xyz")
         assert hasattr(returned, "key")  # not None
 
     def test_tools_none_becomes_empty(self, monkeypatch):
@@ -590,7 +590,7 @@ class TestApplyRole:
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
         sub = FakeSubagentAgent(tools=None)
-        apply_subagent_role(sub, "worker")
+        configure_subagent_agent(sub, "worker")
         assert sub.tools == []
 
     def test_shell_description_overridden_others_preserved(self, monkeypatch):
@@ -599,7 +599,7 @@ class TestApplyRole:
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
         sub = FakeSubagentAgent(tools=[_tool("shell"), _tool("read"), _tool("edit")])
-        apply_subagent_role(sub, "worker")
+        configure_subagent_agent(sub, "worker")
         names = [t["function"]["name"] for t in sub.tools]
         assert names == ["shell", "read", "edit"]
         shell = next(t for t in sub.tools if t["function"]["name"] == "shell")
@@ -613,7 +613,7 @@ class TestApplyRole:
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
         sub = FakeSubagentAgent(tools=[_tool("shell"), _tool("invoke_subagent"), _tool("ask_user")])
-        apply_subagent_role(sub, "worker")
+        configure_subagent_agent(sub, "worker")
         names = [t["function"]["name"] for t in sub.tools]
         assert "invoke_subagent" not in names
         assert "ask_user" not in names
@@ -630,7 +630,7 @@ class FakeCancelStore:
         self.sessions = sessions or []
         self.saved = []
 
-    def get_subagents_for_parent(self, parent_id):
+    def children(self, parent_id):
         return [s for s in self.sessions if s.parent_id == parent_id]
 
     def list(self, kind=None):

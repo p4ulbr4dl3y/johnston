@@ -1,6 +1,6 @@
 """Pure-core session actions — NO widget/Textual imports.
 
-Functions: new_session, resume_session, compact_session, rewind_session.
+Functions: new_session, compact_session, rewind_session.
 Callers (commands.py) handle UI orchestration (push_screen, callback, focus, notify).
 """
 import asyncio
@@ -113,22 +113,6 @@ async def new_session(
 
     agent.clear_history()
     return new_id
-
-
-# ---------------------------------------------------------------------------
-# resume_session
-# ---------------------------------------------------------------------------
-
-def resume_session(
-    sm: SessionStore,
-    sid: str,
-) -> str:
-    """Resolve session id for resume.  Returns the sid to load.
-
-    The UI caller calls ``app.load_session_ui(sid)`` afterwards.
-    No validation on this layer — store presence is checked by the caller.
-    """
-    return sid
 
 
 # ---------------------------------------------------------------------------

@@ -3,9 +3,9 @@ import os
 from typing import Any, Dict, List, Tuple
 
 from core.domain.defaults.errors import ToolResult, format_tool_error
+from core.infrastructure.runtime.git_utils import make_git_diff
 from tools.base import (
     BaseTool,
-    make_unified_diff,
     read_file_text,
     resolve_path,
     try_int,
@@ -275,7 +275,7 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
             lines = new_text.splitlines(keepends=True)
 
     new_content = "".join(lines)
-    diff_output = make_unified_diff(content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
+    diff_output = make_git_diff(content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
     return new_content, diff_output
 
 

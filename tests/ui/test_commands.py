@@ -520,7 +520,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify = MagicMock()
         app.push_screen = MagicMock()
         app.sm = MagicMock()
-        app.sm.get_subagents_for_parent.return_value = []
+        app.sm.children.return_value = []
 
         cmd = SubagentsCommand()
         await cmd.execute(app)
@@ -538,7 +538,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.notify = MagicMock()
         app.push_screen = MagicMock()
         app.sm = MagicMock()
-        app.sm.get_subagents_for_parent.return_value = [MagicMock()]
+        app.sm.children.return_value = [MagicMock()]
 
         cmd = SubagentsCommand()
         await cmd.execute(app)

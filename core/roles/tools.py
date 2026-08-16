@@ -2,7 +2,7 @@
 
 import copy
 
-from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
+from core.domain.policies.role_policy import role_tool_error
 
 HARDENED_SHELL_DESCRIPTION = (
     "Run a synchronous terminal command with a configurable timeout (default 120s, max 600s). "
@@ -16,23 +16,16 @@ def apply_role_tools(subagent, definition) -> None:
     Disables nested subagent spawning, background task management, UI questions,
     and applies the role's read-only/allowed/disallowed lists. The shell tool's
     description is replaced with a non-interactive, timeout-bound variant and
-    background execution is stripped.
+    background execution is stripped. Uses the same single role-tool policy
+    (``role_tool_error`` with ``is_subagent=True``) as prompt_builder and the
+    role registry.
     """
     subagent.allow_task = False
     subagent.tools = [
         t
         for t in (getattr(subagent, "tools", None) or [])
-        if t.get("function", {}).get("name", "").lower() not in SUBAGENT_EXCLUDED_TOOLS
+        if role_tool_error(definition, t.get("function", {}).get("name", ""), is_subagent=True) is None
     ]
-
-    read_only = getattr(definition, "read_only", False)
-    disallowed = getattr(definition, "disallowed_tools", None)
-    allowed = getattr(definition, "allowed_tools", None)
-    if read_only or disallowed or allowed:
-        subagent.tools = [
-            t for t in subagent.tools if definition.is_tool_allowed(t.get("function", {}).get("name", "")) is None
-        ]
-
     subagent.tools = [_rebuild_tool(t) for t in subagent.tools]
 
 

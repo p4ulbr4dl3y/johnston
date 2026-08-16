@@ -102,7 +102,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         screen = SubagentsScreen()
         app = DummyHostApp(screen)
         app.sm = MagicMock()
-        app.sm.get_subagents_for_parent.return_value = []
+        app.sm.children.return_value = []
 
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -123,7 +123,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         app = DummyHostApp(screen)
         app.current_session_id = "main-1"
         app.sm = MagicMock()
-        app.sm.get_subagents_for_parent.return_value = [sub_session]
+        app.sm.children.return_value = [sub_session]
 
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -150,7 +150,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         app = DummyHostApp(screen)
         app.current_session_id = "main-1"
         app.sm = MagicMock()
-        app.sm.get_subagents_for_parent.return_value = [sub_session]
+        app.sm.children.return_value = [sub_session]
 
         async with app.run_test() as pilot:
             await pilot.pause()

@@ -1,7 +1,7 @@
 import inspect
 import json
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import atomic_write_text
@@ -12,7 +12,6 @@ __all__ = [
     "write_file_text",
     "read_file_text",
     "try_int",
-    "make_unified_diff",
     "get_fuzzy_matches",
     "truncate_output",
     "format_background_notification",
@@ -58,26 +57,6 @@ def try_int(val: Any, default: int | None = None) -> int | None:
         return int(val)
     except (ValueError, TypeError):
         return default
-
-
-def make_unified_diff(
-    old_content: str | list[str],
-    new_content: str | list[str],
-    fromfile: str = "old",
-    tofile: str = "new",
-) -> str:
-    """Generates unified diff text string from two strings or lists of lines.
-
-    Uses git's patience diff when available, falling back to difflib.
-    """
-    from core.infrastructure.runtime.git_utils import make_git_diff
-
-    return make_git_diff(
-        old_content,
-        new_content,
-        fromfile=fromfile,
-        tofile=tofile,
-    )
 
 
 def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: float = 0.4) -> list[str]:
@@ -132,16 +111,6 @@ def _write_output_log(
     except Exception:
         return None
     return log_path
-
-
-def _truncate_output_leading(text: str, max_chars: int) -> Tuple[str, int]:
-    """Clips text to the leading max_chars and reports the shown line count.
-
-    Shared leading-truncation step so callers only append their own footer text.
-    """
-    from tools.utils import truncate_leading
-
-    return truncate_leading(text, max_chars)
 
 
 def truncate_output(
@@ -199,7 +168,9 @@ def truncate_output(
         header += "]\n...\n"
         return header + truncated
     else:
-        truncated, shown_lines = _truncate_output_leading(text, max_chars)
+        from tools.utils import truncate_leading
+
+        truncated, shown_lines = truncate_leading(text, max_chars)
         next_line = shown_lines + 1
         footer = f"\n... [Output truncated at {max_chars} chars (lines 1-{shown_lines} shown)."
         if save_log:

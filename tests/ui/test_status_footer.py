@@ -61,7 +61,7 @@ class FooterTestApp(App):
                 self.status = status
 
         self.sm = MagicMock()
-        self.sm.get_subagents_for_parent.return_value = [
+        self.sm.children.return_value = [
             DummySession("running"),
             DummySession("completed"),
         ]

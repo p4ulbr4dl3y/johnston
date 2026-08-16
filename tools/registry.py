@@ -3,6 +3,7 @@ import json
 from typing import Any, Dict, Type
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
+from core.infrastructure.runtime.tool_name import normalize_tool_name
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
@@ -48,16 +49,6 @@ def _close_match_candidates() -> list[str]:
         return _CLOSE_MATCH_CANDIDATES
     _CLOSE_MATCH_CANDIDATES[:] = _build_close_match_candidates()
     return _CLOSE_MATCH_CANDIDATES
-
-
-def normalize_tool_name(name: str) -> str:
-    """Normalizes a tool name for case/whitespace-insensitive dispatch.
-
-    Strip + lowercase only. No alias resolution.
-    """
-    if not name:
-        return ""
-    return name.strip().lower()
 
 
 def get_default_tools() -> list[Dict[str, Any]]:

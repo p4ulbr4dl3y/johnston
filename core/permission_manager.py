@@ -11,6 +11,7 @@ from core.domain.policies.permission_policy import (
 )
 from core.infrastructure.platform.paths import CONFIG_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json
+from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 
 class PermissionManager:
@@ -44,13 +45,13 @@ class PermissionManager:
 
     def _normalize_name(self, tool_name: str) -> str:
         """Canonicalizes a tool name via the injected normalizer, falling back
-        to a plain lowercase strip when none is provided."""
+        to the shared normalize_tool_name when none is provided."""
         if self.tool_name_normalizer:
             try:
                 return self.tool_name_normalizer(tool_name)
             except Exception:
-                return (tool_name or "").strip().lower()
-        return (tool_name or "").strip().lower()
+                return normalize_tool_name(tool_name)
+        return normalize_tool_name(tool_name)
 
     def clear_session_overrides(self) -> None:
         self.session_overrides.clear()
@@ -70,7 +71,6 @@ class PermissionManager:
         if target_type != "tool":
             raise ValueError(f"Invalid target_type: '{target_type}'")
 
-        target_name = (target_name or "").strip().lower()
         target_name = self._normalize_name(target_name)
 
         # Validate the raw value BEFORE normalization: normalize_action() would
@@ -114,8 +114,7 @@ class PermissionManager:
         Returns a PermissionDecision(action, reason) where action is
         PermissionAction.ALLOW/ASK/DENY.
         """
-        raw_tool = (tool_name or "").strip().lower()
-        canonical_name = self._normalize_name(raw_tool)
+        canonical_name = self._normalize_name(tool_name)
         # Fail-closed: an empty/absent tool name must never grant execution.
         if not canonical_name:
             return PermissionDecision(PermissionAction.DENY, "No tool name given")

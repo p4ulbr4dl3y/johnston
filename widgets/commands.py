@@ -14,7 +14,6 @@ from core.application.session.actions import (
     compact_session,
     get_rewind_git_stats,
     new_session,
-    resume_session,
     rewind_session,
 )
 from core.application.skills.manager import SkillManager
@@ -282,7 +281,6 @@ class ResumeCommand(BaseCommand):
                 app.is_generating = False
                 if hasattr(app, "message_queue"):
                     app.message_queue.clear()
-                resume_session(app.sm, selected_sid)
                 app.load_session_ui(selected_sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
@@ -298,7 +296,7 @@ class SubagentsCommand(BaseCommand):
         store = getattr(app, "sm", None)
         curr_sid = getattr(app, "current_session_id", None)
         has_sessions = bool(
-            store and (store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent"))
+            store and (store.children(curr_sid) if curr_sid else store.list(kind="subagent"))
         )
 
         if not has_sessions:

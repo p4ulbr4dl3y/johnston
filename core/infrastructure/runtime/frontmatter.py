@@ -6,6 +6,10 @@ Provides unified YAML frontmatter parsing, CSV/bracket list parsing, and directo
 import os
 from typing import Any, Dict, Generator, List, Tuple
 
+# Canonical markdown file extensions used across frontmatter scanning and the
+# signature-based cache (markdown_scanner). Single source of truth.
+MD_EXTENSIONS: Tuple[str, ...] = (".md", ".markdown")
+
 
 def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     """
@@ -87,7 +91,7 @@ def iter_md_files(dirs: List[Tuple[str, str]]) -> Generator[Tuple[str, str], Non
         scanned_paths.add(rpath)
 
         for fname in sorted(os.listdir(dpath)):
-            if fname.endswith(".md") or fname.endswith(".markdown"):
+            if fname.endswith(MD_EXTENSIONS):
                 fpath = os.path.join(dpath, fname)
                 if os.path.isfile(fpath):
                     yield fpath, source

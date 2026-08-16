@@ -249,7 +249,7 @@ class SubagentsScreen(BaseModalScreen[None]):
 
         store = get_session_store(self.app)
         curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None
-        sessions = store.get_subagents_for_parent(curr_sid) if curr_sid else store.list(kind="subagent")
+        sessions = store.children(curr_sid) if curr_sid else store.list(kind="subagent")
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()

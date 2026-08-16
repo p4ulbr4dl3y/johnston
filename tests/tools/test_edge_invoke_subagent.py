@@ -427,7 +427,7 @@ class _FailingSaveStore(list):
     def list(self, *a, **k):
         return []
 
-    def get_subagents_for_parent(self, pid):
+    def children(self, pid):
         return []
 
     def create_subagent(self, *a, **k):
@@ -466,8 +466,8 @@ class _DieSaveStore:
     def list(self, *a, **k):
         return self._real.list(*a, **k)
 
-    def get_subagents_for_parent(self, pid):
-        return self._real.get_subagents_for_parent(pid)
+    def children(self, pid):
+        return self._real.children(pid)
 
     def create_subagent(self, *a, **k):
         return self._real.create_subagent(*a, **k)

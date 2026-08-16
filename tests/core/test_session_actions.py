@@ -5,7 +5,6 @@ import unittest
 from core.application.session.actions import (
     compact_session,
     new_session,
-    resume_session,
     rewind_session,
 )
 
@@ -231,13 +230,6 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(called_idx, [1])
         self.assertEqual(len(agent.history), 1)
         self.assertEqual(agent.history[0]["content"], "Msg 0")
-
-
-class TestResumeSession(unittest.TestCase):
-    def test_resume_returns_sid(self):
-        from core.session_manager import SessionStore
-
-        self.assertEqual(resume_session(SessionStore(), "abc"), "abc")
 
 
 if __name__ == "__main__":
