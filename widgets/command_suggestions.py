@@ -22,11 +22,6 @@ class CommandSuggestions(OptionList):
         self._cached_files: list[str] = []
         self._cache_time: float = 0.0
 
-    @staticmethod
-    def get_all_command_suggestions() -> list[tuple[str, str]]:
-        """Gets list of (command_name, description) for registered commands and skills with 10s cache."""
-        return get_all_command_suggestions()
-
     def get_workspace_files(self) -> list[str]:
         """Gets relative file paths list in current project with 5s caching"""
         now = time.time()
@@ -98,7 +93,7 @@ class CommandSuggestions(OptionList):
                     self.at_start_idx = slash_idx
                     query_lower = query_part.lower()
                     matched_cmds = []
-                    all_cmds = self.get_all_command_suggestions()
+                    all_cmds = get_all_command_suggestions()
                     max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
                     padding = max(16, max_cmd_len + 2)
                     for cmd, desc in all_cmds:

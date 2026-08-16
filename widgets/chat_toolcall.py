@@ -322,7 +322,7 @@ class _DisplayNamesDict(dict):
     }
 
     def get(self, key, default=None):
-        from widgets.tool_helpers import normalize_tool_name
+        from tools.registry import normalize_tool_name
 
         canonical = normalize_tool_name(key)
         if canonical in self.CANONICAL_NAMES:
@@ -334,7 +334,8 @@ class _SystemToolsSet(set):
     def __contains__(self, item):
         if not isinstance(item, str):
             return False
-        from widgets.tool_helpers import is_system_tool, normalize_tool_name
+        from tools.registry import normalize_tool_name
+        from widgets.tool_helpers import is_system_tool
 
         lower = item.lower()
         canonical = normalize_tool_name(lower)
@@ -377,7 +378,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     }
 
     def is_expandable(self) -> bool:
-        from widgets.tool_helpers import normalize_tool_name
+        from tools.registry import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
         # Shell output is always useful to the user (return code / stdout),
@@ -416,7 +417,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
-        from widgets.tool_helpers import normalize_tool_name
+        from tools.registry import normalize_tool_name
 
         self.tool_type = tool_type
         self.canonical_tool = normalize_tool_name(tool_type)
