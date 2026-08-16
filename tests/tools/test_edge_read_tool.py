@@ -321,7 +321,6 @@ async def test_start_as_non_numeric_string(tmp_path, ctx):
     assert "ERR:" not in res, res
 
 
-@pytest.mark.skip(reason="BUG(DoS): start_line huge -> unbounded readline loop in _read_file_lines even after EOF (tools/read.py:367-368). Hangs forever; cannot run.")
 @pytest.mark.asyncio
 async def test_start_huge_integer(tmp_path, ctx):
     p = wb(tmp_path, "huge.txt", b"a\n")

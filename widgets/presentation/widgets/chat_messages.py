@@ -7,6 +7,7 @@ from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
 
 from widgets.presentation.widgets.chat_markdown import (
+    _handle_markdown_task_done,
     clean_markdown_for_rendering,
     safe_update_markdown,
 )
@@ -35,15 +36,6 @@ class UserMessage(Horizontal):
     def __init__(self, content: str, markup: bool = False):
         self.raw_text = content
         super().__init__(Static(content, markup=markup, classes="user-msg-bubble"), classes="user-msg")
-
-
-def _handle_markdown_task_done(task: asyncio.Task) -> None:
-    try:
-        task.result()
-    except asyncio.CancelledError:
-        pass
-    except Exception:
-        pass
 
 
 class BotMessage(Vertical):

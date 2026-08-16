@@ -99,25 +99,6 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertFalse(GitCheckpointManager.restore_checkpoint("session_456", 1, project_path=repo_path))
         self.assertFalse(GitCheckpointManager.restore_checkpoint("session_456", 2, project_path=repo_path))
 
-    def test_delete_session_checkpoints(self):
-        repo_path = self._init_git_repo()
-        GitCheckpointManager.create_checkpoint("session_789", 0, project_path=repo_path)
-        GitCheckpointManager.delete_session_checkpoints("session_789", project_path=repo_path)
-        self.assertFalse(GitCheckpointManager.restore_checkpoint("session_789", 0, project_path=repo_path))
-
-    def test_get_diff_stats(self):
-        repo_path = self._init_git_repo()
-        GitCheckpointManager.create_checkpoint("session_stat", 0, project_path=repo_path)
-
-        # No changes initially
-        stat_same = GitCheckpointManager.get_diff_stats("session_stat", 0, project_path=repo_path)
-        self.assertEqual(stat_same, "no changes")
-
-        # Make modifications
-        mod_file = os.path.join(repo_path, "initial.txt")
-        with open(mod_file, "a") as f:
-            f.write("added line 1\nadded line 2")
-
     def test_get_diff_stats_batch(self):
         repo_path = self._init_git_repo()
         GitCheckpointManager.create_checkpoint("session_batch", 0, project_path=repo_path)

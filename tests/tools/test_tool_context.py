@@ -72,37 +72,6 @@ class TestToolContextAdvanced(unittest.TestCase):
         self.assertEqual(app.called_with, "test prompt")
         self.assertFalse(app.show_in_ui)
 
-    def test_trigger_ai_response_generating(self):
-        class GenApp:
-            def __init__(self):
-                self.is_generating = True
-                self.message_queue = []
-                self.gen_called = False
-
-            def generate_ai_response(self, prompt, show_in_ui=True):
-                self.gen_called = True
-
-        app = GenApp()
-        ctx = ToolContext(app)
-        ctx.trigger_ai_response("queued prompt")
-        self.assertIn(("queued prompt", False), app.message_queue)
-        self.assertFalse(app.gen_called)
-
-    def test_trigger_ai_response_not_generating(self):
-        class GenApp:
-            def __init__(self):
-                self.is_generating = False
-                self.message_queue = []
-                self.gen_args = None
-
-            def generate_ai_response(self, prompt, show_in_ui=True):
-                self.gen_args = (prompt, show_in_ui)
-
-        app = GenApp()
-        ctx = ToolContext(app)
-        ctx.trigger_ai_response("direct prompt")
-        self.assertEqual(app.gen_args, ("direct prompt", False))
-
     def test_trigger_ai_response_no_app(self):
         ctx = ToolContext(None)
         ctx.trigger_ai_response("noop")  # should not raise

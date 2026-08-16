@@ -109,50 +109,27 @@ class ToolContext:
         """Host task manager via legacy attribute or protocol method fallback."""
         if not self.host:
             return None
-        mgr = getattr(self.host, "task_manager", None)
-        if mgr is not None:
-            return mgr
-        if getattr(self.host, "get_task_manager", None) is not None and callable(getattr(self.host, "get_task_manager")):
-            return self.host.get_task_manager()
-        return None
+        return getattr(self.host, "task_manager", None)
 
     @property
     def provider_manager(self) -> Any | None:
-        """Host provider manager (``pm``) via legacy attribute or protocol fallback."""
+        """Host provider manager (``pm``) via legacy attribute."""
         if not self.host:
             return None
-        pm = getattr(self.host, "pm", None)
-        if pm is not None:
-            return pm
-        if getattr(self.host, "get_provider_manager", None) is not None and callable(
-            getattr(self.host, "get_provider_manager")
-        ):
-            return self.host.get_provider_manager()
-        return None
+        return getattr(self.host, "pm", None)
 
     @property
     def session_id(self) -> str | None:
-        """Current session id via legacy attribute or protocol method fallback."""
+        """Current session id via legacy attribute."""
         if not self.host:
             return None
-        sid = getattr(self.host, "current_session_id", None)
-        if sid is not None:
-            return sid
-        if getattr(self.host, "get_current_session_id", None) is not None and callable(
-            getattr(self.host, "get_current_session_id")
-        ):
-            return self.host.get_current_session_id()
-        return None
+        return getattr(self.host, "current_session_id", None)
 
     @property
     def project_dir(self) -> str:
         """Returns the project directory from host app, or fallback to self.cwd / os.getcwd()."""
         if self.host:
             pdir = getattr(self.host, "project_dir", None)
-            if not pdir:
-                get_pd = getattr(self.host, "get_project_dir", None)
-                if get_pd is not None and callable(get_pd):
-                    pdir = get_pd()
             if isinstance(pdir, str) and pdir.strip():
                 return pdir
         return self.cwd or os.getcwd()

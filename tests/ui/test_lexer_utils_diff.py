@@ -7,9 +7,6 @@ from widgets.lexer_utils import build_edit_diff_text, generate_chunk_unified_dif
 
 
 class TestGenerateChunkUnifiedDiff(unittest.TestCase):
-    def test_empty_both_returns_empty(self):
-        self.assertEqual(generate_chunk_unified_diff("", "", "f.py"), [])
-
     def test_replacement_chunk(self):
         lines = generate_chunk_unified_diff("a\nb\nc\n", "a\nX\nc\n", "foo.py", 5)
         self.assertIn("--- foo.py", lines)

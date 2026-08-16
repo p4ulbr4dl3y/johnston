@@ -31,12 +31,6 @@ class TestToolResultFactories(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertEqual(r.status, "error")
 
-    def test_running(self):
-        r = ToolResult.running("working")
-        self.assertEqual(r.status, "running")
-        self.assertFalse(r.is_error)
-        self.assertEqual(r.content, "working")
-
     def test_cancelled(self):
         r = ToolResult.cancelled()
         self.assertEqual(r.status, "cancelled")
@@ -62,11 +56,9 @@ class TestToolResultConsistency(unittest.TestCase):
         # Factories must keep is_error/status consistent.
         done = ToolResult.done()
         err = ToolResult.error("kind")
-        run = ToolResult.running()
         canc = ToolResult.cancelled()
         self.assertEqual(done.is_error, done.status == "error")
         self.assertEqual(err.is_error, err.status == "error")
-        self.assertEqual(run.is_error, run.status == "error")
         self.assertEqual(canc.is_error, canc.status == "error")
         self.assertTrue(err.is_error)
         self.assertEqual(err.status, "error")

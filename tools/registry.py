@@ -87,25 +87,16 @@ async def check_and_confirm_permission(
     args: Dict[str, Any],
     context_or_app: Any,
     confirm_tool_name: str | None = None,
-    *,
-    action: str | None = None,
-    action_reason: str = "",
 ) -> ToolResult | None:
     """
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
     Returns None if allowed, or an error ToolResult if denied/cancelled.
-
-    When `action` is provided (e.g. a caller that already evaluated role
-    policy), the PermissionManager check is skipped and the given action is used.
     """
     from core.permission_manager import PermissionManager
 
     pm = PermissionManager.get_instance()
     app_obj = _resolve_app(context_or_app)
-    if action is not None:
-        action, reason = action, action_reason
-    else:
-        action, reason = pm.check_permission(target_perm_name, args)
+    action, reason = pm.check_permission(target_perm_name, args)
 
     if action == "deny":
         return ToolResult.error("denied", name=display_name, detail="by permission policy")
