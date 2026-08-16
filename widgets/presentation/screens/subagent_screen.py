@@ -5,8 +5,8 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Label
 
-from core.session_manager import is_ui_visible_user_message
-from widgets.chat_view import ChatView
+from core.domain.entities.session import is_ui_visible_user_message
+from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import SubagentStatusFooter
 
 

@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 
 from app import JohnstonApp
 from core.base_provider import BaseAgent
-from widgets.chat_view import ChatView
 from widgets.mixins.message_flow import MessageFlowMixin
+from widgets.presentation.widgets.chat_container import ChatView
 
 
 def _configure_connected(app, stream_fn):

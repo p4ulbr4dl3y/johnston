@@ -39,7 +39,7 @@ class TestAppInitResume(unittest.IsolatedAsyncioTestCase):
 
         resumed = JohnstonApp(resume_session_id="sess_edge_r")
         async with resumed.run_test():
-            from widgets.chat_view import ChatView
+            from widgets.presentation.widgets.chat_container import ChatView
 
             chat_view = resumed.query_one(ChatView)
             user_msgs = chat_view.get_user_messages()

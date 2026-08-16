@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app import JohnstonApp
 from widgets.chat_input import ChatInput
-from widgets.chat_view import ChatView, UserMessage
 from widgets.command_suggestions import CommandSuggestions
 from widgets.modal_screens import (
     HelpScreen,
@@ -14,6 +13,8 @@ from widgets.modal_screens import (
     RewindScreen,
     SubagentsScreen,
 )
+from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_messages import UserMessage
 
 
 class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):

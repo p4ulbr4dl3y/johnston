@@ -154,7 +154,7 @@ class TestActionsPointer(unittest.IsolatedAsyncioTestCase):
     async def test_on_click_chatview_target_clears_selection(self):
         from textual import events
 
-        from widgets.chat_view import ChatView
+        from widgets.presentation.widgets.chat_container import ChatView
 
         app = JohnstonApp()
         async with app.run_test():
@@ -320,7 +320,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
             app.copy_to_clipboard.assert_not_called()
 
     async def test_on_mouse_up_target_is_chatview(self):
-        from widgets.chat_view import ChatView
+        from widgets.presentation.widgets.chat_container import ChatView
 
         app = JohnstonApp()
         async with app.run_test():
@@ -357,7 +357,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
             app.screen.clear_selection.assert_called()
 
     async def test_on_mouse_up_welcome_widget_parent(self):
-        from widgets.chat_view import WelcomeWidget
+        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
         app = JohnstonApp()
         async with app.run_test():

@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.presentation.widgets.chat_tools import ToolCallWidget
+from widgets.chat_toolcall import ToolCallWidget
 
 
 class TestEdgeToolCallInit(unittest.TestCase):

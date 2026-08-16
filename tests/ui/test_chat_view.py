@@ -7,24 +7,20 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from textual.widgets import Label
 
 from app import JohnstonApp
-from widgets.chat_view import (
-    BotMessage,
-    ChatView,
+from widgets.chat_toolcall import ToolCallWidget
+from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
+from widgets.presentation.widgets.chat_markdown import (
     CustomMarkdownFence,
     CustomMarkdownTable,
     CustomMarkdownTableContent,
-    DiffRenderable,
-    EventDivider,
-    ThinkingWidget,
-    ToolCallWidget,
     TransparentSyntax,
-    UserMessage,
-    WelcomeWidget,
     clean_markdown_for_rendering,
-    format_edit_diff,
     safe_update_markdown,
     to_snake_case,
 )
+from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
+from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 
 class TestChatView(unittest.IsolatedAsyncioTestCase):
@@ -308,7 +304,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         child_mock.tooltip = None
 
     def test_handle_markdown_task_done(self):
-        from widgets.chat_view import _handle_markdown_task_done
+        from widgets.presentation.widgets.chat_markdown import _handle_markdown_task_done
 
         cancelled = MagicMock()
         cancelled.cancelled.return_value = True
@@ -386,7 +382,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         self.assertEqual(calls, [1])
 
     def test_markdown_block_inline_code_style(self):
-        from widgets.chat_view import _new_markdown_block_get_style
+        from widgets.presentation.widgets.chat_markdown import _new_markdown_block_get_style
 
         style = _new_markdown_block_get_style(object(), ".code_inline")
         self.assertEqual(style.background.rgb, (39, 39, 42))

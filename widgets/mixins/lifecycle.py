@@ -7,8 +7,8 @@ from textual.containers import Vertical
 
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
-from widgets.chat_view import ChatView
 from widgets.command_suggestions import CommandSuggestions
+from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger("johnston.app")

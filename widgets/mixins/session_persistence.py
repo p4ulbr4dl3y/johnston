@@ -3,8 +3,8 @@ import logging
 import time
 from typing import Optional
 
-from core.session_manager import is_ui_visible_user_message
-from widgets.chat_view import ChatView
+from core.domain.entities.session import is_ui_visible_user_message
+from widgets.presentation.widgets.chat_container import ChatView
 
 logger = logging.getLogger(__name__)
 

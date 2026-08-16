@@ -20,7 +20,6 @@ from core.application.session.actions import (
 from core.application.skills.manager import SkillManager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
-from widgets.chat_view import ChatView
 from widgets.modal_screens import (
     HelpScreen,
     MCPScreen,
@@ -32,6 +31,7 @@ from widgets.modal_screens import (
     SubagentsScreen,
     ThinkingEffortScreen,
 )
+from widgets.presentation.widgets.chat_container import ChatView
 from widgets.screens.constants import MESSAGE_INPUT
 
 logger = logging.getLogger(__name__)
