@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 from textual.events import Key
 
-from widgets.screens.base_selection import BaseSelectionScreen
-from widgets.screens.providers import ApiKeyInputScreen
+from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.providers import ApiKeyInputScreen
 
 
 class TestModalSearchShiftTab(unittest.TestCase):

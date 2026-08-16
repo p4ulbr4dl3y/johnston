@@ -6,7 +6,7 @@ from textual.app import App
 from textual.screen import Screen
 
 from core.session_manager import SessionStore
-from widgets.screens.subagent_screen import SubagentViewScreen
+from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
 
 class DummyHostApp(App[None]):

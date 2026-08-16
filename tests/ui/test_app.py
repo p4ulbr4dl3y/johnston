@@ -5,14 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
-from widgets.modal_screens import (
-    HelpScreen,
-    ModelScreen,
-    ProvidersScreen,
-    ResumeScreen,
-    RewindScreen,
-    SubagentsScreen,
-)
+from widgets.presentation.screens.help import HelpScreen
+from widgets.presentation.screens.model import ModelScreen
+from widgets.presentation.screens.providers import ProvidersScreen
+from widgets.presentation.screens.resume import ResumeScreen
+from widgets.presentation.screens.rewind import RewindScreen
+from widgets.presentation.screens.tasks import SubagentsScreen
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.presentation.widgets.chat_messages import UserMessage
 

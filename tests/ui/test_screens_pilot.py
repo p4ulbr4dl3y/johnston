@@ -9,12 +9,12 @@ from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
 from core.infrastructure.tasks.manager import TaskManager
-from widgets.screens.help import HelpScreen
-from widgets.screens.mcp import MCPScreen
-from widgets.screens.model import ModelScreen
-from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
-from widgets.screens.subagent_screen import SubagentViewScreen
-from widgets.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
+from widgets.presentation.screens.help import HelpScreen
+from widgets.presentation.screens.mcp import MCPScreen
+from widgets.presentation.screens.model import ModelScreen
+from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
+from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
 class DummyHostApp(App[None]):
@@ -292,7 +292,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_ask_user_wizard_screen_pilot(self):
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
             {"question_text": "Pick color", "options": ["Red", "Blue"]},
@@ -325,7 +325,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Answer: Red", str(app.dismiss_result))
 
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [{"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}]
         screen = AskUserWizardScreen(questions)
@@ -355,7 +355,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_write_in_input_down_key_does_not_advance_page(self):
         from textual.widgets import Input
 
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
             {"question_text": "Enter custom text", "options": []},
@@ -383,7 +383,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_write_in_input_cleared_between_questions(self):
         from textual.widgets import Input
 
-        from widgets.screens.ask_user import AskUserWizardScreen
+        from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [{"question_text": "Q1", "options": ["Opt1"]}, {"question_text": "Q2", "options": ["Opt2"]}]
         screen = AskUserWizardScreen(questions)

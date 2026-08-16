@@ -1,12 +1,12 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from widgets.screens.ask_user import ConfirmScreen
-from widgets.screens.base_selection import BaseSelectionScreen
-from widgets.screens.help import HelpScreen
-from widgets.screens.providers import ApiKeyInputScreen, ProvidersScreen
-from widgets.screens.resume import ResumeScreen
-from widgets.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
+from widgets.presentation.screens.ask_user import ConfirmScreen
+from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.help import HelpScreen
+from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
+from widgets.presentation.screens.resume import ResumeScreen
+from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
 class TestConfirmScreen(unittest.TestCase):
@@ -90,14 +90,14 @@ class TestMCPScreen(unittest.TestCase):
     def test_init(self, mock_get_mgr):
         mock_mgr = MagicMock()
         mock_get_mgr.return_value = mock_mgr
-        from widgets.screens.mcp import MCPScreen
+        from widgets.presentation.screens.mcp import MCPScreen
 
         s = MCPScreen()
         self.assertEqual(s.servers, [])
         self.assertEqual(s.mm, mock_mgr)
 
     def test_bindings(self):
-        from widgets.screens.mcp import MCPScreen
+        from widgets.presentation.screens.mcp import MCPScreen
 
         keys = [b[0] for b in MCPScreen.BINDINGS]
         self.assertIn("escape", keys)
@@ -171,7 +171,7 @@ class TestApiKeyInputScreen(unittest.TestCase):
 class TestSkillScreens(unittest.TestCase):
     @patch("widgets.presentation.screens.skills.SkillManager")
     def test_detail_init(self, _):
-        from widgets.screens.skills import SkillDetailScreen
+        from widgets.presentation.screens.skills import SkillDetailScreen
 
         skill = {"name": "my-skill", "description": "Does things", "scope": "project"}
         s = SkillDetailScreen(skill)
@@ -179,7 +179,7 @@ class TestSkillScreens(unittest.TestCase):
 
     @patch("widgets.presentation.screens.skills.SkillManager")
     def test_detail_bindings(self, _):
-        from widgets.screens.skills import SkillDetailScreen
+        from widgets.presentation.screens.skills import SkillDetailScreen
 
         keys = [b[0] for b in SkillDetailScreen.BINDINGS]
         self.assertIn("escape", keys)
@@ -193,7 +193,7 @@ class TestSkillScreens(unittest.TestCase):
             {"name": "skill-b", "scope": "project"},
         ]
         mock_sm_cls.return_value = mock_sm
-        from widgets.screens.skills import SkillsScreen
+        from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 2)
@@ -207,7 +207,7 @@ class TestSkillScreens(unittest.TestCase):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = []
         mock_sm_cls.return_value = mock_sm
-        from widgets.screens.skills import SkillsScreen
+        from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(s.options, [])
@@ -218,7 +218,7 @@ class TestSkillScreens(unittest.TestCase):
         mock_sm.list_skills.return_value = [{"name": "skill-a", "scope": "global", "hidden": True}]
         mock_sm.toggle_hidden.return_value = False
         mock_sm_cls.return_value = mock_sm
-        from widgets.screens.skills import SkillsScreen
+        from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 1)

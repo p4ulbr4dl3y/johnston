@@ -9,7 +9,7 @@ from textual.app import App, ComposeResult
 from textual.events import Focus, Key
 from textual.widgets import Markdown, OptionList
 
-from widgets.screens.ask_user import (
+from widgets.presentation.screens.ask_user import (
     AskUserWizardScreen,
     ConfirmScreen,
     WriteInInput,

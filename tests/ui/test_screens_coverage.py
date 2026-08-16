@@ -1,4 +1,4 @@
-"""Coverage-focused tests for widgets/screens/mcp.py and widgets/screens/base_selection.py.
+"""Coverage-focused tests for widgets/presentation/screens/mcp.py and widgets/presentation/screens/base_selection.py.
 
 These tests exercise uncovered branches (exception paths, alternate display states,
 key handlers, and selection handlers) using a mounted host app with mocked
@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from textual.app import App
 from textual.events import Key
 
-from widgets.screens.base_selection import BaseSelectionScreen
-from widgets.screens.mcp import MCPScreen
+from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.mcp import MCPScreen
 
 
 class RaisingList(list):
