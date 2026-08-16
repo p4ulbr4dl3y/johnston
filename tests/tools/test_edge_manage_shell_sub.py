@@ -354,44 +354,6 @@ def _ctx(app):
     return ToolContext(app)
 
 
-# --- status on dead / none / never-started --------------------------------
-
-
-async def test_status_none_session_id_soft(sub_tool, store):
-    res = await sub_tool.execute({"action": "status", "session_id": None})
-    assert "ERR: params" in res
-
-
-async def test_status_unknown_session_id_soft(sub_tool, store):
-    res = await sub_tool.execute({"action": "status", "session_id": "ghost"})
-    assert "ERR: notfound 'ghost'" in res
-
-
-async def test_status_completed_session_not_crash(sub_tool, store):
-    _mk("sdone", status="completed")
-    res = await sub_tool.execute({"action": "status", "session_id": "sdone"})
-    assert "COMPLETED" in res
-    assert "RUNNING" not in res
-
-
-async def test_status_never_started_session_not_crash(sub_tool, store):
-    """async_task is None (never spawned). status while 'running' shows log."""
-    sess = _mk("snever", status="running")
-    assert sess.async_task is None
-    res = await sub_tool.execute({"action": "status", "session_id": "snever"})
-    assert "snever" in res
-    assert "RUNNING" in res
-
-
-async def test_status_race_completed_just_before_name(sub_tool, store):
-    """Race: async_task done while session still flagged running. No crash."""
-    sess = _mk("srace", status="running")
-    sess.messages = [{"type": "bot", "text": "done", "final": True}]
-    sess.async_task = _noop_async_task()
-    res = await sub_tool.execute({"action": "status", "session_id": "srace"})
-    assert "srace" in res
-
-
 # --- send_message on dead / none / empty ----------------------------------
 
 
@@ -471,6 +433,13 @@ async def test_send_message_no_agent_available_soft(sub_tool, store):
         {"action": "send_message", "session_id": "snoagent", "message": "hi"}, ctx=_ctx(app)
     )
     assert "ERR: context" in res
+
+
+async def test_subagent_status_action_removed(sub_tool, store):
+    """'status' was dropped from manage_subagent; it must not dispatch."""
+    _mk("sgone", status="running")
+    res = await sub_tool.execute({"action": "status", "session_id": "sgone"})
+    assert "ERR: action 'status'" in res
 
 
 # --- kill edge cases -------------------------------------------------------
@@ -601,12 +570,3 @@ async def test_unknown_subagent_action_soft(sub_tool, store):
 
 
 # helpers
-
-
-def _noop_async_task():
-    """Reduce flakiness: return a task that does nothing and won't finish soon."""
-
-    async def _wait():
-        await asyncio.sleep(3600)
-
-    return asyncio.create_task(_wait())

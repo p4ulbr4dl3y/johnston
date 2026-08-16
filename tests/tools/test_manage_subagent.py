@@ -48,21 +48,6 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Search files", res_list)
         self.assertIn("explorer", res_list)
 
-    async def test_status_action(self):
-        tool = ManageSubagentTool()
-        sess = self._mk_subagent("sub-2", "Refactor module", "clean up code", role="worker")
-        sess.add_event({"type": "user", "text": "clean up code"})
-        sess.add_event({"type": "bot", "text": "Done cleaning.", "final": True})
-
-        res_status = await tool.execute({"action": "status", "session_id": "sub-2"})
-        self.assertIn("sub-2", res_status)
-        self.assertIn("Refactor module", res_status)
-        self.assertIn("[User]: clean up code", res_status)
-        # No log-file path / snippet: status is metadata-only now
-        self.assertNotIn("Log File:", res_status)
-        self.assertNotIn(".log", res_status)
-        self.assertNotIn("Final Response Snippet", res_status)
-
     async def test_kill_action(self):
         tool = ManageSubagentTool()
         sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
@@ -239,10 +224,8 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("message sent to sub-bg", res)
 
-    async def test_status_and_kill_missing_session_id(self):
+    async def test_kill_missing_session_id(self):
         tool = ManageSubagentTool()
-        res_st = await tool.execute({"action": "status"})
-        self.assertIn("ERR: params 'session_id': required for 'status'", res_st)
 
         res_kl = await tool.execute({"action": "kill"})
         self.assertIn("ERR: params 'session_id': required for 'kill'", res_kl)
