@@ -7,13 +7,6 @@ Pure presentation helpers (e.g. ``read_file_content``) live in
 :mod:`widgets.utils.file_reader`.
 """
 
-def normalize_tool_name(name: str) -> str:
-    """Wrapper around ``tools.registry.normalize_tool_name``."""
-    from tools.registry import normalize_tool_name as _registry_normalize
-
-    return _registry_normalize(name)
-
-
 def is_system_tool(tool_type: str) -> bool:
     """Check whether *tool_type* is registered in the system tool registry."""
     if not isinstance(tool_type, str):
