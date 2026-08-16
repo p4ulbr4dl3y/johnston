@@ -380,6 +380,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         from widgets.tool_helpers import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
+        # Shell output is always useful to the user (return code / stdout),
+        # regardless of the tool status, so shell stays expandable.
+        if canonical in ("shell", "bash"):
+            return True
+        # Error/cancelled results are feedback for the agent (they flow to the
+        # model), not content for the user to inspect — don't expand those.
+        if self.status in ("error", "cancelled"):
+            return False
         if canonical == "ask_user":
             # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
             return "Answer:" in (self.result_text or "")

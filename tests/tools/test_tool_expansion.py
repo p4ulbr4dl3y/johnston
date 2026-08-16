@@ -126,8 +126,13 @@ class TestToolExpansion(unittest.TestCase):
             args={"path": "test.py", "target_content": "foo", "replacement_content": "bar"},
         )
         widget.set_result(error_text)
-        widget.toggle_expanded()
         self.assertEqual(widget.status, "error")
+        # Error results are feedback for the agent, not user content — not expandable.
+        self.assertFalse(widget.is_expandable())
+        widget.toggle_expanded()
+        self.assertFalse(widget.is_expanded)
+        # Error text still renders if content is built directly.
+        widget.render_content()
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, error_text)
 
@@ -137,11 +142,11 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget = ToolCallWidget(tool_type="edit", target="test.py", result_text=full_text, args={"path": "test.py"})
         widget.set_result(full_text, is_error=True)
-        widget.toggle_expanded()
-
         # result_text must keep [Hint:] for agent
         self.assertEqual(widget.result_text, full_text)
-        # UI content widget must strip [Hint:] block
+        # Error results are not expandable, but building content directly still
+        # strips [Hint:] while keeping the ERR: line for the UI.
+        widget.render_content()
         content = getattr(widget.content_widget, "_Static__content")
         self.assertNotIn("[Hint:", content)
         self.assertIn("ERR: target not found.", content)
@@ -155,8 +160,13 @@ class TestToolExpansion(unittest.TestCase):
             args={"path": "/some/dir", "content": "some content"},
         )
         widget.set_result(error_text)
-        widget.toggle_expanded()
         self.assertEqual(widget.status, "error")
+        # Error results are feedback for the agent, not user content — not expandable.
+        self.assertFalse(widget.is_expandable())
+        widget.toggle_expanded()
+        self.assertFalse(widget.is_expanded)
+        # Error text still renders if content is built directly.
+        widget.render_content()
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, error_text)
 
@@ -164,8 +174,13 @@ class TestToolExpansion(unittest.TestCase):
         error_text = "ERR: 'plan' must be non-empty"
         widget = ToolCallWidget(tool_type="update_plan", target="plan", result_text=error_text, args={"plan": []})
         widget.set_result(error_text)
-        widget.toggle_expanded()
         self.assertEqual(widget.status, "error")
+        # Error results are feedback for the agent, not user content — not expandable.
+        self.assertFalse(widget.is_expandable())
+        widget.toggle_expanded()
+        self.assertFalse(widget.is_expanded)
+        # Error text still renders if content is built directly.
+        widget.render_content()
         content = getattr(widget.content_widget, "_Static__content")
         self.assertEqual(content, error_text)
 
@@ -384,6 +399,26 @@ class TestToolExpansion(unittest.TestCase):
         url = "https://example.com/doc.html"
         widget = ToolCallWidget(tool_type="web_fetch", target=url, args={"url": url})
         self.assertFalse(widget.is_expandable())
+
+    def test_error_and_cancelled_tools_not_expandable_except_shell(self):
+        # Error/cancelled results are agent feedback, not user content.
+        err = ToolCallWidget(tool_type="edit", target="a.py", args={"path": "a.py"}, status="error")
+        self.assertFalse(err.is_expandable())
+        canc = ToolCallWidget(tool_type="create", target="a.txt", args={}, status="cancelled")
+        self.assertFalse(canc.is_expandable())
+        # Shell is always expandable regardless of status (output/returncode useful).
+        shell_err = ToolCallWidget(tool_type="shell", target="echo x", args={}, status="error")
+        self.assertTrue(shell_err.is_expandable())
+        shell_canc = ToolCallWidget(tool_type="shell", target="echo x", args={}, status="cancelled")
+        self.assertTrue(shell_canc.is_expandable())
+
+    def test_running_and_done_edit_still_expandable(self):
+        done = ToolCallWidget(tool_type="edit", target="a.py", result_text="done", args={"path": "a.py"})
+        done.set_result("done", status="done")
+        self.assertTrue(done.is_expandable())
+        running = ToolCallWidget(tool_type="create", target="a.txt", args={})
+        running.status = "running"
+        self.assertTrue(running.is_expandable())
 
 
 if __name__ == "__main__":
