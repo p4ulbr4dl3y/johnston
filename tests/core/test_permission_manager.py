@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from core.domain.policies.permission_policy import normalize_action
 from core.permission_manager import PermissionManager
 
 
@@ -153,11 +154,11 @@ class TestPermissionManager(unittest.TestCase):
                 self.assertEqual(action, "deny")
 
     def test_normalize_action(self):
-        self.assertEqual(self.pm.normalize_action("  ALLOW "), "allow")
-        self.assertEqual(self.pm.normalize_action("deny"), "deny")
-        self.assertEqual(self.pm.normalize_action("junk"), "ask")
-        self.assertEqual(self.pm.normalize_action("junk", default="deny"), "deny")
-        self.assertEqual(self.pm.normalize_action(None), "ask")
+        self.assertEqual(normalize_action("  ALLOW "), "allow")
+        self.assertEqual(normalize_action("deny"), "deny")
+        self.assertEqual(normalize_action("junk"), "ask")
+        self.assertEqual(normalize_action("junk", default="deny"), "deny")
+        self.assertEqual(normalize_action(None), "ask")
 
     def test_config_read_cached_across_checks(self):
         """Repeated checks must not re-read config from disk (mtime cache)."""
