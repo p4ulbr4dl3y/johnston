@@ -225,6 +225,7 @@ async def test_shell_task_file_log_writes_full_output(monkeypatch, tmp_path):
     task.is_background = True
     task._log.append("hello from file log\n")
     task._log.append("line2\n")
+    task._log.flush_now()
     content = open(task.log_path).read()
     assert "hello from file log" in content
     assert "line2" in content

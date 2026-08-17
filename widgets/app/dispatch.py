@@ -16,6 +16,39 @@ import os
 from core.application.skills.manager import SkillManager
 
 
+def _resolve_skills(sm, norm_skill_words):
+    """(sync, thread-safe) Resolve slash args into Skill objects; returns (skills, unresolved)."""
+    loaded_skills = []
+    unresolved = []
+    for norm in norm_skill_words:
+        skill = sm.get_skill(norm)
+        if skill:
+            if skill not in loaded_skills:
+                loaded_skills.append(skill)
+        else:
+            unresolved.append(norm)
+    return loaded_skills, unresolved
+
+
+def _load_skill_blocks(loaded_skills) -> list[str]:
+    """(sync, thread-safe) Read skill content from disk for the invocation blocks."""
+    blocks = []
+    for s in loaded_skills:
+        content = s.content.strip()
+        if not content and s.location and os.path.exists(s.location):
+            try:
+                with open(s.location, "r", encoding="utf-8") as f:
+                    raw_c = f.read()
+                from core.application.skills.manager import parse_frontmatter
+
+                _, body = parse_frontmatter(raw_c)
+                content = body.strip()
+            except Exception:
+                content = ""
+        blocks.append(f'<SKILL path="{s.location}">\n{content}\n</SKILL>')
+    return blocks
+
+
 def build_command_registry() -> dict:
     """Build the name->class registry from the command classes in widgets.commands."""
     from widgets import commands as _commands
@@ -67,39 +100,21 @@ async def handle_slash_command(app, command_text: str) -> bool:
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
     words = command_text.strip().split()
-    sm = SkillManager()
-    loaded_skills = []
     other_words = []
-
     for w in words:
-        if w.startswith("/"):
-            raw_sname = w[1:].lower()
-            norm_sname = "".join(homoglyphs.get(c, c) for c in raw_sname)
-            skill = sm.get_skill(norm_sname)
-            if skill:
-                if skill not in loaded_skills:
-                    loaded_skills.append(skill)
-            else:
-                other_words.append(w)
-        else:
+        if not w.startswith("/"):
             other_words.append(w)
 
+    skill_words = [w[1:].lower() for w in words if w.startswith("/")]
+    norm_skill_words = ["".join(homoglyphs.get(c, c) for c in raw) for raw in skill_words]
+    if norm_skill_words:
+        loaded_skills, unresolved = await asyncio.to_thread(_resolve_skills, SkillManager(), norm_skill_words)
+        other_words.extend(f"/{norm}" for norm in unresolved)
+    else:
+        loaded_skills = []
+
     if loaded_skills:
-        skill_blocks = []
-        for s in loaded_skills:
-            content = s.content.strip()
-            if not content and s.location and os.path.exists(s.location):
-                try:
-                    with open(s.location, "r", encoding="utf-8") as f:
-                        raw_c = f.read()
-                    from core.application.skills.manager import parse_frontmatter
-
-                    _, body = parse_frontmatter(raw_c)
-                    content = body.strip()
-                except Exception:
-                    content = ""
-            skill_blocks.append(f'<SKILL path="{s.location}">\n{content}\n</SKILL>')
-
+        skill_blocks = await asyncio.to_thread(_load_skill_blocks, loaded_skills)
         skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()
         if user_request:

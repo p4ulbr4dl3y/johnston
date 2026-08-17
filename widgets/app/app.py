@@ -2,6 +2,7 @@ from widgets.patch import apply_textual_patches
 
 apply_textual_patches()
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,6 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             super().copy_to_clipboard(text)
         except Exception:
             pass
-        from core.infrastructure.platform.platform_utils import copy_to_os_clipboard
+        from core.infrastructure.platform.platform_utils import copy_to_os_clipboard_async
 
-        copy_to_os_clipboard(text)
+        asyncio.create_task(copy_to_os_clipboard_async(text))

@@ -524,12 +524,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             suggestions = app.query_one("#command-suggestions", CommandSuggestions)
 
-            matches = suggestions.update_query("/he", "/he", 3)
+            matches = await suggestions.update_query("/he", "/he", 3)
             self.assertEqual(suggestions.mode, "command")
             self.assertTrue(suggestions.display)
             self.assertIn("/help", matches)
 
-            matches = suggestions.update_query("/help now", "/help now", 9)
+            matches = await suggestions.update_query("/help now", "/help now", 9)
             self.assertEqual(matches, [])
             self.assertFalse(suggestions.display)
 

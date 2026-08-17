@@ -11,29 +11,121 @@ by tests).
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 
+from core.infrastructure.mcp import get_mcp_manager
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from core.models_catalog import catalog, format_context_tokens
+
+
+def _collect_cache(app):
+    """(sync, thread-safe) Read provider/skills/mcp state off the event loop."""
+    pm = getattr(app, "pm", None)
+    try:
+        providers = pm.load_providers() if pm else {}
+    except Exception:
+        providers = {}
+    try:
+        from core.application.skills.manager import SkillManager
+
+        all_skills = SkillManager().list_skills(include_hidden=True)
+        skills_total = len(all_skills)
+        skills_visible = sum(1 for s in all_skills if not s.hidden)
+    except Exception:
+        skills_total, skills_visible = 0, 0
+    try:
+        from core.infrastructure.mcp import get_mcp_manager
+
+        mcp_servers = get_mcp_manager().load_servers()
+    except Exception:
+        mcp_servers = []
+    return providers, skills_visible, skills_total, mcp_servers
+
+
+async def refresh_footer_cache(app, widget) -> None:
+    """Async background loader for footer caches (providers/skills/mcp)."""
+    try:
+        providers, skills_visible, skills_total, mcp_servers = await asyncio.to_thread(_collect_cache, app)
+    except Exception:
+        return
+    widget._st_cached_providers = providers
+    widget._st_cached_skills = (skills_visible, skills_total)
+    widget._st_cached_mcp_servers = mcp_servers
+    widget._st_cache_time = time.time()
+    try:
+        if getattr(widget, "is_mounted", True):
+            widget.refresh_footer()
+    except Exception:
+        pass
+
+
+def _ensure_cache(app, widget) -> None:
+    """Kick off a background cache load when the widget has no fresh values yet."""
+    if not widget:
+        return
+    now = time.time()
+    if getattr(widget, "_st_cache_time", 0) and (now - getattr(widget, "_st_cache_time", 0) < 5.0):
+        return
+    if getattr(widget, "_st_cache_loading", False):
+        return
+    widget._st_cache_loading = True
+
+    async def _bg() -> None:
+        try:
+            await refresh_footer_cache(app, widget)
+        finally:
+            widget._st_cache_loading = False
+
+    try:
+        import asyncio as _async
+
+        _async.get_running_loop().create_task(_bg())
+    except RuntimeError:
+        # No running loop (e.g. tests): run synchronously, mirror the old behavior.
+        try:
+            providers, skills_visible, skills_total, mcp_servers = _collect_cache(app)
+            widget._st_cached_providers = providers
+            widget._st_cached_skills = (skills_visible, skills_total)
+            widget._st_cached_mcp_servers = mcp_servers
+            widget._st_cache_time = time.time()
+        except Exception:
+            pass
+        widget._st_cache_loading = False
 
 
 def build_status_kwargs(app, widget=None) -> dict:
     """Collect all footer status values from the app into a render kwargs dict.
 
     ``widget`` is optional and used only as a small TTL-cache holder for the
-    skills/mcp-server enumerations (5s) plus the ``_active_mcp_count`` hook;
-    all real reading happens through ``app``.
+    provider/skills/mcp-server enumerations (5s) plus the ``_active_mcp_count``
+    hook. Heavy reads (``pm.load_providers()``, skills listing, MCP server file
+    load) run off the event loop via ``refresh_footer_cache``; this function
+    only reads the cached values so the footer timer never blocks.
     """
-    from core.application.skills.manager import SkillManager
-    from core.infrastructure.mcp import get_mcp_manager
+    if widget is not None:
+        _ensure_cache(app, widget)
+    else:
+        # No cache holder: fall back to a lightweight synchronous read subset.
+        try:
+            _collect_cache(app)
+        except Exception:
+            pass
     from core.infrastructure.runtime.task_collection import collect_current_tasks
 
     pm = getattr(app, "pm", None)
     pkey = pm.get_active_provider_key() if pm else "default"
     agent = getattr(app, "agent", None)
     model_name = getattr(agent, "model", "")
-    providers = pm.load_providers() if pm else {}
+    providers = getattr(widget, "_st_cached_providers", None)
+    if providers is None:
+        if widget is not None:
+            # Cache not ready yet (background load in flight): avoid blocking the
+            # footer timer on disk; the background loader will re-render shortly.
+            providers = {}
+        else:
+            providers = pm.load_providers() if pm else {}
     provider_info = providers.get(pkey, {}) if isinstance(providers, dict) else {}
     provider_display = provider_info.get("name", pkey) if provider_info else pkey
     is_connected = pm.is_provider_connected(pkey, provider_info) if (pm and pkey) else False
@@ -47,23 +139,17 @@ def build_status_kwargs(app, widget=None) -> dict:
     thinking_effort = display_thinking_effort(effort_val)
     metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
 
-    now = time.time()
-    if not getattr(widget, "_cached_skills", None) or (
-        now - getattr(widget, "_skills_cache_time", 0) > 5.0
-    ):
-        all_skills = SkillManager().list_skills(include_hidden=True)
-        skills_total = len(all_skills)
-        skills_visible = sum(1 for s in all_skills if not s.hidden)
-        widget._cached_skills = (skills_visible, skills_total)
-        widget._skills_cache_time = now
-    skills_visible, skills_total = getattr(widget, "_cached_skills", (0, 0))
+    cached_skills = getattr(widget, "_st_cached_skills", None)
+    if cached_skills is None:
+        _ensure_cache(app, widget)
+        cached_skills = getattr(widget, "_st_cached_skills", (0, 0))
+    skills_visible, skills_total = cached_skills
 
-    if not getattr(widget, "_cached_mcp_servers", None) or (
-        now - getattr(widget, "_mcp_cache_time", 0) > 5.0
-    ):
-        widget._cached_mcp_servers = get_mcp_manager().load_servers()
-        widget._mcp_cache_time = now
-    mcp_servers = getattr(widget, "_cached_mcp_servers", [])
+    cached_mcp = getattr(widget, "_st_cached_mcp_servers", None)
+    if cached_mcp is None:
+        cached_mcp = get_mcp_manager().load_servers()
+        widget._st_cached_mcp_servers = cached_mcp
+    mcp_servers = cached_mcp
 
     # Count only servers that are actually loading (enabled, stdio
     # command) and of those, only the ones that finished loading: a

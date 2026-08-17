@@ -108,7 +108,12 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
     def test_skill_command_suggestions(self):
         from widgets.app.command_provider import get_all_command_suggestions
 
-        suggestions = get_all_command_suggestions()
+        async def run():
+            return await get_all_command_suggestions()
+
+        import asyncio
+
+        suggestions = asyncio.run(run())
         cmd_names = [name for name, _ in suggestions]
         self.assertIn("/skills", cmd_names)
         self.assertIn("/handoff", cmd_names)

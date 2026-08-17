@@ -361,3 +361,12 @@ def copy_to_os_clipboard(text: str) -> None:
             p.communicate(input=text)
     except Exception:
         pass
+
+
+async def copy_to_os_clipboard_async(text: str) -> None:
+    """Copy text to the OS clipboard off the event loop.
+
+    Wraps the blocking ``copy_to_os_clipboard`` (subprocess spawn + communicate)
+    in a thread so Textual's async event loop is never stalled.
+    """
+    await asyncio.to_thread(copy_to_os_clipboard, text)

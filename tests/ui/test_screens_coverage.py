@@ -118,7 +118,10 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             opt_list = MagicMock()
             screen.query_one = MagicMock(return_value=opt_list)
-            screen.refresh_list()
+            # refresh_list loads servers on an executor; emulate the completed
+            # background load so the no-servers render path is exercised directly.
+            screen.servers = list(mgr.load_servers.return_value)
+            screen._render_from_cache()
             self.assertEqual(screen.filtered_servers, [])
             text = str(opt_list.add_option.call_args.args[0])
             self.assertIn("No MCP servers", text)

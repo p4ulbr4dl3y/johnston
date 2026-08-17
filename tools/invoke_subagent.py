@@ -135,17 +135,19 @@ class InvokeSubagentTool(BaseTool):
         wt_branch = None
         project_dir = ctx.project_dir
 
-        from core.infrastructure.runtime.git_utils import run_git
+        from core.infrastructure.runtime.git_utils import run_git_async
 
         current_branch = ""
         if SubagentWorktreeManager.is_git_repo(project_dir):
-            res = run_git(["branch", "--show-current"], cwd=project_dir, timeout=5)
+            res = await run_git_async(["branch", "--show-current"], cwd=project_dir, timeout=5)
             current_branch = res.stdout.strip()
 
         # Same branch as the main tree -> work directly in it; otherwise isolate
         # in a worktree on the requested branch (created if missing).
         if branch_name != current_branch:
-            wt_path, wt_branch = SubagentWorktreeManager.create_worktree(project_dir, session_id, branch_name)
+            wt_path, wt_branch = await SubagentWorktreeManager.create_worktree_async(
+                project_dir, session_id, branch_name
+            )
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path

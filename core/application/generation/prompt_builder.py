@@ -167,6 +167,19 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     return result
 
 
+async def get_project_instructions_snippet_async(cwd: str = None) -> str:
+    """Async variant: reads AGENTS.md/CLAUDE.md on a thread on cache miss.
+
+    Cache-hit calls return immediately without touching the thread pool.
+    """
+    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
+    sig = _project_instr_signature(cwd)
+    cached = _PROJECT_INSTRUCTION_CACHE.get(cwd)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+    return await asyncio.to_thread(get_project_instructions_snippet, cwd)
+
+
 def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager.
 
@@ -179,6 +192,11 @@ def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
 
     return format_rules_markdown(rules)
+
+
+async def get_rules_snippet_async(role: str = "worker", cwd: str = None) -> str:
+    """Async variant of ``get_rules_snippet``: reads rules on a thread."""
+    return await asyncio.to_thread(get_rules_snippet, role, cwd)
 
 
 class PromptBuilder:
@@ -245,6 +263,54 @@ class PromptBuilder:
 
         return sys_prompt
 
+    async def build_system_prompt_async(self) -> str:
+        """Async variant of ``build_system_prompt`` for the async agent loop.
+
+        On cache miss, file/system-prompt-part reads (project instructions, rules,
+        skills tree scan) run on a worker thread instead of blocking the event loop.
+        """
+        cwd = self.cwd or os.getcwd()
+        from core.infrastructure.mcp import get_mcp_manager
+        from core.role_registry import RoleRegistry
+
+        mcp_mgr = get_mcp_manager()
+        mcp_snippet = mcp_mgr.get_system_prompt_snippet()
+        from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
+
+        skills_snippet = format_skills_markdown(
+            await asyncio.to_thread(_get_skill_manager(self.cwd).get_system_prompt_skills)
+        )
+        subagents_snippet = (
+            "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+        )
+
+        now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
+        os_info = f"{platform.system()} {platform.release()}"
+        git_info = await get_git_info_async(self.cwd)
+
+        env_lines = [
+            "## Environment Metadata",
+            f"- Working Directory: {cwd}",
+            f"- Current Date: {now_str}",
+            f"- Operating System: {os_info}",
+        ]
+        if git_info:
+            env_lines.append(f"- Git Context: {git_info}")
+
+        env_block = "\n".join(env_lines)
+
+        stable_core = await self._build_stable_core_async(mcp_snippet, skills_snippet, subagents_snippet)
+
+        # Stable prefix first (cacheable across turns); volatile env metadata
+        # last so the longest possible stable prefix can be prompt-cached.
+        sys_prompt = stable_core
+
+        # Volatile metadata last: time/git change every turn, so keeping them at
+        # the tail preserves the stable cached prefix for provider prompt caching.
+        sys_prompt = f"{sys_prompt}\n\n{env_block}"
+
+        return sys_prompt
+
     def _build_stable_core(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Assemble + cache the stable (non-volatile) system-prompt prefix.
 
@@ -266,6 +332,66 @@ class PromptBuilder:
 
         project_snippet = get_project_instructions_snippet(self.cwd)
         rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
+
+        role_def = None
+        if not self.is_subagent:
+            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
+            if getattr(role_def, "prompt", None):
+                sys_prompt += f"\n\n{role_def.prompt}"
+
+        # Cache key from the stable components. role_def is represented by its
+        # content so the cache invalidates when the role definition changes even
+        # if registry internals were refreshed in place.
+        def _ident(obj):
+            if obj is None:
+                return None
+            return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
+
+        key = (
+            sys_prompt,
+            project_snippet,
+            rules_snippet,
+            skills_snippet,
+            subagents_snippet,
+            mcp_snippet,
+            self.role,
+            _ident(role_def),
+        )
+
+        cached = _STABLE_CORE_CACHE.get(key)
+        if cached is not None:
+            return cached
+
+        if project_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
+        if rules_snippet:
+            sys_prompt = f"{sys_prompt}\n\n## User Rules\n{rules_snippet}"
+        if skills_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
+        if subagents_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{subagents_snippet}"
+        if mcp_snippet:
+            sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
+
+        _cache_set(_STABLE_CORE_CACHE, key, sys_prompt, _STABLE_CORE_CACHE_MAX)
+        return sys_prompt
+
+    async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
+        """Async variant: same stable-prefix assembly, but file reads (project
+        instructions, rules) happen on a worker thread on cache miss."""
+        from core.role_registry import RoleRegistry
+
+        sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
+        if "{model_name}" in sys_prompt:
+            model_label = (
+                self.model_name.strip()
+                if self.model_name and self.model_name.strip()
+                else "an expert AI software engineer"
+            )
+            sys_prompt = sys_prompt.replace("{model_name}", model_label)
+
+        project_snippet = await get_project_instructions_snippet_async(self.cwd)
+        rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
 
         role_def = None
         if not self.is_subagent:

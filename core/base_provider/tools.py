@@ -71,3 +71,33 @@ def build_prompt_context(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
     all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))
     sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
     return sys_prompt, all_tools, sys_tokens
+
+
+async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
+    """Async variant of ``build_prompt_context`` for the async agent loop.
+
+    Uses the async system-prompt build so cache-miss file reads (project
+    instructions, rules, skills scan) go to a worker thread and never block the
+    event loop. Tool schema building stays unchanged.
+    """
+    agent_role = getattr(agent, "role", "worker")
+    allow_task = getattr(agent, "allow_task", True)
+    m_name = (
+        catalog.get_model_display_name(getattr(agent, "provider_key", ""), getattr(agent, "model", ""))
+        or getattr(agent, "model", "")
+    )
+    is_subagent = getattr(agent, "is_subagent", False)
+    builder = PromptBuilder(
+        agent.system_prompt,
+        agent.tools,
+        role=agent_role,
+        allow_task=allow_task,
+        model_name=m_name,
+        cwd=getattr(agent, "cwd", None),
+        is_subagent=is_subagent,
+        subagent_schema=getattr(agent, "subagent_schema", None),
+    )
+    sys_prompt = await builder.build_system_prompt_async()
+    all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))
+    sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
+    return sys_prompt, all_tools, sys_tokens

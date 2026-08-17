@@ -9,7 +9,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.infrastructure.mcp import MCPManager, MCPProcessClient
 
@@ -253,7 +253,7 @@ class BugTests(unittest.TestCase):
 
         failed = MagicMock()
         failed.start_async.return_value = False
-        failed.stop = MagicMock()
+        failed.stop_async = AsyncMock()
 
         with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed) as mk:
             asyncio.run(m.get_active_tools_async())
@@ -262,7 +262,7 @@ class BugTests(unittest.TestCase):
         # Correct behavior: a client that failed to start must not remain cached
         # with a (possibly) running subprocess.
         self.assertNotIn("bad", m.clients)
-        failed.stop.assert_called_once()
+        failed.stop_async.assert_awaited_once()
 
     def test_call_async_after_stop_does_not_raise(self):
         # BUG (process_client.py stop() lines 281-283 + call_tool_async lines

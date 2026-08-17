@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 from core.application.generation.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
-from core.base_provider.tools import ToolMixin, build_prompt_context
+from core.base_provider.tools import ToolMixin
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.adapters.base import (
     extract_image_payload,
@@ -213,7 +213,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)
             except Exception:
                 pass
-        sys_prompt, all_tools, sys_tokens = build_prompt_context(self)
+        from core.base_provider.tools import build_prompt_context_async
+
+        sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
         self._last_sys_tokens = sys_tokens
 
         # Automatic context compaction when total context (system prompt + tools + history)

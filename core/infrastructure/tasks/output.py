@@ -6,7 +6,9 @@ and a hard byte cap with a truncation marker.
 """
 
 import os
+import queue
 import re
+import threading
 import uuid
 from typing import List, Optional
 
@@ -144,17 +146,27 @@ class OutputLog:
     process logs its entire output without any in-memory cap. The file handle is
     held open until ``close`` and flushed per chunk so the tail is durably
     observable on disk.
+
+    Chunk extrusion (``append``) is non-blocking: writes are pushed onto a queue
+    drained by a background worker thread, so the event loop is never blocked on
+    disk I/O even for large logs. ``close`` drains the queue before releasing
+    the file handle, preserving write order.
     """
 
     def __init__(self, path: str = "") -> None:
         self.path = path
         self._file = None
         self._closed = False
+        self._queue = queue.Queue()
+        self._thread: Optional[threading.Thread] = None
         if path:
             try:
                 self._file = open(path, "w", encoding="utf-8")
             except Exception:
                 self._file = None
+        if self._file is not None:
+            self._thread = threading.Thread(target=self._worker, name="output-log", daemon=True)
+            self._thread.start()
 
     @classmethod
     def create(cls, prefix: str = "") -> "OutputLog":
@@ -169,22 +181,58 @@ class OutputLog:
     def opened(self) -> bool:
         return self._file is not None
 
+    def _worker(self) -> None:
+        f = self._file
+        while True:
+            item = self._queue.get()
+            try:
+                if item is None:
+                    try:
+                        f.flush()
+                    except Exception:
+                        pass
+                    try:
+                        f.close()
+                    except Exception:
+                        pass
+                    break
+                try:
+                    f.write(item)
+                    f.flush()
+                except Exception:
+                    pass
+            finally:
+                self._queue.task_done()
+
+    # -- appending ----------------------------------------------------------
+
     def append(self, text: str) -> None:
         if self._file is None or self._closed:
             return
-        try:
-            self._file.write(text)
-            self._file.flush()
-        except Exception:
-            pass
+        if text is None:
+            raise TypeError("OutputLog.append() argument must be str, not None")
+        self._queue.put(text)
+
+    def flush_now(self) -> None:
+        """Synchronously drain the pending queue to disk.
+
+        Blocks until all chunks submitted so far are flushed to the file. Used by
+        synchronous readers (e.g. ``open_log`` backfill) that must observe the
+        buffered output immediately without waiting for ``close``.
+        """
+        if self._file is None or self._thread is None:
+            return
+        self._queue.join()
 
     def close(self) -> None:
         if self._file is not None:
-            try:
-                self._file.close()
-            except Exception:
-                pass
             self._file = None
+        if self._thread is not None and self._thread.is_alive():
+            # Sentinel drains any queued chunks (preserving write order) before
+            # the worker flushes and closes the handle.
+            self._queue.put(None)
+            self._queue.join()
+            self._thread = None
         self._closed = True
 
     def __enter__(self) -> "OutputLog":

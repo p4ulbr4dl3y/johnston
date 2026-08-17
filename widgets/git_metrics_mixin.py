@@ -13,6 +13,9 @@ class GitMetricsMixin:
         Branch lookups funnel through ``get_git_info`` which already caches
         per-directory for 30s; layer a small TTL cache here too so the footer
         spinner tick never triggers a git subprocess even off the event loop.
+        When the cache is stale/empty the branch is computed asynchronously in a
+        worker thread; meanwhile the last known value is shown. Mirrors the
+        ``_git_diff_stats`` non-blocking pattern.
         """
         now = time.time()
         target_cwd = cwd or os.getcwd()
@@ -22,23 +25,52 @@ class GitMetricsMixin:
             and now - getattr(self, "_branch_time", 0.0) < self._BRANCH_TTL
         ):
             return self._branch_text
+        if getattr(self, "_branch_loading", False):
+            return getattr(self, "_branch_text", "") or ""
+        self._branch_loading = True
+        self._branch_cwd = target_cwd
+        import asyncio
+
+        try:
+            asyncio.get_running_loop().create_task(self._compute_branch_async(target_cwd))
+        except RuntimeError:
+            self._branch_text = self._compute_branch_sync(target_cwd)
+            self._branch_cwd = target_cwd
+            self._branch_time = time.time()
+            self._branch_loading = False
+        return getattr(self, "_branch_text", "") or ""
+
+    async def _compute_branch_async(self, cwd: str | None = None) -> None:
+        import asyncio
+        import time
+
+        try:
+            branch = await asyncio.to_thread(self._compute_branch_sync, cwd)
+        finally:
+            self._branch_loading = False
+        self._branch_text = branch
+        self._branch_cwd = cwd or os.getcwd()
+        self._branch_time = time.time()
+        try:
+            if self.is_mounted:
+                self._on_diff_updated()
+        except Exception:
+            pass
+
+    def _compute_branch_sync(self, cwd: str | None = None) -> str:
+        """(sync) Run git branch detection off the event loop thread."""
         try:
             from core.application.generation.prompt_builder import get_git_info
 
+            target_cwd = cwd or os.getcwd()
             info = (get_git_info(cwd=target_cwd) or "").strip()
             if info.startswith("branch '"):
-                branch = info[len("branch '") : -1]
-            elif info.startswith("detached HEAD"):
-                branch = info.replace("detached HEAD (", "detached (").rstrip(")")
-            else:
-                branch = ""
+                return info[len("branch '") : -1]
+            if info.startswith("detached HEAD"):
+                return info.replace("detached HEAD (", "detached (").rstrip(")")
         except Exception:
-            branch = ""
-        if branch or getattr(self, "_branch_cwd", None) != target_cwd:
-            self._branch_text = branch
-            self._branch_cwd = target_cwd
-            self._branch_time = now
-        return branch or getattr(self, "_branch_text", "")
+            pass
+        return ""
 
     def _git_diff_stats(self, cwd: str | None = None) -> str:
         """Return '+add/-del' line-count diff vs HEAD, cached 5s. Returns '' when unavailable."""

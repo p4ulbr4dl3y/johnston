@@ -1,7 +1,8 @@
+import asyncio
 import inspect
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import atomic_write_text
@@ -77,6 +78,26 @@ def format_background_notification(kind: str, name: str, task_id: str, result: s
     return f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n<task_result>\n{result}\n</task_result>"
 
 
+def _get_running_loop() -> Any:
+    """Return the running event loop, or None if none is running."""
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+
+
+# Keeps fire-and-forget disk writes scheduled from async contexts alive until
+# they complete so the coroutine is not garbage-collected before running.
+_BACKGROUND_WRITE_TASKS: Set[asyncio.Task] = set()
+
+
+def _schedule_background(coro: Any) -> None:
+    """Schedule ``coro`` on the running loop, holding a reference until done."""
+    task = asyncio.ensure_future(coro)
+    _BACKGROUND_WRITE_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_WRITE_TASKS.discard)
+
+
 def _write_output_log(
     log_content: str,
     *,
@@ -87,6 +108,10 @@ def _write_output_log(
     """Writes full output to a unique log file under LOGS_DIR and returns its path.
 
     Returns None if logging is skipped (empty content) or the write fails.
+    Runs the blocking ``os.makedirs``/``open().write()`` off the event loop via
+    ``asyncio.to_thread`` when an async context is active so a large snapshot in
+    an async ``execute`` never stalls the loop; falls back to a synchronous write
+    for sync callers (no running loop).
     """
     content = log_content or ""
     if not content.strip():
@@ -104,10 +129,17 @@ def _write_output_log(
         unique_id = tool_id if tool_id else uuid.uuid4().hex[:8]
         filename = f"{name_prefix}{unique_id}.log"
     log_path = os.path.join(LOGS_DIR, filename)
-    try:
+
+    def _write() -> None:
         os.makedirs(LOGS_DIR, exist_ok=True)
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+    try:
+        if _get_running_loop() is not None:
+            _schedule_background(asyncio.to_thread(_write))
+        else:
+            _write()
     except Exception:
         return None
     return log_path

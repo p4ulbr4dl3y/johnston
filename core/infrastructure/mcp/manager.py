@@ -150,6 +150,12 @@ class MCPManager:
         self._servers_cache_signature = signature
         return list(self._servers_cache)
 
+    async def load_servers_async(self) -> List[Dict[str, Any]]:
+        """Async variant of ``load_servers``: config-file reads run on a worker
+        thread so they never block the event loop. Crash-miss path only —
+        cache hits return instantly."""
+        return await asyncio.to_thread(self.load_servers)
+
     def _update_server_config(self, name: str, key_updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Helper to read-modify-write MCP server config files atomically."""
         servers = self.load_servers()
@@ -192,6 +198,11 @@ class MCPManager:
             logger.warning("Failed to update config for MCP server %s: %s", name, e)
 
         return target
+
+    async def _update_server_config_async(self, name: str, key_updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Async variant of ``_update_server_config``: the read-modify-write of
+        the config file runs on a worker thread so the event loop is not blocked."""
+        return await asyncio.to_thread(self._update_server_config, name, key_updates)
 
     def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
         """Formats tool dict to OpenAI function format and handles name collisions across servers."""
@@ -306,7 +317,7 @@ class MCPManager:
             client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
             created = True
 
-        def _cleanup_if_created() -> None:
+        async def _cleanup_if_created() -> None:
             # A freshly-created client that failed to become ready must be torn
             # down so no orphaned subprocess leaks. Both failure paths (start
             # timeout and start failure) pop the client from the cache before
@@ -314,7 +325,7 @@ class MCPManager:
             if not created:
                 return
             try:
-                client.stop()
+                await client.stop_async()
             except Exception:
                 logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
             self.clients.pop(name, None)
@@ -326,13 +337,13 @@ class MCPManager:
                 except (asyncio.TimeoutError, Exception) as exc:
                     client.last_error = str(exc)
                     self.clients.pop(name, None)
-                    _cleanup_if_created()
+                    await _cleanup_if_created()
                     return []
                 if not ok:
                     if not getattr(client, "last_error", None):
                         client.last_error = "Failed to start"
                     self.clients.pop(name, None)
-                    _cleanup_if_created()
+                    await _cleanup_if_created()
                     return []
                 self.clients[name] = client
             elif self._tools_fetch_stale(name):
@@ -353,7 +364,7 @@ class MCPManager:
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         tools: List[Dict[str, Any]] = []
-        servers = self.load_servers()
+        servers = await self.load_servers_async()
         seen_names: Dict[str, str] = {}
 
         eligible = [s for s in servers if not s.get("disabled", False) and s.get("command")]

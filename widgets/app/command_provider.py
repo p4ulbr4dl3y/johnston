@@ -6,6 +6,7 @@ widget keeps rendering/search/filtering and delegates list building here.
 """
 from __future__ import annotations
 
+import asyncio
 import time
 
 from core.application.skills.manager import SkillManager
@@ -15,13 +16,8 @@ _command_suggestions_cache: list[tuple[str, str]] = []
 _command_suggestions_cache_time: float = 0.0
 
 
-def get_all_command_suggestions() -> list[tuple[str, str]]:
-    """Gets list of (command_name, description) for registered commands and skills with 10s cache."""
-    global _command_suggestions_cache, _command_suggestions_cache_time
-    now = time.time()
-    if _command_suggestions_cache and (now - _command_suggestions_cache_time < 10.0):
-        return _command_suggestions_cache
-
+def _build_command_suggestions() -> list[tuple[str, str]]:
+    """(sync) Build the full command+skill suggestion list; run in a thread."""
     suggestions = []
     registered = set()
 
@@ -41,7 +37,16 @@ def get_all_command_suggestions() -> list[tuple[str, str]]:
                 registered.add(s_cmd)
     except Exception:
         pass
-
-    _command_suggestions_cache = suggestions
-    _command_suggestions_cache_time = now
     return suggestions
+
+
+async def get_all_command_suggestions() -> list[tuple[str, str]]:
+    """Gets list of (command_name, description) for registered commands and skills with 10s cache, async disk load."""
+    global _command_suggestions_cache, _command_suggestions_cache_time
+    now = time.time()
+    if _command_suggestions_cache and (now - _command_suggestions_cache_time < 10.0):
+        return _command_suggestions_cache
+
+    _command_suggestions_cache = await asyncio.to_thread(_build_command_suggestions)
+    _command_suggestions_cache_time = now
+    return _command_suggestions_cache

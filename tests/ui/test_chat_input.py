@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from PIL import Image
 from textual.app import App, ComposeResult
@@ -303,7 +303,8 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             mock_suggestions.at_start_idx = 0
 
             with patch.object(app, "query_one", return_value=mock_suggestions):
-                ci.update_suggestions()
+                mock_suggestions.update_query = AsyncMock(return_value=[])
+                await ci.update_suggestions()
                 mock_suggestions.update_query.assert_called_once()
 
                 # Tab key autocompletes command suggestion

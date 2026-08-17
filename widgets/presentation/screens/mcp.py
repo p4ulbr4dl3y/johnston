@@ -68,71 +68,106 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         except Exception:
             pass
 
-    def refresh_list(self) -> None:
-        self.servers = self.mm.load_servers()
-        opt_list = self.query_one("#mcp-option-list", OptionList)
-        prev_highlighted = opt_list.highlighted
-        opt_list.clear_options()
+    def _load_servers_bg(self, refresh: bool = True) -> None:
+        """Load MCP servers off the event loop and refresh the list when ready."""
+        import asyncio as _async
 
-        if not self.servers:
-            opt_list.add_option(f"*No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)*")
-            self.filtered_servers = []
-            return
+        def _load() -> None:
+            try:
+                servers = self.mm.load_servers()
+            except Exception:
+                servers = getattr(self, "servers", []) or []
+            self.servers = servers
+            if refresh and getattr(self, "is_mounted", True):
+                try:
+                    _async.get_running_loop().call_soon_threadsafe(self._render_from_cache)
+                except RuntimeError:
+                    pass
 
-        q = self.search_query.strip().lower()
-
-        def _matches(s: Dict[str, Any]) -> bool:
-            if not q:
-                return True
-            return (
-                q in s.get("name", "").lower()
-                or q in s.get("scope", "").lower()
-                or q in s.get("command", "").lower()
-                or q in s.get("url", "").lower()
-            )
-
-        tools_per_server: Dict[str, int] = {}
         try:
-            if hasattr(self.mm, "clients"):
-                for s_name, client in self.mm.clients.items():
-                    if client and hasattr(client, "tools") and client.tools:
-                        tools_per_server[s_name] = len(client.tools)
-        except Exception:
-            pass
+            import asyncio as _async
 
-        # self.filtered_servers grows in lockstep with option rows: a Group header
-        # is represented by None, a real server by its dict (like BaseSelectionScreen).
-        self.filtered_servers = []
-        first_group = True
-        for scope in ("global", "project"):
-            group = [s for s in self.servers if s.get("scope") == scope and _matches(s)]
-            if not group:
-                continue
-            if not first_group:
-                opt_list.add_option(Option("", disabled=True))
-                self.filtered_servers.append(None)
-            first_group = False
-            opt_list.add_option(Option(scope.capitalize(), disabled=True))
-            self.filtered_servers.append(None)
-            for s in group:
-                self._add_server_row(opt_list, s, tools_per_server)
-                self.filtered_servers.append(s)
+            _async.get_running_loop().run_in_executor(None, _load)
+        except RuntimeError:
+            _load()
 
-        if not self.filtered_servers:
-            opt_list.add_option("*No matching MCP servers found*")
-            return
+    def refresh_list(self) -> None:
+        """Refresh the MCP server list. Disk/file loading runs off the event loop."""
+        # If we already have servers loaded, render immediately from cache; the
+        # background loader refreshes them without blocking keystroke handling.
+        if getattr(self, "servers", None):
+            self._render_from_cache()
+            self._load_servers_bg(refresh=True)
+        else:
+            self._load_servers_bg(refresh=True)
 
-        if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
-            server = self.filtered_servers[prev_highlighted]
-            if server is not None:
-                opt_list.highlighted = prev_highlighted
+    def _render_from_cache(self) -> None:
+        try:
+            opt_list = self.query_one("#mcp-option-list", OptionList)
+            prev_highlighted = opt_list.highlighted
+            opt_list.clear_options()
+
+            if not self.servers:
+                opt_list.add_option(f"*No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)*")
+                self.filtered_servers = []
                 return
 
-        # First selectable (non-header) row — like SkillsScreen does
-        for i, s in enumerate(self.filtered_servers):
-            if s is not None:
-                opt_list.highlighted = i
-                break
+            q = self.search_query.strip().lower()
+
+            def _matches(s: Dict[str, Any]) -> bool:
+                if not q:
+                    return True
+                return (
+                    q in s.get("name", "").lower()
+                    or q in s.get("scope", "").lower()
+                    or q in s.get("command", "").lower()
+                    or q in s.get("url", "").lower()
+                )
+
+            tools_per_server: Dict[str, int] = {}
+            try:
+                if hasattr(self.mm, "clients"):
+                    for s_name, client in self.mm.clients.items():
+                        if client and hasattr(client, "tools") and client.tools:
+                            tools_per_server[s_name] = len(client.tools)
+            except Exception:
+                pass
+
+            # self.filtered_servers grows in lockstep with option rows: a Group header
+            # is represented by None, a real server by its dict (like BaseSelectionScreen).
+            self.filtered_servers = []
+            first_group = True
+            for scope in ("global", "project"):
+                group = [s for s in self.servers if s.get("scope") == scope and _matches(s)]
+                if not group:
+                    continue
+                if not first_group:
+                    opt_list.add_option(Option("", disabled=True))
+                    self.filtered_servers.append(None)
+                first_group = False
+                opt_list.add_option(Option(scope.capitalize(), disabled=True))
+                self.filtered_servers.append(None)
+                for s in group:
+                    self._add_server_row(opt_list, s, tools_per_server)
+                    self.filtered_servers.append(s)
+
+            if not self.filtered_servers:
+                opt_list.add_option("*No matching MCP servers found*")
+                return
+
+            if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
+                server = self.filtered_servers[prev_highlighted]
+                if server is not None:
+                    opt_list.highlighted = prev_highlighted
+                    return
+
+            # First selectable (non-header) row — like SkillsScreen does
+            for i, s in enumerate(self.filtered_servers):
+                if s is not None:
+                    opt_list.highlighted = i
+                    break
+        except Exception:
+            pass
 
     def _add_server_row(self, opt_list: OptionList, s: Dict[str, Any], tools_per_server: Dict[str, int]) -> None:
         disabled = s.get("disabled", False)

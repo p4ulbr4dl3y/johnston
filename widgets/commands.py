@@ -94,33 +94,45 @@ class ProvidersCommand(BaseCommand):
     async def execute(self, app) -> None:
         from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
 
-        def open_providers_screen(focus_key: str | None = None) -> None:
-            provs = app.pm.load_providers(include_disabled=True)
-            if not provs:
-                app.notify("No available providers configured", severity="warning")
-                return
+        try:
+            provs = await asyncio.to_thread(app.pm.load_providers, True)
+        except Exception:
+            provs = {}
+        if not provs:
+            app.notify("No available providers configured", severity="warning")
+            return
 
-            act_key = focus_key or app.pm.get_active_provider_key()
+        def _load_cfg() -> tuple:
+            act_key = app.pm.get_active_provider_key()
             cfg_keys = {k: app.pm.get_api_key(k) for k in provs}
             dis_provs = app.pm.get_disabled_providers()
+            return act_key, cfg_keys, dis_provs
 
-            def on_provider_selected(selected_key: str | None) -> None:
-                if not selected_key:
-                    app.query_one(MESSAGE_INPUT, ChatInput).focus()
-                    return
+        act_key, cfg_keys, dis_provs = await asyncio.to_thread(_load_cfg)
 
-                p_name, curr_key = fetch_api_key_and_provider_info(app.pm, selected_key)
+        def on_provider_selected(selected_key: str | None) -> None:
+            if not selected_key:
+                app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                return
 
-                def on_key_entered(entered_key: str | None) -> None:
-                    if entered_key is not None:
-                        fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
-                        if fetched:
-                            asyncio.create_task(ModelsCommand().execute(app))
-                        else:
-                            open_providers_screen(focus_key=selected_key)
+            p_name, curr_key = fetch_api_key_and_provider_info(app.pm, selected_key)
 
-                app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+            def on_key_entered(entered_key: str | None) -> None:
+                if entered_key is not None:
+                    fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
+                    if fetched:
+                        asyncio.create_task(ModelsCommand().execute(app))
+                    else:
+                        open_providers_screen(focus_key=selected_key)
 
+            app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+
+        def open_providers_screen(focus_key: str | None = None) -> None:
+            if focus_key:
+                asyncio.create_task(
+                    ProvidersCommand()._open_with_key(app, focus_key, on_provider_selected)
+                )
+                return
             app.push_screen(
                 ProvidersScreen(
                     provs,
@@ -133,6 +145,30 @@ class ProvidersCommand(BaseCommand):
             )
 
         open_providers_screen()
+
+    async def _open_with_key(self, app, focus_key, on_provider_selected) -> None:
+        from widgets.presentation.screens.providers import ProvidersScreen
+
+        try:
+            provs = await asyncio.to_thread(app.pm.load_providers, True)
+        except Exception:
+            return
+        if not provs:
+            app.notify("No available providers configured", severity="warning")
+            return
+        act_key = app.pm.get_active_provider_key()
+        cfg_keys = {k: app.pm.get_api_key(k) for k in provs}
+        dis_provs = app.pm.get_disabled_providers()
+        app.push_screen(
+            ProvidersScreen(
+                provs,
+                act_key,
+                cfg_keys,
+                disabled_providers=dis_provs,
+                pm=app.pm,
+            ),
+            callback=on_provider_selected,
+        )
 
 
 class ModelsCommand(BaseCommand):
@@ -264,7 +300,7 @@ class ResumeCommand(BaseCommand):
     description = "Resume a saved session"
 
     async def execute(self, app) -> None:
-        sessions = app.sm.list_main_sessions()
+        sessions = await asyncio.to_thread(app.sm.list_main_sessions)
         if not sessions:
             app.notify("No saved sessions in this project", severity="warning")
             return
@@ -295,9 +331,13 @@ class SubagentsCommand(BaseCommand):
     async def execute(self, app) -> None:
         store = getattr(app, "sm", None)
         curr_sid = getattr(app, "current_session_id", None)
-        has_sessions = bool(
-            store and (store.children(curr_sid) if curr_sid else store.list(kind="subagent"))
-        )
+
+        def _has_subagents() -> bool:
+            if not store:
+                return False
+            return bool(store.children(curr_sid) if curr_sid else store.list(kind="subagent"))
+
+        has_sessions = await asyncio.to_thread(_has_subagents)
 
         if not has_sessions:
             app.notify("No active subagents", severity="warning")
@@ -334,8 +374,7 @@ class SkillsCommand(BaseCommand):
     description = "Browse and activate available skills"
 
     async def execute(self, app) -> None:
-        sm = SkillManager()
-        skills = sm.list_skills()
+        skills = await asyncio.to_thread(SkillManager().list_skills)
         if not skills:
             app.notify("No available skills found", severity="warning")
             return

@@ -1,30 +1,38 @@
+import asyncio
 import unittest
 
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 
 
+def _run_async(coro):
+    return asyncio.run(coro)
+
+
 class TestFileSuggestions(unittest.TestCase):
     def test_file_suggestions_query(self):
         suggestions = CommandSuggestions()
 
-        # 1. Typing '@' should enable 'file' mode and show files
-        res = suggestions.update_query("@", "@", 1)
-        self.assertEqual(suggestions.mode, "file")
-        self.assertTrue(len(res) > 0)
-        self.assertTrue(suggestions.display)
-        self.assertIn("app.py", res)
-        self.assertTrue(any(f.endswith("/") for f in res), "Directories should be included with trailing slash")
+        async def exercise():
+            # 1. Typing '@' should enable 'file' mode and show files
+            res = await suggestions.update_query("@", "@", 1)
+            self.assertEqual(suggestions.mode, "file")
+            self.assertTrue(len(res) > 0)
+            self.assertTrue(suggestions.display)
+            self.assertIn("app.py", res)
+            self.assertTrue(any(f.endswith("/") for f in res), "Directories should be included with trailing slash")
 
-        # 2. Filtering by file name (e.g. '@app')
-        res_app = suggestions.update_query("Check @app", "Check @app", 10)
-        self.assertEqual(suggestions.mode, "file")
-        self.assertIn("app.py", res_app)
+            # 2. Filtering by file name (e.g. '@app')
+            res_app = await suggestions.update_query("Check @app", "Check @app", 10)
+            self.assertEqual(suggestions.mode, "file")
+            self.assertIn("app.py", res_app)
 
-        # 3. Ignoring email addresses (char before @ is not space nor start of line)
-        suggestions.update_query("test@domain.com", "test@domain.com", 15)
-        self.assertIsNone(suggestions.mode)
-        self.assertFalse(suggestions.display)
+            # 3. Ignoring email addresses (char before @ is not space nor start of line)
+            await suggestions.update_query("test@domain.com", "test@domain.com", 15)
+            self.assertIsNone(suggestions.mode)
+            self.assertFalse(suggestions.display)
+
+        _run_async(exercise())
 
     def test_pasted_file_path_formatting(self):
         chat_input = ChatInput()

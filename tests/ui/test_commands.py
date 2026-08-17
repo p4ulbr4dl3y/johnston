@@ -466,15 +466,15 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.agent.role, "explorer")
         self.assertEqual(app.role, "explorer")
 
-    def test_registry_contains_all_commands(self):
+    async def test_registry_contains_all_commands(self):
         self.assertIn("/compact", COMMAND_REGISTRY)
         self.assertIn("/help", COMMAND_REGISTRY)
         self.assertIn("/connect", COMMAND_REGISTRY)
 
-    def test_alias_suggestions_formatting(self):
+    async def test_alias_suggestions_formatting(self):
         from widgets.app.command_provider import get_all_command_suggestions
 
-        commands_dict = dict(get_all_command_suggestions())
+        commands_dict = dict(await get_all_command_suggestions())
         self.assertIn("/providers", commands_dict)
         self.assertIn("/connect", commands_dict)
         self.assertEqual(commands_dict["/connect"], "Alias for /providers")

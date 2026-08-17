@@ -3,6 +3,7 @@ Git Utilities for Johnston.
 Provides unified git command execution with timeout handling and process safety.
 """
 
+import asyncio
 import difflib
 import os
 import re
@@ -31,6 +32,20 @@ def run_git(
         return subprocess.CompletedProcess(args=["git"] + args, returncode=124, stdout="", stderr="timeout")
     except Exception as e:
         return subprocess.CompletedProcess(args=["git"] + args, returncode=1, stdout="", stderr=str(e))
+
+
+async def run_git_async(
+    args: List[str],
+    cwd: Optional[str] = None,
+    env: Optional[dict] = None,
+    timeout: Optional[float] = None,
+) -> subprocess.CompletedProcess:
+    """Runs ``run_git`` off the event loop via ``asyncio.to_thread``.
+
+    Git commands carry timeouts (5-15s) and must never be awaited synchronously
+    on the event loop, so async callers should use this wrapper.
+    """
+    return await asyncio.to_thread(run_git, args, cwd, env, timeout)
 
 
 def is_git_repository(cwd: Optional[str] = None) -> bool:

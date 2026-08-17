@@ -97,7 +97,7 @@ class ChatInput(TextArea):
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height
 
-    def update_suggestions(self) -> None:
+    async def update_suggestions(self) -> None:
         """Update slash command and file suggestions list"""
         try:
             if self.is_mounted and self.app:
@@ -106,7 +106,7 @@ class ChatInput(TextArea):
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 row, col = self.cursor_location
                 line_str = self.document.get_line(row)
-                suggestions.update_query(self.text, line_str, col)
+                await suggestions.update_query(self.text, line_str, col)
         except Exception:
             pass
 
@@ -144,11 +144,21 @@ class ChatInput(TextArea):
             target_col = min(col, len(lines[target_row]))
             self.move_cursor((target_row, target_col))
 
+    def _schedule_suggestions_update(self) -> None:
+        """Schedule suggestion refresh off the event loop when mounted."""
+        if not getattr(self, "is_mounted", False):
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self.update_suggestions())
+        except RuntimeError:
+            pass
+
     def _on_input_change(self) -> None:
         """Called on any input text change"""
         self.sanitize_mouse_artifacts()
         self.update_height()
-        self.update_suggestions()
+        self._schedule_suggestions_update()
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()

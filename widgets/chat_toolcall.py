@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from typing import Any
@@ -700,17 +701,22 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.is_expanded:
             self.render_content()
 
-    def render_content(self) -> None:
+    def _compute_content(self) -> tuple:
+        """Pure content computation (safe to run in a thread); returns (kind, value).
+
+        ``kind`` is one of ``"raw"`` (rich renderable for ``content_widget``),
+        ``"markup"`` (plain/re-escaped string for ``content_widget``) or
+        ``"md"`` (markdown text for ``md_widget``). No widget mutation here — the
+        caller applies the result on the event loop.
+        """
         try:
-            self.content_widget.display = True
-            self.md_widget.display = False
             nargs = self.args if isinstance(self.args, dict) else {}
             file_path = nargs.get("path") or self.target
             if self.tool_type in ("create", "Create", "write_to_file"):
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
-                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
-                elif raw_text and (
+                    return "markup", self._clean_markup_text(raw_text or "(Error)")
+                if raw_text and (
                     "@@" in raw_text
                     or "--- a/" in raw_text
                     or "+++ b/" in raw_text
@@ -726,36 +732,32 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             or ""
                         )
                         diff_text = build_synthetic_create_diff(file_path, content)
-
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
-                    self.content_widget.update(formatted_diff)
-                else:
-                    content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
-                    if content is None:
-                        from widgets.utils.file_reader import read_file_content
+                    return "raw", formatted_diff
+                content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
+                if content is None:
+                    from widgets.utils.file_reader import read_file_content
 
-                        content = read_file_content(file_path)
-                    if content is None and raw_text:
-                        content = raw_text
+                    content = read_file_content(file_path)
+                if content is None and raw_text:
+                    content = raw_text
 
-                    if content is not None:
-                        content = content.rstrip("\r\n")
-                        lexer = self._guess_lexer(file_path)
-                        try:
-                            syntax = TransparentSyntax(
-                                content,
-                                lexer,
-                                theme=CODE_THEME,
-                                line_numbers=True,
-                                word_wrap=False,
-                                background_color="default",
-                            )
-                            self.content_widget.update(syntax)
-                        except Exception:
-                            rendered = self._format_code_with_line_numbers(content)
-                            self.content_widget.update(rendered)
-                    else:
-                        self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
+                if content is not None:
+                    content = content.rstrip("\r\n")
+                    lexer = self._guess_lexer(file_path)
+                    try:
+                        syntax = TransparentSyntax(
+                            content,
+                            lexer,
+                            theme=CODE_THEME,
+                            line_numbers=True,
+                            word_wrap=False,
+                            background_color="default",
+                        )
+                        return "raw", syntax
+                    except Exception:
+                        return "raw", self._format_code_with_line_numbers(content)
+                return "markup", self._clean_markup_text(self.result_text or "(No content)")
             elif self.tool_type in (
                 "edit",
                 "Edit",
@@ -768,139 +770,166 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             ):
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
-                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
-                else:
-                    diff_text = raw_text
-                    if not diff_text or "@@" not in diff_text:
-                        from widgets.lexer_utils import build_edit_diff_text
+                    return "markup", self._clean_markup_text(raw_text or "(Error)")
+                diff_text = raw_text
+                if not diff_text or "@@" not in diff_text:
+                    from widgets.lexer_utils import build_edit_diff_text
 
-                        diff_text = build_edit_diff_text(self.args, file_path or "file", self.tool_type)
+                    diff_text = build_edit_diff_text(self.args, file_path or "file", self.tool_type)
 
-                    if diff_text:
-                        formatted_diff = self._format_edit_diff(diff_text, file_path)
-                        self.content_widget.update(formatted_diff)
-                    else:
-                        self.content_widget.update(self._clean_markup_text(self.result_text or "(No diff)"))
+                if diff_text:
+                    return "raw", self._format_edit_diff(diff_text, file_path)
+                return "markup", self._clean_markup_text(self.result_text or "(No diff)")
             elif self.tool_type in ("update_plan", "Plan", "plan"):
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
-                    self.content_widget.update(self._clean_markup_text(raw_text or "(Error)"))
-                else:
-                    plan_items = self.args.get("plan") or []
-                    explanation = self.args.get("explanation", "")
-                    formatted_plan = self._format_plan_display(plan_items, explanation)
-                    self.content_widget.update(formatted_plan)
+                    return "markup", self._clean_markup_text(raw_text or "(Error)")
+                plan_items = self.args.get("plan") or []
+                explanation = self.args.get("explanation", "")
+                return "raw", self._format_plan_display(plan_items, explanation)
             elif self.canonical_tool == "ask_user":
-                self.content_widget.update(self._format_ask_user_display())
+                return "raw", self._format_ask_user_display()
             elif self.tool_type in ("web_fetch", "WebFetch"):
                 raw_text = self.result_text or ""
                 if self._is_error(raw_text):
-                    t = Text(raw_text.strip(), style="bold #ffffff")
-                    self.content_widget.update(t)
-                    self.content_widget.display = True
-                    self.md_widget.display = False
-                else:
-                    default_target = self.args.get("url") or file_path or "page.md"
-                    clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
-                    lexer = self._guess_lexer(fpath)
-                    raw_mode = bool(self.args.get("raw", False))
+                    return "raw", Text(raw_text.strip(), style="bold #ffffff")
+                default_target = self.args.get("url") or file_path or "page.md"
+                clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
+                lexer = self._guess_lexer(fpath)
+                raw_mode = bool(self.args.get("raw", False))
 
-                    is_code_file = lexer not in ("markdown", "text") and lexer != "html"
-                    if is_code_file or raw_mode:
-                        if clean_code:
-                            clean_code = clean_code.rstrip("\r\n")
-                            try:
-                                syntax = TransparentSyntax(
-                                    clean_code,
-                                    lexer if lexer != "html" else "html",
-                                    theme=CODE_THEME,
-                                    line_numbers=True,
-                                    start_line=start_line,
-                                    word_wrap=False,
-                                    background_color="default",
-                                )
-                                self.content_widget.update(syntax)
-                            except Exception:
-                                rendered = self._format_code_with_line_numbers(clean_code)
-                                self.content_widget.update(rendered)
-                        else:
-                            self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
-                        self.content_widget.display = True
-                        self.md_widget.display = False
-                    else:
-                        clean_code = self._fix_markdown_nested_lists(clean_code)
-                        safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
-                        self.md_widget.display = True
-                        self.content_widget.display = False
+                is_code_file = lexer not in ("markdown", "text") and lexer != "html"
+                if is_code_file or raw_mode:
+                    if clean_code:
+                        clean_code = clean_code.rstrip("\r\n")
+                        try:
+                            syntax = TransparentSyntax(
+                                clean_code,
+                                lexer if lexer != "html" else "html",
+                                theme=CODE_THEME,
+                                line_numbers=True,
+                                start_line=start_line,
+                                word_wrap=False,
+                                background_color="default",
+                            )
+                            return "raw", syntax
+                        except Exception:
+                            return "raw", self._format_code_with_line_numbers(clean_code)
+                    return "markup", self._clean_markup_text(self.result_text or "(No content)")
+                clean_code = self._fix_markdown_nested_lists(clean_code)
+                return "md", clean_code.rstrip("\r\n") or "(No content)"
             elif self.tool_type in ("read", "Read"):
                 raw_text = self.result_text or ""
                 if self._is_error(raw_text):
-                    t = Text(raw_text.strip(), style="bold #ffffff")
-                    self.content_widget.update(t)
-                    self.content_widget.display = True
-                    self.md_widget.display = False
-                else:
-                    default_target = file_path or "file.txt"
-                    clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
+                    return "raw", Text(raw_text.strip(), style="bold #ffffff")
+                default_target = file_path or "file.txt"
+                clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
 
-                    if not clean_code.strip() and fpath:
-                        from widgets.utils.file_reader import read_file_content
+                if not clean_code.strip() and fpath:
+                    from widgets.utils.file_reader import read_file_content
 
-                        disk_content = read_file_content(fpath)
-                        if disk_content is not None:
-                            clean_code = disk_content
-                            start_line = 1
+                    disk_content = read_file_content(fpath)
+                    if disk_content is not None:
+                        clean_code = disk_content
+                        start_line = 1
 
-                    lexer = self._guess_lexer(fpath)
-                    if lexer == "markdown":
-                        clean_code = self._fix_markdown_nested_lists(clean_code)
-                        safe_update_markdown(self.md_widget, clean_code.rstrip("\r\n") or "(No content)")
-                        self.md_widget.display = True
-                        self.content_widget.display = False
-                    else:
-                        if clean_code:
-                            clean_code = clean_code.rstrip("\r\n")
-                            try:
-                                syntax = TransparentSyntax(
-                                    clean_code,
-                                    lexer,
-                                    theme=CODE_THEME,
-                                    line_numbers=True,
-                                    start_line=start_line,
-                                    word_wrap=False,
-                                    background_color="default",
-                                )
-                                self.content_widget.update(syntax)
-                            except Exception:
-                                rendered = self._format_code_with_line_numbers(clean_code)
-                                self.content_widget.update(rendered)
-                        else:
-                            self.content_widget.update(self._clean_markup_text(self.result_text or "(No content)"))
-                        self.content_widget.display = True
-                        self.md_widget.display = False
+                lexer = self._guess_lexer(fpath)
+                if lexer == "markdown":
+                    clean_code = self._fix_markdown_nested_lists(clean_code)
+                    return "md", clean_code.rstrip("\r\n") or "(No content)"
+                if clean_code:
+                    clean_code = clean_code.rstrip("\r\n")
+                    try:
+                        syntax = TransparentSyntax(
+                            clean_code,
+                            lexer,
+                            theme=CODE_THEME,
+                            line_numbers=True,
+                            start_line=start_line,
+                            word_wrap=False,
+                            background_color="default",
+                        )
+                        return "raw", syntax
+                    except Exception:
+                        return "raw", self._format_code_with_line_numbers(clean_code)
+                return "markup", self._clean_markup_text(self.result_text or "(No content)")
             elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
-                    is_running = False
                     if self.app and hasattr(self.app, "task_manager"):
                         bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
                         if bg_match:
                             tid = bg_match.group(1)
                             for t in self.app.task_manager:
-                                if getattr(t, "task_id", "") == tid and getattr(t, "kind", "") == "shell" and getattr(t, "is_running", False):
-                                    is_running = True
+                                if (
+                                    getattr(t, "task_id", "") == tid
+                                    and getattr(t, "kind", "") == "shell"
+                                    and getattr(t, "is_running", False)
+                                ):
+                                    output_text = "(Running command...)"
                                     break
-                    if is_running:
-                        output_text = "(Running command...)"
-                    else:
+                    if not output_text:
                         output_text = "(No output)"
-                self.content_widget.update(self._clean_markup_text(output_text))
+                return "markup", self._clean_markup_text(output_text)
             else:
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
                 syntax = self._format_json_result(clean_res)
                 if syntax:
-                    self.content_widget.update(syntax)
-                else:
-                    self.content_widget.update(self._clean_markup_text(clean_res))
+                    return "raw", syntax
+                return "markup", self._clean_markup_text(clean_res)
+        except Exception:
+            return "markup", self._clean_markup_text(self.result_text or "")
+
+    def _apply_content(self, kind: str, value: Any) -> None:
+        """Apply a computed content payload to the widgets (event-loop only)."""
+        try:
+            if kind == "raw":
+                self.content_widget.update(value)
+                self.content_widget.display = True
+                self.md_widget.display = False
+            elif kind == "md":
+                safe_update_markdown(self.md_widget, value)
+                self.md_widget.display = True
+                self.content_widget.display = False
+            else:  # "markup"
+                self.content_widget.update(value)
+                self.content_widget.display = True
+                self.md_widget.display = False
         except Exception:
             pass
+
+    def render_content(self) -> None:
+        """Render the tool's terminal content into the widgets.
+
+        The heavy path (disk reads, pygments) is pushed to a worker thread when
+        a running event loop is available (real app on the UI thread). When no
+        loop is running (unit tests / sync callers), the content is computed and
+        applied synchronously so the widgets are populated before the call
+        returns.
+        """
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop is not None and getattr(self, "is_mounted", True):
+                self.content_widget.display = True
+                self.md_widget.display = False
+                gate: asyncio.Task | None = self._render_gate if hasattr(self, "_render_gate") else None
+                if gate is not None and not gate.done():
+                    gate.cancel()
+                self._render_gate = loop.create_task(self._async_render_content())
+            else:
+                kind, value = self._compute_content()
+                self._apply_content(kind, value)
+        except Exception:
+            pass
+
+    async def _async_render_content(self) -> None:
+        try:
+            kind, value = await asyncio.to_thread(self._compute_content)
+        except Exception:
+            kind, value = "markup", self._clean_markup_text(self.result_text or "")
+        if not getattr(self, "is_mounted", True):
+            return
+        self._apply_content(kind, value)

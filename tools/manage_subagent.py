@@ -125,7 +125,9 @@ class ManageSubagentTool(BaseTool):
                 if subagent and session.project_dir and session.branch_name:
                     from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
-                    project_dir = SubagentWorktreeManager.ensure_worktree_available(session, parent_dir=ctx.project_dir)
+                    project_dir = await SubagentWorktreeManager.ensure_worktree_available_async(
+                        session, parent_dir=ctx.project_dir
+                    )
                     subagent.project_dir = project_dir
                     subagent.cwd = project_dir
 

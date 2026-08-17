@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 
@@ -20,14 +21,11 @@ class CommandSuggestions(OptionList):
         self.current_matched: list[str] = []
         self.at_start_idx: int = -1
         self._cached_files: list[str] = []
+        self._cached_cwd: str = ""
         self._cache_time: float = 0.0
 
-    def get_workspace_files(self) -> list[str]:
-        """Gets relative file paths list in current project with 5s caching"""
-        now = time.time()
-        if self._cached_files and (now - self._cache_time < 30.0):
-            return self._cached_files
-
+    def _load_workspace_files(self) -> list[str]:
+        """Sync disk walk of the workspace (run inside asyncio.to_thread)."""
         files_list = []
         cwd = os.getcwd()
         real_cwd = os.path.realpath(cwd)
@@ -74,11 +72,49 @@ class CommandSuggestions(OptionList):
                     break
         except Exception:
             pass
-        self._cached_files = sorted(set(files_list))
+        return sorted(set(files_list))
+
+    async def get_workspace_files(self) -> list[str]:
+        """Gets relative file paths list in current project with 30s caching, async disk walk."""
+        now = time.time()
+        cwd = os.getcwd()
+        if (
+            self._cached_files
+            and getattr(self, "_cached_cwd", None) == cwd
+            and now - self._cache_time < 30.0
+        ):
+            return self._cached_files
+        files_list = await asyncio.to_thread(self._load_workspace_files)
+        self._cached_files = files_list
+        self._cached_cwd = cwd
         self._cache_time = now
         return self._cached_files
 
-    def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
+    def _render_file_suggestions(self, files: list[str], query_lower: str) -> list[str]:
+        """Build option rows from the (already cached) file list for the given query."""
+        self.clear_options()
+        matched_files = []
+        seen: set[str] = set()
+        for f in files:
+            if f in seen:
+                continue
+            seen.add(f)
+            if not query_lower or query_lower in f.lower():
+                matched_files.append(f)
+                kind = "Dir" if f.endswith("/") else "File"
+                formatted_line = f"{f:<46} {kind}"
+                self.add_option(formatted_line)
+                if len(matched_files) >= 50:
+                    break
+        self.current_matched = matched_files
+        if matched_files:
+            self.display = True
+            self.highlighted = 0
+        else:
+            self.display = False
+        return matched_files
+
+    async def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
         """Updates matches list formatted for /commands and @files"""
         check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
 
@@ -93,7 +129,7 @@ class CommandSuggestions(OptionList):
                     self.at_start_idx = slash_idx
                     query_lower = query_part.lower()
                     matched_cmds = []
-                    all_cmds = get_all_command_suggestions()
+                    all_cmds = await get_all_command_suggestions()
                     max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
                     padding = max(16, max_cmd_len + 2)
                     for cmd, desc in all_cmds:
@@ -123,28 +159,8 @@ class CommandSuggestions(OptionList):
                     self.mode = "file"
                     self.at_start_idx = at_idx
                     query_lower = query_part.lower()
-                    files = self.get_workspace_files()
-                    matched_files = []
-                    seen: set[str] = set()
-                    for f in files:
-                        if f in seen:
-                            continue
-                        seen.add(f)
-                        if not query_lower or query_lower in f.lower():
-                            matched_files.append(f)
-                            kind = "Dir" if f.endswith("/") else "File"
-                            formatted_line = f"{f:<46} {kind}"
-                            self.add_option(formatted_line)
-                            if len(matched_files) >= 50:
-                                break
-
-                    self.current_matched = matched_files
-                    if matched_files:
-                        self.display = True
-                        self.highlighted = 0
-                    else:
-                        self.display = False
-                    return matched_files
+                    files = await self.get_workspace_files()
+                    return self._render_file_suggestions(files, query_lower)
 
         if self.mode is not None or self.display or self.option_count:
             self.clear_options()

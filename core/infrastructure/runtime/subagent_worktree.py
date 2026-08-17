@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 from typing import Optional, Tuple
@@ -25,7 +26,23 @@ class SubagentWorktreeManager:
         branch is created from HEAD. Returns (worktree_path, branch_name) on success,
         or (None, None) if unavailable. The branch name is caller-supplied, never
         derived from the session id.
+
+        Sync wrapper around :meth:`_create_worktree_impl`; async callers should use
+        :meth:`create_worktree_async` to avoid blocking the event loop.
         """
+        return SubagentWorktreeManager._create_worktree_impl(project_dir, session_id, branch_name)
+
+    @staticmethod
+    async def create_worktree_async(
+        project_dir: str, session_id: str, branch_name: str
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """Async variant of :meth:`create_worktree`, running git off the event loop."""
+        return await asyncio.to_thread(
+            SubagentWorktreeManager._create_worktree_impl, project_dir, session_id, branch_name
+        )
+
+    @staticmethod
+    def _create_worktree_impl(project_dir: str, session_id: str, branch_name: str) -> Tuple[Optional[str], Optional[str]]:
         if not SubagentWorktreeManager.is_git_repo(project_dir) or not branch_name:
             return None, None
 
@@ -49,7 +66,14 @@ class SubagentWorktreeManager:
 
     @staticmethod
     def attach_worktree(project_dir: str, session_id: str, branch_name: str) -> Optional[str]:
-        """Re-attaches a worktree directory to an existing subagent branch for follow-up execution."""
+        """Re-attaches a worktree directory to an existing subagent branch for follow-up execution.
+
+        Sync wrapper around :meth:`_attach_worktree_impl`.
+        """
+        return SubagentWorktreeManager._attach_worktree_impl(project_dir, session_id, branch_name)
+
+    @staticmethod
+    def _attach_worktree_impl(project_dir: str, session_id: str, branch_name: str) -> Optional[str]:
         if not SubagentWorktreeManager.is_git_repo(project_dir) or not branch_name:
             return None
 
@@ -68,7 +92,23 @@ class SubagentWorktreeManager:
 
     @staticmethod
     def get_worktree_diff_summary(project_dir: str, wt_path: str, branch_name: str) -> Tuple[str, bool]:
-        """Auto-commits changes in worktree and returns (diff_summary, has_changes)."""
+        """Auto-commits changes in worktree and returns (diff_summary, has_changes).
+
+        Sync wrapper around :meth:`_get_worktree_diff_summary_impl`.
+        """
+        return SubagentWorktreeManager._get_worktree_diff_summary_impl(project_dir, wt_path, branch_name)
+
+    @staticmethod
+    async def get_worktree_diff_summary_async(
+        project_dir: str, wt_path: str, branch_name: str
+    ) -> Tuple[str, bool]:
+        """Async variant of :meth:`get_worktree_diff_summary`, running git off the event loop."""
+        return await asyncio.to_thread(
+            SubagentWorktreeManager._get_worktree_diff_summary_impl, project_dir, wt_path, branch_name
+        )
+
+    @staticmethod
+    def _get_worktree_diff_summary_impl(project_dir: str, wt_path: str, branch_name: str) -> Tuple[str, bool]:
         if not wt_path or not os.path.exists(wt_path):
             return "", False
 
@@ -116,7 +156,25 @@ class SubagentWorktreeManager:
 
     @staticmethod
     def cleanup_worktree(project_dir: str, wt_path: str, branch_name: str, keep_branch: bool = False) -> None:
-        """Safely removes git worktree and optionally deletes the branch if empty."""
+        """Safely removes git worktree and optionally deletes the branch if empty.
+
+        Sync wrapper around :meth:`_cleanup_worktree_impl`.
+        """
+        SubagentWorktreeManager._cleanup_worktree_impl(project_dir, wt_path, branch_name, keep_branch)
+
+    @staticmethod
+    async def cleanup_worktree_async(
+        project_dir: str, wt_path: str, branch_name: str, keep_branch: bool = False
+    ) -> None:
+        """Async variant of :meth:`cleanup_worktree`, running git off the event loop."""
+        await asyncio.to_thread(
+            SubagentWorktreeManager._cleanup_worktree_impl, project_dir, wt_path, branch_name, keep_branch
+        )
+
+    @staticmethod
+    def _cleanup_worktree_impl(
+        project_dir: str, wt_path: str, branch_name: str, keep_branch: bool = False
+    ) -> None:
         if project_dir and SubagentWorktreeManager.is_git_repo(project_dir):
             if wt_path:
                 run_git(["worktree", "remove", "--force", wt_path], cwd=project_dir, timeout=10)
@@ -150,6 +208,11 @@ class SubagentWorktreeManager:
         if reattached:
             return reattached
         return project_dir
+
+    @staticmethod
+    async def ensure_worktree_available_async(session, parent_dir: Optional[str] = None) -> str:
+        """Async variant of :meth:`ensure_worktree_available`, running git off the event loop."""
+        return await asyncio.to_thread(SubagentWorktreeManager.ensure_worktree_available, session, parent_dir)
 
     @staticmethod
     def make_worktree_cleanup_fn(parent_dir: str, wt_path: Optional[str], wt_branch: Optional[str], is_followup: bool = False):

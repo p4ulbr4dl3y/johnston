@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -173,7 +174,20 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 "good": MagicMock(last_error=None),
             }
             footer._mcp_cache_time = 0  # force reload of cached servers
+            # Force a fresh background cache load with the mocked manager.
+            footer._st_cache_time = 0
+            footer._st_cached_mcp_servers = None
+            footer._st_cache_loading = False
+            footer._st_cached_providers = {}
             with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
+                footer.refresh_footer()
+                await pilot.pause()
+                # Cache loads happen off the event loop; wait until the fresh
+                # values are in place and the footer has re-rendered.
+                for _ in range(50):
+                    if footer._st_cached_mcp_servers:
+                        break
+                    await asyncio.sleep(0.01)
                 footer.refresh_footer()
                 await pilot.pause()
             self.assertEqual(footer._last_status_args["mcp_active"], 1)

@@ -294,7 +294,7 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
 
     class _BadWorktree:
         @staticmethod
-        def create_worktree(*a, **k):
+        async def create_worktree_async(*a, **k):
             raise RuntimeError("git worktree failed")
 
         @staticmethod

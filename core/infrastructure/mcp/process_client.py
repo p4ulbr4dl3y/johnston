@@ -193,12 +193,8 @@ class MCPProcessClient:
             fut = loop.create_future()
             self._pending_futures[current_id] = fut
 
-            line = json.dumps(req, ensure_ascii=False) + "\n"
             try:
-                if self.process and self.process.stdin:
-                    with self._write_lock:
-                        self.process.stdin.write(line)
-                        self.process.stdin.flush()
+                await self._send_async(req)
             except Exception:
                 logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
                 self._pending_futures.pop(current_id, None)
@@ -320,6 +316,15 @@ class MCPProcessClient:
             logger.debug("Reader thread for MCP server '%s' did not exit in time", self.name)
         self._reader_thread = None
 
+    async def stop_async(self) -> None:
+        """Async variant of ``stop`` for use on the event loop.
+
+        Runs blocking subprocess teardown (terminate + wait + stream close) in a
+        worker thread so async callers (e.g. ``_cleanup_if_created`` / timeout
+        teardown) never stall the loop.
+        """
+        await asyncio.to_thread(self.stop)
+
     def _send(self, message: Dict[str, Any]) -> None:
         if not self.process or not self.process.stdin:
             return
@@ -327,6 +332,16 @@ class MCPProcessClient:
         with self._write_lock:
             self.process.stdin.write(line)
             self.process.stdin.flush()
+
+    async def _send_async(self, message: Dict[str, Any]) -> None:
+        """Send a JSON-RPC message without blocking the event loop.
+
+        ``_write_lock`` (threading) still guards the write; the actual blocking
+        write+flush runs in a worker thread so it never stalls the loop.
+        """
+        if not self.process or not self.process.stdin:
+            return
+        await asyncio.to_thread(self._send, message)
 
     def _read_response(self, req_id: Optional[int] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout or self._stopped:
@@ -460,7 +475,7 @@ class MCPProcessClient:
             self.last_error = f"MCP init error: {err_msg}"
             return False
 
-        self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        await self._send_async({"jsonrpc": "2.0", "method": "notifications/initialized"})
         await self.fetch_tools_async()
         return True
 
@@ -559,12 +574,8 @@ class MCPProcessClient:
             fut = loop.create_future()
             self._pending_futures[current_id] = fut
 
-            line = json.dumps(req, ensure_ascii=False) + "\n"
             try:
-                if self.process and self.process.stdin:
-                    with self._write_lock:
-                        self.process.stdin.write(line)
-                        self.process.stdin.flush()
+                await self._send_async(req)
             except Exception as e:
                 self._pending_futures.pop(current_id, None)
                 return f"Error writing to MCP server '{self.name}': {e}"

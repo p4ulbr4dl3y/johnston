@@ -68,6 +68,9 @@ class ShellTask(BaseTask):
             backfill = "".join(self.output.history)
             if backfill:
                 self._log.append(backfill)
+            # Readers may inspect the log before the worker drains; flush now so
+            # the backfilled output is visible synchronously on disk.
+            self._log.flush_now()
             return self.log_path
         self._log = None
         return None
@@ -211,10 +214,10 @@ class ShellTask(BaseTask):
         data = (text + "\n").encode("utf-8")
         try:
             if self.master_fd is not None:
-                os.write(self.master_fd, data)
+                await asyncio.to_thread(os.write, self.master_fd, data)
                 return f"OK: input sent to {self.task_id}"
             if self.process is not None and self.process.stdin is not None:
-                self.process.stdin.write(data)
+                await asyncio.to_thread(self.process.stdin.write, data)
                 await self.process.stdin.drain()
                 return f"OK: input sent to {self.task_id}"
             return format_tool_error("task", f"{self.task_id} stdin not writable")
