@@ -15,10 +15,10 @@ class TestToolDisplay(unittest.TestCase):
 
         root = os.path.realpath("/app/project")
         in_path = os.path.join(root, "src", "main.py")
-        self.assertEqual(extract_tool_display("create", {"TargetFile": in_path}, cwd=root), in_path)
+        self.assertEqual(extract_tool_display("create", {"path": in_path}, cwd=root), in_path)
 
         out_path = os.path.realpath("/tmp/other/file.py")
-        self.assertEqual(extract_tool_display("create", {"TargetFile": out_path}, cwd=root), out_path)
+        self.assertEqual(extract_tool_display("create", {"path": out_path}, cwd=root), out_path)
 
     def test_ask_user_questions(self):
         res = extract_tool_display("ask_user", {"questions": [{"question_text": "Which framework?"}]})
@@ -27,6 +27,10 @@ class TestToolDisplay(unittest.TestCase):
     def test_subagent_description(self):
         res = extract_tool_display("invoke_subagent", {"description": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, '"find bugs"')
+
+    def test_subagent_prompt_only_empty_parens(self):
+        # No description -> empty parens, prompt is not a fallback.
+        self.assertEqual(extract_tool_display("invoke_subagent", {"prompt": "long prompt"}), "")
 
     def test_manage_shell_list_action(self):
         res = extract_tool_display("manage_shell", {"action": "list"})
@@ -40,8 +44,37 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("manage_subagent", {"action": "send_message", "session_id": "sub_123"})
         self.assertEqual(res, "send message to sub_123")
 
-    def test_unknown_tool_fallback(self):
-        self.assertEqual(extract_tool_display("unknown_tool", {}), "unknown_tool")
+    def test_unknown_tool_compact_dict(self):
+        # Non-builtin (MCP/custom) tools always render the compact dict format.
+        self.assertEqual(extract_tool_display("unknown_tool", {}), "")
+        self.assertEqual(extract_tool_display("unknown_tool", {"query": "x"}), '{query: "x"}')
+
+    def test_builtin_missing_arg_empty_parens(self):
+        for name in ("read", "create", "edit", "multi_edit", "shell", "web_fetch", "update_plan"):
+            self.assertEqual(extract_tool_display(name, {}), "")
+        self.assertEqual(extract_tool_display("ask_user", {}), "")
+        self.assertEqual(extract_tool_display("invoke_subagent", {}), "")
+        self.assertEqual(extract_tool_display("manage_shell", {}), "")
+        self.assertEqual(extract_tool_display("manage_subagent", {}), "")
+
+    def test_builtin_no_generic_string_fallback(self):
+        # Model error: multi_edit with only the edits list (no path) -> empty parens.
+        self.assertEqual(extract_tool_display("multi_edit", {"edits": [{"old_str": "a", "new_str": "b"}]}), "")
+        # edit without path, only old/new strings -> empty parens, not old_str.
+        self.assertEqual(extract_tool_display("edit", {"old_str": "a", "new_str": "b"}), "")
+        # update_plan without a plan list -> empty parens (explanation ignored).
+        self.assertEqual(extract_tool_display("update_plan", {"explanation": "why"}), "")
+        # shell with only timeout -> empty parens.
+        self.assertEqual(extract_tool_display("shell", {"timeout": 30}), "")
+
+    def test_update_plan_counter(self):
+        self.assertEqual(
+            extract_tool_display(
+                "update_plan", {"explanation": "phase one", "plan": [{"status": "completed"}, {"status": "pending"}]}
+            ),
+            "[1/2 completed]",
+        )
+        self.assertEqual(extract_tool_display("update_plan", {"explanation": "phase one"}), "")
 
     def test_long_target_is_truncated(self):
         long_cmd = "echo " + "a" * 200

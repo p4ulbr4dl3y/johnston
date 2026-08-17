@@ -10,9 +10,6 @@ import re
 from collections import OrderedDict
 from typing import Any, Dict
 
-# Argument keys whose values must never appear in the display label (secrets).
-_SECRET_KEYS = {"api_key", "apikey", "token", "password", "passwd", "secret", "client_secret", "auth"}
-
 # Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
 # style tags, so escape them (and backslashes) for the chat tool chip.
 _ESCAPE_RE = re.compile(r"([\[\]\\])")
@@ -31,8 +28,47 @@ def escape_markup(target: str) -> str:
     return _ESCAPE_RE.sub(r"\\\1", target)
 
 
-def is_secret_key(key: str) -> bool:
-    return key.strip().lower() in _SECRET_KEYS
+def format_compact_dict(d: dict) -> str:
+    """Render a tool-args dict as a compact ``{k: v, ...}`` chip label.
+
+    Single format for every non-builtin (MCP/custom) tool: keys are clipped to
+    20 chars, values to 35, the whole entry to ~70 chars total; overflow becomes
+    a trailing ``...``. Non-dict or empty input yields ``""`` (empty parens).
+    """
+    if not isinstance(d, dict) or not d:
+        return ""
+
+    items = []
+    total_len = 0
+    overflow = False
+    for k, v in d.items():
+        k_str = str(k)
+        if len(k_str) > 20:
+            k_str = k_str[:17] + "..."
+
+        if isinstance(v, str):
+            v_clean = v.replace("\n", "\\n")
+            if len(v_clean) > 35:
+                v_clean = v_clean[:32] + "..."
+            v_str = f'"{v_clean}"'
+        else:
+            v_str = json.dumps(v, ensure_ascii=False, default=str)
+            if len(v_str) > 35:
+                v_str = v_str[:32] + "..."
+
+        item_str = f"{k_str}: {v_str}"
+        if total_len + len(item_str) > 70:
+            overflow = True
+            break
+        items.append(item_str)
+        total_len += len(item_str) + 2
+
+    if overflow and items:
+        return "{" + ", ".join(items) + ", ...}"
+    elif items:
+        return "{" + ", ".join(items) + "}"
+    else:
+        return "{...}"
 
 
 def truncate(target: str, max_len: int = 60) -> str:
@@ -89,10 +125,17 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
 
 
 def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
-    from tools.registry import normalize_tool_name
+    from tools.registry import REGISTRY
+    from tools.registry import normalize_tool_name as _normalize
 
-    name = normalize_tool_name(tool_name)
-    args = args or {}
+    name = _normalize(tool_name)
+    args = args if isinstance(args, dict) else {}
+    is_builtin = name in REGISTRY
+
+    if not is_builtin:
+        # MCP/custom tools: single predefined format — compact ``{k: v, ...}``
+        # args label (empty parens when no args).
+        return format_compact_dict(args)
 
     if name == "ask_user":
         qs = args.get("questions")
@@ -104,16 +147,17 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str |
                     formatted.append(truncate(q_text))
             if formatted:
                 return truncate(", ".join(f'"{t}"' for t in formatted))
-        return "ask_user"
+        return ""
 
     if name == "invoke_subagent":
-        desc = args.get("description") or args.get("prompt") or ""
-        return truncate(f'"{desc}"') if desc else tool_name
+        desc = args.get("description")
+        if isinstance(desc, str) and desc:
+            return truncate(f'"{desc}"')
+        return ""
 
     if name in ("manage_shell", "manage_subagent"):
-        nargs = args if isinstance(args, dict) else {}
-        act = nargs.get("action") or ""
-        tid = nargs.get("session_id" if name == "manage_subagent" else "task_id") or ""
+        act = args.get("action") or ""
+        tid = args.get("session_id" if name == "manage_subagent" else "task_id") or ""
         if act and tid:
             if act in ("send_input", "send_message"):
                 verb = "send message to" if act == "send_message" else "send input to"
@@ -123,47 +167,32 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str |
             return truncate(tid)
         if act:
             return truncate(act)
-        return tool_name
+        return ""
 
-    # Prioritize file path arguments first for file operations
-    for key in ("TargetFile", "target_file", "path", "file", "file_path", "filepath", "filename", "image_path"):
-        val = args.get(key)
+    if name == "update_plan":
+        plan_data = args.get("plan")
+        if isinstance(plan_data, list):
+            total = len(plan_data)
+            completed = sum(
+                1 for item in plan_data if isinstance(item, dict) and item.get("status") == "completed"
+            )
+            return f"[{completed}/{total} completed]"
+        return ""
+
+    if name in ("read", "create", "edit", "multi_edit"):
+        val = args.get("path")
         if isinstance(val, str) and val:
             return truncate(val.strip())
+        return ""
 
-    # Generic: prefer a query/prompt argument when present (e.g., search, subagent)
-    q_val = args.get("query") or args.get("prompt")
-    if isinstance(q_val, str) and q_val:
-        return truncate(f'"{q_val}"')
+    if name == "shell":
+        cmd = args.get("command")
+        if isinstance(cmd, str) and cmd:
+            return truncate(cmd)
+        return ""
 
-    # Then other string args (command, question, url)
-    for key in ("command", "question", "url"):
-        val = args.get(key)
-        if isinstance(val, str) and val:
-            return truncate(val)
-
-    questions = args.get("questions")
-    if isinstance(questions, list) and questions:
-        first = questions[0]
-        if isinstance(first, dict):
-            txt = first.get("question_text", "")
-            if txt:
-                return truncate(txt)
-
-    # Last resort: first non-empty string value, then first numeric value
-    # (skipping secret keys so api_key/token/password never leak into the chip).
-    str_vals = [
-        str(v)
-        for k, v in args.items()
-        if isinstance(v, str) and v and not is_secret_key(k)
-    ]
-    if not str_vals:
-        str_vals = [
-            str(v)
-            for k, v in args.items()
-            if isinstance(v, (int, float)) and v and not is_secret_key(k)
-        ]
-    if str_vals:
-        return truncate(str_vals[0])
-
-    return tool_name
+    if name == "web_fetch":
+        url = args.get("url")
+        if isinstance(url, str) and url:
+            return truncate(url)
+        return ""

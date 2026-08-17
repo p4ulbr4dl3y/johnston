@@ -273,42 +273,6 @@ class ParsingMixin:
         else:
             return "#98c379"
 
-    def _format_compact_dict(self, d: dict) -> str:
-        if not isinstance(d, dict) or not d:
-            return ""
-
-        items = []
-        total_len = 0
-        overflow = False
-        for k, v in d.items():
-            k_str = str(k)
-            if len(k_str) > 20:
-                k_str = k_str[:17] + "..."
-
-            if isinstance(v, str):
-                v_clean = v.replace("\n", "\\n")
-                if len(v_clean) > 35:
-                    v_clean = v_clean[:32] + "..."
-                v_str = f'"{v_clean}"'
-            else:
-                v_str = json.dumps(v, ensure_ascii=False, default=str)
-                if len(v_str) > 35:
-                    v_str = v_str[:32] + "..."
-
-            item_str = f"{k_str}: {v_str}"
-            if total_len + len(item_str) > 70:
-                overflow = True
-                break
-            items.append(item_str)
-            total_len += len(item_str) + 2
-
-        if overflow and items:
-            return "{" + ", ".join(items) + ", ...}"
-        elif items:
-            return "{" + ", ".join(items) + "}"
-        else:
-            return "{...}"
-
 
 class _DisplayNamesDict(dict):
     CANONICAL_NAMES = {
@@ -534,7 +498,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def render_header(self) -> None:
         c = self._get_status_color()
         if self.canonical_tool == "update_plan":
-            target_str = "Plan"
+            target_str = ""
             if self.args and isinstance(self.args, dict):
                 plan_data = self.args.get("plan")
                 if isinstance(plan_data, list):
@@ -562,17 +526,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             target_str = extract_tool_display(self.tool_type, self.args, cwd=project_dir) if self.args else self.target
             self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
-            # Eager MCP tool or custom external tool
-            mcp_args = self.args if isinstance(self.args, dict) else {}
-            compact = self._format_compact_dict(mcp_args)
+            # MCP/custom tool: single format — ToolName({k: v, ...}).
+            from core.infrastructure.presentation.tool_display import format_compact_dict
+
+            compact = format_compact_dict(self.args if isinstance(self.args, dict) else {})
             is_mcp = (self.tool_type or "").startswith("mcp_") or getattr(self, "is_mcp", False)
-            if compact or is_mcp:
-                tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
-                escaped_compact = escape(compact)
-                self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
-            else:
-                display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
-                self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(self.target)})")
+            tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
+            escaped_compact = escape(compact)
+            self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
 
     def on_click(self, event) -> None:
         if not self.is_clickable_header():

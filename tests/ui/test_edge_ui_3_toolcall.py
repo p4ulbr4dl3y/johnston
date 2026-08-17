@@ -13,9 +13,10 @@ class TestEdgeToolCallInit(unittest.TestCase):
         self.assertIsNotNone(widget.header_label)
 
     def test_whitespace_only_tool_type(self):
+        # Blank name -> non-builtin path renders empty parens, no target fallback.
         widget = ToolCallWidget("   ", "target", "")
         widget.render_header()
-        self.assertIn("target", widget.header_label.render().plain)
+        self.assertIn("()", widget.header_label.render().plain)
 
     def test_none_tool_type_does_not_crash(self):
         """None tool_type is a malformed tool-call; must not raise AttributeError."""

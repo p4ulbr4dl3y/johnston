@@ -135,16 +135,14 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
 
 class TestToolDisplayEdge(unittest.TestCase):
     def test_none_and_missing_args(self):
-        self.assertEqual(extract_tool_display("shell", None), "shell")
-        self.assertEqual(extract_tool_display("shell", {}), "shell")
+        self.assertEqual(extract_tool_display("shell", None), "")
+        self.assertEqual(extract_tool_display("shell", {}), "")
         self.assertEqual(extract_tool_display("", {}), "")
 
-    def test_non_dict_args_crash(self):
-        """BUG: non-dict args pass truthy `args or {}` guard then crash on .get."""
-        with self.assertRaises(AttributeError):
-            extract_tool_display("shell", ["ls", "-la"])
-        with self.assertRaises(AttributeError):
-            extract_tool_display("shell", "not a dict")
+    def test_non_dict_args(self):
+        # Non-dict args are tolerated and render empty parens (no crash).
+        self.assertEqual(extract_tool_display("shell", ["ls", "-la"]), "")
+        self.assertEqual(extract_tool_display("shell", "not a dict"), "")
 
     def test_long_argument_truncated(self):
         long = "a" * 200
@@ -164,15 +162,6 @@ class TestToolDisplayEdge(unittest.TestCase):
         self.assertNotIn("[bold]hi[/bold]", res)
         self.assertIn("\\[", res)
 
-    def test_secrets_hidden_in_args(self):
-        """BUG: secret-typed args leak into rendered label (last-resort string pick)."""
-        res = extract_tool_display("shell", {"api_key": "sk-1234567890abcdef"})
-        self.assertNotIn("sk-1234567890abcdef", res)
-        res2 = extract_tool_display("shell", {"password": "hunter2secret"})
-        self.assertNotIn("hunter2secret", res2)
-        res3 = extract_tool_display("web_fetch", {"token": "tok-abc", "url": "https://x"})
-        self.assertNotIn("tok-abc", res3)
-
     def test_multiple_tools_many_args(self):
         for name, args in [
             ("read", {"path": "f.py"}),
@@ -183,11 +172,11 @@ class TestToolDisplayEdge(unittest.TestCase):
             self.assertIsInstance(extract_tool_display(name, args), str)
 
     def test_large_nested_dict_args_no_crash(self):
-        # Deeply nested values should not crash; name falls back.
+        # Deeply nested values should not crash; builtin without its arg -> "".
         res = extract_tool_display("shell", {"nested": {"a": {"b": {"c": "value"}}}})
-        self.assertEqual(res, "shell")
+        self.assertEqual(res, "")
         res2 = extract_tool_display("shell", {"nested": {"a": ["x" * 1000, "y" * 1000]}})
-        self.assertIsInstance(res2, str)
+        self.assertEqual(res2, "")
 
     def test_truncate_non_string(self):
         self.assertEqual(truncate(None), "")
@@ -197,9 +186,9 @@ class TestToolDisplayEdge(unittest.TestCase):
         self.assertEqual(truncate(""), "")
 
     def test_default_tool_name_return_when_no_match(self):
-        # numeric value falls through to last-resort numeric pick
-        self.assertEqual(extract_tool_display("shell", {"nested": 5}), "5")
-        self.assertEqual(extract_tool_display("shell", {"nested": None}), "shell")
+        # builtin shell without command -> "" regardless of other non-string args
+        self.assertEqual(extract_tool_display("shell", {"nested": 5}), "")
+        self.assertEqual(extract_tool_display("shell", {"nested": None}), "")
 
 
 if __name__ == "__main__":

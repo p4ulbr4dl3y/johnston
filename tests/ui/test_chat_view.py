@@ -1186,22 +1186,23 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget.status, "error")
 
     def test_format_compact_dict(self):
-        widget = ToolCallWidget("shell", "cmd")
-        self.assertEqual(widget._format_compact_dict({}), "")
-        self.assertEqual(widget._format_compact_dict("nope"), "")
-        self.assertEqual(widget._format_compact_dict({"a": 1}), "{a: 1}")
+        from core.infrastructure.presentation.tool_display import format_compact_dict
+
+        self.assertEqual(format_compact_dict({}), "")
+        self.assertEqual(format_compact_dict("nope"), "")
+        self.assertEqual(format_compact_dict({"a": 1}), "{a: 1}")
         self.assertEqual(
-            widget._format_compact_dict({"this_key_is_way_too_long_for_sure": "value"}),
+            format_compact_dict({"this_key_is_way_too_long_for_sure": "value"}),
             '{this_key_is_way_t...: "value"}',
         )
-        compact = widget._format_compact_dict({"long_value": "x" * 50})
+        compact = format_compact_dict({"long_value": "x" * 50})
         self.assertIn("...", compact)
-        overflow = widget._format_compact_dict({f"k{i}": "v" * 10 for i in range(10)})
+        overflow = format_compact_dict({f"k{i}": "v" * 10 for i in range(10)})
         self.assertIn("...", overflow)
-        self.assertEqual(widget._format_compact_dict({"a": {"nested": 1}}), '{a: {"nested": 1}}')
-        long_nonstr = widget._format_compact_dict({"k": ["item" * 20]})
+        self.assertEqual(format_compact_dict({"a": {"nested": 1}}), '{a: {"nested": 1}}')
+        long_nonstr = format_compact_dict({"k": ["item" * 20]})
         self.assertIn("...", long_nonstr)
-        huge_key = widget._format_compact_dict({"k" * 30: "v" * 30})
+        huge_key = format_compact_dict({"k" * 30: "v" * 30})
         self.assertIn("...", huge_key)
 
     def test_display_names_dict_and_system_tools(self):
@@ -1308,6 +1309,11 @@ class TestToolCallWidgetRendering(unittest.TestCase):
 
         widget3 = self._widget("update_plan", "plan", args={"plan": "nope"})
         widget3.render_header()
+        self.assertIn("UpdatePlan()", str(widget3.header_label.render()))
+
+        widget4 = self._widget("update_plan", "plan", args={})
+        widget4.render_header()
+        self.assertIn("UpdatePlan()", str(widget4.header_label.render()))
 
     def test_render_header_system_tools(self):
         widget = self._widget("read", "f.py", args={"path": "f.py"})

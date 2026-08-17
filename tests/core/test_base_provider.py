@@ -1407,7 +1407,7 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
         tool_evts = [e for e in events if e[0] == "tool"]
-        self.assertEqual(tool_evts[0][2], "read")  # target falls back to tool name
+        self.assertEqual(tool_evts[0][2], "")  # read without path -> empty target chip
         agent.tool_executor.assert_called_once()
 
     async def test_tool_policy_error_skips_execution(self):
