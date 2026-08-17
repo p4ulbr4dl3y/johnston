@@ -110,7 +110,7 @@ class InvokeSubagentTool(BaseTool):
         if not branch_name:
             return ToolResult.error("params", name="branch", detail="required")
 
-        session_id = args.get("session_id") or f"subagent-{uuid.uuid4().hex[:6]}"
+        session_id = f"subagent-{uuid.uuid4().hex[:6]}"
         args = {**args, "session_id": session_id}
 
         _record_subagent_session(ctx.host, session_id)

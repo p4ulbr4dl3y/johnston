@@ -28,16 +28,16 @@ class TestToolDisplay(unittest.TestCase):
         res = extract_tool_display("invoke_subagent", {"description": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, '"find bugs"')
 
-    def test_manage_shell_action_and_id(self):
-        res = extract_tool_display("manage_shell", {"action": "status", "task_id": "shell_123"})
-        self.assertEqual(res, "status shell_123")
+    def test_manage_shell_list_action(self):
+        res = extract_tool_display("manage_shell", {"action": "list"})
+        self.assertEqual(res, "list")
 
     def test_manage_shell_send_input_human_like(self):
         res = extract_tool_display("manage_shell", {"action": "send_input", "task_id": "shell_123"})
         self.assertEqual(res, "send input to shell_123")
 
     def test_manage_subagent_send_message_human_like(self):
-        res = extract_tool_display("manage_subagent", {"action": "send_message", "task_id": "sub_123"})
+        res = extract_tool_display("manage_subagent", {"action": "send_message", "session_id": "sub_123"})
         self.assertEqual(res, "send message to sub_123")
 
     def test_unknown_tool_fallback(self):
@@ -53,13 +53,13 @@ class TestToolDisplay(unittest.TestCase):
         # Capitalized tool names (which OpenAI never sends, but we guard) normalize
         self.assertEqual(extract_tool_display("Shell", {"command": "pwd"}), "pwd")
 
-    def test_replace_file_content_target_file(self):
+    def test_edit_target_file(self):
         res = extract_tool_display(
-            "replace_file_content",
+            "edit",
             {
-                "TargetFile": "/path/to/index.html",
-                "Instruction": "replace button",
-                "ReplacementContent": "<a>Get Started</a>",
+                "path": "/path/to/index.html",
+                "old_str": "replace button",
+                "new_str": "<a>Get Started</a>",
             },
         )
         self.assertEqual(res, "/path/to/index.html")

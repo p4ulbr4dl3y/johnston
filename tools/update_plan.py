@@ -53,7 +53,7 @@ class UpdatePlanTool(BaseTool):
         for idx, item in enumerate(raw_plan, start=1):
             if not isinstance(item, dict):
                 continue
-            step_text = str(item.get("step") or item.get("text") or "").strip()
+            step_text = str(item.get("step") or "").strip()
             status = str(item.get("status") or "pending").strip().lower()
             if status not in ("pending", "in_progress", "completed"):
                 status = "pending"

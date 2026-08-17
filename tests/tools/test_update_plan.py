@@ -32,7 +32,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             "plan": [
                 "not a dict item",  # non-dict item skipped
                 {"step": "   ", "status": "pending"},  # empty step skipped
-                {"text": "Use text fallback", "status": "in_progress"},  # 'text' fallback used
+                {"step": "No status item"},  # missing status -> 'pending'
                 {"step": "Unknown status item", "status": "random_status"},  # invalid status -> 'pending'
                 {"step": "Completed item", "status": "completed"},
             ]

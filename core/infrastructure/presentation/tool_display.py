@@ -99,15 +99,11 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str |
         if isinstance(qs, list) and qs:
             formatted = []
             for q in qs:
-                q_text = (q.get("question_text") or q.get("question") or "") if isinstance(q, dict) else ""
+                q_text = q.get("question_text") if isinstance(q, dict) else ""
                 if q_text:
                     formatted.append(truncate(q_text))
             if formatted:
                 return truncate(", ".join(f'"{t}"' for t in formatted))
-        q = args.get("question")
-        if q:
-            q_text = str(q)
-            return truncate(f'"{truncate(q_text)}"')
         return "ask_user"
 
     if name == "invoke_subagent":
@@ -117,7 +113,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str |
     if name in ("manage_shell", "manage_subagent"):
         nargs = args if isinstance(args, dict) else {}
         act = nargs.get("action") or ""
-        tid = nargs.get("task_id") or nargs.get("session_id") or ""
+        tid = nargs.get("session_id" if name == "manage_subagent" else "task_id") or ""
         if act and tid:
             if act in ("send_input", "send_message"):
                 verb = "send message to" if act == "send_message" else "send input to"

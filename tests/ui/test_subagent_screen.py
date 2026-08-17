@@ -237,7 +237,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         sess.add_event({"type": "thinking", "text": "thinking... delta"})
         sess.add_event({"type": "thinking", "text": "thought done", "duration": 1.0})
         sess.add_event({"type": "bot", "text": "   "})  # empty text, will be removed when tool arrives
-        sess.add_event({"type": "tool", "tool_type": "read_file", "target": "main.py", "args": {"path": "main.py"}})
+        sess.add_event({"type": "tool", "tool_type": "read", "target": "main.py", "args": {"path": "main.py"}})
         sess.add_event({"type": "tool", "result_text": "file contents"})
         sess.add_event({"type": "bot", "text": " chunk message 1"})
         sess.add_event({"type": "bot", "text": " chunk message 2"})

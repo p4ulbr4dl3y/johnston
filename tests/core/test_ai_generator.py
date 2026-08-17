@@ -124,7 +124,7 @@ async def test_save_session_called_after_tool_result():
     canvas = _canvas()
 
     async def stream(prompt, attachments=None):
-        yield ("tool", "bash", "run", {"cmd": "ls"})
+        yield ("tool", "shell", "run", {"cmd": "ls"})
         yield ("tool_result", "output", "")
 
     await generate_ai_response(

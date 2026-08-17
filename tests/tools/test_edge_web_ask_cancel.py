@@ -372,11 +372,11 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen["opts"], ["a", "None", "5", "['b']"])
         self.assertIn("x", res)
 
-    async def test_single_question_with_none_options(self):
-        # Single-question fallback where options are missing must not crash.
+    async def test_single_question_form_rejected(self):
+        # The flat {question: ...} form was removed; only questions[].question_text is accepted.
         tool = self._tool()
         res = str(await tool.execute({"question": "Only text?"}, ctx=MagicMock(app=MagicMock())))
-        self.assertIn("ERR", res)
+        self.assertIn("ERR: params 'questions'", res)
 
 
 # --------------------------------------------------------------------------- #

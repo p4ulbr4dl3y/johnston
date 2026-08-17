@@ -293,7 +293,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"questions": [{"invalid_key": "foo"}]}))
         self.assertIn("ERR: params 'questions': missing or invalid", res)
 
-    async def test_replace_file_content_line_range(self):
+    async def test_edit_line_range(self):
         from tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_test.py")
@@ -319,7 +319,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             lines = f.readlines()
         self.assertEqual(lines, ["val = 1\n", "val = 42\n", "val = 1\n"])
 
-    async def test_replace_file_content_out_of_range_error(self):
+    async def test_edit_out_of_range_error(self):
         from tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_err.py")
@@ -403,7 +403,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("a = 10", content)
         self.assertIn("b = 20", content)
 
-    async def test_multi_replace_file_content(self):
+    async def test_multi_edit(self):
         file_path = os.path.join(self.test_dir, "multi_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def fn_one():\n    return 1\n\ndef fn_two():\n    return 2\n")

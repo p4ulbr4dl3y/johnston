@@ -57,31 +57,6 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"questions": "invalid"}))
         self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
-    async def test_single_question_fallback(self):
-        # A single {question, options} dict is wrapped into a questions list.
-        tool = AskUserTool()
-        mock_app = MagicMock()
-        mock_app.ask_user = AsyncMock(return_value="Question: Pick one\nAnswer: blue")
-        res = str(await tool.execute(
-            {"question": "Pick one", "options": ["red", "blue"]},
-            ctx=mock_app,
-        ))
-        self.assertIn("Question: Pick one", res)
-        self.assertIn("Answer: blue", res)
-        mock_app.ask_user.assert_awaited_once()
-
-    async def test_single_question_with_choices_fallback(self):
-        # 'choices' is accepted as an alias for 'options' in the single-question form.
-        tool = AskUserTool()
-        mock_app = MagicMock()
-        mock_app.ask_user = AsyncMock(return_value="Question: Choose\nAnswer: x")
-        res = str(await tool.execute(
-            {"question_text": "Choose", "choices": ["x", "y"]},
-            ctx=mock_app,
-        ))
-        self.assertIn("Answer: x", res)
-        mock_app.ask_user.assert_awaited_once()
-
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()
         mock_app = MagicMock()

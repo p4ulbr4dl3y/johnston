@@ -19,14 +19,14 @@ class HostApp(App[None]):
 
 
 class TestPermissionConfirmScreen(unittest.TestCase):
-    def test_screen_initialization_write(self):
+    def test_screen_initialization_create(self):
         screen = PermissionConfirmScreen(
-            tool_name="write",
+            tool_name="create",
             args={"path": "src/app.py"},
             reason="Update entrypoint",
             diff="--- a\n+++ b",
         )
-        self.assertEqual(screen.tool_name, "write")
+        self.assertEqual(screen.tool_name, "create")
         self.assertEqual(screen.args["path"], "src/app.py")
 
     def test_screen_actions(self):
@@ -49,7 +49,7 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         self.assertEqual(dismissed_val, "deny")
 
     def test_build_diff_text_pre_set_diff(self):
-        screen = PermissionConfirmScreen("write", {"path": "a.py"}, diff="--- custom\n+++ custom")
+        screen = PermissionConfirmScreen("create", {"path": "a.py"}, diff="--- custom\n+++ custom")
         self.assertEqual(screen._build_diff_text("a.py"), "--- custom\n+++ custom")
 
     def test_build_diff_text_create_content(self):
@@ -60,7 +60,7 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         self.assertIn("@@ -1,2 +1,2 @@", diff)
 
     def test_build_diff_text_create_empty_content(self):
-        screen = PermissionConfirmScreen("write", {"path": "a.py", "content": ""})
+        screen = PermissionConfirmScreen("create", {"path": "a.py", "content": ""})
         diff = screen._build_diff_text("a.py")
         self.assertIn("@@ -1,1 +1,1 @@", diff)
         self.assertEqual(len(diff.splitlines()), 3)
@@ -111,12 +111,12 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             async with HostApp(screen).run_test() as pilot:
                 await pilot.pause()
 
-    async def test_compose_write_existing_file(self):
+    async def test_compose_create_existing_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = os.path.join(tmp, "app.py")
             with open(target, "w", encoding="utf-8") as f:
                 f.write("# old content")
-            screen = PermissionConfirmScreen("write", {"path": target, "content": "print(1)"})
+            screen = PermissionConfirmScreen("create", {"path": target, "content": "print(1)"})
             async with HostApp(screen).run_test() as pilot:
                 await pilot.pause()
                 self.assertIsNotNone(screen.query_one(Static))
@@ -126,9 +126,8 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
 
-    async def test_compose_manage_shell_status_list_other(self):
+    async def test_compose_manage_shell_list_other(self):
         cases = [
-            {"action": "status", "task_id": "t1"},
             {"action": "list"},
             {"action": "unknown"},
         ]
@@ -144,7 +143,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_scroll_actions_mounted(self):
         screen = PermissionConfirmScreen(
-            "write",
+            "create",
             {"path": "a.py"},
             diff="--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new",
         )

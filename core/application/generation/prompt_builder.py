@@ -462,7 +462,7 @@ class PromptBuilder:
             and self.allow_task
             and self.subagent_schema
             and not any(
-                t.get("function", {}).get("name", "").lower() in ("invoke_subagent", "subagent")
+                t.get("function", {}).get("name", "").lower() == "invoke_subagent"
                 for t in filtered_tools
             )
         ):
