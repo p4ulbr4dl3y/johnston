@@ -164,7 +164,10 @@ class MessageFlowMixin:
                 logger.warning("Footer update failed: %s", e)
             try:
                 if getattr(self, "is_app_active", True):
-                    await self.save_current_session_async(force=True)
+                    # Non-forced save: respects the built-in 1.5s debounce so the
+                    # per-tool_result saves in the engine still coalesce here
+                    # instead of forcing a full write on every tool call.
+                    await self.save_current_session_async()
             except Exception as e:
                 logger.warning("Session save failed: %s", e)
             self.is_generating = False

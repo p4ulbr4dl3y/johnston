@@ -47,8 +47,10 @@ class ChatView(VerticalScroll):
         try:
             loop = asyncio.get_running_loop()
             t0 = loop.time()
+            # Detached barely ever happens on the hot path; when it does, wait
+            # with a coarse increment so we don't run 100 empty wakeups at 5ms.
             while not self.is_attached and (loop.time() - t0 < timeout):
-                await asyncio.sleep(0.005)
+                await asyncio.sleep(0.02)
         except Exception:
             pass
 

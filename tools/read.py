@@ -254,58 +254,67 @@ class ReadTool(BaseTool):
 
             return await WebFetchTool().execute({"url": raw_path, "raw": bool(args.get("raw", False))}, ctx=ctx)
         path = resolve_path(raw_path, cwd=ctx.cwd)
-        if not os.path.exists(path):
-            parent_dir = os.path.dirname(path) or "."
-            hint = ""
-            if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
-                filename = os.path.basename(path)
-                entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
-                matches = get_fuzzy_matches(filename, entries, n=3, cutoff=0.4)
-                if matches:
-                    hint = f" [Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
-                elif entries:
-                    sample = sorted(entries)[:5]
-                    hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
-            return ToolResult.error("file", detail="not found" + hint, name=path)
+        def _inspect_path() -> ToolResult | tuple[str, str | None]:
+            if not os.path.exists(path):
+                parent_dir = os.path.dirname(path) or "."
+                hint = ""
+                if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
+                    filename = os.path.basename(path)
+                    entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
+                    matches = get_fuzzy_matches(filename, entries, n=3, cutoff=0.4)
+                    if matches:
+                        hint = f" [Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
+                    elif entries:
+                        sample = sorted(entries)[:5]
+                        hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
+                return ToolResult.error("file", detail="not found" + hint, name=path)
 
-        if os.path.isdir(path):
-            try:
-                raw_entries = sorted(os.listdir(path))
-                total_count = len(raw_entries)
-                MAX_DIR_ENTRIES = 60
+            if os.path.isdir(path):
+                try:
+                    raw_entries = sorted(os.listdir(path))
+                    total_count = len(raw_entries)
+                    MAX_DIR_ENTRIES = 60
 
-                dirs, files = [], []
-                for entry in raw_entries:
-                    full_p = os.path.join(path, entry)
-                    if os.path.isdir(full_p):
-                        dirs.append(f"{entry}/")
+                    dirs, files = [], []
+                    for entry in raw_entries:
+                        full_p = os.path.join(path, entry)
+                        if os.path.isdir(full_p):
+                            dirs.append(f"{entry}/")
+                        else:
+                            files.append(entry)
+
+                    formatted = dirs + files
+                    if len(formatted) > MAX_DIR_ENTRIES:
+                        shown = formatted[:MAX_DIR_ENTRIES]
+                        content = (
+                            "\n".join(shown)
+                            + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
+                        )
                     else:
-                        files.append(entry)
+                        content = "\n".join(formatted) if formatted else "(empty directory)"
 
-                formatted = dirs + files
-                if len(formatted) > MAX_DIR_ENTRIES:
-                    shown = formatted[:MAX_DIR_ENTRIES]
-                    content = (
-                        "\n".join(shown)
-                        + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
+                    return ToolResult.done(
+                        f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
                     )
-                else:
-                    content = "\n".join(formatted) if formatted else "(empty directory)"
+                except Exception as e:
+                    return ToolResult.error("listing", detail=str(e), name=path)
 
-                return ToolResult.done(f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}")
-            except Exception as e:
-                return ToolResult.error("listing", detail=str(e), name=path)
+            try:
+                file_size = os.path.getsize(path)
+                if file_size > MAX_TOOL_PAYLOAD_BYTES:
+                    return ToolResult.error(
+                        "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=path
+                    )
+            except OSError as e:
+                return ToolResult.error("check", detail=str(e), name=path)
 
-        try:
-            file_size = os.path.getsize(path)
-            if file_size > MAX_TOOL_PAYLOAD_BYTES:
-                return ToolResult.error(
-                    "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=path
-                )
-        except OSError as e:
-            return ToolResult.error("check", detail=str(e), name=path)
+            ext = os.path.splitext(path)[1].lower()
+            return ("file", ext)
 
-        ext = os.path.splitext(path)[1].lower()
+        probe_res = await run_cancellable(_inspect_path)
+        if isinstance(probe_res, ToolResult):
+            return probe_res
+        _, ext = probe_res
 
         # Resolve the requested line window up front so it applies to all read paths.
         start_line = args.get("start_line")

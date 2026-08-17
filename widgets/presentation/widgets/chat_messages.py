@@ -204,7 +204,7 @@ class BotMessage(Vertical):
     async def _render_markdown(self, content: str) -> None:
         if not self.md_widget.is_attached:
             return
-        cleaned = clean_markdown_for_rendering(content)
+        cleaned = await asyncio.to_thread(clean_markdown_for_rendering, content)
         try:
             await self.md_widget.update(cleaned)
         except asyncio.CancelledError:

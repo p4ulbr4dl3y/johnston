@@ -600,6 +600,22 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.message_queue, [])
         app.load_session_ui.assert_called_once_with("sess_1")
 
+    async def test_demo_command_execution(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from widgets.commands import DemoCommand
+
+        app = MockApp()
+        mock_chat = MagicMock()
+        mock_chat.add_thinking_widget = AsyncMock(return_value=MagicMock())
+        mock_chat.add_tool_call = AsyncMock(return_value=MagicMock())
+        mock_chat.add_bot_message = AsyncMock(return_value=MagicMock())
+        app.chat_view = mock_chat
+
+        cmd = DemoCommand()
+        await cmd.execute(app)
+        self.assertIn("/demo", COMMAND_REGISTRY)
+
 
 if __name__ == "__main__":
     unittest.main()

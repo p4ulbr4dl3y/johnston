@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, List, Tuple
 
 from core.infrastructure.runtime.token_util import estimate_tokens
@@ -164,7 +165,10 @@ class CompactionMixin:
         sys_overhead: int,
         threshold: int,
     ) -> Tuple[List[Dict[str, Any]], bool]:
-        history_tokens = estimate_tokens(messages[1:])
+        if len(messages) > 1:
+            history_tokens = await asyncio.to_thread(estimate_tokens, messages[1:])
+        else:
+            history_tokens = 0
         current_context = sys_overhead + history_tokens
         if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
             self.last_context_tokens = current_context
@@ -176,7 +180,7 @@ class CompactionMixin:
             self.last_context_tokens = current_context
             return messages, False
 
-        compacted_history = self.sanitize_history_for_model(self.history)
+        compacted_history = await asyncio.to_thread(self.sanitize_history_for_model, self.history)
         return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True
 
     async def compact_history(self) -> Tuple[bool, str]:

@@ -5,7 +5,9 @@ markup (escape_markup / extract_tool_display). Domain and application must not
 own rendering-format output, so these helpers live in the infrastructure
 presentation area consumed by core widgets and UI tests.
 """
+import json
 import re
+from collections import OrderedDict
 from typing import Any, Dict
 
 # Argument keys whose values must never appear in the display label (secrets).
@@ -14,6 +16,14 @@ _SECRET_KEYS = {"api_key", "apikey", "token", "password", "passwd", "secret", "c
 # Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
 # style tags, so escape them (and backslashes) for the chat tool chip.
 _ESCAPE_RE = re.compile(r"([\[\]\\])")
+
+# LRU memo for extract_tool_display keyed by (tool_name, canonical args). The
+# agent loop calls this once per tool call for the chip label; multi-tool turns
+# with repeated argument signatures hit the cache instead of re-running the
+# label logic. Keys are limited to a small canonical representation so two
+# distinct arg dicts can't alias an entry.
+_DISPLAY_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
+_DISPLAY_CACHE_MAX = 128
 
 
 def escape_markup(target: str) -> str:
@@ -35,14 +45,50 @@ def truncate(target: str, max_len: int = 60) -> str:
     return escape_markup(target)
 
 
+def _canonical_args(args: Dict[str, Any]) -> tuple:
+    """Small stable representation of a tool-call argument dict for caching."""
+    if not args:
+        return ()
+    try:
+        return (
+            tuple(sorted((k, json.dumps(v, ensure_ascii=False, sort_keys=True)) for k, v in args.items()))
+            if args
+            else ()
+        )
+    except Exception:
+        return (type(args).__name__, repr(args))
+
+
+def _display_cache_key(tool_name: str, args: Dict[str, Any]) -> tuple:
+    return (str(tool_name), _canonical_args(args))
+
+
 def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
     """Build a short, human-readable label describing what a tool call targets.
 
     This is presentation-only metadata for the chat tool chip and is intentionally
     kept out of the core agent loop so business logic stays free of rendering
     concerns. Tool names are matched case-insensitively against the canonical
-    lowercase registry names.
+    lowercase registry names. Results are memoized by (tool_name, args) so the
+    agent loop doesn't rebuild identical labels on every tool call.
     """
+    # cwd affects truncate()? No — truncate is arg-only. Cache solely on args.
+    key = _display_cache_key(tool_name, args)
+    hit = _DISPLAY_CACHE.get(key)
+    if hit is not None:
+        _DISPLAY_CACHE.move_to_end(key)
+        return hit
+
+    # Ensure OrderedDict imported for the cache annotation (no runtime dep).
+    result = _extract_tool_display_inner(tool_name, args, cwd)
+
+    _DISPLAY_CACHE[key] = result
+    while len(_DISPLAY_CACHE) > _DISPLAY_CACHE_MAX:
+        _DISPLAY_CACHE.popitem(last=False)
+    return result
+
+
+def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
     from tools.registry import normalize_tool_name
 
     name = normalize_tool_name(tool_name)

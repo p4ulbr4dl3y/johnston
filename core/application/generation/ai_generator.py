@@ -30,6 +30,57 @@ class ProviderReadyState(Enum):
     NEEDS_MODEL = "model"
 
 
+class _SessionSaveDebounce:
+    """Batches the many per-step save_session calls into one disk write per turn.
+
+    The stream loop pushes save_session on every tool_result, every bot_text,
+    and every event_divider. Most of those target the same in-memory transcript
+    and only the final state matters for persistence, so coalescing them into a
+    single call (trailing edge, after the step bursts settle) avoids hammering
+    the store with near-identical writes.
+    """
+
+    def __init__(self, save_cb, settle_time: float = 0.4):
+        self._save = save_cb
+        self._settle = settle_time
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._task: Optional[asyncio.Task] = None
+
+    def _ensure_loop(self) -> bool:
+        try:
+            self._loop = asyncio.get_running_loop()
+            return True
+        except RuntimeError:
+            return False
+
+    def schedule(self) -> None:
+        """Debounced save: reset the timer on each call in a step burst."""
+        if not self._save:
+            return
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+        if not self._ensure_loop():
+            return
+        self._task = self._loop.create_task(self._run())
+
+    async def _run(self) -> None:
+        try:
+            await asyncio.sleep(self._settle)
+            await self._save()
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    async def flush(self) -> None:
+        """Coalesce any pending save into an immediate one (final upload)."""
+        if self._task is not None:
+            self._task.cancel()
+        if not self._save:
+            return
+        if not self._ensure_loop():
+            return
+        await self._save()
+
+
 @dataclass
 class GenCanvas:
     """UI callback bundle injected by the Textual, mixin.
@@ -123,6 +174,8 @@ async def generate_ai_response(
     start_time = time.time()
 
     try:
+        # Batch all per-step persistence into one debounced write per turn.
+        save_db = _SessionSaveDebounce(canvas.save_session)
         async for step in agent.stream_steps(user_text, attachments=attachments):
             if not step:
                 continue
@@ -186,7 +239,7 @@ async def generate_ai_response(
                         returncode=parsed_tool_result.returncode,
                     )
                 try:
-                    await canvas.save_session()
+                    save_db.schedule()
                 except Exception:  # noqa: BLE001
                     pass
             elif event_type == "bot_delta":
@@ -235,14 +288,14 @@ async def generate_ai_response(
                     await bot_handle.finalize_stream(val1)
                     bot_handle = None
                 try:
-                    await canvas.save_session()
+                    save_db.schedule()
                 except Exception:  # noqa: BLE001
                     pass
             elif event_type == "event_divider":
                 await canvas.add_event_divider(val1 or "Session Compacted")
                 canvas.refresh_status_footer()
                 try:
-                    await canvas.save_session()
+                    save_db.schedule()
                 except Exception:  # noqa: BLE001
                     pass
     except (asyncio.CancelledError, RuntimeError):
@@ -263,6 +316,10 @@ async def generate_ai_response(
                 bot_handle.remove()
             except Exception:  # noqa: BLE001
                 pass
+        try:
+            await save_db.flush()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 async def _handle_interruption(

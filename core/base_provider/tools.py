@@ -6,6 +6,11 @@ from core.infrastructure.runtime.token_util import estimate_tokens
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 from core.models_catalog import catalog
 
+# Sentinel for the _tool_policy_error memo so a cached "allowed" (None) result
+# is indistinguishable from "not yet cached".
+_MISSING = object()
+
+
 
 class ToolMixin:
     """Mixin providing tool-name canonicalization and runtime tool-policy checks for BaseAgent."""
@@ -40,8 +45,31 @@ class ToolMixin:
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> Any:
         from core.domain.policies.role_policy import role_tool_error
 
+        # Cross-call memo keyed by (role identity, canonical tool name) so the
+        # agent loop doesn't re-evaluate the role policy for the same tool on
+        # every tool_result of a multi-tool turn.
+        try:
+            role_key = id(mode_def)
+        except Exception:
+            role_key = repr(mode_def)
+        key = (role_key, tool_name or "")
+        cache = getattr(self, "_tool_policy_cache", None)
+        if cache is None:
+            cache = {}
+            self._tool_policy_cache = cache
+        cached = cache.get(key, _MISSING)
+        if cached is not _MISSING:
+            return cached
+
         clean_name = self._canonical_tool_name(tool_name).lower()
-        return role_tool_error(mode_def, clean_name)
+        result = role_tool_error(mode_def, clean_name)
+        cache[key] = result
+        if len(cache) > 256:
+            # Bounded cache: drop the oldest entries by order of insertion.
+            for _ in range(64):
+                if cache:
+                    cache.pop(next(iter(cache)))
+        return result
 
 
 def build_prompt_context(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
