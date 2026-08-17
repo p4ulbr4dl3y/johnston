@@ -219,7 +219,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             task.move_to_background()
 
             res = str(await exec_task)
-            self.assertIn("moved to background", res)
+            self.assertIn("moved to background by user after", res)
             self.assertIn("Recent Output:\nserver started on port 8080", res)
             self.assertTrue(task.is_background)
             self.assertEqual(len([t for t in mock_app.task_manager]), 1)

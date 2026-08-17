@@ -25,13 +25,19 @@ def _new_task_id() -> str:
 
 
 def _format_background_task_response(
-    task_id: str, cmd: str, recent_output_str: str = None, log_path: str = None
+    task_id: str,
+    cmd: str,
+    recent_output_str: str = None,
+    log_path: str = None,
+    by_user: bool = False,
+    elapsed: float = None,
 ) -> str:
     """Formats a background task status response."""
     log_hint = f"\nFull Log: {log_path} (live; inspect via tail/grep)" if log_path else ""
+    suffix = f" by user after {elapsed}s" if by_user and elapsed is not None else (" by user" if by_user else "")
     if recent_output_str is None:
-        return f"[Background Task ID: {task_id}] '{cmd}' moved to background.{log_hint}"
-    return f"[Background Task ID: {task_id}] '{cmd}' moved to background.{recent_output_str}{log_hint}"
+        return f"[Background Task ID: {task_id}] '{cmd}' moved to background{suffix}.{log_hint}"
+    return f"[Background Task ID: {task_id}] '{cmd}' moved to background{suffix}.{recent_output_str}{log_hint}"
 
 
 def _truncate_output(res: str) -> str:
@@ -152,6 +158,7 @@ class ShellTool(BaseTool):
         ctx.add_background_task(task)
         read_task = task.start_reading(on_completed=callback)
 
+        start_time = time.monotonic()
         proc_task = asyncio.ensure_future(p.wait())
         bg_task = asyncio.ensure_future(task.background_event.wait())
 
@@ -170,12 +177,18 @@ class ShellTool(BaseTool):
             if task.background_event.is_set() or getattr(task, "is_background", False):
                 task.is_background = True
                 task.open_log()
+                elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 recent_str = f"\n\nRecent Output:\n{tail_output(raw_out, max_chars=2000)}" if raw_out else None
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
                     content=_format_background_task_response(
-                        task_id, cmd, recent_output_str=recent_str, log_path=task.log_path
+                        task_id,
+                        cmd,
+                        recent_output_str=recent_str,
+                        log_path=task.log_path,
+                        by_user=True,
+                        elapsed=elapsed,
                     ),
                 )
 
