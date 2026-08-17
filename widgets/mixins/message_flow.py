@@ -230,23 +230,47 @@ class MessageFlowMixin:
         based on the shell task's terminal status. No-op when the task or its
         widget is unavailable.
         """
-        mgr = getattr(self, "task_manager", None)
-        if mgr is None:
-            return
-        task = next(
-            (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
-            None,
+        from tools.base import truncate_output
+
+        final_result = truncate_output(
+            result or "(no output)",
+            max_chars=4000,
+            hint="Pipe output to grep/head/tail if complete log is needed.",
+            tool_name="shell",
+            from_end=True,
+            save_log=False,
         )
+
+        mgr = getattr(self, "task_manager", None)
+        task = None
+        if mgr is not None:
+            task = next(
+                (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
+                None,
+            )
         widget = getattr(task, "widget", None) if task is not None else None
-        if widget is None:
-            return
-        try:
-            task_status = (getattr(getattr(task, "status"), "value", None) or "").lower()
-            status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else None)
-            if status is not None:
-                widget.set_result(result or "(no output)", status=status)
-        except Exception as e:
-            logger.warning("Background shell widget update failed: %s", e)
+        task_status = (getattr(getattr(task, "status", None), "value", None) or "").lower() if task is not None else ""
+        status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else "done")
+
+        if widget is not None:
+            try:
+                widget.set_result(final_result, status=status)
+            except Exception as e:
+                logger.warning("Background shell widget update failed: %s", e)
+
+        sid = getattr(self, "current_session_id", None)
+        if sid and hasattr(self, "sm"):
+            try:
+                session = self.sm.get(sid, reload=False)
+                if session:
+                    for msg in session.messages:
+                        if isinstance(msg, dict) and msg.get("type") == "tool" and task_id in msg.get("result_text", ""):
+                            msg["result_text"] = final_result
+                            msg["status"] = status
+                            break
+                    self.sm.save(session)
+            except Exception as e:
+                logger.warning("Failed to update session for background shell %s: %s", task_id, e)
 
     def on_subagent_tool_completed(self, session_id: str, status: str, result: str = "") -> None:
         """Callback when a background subagent finishes.
@@ -259,14 +283,26 @@ class MessageFlowMixin:
         try:
             reg = getattr(self, "_subagent_tools", None)
             widget = reg.get(session_id) if isinstance(reg, dict) else None
-            if widget is None:
-                return
-            status = (status or "").lower()
-            if status == "cancelled":
-                widget.mark_cancelled()
-            elif status == "error":
-                widget.set_result(result or "(no output)", status="error")
-            else:
-                widget.set_result(result or "(no output)", status="done")
+            status_clean = (status or "").lower()
+            if widget is not None:
+                if status_clean == "cancelled":
+                    widget.mark_cancelled()
+                elif status_clean == "error":
+                    widget.set_result(result or "(no output)", status="error")
+                else:
+                    widget.set_result(result or "(no output)", status="done")
+
+            final_status = "error" if status_clean == "error" else ("cancelled" if status_clean == "cancelled" else "done")
+            sid = getattr(self, "current_session_id", None)
+            if sid and hasattr(self, "sm"):
+                session = self.sm.get(sid, reload=False)
+                if session:
+                    for msg in session.messages:
+                        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "invoke_subagent":
+                            if session_id in msg.get("result_text", "") or session_id in str(msg.get("args", {})):
+                                msg["result_text"] = result or "(no output)"
+                                msg["status"] = final_status
+                                break
+                    self.sm.save(session)
         except Exception as e:
             logger.warning("Subagent tool completion handling failed: %s", e)

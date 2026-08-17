@@ -1107,6 +1107,56 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             app.on_subagent_tool_completed("missing", "completed", "out")
             self.assertEqual(len(app.message_queue), 0)
 
+    async def test_completed_updates_session_messages(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            task = ShellTask("shell_123_1", "ls", widget=MagicMock())
+            task.status = TaskStatus.COMPLETED
+            app.task_manager.register(task)
+
+            session = app.sm.create_main(app.current_session_id)
+            session.messages = [
+                {
+                    "type": "tool",
+                    "tool_type": "shell",
+                    "result_text": "[Background Task ID: shell_123_1] 'ls' moved to background.",
+                    "status": "running",
+                }
+            ]
+            app.sm.save(session)
+
+            with patch.object(app, "generate_ai_response"):
+                app.on_background_shell_completed("shell_123_1", "ls", "file1.txt\nfile2.txt")
+
+            updated = app.sm.get(app.current_session_id)
+            self.assertEqual(updated.messages[0]["status"], "done")
+            self.assertEqual(updated.messages[0]["result_text"], "file1.txt\nfile2.txt")
+
+    async def test_subagent_completed_updates_session_messages(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            session = app.sm.create_main(app.current_session_id)
+            session.messages = [
+                {
+                    "type": "tool",
+                    "tool_type": "invoke_subagent",
+                    "args": {"description": "worker", "prompt": "do work"},
+                    "result_text": "subagent 'worker' launched (session_id: sub_999)",
+                    "status": "running",
+                }
+            ]
+            app.sm.save(session)
+
+            app.on_subagent_tool_completed("sub_999", "completed", "done work")
+
+            updated = app.sm.get(app.current_session_id)
+            self.assertEqual(updated.messages[0]["status"], "done")
+            self.assertEqual(updated.messages[0]["result_text"], "done work")
+
 
 if __name__ == "__main__":
     unittest.main()
