@@ -294,5 +294,27 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.assert_called_once_with("gh__search", {"q": "x"})
 
 
+    async def test_execute_tool_mcp_output_truncated(self):
+        huge_output = "X" * 15000
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_huge_tool"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr.call_tool.return_value = huge_output
+
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
+
+        with (
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            self._mock_mode(),
+        ):
+            res = await execute_tool("mcp_huge_tool", {"arg": "val"})
+
+        self.assertFalse(res.is_error)
+        self.assertIn("[Output truncated at 8000 chars", res.content)
+        self.assertIn("Refine parameters or request partial data", res.content)
+
+
 if __name__ == "__main__":
     unittest.main()

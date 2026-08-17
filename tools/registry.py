@@ -165,11 +165,19 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return perm_err
 
     try:
-        from tools.base import execute_mcp_tool
+        from tools.base import execute_mcp_tool, truncate_output
 
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args)
         if mcp_res is not None:
-            return await _wrap_execute(mcp_res)
+            tool_res = await _wrap_execute(mcp_res)
+            if not tool_res.is_error and tool_res.content and len(tool_res.content) > 8000:
+                tool_res.content = truncate_output(
+                    tool_res.content,
+                    max_chars=8000,
+                    hint="Refine parameters or request partial data if complete response is needed.",
+                    tool_name=f"mcp_{name}",
+                )
+            return tool_res
     except Exception as e:
         return ToolResult.error("mcp", detail=str(e), name=name)
 
