@@ -468,7 +468,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             # Single producer task pulls chunks off the provider; the
                             # consumer polls the queue with a watchdog deadline so we
                             # keep per-chunk timeouts without creating a task per chunk.
-                            _chunk_queue: "Queue[Any]" = Queue(maxsize=8)
+                            _chunk_queue: "Queue[Any]" = Queue(maxsize=64)
                             _DONE = object()
 
                             async def _produce_chunks():

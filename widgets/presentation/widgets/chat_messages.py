@@ -85,7 +85,7 @@ class BotMessage(Vertical):
             self.md_widget.display = False
         self._stream_parts.append(content)
         self._joined_content = None
-        self.content = self._join_stream_content()
+        self._schedule_stream_update()
 
     def set_stream_content(self, content: str) -> None:
         """Replace the streaming text with full content (no Markdown rebuild)."""
@@ -95,7 +95,7 @@ class BotMessage(Vertical):
             self.md_widget.display = False
         self._stream_parts = [content]
         self._joined_content = None
-        self.content = self._join_stream_content()
+        self._schedule_stream_update()
 
     def _join_stream_content(self) -> str:
         """Join pending stream parts into a single string (lazy-cached)."""
@@ -106,6 +106,8 @@ class BotMessage(Vertical):
     async def reset_stream(self) -> None:
         """Clear partial streamed text on retry so the new attempt starts blank."""
         self._streaming = False
+        self._stream_parts = []
+        self._joined_content = None
         self._suppress_content_watch = True
         try:
             self.content = ""
@@ -142,21 +144,23 @@ class BotMessage(Vertical):
     def _flush_stream_update(self) -> None:
         self._stream_update_scheduled = False
         self._stream_update_handle = None
-        if not self.is_attached:
-            return
         try:
-            self.stream_widget.update(self.content)
+            self.stream_widget.update(self._join_stream_content())
             self._scroll_if_needed()
         except Exception:
             pass
 
     def flush_pending_stream(self) -> None:
         """Immediately render any still-pending debounced stream content."""
+        if self._stream_parts:
+            self.content = self._join_stream_content()
         if self._stream_update_scheduled:
             self._flush_stream_update()
 
     async def set_final_content(self, content: str) -> None:
         """Render final Markdown once and wait until its widget tree is mounted."""
+        self._stream_parts = [content]
+        self._joined_content = content
         self._suppress_content_watch = True
         try:
             self.content = content
@@ -181,7 +185,10 @@ class BotMessage(Vertical):
         self._scroll_if_needed()
 
     async def finalize_stream(self, content: str | None = None) -> None:
-        await self.set_final_content(self.content if content is None else content)
+        if content is None:
+            content = self._join_stream_content()
+        self.content = content
+        await self.set_final_content(content)
 
     def _schedule_markdown_render(self, content: str) -> None:
         """Coalesce compatibility assignments so only one Markdown render runs."""
@@ -239,13 +246,28 @@ class ThinkingWidget(Vertical):
 
     def __init__(self, thinking_text: str = ""):
         super().__init__(classes="thinking-widget thinking-active")
-        self.thinking_text = "" if thinking_text == "Thinking..." else thinking_text
+        initial = "" if thinking_text == "Thinking..." else thinking_text
+        self._thinking_parts: list[str] = [initial] if initial else []
+        self._cached_thinking_text: str | None = initial
         self.duration_seconds = 0.0
         self.is_thinking = True
         self.is_expanded = False
+        self._update_scheduled = False
+        self._update_handle: asyncio.TimerHandle | None = None
 
         self.header_label = Label("Thinking...", classes="thinking-header")
         self.content_widget = Static("", markup=False, classes="thinking-content")
+
+    @property
+    def thinking_text(self) -> str:
+        if self._cached_thinking_text is None:
+            self._cached_thinking_text = "".join(self._thinking_parts)
+        return self._cached_thinking_text
+
+    @thinking_text.setter
+    def thinking_text(self, value: str) -> None:
+        self._thinking_parts = [value] if value else []
+        self._cached_thinking_text = value
 
     def compose(self) -> ComposeResult:
         yield self.header_label
@@ -258,17 +280,42 @@ class ThinkingWidget(Vertical):
         else:
             self.header_label.remove_class("thinking-header-expandable")
 
+    def _schedule_content_update(self) -> None:
+        if self._update_scheduled or not self.is_expanded:
+            return
+        self._update_scheduled = True
+        try:
+            self._update_handle = asyncio.get_running_loop().call_later(0.05, self._flush_content_update)
+        except RuntimeError:
+            self._flush_content_update()
+
+    def _flush_content_update(self) -> None:
+        self._update_scheduled = False
+        self._update_handle = None
+        if not self.is_expanded:
+            return
+        try:
+            self.content_widget.update(self.thinking_text)
+        except Exception:
+            pass
+
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
-            self.thinking_text = self.thinking_text + content
+            self._thinking_parts.append(content)
+            self._cached_thinking_text = None
             if self.is_expanded:
-                self.content_widget.update(self.thinking_text)
+                self._schedule_content_update()
 
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
         self.duration_seconds = duration
         if thinking_content and thinking_content != "Thinking...":
-            self.thinking_text = thinking_content
+            self._thinking_parts = [thinking_content]
+            self._cached_thinking_text = thinking_content
+        if self._update_handle is not None:
+            self._update_handle.cancel()
+            self._update_handle = None
+        self._update_scheduled = False
         self.remove_class("thinking-active")
         if self.is_expanded:
             self.content_widget.update(self.thinking_text or "")
@@ -297,4 +344,13 @@ class ThinkingWidget(Vertical):
                 self.content_widget.update(self.thinking_text)
             self.content_widget.display = True
         else:
+            if self._update_handle is not None:
+                self._update_handle.cancel()
+                self._update_handle = None
+            self._update_scheduled = False
             self.content_widget.display = False
+
+    def on_unmount(self) -> None:
+        if self._update_handle is not None:
+            self._update_handle.cancel()
+            self._update_handle = None

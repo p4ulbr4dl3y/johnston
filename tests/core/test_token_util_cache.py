@@ -19,7 +19,7 @@ class TestEstimateTokensCache(unittest.TestCase):
         first = estimate_tokens(history)
         # Same object, unchanged -> same memoized slot.
         self.assertEqual(estimate_tokens(history), first)
-        self.assertIn(("val", "list", len(history), repr(history)), token_util._estimate_cache)
+        self.assertIn(token_util._estimate_cache_key(history), token_util._estimate_cache)
 
     def test_mutation_increases_cache_size_updates_value(self):
         history = [{"role": "user", "content": "a"}]

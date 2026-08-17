@@ -106,17 +106,18 @@ class SkillManager:
         trees change (via a cheap directory signature) or after a short TTL.
         """
         now = time.time()
-        if (
-            self._scan_cache is not None
-            and (now - self._scan_ts) < self._CACHE_TTL
-            and (self._scan_signature == self._compute_scan_signature())
-        ):
+        if self._scan_cache is not None and (now - self._scan_ts) < self._CACHE_TTL:
             skills = self._scan_cache
         else:
-            skills, signature = self._scan_skills()
-            self._scan_cache = skills
-            self._scan_signature = signature
-            self._scan_ts = now
+            sig = self._compute_scan_signature()
+            if self._scan_cache is not None and self._scan_signature == sig:
+                self._scan_ts = now
+                skills = self._scan_cache
+            else:
+                skills, signature = self._scan_skills()
+                self._scan_cache = skills
+                self._scan_signature = signature
+                self._scan_ts = now
 
         result = []
         for s in skills:

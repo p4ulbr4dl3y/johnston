@@ -282,34 +282,25 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
 async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> ToolResult:
     path = resolve_path(path_arg, cwd=cwd)
 
-    def _validate() -> ToolResult | None:
-        """Sync existence/type checks run off the event loop. Returns an error ToolResult or None."""
+    def _do_edit() -> ToolResult:
         if not path or not os.path.exists(path):
             return ToolResult.error("file", name=path, detail="not found")
         if os.path.isdir(path):
             return ToolResult.error("file", name=path, detail="is a directory")
-        return None
 
-    validate_err = await run_cancellable(_validate)
-    if validate_err:
-        return validate_err
-
-    def _do_edit():
         content = read_file_text(path)
         new_content, diff = apply_chunk_replacements(content, raw_chunks, path)
         write_file_text(path, new_content)
-        return diff
+        return ToolResult.done(diff)
 
     try:
-        diff_output = await run_cancellable(_do_edit)
+        return await run_cancellable(_do_edit)
     except (UnicodeDecodeError, UnicodeEncodeError) as ue:
         return ToolResult.error("file", detail=str(ue), name=path)
     except ValueError as ve:
         return ToolResult.error("params", detail=str(ve))
     except Exception as e:
         return ToolResult.error("file", detail=str(e), name=path)
-
-    return ToolResult.done(diff_output)
 
 
 class EditTool(BaseTool):

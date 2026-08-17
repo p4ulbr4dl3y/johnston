@@ -1,3 +1,5 @@
+import asyncio
+import atexit
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -23,6 +25,36 @@ class GeminiAdapter(BaseApiAdapter):
     into Gemini contents (functionCall/functionResponse parts), parses
     streaming functionCall parts, and reports usageMetadata.
     """
+
+    def __init__(self) -> None:
+        self._clients: Dict[Tuple[str, str], httpx.AsyncClient] = {}
+        atexit.register(self.close)
+
+    def _get_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
+        key = (base_url or "", api_key or "")
+        client = self._clients.get(key)
+        if client is None or getattr(client, "is_closed", False):
+            client = httpx.AsyncClient()
+            self._clients[key] = client
+        return client
+
+    def close(self) -> None:
+        """Closes all cached httpx.AsyncClient clients to release HTTP connection pools."""
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        try:
+            asyncio.run(self._close_all(clients))
+        except Exception:
+            pass
+
+    @staticmethod
+    async def _close_all(clients: Dict[Tuple[str, str], httpx.AsyncClient]) -> None:
+        for client in clients.values():
+            try:
+                await client.aclose()
+            except Exception:
+                pass
 
     def _content_to_parts(self, content: Any, msg: Dict[str, Any], role: str) -> List[Dict[str, Any]]:
         parts: List[Dict[str, Any]] = []
@@ -138,41 +170,41 @@ class GeminiAdapter(BaseApiAdapter):
                 )
             payload["tools"] = [{"functionDeclarations": function_declarations}]
 
-        async with httpx.AsyncClient() as client:
-            async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
-                await check_httpx_response_status(resp)
-                async for line in resp.aiter_lines():
-                    evt = parse_sse_line(line)
-                    if evt is None:
-                        continue
+        client = self._get_client(base_url, api_key)
+        async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
+            await check_httpx_response_status(resp)
+            async for line in resp.aiter_lines():
+                evt = parse_sse_line(line)
+                if evt is None:
+                    continue
 
-                    for cand in evt.get("candidates") or []:
-                        parts = ((cand.get("content") or {}).get("parts")) or []
-                        for p in parts:
-                            if not isinstance(p, dict):
-                                continue
-                            if p.get("text"):
-                                yield ("adapter_text", p["text"])
-                            elif p.get("thought"):
-                                t = p["thought"]
-                                yield ("adapter_thought", t if isinstance(t, str) else json.dumps(t, ensure_ascii=False))
-                            elif "functionCall" in p:
-                                fc = p.get("functionCall") or {}
-                                yield (
-                                    "adapter_tool_call",
-                                    {
-                                        "id": new_tool_call_id(),
-                                        "name": fc.get("name", ""),
-                                        "arguments": normalize_tool_arguments_str(fc.get("args")),
-                                    },
-                                )
+                for cand in evt.get("candidates") or []:
+                    parts = ((cand.get("content") or {}).get("parts")) or []
+                    for p in parts:
+                        if not isinstance(p, dict):
+                            continue
+                        if p.get("text"):
+                            yield ("adapter_text", p["text"])
+                        elif p.get("thought"):
+                            t = p["thought"]
+                            yield ("adapter_thought", t if isinstance(t, str) else json.dumps(t, ensure_ascii=False))
+                        elif "functionCall" in p:
+                            fc = p.get("functionCall") or {}
+                            yield (
+                                "adapter_tool_call",
+                                {
+                                    "id": new_tool_call_id(),
+                                    "name": fc.get("name", ""),
+                                    "arguments": normalize_tool_arguments_str(fc.get("args")),
+                                },
+                            )
 
-                    um = evt.get("usageMetadata")
-                    if um:
-                        p_tok = um.get("promptTokenCount", 0) or 0
-                        c_tok = um.get("candidatesTokenCount", 0) or 0
-                        yield build_adapter_usage_event(
-                            p_tok,
-                            c_tok,
-                            um.get("totalTokenCount") or (p_tok + c_tok),
-                        )
+                um = evt.get("usageMetadata")
+                if um:
+                    p_tok = um.get("promptTokenCount", 0) or 0
+                    c_tok = um.get("candidatesTokenCount", 0) or 0
+                    yield build_adapter_usage_event(
+                        p_tok,
+                        c_tok,
+                        um.get("totalTokenCount") or (p_tok + c_tok),
+                    )

@@ -307,6 +307,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Bot when bot_msg is None
             screen.bot_msg = None
             await screen._render_event({"type": "bot", "text": "fresh chunk"})
+            screen.bot_msg.flush_pending_stream()
             self.assertEqual(screen.bot_msg.content, "fresh chunk")
 
             await pilot.press("escape")

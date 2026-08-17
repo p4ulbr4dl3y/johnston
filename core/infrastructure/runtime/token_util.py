@@ -83,24 +83,59 @@ _ESTIMATE_CACHE_MAXSIZE = 256
 _estimate_cache: "OrderedDict[tuple, int]" = OrderedDict()
 
 
-def _estimate_cache_key(input_val: Any) -> tuple:
-    """Build a cheap, hashable cache key for a serializable input.
-
-    Strings use a len-limited tuple; all other inputs use a type/length/content
-    signature (repr of a dict is its ordered key pointers, which is stable for a
-    given list[dict] history as long as that history object is unmutated).
-    """
-    if isinstance(input_val, str):
-        return ("str", len(input_val), input_val[: _CACHE_STR_KEY_MAX])
+def _structural_key(val: Any, depth: int = 0) -> tuple:
+    if depth > 5:
+        return (id(val), type(val).__name__)
+    if isinstance(val, str):
+        if len(val) > _CACHE_STR_KEY_MAX:
+            return ("big", "str")
+        return ("s", len(val), hash(val))
+    if isinstance(val, (int, float, bool)) or val is None:
+        return ("p", val)
+    if isinstance(val, dict):
+        if len(val) > _CACHE_STR_KEY_MAX:
+            return ("big", "dict")
+        items = []
+        for k, v in val.items():
+            k_str = str(k)
+            if isinstance(v, str):
+                if len(v) > _CACHE_STR_KEY_MAX:
+                    return ("big", "dict")
+                items.append((k_str, len(v), hash(v)))
+            elif isinstance(v, (int, float, bool)) or v is None:
+                items.append((k_str, v))
+            else:
+                sub = _structural_key(v, depth + 1)
+                if isinstance(sub, tuple) and len(sub) >= 1 and sub[0] == "big":
+                    return ("big", "dict")
+                items.append((k_str, sub))
+        return ("dict", tuple(items))
+    if isinstance(val, (list, tuple)):
+        if len(val) > _CACHE_STR_KEY_MAX:
+            return ("big", type(val).__name__)
+        items = []
+        for item in val:
+            sub = _structural_key(item, depth + 1)
+            if isinstance(sub, tuple) and len(sub) >= 1 and sub[0] == "big":
+                return ("big", type(val).__name__)
+            items.append(sub)
+        return (type(val).__name__, len(val), tuple(items))
     try:
-        length = len(input_val)
-    except TypeError:
-        return (type(input_val).__name__, repr(input_val))
-    except OverflowError:
-        return ("big", type(input_val).__name__)
-    if length > _CACHE_STR_KEY_MAX:
-        return ("big", type(input_val).__name__)
-    return ("val", type(input_val).__name__, length, repr(input_val))
+        length = len(val)
+        if length > _CACHE_STR_KEY_MAX:
+            return ("big", type(val).__name__)
+    except Exception:
+        pass
+    return (type(val).__name__, id(val))
+
+
+def _estimate_cache_key(input_val: Any) -> tuple:
+    """Build a cheap, hashable cache key for a serializable input without string allocations."""
+    if isinstance(input_val, str):
+        if len(input_val) > _CACHE_STR_KEY_MAX:
+            return ("big", "str")
+        return ("str", len(input_val), hash(input_val))
+    return _structural_key(input_val)
 
 
 def estimate_tokens(input_val: Any) -> int:

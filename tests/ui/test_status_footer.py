@@ -297,9 +297,11 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(footer.is_generating)
             self.assertIsNotNone(footer._spinner_timer)
 
-            # Test _spin re-renders with next frame
+            # Test _spin re-renders with next frame and cached rows without calling git diff
             old_idx = footer._spinner_idx
-            footer._spin()
+            with patch.object(footer, "_git_diff_stats") as diff_mock:
+                footer._spin()
+                diff_mock.assert_not_called()
             self.assertEqual(footer._spinner_idx, old_idx + 1)
 
             # Test on_unmount cleans up timers

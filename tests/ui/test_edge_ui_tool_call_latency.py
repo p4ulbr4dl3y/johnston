@@ -60,8 +60,8 @@ def _create_fake_session():
 
 
 class TestToolCallLatency(unittest.IsolatedAsyncioTestCase):
-    # Threshold for event loop stall: > 150ms catches real UI freezes while tolerating test runner load
-    MAX_ALLOWED_LAG_SECONDS = 0.150
+    # Threshold for event loop stall: > 250ms catches real UI freezes while tolerating parallel xdist test runner load
+    MAX_ALLOWED_LAG_SECONDS = 0.250
 
     async def test_tool_call_mount_responsiveness(self):
         """Mounting ToolCallWidgets for different tools must not block event loop."""

@@ -5,6 +5,7 @@ background_task.py and shell.py: ANSI stripping, carriage-return collapsing,
 and a hard byte cap with a truncation marker.
 """
 
+import collections
 import os
 import queue
 import re
@@ -62,7 +63,7 @@ class OutputBuffer:
     """Thread/async-safe ring buffer of raw output chunks with formatting."""
 
     def __init__(self, byte_limit: int = _OUTPUT_BYTE_LIMIT) -> None:
-        self._chunks: List[str] = []
+        self._chunks: collections.deque[str] = collections.deque()
         self._size = 0
         self._truncated = False
         self._byte_limit = byte_limit
@@ -79,7 +80,7 @@ class OutputBuffer:
             # Drop old chunks from the front (tail preserved) until the size
             # no longer exceeds the full cap.
             while self._chunks and self._size > self._byte_limit:
-                self._size -= len(self._chunks.pop(0))
+                self._size -= len(self._chunks.popleft())
 
     # -- reading ------------------------------------------------------------
 

@@ -29,7 +29,7 @@ ScrollBar, ScrollBarCorner {
     height: 0 !important;
 }
 
-Screen, *, ScrollBar, ScrollBarCorner {
+Screen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
     scrollbar-size: 0 0 !important;
     scrollbar-size-vertical: 0 !important;
     scrollbar-size-horizontal: 0 !important;

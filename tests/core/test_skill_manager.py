@@ -175,6 +175,16 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("caveman", app.ai_prompts[0][0])
         self.assertIn("refactor code", app.ai_prompts[0][0])
 
+    def test_list_skills_ttl_cache_skips_signature_scan(self):
+        from unittest.mock import patch
+
+        sm = SkillManager(project_dir=self.test_dir)
+        sm.list_skills()
+        with patch.object(sm, "_compute_scan_signature", side_effect=AssertionError("Should not compute signature within TTL")):
+            # Within TTL window, calling list_skills() must use cached result without computing signature
+            skills = sm.list_skills()
+            self.assertIsInstance(skills, list)
+
 
 if __name__ == "__main__":
     unittest.main()

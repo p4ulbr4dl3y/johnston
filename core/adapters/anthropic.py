@@ -1,3 +1,5 @@
+import asyncio
+import atexit
 import json
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -66,6 +68,36 @@ class AnthropicAdapter(BaseApiAdapter):
     assistant tool_calls and tool-result messages) into Anthropic content
     blocks, parses streaming tool_use blocks, and reports token usage.
     """
+
+    def __init__(self) -> None:
+        self._clients: Dict[Tuple[str, str], httpx.AsyncClient] = {}
+        atexit.register(self.close)
+
+    def _get_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
+        key = (base_url or "", api_key or "")
+        client = self._clients.get(key)
+        if client is None or getattr(client, "is_closed", False):
+            client = httpx.AsyncClient()
+            self._clients[key] = client
+        return client
+
+    def close(self) -> None:
+        """Closes all cached httpx.AsyncClient clients to release HTTP connection pools."""
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        try:
+            asyncio.run(self._close_all(clients))
+        except Exception:
+            pass
+
+    @staticmethod
+    async def _close_all(clients: Dict[Tuple[str, str], httpx.AsyncClient]) -> None:
+        for client in clients.values():
+            try:
+                await client.aclose()
+            except Exception:
+                pass
 
     @staticmethod
     def _to_anthropic_messages(messages: List[Dict[str, Any]]) -> Tuple[str, List[Dict[str, Any]]]:
@@ -214,59 +246,59 @@ class AnthropicAdapter(BaseApiAdapter):
             "cache_read_tokens": 0,
         }
 
-        async with httpx.AsyncClient() as client:
-            async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
-                await check_httpx_response_status(resp)
-                async for line in resp.aiter_lines():
-                    evt = parse_sse_line(line)
-                    if evt is None:
-                        continue
+        client = self._get_client(base_url, api_key)
+        async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
+            await check_httpx_response_status(resp)
+            async for line in resp.aiter_lines():
+                evt = parse_sse_line(line)
+                if evt is None:
+                    continue
 
-                    etype = evt.get("type")
-                    if etype == "message_start":
-                        u = (evt.get("message") or {}).get("usage") or {}
-                        pending_usage["prompt_tokens"] = u.get("input_tokens", 0) or 0
-                        pending_usage["cache_read_tokens"] = u.get("cache_read_input_tokens", 0) or 0
-                    elif etype == "content_block_start":
-                        idx = evt.get("index")
-                        cb = evt.get("content_block") or {}
-                        if cb.get("type") == "tool_use":
-                            tool_blocks[idx] = {"id": cb.get("id", ""), "name": cb.get("name", ""), "args_buf": ""}
-                    elif etype == "content_block_delta":
-                        idx = evt.get("index")
-                        delta = evt.get("delta") or {}
-                        dtype = delta.get("type")
-                        if dtype == "text_delta":
-                            txt = delta.get("text", "")
-                            if txt:
-                                yield ("adapter_text", txt)
-                        elif dtype == "thinking_delta":
-                            thought = delta.get("thinking", "")
-                            if thought:
-                                yield ("adapter_thought", thought)
-                        elif dtype == "input_json_delta":
-                            if idx in tool_blocks:
-                                tool_blocks[idx]["args_buf"] += delta.get("partial_json", "")
-                    elif etype == "content_block_stop":
-                        idx = evt.get("index")
+                etype = evt.get("type")
+                if etype == "message_start":
+                    u = (evt.get("message") or {}).get("usage") or {}
+                    pending_usage["prompt_tokens"] = u.get("input_tokens", 0) or 0
+                    pending_usage["cache_read_tokens"] = u.get("cache_read_input_tokens", 0) or 0
+                elif etype == "content_block_start":
+                    idx = evt.get("index")
+                    cb = evt.get("content_block") or {}
+                    if cb.get("type") == "tool_use":
+                        tool_blocks[idx] = {"id": cb.get("id", ""), "name": cb.get("name", ""), "args_buf": ""}
+                elif etype == "content_block_delta":
+                    idx = evt.get("index")
+                    delta = evt.get("delta") or {}
+                    dtype = delta.get("type")
+                    if dtype == "text_delta":
+                        txt = delta.get("text", "")
+                        if txt:
+                            yield ("adapter_text", txt)
+                    elif dtype == "thinking_delta":
+                        thought = delta.get("thinking", "")
+                        if thought:
+                            yield ("adapter_thought", thought)
+                    elif dtype == "input_json_delta":
                         if idx in tool_blocks:
-                            tb = tool_blocks.pop(idx)
-                            yield (
-                                "adapter_tool_call",
-                                {
-                                    "id": tb["id"] or new_tool_call_id(),
-                                    "name": tb["name"],
-                                    "arguments": tb["args_buf"] or "{}",
-                                },
-                            )
-                    elif etype == "message_delta":
-                        u = evt.get("usage") or {}
-                        if u.get("output_tokens") is not None:
-                            pending_usage["completion_tokens"] = u.get("output_tokens", 0) or 0
-                    elif etype == "message_stop":
-                        yield build_adapter_usage_event(
-                            pending_usage["prompt_tokens"],
-                            pending_usage["completion_tokens"],
-                            cache_read_tokens=pending_usage["cache_read_tokens"],
+                            tool_blocks[idx]["args_buf"] += delta.get("partial_json", "")
+                elif etype == "content_block_stop":
+                    idx = evt.get("index")
+                    if idx in tool_blocks:
+                        tb = tool_blocks.pop(idx)
+                        yield (
+                            "adapter_tool_call",
+                            {
+                                "id": tb["id"] or new_tool_call_id(),
+                                "name": tb["name"],
+                                "arguments": tb["args_buf"] or "{}",
+                            },
                         )
-                        pending_usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_read_tokens": 0}
+                elif etype == "message_delta":
+                    u = evt.get("usage") or {}
+                    if u.get("output_tokens") is not None:
+                        pending_usage["completion_tokens"] = u.get("output_tokens", 0) or 0
+                elif etype == "message_stop":
+                    yield build_adapter_usage_event(
+                        pending_usage["prompt_tokens"],
+                        pending_usage["completion_tokens"],
+                        cache_read_tokens=pending_usage["cache_read_tokens"],
+                    )
+                    pending_usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_read_tokens": 0}

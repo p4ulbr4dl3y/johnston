@@ -713,10 +713,34 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
             await bot.finalize_stream("explicit")
         final_mock.assert_awaited_once_with("explicit")
 
+    async def test_append_stream_content_accumulates_without_updating_reactive_content(self):
+        bot = BotMessage()
+        with patch.object(bot, "_schedule_stream_update"):
+            bot.append_stream_content("hello ")
+            bot.append_stream_content("world")
+            self.assertEqual(bot._stream_parts, ["hello ", "world"])
+            self.assertEqual(bot.content, "")
+            self.assertEqual(bot._join_stream_content(), "hello world")
+            bot._flush_stream_update()
+            self.assertEqual(bot.stream_widget.render(), "hello world")
+            bot.flush_pending_stream()
+            self.assertEqual(bot.content, "hello world")
+
 
 class TestThinkingWidget(unittest.TestCase):
     def _make_widget(self, text="Thinking..."):
         return ThinkingWidget(text)
+
+    def test_thinking_widget_accumulates_parts_and_debounces(self):
+        widget = self._make_widget()
+        widget.is_expanded = True
+        with patch.object(widget.content_widget, "update") as update_mock:
+            widget.update_thinking("part1 ")
+            widget.update_thinking("part2")
+            self.assertEqual(widget._thinking_parts, ["part1 ", "part2"])
+            self.assertEqual(widget.thinking_text, "part1 part2")
+            widget._flush_content_update()
+            update_mock.assert_called_with("part1 part2")
 
     def test_thinking_widget_init_and_compose(self):
         widget = self._make_widget()
@@ -763,6 +787,7 @@ class TestThinkingWidget(unittest.TestCase):
         widget.is_expanded = True
         with patch.object(widget.content_widget, "update") as update_mock:
             widget.update_thinking("expanded thought")
+            widget._flush_content_update()
         update_mock.assert_called_with("new thoughtexpanded thought")
 
         widget.finish_thinking(2.5, "final thought")

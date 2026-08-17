@@ -496,16 +496,13 @@ class PromptBuilder:
         # Identity key lets us reuse the last pre-sorted build when the tool
         # objects (and role flags) are unchanged this turn, skipping the
         # per-schema deepcopy + re-sort. A fresh build always happens after any
-        # tool swap because old object ids drop out of the key. Copies are
-        # returned so callers mutating the schemas cannot corrupt the cache.
-        import copy
-
+        # tool swap because old object ids drop out of the key.
         key = (tuple(id(t) for t in allowed_tools), self.is_subagent, self.allow_task)
         cached = _TOOLS_CACHE.get(key)
         if cached is not None:
-            return copy.deepcopy(cached)
+            return list(cached)
 
         sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]
         sorted_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
         _cache_set(_TOOLS_CACHE, key, sorted_tools, _TOOLS_CACHE_MAX)
-        return copy.deepcopy(sorted_tools)
+        return list(sorted_tools)

@@ -9,7 +9,7 @@ each manager only supplies how to turn discovered files into its own result type
 
 import os
 import time
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.runtime.frontmatter import MD_EXTENSIONS, iter_md_files
@@ -50,9 +50,7 @@ class MarkdownScannerCache:
 
     def __init__(self, subpath: str = "roles"):
         self.subpath = subpath
-        self._signature: Optional[Tuple] = None
-        self._ts: float = 0.0
-        self._value: Any = None
+        self._cache: Dict[Tuple[str, bool], Tuple[float, Optional[Tuple], Any]] = {}
 
     def get(
         self,
@@ -60,23 +58,28 @@ class MarkdownScannerCache:
         include_global: bool = True,
         build: Optional[Callable[[MarkdownDirs, List[Tuple[str, str]]], Any]] = None,
     ) -> Any:
+        p_dir = os.path.realpath(project_dir) if project_dir else os.path.realpath(os.getcwd())
+        key = (p_dir, include_global)
+        now = time.time()
+        entry = self._cache.get(key)
+        if entry is not None:
+            ts, sig, val = entry
+            if (now - ts) < self.cache_ttl:
+                return val
+
         dirs = build_markdown_dirs(project_dir, include_global=include_global, subpath=self.subpath)
         signature = compute_dir_signature(dirs, MD_EXTENSIONS) or ()
-        now = time.time()
-        if (
-            self._signature is not None
-            and signature == self._signature
-            and (now - self._ts) < self.cache_ttl
-        ):
-            return self._value
+        if entry is not None:
+            ts, sig, val = entry
+            if signature == sig and val is not None:
+                self._cache[key] = (now, signature, val)
+                return val
+
         files = list(iter_md_files(dirs))
         value = build(dirs, files) if build else files
-        self._signature = signature
-        self._ts = now
-        self._value = value
+        self._cache[key] = (now, signature, value)
         return value
 
     def invalidate(self) -> None:
         """Force the next ``get`` to re-scan from disk."""
-        self._signature = None
-        self._ts = 0.0
+        self._cache.clear()

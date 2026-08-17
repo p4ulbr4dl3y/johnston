@@ -188,15 +188,14 @@ def test_build_tools_deterministic_same_input():
 
 
 def test_build_tools_cache_isolated_from_caller_mutation():
-    """Mutating a returned (cached) schema must not corrupt the next call."""
+    """Mutating the returned list does not corrupt the cached tool list."""
     base = [{"function": {"name": "t", "parameters": {"properties": {"z": {}, "a": {}}}}}]
     b = PromptBuilder("p", list(base), role="worker", allow_task=False)
     first = b.build_tools()
-    # Mutate the returned nested dict aggressively.
-    first[0]["function"]["parameters"]["properties"]["a"]["x"] = "polluted"
+    first.append({"function": {"name": "polluted"}})
     second = b.build_tools()
-    assert "x" not in second[0]["function"]["parameters"]["properties"]["a"]
-    assert list(second[0]["function"]["parameters"]["properties"]) == ["a", "z"]
+    assert len(second) == 1
+    assert second[0]["function"]["name"] == "t"
 
 
 def test_build_tools_subagent_excluded_tools():

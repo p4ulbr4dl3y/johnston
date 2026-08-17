@@ -52,22 +52,26 @@ class CreateTool(BaseTool):
             content = content.decode("utf-8", errors="replace")
         content = content.rstrip("\r\n")
 
+        def _write_and_diff():
+            write_file_text(path, content)
+            if not file_existed:
+                return None
+            diff_text = make_git_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
+            if not diff_text:
+                new_lines = content.splitlines()
+                cnt = len(new_lines) or 1
+                diff_lines = [
+                    f"--- a/{path}",
+                    f"+++ b/{path}",
+                    f"@@ -1,{cnt} +1,{cnt} @@",
+                ] + [" " + line for line in new_lines]
+                diff_text = "\n".join(diff_lines)
+            return diff_text
+
         try:
-            await run_cancellable(write_file_text, path, content)
-
+            diff_text = await run_cancellable(_write_and_diff)
             if file_existed:
-                diff_text = make_git_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
-                if not diff_text:
-                    new_lines = content.splitlines()
-                    cnt = len(new_lines) or 1
-                    diff_lines = [
-                        f"--- a/{path}",
-                        f"+++ b/{path}",
-                        f"@@ -1,{cnt} +1,{cnt} @@",
-                    ] + [" " + line for line in new_lines]
-                    diff_text = "\n".join(diff_lines)
-
-                diff_part = f"\n\n{diff_text.strip()}" if diff_text.strip() else ""
+                diff_part = f"\n\n{diff_text.strip()}" if diff_text and diff_text.strip() else ""
                 return ToolResult.done(f"file '{path}' updated.{diff_part}")
             else:
                 return ToolResult.done(f"file '{path}' created.")

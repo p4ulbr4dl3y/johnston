@@ -60,6 +60,18 @@ Always run uv instead of pip.""")
                 self.assertEqual(len(rules), 1)
                 self.assertEqual(rules[0].source, "global")
 
+    def test_markdown_scanner_cache_ttl_skips_signature(self):
+        from unittest.mock import patch
+
+        from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
+
+        cache = MarkdownScannerCache(subpath="rules")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            res1 = cache.get(project_dir=tmpdir, include_global=False)
+            with patch("core.infrastructure.runtime.markdown_scanner.compute_dir_signature", side_effect=AssertionError("Should not compute signature within TTL")):
+                res2 = cache.get(project_dir=tmpdir, include_global=False)
+                self.assertEqual(res1, res2)
+
 
 if __name__ == "__main__":
     unittest.main()

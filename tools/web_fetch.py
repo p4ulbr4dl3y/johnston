@@ -1,3 +1,4 @@
+import asyncio
 import ipaddress
 import os
 import re
@@ -20,7 +21,7 @@ DEFAULT_USER_AGENT = (
 )
 
 
-def _is_private_host(url: str) -> bool:
+async def _is_private_host(url: str) -> bool:
     """True if URL resolves to a private/loopback/link-local address (SSRF guard)."""
     try:
         host = httpx.URL(url).host
@@ -36,7 +37,7 @@ def _is_private_host(url: str) -> bool:
         pass
     # Hostname: resolve; block any private/loopback result.
     try:
-        infos = socket.getaddrinfo(host, None)
+        infos = await asyncio.to_thread(socket.getaddrinfo, host, None)
     except socket.gaierror:
         # Unresolvable host: cannot classify as private. Let httpx surface the real
         # connection error rather than (falsely) blocking offline/sandboxed resolvers.
@@ -106,7 +107,7 @@ class WebFetchTool(BaseTool):
         if not (url.startswith("http://") or url.startswith("https://")):
             return ToolResult.error("scheme", name=url, detail="must be http(s)")
 
-        if _is_private_host(url):
+        if await _is_private_host(url):
             return ToolResult.error("blocked", name=url, detail="private/loopback address is not allowed")
 
         raw_mode = bool(args.get("raw", False))
@@ -118,7 +119,7 @@ class WebFetchTool(BaseTool):
         }
 
         async def _guard_request(req: "httpx.Request") -> None:
-            if _is_private_host(str(req.url)):
+            if await _is_private_host(str(req.url)):
                 raise httpx.RequestError("private/loopback redirect target is not allowed", request=req)
 
         try:

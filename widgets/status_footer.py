@@ -61,7 +61,7 @@ def _build_subagent_grid(
     directory: str = "",
     branch: str = "",
     git_diff_stats,
-) -> Table:
+) -> tuple[Table, list[tuple[str, str]]]:
     """Shared subagent-status table builder.
 
     Used by both ``StatusFooter._render_subagent`` and
@@ -75,7 +75,9 @@ def _build_subagent_grid(
     row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"]
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
         row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
-    grid.add_row("  •  ".join(row1_left_parts), "")
+    row1_left = "  •  ".join(row1_left_parts)
+    row1_right = ""
+    grid.add_row(row1_left, row1_right)
 
     # Line 2: [context]  [tokens • cost • effort]
     if is_connected and model_name:
@@ -108,9 +110,15 @@ def _build_subagent_grid(
     if diff_text:
         row3_left_parts.append(f"[{THEME_SECONDARY}]{diff_text}[/]")
     row3_left = "  •  ".join(row3_left_parts)
-    grid.add_row(row3_left, "")
+    row3_right = ""
+    grid.add_row(row3_left, row3_right)
 
-    return grid
+    rows = [
+        (row1_left, row1_right),
+        (row2_left, row2_right),
+        (row3_left, row3_right),
+    ]
+    return grid, rows
 
 
 class StatusFooter(GitMetricsMixin, Static):
@@ -147,7 +155,10 @@ class StatusFooter(GitMetricsMixin, Static):
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
         if self.is_subagent:
             if getattr(self, "_subagent_session", None):
-                self.update_subagent_footer(self._subagent_session)
+                if getattr(self, "_last_grid_rows", None):
+                    self._render_stream_frame()
+                else:
+                    self.update_subagent_footer(self._subagent_session)
         elif hasattr(self, "_last_status_args"):
             # Only the spinner frame changed: redraw cheaply from cached rows
             # instead of rebuilding git/table data on every tick.
@@ -157,7 +168,7 @@ class StatusFooter(GitMetricsMixin, Static):
 
     def _render_stream_frame(self) -> None:
         """Redraw only the animated frame from cached status rows (no git/rebuild)."""
-        if not self.is_generating or self.is_subagent:
+        if not self.is_generating:
             return
         rows = getattr(self, "_last_grid_rows", None)
         if rows is None:
@@ -325,7 +336,7 @@ class StatusFooter(GitMetricsMixin, Static):
     ) -> None:
         """Footer for the subagent screen: role/model, context/tokens, dir/branch."""
         branch = branch_name or self._git_branch(cwd=directory)
-        grid = _build_subagent_grid(
+        grid, rows = _build_subagent_grid(
             role_formatted=role_formatted,
             provider_display=provider_display,
             clean_model=clean_model,
@@ -341,6 +352,7 @@ class StatusFooter(GitMetricsMixin, Static):
             branch=branch,
             git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
         )
+        self._last_grid_rows = rows
         self.update(grid)
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
@@ -572,6 +584,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
         self._diff_text: str = ""
         self._diff_time: float = 0.0
         self._diff_loading: bool = False
+        self._last_grid_rows: list[tuple[str, str]] | None = None
 
     def on_mount(self) -> None:
         self._render_footer()
@@ -607,7 +620,39 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        self._render_footer()
+        if getattr(self, "_last_grid_rows", None):
+            self._render_stream_frame()
+        else:
+            self._render_footer()
+
+    def _render_stream_frame(self) -> None:
+        """Redraw only the animated frame from cached status rows (no git/rebuild)."""
+        if not self.is_generating:
+            return
+        rows = getattr(self, "_last_grid_rows", None)
+        if rows is None:
+            return
+        try:
+            frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
+            grid = Table.grid(expand=True)
+            grid.add_column(justify="left")
+            grid.add_column(justify="right")
+            for i, (left, right) in enumerate(rows):
+                if i == 0:
+                    left = self._swap_frame(left, frame)
+                grid.add_row(left, right)
+            self.update(grid)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _swap_frame(left: str, frame: str) -> str:
+        """Replace the old spinner char in the cached left cell with the new frame."""
+        try:
+            idx = left.index("]") + 1
+            return left[:idx] + frame + left[idx + 1 :]
+        except Exception:
+            return left
 
     def _render_footer(self) -> None:
         grid = Table.grid(expand=True)
@@ -617,6 +662,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             grid.add_row("", "")
             grid.add_row("", "")
             grid.add_row("", "")
+            self._last_grid_rows = [("", ""), ("", ""), ("", "")]
             self.update(grid)
             return
         session = self.session
@@ -678,7 +724,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             role_formatted += role.capitalize()
 
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
-            grid = _build_subagent_grid(
+            grid, rows = _build_subagent_grid(
                 role_formatted=role_formatted,
                 provider_display=provider_display,
                 clean_model=clean_model,
@@ -695,6 +741,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
                 git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
             )
 
+            self._last_grid_rows = rows
             self.update(grid)
         except Exception:
             pass

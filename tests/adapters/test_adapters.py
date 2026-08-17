@@ -734,5 +734,37 @@ class TestAdapterNormalizationRegression(unittest.TestCase):
         self.assertEqual(messages[0]["content"][1]["image_url"]["url"], "data:image/png;base64,abc")
 
 
+class TestAdapterClientPooling(unittest.TestCase):
+    def test_anthropic_client_pooling_and_close(self):
+        adapter = AnthropicAdapter()
+        c1 = adapter._get_client("https://api.anthropic.com", "key1")
+        c2 = adapter._get_client("https://api.anthropic.com", "key1")
+        c3 = adapter._get_client("https://api.anthropic.com", "key2")
+        self.assertIs(c1, c2)
+        self.assertIsNot(c1, c3)
+        adapter.close()
+        self.assertEqual(len(adapter._clients), 0)
+
+    def test_gemini_client_pooling_and_close(self):
+        adapter = GeminiAdapter()
+        c1 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
+        c2 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
+        c3 = adapter._get_client("https://generativelanguage.googleapis.com", "key2")
+        self.assertIs(c1, c2)
+        self.assertIsNot(c1, c3)
+        adapter.close()
+        self.assertEqual(len(adapter._clients), 0)
+
+    def test_ollama_client_pooling_and_close(self):
+        adapter = OllamaAdapter()
+        c1 = adapter._get_client("http://localhost:11434", "")
+        c2 = adapter._get_client("http://localhost:11434", "")
+        c3 = adapter._get_client("http://remote:11434", "")
+        self.assertIs(c1, c2)
+        self.assertIsNot(c1, c3)
+        adapter.close()
+        self.assertEqual(len(adapter._clients), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

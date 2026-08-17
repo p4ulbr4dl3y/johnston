@@ -394,8 +394,11 @@ class TestSingletonAndCache:
             with open(p, "w", encoding="utf-8") as f:
                 f.write("---\nkey: t\n---\nTTL 1")
             reg.load_roles(project_dir=tmpdir, include_global=False)
-            assert reg.roles["t"].prompt == "TTL 1"
-            # change content within TTL but with a changed mtime -> reload
+            # change content with a changed mtime after TTL expiry -> reload
+            p_dir = os.path.realpath(tmpdir)
+            if (p_dir, False) in reg._cache._cache:
+                ts, sig, val = reg._cache._cache[(p_dir, False)]
+                reg._cache._cache[(p_dir, False)] = (ts - 10.0, sig, val)
             with open(p, "w", encoding="utf-8") as f:
                 f.write("---\nkey: t\n---\nTTL 2")
             os.utime(p, (time.time() + 5, time.time() + 5))

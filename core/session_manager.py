@@ -491,7 +491,9 @@ class SessionStore:
                 fpath = self._main_path(sess.id)
             atomic_write_json(fpath, sess.to_dict(), indent=2)
             self._sessions[sess.id] = sess
-            self._invalidate_disk_cache()
+            if self._disk_cache is not None:
+                self._disk_cache[sess.id] = sess
+                self._disk_cache_signature = self._disk_signature()
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
 
