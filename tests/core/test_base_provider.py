@@ -1607,6 +1607,47 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(s[0] == "queued_user_message" for s in steps))
         self.assertEqual([item[0] for item in app.message_queue], ["foreign", "foreign2"])
 
+    async def test_subagent_pending_messages_drained_in_stream_steps(self):
+        """Subagents must drain pending_messages between stream steps."""
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
+        self.addAsyncCleanup(agent.close)
+        agent.is_subagent = True
+
+        sess = unittest.mock.MagicMock()
+        sess.pending_messages = ["follow up 1", "follow up 2"]
+        agent.session = sess
+
+        mock_chunk = unittest.mock.MagicMock(spec=["choices"])
+        mock_delta = unittest.mock.MagicMock()
+        mock_delta.reasoning_content = None
+        mock_delta.reasoning = None
+        mock_delta.model_extra = None
+        mock_delta.content = "Subagent reply"
+        mock_delta.tool_calls = None
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.delta = mock_delta
+        mock_chunk.choices = [mock_choice]
+
+        async def mock_aiter(*args, **kwargs):
+            yield mock_chunk
+
+        mock_response = unittest.mock.MagicMock()
+        mock_response.__aiter__ = mock_aiter
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            steps = []
+            async for step in agent.stream_steps("Hi"):
+                steps.append(step)
+
+        queued = [s for s in steps if s[0] == "queued_user_message"]
+        self.assertEqual([s[1] for s in queued], ["follow up 1", "follow up 2"])
+        self.assertEqual(sess.pending_messages, [])
+
 
 if __name__ == "__main__":
     unittest.main()

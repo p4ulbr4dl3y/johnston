@@ -67,6 +67,9 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     elif etype in ("bot_text", "outro"):
         text_accumulator[0] = val1
         session.add_event({"type": "bot", "text": text_accumulator[0], "final": True})
+    elif etype == "queued_user_message":
+        text_accumulator[0] = ""
+        session.add_event({"type": "user", "text": val1})
     elif etype == "event_divider":
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
 
@@ -158,15 +161,25 @@ async def _run_single_subagent_message(
     persisting the session in each terminal state.
     """
     acc = [""]
+    last_api_error = [None]
     try:
         async for step in subagent.stream_steps(message):
+            if step and step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"):
+                last_api_error[0] = str(step[1])
             record_subagent_step(step, session, acc)
         session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
         session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
         session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
         session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
         session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
-        session.finish(STATUS_COMPLETED)
+        if last_api_error[0]:
+            if not acc[0].strip():
+                acc[0] = f"[{last_api_error[0]}]"
+            else:
+                acc[0] = f"{acc[0]}\n\n[{last_api_error[0]}]"
+            session.finish(STATUS_ERROR, last_api_error[0])
+        else:
+            session.finish(STATUS_COMPLETED)
         _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
@@ -217,6 +230,7 @@ async def run_subagent_stream_bg(
     processing until its queue is empty. The session stays `running` while the
     queue is non-empty and only finishes `completed` once drained.
     """
+    subagent.session = session
     acc = [""]
     try:
         message = prompt_or_message
@@ -229,6 +243,7 @@ async def run_subagent_stream_bg(
             if session.pending_messages:
                 message = session.pending_messages.pop(0)
                 session.status = SUBAGENT_STATUS_RUNNING
+                session.add_event({"type": "user", "text": message})
                 session.add_event({"type": "status_change", "status": SUBAGENT_STATUS_RUNNING})
                 continue
             break

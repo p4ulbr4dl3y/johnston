@@ -5,6 +5,7 @@ import os
 import random
 import time
 from asyncio import Queue
+from collections import OrderedDict
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
@@ -26,6 +27,65 @@ from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.models_catalog import catalog
 
 logger = logging.getLogger(__name__)
+
+
+def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
+    """Return a stable memoization key for a message list.
+
+    Built only from the operationally-meaningful fields (role, content,
+    tool_call_id, tool_calls), so two distinct histories can't alias a cache
+    entry without also having identical payloads.
+    """
+    out = []
+    for m in msgs:
+        out.append(str(m.get("role")))
+        c = m.get("content")
+        out.append(c if isinstance(c, str) else json.dumps(c, ensure_ascii=False, sort_keys=True))
+        out.append(str(m.get("tool_call_id")))
+        tc = m.get("tool_calls")
+        out.append(json.dumps(tc, ensure_ascii=False, sort_keys=True) if tc else "")
+    return ("\x1f".join(out)).encode("utf-8")
+
+
+# LRU memo cache for sanitize_history_for_model. The key is a compact serialized
+# snapshot of the history and stores only the sanitized messages (never the deep
+# input). Multi-tool turns call sanitize once per step with only a couple of
+# messages appended per step, so the cached tail is reused and the O(history)
+# pass runs once per turn instead of once per tool_result.
+_SANITIZE_CACHE: "OrderedDict[bytes, List[Dict[str, Any]]]" = OrderedDict()
+_SANITIZE_CACHE_MAX = 64
+
+
+def _cache_sanitize_get(encoded_history: bytes) -> Optional[List[Dict[str, Any]]]:
+    val = _SANITIZE_CACHE.get(encoded_history)
+    if val is not None:
+        _SANITIZE_CACHE.move_to_end(encoded_history)
+    return val
+
+
+def _cache_sanitize_put(encoded_history: bytes, sanitized: List[Dict[str, Any]]) -> None:
+    _SANITIZE_CACHE[encoded_history] = sanitized
+    while len(_SANITIZE_CACHE) > _SANITIZE_CACHE_MAX:
+        _SANITIZE_CACHE.popitem(last=False)
+
+
+async def sanitize_history_cached(agent: Any, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Memoized, event-loop-friendly ``sanitize_history_for_model``.
+
+    Returns the cached result when the history is unchanged since the last call
+    (the common case inside a multi-tool turn). On a miss, the O(history)
+    sanitize pass is offloaded to a worker thread so it never blocks the UI
+    event loop; the result (not the input) is stored in the LRU cache.
+    """
+    key = serialize_messages_key(history)
+    cached = _cache_sanitize_get(key)
+    if cached is not None:
+        return cached
+    sanitized = await asyncio.to_thread(agent.sanitize_history_for_model, history)
+    _cache_sanitize_put(key, sanitized)
+    return sanitized
+
+
 
 
 class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
@@ -90,6 +150,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.default_tools_provider = default_tools_provider
         self.image_processor = image_processor
         self.tool_name_normalizer = tool_name_normalizer
+        # Per-agent memo for _tool_policy_error keyed by (id(role_def), tool_name).
+        # The stream loop calls it once per tool call; without the memo the role
+        # resolution + membership checks rerun for every tool_result.
+        self._tool_policy_cache: Dict[tuple, Any] = {}
 
     async def close(self):
         if hasattr(self, "client") and self.client:
@@ -182,9 +246,15 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         return None
 
     def _has_queued_messages(self) -> bool:
-        """True if the main app's queue has a message for the current session."""
+        """True if the queue has a message for the current session."""
+        if getattr(self, "is_subagent", False):
+            session = getattr(self, "session", None)
+            if session is not None and getattr(session, "pending_messages", None):
+                return True
+            pending = getattr(self, "pending_messages", None)
+            return bool(pending)
         app = getattr(self, "app", None)
-        if app is None or getattr(self, "is_subagent", False):
+        if app is None:
             return False
         mq = getattr(app, "message_queue", None)
         if not mq:
@@ -237,7 +307,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
-        sanitized_history = self.sanitize_history_for_model(self.history)
+        sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:
             user_content: List[Dict[str, Any]] = [{"type": "text", "text": user_text}]
             for idx, att in enumerate(attachments):
@@ -259,25 +329,40 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         try:
             while True:
-                # Drain queued user messages between agent steps (main app only).
-                app = getattr(self, "app", None)
-                if app is not None and not getattr(self, "is_subagent", False):
-                    mq = getattr(app, "message_queue", None)
-                    if mq:
-                        sid = getattr(app, "current_session_id", None)
-                        # Iterate over a snapshot so foreign-session items are left
-                        # in place (no infinite loop) while own items are consumed.
-                        # Single-pass drain: keep foreign-session items in place,
-                        # consume own items. O(n) instead of list()+remove() O(n^2).
-                        kept = []
-                        for item in mq:
-                            item_sid = item[3] if len(item) > 3 else None
-                            if item_sid is not None and sid is not None and item_sid != sid:
-                                kept.append(item)
-                                continue
-                            messages.append({"role": "user", "content": item[0]})
-                            yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
-                        mq[:] = kept
+                # Drain queued user messages between agent steps.
+                if getattr(self, "is_subagent", False):
+                    session = getattr(self, "session", None)
+                    pending_list = None
+                    if session is not None and hasattr(session, "pending_messages") and session.pending_messages:
+                        pending_list = session.pending_messages
+                    elif hasattr(self, "pending_messages") and self.pending_messages:
+                        pending_list = self.pending_messages
+
+                    if pending_list:
+                        while pending_list:
+                            item = pending_list.pop(0)
+                            msg_text = item if isinstance(item, str) else item[0]
+                            messages.append({"role": "user", "content": msg_text})
+                            yield ("queued_user_message", msg_text, None, True)
+                else:
+                    app = getattr(self, "app", None)
+                    if app is not None:
+                        mq = getattr(app, "message_queue", None)
+                        if mq:
+                            sid = getattr(app, "current_session_id", None)
+                            # Iterate over a snapshot so foreign-session items are left
+                            # in place (no infinite loop) while own items are consumed.
+                            # Single-pass drain: keep foreign-session items in place,
+                            # consume own items. O(n) instead of list()+remove() O(n^2).
+                            kept = []
+                            for item in mq:
+                                item_sid = item[3] if len(item) > 3 else None
+                                if item_sid is not None and sid is not None and item_sid != sid:
+                                    kept.append(item)
+                                    continue
+                                messages.append({"role": "user", "content": item[0]})
+                                yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
+                            mq[:] = kept
 
                 step_usage = None
                 prompt_tokens_est = estimate_tokens(messages)
@@ -635,7 +720,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                     messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 
-                self.history = messages[1:]
+                # Per-step copy of the transcript for the next provider request.
+                # Recomputing the full ``messages[1:]`` slice on every tool_result
+                # was a repeated O(history) allocation on the UI thread; build it
+                # once here and reuse the latest slice on the next iteration.
+                history_snapshot = await asyncio.to_thread(list, messages[1:])
+                self.history = history_snapshot
                 messages, compacted_in_loop = (
                     (messages, False)
                     if compacted_this_turn
@@ -652,4 +742,4 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             yield ("event_divider", clean_msg, "")
         finally:
             if len(messages) > 1:
-                self.history = self.sanitize_history_for_model(messages[1:])
+                self.history = await sanitize_history_cached(self, messages[1:])

@@ -693,3 +693,31 @@ class TestCancelRunning:
         assert n == 2
         assert a.async_task.cancelled
         assert b.async_task.cancelled
+
+
+class TestSubagentStepAndErrorHandling:
+    def test_record_subagent_step_queued_user_message(self):
+        from core.application.session.stream import record_subagent_step
+
+        sess = make_session()
+        acc = ["previous text"]
+        record_subagent_step(("queued_user_message", "New prompt", None, True), sess, acc)
+        assert acc[0] == ""
+        assert len(sess.messages) == 1
+        assert sess.messages[0]["type"] == "user"
+        assert sess.messages[0]["text"] == "New prompt"
+
+    @pytest.mark.asyncio
+    async def test_api_error_divider_marks_status_error_and_returns_error_text(self):
+        error_msg = "API Error: Failed to create stream: model overloaded"
+        sub = FakeSubagent(steps=[("event_divider", error_msg, "")])
+        sess = make_session()
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template="Result: {result_text}"
+        )
+        assert sess.status == STATUS_ERROR
+        assert f"[{error_msg}]" in result
+        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+

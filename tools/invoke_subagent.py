@@ -174,6 +174,7 @@ class InvokeSubagentTool(BaseTool):
             branch_name=wt_branch or branch_name,
         )
         session.agent = subagent
+        subagent.session = session
         session.add_event({"type": "user", "text": prompt})
 
         from core.application.session.stream import run_subagent_stream_bg

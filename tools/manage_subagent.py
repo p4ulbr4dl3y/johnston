@@ -135,9 +135,8 @@ class ManageSubagentTool(BaseTool):
                     return ToolResult.error("context", name=session.id, detail="no active agent")
 
                 session.status = "running"
-                if not hasattr(session, "pending_messages"):
-                    session.pending_messages = []
-                session.pending_messages.append(message)
+                session.agent = subagent
+                subagent.session = session
                 session.add_event({"type": "user", "text": message})
                 session.add_event({"type": "status_change", "status": "running"})
 
@@ -159,7 +158,7 @@ class ManageSubagentTool(BaseTool):
                 bg_task = asyncio.create_task(
                     run_subagent_stream_bg(
                         subagent,
-                        session.pending_messages.pop(0),
+                        message,
                         session,
                         ctx,
                         store,
