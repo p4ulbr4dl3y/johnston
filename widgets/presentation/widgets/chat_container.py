@@ -96,8 +96,14 @@ class ChatView(VerticalScroll):
     ) -> ToolCallWidget:
         last_child = None
         for child in reversed(self.children):
-            if isinstance(child, BotMessage) and not child.content.strip():
-                continue
+            if isinstance(child, BotMessage):
+                c_str = (
+                    child._join_stream_content()
+                    if hasattr(child, "_join_stream_content") and child._stream_parts
+                    else getattr(child, "content", "")
+                )
+                if not (c_str or "").strip():
+                    continue
             last_child = child
             break
         is_seq = bool(last_child and isinstance(last_child, ToolCallWidget))

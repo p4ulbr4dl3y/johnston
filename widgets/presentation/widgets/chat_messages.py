@@ -145,7 +145,13 @@ class BotMessage(Vertical):
         self._stream_update_scheduled = False
         self._stream_update_handle = None
         try:
-            self.stream_widget.update(self._join_stream_content())
+            text = self._join_stream_content()
+            self._suppress_content_watch = True
+            try:
+                self.content = text
+            finally:
+                self._suppress_content_watch = False
+            self.stream_widget.update(text)
             self._scroll_if_needed()
         except Exception:
             pass
@@ -153,7 +159,11 @@ class BotMessage(Vertical):
     def flush_pending_stream(self) -> None:
         """Immediately render any still-pending debounced stream content."""
         if self._stream_parts:
-            self.content = self._join_stream_content()
+            self._suppress_content_watch = True
+            try:
+                self.content = self._join_stream_content()
+            finally:
+                self._suppress_content_watch = False
         if self._stream_update_scheduled:
             self._flush_stream_update()
 

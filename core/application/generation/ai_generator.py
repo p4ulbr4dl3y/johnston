@@ -215,12 +215,13 @@ async def generate_ai_response(
                 thinking_handle = None
             elif event_type == "tool":
                 if bot_handle:
-                    if not bot_handle.content.strip():
+                    bot_handle.flush_pending_stream()
+                    content_str = getattr(bot_handle, "content", "")
+                    if hasattr(bot_handle, "_stream_parts") and bot_handle._stream_parts:
+                        content_str = bot_handle._join_stream_content()
+                    if not (content_str or "").strip():
                         bot_handle.remove()
                     else:
-                        # Flush any pending debounced stream render so the last
-                        # character is drawn before finalizing to the tool call.
-                        bot_handle.flush_pending_stream()
                         await bot_handle.finalize_stream()
                 bot_handle = None
                 targs = val3 if isinstance(val3, dict) else {}

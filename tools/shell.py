@@ -49,10 +49,10 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Run a terminal command. If command runs longer than timeout or 'background: true', "
-        "it moves to background and returns a task_id and log path immediately. "
-        "Output streams live to the log file. When finished, full output is delivered "
-        "automatically via a [System Notification] message."
+        "Run a terminal command synchronously with a configurable timeout (default 120s, max 600s). "
+        "Output is returned after the command finishes; processes are terminated on timeout. "
+        "Set 'background: true' to run asynchronously: returns a task_id and log path immediately, "
+        "output streams live to the log file, and completion arrives via a [System Notification] message."
     )
 
     schema = {
@@ -111,13 +111,16 @@ class ShellTool(BaseTool):
         p = await self._create_std_process(cmd, env, cwd=proc_cwd)
 
         run_in_bg = bool(args.get("background", False))
+        if run_in_bg and ctx.is_subagent:
+            await terminate_process(p)
+            return ToolResult.error("background", name="shell")
 
-        # Synchronous execution mode for subagents (no background task)
-        if ctx.is_subagent:
-            if run_in_bg:
-                await terminate_process(p)
-                return ToolResult.error("background", name="shell")
-
+        # Synchronous execution mode (default for main and subagents): stream
+        # output into a bounded tail buffer and wait with a hard timeout. On
+        # timeout the process is terminated (never converted to a background
+        # task), so long-running commands report a truthful error instead of
+        # silently continuing after the agent already returns.
+        if not run_in_bg:
             output_chunks = deque()
             output_size = 0
             output_truncated = False

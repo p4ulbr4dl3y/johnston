@@ -160,6 +160,47 @@ async def test_bot_message_streamed_and_finalized():
 
 
 @pytest.mark.asyncio
+async def test_bot_message_preserved_when_tool_call_emitted():
+    class Bot:
+        def __init__(self):
+            self.content = ""
+            self._stream_parts = []
+            self.removed = False
+            self.finalized = False
+
+        def append_stream_content(self, c):
+            self._stream_parts.append(c)
+
+        def _join_stream_content(self):
+            return "".join(self._stream_parts)
+
+        def flush_pending_stream(self):
+            self.content = self._join_stream_content()
+
+        async def finalize_stream(self):
+            self.finalized = True
+
+        def remove(self):
+            self.removed = True
+
+    bot = Bot()
+    canvas = _canvas(add_bot_message=AsyncMock(return_value=bot))
+
+    async def stream(prompt, attachments=None):
+        yield ("bot_delta", "I will run a command:", "")
+        yield ("tool", "shell", "echo hi", {"command": "echo hi"})
+        yield ("tool_result", "hi\n", "")
+        yield ("bot_delta", " Done.", "")
+        yield ("bot_text", "final text", "")
+
+    await generate_ai_response(
+        _FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi"
+    )
+    assert not bot.removed, "Bot message before tool call must NOT be removed"
+    assert bot.finalized, "Bot message before tool call must be finalized"
+
+
+@pytest.mark.asyncio
 async def test_event_divider_refreshes_footer():
     canvas = _canvas()
 
