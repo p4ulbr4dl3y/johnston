@@ -72,10 +72,23 @@ WelcomeWidget {
 .user-msg-bubble {
     width: auto;
     max-width: 85%;
+    height: auto;
     padding: 1 2;
     background: #18181b;
     color: #ffffff;
     text-align: left;
+}
+
+.user-msg-text {
+    width: auto;
+    height: auto;
+    color: #ffffff;
+}
+
+.user-msg-att {
+    width: auto;
+    height: auto;
+    color: #71717a;
 }
 
 #modal-dialog .user-msg-bubble {

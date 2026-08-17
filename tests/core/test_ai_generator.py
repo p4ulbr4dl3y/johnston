@@ -231,3 +231,24 @@ async def test_retry_notifies_canvas_with_warning():
     assert "retrying in 5s (attempt 1/3)" in msg
     assert kw.get("severity") == "warning"
 
+
+@pytest.mark.asyncio
+async def test_user_message_recorded_with_attachments():
+    async def stream(prompt, attachments=None):
+        yield ("bot_text", "ok", "")
+
+    session = _fake_session()
+    canvas = _canvas()
+    await generate_ai_response(
+        _FakeAgent(stream),
+        session,
+        canvas,
+        session_id="s1",
+        user_text="hi",
+        show_in_ui=True,
+        attachments=["a.png", "b.png"],
+    )
+    canvas.add_user_message.assert_awaited_once_with("hi", ["a.png", "b.png"])
+    assert {"type": "user", "text": "hi", "show_in_ui": True, "attachments_count": 2} in session.events
+
+

@@ -861,6 +861,16 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertIn("2 images attached", msg.raw_text)
             self.assertIsInstance(msg, UserMessage)
 
+    async def test_add_user_message_with_attachments_count(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            msg = await chat_view.add_user_message("hello", attachments_count=1)
+            await pilot.pause()
+            self.assertIn("1 image attached", msg.raw_text)
+            self.assertIsInstance(msg, UserMessage)
+
+
     async def test_add_user_message_when_unattached_waits(self):
         chat_view = ChatView()
         with (

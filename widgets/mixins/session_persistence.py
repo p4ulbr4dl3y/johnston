@@ -41,7 +41,14 @@ class SessionPersistenceMixin:
                             if not is_ui_visible_user_message(msg):
                                 continue
                             text = msg.get("text", "")
-                            await chat_view.add_user_message(text, animate=False)
+                            att_count = msg.get("attachments_count", 0)
+                            if not att_count and msg.get("attachments"):
+                                att_count = len(msg.get("attachments"))
+                            await chat_view.add_user_message(
+                                text,
+                                animate=False,
+                                attachments_count=att_count,
+                            )
                         elif mtype == "bot":
                             text = msg.get("text", "")
                             if not text.strip():

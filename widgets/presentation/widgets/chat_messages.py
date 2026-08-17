@@ -1,6 +1,7 @@
 import asyncio
 
 from rich.rule import Rule
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
@@ -28,14 +29,49 @@ class EventDivider(Static):
         self.update(Rule(title, style="dim #71717a"))
 
 
+class UserMessageAttachment(Static):
+    """Attachment footnote for UserMessage, unselectable so prompt copy stays clean"""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+
 class UserMessage(Horizontal):
     """User message"""
 
     can_focus = False
 
-    def __init__(self, content: str, markup: bool = False):
-        self.raw_text = content
-        super().__init__(Static(content, markup=markup, classes="user-msg-bubble"), classes="user-msg")
+    def __init__(
+        self,
+        content: str | Text = "",
+        attachment_text: str = "",
+        markup: bool = False,
+    ):
+        if isinstance(content, Text):
+            user_str = content.plain
+            renderable_content = content
+        else:
+            user_str = str(content or "")
+            renderable_content = user_str
+
+        att_str = str(attachment_text or "")
+        if att_str and user_str:
+            self.raw_text = f"{user_str}\n{att_str}"
+        elif att_str:
+            self.raw_text = att_str
+        else:
+            self.raw_text = user_str
+
+        if att_str:
+            bubble = Vertical(
+                Static(renderable_content, markup=markup, classes="user-msg-text"),
+                UserMessageAttachment(att_str, markup=False, classes="user-msg-att"),
+                classes="user-msg-bubble",
+            )
+        else:
+            bubble = Static(renderable_content, markup=markup, classes="user-msg-bubble")
+
+        super().__init__(bubble, classes="user-msg")
 
 
 class BotMessage(Vertical):

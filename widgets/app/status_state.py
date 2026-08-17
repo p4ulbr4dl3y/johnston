@@ -176,6 +176,16 @@ def build_status_kwargs(app, widget=None) -> dict:
 
     agent_role = getattr(agent, "role", "worker")
 
+    attachments_count = 0
+    try:
+        if app:
+            from widgets.presentation.screens.constants import MESSAGE_INPUT
+
+            chat_input = app.query_one(MESSAGE_INPUT)
+            attachments_count = len(getattr(chat_input, "clipboard_attachments", []))
+    except Exception:
+        attachments_count = 0
+
     return {
         "provider_key": pkey,
         "provider_display": provider_display,
@@ -197,6 +207,7 @@ def build_status_kwargs(app, widget=None) -> dict:
         "skills_total": skills_total,
         "mcp_active": mcp_active,
         "mcp_total": mcp_total,
+        "attachments_count": attachments_count,
     }
 
 

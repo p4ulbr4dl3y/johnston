@@ -184,7 +184,14 @@ class SubagentViewScreen(Screen[None]):
         if etype == "user":
             if not is_ui_visible_user_message(evt):
                 return
-            await chat_view.add_user_message(evt.get("text", ""), animate=animate)
+            att_count = evt.get("attachments_count", 0)
+            if not att_count and evt.get("attachments"):
+                att_count = len(evt.get("attachments"))
+            await chat_view.add_user_message(
+                evt.get("text", ""),
+                animate=animate,
+                attachments_count=att_count,
+            )
         elif etype == "thinking":
             txt = evt.get("text", "")
             if self.thinking_widget is None:

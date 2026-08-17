@@ -7,8 +7,7 @@ from core.domain.defaults.config import THEME_PRIMARY, THEME_SECONDARY, THEME_SU
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
-
-SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 
 
 def format_display_path(raw_path: str, max_length: int = 40) -> str:
@@ -121,7 +120,7 @@ def _build_subagent_grid(
     return grid, rows
 
 
-class StatusFooter(GitMetricsMixin, Static):
+class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     """Two-line status footer below chat"""
 
     can_focus = False
@@ -165,43 +164,6 @@ class StatusFooter(GitMetricsMixin, Static):
             self._render_stream_frame()
         else:
             self.refresh_footer()
-
-    def _render_stream_frame(self) -> None:
-        """Redraw only the animated frame from cached status rows (no git/rebuild)."""
-        if not self.is_generating:
-            return
-        rows = getattr(self, "_last_grid_rows", None)
-        if rows is None:
-            return
-        try:
-            frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
-            grid = Table.grid(expand=True)
-            if rows and len(rows[0]) == 1:
-                grid.add_column(justify="left")
-                for i, row in enumerate(rows):
-                    cell = row[0]
-                    if i == 0:
-                        cell = self._swap_frame(cell, frame)
-                    grid.add_row(cell)
-            else:
-                grid.add_column(justify="left")
-                grid.add_column(justify="right")
-                for i, (left, right) in enumerate(rows):
-                    if i == 0:
-                        left = self._swap_frame(left, frame)
-                    grid.add_row(left, right)
-            self.update(grid)
-        except Exception:
-            pass
-
-    @staticmethod
-    def _swap_frame(left: str, frame: str) -> str:
-        """Replace the old spinner char in the cached left cell with the new frame."""
-        try:
-            idx = left.index("]") + 1
-            return left[:idx] + frame + left[idx + 1 :]
-        except Exception:
-            return left
 
     def on_mount(self) -> None:
         if not self.is_subagent:
@@ -381,6 +343,7 @@ class StatusFooter(GitMetricsMixin, Static):
         skills_total: int = 0,
         mcp_active: int = 0,
         mcp_total: int = 0,
+        attachments_count: int = 0,
     ) -> None:
         if not directory:
             directory = os.getcwd()
@@ -389,7 +352,11 @@ class StatusFooter(GitMetricsMixin, Static):
         if provider_display is None:
             provider_display = provider_key.capitalize() if provider_key else ""
         if is_connected is None:
-            pm = getattr(self.app, "pm", None)
+            pm = None
+            try:
+                pm = getattr(self.app, "pm", None)
+            except Exception:
+                pass
             is_connected = pm.is_provider_connected(provider_key) if (pm and provider_key) else bool(provider_key)
         if clean_model is None:
             clean_model = catalog.get_model_display_name(provider_key, model_name)
@@ -419,10 +386,17 @@ class StatusFooter(GitMetricsMixin, Static):
             )
             return
 
+        app_width = 80
+        try:
+            if self.app and self.app.size:
+                app_width = self.app.size.width
+        except Exception:
+            pass
+
         width = (
             self.size.width
             if (self.size and self.size.width > 0)
-            else (self.app.size.width if (self.app and self.app.size) else 80)
+            else app_width
         )
         is_compact = width > 0 and width < 75
 
@@ -432,6 +406,9 @@ class StatusFooter(GitMetricsMixin, Static):
             row1_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
+            if attachments_count > 0:
+                img_s = "s" if attachments_count > 1 else ""
+                row1_parts.append(f"[{THEME_SECONDARY}]{attachments_count} image{img_s} attached[/]")
             row1_parts.append(self._mcp_footer_text(mcp_active, mcp_total))
             row1 = " • ".join(row1_parts)
 
@@ -476,10 +453,13 @@ class StatusFooter(GitMetricsMixin, Static):
         else:
             branch = self._git_branch(cwd=directory)
 
-            # Line 1: [role • provider › model]  [skills • mcp]
+            # Line 1: [role • provider › model • N image(s) attached]  [skills • mcp]
             row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{provider_display} › {clean_model}[/]")
+            if attachments_count > 0:
+                img_s = "s" if attachments_count > 1 else ""
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{attachments_count} image{img_s} attached[/]")
             row1_left = "  •  ".join(row1_left_parts)
             row1_right_parts = [
                 f"Skills: [{THEME_SECONDARY}]{skills_visible}/{skills_total}[/]"
@@ -531,7 +511,7 @@ class StatusFooter(GitMetricsMixin, Static):
             if active_bg_tasks > 0:
                 task_parts.append(f"{active_bg_tasks} shell")
             if task_parts:
-                row3_right_parts.extend(f"[{THEME_SECONDARY}]{p}[/]" for p in task_parts)
+                row3_right_parts.append(f"Background: [{THEME_SECONDARY}]{'  •  '.join(task_parts)}[/]")
             row3_right = "  •  ".join(row3_right_parts)
 
             grid = Table.grid(expand=True)
@@ -569,7 +549,7 @@ class StatusFooter(GitMetricsMixin, Static):
         self.refresh_footer()
 
 
-class SubagentStatusFooter(GitMetricsMixin, Static):
+class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     """Dedicated status footer for subagent screen, isolated from main app footer."""
 
     can_focus = False
@@ -624,35 +604,6 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             self._render_stream_frame()
         else:
             self._render_footer()
-
-    def _render_stream_frame(self) -> None:
-        """Redraw only the animated frame from cached status rows (no git/rebuild)."""
-        if not self.is_generating:
-            return
-        rows = getattr(self, "_last_grid_rows", None)
-        if rows is None:
-            return
-        try:
-            frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
-            grid = Table.grid(expand=True)
-            grid.add_column(justify="left")
-            grid.add_column(justify="right")
-            for i, (left, right) in enumerate(rows):
-                if i == 0:
-                    left = self._swap_frame(left, frame)
-                grid.add_row(left, right)
-            self.update(grid)
-        except Exception:
-            pass
-
-    @staticmethod
-    def _swap_frame(left: str, frame: str) -> str:
-        """Replace the old spinner char in the cached left cell with the new frame."""
-        try:
-            idx = left.index("]") + 1
-            return left[:idx] + frame + left[idx + 1 :]
-        except Exception:
-            return left
 
     def _render_footer(self) -> None:
         grid = Table.grid(expand=True)

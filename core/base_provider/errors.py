@@ -263,8 +263,19 @@ class ErrorHandlingMixin:
             content = msg.get("content")
 
             if role == "user" and isinstance(content, list):
-                has_image_url = any(isinstance(item, dict) and item.get("type") == "image_url" for item in content)
-                if has_image_url:
+                has_image = any(
+                    isinstance(item, dict) and item.get("type") in ("image_url", "image") for item in content
+                )
+                if has_image:
+                    text_parts = [
+                        item.get("text", "")
+                        for item in content
+                        if isinstance(item, dict) and item.get("type") == "text" and item.get("text")
+                    ]
+                    clean_text = "\n".join(text_parts).strip()
+                    note = "[Note: User attached image(s), but this model does not support vision.]"
+                    combined_text = f"{clean_text}\n{note}".strip() if clean_text else note
+                    sanitized.append({"role": "user", "content": combined_text})
                     continue
 
             if role == "tool":

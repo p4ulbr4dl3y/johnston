@@ -655,9 +655,11 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         self.assertEqual(attempts, 2)
-        # Verify retry notice was yielded to UI
-        retry_notices = [e for e in events if e[0] == "thinking" and "[Retry 1/3]" in e[1]]
-        self.assertEqual(len(retry_notices), 1)
+        # Verify retry notice was yielded
+        retry_events = [e for e in events if e[0] == "retry"]
+        self.assertEqual(len(retry_events), 1)
+        self.assertEqual(retry_events[0][1], 1)
+        self.assertEqual(retry_events[0][2], 3)
         # Verify bot_text event
         bot_texts = [e for e in events if e[0] == "bot_text"]
         self.assertTrue(any("hello after retry" in e[1] for e in bot_texts))
@@ -843,8 +845,12 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         ]
 
         sanitized = agent._sanitize_vision_error_messages(messages)
-        # Verify user image_url message was removed
-        self.assertEqual(len(sanitized), 3)
+        # Verify user message is preserved with text and note
+        self.assertEqual(len(sanitized), 4)
+        user_msg = sanitized[3]
+        self.assertEqual(user_msg["role"], "user")
+        self.assertIn("Preview:", user_msg["content"])
+        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", user_msg["content"])
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")
@@ -1363,8 +1369,8 @@ class TestBaseAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         self.assertIn(("bot_reset", "", ""), events)
-        retry_notices = [e for e in events if e[0] == "thinking" and "[Retry 1/2]" in e[1]]
-        self.assertEqual(len(retry_notices), 1)
+        retry_events = [e for e in events if e[0] == "retry"]
+        self.assertEqual(len(retry_events), 1)
         self.assertEqual(events[-1], ("bot_text", "done", ""))
 
     async def test_thinking_end_at_stream_end(self):

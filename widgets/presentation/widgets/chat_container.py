@@ -63,15 +63,21 @@ class ChatView(VerticalScroll):
             self.call_after_refresh(self.scroll_end, animate=animate)
         return widget
 
-    async def add_user_message(self, text: str, animate: bool = True, attachments: list = None) -> UserMessage:
-        if attachments:
-            att_count = len(attachments)
+    async def add_user_message(
+        self,
+        text: str,
+        animate: bool = True,
+        attachments: list = None,
+        attachments_count: int = 0,
+    ) -> UserMessage:
+        att_count = attachments_count or (len(attachments) if attachments else 0)
+        if att_count > 0:
             img_s = "s" if att_count > 1 else ""
-            display_text = f"{text}\n└─ {att_count} image{img_s} attached"
+            att_text = f"└─ {att_count} image{img_s} attached"
+            msg = UserMessage(text or "", attachment_text=att_text, markup=False)
         else:
-            display_text = text
+            msg = UserMessage(text or "", markup=False)
 
-        msg = UserMessage(display_text or "", markup=False)
         return await self._mount_and_scroll(msg, should_scroll=not self._is_loading_session, animate=animate)
 
     async def add_bot_message(self, animate: bool = True) -> BotMessage:

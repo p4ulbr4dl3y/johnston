@@ -160,11 +160,12 @@ async def generate_ai_response(
     transcript_acc = [""]
 
     # Prepare the turn: record the user message, render it, snapshot a checkpoint.
+    user_event = {"type": "user", "text": user_text, "show_in_ui": show_in_ui}
+    if attachments:
+        user_event["attachments_count"] = len(attachments)
+    session.add_event(user_event)
     if show_in_ui:
         await canvas.add_user_message(user_text, attachments)
-        session.add_event({"type": "user", "text": user_text, "show_in_ui": True})
-    else:
-        session.add_event({"type": "user", "text": user_text, "show_in_ui": False})
 
     await _create_git_checkpoint_async(canvas, session_id, project_path)
 
@@ -190,7 +191,10 @@ async def generate_ai_response(
                 q_msg = val1
                 q_atts = val2 if val2 else None
                 q_show = val3 if val3 is not None else True
-                session.add_event({"type": "user", "text": q_msg, "show_in_ui": q_show})
+                q_event = {"type": "user", "text": q_msg, "show_in_ui": q_show}
+                if q_atts:
+                    q_event["attachments_count"] = len(q_atts)
+                session.add_event(q_event)
                 transcript_acc[0] = ""
                 if q_show:
                     await canvas.add_user_message(q_msg, q_atts)

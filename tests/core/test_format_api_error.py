@@ -246,9 +246,28 @@ class TestErrorHandlingMixin(unittest.TestCase):
         messages = ["plain string", 42, None]
         self.assertEqual(self.mixin._sanitize_vision_error_messages(messages), messages)
 
-    def test_sanitize_user_image_url_skipped(self):
+    def test_sanitize_user_image_url_replaced_with_note(self):
         messages = [{"role": "user", "content": [{"type": "image_url", "url": "..."}]}]
-        self.assertEqual(self.mixin._sanitize_vision_error_messages(messages), [])
+        res = self.mixin._sanitize_vision_error_messages(messages)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["role"], "user")
+        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", res[0]["content"])
+
+    def test_sanitize_user_text_and_image_preserves_text(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {"type": "image_url", "image_url": {"url": "..."}},
+                ],
+            }
+        ]
+        res = self.mixin._sanitize_vision_error_messages(messages)
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["role"], "user")
+        self.assertIn("What is in this image?", res[0]["content"])
+        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", res[0]["content"])
 
     def test_sanitize_user_without_image_kept(self):
         messages = [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]

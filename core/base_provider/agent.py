@@ -613,11 +613,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 # retried attempt starts from a blank reply (no duplication).
                                 yield ("bot_reset", "", "")
                             yield ("retry", attempt, max_retries, actual_delay, api_err)
-                            yield (
-                                "thinking",
-                                f"[Retry {attempt}/{max_retries}] Provider '{pkey}' error ({api_err}). Retrying in {actual_delay:.1f}s...",
-                                "",
-                            )
                             await asyncio.sleep(actual_delay)
                             continue
 

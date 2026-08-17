@@ -93,6 +93,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(args["subagents_active"], 1)
             self.assertEqual(args["subagents_total"], 2)
             self.assertEqual(args["thinking_effort"], "high")
+            self.assertEqual(args["attachments_count"], 0)
             self.assertIn("skills_visible", args)
             self.assertIn("skills_total", args)
 
@@ -400,5 +401,57 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 timeout=2,
                 cwd="/custom/path",
             )
+
+    async def test_update_status_background_label(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            footer.update_status(
+                provider_key="openai",
+                model_name="gpt-4o",
+                subagents_active=1,
+                active_bg_tasks=2,
+            )
+            rows = footer._last_grid_rows
+            row3_right = rows[2][1]
+            self.assertIn("Background:", row3_right)
+            self.assertIn("1 agent", row3_right)
+            self.assertIn("2 shell", row3_right)
+
+    async def test_update_status_background_label_empty(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            footer.update_status(provider_key="openai", model_name="gpt-4o")
+            rows = footer._last_grid_rows
+            self.assertEqual(rows[2][1], "")
+
+    async def test_update_status_attachments_indicator(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            # 1 image attached
+            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=1)
+            row1_left = footer._last_grid_rows[0][0]
+            self.assertIn("1 image attached", row1_left)
+
+            # 2 images attached
+            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=2)
+            row1_left = footer._last_grid_rows[0][0]
+            self.assertIn("2 images attached", row1_left)
+
+            # 0 attachments
+            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=0)
+            row1_left = footer._last_grid_rows[0][0]
+            self.assertNotIn("attached", row1_left)
+
+    async def test_update_status_compact_attachments_indicator(self):
+        app = FooterTestApp()
+        async with app.run_test(size=(60, 24)):
+            footer = app.query_one(StatusFooter)
+            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=1)
+            row1 = footer._last_grid_rows[0][0]
+            self.assertIn("1 image attached", row1)
+
 
 
