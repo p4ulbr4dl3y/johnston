@@ -991,12 +991,12 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRuntimeToolPolicy(unittest.IsolatedAsyncioTestCase):
-    async def test_read_only_blocks_write_aliases(self):
+    async def test_disallowed_blocks_write_aliases(self):
         from core.role_registry import AgentRole
 
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="s", tools=[])
         self.addAsyncCleanup(agent.close)
-        role_def = AgentRole("explorer", "Explorer", read_only=True, disallowed_tools=["write_file", "create", "edit"])
+        role_def = AgentRole("explorer", "Explorer", disallowed_tools=["write_file", "create", "edit"])
         err = agent._tool_policy_error("write_file", role_def)
         self.assertIsNotNone(err)
         self.assertTrue(err.is_error)

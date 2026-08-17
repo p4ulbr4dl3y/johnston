@@ -28,7 +28,7 @@ class TestSubagentRoles(unittest.TestCase):
                 f.write("""---
 name: reviewer
 description: Code reviewer subagent
-tools: read, grep, glob
+allowed_tools: read, grep, glob
 model: deepseek-v4-flash
 provider: clinepass
 ---
@@ -40,7 +40,7 @@ You are a senior code reviewer subagent. Analyze diffs carefully.""")
                 f.write("""---
 name: tester
 description: Automated testing subagent
-tools: shell
+allowed_tools: shell
 model: gpt-4o
 ---
 You run tests and report coverage.""")

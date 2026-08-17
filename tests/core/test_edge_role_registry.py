@@ -60,7 +60,6 @@ class TestAgentRoleConstruction:
         assert r.scope == "any"
         assert r.allowed_tools == []
         assert r.disallowed_tools == []
-        assert not r.read_only
 
     def test_key_normalized_lower_strip(self):
         r = AgentRole(key="  MiXeD  ")
@@ -149,11 +148,11 @@ class TestIsToolAllowed:
         # WARNING: allowed_tools=[] allows everything (falsy). This means an
         # author who writes `tools:` with an empty value silently gets full
         # tool access - a security footgun.
-        r_empty = AgentRole(key="x", allowed_tools=[], read_only=False)
+        r_empty = AgentRole(key="x", allowed_tools=[])
         assert r_empty.is_tool_allowed("shell") is None  # shell allowed!
 
-    def test_read_only_blocks_all_write_tools(self):
-        r = AgentRole(key="x", read_only=True)
+    def test_disallowed_blocks_specified_tools(self):
+        r = AgentRole(key="x", disallowed_tools=["create", "edit", "multi_edit"])
         for w in ("create", "edit", "multi_edit"):
             assert r.is_tool_allowed(w) is not None
         assert r.is_tool_allowed("read") is None
@@ -166,17 +165,11 @@ class TestRoleToolError:
     def test_none_def(self):
         assert role_tool_error(None, "read") is None
 
-    def test_plain_object_no_read_only(self):
+    def test_plain_object_disallowed(self):
         class Fake:
             disallowed_tools = ["create"]
         assert role_tool_error(Fake(), "create") is not None
         assert role_tool_error(Fake(), "read") is None
-
-    def test_read_only_plain_object(self):
-        class Fake:
-            disallowed_tools = []
-            read_only = True
-        assert role_tool_error(Fake(), "edit") is not None
 
 
 # --------------------------------------------------------------------------- #

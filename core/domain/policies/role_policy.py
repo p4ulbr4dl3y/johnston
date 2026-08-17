@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
-from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS, WRITE_TOOLS
+from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 
@@ -37,7 +37,6 @@ class AgentRole:
         name: str = "",
         description: str = "",
         prompt: str = "",
-        read_only: bool = False,
         disallowed_tools: Optional[List[str]] = None,
         allowed_tools: Optional[List[str]] = None,
         model: str = "",
@@ -50,7 +49,6 @@ class AgentRole:
         self.name = name or self.key.capitalize()
         self.description = description
         self.prompt = prompt or ""
-        self.read_only = read_only
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
         self.model = model
@@ -70,8 +68,7 @@ class AgentRole:
 
 # Single source of truth for role/mode tool-policy checks. Used by
 # role_tool_error, AgentRole.is_tool_allowed, roles/tools, and application.generation.prompt_builder so
-# disallowed, read_only, allowed_tools, and subagent exclusions are honored in
-# one place.
+# disallowed, allowed_tools, and subagent exclusions are honored in one place.
 def _tool_policy_result(
     role_def: Any,
     tool_name: str,
@@ -82,7 +79,7 @@ def _tool_policy_result(
 
     Returns (allowed, reason). reason is None when allowed. Works with both
     AgentRole instances and duck-typed mode objects exposing disallowed_tools,
-    read_only, allowed_tools, and name attributes. When ``is_subagent`` is set,
+    allowed_tools, and name attributes. When ``is_subagent`` is set,
     subagent-excluded tools are always denied. ``tool_name_normalizer`` canonicalizes
     tool names; when None (or on error) the name is used as-is.
     """
@@ -104,9 +101,6 @@ def _tool_policy_result(
     disallowed = [t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
     if clean in disallowed or resolved in disallowed:
         return False, format_tool_error(f"tool '{clean}' disabled in {name} role")
-
-    if getattr(role_def, "read_only", False) and (clean in WRITE_TOOLS or resolved in WRITE_TOOLS):
-        return False, format_tool_error(f"tool '{clean}' disabled in read-only {name} role")
 
     allowed = [t.lower() for t in (getattr(role_def, "allowed_tools", []) or [])]
     if allowed and clean not in allowed and resolved not in allowed:

@@ -189,9 +189,8 @@ def print_roles():
     print("Available Agent Roles & Modes:")
     role_list = list(roles.items())
     for idx, (key, r) in enumerate(role_list):
-        ro_str = " (read-only)" if r.read_only else ""
         scope_str = f" [scope: {r.scope}]" if r.scope != "any" else ""
-        print(f"  * {r.name} ({r.key}){ro_str}{scope_str} [{r.source}]")
+        print(f"  * {r.name} ({r.key}){scope_str} [{r.source}]")
         if r.description:
             print(f"    Description: {r.description}")
         if r.disallowed_tools:

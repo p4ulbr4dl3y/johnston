@@ -10,7 +10,7 @@
 name: reviewer
 description: Code reviewer subagent
 scope: subagent
-tools: read, grep, glob
+allowed_tools: read, grep, glob
 model: deepseek-v4-flash
 provider: clinepass
 ---
@@ -27,9 +27,8 @@ System prompt instructions for the role...
 - `name`: Role identifier (defaults to filename).
 - `description`: Summary of purpose.
 - `scope`: `any`, `subagent`, or `main`.
-- `tools` / `allowed_tools`: Comma-separated whitelist of permitted tool names.
+- `allowed_tools`: Comma-separated whitelist of permitted tool names.
 - `disallowed_tools`: Comma-separated list of blocked tool names.
-- `read_only`: Boolean flag blocking state-changing operations.
 - `model`: Specific LLM model override (subagents).
 - `provider`: Specific provider override (subagents). Defaults to parent's active provider.
 

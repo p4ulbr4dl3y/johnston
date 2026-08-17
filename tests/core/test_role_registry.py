@@ -17,8 +17,7 @@ class TestRoleRegistry(unittest.TestCase):
         self.assertIn("explorer", roles)
         self.assertIn("orchestrator", roles)
 
-        self.assertFalse(roles["worker"].read_only)
-        self.assertTrue(roles["explorer"].read_only)
+        self.assertEqual(roles["explorer"].disallowed_tools, ["create", "edit", "multi_edit"])
         self.assertEqual(roles["orchestrator"].name, "Orchestrator")
         self.assertEqual(roles["orchestrator"].scope, "main")
         self.assertEqual(normalize_role_scope("main_only"), "main_only")
@@ -35,8 +34,7 @@ class TestRoleRegistry(unittest.TestCase):
                 f.write("""---
 name: Reviewer
 description: Code reviewer role
-read_only: true
-tools: read, grep, glob
+allowed_tools: read, grep, glob
 model: deepseek-chat
 provider: clinepass
 scope: subagent
@@ -51,8 +49,6 @@ You are a senior code reviewer role.""")
 
             self.assertEqual(rev.name, "Reviewer")
             self.assertEqual(rev.description, "Code reviewer role")
-            self.assertTrue(rev.read_only)
-            self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(rev.model, "deepseek-chat")
             self.assertEqual(rev.provider, "clinepass")
@@ -70,7 +66,7 @@ You are a senior code reviewer role.""")
                 f.write("""---
 name: tester
 description: Automated testing role
-tools: shell
+allowed_tools: shell
 model: gpt-4o
 ---
 You run tests and report coverage.""")
@@ -85,13 +81,13 @@ You run tests and report coverage.""")
             self.assertEqual(tester.allowed_tools, ["shell"])
 
     def test_is_tool_allowed_validation(self):
-        role_ro = AgentRole(key="reviewer", name="Reviewer", read_only=True, allowed_tools=["read", "grep"])
+        role_ro = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["edit"], allowed_tools=["read", "grep"])
 
         # Read tool in allowed list -> ok
         self.assertIsNone(role_ro.is_tool_allowed("read"))
         # Shell not in allowed list -> blocked
         self.assertIsNotNone(role_ro.is_tool_allowed("shell"))
-        # Edit is write tool & read_only -> blocked
+        # Edit in disallowed list -> blocked
         self.assertIsNotNone(role_ro.is_tool_allowed("edit"))
 
         # Test role_tool_error helper
@@ -104,8 +100,7 @@ You run tests and report coverage.""")
         role_ro = AgentRole(
             key="reviewer",
             name="Reviewer",
-            read_only=True,
-            disallowed_tools=["invoke_subagent"],
+            disallowed_tools=["invoke_subagent", "create"],
             tool_name_normalizer=normalize_tool_name,
         )
 
@@ -113,12 +108,10 @@ You run tests and report coverage.""")
         # disallowed list (which holds 'invoke_subagent'), so it is allowed.
         self.assertIsNone(role_ro.is_tool_allowed("subagent"))
         # Without a normalizer the result is the same (identity on lowercase).
-        role_no_norm = AgentRole(key="reviewer", name="Reviewer", read_only=True, disallowed_tools=["invoke_subagent"])
+        role_no_norm = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["invoke_subagent", "create"])
         self.assertIsNone(role_no_norm.is_tool_allowed("subagent"))
         # Canonical 'invoke_subagent' is blocked by the disallowed list.
         self.assertIsNotNone(role_ro.is_tool_allowed("invoke_subagent"))
-        # 'write_file' is not a recognized write tool alias anymore, so read_only
-        # does not block it; canonical 'create' is still blocked.
         self.assertIsNone(role_ro.is_tool_allowed("write_file"))
         self.assertIsNotNone(role_ro.is_tool_allowed("create"))
 
@@ -141,7 +134,6 @@ You run tests and report coverage.""")
                 f.write("""---
 name: Architect
 description: High-level design role
-read_only: true
 disallowed_tools: [create, edit]
 ---
 Architect prompt content""")
@@ -151,20 +143,18 @@ Architect prompt content""")
             self.assertIn("architect", roles)
             arch = roles["architect"]
             self.assertEqual(arch.name, "Architect")
-            self.assertTrue(arch.read_only)
             self.assertEqual(arch.prompt, "Architect prompt content")
             self.assertIn("create", arch.disallowed_tools)
 
-    def test_role_tool_error_read_only_enforced(self):
+    def test_role_tool_error_disallowed_enforced(self):
         reg = RoleRegistry.get_instance()
         explorer = reg.get_role("explorer")
 
-        # disallowed_tools still enforced
+        # disallowed_tools enforced
         self.assertIsNotNone(role_tool_error(explorer, "create"))
-        # read_only blocks write tools even without explicit disallow
         self.assertIsNotNone(role_tool_error(explorer, "edit"))
         self.assertIsNotNone(role_tool_error(explorer, "multi_edit"))
-        # read tools allowed in read-only mode
+        # read tools allowed
         self.assertIsNone(role_tool_error(explorer, "read"))
         self.assertIsNone(role_tool_error(explorer, "shell"))
         # worker mode allows everything
@@ -172,27 +162,18 @@ Architect prompt content""")
         self.assertIsNone(role_tool_error(worker, "create"))
 
     def test_role_tool_error_allowed_tools_enforced(self):
-        # Regression: role_tool_error must honor allowed_tools (previous buggy
-        # free function ignored the allow-list and let restricted tools through).
         restricted = AgentRole(key="limited", name="Limited", allowed_tools=["read", "grep"])
         self.assertIsNone(role_tool_error(restricted, "read"))
         self.assertIsNotNone(role_tool_error(restricted, "shell"))
         self.assertIsNotNone(role_tool_error(restricted, "edit"))
 
-        # Parrot an AgentRole through the non-AgentRole duck-typed mode branch too.
         mode = type("Mode", (), {
             "name": "Limited",
             "allowed_tools": ["read", "grep"],
             "disallowed_tools": [],
-            "read_only": False,
         })()
         self.assertIsNone(role_tool_error(mode, "read"))
         self.assertIsNotNone(role_tool_error(mode, "shell"))
-
-    def test_role_tool_error_custom_read_only_without_disallowed(self):
-        ro_mode = AgentRole(key="ro", name="RO", read_only=True)
-        self.assertIsNotNone(role_tool_error(ro_mode, "create"))
-        self.assertIsNone(role_tool_error(ro_mode, "read"))
 
 
 if __name__ == "__main__":

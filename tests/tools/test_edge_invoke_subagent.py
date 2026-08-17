@@ -30,7 +30,6 @@ class _FakeRole:
         provider="",
         model="",
         system_prompt="test prompt",
-        read_only=False,
         disallowed_tools=None,
         allowed_tools=None,
     ):
@@ -39,7 +38,6 @@ class _FakeRole:
         self.provider = provider
         self.model = model
         self.system_prompt = system_prompt
-        self.read_only = read_only
         self.disallowed_tools = disallowed_tools or []
         self.allowed_tools = allowed_tools or []
 

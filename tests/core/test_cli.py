@@ -326,7 +326,6 @@ class TestCLIAdvanced(unittest.TestCase):
         with patch("core.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
             role = MagicMock(
-                read_only=False,
                 source="builtin",
                 disallowed_tools=["rm"],
                 description="Worker mode",

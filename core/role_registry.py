@@ -15,7 +15,6 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         key="worker",
         name="Worker",
         description="Execution mode: full write, edit, shell, and task tool access.",
-        read_only=False,
         prompt=(
             "## Execution Mode: WORKER\n\n"
             "Execution and implementation mode. Write, edit, shell, and task tools are fully enabled.\n\n"
@@ -34,7 +33,6 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         key="explorer",
         name="Explorer",
         description="Read-only Q&A, codebase research, and planning role.",
-        read_only=True,
         prompt=(
             "## Execution Mode: EXPLORER\n\n"
             "Read-only mode for codebase research, architecture review, debugging diagnosis, and implementation planning. You cannot modify code.\n\n"
@@ -60,7 +58,6 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         key="orchestrator",
         name="Orchestrator",
         description="Orchestrator role (primary agent only): plan and delegate bounded subtasks",
-        read_only=False,
         prompt=(
             "## Execution Mode: ORCHESTRATOR\n\n"
             "You plan, decompose complex goals into bounded subtasks, and coordinate autonomous subagents.\n\n"
@@ -195,20 +192,18 @@ class RoleRegistry:
             key = meta.get("key") or meta.get("name") or meta.get("subagent_type") or base_key
             name = meta.get("name") or key.capitalize()
             desc = meta.get("description", "")
-            read_only_val = str(meta.get("read_only", "false")).lower() in ("true", "1", "yes")
             model = meta.get("model", "")
             provider = meta.get("provider", "")
             scope = meta.get("scope", "any")
 
             disallowed_tools = parse_csv_list(meta.get("disallowed_tools"))
-            allowed_tools = parse_csv_list(meta.get("tools")) or parse_csv_list(meta.get("allowed_tools"))
+            allowed_tools = parse_csv_list(meta.get("allowed_tools"))
 
             return AgentRole(
                 key=key,
                 name=name,
                 description=desc,
                 prompt=prompt,
-                read_only=read_only_val,
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
                 model=model,

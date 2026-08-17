@@ -519,7 +519,6 @@ class FakeRole:
         model="",
         provider="",
         scope="any",
-        read_only=False,
         disallowed_tools=None,
         allowed_tools=None,
     ):
@@ -529,7 +528,6 @@ class FakeRole:
         self.model = model
         self.provider = provider
         self.scope = scope
-        self.read_only = read_only
         self.disallowed_tools = disallowed_tools or []
         self.allowed_tools = allowed_tools or []
 
