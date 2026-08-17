@@ -6,7 +6,6 @@ from core.domain.defaults.errors import ToolResult, format_tool_error
 from core.infrastructure.runtime.git_utils import make_git_diff
 from tools.base import (
     BaseTool,
-    read_file_text,
     resolve_path,
     try_int,
     write_file_text,
@@ -288,7 +287,11 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
         if os.path.isdir(path):
             return ToolResult.error("file", name=path, detail="is a directory")
 
-        content = read_file_text(path)
+        # Read with newline="" to keep \r\n line endings intact: the default
+        # universal-newline mode would collapse CRLF -> LF and silently rewrite
+        # the whole file in LF on write-back (regression: CRLF file edits).
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            content = f.read()
         new_content, diff = apply_chunk_replacements(content, raw_chunks, path)
         write_file_text(path, new_content)
         return ToolResult.done(diff)
