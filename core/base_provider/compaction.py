@@ -27,7 +27,14 @@ class CompactionMixin:
         return get_context_window(self.provider_key, self.model)
 
     def truncate_history_to_user_message(self, user_msg_index: int) -> None:
-        """Truncates conversation history to immediately before the specified user message index (0-indexed)."""
+        """Truncates conversation history to immediately before the specified user message index (0-indexed).
+
+        The index counts UI-visible user turns only: compaction checkpoints
+        (``<conversation-checkpoint>``) and interruption notes
+        (``[System Note: ...]``) are not user turns and never counted. When the
+        requested turn is not found in history (it lives in a compacted region),
+        history is fully cleared so the model cannot remember rolled-back turns.
+        """
         if user_msg_index <= 0 or not self.history:
             self.clear_history()
             return
@@ -35,17 +42,36 @@ class CompactionMixin:
         user_count = 0
         cutoff_idx = len(self.history)
         for idx, msg in enumerate(self.history):
-            if msg.get("role") == "user":
-                content = msg.get("content", "")
-                if isinstance(content, str) and "<conversation-checkpoint>" in content:
-                    continue
-                if user_count == user_msg_index:
-                    cutoff_idx = idx
-                    break
-                user_count += 1
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, str) and (
+                "<conversation-checkpoint>" in content or content.startswith("[System Note:")
+            ):
+                continue
+            if user_count == user_msg_index:
+                cutoff_idx = idx
+                break
+            user_count += 1
 
         if user_count >= user_msg_index:
-            self.history = self.history[:cutoff_idx]
+            kept = self.history[:cutoff_idx]
+            # Interruption notes are not user turns; drop any that fell inside
+            # the kept tail so the model does not see stale "[System Note...]".
+            self.history = [
+                m
+                for m in kept
+                if not (
+                    m.get("role") == "user"
+                    and isinstance(m.get("content", ""), str)
+                    and m["content"].startswith("[System Note:")
+                )
+            ]
+        else:
+            # The selected user message predates the compaction checkpoint (or
+            # history is shorter than the UI): roll back to a clean slate to
+            # avoid stale memory of turns that were removed from the UI.
+            self.clear_history()
 
         sys_tok = getattr(self, "_last_sys_tokens", 0)
         hist_tok = estimate_tokens(self.history) if self.history else 0

@@ -220,7 +220,7 @@ async def get_rewind_git_stats(
                 ),
                 timeout=2.0,
             )
-        except (asyncio.TimeoutError, Exception):
+        except Exception:
             stats_map = {}
         for seq_idx, (child_idx, text) in enumerate(user_msgs):
             stat = stats_map.get(seq_idx) or ""
@@ -235,6 +235,72 @@ async def get_rewind_git_stats(
 # rewind_session
 # ---------------------------------------------------------------------------
 
+def _reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
+    """Reset cumulative token/cost metrics after a rollback.
+
+    ``reset_context=False`` keeps the freshly recomputed
+    ``last_context_tokens`` (callers that truncate history recompute it first).
+    """
+    for attr, value in (
+        ("tokens_input", 0),
+        ("tokens_output", 0),
+        ("tokens_cache_read", 0),
+        ("last_context_tokens", 0),
+        ("total_tokens", 0),
+        ("cost_usd", 0.0),
+    ):
+        if attr == "last_context_tokens" and not reset_context:
+            continue
+        if hasattr(agent, attr):
+            setattr(agent, attr, value)
+
+
+def _truncate_transcript(session: Any, seq_idx: int) -> None:
+    """Drop stored transcript events from the selected UI-visible user turn onward.
+
+    ``seq_idx`` is the UI position of the selected user message (0-indexed over
+    visible user widgets). The transcript may contain non-visible user events
+    (``show_in_ui=False``, system notifications/notes), so the walk skips them
+    to keep the index space aligned with the UI.
+    """
+    if session is None or not getattr(session, "messages", None):
+        return
+    messages = session.messages
+    visible = 0
+    cutoff = len(messages)
+    for idx, msg in enumerate(messages):
+        if not isinstance(msg, dict) or msg.get("type") != "user":
+            continue
+        if msg.get("show_in_ui") is False:
+            continue
+        text = str(msg.get("text", ""))
+        if text.startswith(("[System Notification]", "[System Note:")):
+            continue
+        if visible == seq_idx:
+            cutoff = idx
+            break
+        visible += 1
+    if seq_idx == 0:
+        session.messages = []
+    elif visible >= seq_idx:
+        kept = messages[:cutoff]
+        # Mirror the agent-history policy: drop stale interruption notes that
+        # are not real user turns.
+        session.messages = [
+            m
+            for m in kept
+            if not (
+                isinstance(m, dict)
+                and m.get("type") == "user"
+                and str(m.get("text", "")).startswith("[System Note:")
+            )
+        ]
+
+
+# ---------------------------------------------------------------------------
+# rewind_session
+# ---------------------------------------------------------------------------
+
 def rewind_session(
     agent: Any,
     curr_sid: str | None,
@@ -242,6 +308,7 @@ def rewind_session(
     user_msgs: list[tuple[int, str]],
     selected_child_idx: int,
     *,
+    session: Any = None,
     rollback_ui: Callable[[int], None],
     load_text_into_input: Callable[[str], None],
     save_session_cb: Callable[[], None],
@@ -259,7 +326,8 @@ def rewind_session(
     * Walk user_msgs to find the text and sequence index of the message.
     * Compute target_idx = selected_child_idx - 1 (the position to rollback to).
     * Clear or truncate agent history depending on seq_idx.
-    * Reset token counters when going to zero.
+    * Truncate the store transcript (``session.messages``) at the same turn.
+    * Reset token counters.
     * Restore Git checkpoints in background.
     """
     msg_text = ""
@@ -279,21 +347,41 @@ def rewind_session(
             agent.clear_history()
         elif hasattr(agent, "history"):
             agent.history = []
-        for attr, value in (
-            ("tokens_input", 0),
-            ("tokens_output", 0),
-            ("tokens_cache_read", 0),
-            ("last_context_tokens", 0),
-            ("total_tokens", 0),
-            ("cost_usd", 0.0),
-        ):
-            if hasattr(agent, attr):
-                setattr(agent, attr, value)
+        _reset_token_counters(agent)
     else:
-        if hasattr(agent, "truncate_history_to_user_message"):
-            agent.truncate_history_to_user_message(seq_idx)
-        elif hasattr(agent, "history"):
-            agent.history = []
+        # Map UI sequence index to a history index: the last ``real_tail``
+        # visible user turns map 1:1 to real (non-checkpoint, non-note) user
+        # messages in history, so only the tail can be truncated by index.
+        # A selection inside the compacted region cannot be restored from
+        # history and is rolled back to a clean slate.
+        real_tail = 0
+        for msg in agent.history:
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                if isinstance(content, str) and (
+                    "<conversation-checkpoint>" in content or content.startswith("[System Note:")
+                ):
+                    continue
+                real_tail += 1
+        tail_start = len(user_msgs) - real_tail
+        if seq_idx >= tail_start:
+            truncate_idx = max(0, seq_idx - tail_start)
+            if hasattr(agent, "truncate_history_to_user_message"):
+                agent.truncate_history_to_user_message(truncate_idx)
+            elif hasattr(agent, "history"):
+                agent.history = []
+        else:
+            if hasattr(agent, "clear_history"):
+                agent.clear_history()
+            elif hasattr(agent, "history"):
+                agent.history = []
+        _reset_token_counters(agent, reset_context=False)
+
+    # Store transcript: drop events from the selected turn onward so a later
+    # /resume does not resurrect rolled-back turns.
+    _truncate_transcript(session, seq_idx)
+
+    git_restore_task: Any = None
 
     # Restore Git checkpoints in background
     if curr_sid:
@@ -308,7 +396,14 @@ def rewind_session(
                 )
             except Exception as e:
                 logger.warning("Git checkpoint restore failed: %s", e)
-        asyncio.create_task(_restore_git_bg())
+
+        git_restore_task = asyncio.create_task(_restore_git_bg())
+        # Keep a reference on the agent so app shutdown can cancel/await it.
+        if hasattr(agent, "rewind_git_restore_task"):
+            previous = agent.rewind_git_restore_task
+            if previous and not previous.done():
+                previous.cancel()
+        agent.rewind_git_restore_task = git_restore_task
 
     refresh_footer_cb()
     save_session_cb()

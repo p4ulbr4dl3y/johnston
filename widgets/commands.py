@@ -248,18 +248,45 @@ class RewindCommand(BaseCommand):
         msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path)
         checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
 
-        def on_rewind_selected(selected_idx: int | None) -> None:
+        async def on_rewind_selected(selected_idx: int | None) -> None:
             if selected_idx is not None and selected_idx >= 0:
+                # 1. Stop in-flight generation first and wait for its cleanup
+                #    before touching history/UI, so the engine's interruption
+                #    teardown cannot re-pollute the rolled-back state.
                 try:
-                    if hasattr(app, "workers"):
-                        for w in app.workers:
-                            if getattr(w, "is_running", False):
-                                w.cancel()
+                    for w in [w for w in getattr(app, "workers", []) if w.is_running]:
+                        w.cancel()
+                except Exception:
+                    pass
+                try:
+                    from textual.worker import WorkerCancelled, WorkerFailed
+
+                    for w in [w for w in getattr(app, "workers", []) if not w.is_finished]:
+                        try:
+                            await w.wait()
+                        except (WorkerCancelled, WorkerFailed):
+                            pass
                 except Exception:
                     pass
                 app.is_generating = False
                 if hasattr(app, "message_queue"):
                     app.message_queue.clear()
+
+                # 2. Kill background shell tasks and cancel running subagents so
+                #    their completion callbacks cannot append results after the
+                #    rollback (mirrors NewCommand behaviour).
+                try:
+                    if hasattr(app, "task_manager"):
+                        await app.task_manager.kill_all()
+                except Exception:
+                    pass
+                try:
+                    from core.application.session.stream import cancel_running_subagents
+
+                    if getattr(app, "sm", None) is not None:
+                        cancel_running_subagents(app.sm, curr_sid)
+                except Exception:
+                    pass
 
                 def rollback_ui(target_idx: int) -> None:
                     chat_view.rollback_to(target_idx)
@@ -276,12 +303,16 @@ class RewindCommand(BaseCommand):
                     else:
                         app.save_current_session()
 
+                sm = getattr(app, "sm", None)
+                session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
+
                 rewind_session(
                     app.agent,
                     curr_sid,
                     proj_path,
                     user_msgs,
                     selected_idx,
+                    session=session,
                     rollback_ui=rollback_ui,
                     load_text_into_input=load_text_into_input,
                     save_session_cb=save_cb,
@@ -289,9 +320,13 @@ class RewindCommand(BaseCommand):
                 )
             app.query_one(MESSAGE_INPUT).focus()
 
-        app.push_screen(
+        result = app.push_screen(
             RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected
         )
+        # Test doubles may return a coroutine for the async callback; the real
+        # Textual push_screen is synchronous and returns None.
+        if asyncio.iscoroutine(result):
+            await result
 
 
 class ResumeCommand(BaseCommand):

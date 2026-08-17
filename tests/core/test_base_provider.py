@@ -372,6 +372,45 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         agent.truncate_history_to_user_message(0)
         self.assertEqual(len(agent.history), 0)
 
+    def test_truncate_skips_checkpoint_and_interruption_notes(self):
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
+        agent.history = [
+            {"role": "user", "content": "<conversation-checkpoint>\n<summary>earlier work</summary>\n</conversation-checkpoint>"},
+            {"role": "user", "content": "Tail 0"},
+            {"role": "assistant", "content": "Resp 0"},
+            {"role": "user", "content": "[System Note: Response interrupted by user]"},
+            {"role": "user", "content": "Tail 1"},
+            {"role": "assistant", "content": "Resp 1"},
+        ]
+
+        # History has only two real user turns (checkpoint + interruption note
+        # are not user turns). Truncate to the 2nd real user turn -> keep Tail 0.
+        agent.truncate_history_to_user_message(1)
+        contents = [m["content"] for m in agent.history]
+        self.assertEqual(contents, ["<conversation-checkpoint>\n<summary>earlier work</summary>\n</conversation-checkpoint>", "Tail 0", "Resp 0"])
+
+        # Truncate to the 1st real user turn -> drops the checkpoint too.
+        agent.truncate_history_to_user_message(0)
+        self.assertEqual(agent.history, [])
+
+    def test_truncate_clears_when_user_turn_is_compacted(self):
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
+        agent.history = [
+            {"role": "user", "content": "<conversation-checkpoint>\n<summary>earlier work</summary>\n</conversation-checkpoint>"},
+            {"role": "user", "content": "Tail 0"},
+            {"role": "assistant", "content": "Resp 0"},
+        ]
+
+        # UI shows 3 user turns, but only 1 survived in history: requesting a
+        # rollback to the compacted region must clear history so the model
+        # cannot remember rolled-back turns.
+        agent.truncate_history_to_user_message(2)
+        self.assertEqual(agent.history, [])
+
     async def test_stream_steps_history_updated_on_exception(self):
         agent = BaseAgent(
             api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"

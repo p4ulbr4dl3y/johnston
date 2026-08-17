@@ -141,8 +141,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         # Simulate selecting user message at index 0 in on_rewind_selected
-        def simulate_on_rewind_selected(screen, callback):
-            callback(0)
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(0)
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -182,7 +182,11 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
 
         cmd = RewindCommand()
-        app.push_screen = lambda screen, callback: callback(0)
+
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(0)
+
+        app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
 
         self.assertFalse(app.is_generating)
@@ -221,8 +225,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         cmd = RewindCommand()
 
-        def simulate_on_rewind_selected(screen, callback):
-            callback(2)  # child_idx of Msg 1 (seq_idx = 1)
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(2)  # child_idx of Msg 1 (seq_idx = 1)
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -231,6 +235,230 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(called_truncate, [1])  # seq_idx = 1
         self.assertEqual(len(app.agent.history), 2)
         self.assertEqual(app.agent.history[0]["content"], "Msg 0")
+
+    async def test_rewind_command_truncates_store_transcript(self):
+        from unittest.mock import MagicMock
+
+        from widgets.commands import RewindCommand
+
+        app = MockApp()
+        app.current_session_id = "sess-a"
+        app.sm = MagicMock()
+        app.sm.project_path = None
+        session = MagicMock()
+        session.messages = [
+            {"type": "user", "text": "First", "show_in_ui": True},
+            {"type": "bot", "text": "Resp 0"},
+            {"type": "user", "text": "[System Notification]: bg shell done", "show_in_ui": False},
+            {"type": "user", "text": "Second", "show_in_ui": True},
+            {"type": "bot", "text": "Resp 1"},
+        ]
+        app.sm.get.return_value = session
+        app.agent.history = [
+            {"role": "user", "content": "First"},
+            {"role": "assistant", "content": "Resp 0"},
+            {"role": "user", "content": "Second"},
+            {"role": "assistant", "content": "Resp 1"},
+        ]
+        app.agent.truncate_history_to_user_message = lambda idx: setattr(app.agent, "history", [])
+        app.chat_view.get_user_messages = lambda: [(0, "First"), (3, "Second")]
+        rolled_back_target = []
+        app.chat_view.rollback_to = lambda target_idx: rolled_back_target.append(target_idx)
+
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: setattr(self, "text", txt),
+                "text": "",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(3)  # rewind to "Second" (seq_idx = 1)
+
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        # Transcript keeps events up to (but excluding) the selected turn; the
+        # hidden notification user event predates the selection and survives.
+        self.assertEqual(
+            session.messages,
+            [
+                {"type": "user", "text": "First", "show_in_ui": True},
+                {"type": "bot", "text": "Resp 0"},
+                {"type": "user", "text": "[System Notification]: bg shell done", "show_in_ui": False},
+            ],
+        )
+
+    async def test_rewind_command_kills_tasks_and_cancels_subagents(self):
+        from unittest.mock import MagicMock
+
+        from core.infrastructure.tasks.shell_task import ShellTask
+        from widgets.commands import RewindCommand
+
+        app = MockApp()
+        app.current_session_id = "sess-a"
+        app.sm = MagicMock()
+        app.sm.project_path = None
+
+        # Background shell task survives rewind unless killed.
+        bg_task = ShellTask("t-bg", "sleep 100", None)
+        bg_task.is_background = True
+        app.task_manager.register(bg_task)
+
+        # Running subagent session that must be cancelled.
+        subagent = MagicMock()
+        subagent.status = "running"
+        subagent.async_task = MagicMock()
+        subagent.async_task.done.return_value = False
+        app.sm.children.return_value = [subagent]
+        app.sm.save = MagicMock()
+
+        session = MagicMock()
+        session.messages = [{"type": "user", "text": "First", "show_in_ui": True}]
+        app.sm.get.return_value = session
+        app.agent.history = [{"role": "user", "content": "First"}]
+        app.agent.truncate_history_to_user_message = lambda idx: None
+        app.chat_view.get_user_messages = lambda: [(0, "First")]
+        app.chat_view.rollback_to = lambda idx: None
+
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: None,
+                "text": "",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(0)
+
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        self.assertFalse(bg_task.is_running)
+        subagent.async_task.cancel.assert_called_once()
+        subagent.finish.assert_called_once()
+
+    async def test_rewind_awaits_generation_worker_before_rollback(self):
+        from widgets.commands import RewindCommand
+
+        class FakeWorker:
+            """Minimal Textual-Worker stand-in: cleanup runs inside wait()."""
+
+            def __init__(self, order):
+                self.order = order
+                self.is_running = True
+                self.is_finished = False
+
+            def cancel(self):
+                self._cancelled = True
+
+            async def wait(self):
+                # Simulate the engine interruption teardown finishing before
+                # the rollback applies.
+                self.order.append("worker-wait")
+                self.is_running = False
+                self.is_finished = True
+
+        app = MockApp()
+        app.is_generating = True
+        order = []
+        app.workers = [FakeWorker(order)]
+        app.agent.history = [{"role": "user", "content": "First"}]
+        app.chat_view.get_user_messages = lambda: [(0, "First")]
+        app.chat_view.rollback_to = lambda idx: order.append("rollback")
+
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: None,
+                "text": "",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+
+        async def simulate_on_rewind_selected(screen, callback):
+            await callback(0)
+
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        # The in-flight generation must fully settle before history/UI rollback
+        # touches state, so the interruption teardown cannot re-pollute it.
+        self.assertEqual(order, ["worker-wait", "rollback"])
+
+    async def test_rewind_compacted_region_clears_history(self):
+        from unittest.mock import MagicMock
+
+        from widgets.commands import RewindCommand
+
+        app = MockApp()
+        app.current_session_id = "sess-a"
+        app.sm = MagicMock()
+        app.sm.project_path = None
+
+        session = MagicMock()
+        session.messages = [
+            {"type": "user", "text": "A", "show_in_ui": True},
+            {"type": "user", "text": "B", "show_in_ui": True},
+            {"type": "event_divider"},
+            {"type": "user", "text": "Tail 0", "show_in_ui": True},
+            {"type": "bot", "text": "Resp"},
+        ]
+        app.sm.get.return_value = session
+        # Compacted history: checkpoint replaced A+B; only Tail 0 survived.
+        app.agent.history = [
+            {"role": "user", "content": "<conversation-checkpoint>\n<summary>early</summary>\n</conversation-checkpoint>"},
+            {"role": "user", "content": "Tail 0"},
+            {"role": "assistant", "content": "Resp"},
+        ]
+        app.chat_view.get_user_messages = lambda: [(0, "A"), (1, "B"), (3, "Tail 0")]
+        app.chat_view.rollback_to = lambda idx: None
+
+        mock_input = type(
+            "MockInput",
+            (),
+            {
+                "load_text": lambda self, txt: None,
+                "text": "",
+                "move_cursor": lambda self, pos: None,
+                "focus": lambda self: None,
+            },
+        )()
+        app.query_one = lambda target, default=None: mock_input if target == "#message-input" else app.chat_view
+
+        cmd = RewindCommand()
+
+        async def simulate_on_rewind_selected(screen, callback):
+            # Select "B" — a turn inside the compacted region.
+            await callback(1)
+
+        app.push_screen = simulate_on_rewind_selected
+        await cmd.execute(app)
+
+        # The model must not remember turns that were rolled back: history is
+        # cleared because the selected turn predates the checkpoint.
+        self.assertEqual(app.agent.history, [])
+        # Transcript: everything from "B" onward (incl. divider + tail) drops.
+        self.assertEqual(session.messages, [{"type": "user", "text": "A", "show_in_ui": True}])
 
     async def test_unknown_command(self):
         app = MockApp()

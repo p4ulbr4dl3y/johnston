@@ -13,6 +13,12 @@ class MockAgent:
     def __init__(self):
         self.history = []
         self.compact_called = False
+        self.tokens_input = 0
+        self.tokens_output = 0
+        self.tokens_cache_read = 0
+        self.last_context_tokens = 0
+        self.total_tokens = 0
+        self.cost_usd = 0.0
 
     def clear_history(self):
         self.history = []
@@ -211,7 +217,18 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
             agent.history = [{"role": "user", "content": "Msg 0"}]
 
         agent = MockAgent()
-        agent.history = [{"role": "user", "content": "Msg 0"}, {"role": "assistant", "content": "Resp 0"}]
+        agent.history = [
+            {"role": "user", "content": "Msg 0"},
+            {"role": "assistant", "content": "Resp 0"},
+            {"role": "user", "content": "Msg 1"},
+            {"role": "assistant", "content": "Resp 1"},
+        ]
+        agent.tokens_input = 4000
+        agent.tokens_output = 3000
+        agent.tokens_cache_read = 2000
+        agent.last_context_tokens = 5000
+        agent.total_tokens = 7000
+        agent.cost_usd = 0.12
         agent.truncate_history_to_user_message = do_truncate
 
         await asyncio.to_thread(
@@ -230,6 +247,104 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(called_idx, [1])
         self.assertEqual(len(agent.history), 1)
         self.assertEqual(agent.history[0]["content"], "Msg 0")
+        # Cumulative metrics reset on the truncate path too, but the freshly
+        # recomputed context-token estimate survives.
+        self.assertEqual(agent.tokens_input, 0)
+        self.assertEqual(agent.tokens_output, 0)
+        self.assertEqual(agent.tokens_cache_read, 0)
+        self.assertEqual(agent.total_tokens, 0)
+        self.assertEqual(agent.cost_usd, 0.0)
+        self.assertEqual(agent.last_context_tokens, 5000)
+
+    async def test_rewind_truncates_store_transcript(self):
+        class Session:
+            def __init__(self):
+                self.messages = [
+                    {"type": "user", "text": "Msg 0", "show_in_ui": True},
+                    {"type": "bot", "text": "Resp 0"},
+                    {"type": "user", "text": "[System Note: Response interrupted by user]", "show_in_ui": True},
+                    {"type": "user", "text": "Msg 1", "show_in_ui": True},
+                    {"type": "bot", "text": "Resp 1"},
+                ]
+
+        agent = MockAgent()
+        agent.history = [{"role": "user", "content": "Msg 0"}, {"role": "user", "content": "Msg 1"}]
+        session = Session()
+
+        await asyncio.to_thread(
+            rewind_session,
+            agent,
+            None,
+            None,
+            [(0, "Msg 0"), (3, "Msg 1")],
+            3,
+            session=session,
+            rollback_ui=lambda i: None,
+            load_text_into_input=lambda t: None,
+            save_session_cb=lambda: None,
+            refresh_footer_cb=lambda: None,
+        )
+
+        # Rolled-back turn (Msg 1 + Resp 1) and the hidden interruption note
+        # are dropped from the store transcript; UI indexing counts only visible
+        # user turns, and the [System Note] turn is skipped.
+        self.assertEqual(
+            session.messages,
+            [{"type": "user", "text": "Msg 0", "show_in_ui": True}, {"type": "bot", "text": "Resp 0"}],
+        )
+
+    async def test_rewind_full_clear_truncates_whole_transcript(self):
+        class Session:
+            def __init__(self):
+                self.messages = [
+                    {"type": "user", "text": "Msg 0", "show_in_ui": True},
+                    {"type": "bot", "text": "Resp 0"},
+                ]
+
+        agent = MockAgent()
+        agent.history = [{"role": "user", "content": "Msg 0"}]
+        session = Session()
+
+        await asyncio.to_thread(
+            rewind_session,
+            agent,
+            None,
+            None,
+            [(0, "Msg 0")],
+            0,
+            session=session,
+            rollback_ui=lambda i: None,
+            load_text_into_input=lambda t: None,
+            save_session_cb=lambda: None,
+            refresh_footer_cb=lambda: None,
+        )
+
+        self.assertEqual(session.messages, [])
+
+    async def test_rewind_keeps_git_restore_task_on_agent(self):
+        agent = MockAgent()
+        agent.history = [{"role": "user", "content": "Msg 0"}]
+
+        # Called directly on the event loop (as RewindCommand does); the
+        # background git restore needs a running loop to spawn.
+        rewind_session(
+            agent,
+            "sess-1",
+            "/tmp/project",
+            [(0, "Msg 0")],
+            0,
+            rollback_ui=lambda i: None,
+            load_text_into_input=lambda t: None,
+            save_session_cb=lambda: None,
+            refresh_footer_cb=lambda: None,
+        )
+
+        task = getattr(agent, "rewind_git_restore_task", None)
+        self.assertIsNotNone(task)
+        # Give the background restore a chance to run; it should fail cleanly
+        # on a non-git target and finish without raising.
+        await asyncio.wait_for(asyncio.shield(task), timeout=5)
+        self.assertTrue(task.done())
 
 
 if __name__ == "__main__":

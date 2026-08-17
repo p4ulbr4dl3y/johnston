@@ -56,6 +56,12 @@ class LifecycleMixin:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
 
+        # Cancel an in-flight rewind git-restore task (kept on the agent by
+        # rewind_session) so shutdown does not leave the worktree half-restored.
+        git_task = getattr(getattr(self, "agent", None), "rewind_git_restore_task", None)
+        if git_task is not None and not git_task.done():
+            git_task.cancel()
+
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
