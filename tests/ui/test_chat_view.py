@@ -1281,9 +1281,9 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def _widget(self, tool_type="shell", target="cmd", result_text="", args=None, **kwargs):
         return ToolCallWidget(tool_type, target, result_text=result_text, args=args, **kwargs)
 
-    def test_render_header_update_plan_dict_and_list(self):
+    def test_render_header_update_plan_list(self):
         widget = self._widget(
-            "update_plan", "plan", args={"plan": {"entries": [{"status": "completed"}, {"status": "pending"}]}}
+            "update_plan", "plan", args={"plan": [{"status": "completed"}, {"status": "pending"}]}
         )
         widget.render_header()
         self.assertIn("[1/2 completed]", str(widget.header_label.render()))
@@ -1291,7 +1291,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget2 = self._widget(
             "update_plan",
             "plan",
-            args={"plan": [{"status": "done"}, {"status": "pending"}, {"step": "x", "status": "in_progress"}]},
+            args={"plan": [{"status": "completed"}, {"status": "pending"}, {"step": "x", "status": "in_progress"}]},
         )
         widget2.render_header()
         self.assertIn("[1/3 completed]", str(widget2.header_label.render()))
@@ -1307,7 +1307,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget2 = self._widget("invoke_subagent", "do stuff", args={"prompt": "hello"})
         widget2.render_header()
 
-        widget3 = self._widget("ask_user", "", args={"question": "q?"})
+        widget3 = self._widget("ask_user", "", args={"questions": [{"question_text": "q?", "options": []}]})
         widget3.render_header()
 
         widget4 = self._widget("manage_shell", "", args={"task_id": "t1"})
@@ -1450,11 +1450,11 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertEqual(widget._parse_ask_user_answers(qs), {})
         self.assertFalse(widget.is_expandable())
 
-    def test_parse_ask_user_flat_single_question(self):
+    def test_parse_ask_user_questions(self):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"question": "F", "options": ["X", "Y"]},
+            args={"questions": [{"question_text": "F", "options": ["X", "Y"]}]},
             result_text="Question: F\nAnswer: X",
         )
         qs = widget._parse_ask_user_questions()

@@ -34,18 +34,13 @@ _BUILTIN_TOOLS = frozenset(
         "create",
         "edit",
         "multi_edit",
-        "replace_file_content",
-        "multi_replace_file_content",
-        "write_to_file",
-        "glob",
-        "grep",
-        "list",
         "shell",
         "ask_user",
         "web_fetch",
-        "web_search",
         "invoke_subagent",
         "manage_subagent",
+        "manage_shell",
+        "update_plan",
     }
 )
 

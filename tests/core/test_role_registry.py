@@ -161,7 +161,6 @@ Architect prompt content""")
 
         # disallowed_tools still enforced
         self.assertIsNotNone(role_tool_error(explorer, "create"))
-        self.assertIsNotNone(role_tool_error(explorer, "write_to_file"))
         # read_only blocks write tools even without explicit disallow
         self.assertIsNotNone(role_tool_error(explorer, "edit"))
         self.assertIsNotNone(role_tool_error(explorer, "multi_edit"))

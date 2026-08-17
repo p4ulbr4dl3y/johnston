@@ -329,10 +329,6 @@ class EditTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
         path = args.get("path") or ""
-        chunks = args.get("edits")
-        if chunks and isinstance(chunks, list):
-            return await _execute_edit_helper(path, chunks, cwd=ctx.cwd)
-
         target_val = args.get("old_str", "")
         repl_val = args.get("new_str", "")
         chunk = {

@@ -77,11 +77,11 @@ def _task(tid, running=True, session=None):
 
 # --- None task_id ----------------------------------------------------------
 
-async def test_status_none_task_id_should_not_crash(tool):
+async def test_unknown_action_none_task_id_should_not_crash(tool):
     """Bug B1: task_id=None -> AttributeError on .strip() (tools/manage_shell.py:28)."""
     app = _shell_app([])
     try:
-        res = str(await tool.execute({"action": "status", "task_id": None}, ctx=app))
+        res = str(await tool.execute({"action": "bogus", "task_id": None}, ctx=app))
     except AttributeError as exc:
         import inspect
 
@@ -495,15 +495,6 @@ async def test_list_filters_by_parent(sub_tool, store):
     assert "sp2" not in res
 
 
-async def test_list_all_flag_ignores_parent(sub_tool, store):
-    _mk("sp1a", parent="parent-a")
-    _mk("sp2", parent="parent-b")
-    app = _SmApp(store, current_session_id="parent-a")
-    res = str(await sub_tool.execute({"action": "list", "all": True}, ctx=_ctx(app)))
-    assert "sp1a" in res
-    assert "sp2" in res
-
-
 async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
@@ -516,11 +507,11 @@ async def test_list_invalid_parent_id_no_crash(sub_tool, store):
 # --- race / double send ----------------------------------------------------
 
 
-async def test_status_stable_while_running_does_not_finish(sub_tool, store):
-    """Repeated status on a running subagent must not flip it to completed."""
+async def test_list_stable_while_running_does_not_finish(sub_tool, store):
+    """Repeated list on a running subagent must not flip it to completed."""
     sess = _mk("sstable", status="running")
     for _ in range(3):
-        await sub_tool.execute({"action": "status", "session_id": "sstable"})
+        await sub_tool.execute({"action": "list"})
     assert sess.status == "running"
 
 

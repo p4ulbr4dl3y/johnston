@@ -62,16 +62,6 @@ class AskUserTool(BaseTool):
         ctx = self._ensure_context(ctx)
         questions_list = args.get("questions")
 
-        # Fallback: a single question passed as {question|question_text, options/choices}.
-        single_q_text = args.get("question") or args.get("question_text")
-        if (not questions_list or not isinstance(questions_list, list)) and single_q_text:
-            questions_list = [
-                {
-                    "question_text": single_q_text,
-                    "options": args.get("options") or args.get("choices"),
-                }
-            ]
-
         if not questions_list or not isinstance(questions_list, list):
             return ToolResult.error("params", name="questions", detail="missing or invalid")
 
@@ -79,10 +69,8 @@ class AskUserTool(BaseTool):
         for q in questions_list:
             if not isinstance(q, dict):
                 continue
-            q_text = str(q.get("question_text") or q.get("question") or "").strip()
+            q_text = str(q.get("question_text") or "").strip()
             options = q.get("options")
-            if options is None:
-                options = q.get("choices")
             if not q_text or not isinstance(options, list):
                 continue
             validated_questions.append(

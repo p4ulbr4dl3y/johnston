@@ -74,7 +74,7 @@ class TestToolCallLatency(unittest.IsolatedAsyncioTestCase):
                 ("shell", "pytest -q", {"command": "pytest -q"}),
                 ("create", "new_file.py", {"path": "new_file.py", "content": "print('hello')\n" * 50}),
                 ("edit", "old_file.py", {"path": "old_file.py", "old_str": "a", "new_str": "b"}),
-                ("update_plan", "Plan", {"plan": {"entries": [{"step": "step1", "status": "in_progress"}]}}),
+                ("update_plan", "Plan", {"plan": [{"step": "step1", "status": "in_progress"}]}),
                 ("mcp_custom_tool", "arg_value", {"query": "search query", "limit": 10}),
             ]
 

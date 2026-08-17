@@ -304,7 +304,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def test_tool_and_tool_result(self):
         async def stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
             yield ("tool_result", "output", "")
 
         app = await self._run(stream)
@@ -425,7 +425,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
 
     async def test_save_session_exception_tool_result(self):
         async def stream(prompt, attachments=None):
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
             yield ("tool_result", "output", "")
 
         app = JohnstonApp()
@@ -731,7 +731,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def test_tool_event_after_bot_text_finalizes(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "text before tool", "")
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
             yield ("bot_text", "after tool", "")
 
         app = await self._run(stream)
@@ -740,7 +740,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def test_tool_event_after_empty_bot_removes(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "   ", "")
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
 
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
@@ -748,7 +748,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def test_tool_event_flushes_pending_stream(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "text before tool", "")
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
 
         app = await self._run(stream)
         self.assertFalse(app.is_generating)
@@ -756,7 +756,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
     async def test_tool_event_after_empty_content_bot_msg(self):
         async def stream(prompt, attachments=None):
             yield ("bot_delta", "content", "")
-            yield ("tool", "bash", "run", {"cmd": "ls"})
+            yield ("tool", "shell", "run", {"cmd": "ls"})
 
         app = JohnstonApp()
         with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
@@ -774,7 +774,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
         # generation; the in-flight tool widget must be marked cancelled (not
         # left stuck in "running").
         async def stream(prompt, attachments=None):
-            yield ("tool", "bash", "run", {"cmd": "tail -f log"})
+            yield ("tool", "shell", "run", {"cmd": "tail -f log"})
             await asyncio.sleep(30.0)
 
         app = JohnstonApp()

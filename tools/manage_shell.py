@@ -41,7 +41,7 @@ class ManageShellTool(BaseTool):
         if action == "list":
             return ToolResult.done(list_lines(tasks))
 
-        elif action in ("send_input", "input"):
+        elif action == "send_input":
             if not task_id:
                 return ToolResult.error("params", name="task_id", detail="required for 'send_input'")
             input_text = args.get("input", "") or ""

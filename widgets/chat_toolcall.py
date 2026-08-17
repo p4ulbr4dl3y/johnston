@@ -73,10 +73,10 @@ class FormattingMixin:
         for item in plan_items:
             if not isinstance(item, dict):
                 continue
-            step = item.get("step") or item.get("text") or ""
+            step = item.get("step") or ""
             status = str(item.get("status") or "pending").lower()
 
-            if status in ("completed", "done"):
+            if status == "completed":
                 line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
             elif status == "in_progress":
                 line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
@@ -365,20 +365,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "edit",
         "multi_edit",
         "shell",
-        "bash",
         "update_plan",
-        "plan",
-        "replace_file_content",
-        "multi_replace_file_content",
-        "replace",
-        "multi_replace",
-        "write_to_file",
-        "Create",
-        "Edit",
-        "MultiEdit",
-        "Shell",
-        "Bash",
-        "Plan",
     }
 
     def is_expandable(self) -> bool:
@@ -387,7 +374,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
         # Shell output is always useful to the user (return code / stdout),
         # regardless of the tool status, so shell stays expandable.
-        if canonical in ("shell", "bash"):
+        if canonical == "shell":
             return True
         # Error/cancelled results are feedback for the agent (they flow to the
         # model), not content for the user to inspect — don't expand those.
@@ -493,7 +480,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
-        if self.tool_type in ("shell", "Shell", "bash", "Bash"):
+        if self.tool_type == "shell":
             if cleaned:
                 self.result_text = cleaned
         elif self.canonical_tool == "invoke_subagent":
@@ -550,17 +537,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             target_str = "Plan"
             if self.args and isinstance(self.args, dict):
                 plan_data = self.args.get("plan")
-                if isinstance(plan_data, dict):
-                    entries = plan_data.get("entries", [])
-                    total = len(entries)
-                    completed = sum(1 for e in entries if isinstance(e, dict) and e.get("status") == "completed")
-                    target_str = f"[{completed}/{total} completed]"
-                elif isinstance(plan_data, list):
+                if isinstance(plan_data, list):
                     total = len(plan_data)
                     completed = sum(
                         1
                         for item in plan_data
-                        if isinstance(item, dict) and item.get("status") in ("completed", "done")
+                        if isinstance(item, dict) and item.get("status") == "completed"
                     )
                     target_str = f"[{completed}/{total} completed]"
             self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
@@ -599,7 +581,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             if self.canonical_tool == "invoke_subagent":
                 args = self.args if isinstance(self.args, dict) else {}
                 nargs = args
-                session_id = nargs.get("task_id") or getattr(self, "subagent_session_id", None)
+                session_id = getattr(self, "subagent_session_id", None)
                 identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
                 try:
                     from widgets.presentation.screens.subagent_screen import SubagentViewScreen
@@ -628,24 +610,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def _parse_ask_user_questions(self) -> list[dict]:
         args = self.args if isinstance(self.args, dict) else {}
         qs = args.get("questions")
-        if not isinstance(qs, list):
-            single = args.get("question") or args.get("question_text")
-            if isinstance(single, str):
-                qs = [
-                    {
-                        "question_text": single,
-                        "options": args.get("options") or args.get("choices"),
-                    }
-                ]
         out = []
         if isinstance(qs, list):
             for q in qs:
                 if not isinstance(q, dict):
                     continue
-                q_text = q.get("question_text") or q.get("question") or ""
+                q_text = q.get("question_text") or ""
                 opts = q.get("options")
-                if opts is None:
-                    opts = q.get("choices")
                 if q_text and isinstance(opts, list):
                     out.append({"question_text": str(q_text), "options": [str(o) for o in opts]})
         return out
@@ -712,7 +683,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         try:
             nargs = self.args if isinstance(self.args, dict) else {}
             file_path = nargs.get("path") or self.target
-            if self.tool_type in ("create", "Create", "write_to_file"):
+            if self.tool_type == "create":
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
                     return "markup", self._clean_markup_text(raw_text or "(Error)")
@@ -725,16 +696,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 ):
                     diff_text = raw_text
                     if "@@" not in diff_text and "--- a/" not in diff_text:
-                        content = (
-                            self.args.get("content")
-                            or self.args.get("CodeContent")
-                            or self.args.get("code_content")
-                            or ""
-                        )
+                        content = self.args.get("content") or ""
                         diff_text = build_synthetic_create_diff(file_path, content)
                     formatted_diff = self._format_edit_diff(diff_text, file_path)
                     return "raw", formatted_diff
-                content = self.args.get("content") or self.args.get("CodeContent") or self.args.get("code_content")
+                content = self.args.get("content")
                 if content is None:
                     from widgets.utils.file_reader import read_file_content
 
@@ -758,16 +724,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     except Exception:
                         return "raw", self._format_code_with_line_numbers(content)
                 return "markup", self._clean_markup_text(self.result_text or "(No content)")
-            elif self.tool_type in (
-                "edit",
-                "Edit",
-                "multi_edit",
-                "MultiEdit",
-                "replace_file_content",
-                "multi_replace_file_content",
-                "replace",
-                "multi_replace",
-            ):
+            elif self.tool_type in ("edit", "multi_edit"):
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
                     return "markup", self._clean_markup_text(raw_text or "(Error)")
@@ -780,7 +737,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if diff_text:
                     return "raw", self._format_edit_diff(diff_text, file_path)
                 return "markup", self._clean_markup_text(self.result_text or "(No diff)")
-            elif self.tool_type in ("update_plan", "Plan", "plan"):
+            elif self.tool_type == "update_plan":
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
                     return "markup", self._clean_markup_text(raw_text or "(Error)")
@@ -853,7 +810,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     except Exception:
                         return "raw", self._format_code_with_line_numbers(clean_code)
                 return "markup", self._clean_markup_text(self.result_text or "(No content)")
-            elif self.tool_type in ("shell", "Shell", "bash", "Bash"):
+            elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)
                 if not output_text.strip():
                     if self.app and hasattr(self.app, "task_manager"):
