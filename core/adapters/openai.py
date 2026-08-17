@@ -58,29 +58,32 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
             formatted.extend(pending_user_images)
             continue
 
-        if role == "assistant" and msg.get("tool_calls"):
+        if role == "assistant":
             cleaned_msg = dict(msg)
-            cleaned_calls = []
-            for tc in msg["tool_calls"]:
-                if isinstance(tc, dict):
-                    tc_copy = dict(tc)
-                    fn = tc.get("function")
-                    if isinstance(fn, dict):
-                        fn_copy = dict(fn)
-                        raw_args = fn.get("arguments", "{}")
-                        if not isinstance(raw_args, str):
-                            raw_args = json.dumps(raw_args)
-                        else:
-                            try:
-                                json.loads(raw_args)
-                            except Exception:
-                                raw_args = "{}"
-                        fn_copy["arguments"] = raw_args
-                        tc_copy["function"] = fn_copy
-                    cleaned_calls.append(tc_copy)
-                else:
-                    cleaned_calls.append(tc)
-            cleaned_msg["tool_calls"] = cleaned_calls
+            if "reasoning_content" not in cleaned_msg or cleaned_msg.get("reasoning_content") is None:
+                cleaned_msg["reasoning_content"] = ""
+            if msg.get("tool_calls"):
+                cleaned_calls = []
+                for tc in msg["tool_calls"]:
+                    if isinstance(tc, dict):
+                        tc_copy = dict(tc)
+                        fn = tc.get("function")
+                        if isinstance(fn, dict):
+                            fn_copy = dict(fn)
+                            raw_args = fn.get("arguments", "{}")
+                            if not isinstance(raw_args, str):
+                                raw_args = json.dumps(raw_args)
+                            else:
+                                try:
+                                    json.loads(raw_args)
+                                except Exception:
+                                    raw_args = "{}"
+                            fn_copy["arguments"] = raw_args
+                            tc_copy["function"] = fn_copy
+                        cleaned_calls.append(tc_copy)
+                    else:
+                        cleaned_calls.append(tc)
+                cleaned_msg["tool_calls"] = cleaned_calls
             formatted.append(cleaned_msg)
             i += 1
             continue

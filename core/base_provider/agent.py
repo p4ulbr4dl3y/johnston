@@ -640,9 +640,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 if not tool_calls_dict:
                     full_assistant_text_final = "".join(full_assistant_parts)
-                    final_msg: Dict[str, Any] = {"role": "assistant", "content": full_assistant_text_final}
-                    if active_thought_parts:
-                        final_msg["reasoning_content"] = "".join(active_thought_parts)
+                    final_msg: Dict[str, Any] = {
+                        "role": "assistant",
+                        "content": full_assistant_text_final,
+                        "reasoning_content": "".join(active_thought_parts),
+                    }
                     messages.append(final_msg)
                     yield ("bot_text", full_assistant_text_final, "")
                     # If user messages were queued during this turn, keep going
@@ -678,9 +680,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     "role": "assistant",
                     "content": "".join(full_assistant_parts) or None,
                     "tool_calls": cleaned_tool_calls,
+                    "reasoning_content": "".join(active_thought_parts),
                 }
-                if active_thought_parts:
-                    assistant_tool_msg["reasoning_content"] = "".join(active_thought_parts)
                 messages.append(assistant_tool_msg)
 
                 for tc in ordered_calls:

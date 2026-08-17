@@ -90,6 +90,8 @@ class CompactionMixin:
             item = dict(msg)
 
             if role == "assistant":
+                if "reasoning_content" not in item or item.get("reasoning_content") is None:
+                    item["reasoning_content"] = ""
                 tool_calls = item.get("tool_calls")
                 if tool_calls and isinstance(tool_calls, list):
                     valid_calls = []
