@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -94,12 +95,16 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_command_timeout_terminates_process(self):
         mock_app = MagicMock()
+        mock_app.task_manager = TaskManager()
         mock_ctx = MagicMock()
         mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
+        mock_ctx.task_manager = mock_app.task_manager
+        mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
 
         mock_p = MagicMock()
         mock_p.wait.return_value = asyncio.Future()
+        mock_p.returncode = None
 
         with (
             patch("tools.shell.shell_executable", return_value="/bin/sh"),
@@ -111,7 +116,11 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("ERR: timeout 'shell': timed out after 1s", res)
             self.assertNotIn("moved to background.", res)
             mock_term.assert_called_once()
-            mock_ctx.add_background_task.assert_not_called()
+            # Sync tasks are temporarily registered (for ctrl+b) even on timeout;
+            # they are NOT converted to persistent background tasks, so the
+            # manager must not still hold them after the tool returns.
+            mock_ctx.add_background_task.assert_called_once()
+            self.assertEqual(len([t for t in mock_app.task_manager]), 0)
 
     async def test_create_windows_process_powershell(self):
         with (
@@ -191,7 +200,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             res = str(await self.tool.execute({"command": "run_long_task", "timeout": 5}))
             self.assertIn("ERR: timeout 'shell': timed out after 5s", res)
             mock_term.assert_called_once()
-            mock_ctx.add_background_task.assert_not_called()
+            mock_ctx.add_background_task.assert_called_once()
 
     async def test_explicit_run_in_background(self):
         mock_app = MagicMock()
@@ -247,7 +256,9 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         ):
             res = str(await self.tool.execute({"command": "echo sync"}, ctx=mock_app))
             self.assertEqual(res, "(no output)")
-            mock_ctx.add_background_task.assert_not_called()
+            # Sync task is registered while running for ctrl+b, then dropped
+            # after completion (never converted to a background task).
+            mock_ctx.add_background_task.assert_called_once()
 
     async def test_sync_task_cleaned_up_from_background_tasks(self):
         mock_app = MagicMock()
@@ -255,6 +266,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx = MagicMock()
         mock_ctx.host = mock_app
         mock_ctx.is_subagent = False
+        mock_ctx.task_manager = mock_app.task_manager
         mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
 
         with patch.object(ShellTool, "_ensure_context", return_value=mock_ctx):
@@ -400,7 +412,7 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             res = str(await self.tool.execute({"command": "tail -f x", "timeout": 1}))
             self.assertIn("ERR: timeout 'shell': timed out after 1s", res)
             mock_term.assert_called_once()
-            mock_ctx.add_background_task.assert_not_called()
+            mock_ctx.add_background_task.assert_called_once()
 
 
     async def test_execute_cancelled_terminates_process(self):
@@ -423,7 +435,87 @@ class TestShellTool(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await exec_task
             mock_term.assert_called_once()
-            mock_ctx.add_background_task.assert_not_called()
+            mock_ctx.add_background_task.assert_called_once()
+
+    async def test_main_sync_task_visible_and_running_while_alive(self):
+        # While a sync shell runs, it must be visible in the task manager and
+        # report is_running=True (process still alive) so ctrl+b / manage_shell
+        # can act on it; after completion it must be dropped.
+        mock_app = MagicMock()
+        mock_app.task_manager = TaskManager()
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.is_subagent = False
+        mock_ctx.task_manager = mock_app.task_manager
+        mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
+
+        mock_p = MagicMock()
+        mock_p.stdout = None
+        mock_p.wait.return_value = asyncio.Future()  # never resolves
+        mock_p.returncode = None
+
+        with (
+            patch.object(ShellTool, "_create_std_process", return_value=mock_p),
+            patch.object(ShellTool, "_ensure_context", return_value=mock_ctx),
+            patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        ):
+            exec_task = asyncio.create_task(self.tool.execute({"command": "long_running_sync_cmd"}, ctx=mock_app))
+            await asyncio.sleep(0.05)
+            tasks = [t for t in mock_app.task_manager]
+            self.assertEqual(len(tasks), 1)
+            self.assertTrue(tasks[0].is_running)
+            self.assertFalse(tasks[0].is_background)
+            exec_task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await exec_task
+        self.assertEqual(len([t for t in mock_app.task_manager]), 0)
+
+    async def test_background_task_manage_shell_lifecycle(self):
+        # Real end-to-end: explicit background task (cat keeps stdin/stdout
+        # open). manage_shell must list it as RUNNING (process alive), send
+        # input to its stdin, and kill it.
+        mock_app = MagicMock()
+        mock_app.task_manager = TaskManager()
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.is_subagent = False
+        mock_ctx.task_manager = mock_app.task_manager
+        mock_ctx.add_background_task.side_effect = lambda t: mock_app.task_manager.register(t)
+
+        from tools.manage_shell import ManageShellTool
+
+        mgr = ManageShellTool()
+        with patch.object(ShellTool, "_ensure_context", return_value=mock_ctx):
+            res = str(await self.tool.execute({"command": "cat", "background": True}, ctx=mock_app))
+        m = re.search(r"Task ID: (shell_\d+_\d+)", res)
+        self.assertIsNotNone(m)
+        task_id = m.group(1)
+
+        tasks = [t for t in mock_app.task_manager]
+        self.assertEqual(len(tasks), 1)
+        self.assertTrue(tasks[0].is_background)
+
+        # list: process alive -> RUNNING
+        r = str(await mgr.execute({"action": "list"}, ctx=mock_ctx))
+        self.assertIn("RUNNING", r)
+        self.assertIn(task_id, r)
+
+        # send_input: writes to live stdin
+        r = str(await mgr.execute({"action": "send_input", "task_id": task_id, "input": "hello_manage"}, ctx=mock_ctx))
+        self.assertIn("OK: input sent", r)
+        await asyncio.sleep(0.3)
+
+        # background output is streamed into the task buffer (file log too)
+        streamed = tasks[0].output.formatted()
+        self.assertIn("hello_manage", streamed)
+
+        # kill: terminates the live process
+        r = str(await mgr.execute({"action": "kill", "task_id": task_id}, ctx=mock_ctx))
+        self.assertIn("killed", r)
+
+        # completed/killed task no longer reports running
+        r = str(await mgr.execute({"action": "list"}, ctx=mock_ctx))
+        self.assertIn("FINISHED", r)
 
     async def test_session_override_allow_shell(self):
         from core.permission_manager import PermissionManager

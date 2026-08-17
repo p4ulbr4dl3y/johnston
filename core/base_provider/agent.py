@@ -640,7 +640,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 if not tool_calls_dict:
                     full_assistant_text_final = "".join(full_assistant_parts)
-                    messages.append({"role": "assistant", "content": full_assistant_text_final})
+                    final_msg: Dict[str, Any] = {"role": "assistant", "content": full_assistant_text_final}
+                    if active_thought_parts:
+                        final_msg["reasoning_content"] = "".join(active_thought_parts)
+                    messages.append(final_msg)
                     yield ("bot_text", full_assistant_text_final, "")
                     # If user messages were queued during this turn, keep going
                     # so the next while-iteration drains them as new steps.
@@ -653,18 +656,31 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 # some providers, so sort explicitly by the tool-call index key.
                 ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
 
-                assistant_tool_msg = {
-                    "role": "assistant",
-                    "content": "".join(full_assistant_parts) or None,
-                    "tool_calls": [
+                cleaned_tool_calls = []
+                for tc in ordered_calls:
+                    raw_args = tc.get("arguments", "{}")
+                    if not isinstance(raw_args, str):
+                        raw_args = json.dumps(raw_args)
+                    else:
+                        try:
+                            json.loads(raw_args)
+                        except Exception:
+                            raw_args = "{}"
+                    cleaned_tool_calls.append(
                         {
                             "id": tc["id"],
                             "type": "function",
-                            "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                            "function": {"name": tc["name"], "arguments": raw_args},
                         }
-                        for tc in ordered_calls
-                    ],
+                    )
+
+                assistant_tool_msg: Dict[str, Any] = {
+                    "role": "assistant",
+                    "content": "".join(full_assistant_parts) or None,
+                    "tool_calls": cleaned_tool_calls,
                 }
+                if active_thought_parts:
+                    assistant_tool_msg["reasoning_content"] = "".join(active_thought_parts)
                 messages.append(assistant_tool_msg)
 
                 for tc in ordered_calls:

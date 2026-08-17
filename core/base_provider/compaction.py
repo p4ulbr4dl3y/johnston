@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any, Dict, List, Tuple
 
 from core.infrastructure.runtime.token_util import estimate_tokens
@@ -100,10 +101,27 @@ class CompactionMixin:
                             if tc_id:
                                 known_tool_call_ids.add(tc_id)
                                 valid_tc_ids.add(tc_id)
-                                valid_calls.append(tc)
+                                tc_clean = dict(tc)
+                                fn_obj = tc.get("function")
+                                if isinstance(fn_obj, dict):
+                                    raw_args = fn_obj.get("arguments", "{}")
+                                    if not isinstance(raw_args, str):
+                                        raw_args = json.dumps(raw_args)
+                                    else:
+                                        try:
+                                            json.loads(raw_args)
+                                        except Exception:
+                                            raw_args = "{}"
+                                    fn_clean = dict(fn_obj)
+                                    fn_clean["arguments"] = raw_args
+                                    tc_clean["function"] = fn_clean
+                                valid_calls.append(tc_clean)
                                 if tc_id not in tool_responses_by_id:
-                                    fn_obj = tc.get("function", {}) if isinstance(tc.get("function"), dict) else {}
-                                    fn_name = fn_obj.get("name") or tc.get("name") or "tool"
+                                    fn_name = (
+                                        fn_obj.get("name")
+                                        if isinstance(fn_obj, dict)
+                                        else (tc.get("name") or "tool")
+                                    )
                                     missing_tool_call_ids.append((tc_id, fn_name))
 
                     item["tool_calls"] = valid_calls

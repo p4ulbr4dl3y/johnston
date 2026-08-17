@@ -14,7 +14,7 @@ from core.infrastructure.platform.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
-from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi, tail_output
+from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
@@ -48,12 +48,7 @@ def _truncate_output(res: str) -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = (
-        "Run a terminal command synchronously with a configurable timeout (default 120s, max 600s). "
-        "Output is returned after the command finishes; processes are terminated on timeout. "
-        "Set 'background: true' to run asynchronously: returns a task_id and log path immediately, "
-        "output streams live to the log file, and completion arrives via a [System Notification] message."
-    )
+    description = "Run a terminal command synchronously or in the background (background: true)."
 
     schema = {
         "type": "function",
@@ -64,12 +59,12 @@ class ShellTool(BaseTool):
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Terminal command to run (resolved relative to current working directory, cwd)",
+                        "description": "Terminal command to run (relative to cwd)",
                     },
                     "timeout": {"type": "integer", "description": "Timeout in seconds (default 120, max 600)"},
                     "background": {
                         "type": "boolean",
-                        "description": "Run asynchronously. Returns task_id immediately; completion arrives via System Notification.",
+                        "description": "Run asynchronously in background; completion arrives via System Notification",
                     },
                 },
                 "required": ["command"],
@@ -121,147 +116,107 @@ class ShellTool(BaseTool):
         # task), so long-running commands report a truthful error instead of
         # silently continuing after the agent already returns.
         if not run_in_bg:
-            output_chunks = deque()
-            output_size = 0
-            output_truncated = False
-            _SUBAGENT_OUTPUT_LIMIT = 2 * 1024 * 1024  # 2 MB cap (mirrors web_fetch)
+            return await self._run_sync(p, ctx, cmd, timeout)
 
-            def _flush_raw() -> str:
-                raw_all = "".join(output_chunks)
-                if output_truncated:
-                    raw_all = "[Output truncated: showing recent output]\n" + raw_all
-                return raw_all
-
-            async def _read_stream(stream):
-                nonlocal output_size, output_truncated
-                if not stream:
-                    return
-                while True:
-                    try:
-                        chunk = await stream.read(1024)
-                        if not chunk:
-                            break
-                        text = decode_output(chunk)
-                        output_chunks.append(text)
-                        output_size += len(text)
-                        if output_size > _SUBAGENT_OUTPUT_LIMIT:
-                            output_truncated = True
-                            # Drop old chunks from the front, keeping the tail.
-                            while output_chunks and output_size > _SUBAGENT_OUTPUT_LIMIT // 2:
-                                output_size -= len(output_chunks.popleft())
-                    except Exception:
-                        break
-
-            read_task = asyncio.create_task(_read_stream(p.stdout))
-            try:
-                await asyncio.wait_for(p.wait(), timeout=float(timeout))
-                if read_task:
-                    try:
-                        await asyncio.wait_for(read_task, timeout=2.0)
-                    except asyncio.TimeoutError:
-                        pass
-                res = process_carriage_returns(strip_ansi(_flush_raw()))
-                if not res.strip():
-                    return ToolResult.done("(no output)")
-                return ToolResult.done(_truncate_output(res))
-            except asyncio.TimeoutError:
-                await terminate_process(p)
-                if read_task:
-                    try:
-                        await asyncio.wait_for(read_task, timeout=1.0)
-                    except Exception:
-                        pass
-                raw_out = process_carriage_returns(strip_ansi(_flush_raw()))
-                partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-                return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
-            except asyncio.CancelledError:
-                await terminate_process(p)
-                raise
-
+        # Explicit background execution (main agent only).
         task_id = _new_task_id()
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-        curr_sid = ctx.session_id
         task = ShellTask(
             task_id,
             cmd,
             p,
             widget=target_widget,
-            session_id=curr_sid,
+            session_id=ctx.session_id,
         )
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
-
-        if run_in_bg:
-            task.is_background = True
-            task.open_log()
-            ctx.add_background_task(task)
-            task.start_reading(on_completed=callback)
-
-            return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, log_path=task.log_path))
-
+        task.is_background = True
+        task.open_log()
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 
-        try:
-            wait_proc_task = asyncio.ensure_future(p.wait())
-            wait_bg_task = asyncio.ensure_future(task.background_event.wait())
-            done, pending = await asyncio.wait(
-                [wait_proc_task, wait_bg_task],
-                timeout=float(timeout),
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for t_pending in pending:
-                t_pending.cancel()
+        return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, log_path=task.log_path))
 
-            if not done:
-                raise asyncio.TimeoutError()
+    async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
+        """Run a process synchronously: stream output into a bounded tail buffer,
+        wait with a hard timeout, terminate the process on timeout/cancellation.
+        Never converts to a background task, but the task stays registered in the
+        task manager so ctrl+b can background it while it is still alive.
+        """
+        output_chunks = deque()
+        output_size = 0
+        output_truncated = False
+        _OUTPUT_LIMIT = 2 * 1024 * 1024  # 2 MB cap (mirrors web_fetch)
 
-            if task.background_event.is_set() or task.is_background:
-                task.is_background = True
-                task.open_log()
-                raw_out = task.get_formatted_output()
-                if raw_out.strip():
-                    recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
-                else:
-                    recent_output_str = "\n\nRecent Output: (No output yet)"
-                return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, recent_output_str, task.log_path))
+        def _flush_raw() -> str:
+            raw_all = "".join(output_chunks)
+            if output_truncated:
+                raw_all = "[Output truncated: showing recent output]\n" + raw_all
+            return raw_all
 
-            if task.read_task:
+        async def _read_stream(stream):
+            nonlocal output_size, output_truncated
+            if not stream:
+                return
+            while True:
                 try:
-                    await asyncio.wait_for(task.read_task, timeout=2.0)
+                    chunk = await stream.read(1024)
+                    if not chunk:
+                        break
+                    text = decode_output(chunk)
+                    output_chunks.append(text)
+                    output_size += len(text)
+                    if output_size > _OUTPUT_LIMIT:
+                        output_truncated = True
+                        # Drop old chunks from the front, keeping the tail.
+                        while output_chunks and output_size > _OUTPUT_LIMIT // 2:
+                            output_size -= len(output_chunks.popleft())
+                except Exception:
+                    break
+
+        task_id = _new_task_id()
+        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
+        task = ShellTask(
+            task_id,
+            cmd,
+            p,
+            widget=target_widget,
+            session_id=ctx.session_id,
+        )
+        ctx.add_background_task(task)
+
+        read_task = asyncio.create_task(_read_stream(p.stdout))
+        try:
+            await asyncio.wait_for(p.wait(), timeout=float(timeout))
+            if read_task:
+                try:
+                    await asyncio.wait_for(read_task, timeout=2.0)
                 except asyncio.TimeoutError:
                     pass
-            task.close_pty()
-            res = task.get_formatted_output()
+            res = process_carriage_returns(strip_ansi(_flush_raw()))
             if not res.strip():
                 return ToolResult.done("(no output)")
             return ToolResult.done(_truncate_output(res))
         except asyncio.TimeoutError:
-            task.is_background = True
-            task.open_log()
-            raw_out = task.get_formatted_output()
-            if raw_out.strip():
-                recent_output_str = f"\n\nRecent Output:\n{tail_output(raw_out, 2000)}"
-            else:
-                recent_output_str = "\n\nRecent Output: (No output yet)"
-            return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, recent_output_str, task.log_path))
-        except asyncio.CancelledError:
-            if "task" in locals() and task:
-                task.kill_sync()
-                task.close_pty()
-            elif "p" in locals() and p:
+            await terminate_process(p)
+            if read_task:
                 try:
-                    p.kill()
+                    await asyncio.wait_for(read_task, timeout=1.0)
                 except Exception:
                     pass
+            raw_out = process_carriage_returns(strip_ansi(_flush_raw()))
+            partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
+            return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
+        except asyncio.CancelledError:
+            await terminate_process(p)
             raise
         finally:
-            if "task" in locals() and task and not getattr(task, "is_background", False):
-                app_obj = getattr(ctx, "host", None)
-                mgr = getattr(app_obj, "task_manager", None) if app_obj is not None else None
-                if mgr is None:
-                    mgr = getattr(ctx, "task_manager", None)
+            if not hasattr(task, "is_background") or not task.is_background:
+                mgr = getattr(ctx, "task_manager", None)
                 if mgr is not None and hasattr(mgr, "drop"):
-                    mgr.drop(task.task_id)
+                    try:
+                        mgr.drop(task.task_id)
+                    except Exception:
+                        pass
 
     async def _create_std_process(self, command: str, env: dict[str, str], cwd: str = None):
         if is_windows():

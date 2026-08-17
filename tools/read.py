@@ -238,7 +238,6 @@ class ReadTool(BaseTool):
                         "description": "Byte offset (only for single-line or huge binary/log files)",
                     },
                     "detail": {"type": "string", "description": "Image detail: high (default), low, original"},
-                    "raw": {"type": "boolean", "description": "Return raw response for URL"},
                 },
                 "required": ["path"],
             },

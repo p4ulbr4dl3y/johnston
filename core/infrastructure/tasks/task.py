@@ -63,16 +63,30 @@ class BaseTask(ABC):
     # -- status ------------------------------------------------------------
 
     @property
+    def is_running(self) -> bool:
+        """True while the task status is running OR the backing process is alive.
+
+        The process check keeps tasks with a replaced/dead status (e.g. a timed
+        out task moved to background) responsive to manage_shell/ctrl+b as long
+        as their subprocess still lives.
+        """
+        return self._status.is_running or self._process_alive()
+
+    @property
     def status(self) -> TaskStatus:
+        if self._status.is_running or self._process_alive():
+            return TaskStatus.RUNNING
         return self._status
 
     @status.setter
     def status(self, value: TaskStatus) -> None:
         self._status = value
 
-    @property
-    def is_running(self) -> bool:
-        return self._status.is_running
+    def _process_alive(self) -> bool:
+        proc = self.process
+        if proc is None:
+            return False
+        return getattr(proc, "returncode", None) is None
 
     # -- io -----------------------------------------------------------------
 

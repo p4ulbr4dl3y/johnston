@@ -751,6 +751,11 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         bot_texts = [e for e in events if e[0] == "bot_text"]
         self.assertIn("File read complete", bot_texts[-1][1])
 
+        # Check reasoning_content was preserved in assistant messages in history
+        assistant_msgs = [m for m in agent.history if m.get("role") == "assistant"]
+        self.assertTrue(len(assistant_msgs) >= 1)
+        self.assertEqual(assistant_msgs[0].get("reasoning_content"), "Thinking about file...")
+
     async def test_duplicate_tool_calls_are_all_executed(self):
         """Identical tool calls (same name+args) must all run, not be dropped by dedup."""
         agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")

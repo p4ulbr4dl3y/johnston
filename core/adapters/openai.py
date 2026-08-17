@@ -1,5 +1,6 @@
 import asyncio
 import atexit
+import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from openai import AsyncOpenAI
@@ -55,6 +56,33 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
             formatted.extend(tool_batch)
             formatted.extend(pending_user_images)
+            continue
+
+        if role == "assistant" and msg.get("tool_calls"):
+            cleaned_msg = dict(msg)
+            cleaned_calls = []
+            for tc in msg["tool_calls"]:
+                if isinstance(tc, dict):
+                    tc_copy = dict(tc)
+                    fn = tc.get("function")
+                    if isinstance(fn, dict):
+                        fn_copy = dict(fn)
+                        raw_args = fn.get("arguments", "{}")
+                        if not isinstance(raw_args, str):
+                            raw_args = json.dumps(raw_args)
+                        else:
+                            try:
+                                json.loads(raw_args)
+                            except Exception:
+                                raw_args = "{}"
+                        fn_copy["arguments"] = raw_args
+                        tc_copy["function"] = fn_copy
+                    cleaned_calls.append(tc_copy)
+                else:
+                    cleaned_calls.append(tc)
+            cleaned_msg["tool_calls"] = cleaned_calls
+            formatted.append(cleaned_msg)
+            i += 1
             continue
 
         formatted.append(msg)

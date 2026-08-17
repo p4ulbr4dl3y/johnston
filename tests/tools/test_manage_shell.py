@@ -11,6 +11,9 @@ def _make_task(task_id, command="cmd", status=None, output=None, proc=None):
     t = ShellTask(task_id, command, proc)
     t.session_id = getattr(t, "session_id", "sess-A")
     t.is_background = True
+    if proc is not None:
+        # Simulate a live process (returncode None while running).
+        proc.returncode = None
     if status is not None:
         t.status = status
     if output:
@@ -51,7 +54,7 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_list_with_tasks(self):
         tool = ManageShellTool()
-        t1 = _make_task("t1", "echo hello")
+        t1 = _make_task("t1", "echo hello", proc=MagicMock())
         t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
         mock_app = self._make_app([t1, t2])
         res = str(await tool.execute({"action": "list"}, ctx=mock_app))
@@ -86,11 +89,14 @@ class TestManageShellTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_kill_running_task(self):
         tool = ManageShellTool()
-        mock_proc = MagicMock()
-        t = _make_task("t-kill", "sleep 100", proc=mock_proc)
+        t = _make_task("t-kill", "sleep 100", proc=MagicMock())
 
         async def _fake_kill():
             t.status = TaskStatus.KILLED
+            # A real kill sets the backing process returncode; the task must
+            # then report not running even though status was replaced.
+            if t.process is not None:
+                t.process.returncode = 1
 
         t.kill = _fake_kill
         mock_app = self._make_app([t])

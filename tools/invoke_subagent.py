@@ -82,7 +82,10 @@ class InvokeSubagentTool(BaseTool):
                         "description": "Task prompt with relative paths, boundaries, output format",
                     },
                     "description": {"type": "string", "description": "Short summary (3-5 words)"},
-                    "type": {"type": "string", "description": "Subagent type"},
+                    "type": {
+                        "type": "string",
+                        "description": "Subagent role/type (e.g. 'worker' [default], 'explorer')",
+                    },
                     "branch": {
                         "type": "string",
                         "description": "Git branch to work on. If it matches the current branch, the subagent works in the main tree; otherwise it runs in an isolated worktree on that branch (created if missing).",
