@@ -178,6 +178,54 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 agent.history,
             )
 
+    async def test_compact_history_bounds_long_in_turn_tool_cascade(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+
+        # Simulate 1 user message followed by 50 tool execution steps within the same turn
+        history = [{"role": "user", "content": "Fix all 50 issues"}]
+        for i in range(25):
+            tc_id = f"call_{i}"
+            history.append({
+                "role": "assistant",
+                "content": f"Step {i}",
+                "tool_calls": [{"id": tc_id, "type": "function", "function": {"name": "edit", "arguments": "{}"}}],
+            })
+            history.append({
+                "role": "tool",
+                "tool_call_id": tc_id,
+                "name": "edit",
+                "content": f"File {i} edited successfully with lots of diff text " * 10,
+            })
+        agent.history = history
+        self.assertEqual(len(agent.history), 51)
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = (
+            "## Objective\n- Fix 50 issues\n\n"
+            "## Key Decisions & User Constraints\n- (none)\n\n"
+            "## Work State\n### Completed\n- Fixed 25 files\n\n"
+            "## Next Move\n1. Run pytest\n\n"
+            "## Relevant Files & Context\n- All edited files"
+        )
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+
+            self.assertTrue(success)
+            self.assertIn("compacted successfully", msg)
+            # The 50-step cascade must be compacted down to checkpoint + bounded recent tail (<= 5 messages)
+            self.assertLessEqual(len(agent.history), 5)
+            self.assertIn("<conversation-checkpoint>", agent.history[0]["content"])
+            self.assertIn("## Key Decisions & User Constraints", agent.history[0]["content"])
+            self.assertIn("## Relevant Files & Context", agent.history[0]["content"])
+
+
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         self.addAsyncCleanup(agent.close)

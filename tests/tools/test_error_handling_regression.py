@@ -60,6 +60,8 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
     async def test_get_active_tools_exception_wrapped(self):
         mock_mgr = MagicMock()
         mock_mgr.get_active_tools.side_effect = RuntimeError("broken transport")
+        # Explicit caps miss so the flow reaches the full active-tools listing.
+        mock_mgr.get_capabilities_for_exposed_tool.return_value = None
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),

@@ -283,6 +283,9 @@ class TestStop(unittest.TestCase):
             proc = MagicMock()
             client.process = proc
             client.stop()
+            # stop() defers task-cancel/future-failure onto the loop via
+            # call_soon_threadsafe; run a tick so those callbacks execute.
+            loop.run_until_complete(asyncio.sleep(0))
         finally:
             loop.close()
 

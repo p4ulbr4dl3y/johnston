@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from core.infrastructure.mcp import MCPManager
+from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
 from widgets.app.dispatch import COMMAND_REGISTRY
 
 
@@ -82,6 +83,9 @@ class TestMCPManager(unittest.TestCase):
             def start(self):
                 return True
 
+            def stop(self):
+                pass
+
             def is_tools_stale(self, ttl=5.0):
                 return False
 
@@ -119,6 +123,9 @@ class TestMCPManager(unittest.TestCase):
 
             def start(self):
                 return True
+
+            def stop(self):
+                pass
 
             def is_tools_stale(self, ttl=5.0):
                 return False
@@ -161,6 +168,9 @@ class TestMCPManagerRegression(unittest.TestCase):
                 self.name = name
                 self.tools = [{"name": "search", "description": "Search", "inputSchema": {"type": "object"}}]
 
+            def stop(self):
+                pass
+
             def is_tools_stale(self, ttl=5.0):
                 return False
 
@@ -177,7 +187,12 @@ class TestMCPManagerRegression(unittest.TestCase):
         names = [t["function"]["name"] for t in mm.get_active_tools()]
 
         self.assertEqual(names, ["search"])
-        self.assertEqual(mm.call_tool("search", {"q": "x"}), "enabled:search:{'q': 'x'}:None")
+        # A default tools/call timeout is applied when none is given, so a hung
+        # server can never stall the agent turn forever.
+        self.assertEqual(
+            mm.call_tool("search", {"q": "x"}),
+            f"enabled:search:{{'q': 'x'}}:{DEFAULT_MCP_CALL_TIMEOUT}",
+        )
         self.assertIsNone(mm.call_tool("disabled__search", {"q": "x"}))
 
     def test_namespaced_capabilities_are_resolved(self):
@@ -192,6 +207,44 @@ class TestMCPManagerRegression(unittest.TestCase):
         ]
 
         self.assertEqual(mm.get_capabilities_for_exposed_tool("serverA__search"), ["network", "read"])
+
+    def test_invalid_command_entries_are_skipped_without_crashing(self):
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
+        with open(mm.global_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "mcpServers": {
+                        "good": {"command": "python", "args": ["-m", "srv"]},
+                        "bad-int": {"command": 42},
+                        "bad-list": {"command": [1, 2]},
+                        "no-cmd": {"args": []},
+                        "bad-env": {"command": "node", "env": "not-a-dict"},
+                        "bad-args": {"command": "node", "args": "-x"},
+                    }
+                },
+                f,
+            )
+
+        servers = mm.load_servers()
+        by_name = {s["name"]: s for s in servers}
+        # Broken commands are dropped entirely; valid commands keep their raw
+        # shape, and mis-typed env/args are sanitized away (server kept).
+        self.assertEqual(sorted(by_name), ["bad-args", "bad-env", "good"])
+        self.assertEqual(by_name["good"]["command"], "python")
+        self.assertEqual(by_name["good"]["args"], ["-m", "srv"])
+        self.assertEqual(by_name["bad-args"]["args"], [])
+        self.assertIsNone(by_name["bad-env"]["env"])
+
+    def test_constructor_does_not_write_real_global_config(self):
+        # Regression: instantiating the manager must not scribble the default
+        # config into the user's real ~/.johnston/mcp.json (was a constructor
+        # side effect). Merely constructing with a tmp project dir is enough;
+        # the lazy ensure only touches the (test-overridden) global_file.
+        real_global = os.path.join(os.path.expanduser("~"), ".johnston", "mcp.json")
+        before = os.path.exists(real_global)
+        MCPManager(project_dir=self.test_dir)
+        self.assertEqual(os.path.exists(real_global), before)
 
 
 class TestMCPProcessClientAndExtra(unittest.TestCase):

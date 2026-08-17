@@ -210,7 +210,7 @@ class CompactionMixin:
         messages: List[Dict[str, Any]],
         sys_overhead: int,
         threshold: int,
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+    ) -> Tuple[List[Dict[str, Any]], bool, str]:
         if len(messages) > 1:
             history_tokens = await asyncio.to_thread(estimate_tokens, messages[1:])
         else:
@@ -218,16 +218,16 @@ class CompactionMixin:
         current_context = sys_overhead + history_tokens
         if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
             self.last_context_tokens = current_context
-            return messages, False
+            return messages, False, ""
 
         self.history = messages[1:]
-        success, _ = await self.compact_history()
+        success, msg = await self.compact_history()
         if not success:
             self.last_context_tokens = current_context
-            return messages, False
+            return messages, False, msg
 
         compacted_history = await asyncio.to_thread(self.sanitize_history_for_model, self.history)
-        return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True
+        return [{"role": "system", "content": messages[0]["content"]}] + compacted_history, True, msg
 
     async def compact_history(self) -> Tuple[bool, str]:
         """
@@ -249,23 +249,19 @@ class CompactionMixin:
             else (sys_tokens + estimate_tokens(self.history))
         )
 
-        # Find clean user boundary to split history (preserve 4+ recent messages when available)
-        target_tail_start = max(1, len(self.history) - 4)
-        split_idx = target_tail_start
-        while split_idx > 0:
-            if self.history[split_idx].get("role") == "user":
+        # Preserve recent context tail (prefer recent user boundary in the last 2-6 messages,
+        # otherwise bound recent tail to the last 4 messages to avoid retaining huge in-turn tool cascades).
+        split_idx = None
+        min_tail_idx = max(1, len(self.history) - 6)
+        max_tail_idx = max(1, len(self.history) - 2)
+
+        for idx in range(min_tail_idx, max_tail_idx + 1):
+            if self.history[idx].get("role") == "user":
+                split_idx = idx
                 break
-            split_idx -= 1
 
-        if split_idx <= 0:
-            split_idx = len(self.history) - 2
-            while split_idx > 0:
-                if self.history[split_idx].get("role") == "user":
-                    break
-                split_idx -= 1
-
-        if split_idx <= 0:
-            split_idx = max(1, len(self.history) - 2)
+        if split_idx is None or split_idx <= 0:
+            split_idx = max(1, len(self.history) - 4)
 
         recent_tail = self.history[split_idx:]
         history_to_compact = self.history[:split_idx]
@@ -284,101 +280,69 @@ class CompactionMixin:
                 elif "[Context Summary of earlier conversation]:" in content_str:
                     previous_summary = content_str.split("[Context Summary of earlier conversation]:", 1)[1].strip()
 
-        # Prune and serialize history to compact using OpenCode format
-        TOOL_OUTPUT_MAX_CHARS = 3000
-        pruned_history = []
-        for msg in history_to_compact:
-            if not isinstance(msg, dict):
-                continue
-            role = msg.get("role")
-            content = msg.get("content") or ""
+        # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
+        sanitized_history_to_compact = self.sanitize_history_for_model(history_to_compact)
 
-            if role == "tool":
-                text_content = content if isinstance(content, str) else str(content)
-                if len(text_content) > TOOL_OUTPUT_MAX_CHARS:
-                    text_content = text_content[:TOOL_OUTPUT_MAX_CHARS] + "... [tool output truncated]"
-                if not (text_content or "").strip():
-                    # Skip empty tool output (serialized as user on OpenAI wire
-                    # contract, which rejects empty user content with 400).
-                    continue
-                # Tool outputs are serialized as user on OpenAI wire, but no redundant
-                # `[Tool Result]:` wrapper — that label adds tokens with no signal.
-                pruned_history.append({"role": "user", "content": text_content})
-            elif role == "assistant":
-                # tool_calls are already re-serialized as their own tool messages
-                # below, so include only the assistant's text content (no redundant
-                # `[Assistant tool call]: name(args)` duplication).
-                text_content = content if isinstance(content, str) else str(content)
-                if text_content:
-                    pruned_history.append({"role": "assistant", "content": text_content})
-            else:
-                text_content = content if isinstance(content, str) else str(content)
-                role_out = role if role in ("user", "system", "assistant") else "user"
-                if role_out == "user" and not (text_content or "").strip():
-                    # Skip empty user messages (invalid on OpenAI wire contract).
-                    continue
-                pruned_history.append({"role": role_out, "content": text_content})
-
-        # Merge consecutive messages with the same role to prevent OpenAI API 400 Bad Request errors
-        merged_history = []
-        for msg in pruned_history:
-            if not merged_history:
-                merged_history.append(dict(msg))
-            else:
-                prev = merged_history[-1]
-                if prev.get("role") == msg.get("role"):
-                    prev_content = str(prev.get("content", ""))
-                    curr_content = str(msg.get("content", ""))
-                    prev["content"] = f"{prev_content}\n\n{curr_content}".strip()
-                else:
-                    merged_history.append(dict(msg))
+        # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
+        max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)
+        while sanitized_history_to_compact and (sys_tokens + estimate_tokens(sanitized_history_to_compact)) > max_summarize_tokens:
+            sanitized_history_to_compact.pop(0)
+            sanitized_history_to_compact = self.sanitize_history_for_model(sanitized_history_to_compact)
 
         summary_template = (
+            "You are performing a CONTEXT CHECKPOINT COMPACTION.\n"
+            "Create a structured handoff summary for another LLM that will seamlessly resume and continue the task.\n"
             "Output exactly the Markdown structure shown inside <template> and keep the section order unchanged. "
-            "Do not include the <template> tags in your response.\n"
+            "Do not include the <template> tags in your response.\n\n"
             "<template>\n"
             "## Objective\n"
-            "- [one or two brief sentences describing what the user is trying to accomplish]\n\n"
-            "## Important Details\n"
-            '- [constraints/preferences, decisions and why, important facts/assumptions, exact context needed to continue, or "(none)"]\n\n'
+            "- [1-2 brief sentences: primary goal and what user is trying to accomplish]\n\n"
+            "## Key Decisions & User Constraints\n"
+            '- [user preferences, architecture choices, explicit constraints, or "(none)"]\n'
+            '- [key technical decisions made and why, or "(none)"]\n\n'
             "## Work State\n"
             "### Completed\n"
-            '- [finished work, verified facts, or changes made; otherwise "(none)"]\n\n'
+            '- [finished tasks, verified code changes, passing test suites, or "(none)"]\n\n'
             "### Active\n"
-            '- [current work, partial changes, or investigation state; otherwise "(none)"]\n\n'
+            '- [in-flight work, partial edits, current investigation state, or "(none)"]\n\n'
             "### Blocked\n"
-            '- [blockers, failing commands, or unknowns; otherwise "(none)"]\n\n'
+            '- [blockers, failing commands, unsolved errors, or "(none)"]\n\n'
             "## Next Move\n"
-            '1. [immediate concrete action, or "(none)"]\n'
-            '2. [next action if known, or "(none)"]\n\n'
-            "## Relevant Files\n"
-            '- [file or directory path: why it matters, or "(none)"]\n'
+            '1. [immediate concrete next action]\n'
+            '2. [subsequent step if known, or "(none)"]\n\n'
+            "## Relevant Files & Context\n"
+            '- [file/directory path: why it matters, critical symbols, error messages, or "(none)"]\n'
             "</template>\n\n"
             "Rules:\n"
+            "- Be concise, dense, and structured for an AI agent to continue execution without context loss.\n"
             "- Keep every section, even when empty.\n"
-            "- Use terse bullets, not prose paragraphs.\n"
+            "- Use terse factual bullets, not prose paragraphs.\n"
             "- Preserve exact file paths, symbols, commands, error strings, URLs, and identifiers when known.\n"
-            "- Do not mention the summary process or that context was compacted."
+            "- Do not mention that context was compacted or the summarization process itself."
         )
 
         if previous_summary:
             prompt_header = (
-                "Update the anchored summary below using the conversation history.\n"
+                "Update the anchored handoff summary below using the conversation history above.\n"
                 "Preserve still-true details, remove stale details, and merge in new facts.\n"
                 f"<previous-summary>\n{previous_summary}\n</previous-summary>\n\n"
             )
         else:
-            prompt_header = "Create a new anchored summary from the conversation history.\n\n"
+            prompt_header = "Create a new anchored handoff summary from the conversation history above.\n\n"
 
-        user_instruction = "Generate the context summary now based on the above history."
-        if merged_history and merged_history[-1].get("role") == "user":
-            merged_history[-1]["content"] = (
-                f"{merged_history[-1].get('content', '')}\n\n[Instruction]: {user_instruction}".strip()
-            )
-        else:
-            merged_history.append({"role": "user", "content": user_instruction})
+        compaction_user_prompt = (
+            f"{prompt_header}{summary_template}\n\n"
+            "Generate the structured context handoff summary now based on the conversation history."
+        )
 
-        compact_messages = [{"role": "system", "content": prompt_header + summary_template}] + merged_history
+        from core.base_provider.tools import build_prompt_context
+        sys_prompt, _, _ = build_prompt_context(self)
+
+        compact_messages = (
+            [{"role": "system", "content": sys_prompt}]
+            + sanitized_history_to_compact
+            + [{"role": "user", "content": compaction_user_prompt}]
+        )
 
         summary_text = ""
         last_err = None
@@ -453,9 +417,8 @@ class CompactionMixin:
             )
 
             new_history = [{"role": "user", "content": checkpoint_content}] + recent_tail
-
-            self.history = new_history
-            tokens_after = sys_tokens + estimate_tokens(new_history)
+            self.history = self.sanitize_history_for_model(new_history)
+            tokens_after = sys_tokens + estimate_tokens(self.history)
             self.last_context_tokens = tokens_after
 
             from core.models_catalog import format_context_tokens

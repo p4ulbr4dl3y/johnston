@@ -300,10 +300,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         if should_compact(len(self.history), sys_overhead, estimate_tokens(self.history), threshold):
             yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
             try:
-                success, _ = await self.compact_history()
+                success, msg = await self.compact_history()
                 if success:
                     compacted_this_turn = True
-                    yield ("event_divider", "Session Compacted", "")
+                    divider_text = "Session Compacted"
+                    if "(" in msg and ")" in msg:
+                        divider_text = f"Session Compacted ({msg[msg.find('(') + 1: msg.rfind(')')]})"
+                    yield ("event_divider", divider_text, "")
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
@@ -738,14 +741,24 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 # once here and reuse the latest slice on the next iteration.
                 history_snapshot = await asyncio.to_thread(list, messages[1:])
                 self.history = history_snapshot
-                messages, compacted_in_loop = (
-                    (messages, False)
-                    if compacted_this_turn
-                    else await self._compact_messages_if_needed(messages, self._last_sys_tokens, threshold)
-                )
+                if compacted_this_turn:
+                    messages, compacted_in_loop, compact_msg = messages, False, ""
+                else:
+                    compact_res = await self._compact_messages_if_needed(messages, self._last_sys_tokens, threshold)
+                    if isinstance(compact_res, tuple) and len(compact_res) == 3:
+                        messages, compacted_in_loop, compact_msg = compact_res
+                    elif isinstance(compact_res, tuple) and len(compact_res) == 2:
+                        messages, compacted_in_loop = compact_res[0], compact_res[1]
+                        compact_msg = ""
+                    else:
+                        messages, compacted_in_loop, compact_msg = messages, False, ""
+
                 if compacted_in_loop:
                     compacted_this_turn = True
-                    yield ("event_divider", "Session Compacted", "")
+                    divider_text = "Session Compacted"
+                    if "(" in compact_msg and ")" in compact_msg:
+                        divider_text = f"Session Compacted ({compact_msg[compact_msg.find('(') + 1: compact_msg.rfind(')')]})"
+                    yield ("event_divider", divider_text, "")
                     yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:

@@ -114,26 +114,46 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     from tools.base import is_mock_manager
 
-    # Check if the tool is an active MCP tool
+    mock_mgr = is_mock_manager(mcp_mgr)
+
+    # Fast path: a known MCP tool must not re-warm every server (spawning npx)
+    # just to confirm the name. Check the already-discovered cached tools first;
+    # only fall back to a full active listing when the name isn't cached (cold
+    # server not yet warmed up).
+    active_mcp_tools: list = []
     try:
-        if hasattr(mcp_mgr, "get_active_tools_async") and not is_mock_manager(mcp_mgr):
-            res_or_coro = mcp_mgr.get_active_tools_async()
-            active_mcp_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
-        else:
-            active_mcp_tools = mcp_mgr.get_active_tools() or []
-        is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+        if hasattr(mcp_mgr, "get_cached_tools"):
+            cached_tools = mcp_mgr.get_cached_tools() or []
+            if isinstance(cached_tools, list):
+                active_mcp_tools = cached_tools
     except Exception as e:
-        return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
+        return ToolResult.error("mcp", detail=f"failed to read cached tools: {e}", name=name)
+    is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
 
     if not is_mcp:
         # Short-circuit: only check the capability lookup when the name wasn't
-        # found among active tools. Kept outside the listing try so its failure
+        # found among cached tools. Kept outside the listing try so its failure
         # is reported distinctly and not confused with transport listing errors.
         try:
             if mcp_mgr.get_capabilities_for_exposed_tool(name):
                 is_mcp = True
         except Exception as e:
             return ToolResult.error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
+
+    if not is_mcp:
+        # Full listing fallback: starts/refreshes servers that cache misses
+        # could not cover (e.g. very first call before any warmup ran).
+        try:
+            if hasattr(mcp_mgr, "get_active_tools_async") and not mock_mgr:
+                res_or_coro = mcp_mgr.get_active_tools_async()
+                listed_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
+            else:
+                listed_tools = mcp_mgr.get_active_tools() or []
+            if listed_tools:
+                active_mcp_tools = list(listed_tools)
+            is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+        except Exception as e:
+            return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
 
     if not is_mcp:
         import difflib
@@ -154,10 +174,12 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     # Determine the exposed MCP tool name (namespaced as "server__tool" on name
     # collisions) so permissions are stored and checked under that name.
     exposed_name = clean_name
+    target_entry = None
     for t in active_mcp_tools:
         fn_name = t.get("function", {}).get("name")
         if fn_name in (name, clean_name, resolved_name):
             exposed_name = fn_name
+            target_entry = t
             break
 
     perm_err = await check_and_confirm_permission(exposed_name, name, args, ctx_or_app)
@@ -167,7 +189,11 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     try:
         from tools.base import execute_mcp_tool, truncate_output
 
-        mcp_res = await execute_mcp_tool(mcp_mgr, name, args)
+        # Execute against the exact server that owns the permission-checked
+        # exposed name, so the permission decision and the executed tool can
+        # never diverge on a name collision.
+        target_server = target_entry.get("_mcp_server") if isinstance(target_entry, dict) else None
+        mcp_res = await execute_mcp_tool(mcp_mgr, name, args, target_server=target_server)
         if mcp_res is not None:
             tool_res = await _wrap_execute(mcp_res)
             if not tool_res.is_error and tool_res.content and len(tool_res.content) > 8000:

@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -231,8 +232,8 @@ class TransportEdge(unittest.TestCase):
         self.assertIn(99, client._pending_responses)
 
 
-class BugTests(unittest.TestCase):
-    """Intentional bug-confirming tests. Left RED if the code is broken."""
+class BugTests(unittest.IsolatedAsyncioTestCase):
+    """Regression tests for fixed MCP bugs."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -240,37 +241,56 @@ class BugTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
-    def test_failed_start_does_not_leak_cached_client(self):
-        # BUG (manager.py _load_server_tools_async, ~lines 314-335):
-        # On start failure the freshly-created client is stored in self.clients
-        # BEFORE _cleanup_if_created() runs, whose guard
-        #   self.clients.get(name) is not client
-        # then never matches, so the failed client (with a live subprocess) is
-        # never stopped/removed. Sync get_active_tools (line 269-272) does NOT
-        # store failed clients, so async path is inconsistent -> process leak.
+    async def test_failed_start_does_not_leak_cached_client(self):
+        # A client whose async start reported ok=False must be torn down and
+        # never remain cached with a (possibly) running subprocess. Uses a real
+        # awaitable mock so the ok=False branch is the one exercised (the old
+        # plain MagicMock made the test pass via a TypeError instead).
         m = make_manager(self.tmp)
         m.load_servers = lambda: [{"name": "bad", "command": "python"}]
 
         failed = MagicMock()
-        failed.start_async.return_value = False
+        failed.start_async = AsyncMock(return_value=False)
         failed.stop_async = AsyncMock()
+        failed.last_error = "boom"
 
         with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed) as mk:
-            asyncio.run(m.get_active_tools_async())
+            tools = await m.get_active_tools_async()
 
+        self.assertEqual(tools, [])
         self.assertEqual(mk.call_count, 1)
-        # Correct behavior: a client that failed to start must not remain cached
-        # with a (possibly) running subprocess.
         self.assertNotIn("bad", m.clients)
         failed.stop_async.assert_awaited_once()
 
-    def test_call_async_after_stop_does_not_raise(self):
-        # BUG (process_client.py stop() lines 281-283 + call_tool_async lines
-        # 572-582): stop() sets a RuntimeError exception on pending futures, but
-        # call_tool_async only catches asyncio.TimeoutError and CancelledError.
-        # A RuntimeError therefore propagates to the caller when the server is
-        # stopped mid-call. The sync path (call_tool/_read_response) handles the
-        # same scenario gracefully, so this is an async-only crash.
+    async def test_start_timeout_does_not_leak_cached_client(self):
+        # A client whose async start times out past the per-server deadline must
+        # be torn down too, with a descriptive last_error. The mocked start
+        # raises asyncio.TimeoutError so the timeout branch is genuinely
+        # exercised without waiting out the real 15s deadline.
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [{"name": "slow", "command": "python"}]
+
+        hanging = MagicMock()
+        hanging.last_error = None
+
+        async def raise_timeout():
+            raise asyncio.TimeoutError("simulated hang")
+
+        hanging.start_async = AsyncMock(side_effect=raise_timeout)
+        hanging.stop_async = AsyncMock()
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=hanging):
+            tools = await m.get_active_tools_async()
+
+        self.assertEqual(tools, [])
+        self.assertNotIn("slow", m.clients)
+        self.assertIn("timed out", hanging.last_error or "")
+        hanging.stop_async.assert_awaited_once()
+
+    async def test_call_async_after_stop_does_not_raise(self):
+        # Regression: stop() failing the pending future (RuntimeError) while an
+        # async call is awaiting must surface as a graceful error string, never
+        # an uncaught exception.
         async def scenario():
             client = MCPProcessClient("s", "echo", cwd=self.tmp)
             client.process = fake_proc()
@@ -283,11 +303,253 @@ class BugTests(unittest.TestCase):
                     res = await task
                 except asyncio.CancelledError:
                     return "cancelled"
-            # Correct behavior: a graceful error string, not an uncaught RuntimeError.
             self.assertIsInstance(res, str)
             return res
 
-        asyncio.run(scenario())
+        res = await scenario()
+        self.assertIn("Error", res)
+
+
+class NamespaceResolutionEdge(unittest.TestCase):
+    """Exact-match-before-split resolution for tool names containing ``__``."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _manager_with_client(self, tools):
+        m = make_manager(self.tmp)
+
+        class DummyClient:
+            def __init__(self, tools):
+                self.tools = tools
+                self.called = []
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
+            def call_tool(self, tool_name, arguments, timeout=None):
+                self.called.append(tool_name)
+                return f"called {tool_name}"
+
+        client = DummyClient(tools)
+        m.clients["db"] = client
+        m.load_servers = lambda: [{"name": "db", "command": "python"}]
+        return m, client
+
+    def test_double_underscore_tool_name_not_confused_with_namespace(self):
+        # Tool named "db__query" must resolve to itself, not to the "db" server
+        # namespace split ("db" server + "query" tool).
+        m, client = self._manager_with_client(
+            [{"name": "query", "description": "q1"}, {"name": "db__query", "description": "q2"}]
+        )
+        res = m.call_tool("db__query", {})
+        self.assertEqual(res, "called db__query")
+        self.assertEqual(client.called, ["db__query"])
+
+    def test_namespaced_exposed_name_still_resolves_via_split(self):
+        # Collision case: plain "search" exists (unprefixed winner) so the
+        # other server's exposed name is serverB__search; calls to the exposed
+        # name still route to serverB.
+        m = make_manager(self.tmp)
+
+        class DummyClient:
+            def __init__(self, name, tools):
+                self.name = name
+                self.tools = tools
+                self.called = []
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
+            def call_tool(self, tool_name, arguments, timeout=None):
+                self.called.append((self.name, tool_name))
+                return f"called {self.name}:{tool_name}"
+
+        cA = DummyClient("serverA", [{"name": "search", "description": "s"}])
+        cB = DummyClient("serverB", [{"name": "search", "description": "s"}])
+        m.clients = {"serverA": cA, "serverB": cB}
+        m.load_servers = lambda: [
+            {"name": "serverA", "command": "python"},
+            {"name": "serverB", "command": "python"},
+        ]
+
+        self.assertEqual(m.call_tool("serverB__search", {}), "called serverB:search")
+        self.assertEqual(cB.called, [("serverB", "search")])
+        self.assertEqual(cA.called, [])
+
+
+class AsyncNamingEdge(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    async def test_async_collision_naming_is_deterministic(self):
+        # Namespace assignment must follow config order even though servers
+        # start concurrently (old code raced on a shared seen_names dict).
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [
+            {"name": "serverA", "command": "python"},
+            {"name": "serverB", "command": "python"},
+        ]
+
+        class DummyClient:
+            def __init__(self, tools):
+                self.tools = tools
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
+            async def start_async(self):
+                return True
+
+            async def fetch_tools_async(self):
+                return self.tools
+
+        m.clients = {
+            "serverA": DummyClient([{"name": "search", "description": "s"}]),
+            "serverB": DummyClient([{"name": "search", "description": "s"}]),
+        }
+
+        tools = await m.get_active_tools_async()
+        names = [t["function"]["name"] for t in tools]
+        self.assertEqual(names, ["search", "serverB__search"])
+
+    async def test_inflight_tools_refresh_task_is_reused(self):
+        # A second ensure_tools_ready_async while the first warmup is still in
+        # flight must reuse the task, never spawn an orphaned second one.
+        m = make_manager(self.tmp)
+        m.get_cached_tools = lambda: []
+        started = 0
+        release = asyncio.Event()
+
+        async def slow_warmup():
+            nonlocal started
+            started += 1
+            await release.wait()
+            return []
+
+        m.get_active_tools_async = slow_warmup
+
+        t1 = asyncio.create_task(m.ensure_tools_ready_async())
+        await asyncio.sleep(0)
+        t2 = asyncio.create_task(m.ensure_tools_ready_async())
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.gather(t1, t2)
+
+        self.assertEqual(started, 1)
+
+
+class ProcessClientRobustnessEdge(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_tools_fetch_stale_without_client_is_false(self):
+        m = make_manager(self.tmp)
+        self.assertFalse(m._tools_fetch_stale("ghost"))
+
+    def test_stderr_is_drained_and_tail_captured(self):
+        from io import StringIO
+
+        client = MCPProcessClient("s", ["python", "-c", "x"], cwd=self.tmp)
+        proc = fake_proc()
+        proc.stderr = StringIO("line1\nline2\n")
+        proc.stderr.fileno = lambda: 4
+        client.process = proc
+        client._spawn_stderr_drain()
+
+        deadline = time.time() + 2.0
+        while not client._stderr_tail and time.time() < deadline:
+            time.sleep(0.01)
+
+        self.assertIn("line1", client.stderr_tail())
+        client.stop()
+        self.assertIsNone(client.process)
+        self.assertIsNone(client._stderr_thread)
+
+    def test_stderr_drain_thread_is_skipped_for_mocked_process(self):
+        # MagicMock streams must not spawn a spin-looping drain thread.
+        client = MCPProcessClient("s", ["python", "-c", "x"], cwd=self.tmp)
+        client.process = fake_proc()
+        client._spawn_stderr_drain()
+        self.assertIsNone(client._stderr_thread)
+
+    async def test_async_restart_after_stop_recreates_reader(self):
+        client = MCPProcessClient("s", "echo", cwd=self.tmp)
+        with patch("subprocess.Popen", return_value=fake_proc()):
+            with patch.object(client, "_initialize_async", new=AsyncMock(return_value=True)):
+                ok = await client.start_async()
+        self.assertTrue(ok)
+        self.assertIsNotNone(client._read_task)
+
+        client.stop()
+        self.assertIsNone(client._read_task)
+
+        with patch("subprocess.Popen", return_value=fake_proc()):
+            with patch.object(client, "_initialize_async", new=AsyncMock(return_value=True)):
+                ok2 = await client.start_async()
+        self.assertTrue(ok2)
+        # A fresh async reader must have been spawned for the new process.
+        self.assertIsNotNone(client._read_task)
+        client.stop()
+
+
+class DefaultTimeoutEdge(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_call_tool_applies_default_timeout(self):
+        from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
+
+        m = make_manager(self.tmp)
+        seen = {}
+
+        class DummyClient:
+            tools = [{"name": "t", "description": "d"}]
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
+            def call_tool(self, tool_name, arguments, timeout=None):
+                seen["timeout"] = timeout
+                return "ok"
+
+        m.clients["srv"] = DummyClient()
+        m.load_servers = lambda: [{"name": "srv", "command": "python"}]
+
+        self.assertEqual(m.call_tool("t", {}), "ok")
+        self.assertEqual(seen["timeout"], DEFAULT_MCP_CALL_TIMEOUT)
+
+    def test_call_tool_respects_explicit_timeout(self):
+        m = make_manager(self.tmp)
+        seen = {}
+
+        class DummyClient:
+            tools = [{"name": "t", "description": "d"}]
+
+            def is_tools_stale(self, ttl=5.0):
+                return False
+
+            def call_tool(self, tool_name, arguments, timeout=None):
+                seen["timeout"] = timeout
+                return "ok"
+
+        m.clients["srv"] = DummyClient()
+        m.load_servers = lambda: [{"name": "srv", "command": "python"}]
+
+        self.assertEqual(m.call_tool("t", {}, timeout=7.5), "ok")
+        self.assertEqual(seen["timeout"], 7.5)
 
 
 class ParallelCallsEdge(unittest.IsolatedAsyncioTestCase):
@@ -314,6 +576,39 @@ class ParallelCallsEdge(unittest.IsolatedAsyncioTestCase):
             res = await client.call_tool_async("t", {}, timeout=0.05)
         self.assertIn("No response", res)
         self.assertEqual(client._pending_futures, {})
+
+    async def test_parallel_async_calls_get_distinct_ids_and_resolve(self):
+        # Concurrent callers must never share a req_id: the _call_lock serializes
+        # id allocation + future registration, and each future resolves with its
+        # own response.
+        client = MCPProcessClient("s", "echo")
+        client.process = fake_proc()
+        client.process.stdin = MagicMock()
+        # Fresh tools cache so the per-call post-refresh does not add ids.
+        client._tools_fetch_time = time.monotonic()
+        with patch.object(client, "_start_async_reader"):
+            seen_ids: list = []
+
+            def on_write(line):
+                req = json.loads(line)
+                seen_ids.append(req["id"])
+                fut = client._pending_futures.get(req["id"])
+                if fut and not fut.done():
+                    fut.set_result(
+                        {"jsonrpc": "2.0", "id": req["id"], "result": {"content": [{"type": "text", "text": f"r{req['id']}"}]}}
+                    )
+
+            client.process.stdin.write.side_effect = on_write
+
+            out = await asyncio.gather(*(client.call_tool_async("t", {}) for _ in range(5)))
+
+        self.assertEqual(len(seen_ids), 5)
+        self.assertEqual(len(set(seen_ids)), 5)
+        self.assertEqual([f"r{i}" for i in seen_ids], list(out))
+        # In real operation the async reader pops futures as responses arrive;
+        # the mocked write path resolves them directly, so nothing may be left
+        # pending/unresolved.
+        self.assertEqual([f for f in client._pending_futures.values() if not f.done()], [])
 
 
 if __name__ == "__main__":

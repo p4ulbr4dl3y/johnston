@@ -13,18 +13,33 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.infrastructure.mcp.process_client import MCPProcessClient
 from core.infrastructure.platform.paths import CONFIG_DIR
+from core.infrastructure.platform.platform_utils import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
 PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
 
+# Default upper bound for an MCP tools/call round-trip. A hanging server must
+# never hold an agent turn forever; callers without an explicit timeout get this.
+DEFAULT_MCP_CALL_TIMEOUT = 120.0
 
 _mcp_manager_instance: Optional["MCPManager"] = None
+_atexit_registered = False
+
+
+def _atexit_stop_all() -> None:
+    inst = _mcp_manager_instance
+    if inst is None:
+        return
+    try:
+        inst.stop_all()
+    except Exception:
+        logger.debug("Failed to stop MCP manager at exit", exc_info=True)
 
 
 def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
-    global _mcp_manager_instance
+    global _mcp_manager_instance, _atexit_registered
     if _mcp_manager_instance is None:
         _mcp_manager_instance = MCPManager(project_dir=project_dir)
     elif project_dir:
@@ -37,10 +52,19 @@ def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
             # directory. Stop them and drop cached tools so they are restarted
             # against the new project when next needed.
             _mcp_manager_instance._reset_clients_for_project()
+    if not _atexit_registered:
+        # Register the atexit hook exactly once (per instance registrations
+        # multiplied the teardown pass and hit clients nobody owned).
+        atexit.register(_atexit_stop_all)
+        _atexit_registered = True
     return _mcp_manager_instance
 
 
 class MCPManager:
+    # Defaults so `__new__`-constructed test doubles never AttributeError.
+    _global_config_ensured = False
+    _warned_broken_config_files: set = None  # type: ignore[assignment]
+
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
         self.global_file = GLOBAL_MCP_FILE
@@ -50,14 +74,17 @@ class MCPManager:
         self._tools_refresh_task: Optional[asyncio.Task] = None
         self._servers_cache_signature: Optional[Tuple] = None
         self._servers_cache: List[Dict[str, Any]] = []
-        self.ensure_default_configs()
-        atexit.register(self.stop_all)
+        self._warned_broken_config_files = set()
+        self._global_config_ensured = False
 
     def stop_all(self):
         """Stops all running MCP client processes."""
         for client in list(self.clients.values()):
+            stop = getattr(client, "stop", None)
+            if not callable(stop):
+                continue
             try:
-                client.stop()
+                stop()
             except Exception:
                 logger.warning("Failed to stop MCP client", exc_info=True)
         self.clients.clear()
@@ -70,19 +97,51 @@ class MCPManager:
         running. Also invalidates cached server/tool state so they are re-derived
         from the new project's config.
         """
-        for client in list(self.clients.values()):
-            try:
-                client.stop()
-            except Exception:
-                logger.warning("Failed to stop MCP client on project switch", exc_info=True)
-        self.clients.clear()
+        self.stop_all()
         self._servers_cache_signature = None
         self._servers_cache = []
 
-    def ensure_default_configs(self):
-        from core.infrastructure.config.config_helpers import ensure_json_config
+    def _ensure_global_config(self) -> None:
+        """Lazily materialize the default global config, only once per manager.
 
-        ensure_json_config(self.global_file, {"mcpServers": {}})
+        Doing this at construction time wrote `~/.johnston/mcp.json` as a side
+        effect of merely instantiating the manager (and polluted test runs with
+        real user-config writes); deferring to first use keeps the constructor
+        side-effect free while preserving prod behavior.
+        """
+        try:
+            from core.infrastructure.config.config_helpers import ensure_json_config
+
+            ensure_json_config(self.global_file, {"mcpServers": {}})
+        except Exception:
+            logger.debug("Failed to ensure default global MCP config", exc_info=True)
+        self._global_config_ensured = True
+
+    def _warn_broken_config(self, path: str, reason: str = "") -> None:
+        """Log a broken-config warning once per (file, reason), not per call."""
+        warned = self._warned_broken_config_files
+        if warned is None:
+            warned = self._warned_broken_config_files = set()
+        key = (path, reason)
+        if key in warned:
+            return
+        warned.add(key)
+        if reason:
+            logger.warning("Failed to load MCP servers config %s: %s", path, reason)
+        else:
+            logger.warning("Failed to load MCP servers config %s: invalid JSON", path)
+
+    @staticmethod
+    def _command_parts_valid(cmd: Any) -> bool:
+        """Validate a server command before it reaches subprocess launch.
+
+        Accepts a single string (binary name) or a non-empty list of strings;
+        anything else (int, None, mixed types) fails validation so the server is
+        skipped with a warning instead of crashing on a later ``list(cmd)``.
+        """
+        if isinstance(cmd, str):
+            return True
+        return isinstance(cmd, list) and bool(cmd) and all(isinstance(c, str) for c in cmd)
 
     def _servers_signature(self) -> Tuple:
         """Returns (path, mtime_ns, size) for both config files to detect changes."""
@@ -98,7 +157,57 @@ class MCPManager:
     def _tools_fetch_stale(self, server_name: str, ttl: float = 5.0) -> bool:
         """True if this server's cached tools list is stale, based on last fetch time."""
         client = self.clients.get(server_name)
-        return client.is_tools_stale(ttl=ttl)
+        if client is None:
+            return False
+        return bool(client.is_tools_stale(ttl=ttl))
+
+    def _load_config_file(self, path: str, scope: str, servers: Dict[str, Dict[str, Any]]) -> None:
+        """Parse one MCP config file into ``servers``, validating entries.
+
+        Invalid entries (broken command/env/args types) are skipped with a
+        one-time warning; a malformed file logs a one-time warning and yields
+        nothing rather than spamming WARNING+traceback on every call.
+        """
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            self._warn_broken_config(path)
+            return
+
+        mcp_servers = data.get("mcpServers") or {}
+        if not isinstance(mcp_servers, dict):
+            self._warn_broken_config(path, reason="'mcpServers' must be an object")
+            return
+
+        for k, v in mcp_servers.items():
+            if not isinstance(v, dict):
+                self._warn_broken_config(path, reason=f"server '{k}': entry must be an object")
+                continue
+            v_copy = dict(v)
+            if not self._command_parts_valid(v_copy.get("command")):
+                self._warn_broken_config(path, reason=f"server '{k}': invalid command {v_copy.get('command')!r}")
+                continue
+            args = v_copy.get("args")
+            if args is not None and not isinstance(args, list):
+                self._warn_broken_config(path, reason=f"server '{k}': 'args' must be an array")
+                args = None
+            v_copy["args"] = args or []
+            env = v_copy.get("env")
+            if env is not None and not isinstance(env, dict):
+                self._warn_broken_config(path, reason=f"server '{k}': 'env' must be an object")
+                env = None
+            v_copy["env"] = env
+            cwd = v_copy.get("cwd")
+            if cwd is not None and not isinstance(cwd, str):
+                self._warn_broken_config(path, reason=f"server '{k}': 'cwd' must be a string")
+                cwd = None
+            v_copy["cwd"] = cwd
+            v_copy["name"] = k
+            v_copy["scope"] = scope
+            servers[k] = v_copy
 
     def load_servers(self) -> List[Dict[str, Any]]:
         """
@@ -108,43 +217,24 @@ class MCPManager:
         Results are cached by config file mtime/size so repeated calls (e.g. per
         tool call) do not re-read and re-parse JSON on every invocation. Cache is
         invalidated automatically when either config file changes, preserving
-        hot-reload.
+        hot-reload. The default global config is materialized lazily on first use.
         """
         curr_proj_dir = os.path.realpath(self.project_dir or os.getcwd())
         self.project_file = os.path.join(curr_proj_dir, PROJECT_MCP_FILE)
+        if not self._global_config_ensured:
+            self._ensure_global_config()
+
         signature = self._servers_signature()
         if signature == self._servers_cache_signature:
             return list(self._servers_cache)
 
         servers: Dict[str, Dict[str, Any]] = {}
+        self._load_config_file(self.global_file, "global", servers)
 
-        # 1. Load global
-        if os.path.exists(self.global_file):
-            try:
-                with open(self.global_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    for k, v in data.get("mcpServers", {}).items():
-                        v_copy = dict(v)
-                        v_copy["name"] = k
-                        v_copy["scope"] = "global"
-                        servers[k] = v_copy
-            except Exception:
-                logger.warning("Failed to load global MCP servers config", exc_info=True)
-
-        # 2. Load project (only if distinct from global_file)
         real_global = os.path.realpath(self.global_file)
         real_project = os.path.realpath(self.project_file)
         if os.path.exists(self.project_file) and real_project != real_global:
-            try:
-                with open(self.project_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    for k, v in data.get("mcpServers", {}).items():
-                        v_copy = dict(v)
-                        v_copy["name"] = k
-                        v_copy["scope"] = "project"
-                        servers[k] = v_copy
-            except Exception:
-                logger.warning("Failed to load project MCP servers config", exc_info=True)
+            self._load_config_file(self.project_file, "project", servers)
 
         self._servers_cache = list(servers.values())
         self._servers_cache_signature = signature
@@ -190,8 +280,6 @@ class MCPManager:
                 }
                 server_dict.update(key_updates)
                 cfg["mcpServers"][name] = server_dict
-
-            from core.infrastructure.platform.platform_utils import atomic_write_json
 
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
@@ -261,14 +349,13 @@ class MCPManager:
 
             name = s["name"]
             cmd = s.get("command")
-            args = s.get("args") or []
-            env = s.get("env")
-            cwd = s.get("cwd")
-
             if not cmd:
                 continue
 
-            full_cmd = [cmd] + args if isinstance(cmd, str) else list(cmd) + args
+            args = s.get("args") or []
+            env = s.get("env")
+            cwd = s.get("cwd")
+            full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
             client = self.clients.get(name)
             if not client:
@@ -291,15 +378,14 @@ class MCPManager:
 
         return tools
 
-    async def _load_server_tools_async(
-        self, server: Dict[str, Any], seen_names: Dict[str, str], timeout: float = 15.0
-    ) -> List[Dict[str, Any]]:
-        """Start (or refresh) a single MCP server and return its formatted tools.
+    async def _load_server_tools_async(self, server: Dict[str, Any], timeout: float = 15.0) -> List[Dict[str, Any]]:
+        """Start (or refresh) a single MCP server and return its raw tools.
 
         Isolated per server with a short deadline so one slow/broken server can
         never block the others: any failure yields an empty list for that server
         only. If a freshly-created client cannot become ready in time it is torn
-        down so no orphaned subprocess leaks.
+        down so no orphaned subprocess leaks. Naming/formatting happens later,
+        sequentially, so name-collision assignment stays deterministic.
         """
         name = server["name"]
         cmd = server.get("command")
@@ -309,7 +395,7 @@ class MCPManager:
         args = server.get("args") or []
         env = server.get("env")
         cwd = server.get("cwd")
-        full_cmd = [cmd] + args if isinstance(cmd, str) else list(cmd) + args
+        full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
         client = self.clients.get(name)
         created = False
@@ -334,13 +420,19 @@ class MCPManager:
             if created:
                 try:
                     ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
-                except (asyncio.TimeoutError, Exception) as exc:
-                    client.last_error = str(exc)
+                except asyncio.TimeoutError:
+                    client.last_error = client.last_error or f"Server start timed out after {timeout}s"
+                    self.clients.pop(name, None)
+                    await _cleanup_if_created()
+                    return []
+                except Exception as exc:
+                    if not client.last_error:
+                        client.last_error = str(exc)
                     self.clients.pop(name, None)
                     await _cleanup_if_created()
                     return []
                 if not ok:
-                    if not getattr(client, "last_error", None):
+                    if not client.last_error:
                         client.last_error = "Failed to start"
                     self.clients.pop(name, None)
                     await _cleanup_if_created()
@@ -349,31 +441,35 @@ class MCPManager:
             elif self._tools_fetch_stale(name):
                 try:
                     await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
-                except (asyncio.TimeoutError, Exception):
+                except Exception:
                     logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
-            tools = []
-            for t in client.tools:
-                formatted = self._format_tool_schema(t, name, seen_names)
-                if formatted:
-                    tools.append(formatted)
-            return tools
+            return list(client.tools)
         except Exception:
             logger.warning("MCP server %s failed to load tools", name, exc_info=True)
             return []
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
-        tools: List[Dict[str, Any]] = []
         servers = await self.load_servers_async()
-        seen_names: Dict[str, str] = {}
 
         eligible = [s for s in servers if not s.get("disabled", False) and s.get("command")]
         # Start every server concurrently with an isolated per-server deadline so
-        # a slow/cold (npx/uvx) or broken server cannot stall the others.
-        results = await asyncio.gather(*(self._load_server_tools_async(s, seen_names) for s in eligible))
-        for server_tools in results:
-            tools.extend(server_tools)
+        # a slow/cold (npx/uvx) or broken server cannot stall the others. Tool
+        # naming/formatting happens afterwards, sequentially in config order, so
+        # the winner of a name collision is deterministic (config order), not
+        # whatever gather scheduling happened to finish first.
+        results = await asyncio.gather(*(self._load_server_tools_async(s) for s in eligible), return_exceptions=True)
 
+        tools: List[Dict[str, Any]] = []
+        seen_names: Dict[str, str] = {}
+        for server, res in zip(eligible, results):
+            if isinstance(res, Exception):
+                logger.debug("MCP server %s failed to load tools: %s", server.get("name"), res)
+                continue
+            for t in res or []:
+                formatted = self._format_tool_schema(t, server["name"], seen_names)
+                if formatted:
+                    tools.append(formatted)
         return tools
 
     def get_cached_tools(self) -> List[Dict[str, Any]]:
@@ -405,25 +501,31 @@ class MCPManager:
         already cached from a previous run, so a later turn picks the freshly
         loaded tools up. A first call with an empty cache therefore returns []
         immediately while warmup proceeds in the background.
+
+        A task that is still in flight is always reused — a fresh check is only
+        spawned when the previous warmup finished longer than ``max_age`` ago.
         """
         now = time.monotonic()
         task = self._tools_refresh_task
 
-        if task is not None and not task.done() and (now - self._tools_refresh_time) < max_age:
-            # A warmup is already in flight and its results are still fresh:
-            # return what we have; the build_x caller snapshots cached tools.
+        if task is not None and not task.done():
+            # A warmup is already in flight: reuse it, never spawn a second
+            # (spawning would orphan the first task and its done-callback).
             return self.get_cached_tools()
 
-        if task is None or task.done():
-            task = asyncio.create_task(self.get_active_tools_async())
-            self._tools_refresh_task = task
+        if task is not None and (now - self._tools_refresh_time) < max_age:
+            # Most recent warmup finished within the freshness window.
+            return self.get_cached_tools()
 
-            def _on_done(done: asyncio.Task) -> None:
-                self._tools_refresh_time = time.monotonic()
-                if self._tools_refresh_task is done:
-                    self._tools_refresh_task = None
+        task = asyncio.create_task(self.get_active_tools_async())
+        self._tools_refresh_task = task
 
-            task.add_done_callback(_on_done)
+        def _on_done(done: asyncio.Task) -> None:
+            self._tools_refresh_time = time.monotonic()
+            if self._tools_refresh_task is done:
+                self._tools_refresh_task = None
+
+        task.add_done_callback(_on_done)
 
         return self.get_cached_tools()
 
@@ -467,26 +569,32 @@ class MCPManager:
     def _resolve_target_client_and_tool(
         self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None
     ) -> Tuple[Optional[MCPProcessClient], Optional[str]]:
-        """Helper to match exposed/raw tool_name against active MCP clients."""
-        req_server = target_server
-        req_tool = tool_name
+        """Helper to match exposed/raw tool_name against active MCP clients.
 
-        if "__" in tool_name and not req_server:
-            req_server, req_tool = tool_name.split("__", 1)
-
+        Exact match on the exposed or raw name runs FIRST, so a tool whose real
+        name contains ``__`` (e.g. ``db__query``) still resolves; the
+        ``server__tool`` namespace split is only attempted for legacy names that
+        no exact match covered.
+        """
         for t in active_tools:
-            fn = t.get("function", {})
             s_name = t.get("_mcp_server")
             o_name = t.get("_mcp_tool_name")
-            exposed_name = fn.get("name")
+            if s_name is None or o_name is None:
+                continue
+            if target_server and s_name != target_server:
+                continue
+            exposed_name = t.get("function", {}).get("name")
+            if exposed_name == tool_name or o_name == tool_name:
+                client = self.clients.get(s_name)
+                if client:
+                    return client, o_name
 
-            if req_server:
-                if s_name == req_server and (o_name == req_tool or exposed_name == tool_name):
-                    client = self.clients.get(s_name)
-                    if client:
-                        return client, o_name
-            else:
-                if exposed_name == tool_name or o_name == tool_name:
+        if not target_server and "__" in tool_name:
+            req_server, req_tool = tool_name.split("__", 1)
+            for t in active_tools:
+                s_name = t.get("_mcp_server")
+                o_name = t.get("_mcp_tool_name")
+                if s_name == req_server and o_name == req_tool:
                     client = self.clients.get(s_name)
                     if client:
                         return client, o_name
@@ -506,7 +614,9 @@ class MCPManager:
         active_tools = self.get_active_tools()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
-            return client.call_tool(o_name, arguments, timeout=timeout)
+            return client.call_tool(
+                o_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
+            )
         return None
 
     async def call_tool_async(
@@ -519,7 +629,9 @@ class MCPManager:
         active_tools = await self.get_active_tools_async()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
-            return await client.call_tool_async(o_name, arguments, timeout=timeout)
+            return await client.call_tool_async(
+                o_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
+            )
         return None
 
     def get_system_prompt_snippet(self) -> str:

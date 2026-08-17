@@ -3,17 +3,30 @@ Stdio JSON-RPC 2.0 client for MCP servers.
 """
 
 import asyncio
+import collections
 import json
 import logging
 import os
 import select
+import signal
 import subprocess
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+MCP_PROTOCOL_VERSION = "2024-11-05"
+CLIENT_NAME = "johnston"
+CLIENT_VERSION = "1.0.0"
+
+# Default upper bound for a tools/call round-trip. A hanging server must never
+# hold an agent turn forever; both the manager and direct callers get this
+# default when no explicit timeout is passed.
+DEFAULT_TOOLS_CALL_TIMEOUT = 120.0
+INIT_TIMEOUT = 5.0
+STDERR_TAIL_LINES = 200
 
 
 class MCPProcessClient:
@@ -38,6 +51,7 @@ class MCPProcessClient:
         self.process: Optional[subprocess.Popen] = None
         self.req_id = 0
         self.tools: List[Dict[str, Any]] = []
+        self.last_error: Optional[str] = None
         self._stopped = False
         self._buffer = ""
         self._lock = threading.RLock()
@@ -46,6 +60,12 @@ class MCPProcessClient:
         self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
         self._reader_thread: Optional[threading.Thread] = None
+        self._reader_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._stderr_thread: Optional[threading.Thread] = None
+        # Bounded tail of server stderr (drained off the event loop) so a chatty
+        # server can never deadlock on a full pipe; also available as diagnostics.
+        self._stderr_tail: Deque[str] = collections.deque(maxlen=STDERR_TAIL_LINES)
+        self._queue: Optional[asyncio.Queue] = None
         # Guards the async request critical section (id generation, future
         # registration and stdin write) so concurrent callers never pick a
         # duplicate req_id or leave an unregistered future behind.
@@ -70,9 +90,10 @@ class MCPProcessClient:
             return
         try:
             loop = asyncio.get_running_loop()
-            self._read_task = loop.create_task(self._async_read_loop())
         except RuntimeError:
             logger.debug("No running loop; skipping async reader for MCP server '%s'", self.name)
+            return
+        self._read_task = loop.create_task(self._async_read_loop())
 
     def _reader_thread_target(self):
         """Long-lived daemon thread that blocks on process stdout and hands lines to the event loop.
@@ -116,6 +137,64 @@ class MCPProcessClient:
         )
         self._reader_thread.start()
 
+    def _spawn_stderr_drain(self) -> None:
+        """Drain the server's stderr pipe in a daemon thread.
+
+        Without this, a server writing more than the OS pipe buffer (~64KB) of
+        logs to stderr blocks on ``write(2)`` and stops answering stdin, which
+        looks exactly like a hung server. The tail is kept in a bounded ring
+        buffer for diagnostics. Only spawned for real stream objects (mocked
+        test doubles are skipped via the ``fileno`` check).
+        """
+        if not self.process or self._stderr_thread and self._stderr_thread.is_alive():
+            return
+        stream = getattr(self.process, "stderr", None)
+        if stream is None:
+            return
+        try:
+            fd = stream.fileno()
+        except Exception:
+            return
+        if not isinstance(fd, int):
+            return
+        self._stderr_thread = threading.Thread(
+            target=self._drain_stderr, name=f"mcp-stderr-{self.name}", daemon=True
+        )
+        self._stderr_thread.start()
+
+    def _drain_stderr(self) -> None:
+        stream = getattr(self.process, "stderr", None) if self.process else None
+        if stream is None:
+            return
+        while not self._stopped:
+            try:
+                line = stream.readline()
+            except Exception:
+                return
+            if not line:
+                return
+            line = line.rstrip("\n")
+            if line:
+                self._stderr_tail.append(line)
+
+    def _join_stderr_thread(self, timeout: float = 1.0) -> None:
+        thread = self._stderr_thread
+        if thread is None:
+            return
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            logger.debug("stderr thread for MCP server '%s' did not exit in time", self.name)
+        self._stderr_thread = None
+
+    def stderr_tail(self, max_lines: int = 30) -> str:
+        """Return the last captured stderr lines (for diagnostics on failures)."""
+        return "\n".join(list(self._stderr_tail)[-max_lines:])
+
+    def _maybe_append_stderr_tail(self) -> None:
+        tail = self.stderr_tail(max_lines=15)
+        if tail:
+            self.last_error = f"{self.last_error}; server stderr: {tail[-300:]}"
+
     async def _async_read_loop(self):
         """Background async loop reading stdio JSON-RPC lines and fulfilling futures by request ID.
 
@@ -124,7 +203,7 @@ class MCPProcessClient:
         all JSON-RPC parsing/future fulfillment on the event loop.
         """
         loop = asyncio.get_running_loop()
-        self._queue: asyncio.Queue = asyncio.Queue()
+        self._queue = asyncio.Queue()
         self._spawn_reader_thread(loop)
         while not self._stopped:
             try:
@@ -215,7 +294,7 @@ class MCPProcessClient:
         run_env = os.environ.copy()
         if self.env:
             run_env.update(self.env)
-        return {
+        kwargs: Dict[str, Any] = {
             "args": self.cmd,
             "stdin": subprocess.PIPE,
             "stdout": subprocess.PIPE,
@@ -225,6 +304,15 @@ class MCPProcessClient:
             "text": True,
             "bufsize": 1,
         }
+        if sys.platform == "win32":
+            creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            if creationflags:
+                kwargs["creationflags"] = creationflags
+        else:
+            # Own process group so stop() can kill the whole tree (npx/uvx
+            # spawn children that would otherwise be orphaned).
+            kwargs["start_new_session"] = True
+        return kwargs
 
     def start(self) -> bool:
         self._stopped = False
@@ -235,16 +323,19 @@ class MCPProcessClient:
         self.last_error = None
         try:
             self.process = subprocess.Popen(**self._build_popen_kwargs())
+            self._spawn_stderr_drain()
             self._buffer = ""
             init_ok = self._initialize()
             if not init_ok:
                 if not self.last_error:
                     self.last_error = "Server initialization timed out or returned error"
                 self.stop()
+                self._maybe_append_stderr_tail()
             return init_ok
         except Exception as e:
             self.last_error = f"Process start failed: {e}"
             self.stop()
+            self._maybe_append_stderr_tail()
             return False
 
     async def start_async(self) -> bool:
@@ -258,49 +349,110 @@ class MCPProcessClient:
             kwargs = self._build_popen_kwargs()
             args = kwargs.pop("args")
             self.process = await asyncio.to_thread(subprocess.Popen, args, **kwargs)
+            self._spawn_stderr_drain()
             self._start_async_reader()
             init_ok = await self._initialize_async()
             if not init_ok:
                 if not self.last_error:
                     self.last_error = "Server initialization timed out or returned error"
                 self.stop()
+                self._maybe_append_stderr_tail()
             return init_ok
         except Exception as e:
             self.last_error = f"Process start failed: {e}"
             self.stop()
+            self._maybe_append_stderr_tail()
             return False
+
+    def _cancel_read_task_threadsafe(self) -> None:
+        """Cancel the async reader without touching the task from a foreign thread."""
+        task = self._read_task
+        if task is None or task.done():
+            self._read_task = None
+            return
+        loop = self._reader_loop
+        if loop is not None:
+            try:
+                loop.call_soon_threadsafe(task.cancel)
+            except RuntimeError:
+                task.cancel()
+        else:
+            task.cancel()
+        self._read_task = None
+
+    @staticmethod
+    def _set_future_exception(fut: asyncio.Future, exc: Exception) -> None:
+        if not fut.done():
+            fut.set_exception(exc)
+
+    def _fail_pending_futures(self) -> None:
+        """Fail all in-flight async requests, scheduling the exception on their loop."""
+        futs = list(self._pending_futures.values())
+        self._pending_futures.clear()
+        exc = RuntimeError(f"MCP server '{self.name}' stopped")
+        for fut in futs:
+            if fut.done():
+                continue
+            try:
+                loop = fut.get_loop()
+                loop.call_soon_threadsafe(self._set_future_exception, fut, exc)
+            except RuntimeError:
+                self._set_future_exception(fut, exc)
+
+    def _terminate_process_group(self) -> None:
+        """Terminate the server process and its whole process group (POSIX)."""
+        proc = self.process
+        if proc is None:
+            return
+        pid = getattr(proc, "pid", None)
+        use_pg = sys.platform != "win32" and isinstance(pid, int) and pid > 0
+
+        for name in ("stdin", "stdout", "stderr"):
+            stream = getattr(proc, name, None)
+            if stream is None:
+                continue
+            try:
+                stream.close()
+            except Exception:
+                logger.debug("Error closing MCP server '%s' %s stream", self.name, name, exc_info=True)
+
+        try:
+            try:
+                if use_pg:
+                    os.killpg(pid, signal.SIGTERM)
+                else:
+                    proc.terminate()
+                try:
+                    proc.wait(timeout=1)
+                except Exception:
+                    if use_pg:
+                        try:
+                            os.killpg(pid, signal.SIGKILL)
+                        except Exception:
+                            pass
+                    else:
+                        proc.kill()
+            except Exception:
+                if use_pg:
+                    try:
+                        os.killpg(pid, signal.SIGKILL)
+                    except Exception:
+                        logger.debug("Failed to kill MCP server group '%s'", self.name, exc_info=True)
+                else:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        logger.debug("Failed to kill MCP server '%s'", self.name, exc_info=True)
+        finally:
+            self.process = None
 
     def stop(self):
         self._stopped = True
-        if self._read_task and not self._read_task.done():
-            self._read_task.cancel()
-        for fut in list(self._pending_futures.values()):
-            if not fut.done():
-                fut.set_exception(RuntimeError(f"MCP server '{self.name}' stopped"))
-        self._pending_futures.clear()
-
-        if self.process:
-            try:
-                if self.process.stdin:
-                    self.process.stdin.close()
-                if self.process.stdout:
-                    self.process.stdout.close()
-                if self.process.stderr:
-                    self.process.stderr.close()
-            except Exception:
-                logger.debug("Error closing MCP server '%s' stdio streams", self.name, exc_info=True)
-
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=1)
-            except Exception:
-                try:
-                    self.process.kill()
-                except Exception:
-                    logger.debug("Failed to kill MCP server '%s'", self.name, exc_info=True)
-            self.process = None
-
+        self._cancel_read_task_threadsafe()
+        self._fail_pending_futures()
+        self._terminate_process_group()
         self._join_reader_thread()
+        self._join_stderr_thread()
 
     def _join_reader_thread(self, timeout: float = 1.0) -> None:
         """Wait for the background reader thread to finish so we don't leak it.
@@ -370,6 +522,10 @@ class MCPProcessClient:
                     continue
                 if "method" in data and "id" not in data:
                     if data.get("method") == "notifications/tools/list_changed":
+                        # Reentrant by design: _lock is an RLock and fetch_tools
+                        # only mutates the same reader-critical sections guarded
+                        # here; the GIL keeps _pending_responses consistent
+                        # between sync and async read paths.
                         try:
                             self.fetch_tools()
                         except Exception:
@@ -434,13 +590,13 @@ class MCPProcessClient:
             "id": self.req_id,
             "method": "initialize",
             "params": {
-                "protocolVersion": "2024-11-05",
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {},
-                "clientInfo": {"name": "johnston", "version": "1.0.0"},
+                "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
         }
         self._send(init_req)
-        res = self._read_response(req_id=self.req_id, timeout=5.0)
+        res = self._read_response(req_id=self.req_id, timeout=INIT_TIMEOUT)
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
@@ -459,11 +615,11 @@ class MCPProcessClient:
         res = await self._send_request_async(
             "initialize",
             params={
-                "protocolVersion": "2024-11-05",
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {},
-                "clientInfo": {"name": "johnston", "version": "1.0.0"},
+                "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
-            timeout=5.0,
+            timeout=INIT_TIMEOUT,
         )
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
@@ -485,14 +641,14 @@ class MCPProcessClient:
             current_id = self.req_id
             req = {"jsonrpc": "2.0", "id": current_id, "method": "tools/list"}
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=5.0)
+            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
             if res and "result" in res:
                 self.tools = res["result"].get("tools", [])
                 self._tools_fetch_time = time.monotonic()
             return self.tools
 
     async def fetch_tools_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("tools/list", timeout=5.0)
+        res = await self._send_request_async("tools/list", timeout=INIT_TIMEOUT)
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
             self._tools_fetch_time = time.monotonic()
@@ -549,7 +705,7 @@ class MCPProcessClient:
 
             current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=timeout)
+            res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
             if self.is_tools_stale():
                 try:
                     self.fetch_tools()
@@ -584,7 +740,7 @@ class MCPProcessClient:
             if timeout is not None:
                 res = await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
             else:
-                res = await fut
+                res = await asyncio.wait_for(asyncio.shield(fut), timeout=DEFAULT_TOOLS_CALL_TIMEOUT)
         except asyncio.TimeoutError:
             self._pending_futures.pop(current_id, None)
             return f"Error: No response from MCP server '{self.name}'"
@@ -593,6 +749,9 @@ class MCPProcessClient:
             raise
         except RuntimeError as e:
             # Server stopped while we awaited; surface gracefully instead of crashing.
+            self._pending_futures.pop(current_id, None)
+            return f"Error: {e}"
+        except Exception as e:
             self._pending_futures.pop(current_id, None)
             return f"Error: {e}"
 
