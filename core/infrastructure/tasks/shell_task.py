@@ -173,7 +173,7 @@ class ShellTask(BaseTask):
                     try:
                         if self.process.returncode is None:
                             try:
-                                await asyncio.wait_for(self.process.wait(), timeout=0.1)
+                                await asyncio.wait_for(asyncio.shield(self.process.wait()), timeout=0.1)
                             except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
                                 pass
                     except Exception:

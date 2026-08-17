@@ -2,19 +2,17 @@ import asyncio
 import itertools
 import re
 import time
-from collections import deque
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.platform.platform_utils import (
-    decode_output,
     is_windows,
     shell_env,
     shell_executable,
     shell_subprocess_kwargs,
     terminate_process,
 )
-from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
+from core.infrastructure.tasks.output import tail_output
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
@@ -139,40 +137,8 @@ class ShellTool(BaseTool):
     async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,
         wait with a hard timeout, terminate the process on timeout/cancellation.
-        Never converts to a background task, but the task stays registered in the
-        task manager so ctrl+b can background it while it is still alive.
+        Never converts to a background task unless ctrl+b / background_event is triggered.
         """
-        output_chunks = deque()
-        output_size = 0
-        output_truncated = False
-        _OUTPUT_LIMIT = 2 * 1024 * 1024  # 2 MB cap (mirrors web_fetch)
-
-        def _flush_raw() -> str:
-            raw_all = "".join(output_chunks)
-            if output_truncated:
-                raw_all = "[Output truncated: showing recent output]\n" + raw_all
-            return raw_all
-
-        async def _read_stream(stream):
-            nonlocal output_size, output_truncated
-            if not stream:
-                return
-            while True:
-                try:
-                    chunk = await stream.read(1024)
-                    if not chunk:
-                        break
-                    text = decode_output(chunk)
-                    output_chunks.append(text)
-                    output_size += len(text)
-                    if output_size > _OUTPUT_LIMIT:
-                        output_truncated = True
-                        # Drop old chunks from the front, keeping the tail.
-                        while output_chunks and output_size > _OUTPUT_LIMIT // 2:
-                            output_size -= len(output_chunks.popleft())
-                except Exception:
-                    break
-
         task_id = _new_task_id()
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         task = ShellTask(
@@ -182,17 +148,43 @@ class ShellTool(BaseTool):
             widget=target_widget,
             session_id=ctx.session_id,
         )
+        callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         ctx.add_background_task(task)
+        read_task = task.start_reading(on_completed=callback)
 
-        read_task = asyncio.create_task(_read_stream(p.stdout))
+        proc_task = asyncio.ensure_future(p.wait())
+        bg_task = asyncio.ensure_future(task.background_event.wait())
+
         try:
-            await asyncio.wait_for(p.wait(), timeout=float(timeout))
+            done, pending = await asyncio.wait(
+                [proc_task, bg_task],
+                timeout=float(timeout),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+
+            if not done:
+                raise asyncio.TimeoutError()
+
+            if task.background_event.is_set() or getattr(task, "is_background", False):
+                task.is_background = True
+                task.open_log()
+                raw_out = task.get_formatted_output().strip()
+                recent_str = f"\n\nRecent Output:\n{tail_output(raw_out, max_chars=2000)}" if raw_out else None
+                return ToolResult(
+                    status=ToolResultStatus.RUNNING,
+                    content=_format_background_task_response(
+                        task_id, cmd, recent_output_str=recent_str, log_path=task.log_path
+                    ),
+                )
+
             if read_task:
                 try:
                     await asyncio.wait_for(read_task, timeout=2.0)
                 except asyncio.TimeoutError:
                     pass
-            res = process_carriage_returns(strip_ansi(_flush_raw()))
+            res = task.get_formatted_output()
             if not res.strip():
                 return ToolResult.done("(no output)")
             return ToolResult.done(_truncate_output(res))
@@ -203,14 +195,14 @@ class ShellTool(BaseTool):
                     await asyncio.wait_for(read_task, timeout=1.0)
                 except Exception:
                     pass
-            raw_out = process_carriage_returns(strip_ansi(_flush_raw()))
+            raw_out = _truncate_output(task.get_formatted_output())
             partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
             return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
         except asyncio.CancelledError:
             await terminate_process(p)
             raise
         finally:
-            if not hasattr(task, "is_background") or not task.is_background:
+            if not getattr(task, "is_background", False):
                 mgr = getattr(ctx, "task_manager", None)
                 if mgr is not None and hasattr(mgr, "drop"):
                     try:
