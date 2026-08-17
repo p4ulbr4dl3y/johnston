@@ -67,7 +67,7 @@ class FormattingMixin:
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         t = Text()
         if explanation:
-            t.append(f"{explanation}\n\n", style="bold #ffffff")
+            t.append(f"{explanation}\n\n", style="italic #a1a1aa")
 
         plan_lines = []
         for item in plan_items:
