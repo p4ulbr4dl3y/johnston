@@ -1,11 +1,13 @@
-"""Coverage-focused tests for widgets/presentation/screens/mcp.py and widgets/presentation/screens/base_selection.py.
+"""Tests for widgets/presentation/screens/mcp.py.
 
-These tests exercise uncovered branches (exception paths, alternate display states,
-key handlers, and selection handlers) using a mounted host app with mocked
-query_one / event objects, matching the mocking style in tests/ui/test_screens_pilot.py.
+Consolidates the basic init/bindings checks, the render-regression suite (the
+background loader must re-schedule its render off the worker thread) and the
+coverage/exception-path tests for the MCP modal.
 """
 
 import asyncio
+import threading
+import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,41 +15,78 @@ from textual.app import App
 from textual.events import Key
 from textual.widgets import OptionList
 
-from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.mcp import MCPScreen
 
 
-class RaisingList(list):
-    """List whose .index() always raises, but membership still works."""
+class _MCPScreenHost(App[None]):
+    """Host app providing refresh_status_footer for mounted MCP tests."""
 
-    def index(self, *args, **kwargs):
-        raise ValueError("boom")
-
-
-class CoverageHostApp(App[None]):
-    """Host app providing refresh_status_footer for testing modal screens."""
-
-    def __init__(self, screen):
+    def __init__(self, screen_to_test=None):
         super().__init__()
-        self.screen_to_test = screen
+        self.screen_to_test = screen_to_test
         self.dismiss_result = None
 
     def on_mount(self) -> None:
-        self.push_screen(self.screen_to_test)
+        if self.screen_to_test is not None:
+            self.push_screen(self.screen_to_test)
 
     def refresh_status_footer(self):
         pass
 
 
-async def run_mounted(screen, test):
+class _MCPToggleHost(App[None]):
+    """Host app providing refresh_status_footer for _do_toggle tests."""
+
+    def __init__(self):
+        super().__init__()
+        self.footer_calls = 0
+
+    def on_mount(self):
+        pass
+
+    def refresh_status_footer(self):
+        self.footer_calls += 1
+
+
+async def _run_mounted(screen, test):
     """Enter a host app run that mounts `screen`, run `test(screen)`, then yield."""
-    app = CoverageHostApp(screen)
+    app = _MCPScreenHost(screen)
     async with app.run_test() as pilot:
-        # pause to let on_mount / warmup complete
         await pilot.pause()
         await pilot.pause()
         test(screen)
         await pilot.pause()
+
+
+def _mock_mgr(servers):
+    mgr = MagicMock()
+    mgr.load_servers.return_value = servers
+    mgr.clients = {}
+    mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
+    mgr.get_server_status.return_value = {"tools": 0, "error": None, "running": False}
+    return mgr
+
+
+def _make_screen(mgr):
+    with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
+        mock_get.return_value = mgr
+        return MCPScreen()
+
+
+class TestMCPScreen(unittest.TestCase):
+    @patch("widgets.presentation.screens.mcp.get_mcp_manager")
+    def test_init(self, mock_get_mgr):
+        mock_mgr = MagicMock()
+        mock_mgr.load_servers.return_value = []
+        mock_get_mgr.return_value = mock_mgr
+
+        s = MCPScreen()
+        self.assertEqual(s.servers, [])
+        self.assertEqual(s.mm, mock_mgr)
+
+    def test_bindings(self):
+        keys = [b[0] for b in MCPScreen.BINDINGS]
+        self.assertIn("escape", keys)
 
 
 class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
@@ -58,19 +97,6 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
     callback is lost (e.g. get_running_loop() called inside the worker
     thread), the OptionList stays empty and the modal shows no servers.
     """
-
-    def _make_screen(self, mgr):
-        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
-            mock_get.return_value = mgr
-            return MCPScreen()
-
-    def _mock_mgr(self, servers):
-        mgr = MagicMock()
-        mgr.load_servers.return_value = servers
-        mgr.clients = {}
-        mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
-        mgr.get_server_status.return_value = {"tools": 0, "error": None, "running": False}
-        return mgr
 
     async def _wait_until(self, cond, attempts=150):
         """Poll until the executor callback lands (loop closes at teardown)."""
@@ -86,8 +112,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             {"name": "beta", "command": "py", "disabled": True, "scope": "global"},
             {"name": "gamma", "command": "py", "disabled": False, "scope": "project"},
         ]
-        screen = self._make_screen(self._mock_mgr(servers))
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(_mock_mgr(servers))
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             rendered = await self._wait_until(lambda: screen.filtered_servers)
             self.assertTrue(rendered, "modal never rendered any server row")
@@ -99,8 +125,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(screen.filtered_servers[0])
 
     async def test_modal_empty_config_placeholder(self):
-        screen = self._make_screen(self._mock_mgr([]))
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(_mock_mgr([]))
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             rendered = await self._wait_until(
                 lambda: screen.servers == [] and screen.filtered_servers == []
@@ -118,8 +144,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
-        screen = self._make_screen(self._mock_mgr(servers))
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(_mock_mgr(servers))
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             rendered = await self._wait_until(lambda: screen.servers)
             self.assertTrue(rendered)
@@ -135,8 +161,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
-        screen = self._make_screen(self._mock_mgr(servers))
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(_mock_mgr(servers))
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.servers = []
             screen.filtered_servers = []
@@ -147,8 +173,6 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
 
     async def _press_spam(self, pilot, opt_list, seconds_gap=0.02):
         """Return elapsed seconds for a burst of enter presses."""
-        import time
-
         opt_list.highlighted = 1
         start = time.monotonic()
         for _ in range(6):
@@ -161,8 +185,6 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # toggle (config write + client stop, up to seconds) froze the modal
         # on every enter. It must run off-thread with duplicate toggles for
         # the same server dropped while one is in flight.
-        import threading
-
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
@@ -170,18 +192,18 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # Baseline: measure how long a burst of 6 enters takes when the toggle
         # is instant. Compare the slow-toggle burst against this baseline so the
         # assertion scales with machine load instead of an absolute wallclock.
-        baseline_mgr = self._mock_mgr(list(servers))
+        baseline_mgr = _mock_mgr(list(servers))
         baseline_calls: list[str] = []
         baseline_mgr.toggle_server = lambda name: (baseline_calls.append(name), True)[1]
 
-        baseline_screen = self._make_screen(baseline_mgr)
-        async with CoverageHostApp(baseline_screen).run_test() as baseline_pilot:
+        baseline_screen = _make_screen(baseline_mgr)
+        async with _MCPScreenHost(baseline_screen).run_test() as baseline_pilot:
             await baseline_pilot.pause()
             await self._wait_until(lambda: baseline_screen.filtered_servers)
             baseline_opt = baseline_screen.query_one("#mcp-option-list", OptionList)
             baseline_elapsed = await self._press_spam(baseline_pilot, baseline_opt)
 
-        mgr = self._mock_mgr(servers)
+        mgr = _mock_mgr(servers)
         calls: list[str] = []
         # Deterministic in-flight lock: the toggle blocks in a worker thread
         # until released, so it can never complete (and drop the pending guard)
@@ -194,8 +216,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             return True
 
         mgr.toggle_server = slow_toggle
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             await self._wait_until(lambda: screen.filtered_servers)
             opt_list = screen.query_one("#mcp-option-list", OptionList)
@@ -217,12 +239,10 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
     async def test_enter_after_toggle_finishes_toggles_again(self):
         # Once the in-flight toggle completes, a later enter toggles again
         # (no permanent lock on the server).
-        import time
-
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
-        mgr = self._mock_mgr(servers)
+        mgr = _mock_mgr(servers)
         calls: list[str] = []
 
         def slow_toggle(name):
@@ -231,8 +251,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             return True
 
         mgr.toggle_server = slow_toggle
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             await self._wait_until(lambda: screen.filtered_servers)
             opt_list = screen.query_one("#mcp-option-list", OptionList)
@@ -249,7 +269,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         servers = [
             {"name": "alpha", "command": "py", "disabled": True, "scope": "global"},
         ]
-        mgr = self._mock_mgr(servers)
+        mgr = _mock_mgr(servers)
         state = {"disabled": True}
 
         def toggle(name):
@@ -266,8 +286,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             return []
 
         mgr.ensure_tools_ready_async = warmup
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             await self._wait_until(lambda: screen.filtered_servers)
             opt_list = screen.query_one("#mcp-option-list", OptionList)
@@ -285,8 +305,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
-        screen = self._make_screen(self._mock_mgr(servers))
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(_mock_mgr(servers))
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list = screen.query_one("#mcp-option-list", OptionList)
             self.assertGreater(opt_list.option_count, 0)
@@ -294,16 +314,11 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
 
 
 class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
-    def _make_screen(self, mgr):
-        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
-            mock_get.return_value = mgr
-            return MCPScreen()
-
     async def test_action_quit_app(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
+        screen = _make_screen(mgr)
         mgr.load_servers.return_value = []
-        async with CoverageHostApp(screen).run_test() as pilot:
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             with patch.object(screen.app, "exit") as mock_exit:
                 screen.action_quit_app()
@@ -350,8 +365,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
         mgr.get_server_status.side_effect = _status
 
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list = MagicMock()
             opt_list.highlighted = None
@@ -371,8 +386,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_list_no_servers(self):
         mgr = MagicMock()
         mgr.load_servers.return_value = []
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list = MagicMock()
             screen.query_one = MagicMock(return_value=opt_list)
@@ -393,8 +408,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         mgr.load_servers.return_value = servers
         mgr.clients = {}
         mgr.get_server_status.return_value = {"tools": 0}
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list = MagicMock()
             opt_list.highlighted = 1
@@ -410,7 +425,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_on_mount_focus_exception(self):
         mgr = MagicMock()
         mgr.load_servers.return_value = []
-        screen = self._make_screen(mgr)
+        screen = _make_screen(mgr)
         opt_list = MagicMock()
         opt_list.highlighted = None
 
@@ -430,10 +445,10 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_warmup_tools_success_mounted(self):
         mgr = MagicMock()
         mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
-        screen = self._make_screen(mgr)
+        screen = _make_screen(mgr)
         screen.refresh_list = MagicMock()
         screen.refresh_list.reset_mock()
-        async with CoverageHostApp(screen).run_test() as pilot:
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.refresh_list.reset_mock()
             await screen._warmup_tools()
@@ -442,7 +457,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_warmup_tools_not_mounted_skips_refresh(self):
         mgr = MagicMock()
         mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
-        screen = self._make_screen(mgr)
+        screen = _make_screen(mgr)
         screen.refresh_list = MagicMock()
         # Not mounted -> is_mounted getter False
         await screen._warmup_tools()
@@ -451,7 +466,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_warmup_tools_exception(self):
         mgr = MagicMock()
         mgr.ensure_tools_ready_async = AsyncMock(side_effect=Exception("boom"))
-        screen = self._make_screen(mgr)
+        screen = _make_screen(mgr)
         screen.refresh_list = MagicMock()
         await screen._warmup_tools()
         screen.refresh_list.assert_not_called()
@@ -461,8 +476,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         mgr.load_servers.return_value = [
             {"name": "srv", "command": "py", "disabled": False, "scope": "global"}
         ]
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list = MagicMock()
             opt_list.highlighted = None
@@ -475,8 +490,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_input_changed_other_input(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.query_one = MagicMock()
             event = MagicMock()
@@ -488,8 +503,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         mgr = MagicMock()
         mgr.toggle_server.return_value = True
         mgr.load_servers.return_value = []
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.filtered_servers = [{"name": "srv", "disabled": False}]
             opt_list = MagicMock()
@@ -506,8 +521,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_on_option_selected(self):
         mgr = MagicMock()
         mgr.load_servers.return_value = []
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.filtered_servers = [{"name": "srv", "disabled": False}]
             opt_list = MagicMock()
@@ -522,8 +537,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_option_selected_invalid_index(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.filtered_servers = [{"name": "srv"}]
             screen.query_one = MagicMock(return_value=MagicMock())
@@ -549,8 +564,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_down_no_highlight(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list, _ = self._setup_key_harness(screen, highlighted=None)
             event = Key(key="down", character=None)
@@ -563,8 +578,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_down_with_highlight(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list, _ = self._setup_key_harness(screen, highlighted=1)
             event = Key(key="down", character=None)
@@ -576,8 +591,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_up(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list, _ = self._setup_key_harness(screen, highlighted=1)
             event = Key(key="up", character=None)
@@ -588,8 +603,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_empty_filtered(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             opt_list, _ = self._setup_key_harness(screen, highlighted=None, empty_filtered=True)
             event = Key(key="down", character=None)
@@ -601,8 +616,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_exception(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.query_one = MagicMock(side_effect=Exception("boom"))
             event = Key(key="down", character=None)
@@ -612,8 +627,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_key_ignored_keys(self):
         mgr = MagicMock()
-        screen = self._make_screen(mgr)
-        async with CoverageHostApp(screen).run_test() as pilot:
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
             screen.query_one = MagicMock()
             event = Key(key="a", character="a")
@@ -624,186 +639,158 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             event.stop.assert_not_called()
 
 
-class TestBaseSelectionCoverage(unittest.IsolatedAsyncioTestCase):
-    def test_on_mount_index_exception(self):
-        items = RaisingList(["a", "b"])
-        screen = BaseSelectionScreen("t", ["A"], items, "b", show_search=False)
+class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
+    def test_init_load_servers_exception(self):
+        mgr = MagicMock()
+        mgr.load_servers.side_effect = Exception("boom")
+        with patch("widgets.presentation.screens.mcp.get_mcp_manager", return_value=mgr):
+            screen = MCPScreen()
+        self.assertEqual(screen.servers, [])
+
+    def test_on_unmount_cancels(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        wtask = MagicMock()
+        wtask.done.return_value = False
+        screen._warmup_task = wtask
+        t = MagicMock()
+        screen._toggle_tasks = {t}
+        screen.on_unmount()
+        wtask.cancel.assert_called_once()
+        t.cancel.assert_called_once()
+
+    async def test_warmup_tools_waits_refresh_task(self):
+        mgr = MagicMock()
+        mgr.ensure_tools_ready_async = AsyncMock()
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        mgr._tools_refresh_task = fut
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen.refresh_list = MagicMock()
+        screen._is_mounted = True
+        task = asyncio.create_task(screen._warmup_tools())
+        await asyncio.sleep(0.01)
+        self.assertFalse(task.done())
+        fut.set_result(None)
+        await task
+        screen.refresh_list.assert_called()
+
+    async def test_load_servers_bg_sync_no_loop(self):
+        mgr = MagicMock()
+        mgr.load_servers.side_effect = Exception("boom")
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen.servers = ["cached"]
+        with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+            screen._load_servers_bg(refresh=True)
+        self.assertEqual(screen.servers, ["cached"])
+
+    async def test_load_servers_bg_call_soon_threadsafe_raises(self):
+        mgr = MagicMock()
+        mgr.load_servers.return_value = [{"name": "a", "command": "x"}]
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen.servers = []
+        screen._is_mounted = True
+        loop = asyncio.get_running_loop()
+        with patch.object(loop, "call_soon_threadsafe", side_effect=RuntimeError("closed")):
+            screen._load_servers_bg(refresh=True)
+            await asyncio.sleep(0.1)
+        self.assertEqual(screen.servers, [{"name": "a", "command": "x"}])
+
+    async def test_render_status_exception(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        mgr = MagicMock()
+        mgr.get_server_status.side_effect = Exception("boom")
+        screen.mm = mgr
+        screen.servers = [{"name": "a", "command": "x", "scope": "global", "disabled": False}]
+        screen.search_query = ""
         opt_list = MagicMock()
         opt_list.highlighted = None
         screen.query_one = MagicMock(return_value=opt_list)
-        screen.on_mount()
-        self.assertIsNone(opt_list.highlighted)
-        opt_list.focus.assert_called_once()
+        screen._render_from_cache()
+        self.assertTrue(screen.filtered_servers)
 
-    def test_on_mount_scroll_exception(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "b", show_search=False)
+    async def test_add_server_row_status_exception(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = MagicMock()
+        screen.mm.get_server_status.side_effect = Exception("boom")
         opt_list = MagicMock()
-        opt_list.highlighted = 1
-        opt_list.scroll_to_highlight = MagicMock(side_effect=Exception("boom"))
-        screen.query_one = MagicMock(return_value=opt_list)
-        screen.on_mount()
-        opt_list.focus.assert_called_once()
+        screen._add_server_row(opt_list, {"name": "s", "command": "c", "disabled": False}, {})
 
-    def _on_input(self, screen, value):
+    async def test_add_server_row_plain_error(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = MagicMock()
+        screen.mm.get_server_status.return_value = {"error": "boom boom"}
         opt_list = MagicMock()
-        screen.query_one = MagicMock(return_value=opt_list)
-        event = MagicMock()
-        event.value = value
-        screen.on_input_changed(event)
-        return opt_list
+        screen._add_server_row(opt_list, {"name": "s", "command": "c", "disabled": False}, {})
 
-    def test_on_input_changed_section_filter_and_empty_header(self):
-        options = ["Hdr1", "MatchOp", "Hdr2", "x", ""]
-        items = [None, "match1", None, "z", None]
-        screen = BaseSelectionScreen("t", options, items, "zzz", show_search=True)
-        self._on_input(screen, "match")
-        self.assertEqual(screen.filtered_items, [None, "match1"])
+    async def test_do_toggle_enabled_warmup_callback(self):
+        mgr = MagicMock()
+        mgr.toggle_server = lambda name: True
+        mgr.ensure_tools_ready_async = AsyncMock()
+        fut = asyncio.Future()
+        mgr._tools_refresh_task = fut
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen._pending_toggles = set()
+        screen._toggle_tasks = set()
+        screen.refresh_list = MagicMock()
+        screen._is_mounted = True
+        host = _MCPToggleHost()
+        async with host.run_test():
+            await screen._do_toggle("s")
+            fut.set_result(None)
+            await asyncio.sleep(0.01)
+        self.assertGreater(host.footer_calls, 0)
 
-    def test_on_input_changed_empty_query(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "a", show_search=True)
-        self._on_input(screen, "  ")
-        self.assertEqual(screen.filtered_items, ["a", "b"])
-        self.assertEqual(screen.filtered_options, ["A", "B"])
+    async def test_do_toggle_failure_notify(self):
+        mgr = MagicMock()
+        mgr.toggle_server = MagicMock(side_effect=Exception("bad"))
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen._pending_toggles = set()
+        screen._toggle_tasks = set()
+        screen.notify = MagicMock()
+        screen.refresh_list = MagicMock()
+        screen._is_mounted = True
+        host = _MCPToggleHost()
+        async with host.run_test():
+            await screen._do_toggle("s")
+        screen.notify.assert_called_once()
 
-    def test_on_input_submitted_highlighted_item(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=False)
+    async def test_do_toggle_cancelled_reraises(self):
+        mgr = MagicMock()
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.mm = mgr
+        screen._pending_toggles = set()
+        screen._toggle_tasks = set()
+        screen.notify = MagicMock()
+        screen.refresh_list = MagicMock()
+        screen._is_mounted = True
+        host = _MCPToggleHost()
+        async with host.run_test():
+            with patch("widgets.presentation.screens.mcp.asyncio.to_thread", side_effect=asyncio.CancelledError()):
+                with self.assertRaises(asyncio.CancelledError):
+                    await screen._do_toggle("s")
+        self.assertNotIn("s", screen._pending_toggles)
+
+    async def test_on_input_submitted_target_none(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.filtered_servers = [None]
         opt_list = MagicMock()
         opt_list.highlighted = 0
         screen.query_one = MagicMock(return_value=opt_list)
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_input_submitted(MagicMock())
-            mock_dismiss.assert_called_once_with("a")
+        event = MagicMock()
+        event.input.id = "modal-search-input"
+        screen.on_input_submitted(event)  # header row -> return
 
-    def test_on_input_submitted_highlighted_none_item_loop(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=False)
-        screen.filtered_items = [None, "a"]
-        opt_list = MagicMock()
-        opt_list.highlighted = 0
-        screen.query_one = MagicMock(return_value=opt_list)
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_input_submitted(MagicMock())
-            mock_dismiss.assert_called_once_with("a")
-
-    def test_on_input_submitted_all_none_default(self):
-        screen = BaseSelectionScreen("t", ["A"], [None], "def", show_search=False)
-        screen.filtered_items = [None]
-        opt_list = MagicMock()
-        opt_list.highlighted = None
-        screen.query_one = MagicMock(return_value=opt_list)
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_input_submitted(MagicMock())
-            mock_dismiss.assert_called_once_with("def")
-
-    def test_on_input_submitted_no_highlight_fallback(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=False)
-        opt_list = MagicMock()
-        opt_list.highlighted = None
-        screen.query_one = MagicMock(return_value=opt_list)
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_input_submitted(MagicMock())
-            mock_dismiss.assert_called_once_with("a")
-
-    def _base_key_harness(self, screen, highlighted=None, non_none_first=True, search_focus=True):
-        items = ["a", "b"] if non_none_first else [None, "b"]
-        screen.filtered_items = items
-        opt_list = MagicMock()
-        opt_list.highlighted = highlighted
-        search_input = MagicMock()
-        search_input.has_focus = search_focus
-
-        def qo(id_, *args):
-            if "search-input" in id_:
-                return search_input
-            return opt_list
-
-        screen.query_one = MagicMock(side_effect=qo)
-        return opt_list
-
-    def test_on_key_down_no_highlight_picks_first(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "a", show_search=True)
-        self._base_key_harness(screen, highlighted=None)
-        event = Key(key="down", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)
-        self.assertEqual(screen.query_one("o").highlighted, 0)
-        event.prevent_default.assert_called()
-        event.stop.assert_called()
-
-    def test_on_key_down_skips_none(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "a", show_search=True)
-        opt_list = self._base_key_harness(screen, highlighted=None, non_none_first=False)
-        event = Key(key="down", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)
-        self.assertEqual(opt_list.highlighted, 1)
-        event.prevent_default.assert_called()
-
-    def test_on_key_down_moves(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "a", show_search=True)
-        opt_list = self._base_key_harness(screen, highlighted=0)
-        event = Key(key="down", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)
-        opt_list.action_cursor_down.assert_called_once()
-        event.prevent_default.assert_called()
-
-    def test_on_key_up_moves(self):
-        screen = BaseSelectionScreen("t", ["A", "B"], ["a", "b"], "a", show_search=True)
-        opt_list = self._base_key_harness(screen, highlighted=1)
-        event = Key(key="up", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)
-        opt_list.action_cursor_up.assert_called_once()
-
-    def test_on_key_search_not_focused(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=True)
-        self._base_key_harness(screen, highlighted=0, search_focus=False)
-        event = Key(key="down", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)
-        event.prevent_default.assert_not_called()
-
-    def test_on_key_exception(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=True)
-        screen.query_one = MagicMock(side_effect=Exception("boom"))
-        event = Key(key="down", character=None)
-        event.prevent_default = MagicMock()
-        event.stop = MagicMock()
-        screen._on_key(event)  # must not raise
-
-    def test_on_option_selected_none_item_stops(self):
-        screen = BaseSelectionScreen("t", ["A"], [None], "a", show_search=False)
-        screen.filtered_items = [None]
+    async def test_on_option_selected_target_none(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        screen.filtered_servers = [None]
         event = MagicMock()
         event.option_index = 0
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_option_list_option_selected(event)
-            mock_dismiss.assert_not_called()
-        event.stop.assert_called_once()
-
-    def test_on_option_selected_item(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=False)
-        screen.filtered_items = ["a"]
-        event = MagicMock()
-        event.option_index = 0
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_option_list_option_selected(event)
-            mock_dismiss.assert_called_once_with("a")
-
-    def test_on_option_selected_invalid_index(self):
-        screen = BaseSelectionScreen("t", ["A"], ["a"], "a", show_search=False)
-        screen.filtered_items = ["a"]
-        event = MagicMock()
-        event.option_index = 99
-        with patch.object(screen, "dismiss") as mock_dismiss:
-            screen.on_option_list_option_selected(event)
-            mock_dismiss.assert_not_called()
-        event.stop.assert_not_called()
+        screen.on_option_list_option_selected(event)  # header row -> return
 
 
 if __name__ == "__main__":
