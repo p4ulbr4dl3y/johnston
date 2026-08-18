@@ -16,11 +16,11 @@ class TestRoleRegistry(unittest.TestCase):
 
         self.assertIn("worker", roles)
         self.assertIn("explorer", roles)
-        self.assertIn("orchestrator", roles)
+        self.assertNotIn("orchestrator", roles)
 
         self.assertEqual(roles["explorer"].disallowed_tools, ["create", "edit", "multi_edit"])
-        self.assertEqual(roles["orchestrator"].name, "Orchestrator")
-        self.assertEqual(roles["orchestrator"].scope, "main")
+        self.assertEqual(roles["worker"].name, "Worker")
+        self.assertEqual(roles["worker"].scope, "any")
         self.assertEqual(normalize_role_scope("main_only"), "main_only")
         self.assertEqual(normalize_role_scope("subagent_only"), "subagent_only")
         self.assertEqual(normalize_role_scope("any"), "any")
@@ -119,12 +119,12 @@ You run tests and report coverage.""")
     def test_scope_filtering(self):
         reg = RoleRegistry.get_instance()
         main_roles = reg.list_roles(scope="main")
-        self.assertIn("orchestrator", main_roles)
+        self.assertIn("worker", main_roles)
+        self.assertIn("explorer", main_roles)
 
         subagent_roles = reg.list_subagent_roles()
         self.assertIn("worker", subagent_roles)
         self.assertIn("explorer", subagent_roles)
-        self.assertNotIn("orchestrator", subagent_roles)
 
     def test_custom_md_role_with_list_disallowed_tools(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -473,7 +473,7 @@ class TestLoadRoles():
         reg = RoleRegistry()
         roles = reg.load_roles(project_dir="/nonexistent/path/xyz", include_global=False)
         assert "worker" in roles
-        assert len(roles) >= 3
+        assert len(roles) >= 2
 
     def test_global_only(self):
         reg = RoleRegistry()
@@ -483,11 +483,11 @@ class TestLoadRoles():
     def test_scope_filtering_main_vs_subagent(self):
         reg = RoleRegistry()
         main = reg.list_roles("main")
-        assert "orchestrator" in main
         assert "worker" in main  # scope any
+        assert "explorer" in main  # scope any
         sub = reg.list_subagent_roles()
         assert "worker" in sub
-        assert "orchestrator" not in sub
+        assert "explorer" in sub
 
     def test_invalid_scope_listing(self):
         reg = RoleRegistry()
@@ -584,5 +584,5 @@ class TestDefaultRoles:
     def test_worker_scope_any(self):
         assert BUILTIN_ROLES["worker"].scope in ("any", "subagent")
 
-    def test_orchestrator_main_only(self):
-        assert BUILTIN_ROLES["orchestrator"].scope == "main"
+    def test_explorer_scope_any(self):
+        assert BUILTIN_ROLES["explorer"].scope in ("any", "subagent")

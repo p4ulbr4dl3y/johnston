@@ -200,7 +200,7 @@ async def get_rules_snippet_async(role: str = "worker", cwd: str = None) -> str:
 
 
 class PromptBuilder:
-    """Builds composite system prompt and tool definitions accounting for MCP, Skills, and agent role (worker/explorer/orchestrator)"""
+    """Builds composite system prompt and tool definitions accounting for MCP, Skills, and agent role (worker/explorer)"""
 
     def __init__(
         self,
@@ -326,7 +326,7 @@ class PromptBuilder:
             model_label = (
                 self.model_name.strip()
                 if self.model_name and self.model_name.strip()
-                else "an expert AI software engineer"
+                else "an expert AI assistant"
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
 
@@ -386,7 +386,7 @@ class PromptBuilder:
             model_label = (
                 self.model_name.strip()
                 if self.model_name and self.model_name.strip()
-                else "an expert AI software engineer"
+                else "an expert AI assistant"
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
 

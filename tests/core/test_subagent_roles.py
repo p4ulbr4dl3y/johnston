@@ -67,7 +67,7 @@ You run tests and report coverage.""")
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
             self.assertIn("## Subagents (use as `type` in `invoke_subagent`)", snippet)
             self.assertIn("### Builtin", snippet)
-            self.assertIn("- `explorer`: Read-only Q&A, codebase research, and planning role.", snippet)
+            self.assertIn("- `explorer`: Read-only mode for information gathering, research, analysis, and action planning.", snippet)
             self.assertIn("### Project (`.johnston/roles/<name>.md`)", snippet)
             self.assertIn(
                 "- `reviewer`: Code reviewer subagent (Tools: read, grep, glob) (provider: clinepass)", snippet
@@ -83,18 +83,24 @@ class TestSubagentApplyRole(unittest.TestCase):
         from core.application.session.stream import configure_subagent_agent
         from core.role_registry import RoleRegistry
 
-        registry = RoleRegistry.get_instance()
-        definition = registry.get_role("orchestrator")
-        self.assertEqual(definition.scope, "main")
-
         class _FakeAgent:
             pass
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            roles_dir = os.path.join(tmpdir, ".johnston", "roles")
+            os.makedirs(roles_dir, exist_ok=True)
+            with open(os.path.join(roles_dir, "lead.md"), "w", encoding="utf-8") as f:
+                f.write("---\nname: Lead\nscope: main\n---\nLead prompt")
+
+            registry = RoleRegistry()
+            registry.load_roles(project_dir=tmpdir)
+            definition = registry.get_role("lead")
+            self.assertEqual(definition.scope, "main")
+
             agent = _FakeAgent()
             agent.tools = []
-            configure_subagent_agent(agent, "orchestrator", app=None, project_dir=tmpdir)
-            # The subagent must end up bound to the worker role, not orchestrator.
+            configure_subagent_agent(agent, "lead", app=None, project_dir=tmpdir)
+            # The subagent must end up bound to the worker role, not lead.
             self.assertEqual(agent.role, "worker")
 
 

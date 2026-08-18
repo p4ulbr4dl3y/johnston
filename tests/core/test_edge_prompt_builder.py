@@ -272,7 +272,7 @@ def test_build_system_prompt_no_placeholder_untouched():
 def test_build_system_prompt_whitespace_model_name_falls_back():
     b = PromptBuilder("You are {model_name}", [], role="worker", model_name="   ")
     out = b.build_system_prompt()
-    assert "an expert AI software engineer" in out
+    assert "an expert AI assistant" in out
 
 
 def test_build_system_prompt_environment_metadata_last():

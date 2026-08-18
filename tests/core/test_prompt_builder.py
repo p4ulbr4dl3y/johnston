@@ -127,7 +127,7 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_fallback_model_name(self):
         builder = PromptBuilder("You are {model_name} operating inside Johnston CLI", [], role="worker", model_name="")
         prompt = builder.build_system_prompt()
-        self.assertIn("You are an expert AI software engineer operating inside Johnston CLI", prompt)
+        self.assertIn("You are an expert AI assistant operating inside Johnston CLI", prompt)
 
     def test_build_system_prompt_orchestrator_as_subagent_no_prompt(self):
         builder = PromptBuilder("Subagent base prompt", [], role="orchestrator", is_subagent=True)
