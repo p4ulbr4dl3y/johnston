@@ -8,6 +8,7 @@ from textual.widgets import Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
 from core.domain.defaults.config import THEME_MUTED
+from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
@@ -34,7 +35,12 @@ def _filter_and_sort_tasks(items: list, search_query: str) -> list:
 
 
 class TaskConsoleScreen(BaseModalScreen[None]):
-    """Modal screen for viewing console output of a specific task in real-time"""
+    """Modal screen for viewing console output of a specific task in real-time.
+
+    Push-based: subscribes to the task's output listeners on mount, backfills
+    the buffered history once, then renders live chunks as they arrive. No
+    polling, no missed tail on buffer overflow.
+    """
 
     BINDINGS = [
         ("escape", "back", "Back to list"),
@@ -43,7 +49,8 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     def __init__(self, bg_task):
         super().__init__()
         self.bg_task = bg_task
-        self.printed_count = 0
+        self.log_widget = None
+        self._pending_line = ""
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -54,19 +61,40 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
         self.log_widget.focus()
-        self.update_log()
-        self.set_interval(0.1, self.update_log)
+        # Backfill the history already buffered, then go live: subscribing after
+        # the synchronous backfill keeps the two ordered in the event loop.
+        for chunk in self.bg_task.output.history:
+            self._consume(strip_ansi(chunk))
+        self.bg_task.add_listener(self._on_output)
 
-    def update_log(self) -> None:
-        from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
+    def on_unmount(self) -> None:
+        if self.bg_task is not None:
+            self.bg_task.remove_listener(self._on_output)
 
-        lines = self.bg_task.output.history
-        if len(lines) > self.printed_count:
-            for i in range(self.printed_count, len(lines)):
-                raw_line = lines[i].rstrip("\r\n")
-                clean_line = process_carriage_returns(strip_ansi(raw_line))
-                self.log_widget.write(clean_line)
-            self.printed_count = len(lines)
+    def _on_output(self, text: str) -> None:
+        """Live chunk from the task; the final empty signal flushes the tail."""
+        if text:
+            self._consume(text)
+        else:
+            self._flush_pending()
+
+    def _consume(self, text: str) -> None:
+        """Accumulate partial lines; write each completed line to the log.
+
+        Chunks arrive at arbitrary boundaries, so a line that crosses a chunk
+        boundary is buffered until its newline (or the final flush signal)
+        arrives.
+        """
+        combined = self._pending_line + text
+        parts = combined.split("\n")
+        self._pending_line = parts.pop()
+        for line in parts:
+            self.log_widget.write(process_carriage_returns(line))
+
+    def _flush_pending(self) -> None:
+        if self._pending_line:
+            self.log_widget.write(process_carriage_returns(self._pending_line))
+            self._pending_line = ""
 
     def action_back(self) -> None:
         self.dismiss()

@@ -46,6 +46,10 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.sm = SessionStore()
         self.task_manager = TaskManager(self)
         self._subagent_tools: dict[str, Any] = {}
+        # task_id -> shell tool card: completion handle for the message-flow
+        # repaint once a background shell task exits (chunks stream via the
+        # task's output listeners; this registry is only for the final status).
+        self._background_shell_widgets: dict[str, Any] = {}
         self.agent = self.pm.create_active_agent()
         self.role = getattr(self.agent, "role", "worker") if self.agent else "worker"
         if self.agent:

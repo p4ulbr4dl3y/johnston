@@ -1041,9 +1041,10 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.is_generating = False
             widget = MagicMock()
-            task = ShellTask("t1", "ls", widget=widget)
+            task = ShellTask("t1", "ls")
             task.status = TaskStatus.COMPLETED
             app.task_manager.register(task)
+            app._background_shell_widgets["t1"] = widget
             with patch.object(app, "generate_ai_response"):
                 app.on_background_shell_completed("t1", "ls", "some output")
             widget.set_result.assert_called_once_with("some output", status="done")
@@ -1056,9 +1057,10 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.is_generating = False
             widget = MagicMock()
-            task = ShellTask("t1", "ls", widget=widget)
+            task = ShellTask("t1", "ls")
             task.status = TaskStatus.ERROR
             app.task_manager.register(task)
+            app._background_shell_widgets["t1"] = widget
             with patch.object(app, "generate_ai_response"):
                 app.on_background_shell_completed("t1", "ls", "ERR: command failed")
             widget.set_result.assert_called_once_with("ERR: command failed", status="error")
@@ -1114,7 +1116,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.is_generating = False
-            task = ShellTask("shell_123_1", "ls", widget=MagicMock())
+            task = ShellTask("shell_123_1", "ls")
             task.status = TaskStatus.COMPLETED
             app.task_manager.register(task)
 

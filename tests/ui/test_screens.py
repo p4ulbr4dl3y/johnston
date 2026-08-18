@@ -69,11 +69,14 @@ class TestTaskScreens(unittest.TestCase):
         mock_task.command = "npm run dev"
         s = TaskConsoleScreen(mock_task)
         self.assertEqual(s.bg_task, mock_task)
-        self.assertEqual(s.printed_count, 0)
+        self.assertEqual(s._pending_line, "")
 
     def test_console_bindings(self):
-        keys = [b[0] for b in TaskConsoleScreen(MagicMock()).BINDINGS]
+        s = TaskConsoleScreen(MagicMock())
+        keys = [b[0] for b in s.BINDINGS]
         self.assertIn("escape", keys)
+        # No polling interval remains.
+        self.assertEqual(len(s._timers), 0)
 
     def test_subagents_bindings(self):
         keys = [b[0] for b in SubagentsScreen.BINDINGS]

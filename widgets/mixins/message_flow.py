@@ -248,7 +248,8 @@ class MessageFlowMixin:
                 (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
                 None,
             )
-        widget = getattr(task, "widget", None) if task is not None else None
+        reg = getattr(self, "_background_shell_widgets", None)
+        widget = (reg or {}).pop(task_id, None)
         task_status = (getattr(getattr(task, "status", None), "value", None) or "").lower() if task is not None else ""
         status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else "done")
 

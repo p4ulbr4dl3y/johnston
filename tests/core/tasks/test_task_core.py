@@ -167,11 +167,15 @@ async def test_shell_task_widget_streaming_appends_output():
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
-    task = ShellTask(task_id="t5", command="echo widget hello", process=proc, widget=widget)
+    task = ShellTask(task_id="t5", command="echo widget hello", process=proc)
+    task.add_listener(widget.append_shell_output)
     task.start_reading()
     await task.wait()
 
-    assert "widget hello" in "".join(widget.received)
+    chunks = "".join(widget.received)
+    assert "widget hello" in chunks
+    # Final empty flush signal is delivered after completion.
+    assert "" in widget.received
     # ANSI-free output landed in the buffer too.
     text = await task.read()
     assert "widget hello" in text
@@ -193,16 +197,47 @@ async def test_shell_task_widget_streaming_strips_ansi():
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
-    task = ShellTask(task_id="t6", command="print ansi", process=proc, widget=widget)
+    task = ShellTask(task_id="t6", command="print ansi", process=proc)
+    task.add_listener(widget.append_shell_output)
     task.start_reading()
     await task.wait()
 
-    assert "colored text" in "".join(widget.received)
-    assert "\x1b" not in "".join(widget.received)
+    received = "".join(widget.received)
+    assert "colored text" in received
+    assert "\x1b" not in received
     # The buffer itself is ANSI-free too.
     text = await task.read()
     assert "colored text" in text
     assert "\x1b" not in text
+
+
+@pytest.mark.asyncio
+async def test_shell_task_listeners_are_isolated_and_removable():
+    """Multiple listeners each get chunks; removal stops delivery to one only."""
+
+    class DummyWidget:
+        def __init__(self):
+            self.received = []
+
+        def append_shell_output(self, text: str) -> None:
+            self.received.append(text)
+
+    a, b = DummyWidget(), DummyWidget()
+    proc = await asyncio.create_subprocess_exec(
+        "echo", "fanout",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task = ShellTask(task_id="t7", command="echo fanout", process=proc)
+    task.add_listener(a.append_shell_output)
+    task.add_listener(b.append_shell_output)
+    task.add_listener(b.append_shell_output)  # idempotent
+    task.remove_listener(a.append_shell_output)
+    task.start_reading()
+    await task.wait()
+
+    assert "fanout" not in "".join(a.received)
+    assert "fanout" in "".join(b.received)
 
 
 # ---------------------------------------------------------------------------

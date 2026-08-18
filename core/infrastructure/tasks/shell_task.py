@@ -7,7 +7,7 @@ real-time output, input and kill semantics for background shell processes.
 import asyncio
 import os
 import signal
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import decode_output, terminate_process
@@ -30,7 +30,6 @@ class ShellTask(BaseTask):
         reader: Any = None,
         transport: Any = None,
         session_id: Optional[str] = None,
-        widget: Any = None,
     ) -> None:
         super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)
         self.process = process
@@ -38,13 +37,16 @@ class ShellTask(BaseTask):
         self.reader = reader
         self.transport = transport
         self.session_id = session_id
-        self.widget = widget
         self.output = OutputBuffer()
         self.is_background = False
         self.was_killed = False
         self.read_task: Optional[asyncio.Task] = None
         self.background_event = asyncio.Event()
         self._done: Optional[asyncio.Future] = None
+        # Output subscribers: each decoded chunk is pushed (ANSI-stripped) to
+        # every listener as it arrives, plus one final empty-string signal after
+        # reading completes so subscribers can flush buffered partial lines.
+        self._listeners: list[Callable[[str], None]] = []
         # File log for background tasks (full output, no memory cap).
         self.log_path: Optional[str] = None
         self._log: Optional[OutputLog] = None
@@ -114,12 +116,35 @@ class ShellTask(BaseTask):
                 pass
             self.master_fd = None
 
+    # -- output listeners ----------------------------------------------------
+
+    def add_listener(self, callback: Callable[[str], None]) -> None:
+        """Subscribe a callback that receives each decoded output chunk.
+
+        Chunks are pushed ANSI-stripped as they arrive, in the event loop.
+        After reading completes a final ``""`` signal is emitted so subscribers
+        can flush buffered partial lines. Subscription is idempotent.
+        """
+        if callback not in self._listeners:
+            self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[str], None]) -> None:
+        """Unsubscribe a callback. Safe to call while the task is running."""
+        if callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def _notify_listeners(self, text: str) -> None:
+        for callback in tuple(self._listeners):
+            try:
+                callback(strip_ansi(text))
+            except Exception:
+                pass
+
     # -- start --------------------------------------------------------------
 
-    def start_reading(self, on_chunk=None, on_completed=None) -> asyncio.Task:
+    def start_reading(self, on_completed=None) -> asyncio.Task:
         """Begin reading the process output in the background.
 
-        ``on_chunk`` (callable, optional) receives each decoded text chunk.
         ``on_completed`` (callable, optional) is fired with (task_id, command,
         formatted_output) when the process exits.
         """
@@ -128,20 +153,7 @@ class ShellTask(BaseTask):
             self.output.append(text)
             if self._log is not None:
                 self._log.append(text)
-            if self.widget is not None:
-                func = getattr(
-                    self.widget, "append_shell_output", getattr(self.widget, "append_bash_output", None)
-                )
-                if func and getattr(self.widget, "is_mounted", True):
-                    try:
-                        func(strip_ansi(text))
-                    except Exception:
-                        pass
-            if on_chunk is not None:
-                try:
-                    on_chunk(text)
-                except Exception:
-                    pass
+            self._notify_listeners(text)
 
         async def _read():
             try:
@@ -168,6 +180,9 @@ class ShellTask(BaseTask):
                 self.close_pty()
                 self.close_log()
                 self._mark_terminated()
+                # Flush signal: subscribers (e.g. a console view) release any
+                # buffered partial line they still hold.
+                self._notify_listeners("")
 
                 if self.process is not None:
                     try:

@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from textual.app import App
-from textual.widgets import OptionList
+from textual.widgets import OptionList, RichLog
 from textual.widgets.option_list import Option
 
 from core.infrastructure.tasks.manager import TaskManager
@@ -201,15 +201,40 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause()
-            self.assertEqual(screen.printed_count, 2)
+            # Backfilled history rendered on mount.
+            mock_task.add_listener.assert_called_once_with(screen._on_output)
+            log = screen.query_one("#console-log", RichLog)
+            self.assertIn("Line 2", self._richlog_lines(log))
+            self.assertEqual(screen._pending_line, "")
 
-            # Test updating log with new lines
-            mock_task.output.append("Line 3\n")
-            screen.update_log()
-            self.assertEqual(screen.printed_count, 3)
+            # Live chunks are pushed to the log, no polling involved.
+            screen._on_output("Line 3\n")
+            self.assertIn("Line 3", self._richlog_lines(log))
+
+            # A line split across chunks is buffered, then flushed by the final
+            # empty signal (e.g. output without a trailing newline).
+            screen._on_output("Partial no")
+            screen._on_output(" newline")
+            screen._on_output("")
+            self.assertIn("Partial no newline", self._richlog_lines(log))
+
+            # \r progress markers collapse to the latest value per line.
+            screen._on_output("Progress: 50%\rProgress: 60%\n")
+            self.assertIn("Progress: 60%", self._richlog_lines(log))
 
             await pilot.press("escape")
             await pilot.pause()
+            # Unsubscribed on close — no listener leak.
+            mock_task.remove_listener.assert_called_once_with(screen._on_output)
+
+    @staticmethod
+    def _richlog_lines(log: RichLog) -> list:
+        lines = []
+        for line in log.lines:
+            segs = getattr(line, "segments", line)
+            text = "".join(getattr(seg, "text", str(seg)) for seg in segs)
+            lines.append(text)
+        return lines
 
     async def test_shell_screen_pilot(self):
         task_normal = MagicMock()

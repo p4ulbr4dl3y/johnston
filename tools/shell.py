@@ -24,6 +24,21 @@ def _new_task_id() -> str:
     return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
+def _attach_shell_widget(host, task_id: str, widget) -> None:
+    """Link the shell tool card to the task for the completion repaint.
+
+    Live chunks stream to the card through the task's output listeners; this
+    registry only keeps a handle so the host can flip the card to its terminal
+    status (spinner -> done/error) once the task exits.
+    """
+    if host is None or widget is None:
+        return
+    reg = getattr(host, "_background_shell_widgets", None)
+    if reg is None:
+        reg = host._background_shell_widgets = {}
+    reg[task_id] = widget
+
+
 def _format_background_task_response(
     task_id: str,
     cmd: str,
@@ -124,14 +139,16 @@ class ShellTool(BaseTool):
 
         # Explicit background execution (main agent only).
         task_id = _new_task_id()
-        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         task = ShellTask(
             task_id,
             cmd,
             p,
-            widget=target_widget,
             session_id=ctx.session_id,
         )
+        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
+        if target_widget is not None:
+            task.add_listener(target_widget.append_shell_output)
+        _attach_shell_widget(ctx.host, task_id, target_widget)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         task.is_background = True
         task.open_log()
@@ -146,14 +163,16 @@ class ShellTool(BaseTool):
         Never converts to a background task unless ctrl+b / background_event is triggered.
         """
         task_id = _new_task_id()
-        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         task = ShellTask(
             task_id,
             cmd,
             p,
-            widget=target_widget,
             session_id=ctx.session_id,
         )
+        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
+        if target_widget is not None:
+            task.add_listener(target_widget.append_shell_output)
+        _attach_shell_widget(ctx.host, task_id, target_widget)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         ctx.add_background_task(task)
         read_task = task.start_reading(on_completed=callback)
