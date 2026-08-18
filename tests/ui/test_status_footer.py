@@ -174,6 +174,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 "err-client": MagicMock(last_error="boom"),
                 "good": MagicMock(last_error=None),
             }
+            mgr.active_server_count.return_value = 1
             footer._mcp_cache_time = 0  # force reload of cached servers
             # Force a fresh background cache load with the mocked manager.
             footer._st_cache_time = 0
@@ -252,6 +253,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         footer = StatusFooter()
         mgr = MagicMock()
         mgr.is_loading.return_value = True
+        mgr.active_server_count.return_value = 0
         with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             with patch.object(footer, "refresh_footer") as mock_rf:
                 footer._poll_mcp_refresh()

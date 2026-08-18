@@ -64,6 +64,8 @@ class MCPManager:
     # Defaults so `__new__`-constructed test doubles never AttributeError.
     _global_config_ensured = False
     _warned_broken_config_files: set = None  # type: ignore[assignment]
+    _start_locks = None  # type: ignore[assignment]
+    _generation = 0
 
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
@@ -76,9 +78,33 @@ class MCPManager:
         self._servers_cache: List[Dict[str, Any]] = []
         self._warned_broken_config_files = set()
         self._global_config_ensured = False
+        # Per-server locks serializing client creation so two concurrent warmup
+        # callers (lifecycle mount, MCP/permissions screens, registry fallback)
+        # can never spawn two npx processes for the same server. Lazily created
+        # on first use; the create-then-store is atomic in a single loop so no
+        # two callers can race to build a duplicate lock.
+        self._start_locks: Dict[str, asyncio.Lock] = {}
+        # Incremented by ``stop_all``: in-flight warmup coroutines capture the
+        # generation before starting a server and abort if it changed, so a
+        # stopped manager can never re-spawn clients for a dead project.
+        self._generation = 0
 
     def stop_all(self):
-        """Stops all running MCP client processes."""
+        """Stops all running MCP client processes and cancels background warmup.
+
+        Cancelling ``_tools_refresh_task`` matters: clients are registered in
+        ``self.clients`` BEFORE their process starts, so every half-started
+        client is stopped below even though the warmup task never completed.
+        The generation bump makes any warmup coroutine still in flight abort
+        before spawning a fresh process for the now-inactive manager.
+        """
+        self._generation += 1
+        locks = self._start_locks
+        if locks is not None:
+            locks.clear()
+        task = self._tools_refresh_task
+        if task is not None and not task.done():
+            task.cancel()
         for client in list(self.clients.values()):
             stop = getattr(client, "stop", None)
             if not callable(stop):
@@ -383,9 +409,12 @@ class MCPManager:
 
         Isolated per server with a short deadline so one slow/broken server can
         never block the others: any failure yields an empty list for that server
-        only. If a freshly-created client cannot become ready in time it is torn
-        down so no orphaned subprocess leaks. Naming/formatting happens later,
-        sequentially, so name-collision assignment stays deterministic.
+        only. A per-server lock serializes client creation: concurrent callers
+        (lifecycle mount, MCP/permissions screens, registry fallback) share the
+        first spawned process instead of double-starting npx. Clients are
+        registered BEFORE their subprocess starts so ``stop_all`` can always
+        reach and terminate a half-started server. Naming/formatting happens
+        later, sequentially, so name-collision assignment stays deterministic.
         """
         name = server["name"]
         cmd = server.get("command")
@@ -397,57 +426,74 @@ class MCPManager:
         cwd = server.get("cwd")
         full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
-        client = self.clients.get(name)
-        created = False
-        if client is None:
-            client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
-            created = True
+        gen = self._generation
+        locks = self._start_locks
+        if locks is None:
+            locks = {}
+            self._start_locks = locks
+        lock = locks.get(name)
+        if lock is None:
+            lock = asyncio.Lock()
+            locks[name] = lock
 
-        async def _cleanup_if_created() -> None:
-            # A freshly-created client that failed to become ready must be torn
-            # down so no orphaned subprocess leaks. Both failure paths (start
-            # timeout and start failure) pop the client from the cache before
-            # calling this, so the guard reduces to "we created it".
-            if not created:
-                return
-            try:
-                await client.stop_async()
-            except Exception:
-                logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
-            self.clients.pop(name, None)
+        async with lock:
+            if self._generation != gen:
+                # The manager was stopped while we waited for the lock: spawning
+                # a client now would resurrect processes for a dead project.
+                return []
 
-        try:
+            client = self.clients.get(name)
+            created = client is None
             if created:
-                try:
-                    ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
-                except asyncio.TimeoutError:
-                    client.last_error = client.last_error or f"Server start timed out after {timeout}s"
-                    self.clients.pop(name, None)
-                    await _cleanup_if_created()
-                    return []
-                except Exception as exc:
-                    if not client.last_error:
-                        client.last_error = str(exc)
-                    self.clients.pop(name, None)
-                    await _cleanup_if_created()
-                    return []
-                if not ok:
-                    if not client.last_error:
-                        client.last_error = "Failed to start"
-                    self.clients.pop(name, None)
-                    await _cleanup_if_created()
-                    return []
+                client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+                # Register before starting: a concurrent stop_all() iterates
+                # clients, so a half-started process must already be reachable.
                 self.clients[name] = client
-            elif self._tools_fetch_stale(name):
-                try:
-                    await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
-                except Exception:
-                    logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
 
-            return list(client.tools)
+            try:
+                if created:
+                    try:
+                        ok = await asyncio.wait_for(client.start_async(), timeout=timeout)
+                    except asyncio.TimeoutError:
+                        client.last_error = client.last_error or f"Server start timed out after {timeout}s"
+                        await self._teardown_unready_client(name, client)
+                        return []
+                    except asyncio.CancelledError:
+                        # The surrounding warmup task was cancelled (e.g. by
+                        # stop_all): never orphan the spawned subprocess.
+                        await self._teardown_unready_client(name, client)
+                        raise
+                    except Exception as exc:
+                        if not client.last_error:
+                            client.last_error = str(exc)
+                        await self._teardown_unready_client(name, client)
+                        return []
+                    if not ok:
+                        if not client.last_error:
+                            client.last_error = "Failed to start"
+                        await self._teardown_unready_client(name, client)
+                        return []
+                    if self._generation != gen:
+                        await self._teardown_unready_client(name, client)
+                        return []
+                elif self._tools_fetch_stale(name):
+                    try:
+                        await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
+                    except Exception:
+                        logger.warning("Failed to fetch tools asynchronously for MCP server %s", name, exc_info=True)
+
+                return list(client.tools)
+            except Exception:
+                logger.warning("MCP server %s failed to load tools", name, exc_info=True)
+                return []
+
+    async def _teardown_unready_client(self, name: str, client: MCPProcessClient) -> None:
+        """Stop a client that must not stay alive and drop it from the cache."""
+        try:
+            await client.stop_async()
         except Exception:
-            logger.warning("MCP server %s failed to load tools", name, exc_info=True)
-            return []
+            logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
+        self.clients.pop(name, None)
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
@@ -492,6 +538,46 @@ class MCPManager:
                     tools.append(formatted)
 
         return tools
+
+    def get_server_status(self, server_name: str) -> Dict[str, Any]:
+        """Public, internals-free status snapshot for one MCP server (UI rendering).
+
+        Returns the discovered tool count, last error and whether the client
+        process is running. UI layers should use this instead of poking at
+        ``clients`` / ``client.tools`` / ``client.last_error`` directly.
+        """
+        client = self.clients.get(server_name)
+        if client is None:
+            return {"server": server_name, "tools": 0, "error": None, "running": False}
+        proc = getattr(client, "process", None)
+        running = False
+        if proc is not None:
+            try:
+                running = proc.poll() is None
+            except Exception:
+                running = False
+        err = getattr(client, "last_error", None)
+        tools = getattr(client, "tools", None) or []
+        return {"server": server_name, "tools": len(tools), "error": err, "running": running}
+
+    def active_server_count(self, servers: Optional[List[Dict[str, Any]]] = None) -> int:
+        """Count enabled stdio servers that finished loading tools without error.
+
+        Pending/errored servers don't count, so while loading the footer flips
+        to the spinner until the first warmup delivers tools.
+        """
+        if servers is None:
+            servers = self.load_servers()
+        count = 0
+        for s in servers:
+            if s.get("url") and not s.get("command"):
+                continue
+            if s.get("disabled", False):
+                continue
+            st = self.get_server_status(s.get("name", ""))
+            if st["tools"] > 0 and not st["error"]:
+                count += 1
+        return count
 
     async def ensure_tools_ready_async(self, max_age: float = 30.0) -> List[Dict[str, Any]]:
         """Ensure MCP tools are being warmed up, coalescing concurrent callers.

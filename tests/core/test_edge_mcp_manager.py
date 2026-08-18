@@ -611,5 +611,154 @@ class ParallelCallsEdge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([f for f in client._pending_futures.values() if not f.done()], [])
 
 
+class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
+    """Regressions from the UI MCP audit: shared client creation, stop_all vs
+    in-flight warmup, generation guard, cancel cleanup, public status accessors."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _server(self, name="srv"):
+        return {"name": name, "command": "python", "args": [], "scope": "global"}
+
+    async def test_concurrent_same_server_start_shares_one_client(self):
+        # Two parallel warmup callers (lifecycle mount + MCP/permissions screen)
+        # must never double-spawn npx: the per-server lock makes the second
+        # caller reuse the first client.
+        m = make_manager(self.tmp)
+        ok_client = MagicMock()
+        ok_client.start_async = AsyncMock(return_value=True)
+        ok_client.stop_async = AsyncMock()
+        ok_client.is_tools_stale = lambda ttl=5.0: False
+        ok_client.tools = [{"name": "t1"}]
+        ok_client.last_error = None
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client) as mk:
+            results = await asyncio.gather(
+                m._load_server_tools_async(self._server()),
+                m._load_server_tools_async(self._server()),
+            )
+
+        self.assertEqual(mk.call_count, 1)
+        self.assertEqual(list(m.clients), ["srv"])
+        self.assertEqual(results, [[{"name": "t1"}], [{"name": "t1"}]])
+
+    async def test_stop_all_cancels_inflight_warmup_and_stops_half_started_client(self):
+        # A client is registered BEFORE its subprocess starts, so stop_all() can
+        # always reach it; the cancelled warmup must not re-spawn anything after.
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [self._server()]
+
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        async def slow_start():
+            started.set()
+            await release.wait()
+            return True
+
+        client = MagicMock()
+        client.start_async = AsyncMock(side_effect=slow_start)
+        client.stop_async = AsyncMock()
+        client.stop = MagicMock()
+        client.tools = []
+        client.last_error = None
+        client.process = None
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+            warmup = asyncio.create_task(m.ensure_tools_ready_async())
+            await started.wait()
+            # Half-started client is already reachable before its start returns.
+            self.assertIn("srv", m.clients)
+
+            m.stop_all()
+            release.set()
+            try:
+                await m._tools_refresh_task
+            except asyncio.CancelledError:
+                pass
+            await warmup
+
+        client.stop.assert_called()
+        self.assertEqual(m.clients, {})
+
+    async def test_stop_during_lock_wait_prevents_recreation(self):
+        # stop_all() bumps the generation; a warmup coroutine still waiting on
+        # the per-server lock must abort instead of spawning a stale client.
+        m = make_manager(self.tmp)
+        lock = asyncio.Lock()
+        await lock.acquire()
+        m._start_locks = {"srv": lock}
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient") as mk:
+            task = asyncio.create_task(m._load_server_tools_async(self._server()))
+            await asyncio.sleep(0)
+            m.stop_all()
+            lock.release()
+            res = await task
+
+        self.assertEqual(res, [])
+        mk.assert_not_called()
+        self.assertEqual(m.clients, {})
+
+    async def test_cancelled_start_cleans_up_subprocess(self):
+        # Cancelling the warmup task while a server start is in flight must tear
+        # down the spawned client, never orphan it.
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [self._server()]
+
+        started = asyncio.Event()
+
+        async def slow_start():
+            started.set()
+            await asyncio.sleep(30)
+            return True
+
+        client = MagicMock()
+        client.start_async = AsyncMock(side_effect=slow_start)
+        client.stop_async = AsyncMock()
+        client.last_error = None
+        client.process = None
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+            task = asyncio.create_task(m._load_server_tools_async(self._server()))
+            await started.wait()
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+
+        client.stop_async.assert_awaited_once()
+        self.assertEqual(m.clients, {})
+
+    def test_server_status_and_active_count(self):
+        m = make_manager(self.tmp)
+        ok_client = MagicMock()
+        ok_client.tools = [{"x": 1}, {"y": 2}]
+        ok_client.last_error = None
+        ok_client.process = fake_proc()
+        err_client = MagicMock()
+        err_client.tools = []
+        err_client.last_error = "boom"
+        err_client.process = fake_proc()
+        m.clients = {"ok": ok_client, "bad": err_client}
+        m.load_servers = lambda: [
+            {"name": "ok", "command": "py", "scope": "global"},
+            {"name": "bad", "command": "py", "scope": "global"},
+            {"name": "urlsrv", "url": "http://x", "scope": "global"},
+            {"name": "off", "command": "py", "disabled": True, "scope": "global"},
+        ]
+
+        st = m.get_server_status("ok")
+        self.assertEqual(st["tools"], 2)
+        self.assertIsNone(st["error"])
+        self.assertTrue(st["running"])
+        self.assertFalse(m.get_server_status("missing")["running"])
+        # Only "ok" finished loading tools without error.
+        self.assertEqual(m.active_server_count(), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -72,18 +72,29 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             self._mcp_task.cancel()
 
     async def _load_mcp_tools_async(self) -> None:
-        try:
-            from core.infrastructure.mcp import get_mcp_manager
+        from core.infrastructure.mcp import get_mcp_manager
 
-            mcp_mgr = get_mcp_manager()
+        mcp_mgr = get_mcp_manager()
+        try:
             ready = getattr(mcp_mgr, "ensure_tools_ready_async", None)
             if callable(ready):
                 res = ready()
                 if inspect.isawaitable(res):
                     await res
-            res = mcp_mgr.get_active_tools_async()
-            tools = await res if inspect.isawaitable(res) else res
-        except Exception:
+            # Render from cache first: ensure_tools_ready_async already kicked
+            # off the warmup, so a redundant full active listing here would
+            # duplicate the server fetch (and double-spawn cold npx). Only fall
+            # back to a full listing when nothing is cached yet (first run).
+            tools = mcp_mgr.get_cached_tools() or []
+            if not tools:
+                res = mcp_mgr.get_active_tools_async()
+                tools = await res if inspect.isawaitable(res) else res
+        except Exception as e:
+            if getattr(self, "is_mounted", True):
+                try:
+                    self.notify(f"MCP tools unavailable: {e}", severity="warning", timeout=5)
+                except Exception:
+                    pass
             return
         self.mcp_tools = tools or []
         if getattr(self, "is_mounted", True):

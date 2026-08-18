@@ -2,6 +2,7 @@ import asyncio
 
 from textual.containers import VerticalScroll
 
+from core.infrastructure.mcp import mcp_tool_is_known
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
@@ -113,6 +114,9 @@ class ChatView(VerticalScroll):
             last_child = child
             break
         is_seq = bool(last_child and isinstance(last_child, ToolCallWidget))
+        # MCP tool names aren't in the builtin registry; mark the widget so the
+        # header display can snake_case them (e.g. "get-file-info").
+        is_mcp = mcp_tool_is_known(tool_type)
         widget = ToolCallWidget(
             tool_type,
             target,
@@ -121,6 +125,7 @@ class ChatView(VerticalScroll):
             args=args,
             status=status,
             returncode=returncode,
+            is_mcp=is_mcp,
         )
         should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)

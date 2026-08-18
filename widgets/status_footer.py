@@ -220,25 +220,13 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         """Count enabled MCP servers that finished loading tools (no error, has tools)."""
         from core.infrastructure.mcp import get_mcp_manager
 
-        mm = get_mcp_manager()
-        count = 0
-        for s in servers:
-            s_name = s.get("name")
-            cmd = s.get("command")
-            url = s.get("url")
-            if url and not cmd:
-                continue
-            if s.get("disabled", False):
-                continue
-            client = mm.clients.get(s_name) if hasattr(mm, "clients") else None
-            if client is None:
-                continue
-            if getattr(client, "last_error", None):
-                continue
-            if not getattr(client, "tools", None):
-                continue
-            count += 1
-        return count
+        count_fn = getattr(get_mcp_manager(), "active_server_count", None)
+        if callable(count_fn):
+            try:
+                return count_fn(servers) or 0
+            except Exception:
+                pass
+        return 0
 
     def refresh_footer(self) -> None:
         try:

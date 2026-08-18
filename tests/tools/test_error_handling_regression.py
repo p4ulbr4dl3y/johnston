@@ -105,5 +105,60 @@ class TestAskUserCancellationRaises(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(mock_app._pending_ask_user)
 
 
+class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
+    """A hallucinated MCP tool name must not re-list (and spawn) every server on
+    every agent turn: a failed full listing is remembered briefly."""
+
+    def setUp(self):
+        from tools import registry
+
+        registry._mcp_name_misses.clear()
+
+    def _mock_mgr(self):
+        mock_mgr = MagicMock()
+        mock_mgr.get_cached_tools.return_value = []
+        mock_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mgr.get_active_tools.return_value = []
+        return mock_mgr
+
+    def _mode(self):
+        mock_role = MagicMock()
+        mock_role.name = "action"
+        mock_role.disallowed_tools = []
+        reg = MagicMock()
+        reg.get_role.return_value = mock_role
+        return patch("core.role_registry.RoleRegistry.get_instance", return_value=reg)
+
+    async def test_first_miss_lists_second_hits_negative_cache(self):
+        mock_mgr = self._mock_mgr()
+        with (
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
+            self._mode(),
+        ):
+            r1 = await execute_tool("totally_hallucinated_tool", {})
+            r2 = await execute_tool("totally_hallucinated_tool", {})
+
+        self.assertTrue(r1.is_error)
+        self.assertTrue(r2.is_error)
+        # The sync fallback listing ran exactly once, not per call.
+        mock_mgr.get_active_tools.assert_called_once()
+
+    def test_remember_and_forget_helpers(self):
+        from tools import registry
+
+        registry._remember_mcp_miss("srv__x")
+        self.assertTrue(registry._mcp_name_recently_missed("srv__x"))
+        registry._forget_mcp_miss("srv__x")
+        self.assertFalse(registry._mcp_name_recently_missed("srv__x"))
+
+    def test_ttl_expiry_forgets(self):
+        from tools import registry
+
+        registry._mcp_name_misses.clear()
+        registry._mcp_name_misses["stale"] = 0.0  # long past TTL
+        self.assertFalse(registry._mcp_name_recently_missed("stale"))
+        self.assertNotIn("stale", registry._mcp_name_misses)
+
+
 if __name__ == "__main__":
     unittest.main()

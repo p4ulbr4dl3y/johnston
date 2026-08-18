@@ -147,8 +147,13 @@ def build_status_kwargs(app, widget=None) -> dict:
 
     cached_mcp = getattr(widget, "_st_cached_mcp_servers", None)
     if cached_mcp is None:
-        cached_mcp = get_mcp_manager().load_servers()
-        widget._st_cached_mcp_servers = cached_mcp
+        if widget is not None:
+            # Background cache load is still in flight: never block the footer
+            # timer on disk reads. Keep the last-known state (empty on first
+            # render); the background loader re-renders as soon as it's ready.
+            cached_mcp = []
+        else:
+            cached_mcp = get_mcp_manager().load_servers()
     mcp_servers = cached_mcp
 
     # Count only servers that are actually loading (enabled, stdio

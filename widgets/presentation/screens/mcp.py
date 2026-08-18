@@ -62,7 +62,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     async def _warmup_tools(self) -> None:
         try:
-            await asyncio.to_thread(self.mm.get_active_tools)
+            # Coalesced background warmup: reuses an in-flight fetch and never
+            # blocks on a cold (npx/uvx) server. Tools are rendered from cache
+            # once the warmup finishes.
+            await self.mm.ensure_tools_ready_async()
             if getattr(self, "is_mounted", True):
                 self.refresh_list()
         except Exception:
@@ -126,10 +129,12 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             tools_per_server: Dict[str, int] = {}
             try:
-                if hasattr(self.mm, "clients"):
-                    for s_name, client in self.mm.clients.items():
-                        if client and hasattr(client, "tools") and client.tools:
-                            tools_per_server[s_name] = len(client.tools)
+                get_status = getattr(self.mm, "get_server_status", None)
+                if callable(get_status):
+                    for s in self.servers:
+                        st = get_status(s.get("name", ""))
+                        if st.get("tools"):
+                            tools_per_server[s["name"]] = st["tools"]
             except Exception:
                 pass
 
@@ -187,14 +192,19 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         elif url and not cmd:
             opt_list.add_option(f"   {status_tag('ERR')} {name} — URL unsupported")
         else:
-            client = self.mm.clients.get(name) if hasattr(self.mm, "clients") else None
-            err = getattr(client, "last_error", None) if client else None
-            if err and "Process start failed" in err:
-                opt_list.add_option(f"   {status_tag('ERR')} {name} — Start failed")
-            elif err and "timeout" in err.lower():
-                opt_list.add_option(f"   {status_tag('ERR')} {name} — Timeout")
-            elif err:
-                opt_list.add_option(f"   {status_tag('ERR')} {name} — Error")
+            try:
+                st = self.mm.get_server_status(name) if hasattr(self.mm, "get_server_status") else {}
+            except Exception:
+                st = {}
+            err = st.get("error") if isinstance(st, dict) else None
+            if err:
+                e_lower = err.lower()
+                if "timeout" in e_lower or "timed out" in e_lower:
+                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Timeout")
+                elif "start" in e_lower:
+                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Start failed")
+                else:
+                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Error")
             else:
                 stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
                 opt_list.add_option(f"   {stag} {name}")

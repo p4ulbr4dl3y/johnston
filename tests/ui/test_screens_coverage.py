@@ -92,6 +92,19 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             "tmo": client_tmo,
         }
 
+        def _status(name):
+            c = mgr.clients.get(name)
+            if c is None:
+                return {"server": name, "tools": 0, "error": None, "running": False}
+            return {
+                "server": name,
+                "tools": len(getattr(c, "tools", None) or []),
+                "error": getattr(c, "last_error", None),
+                "running": True,
+            }
+
+        mgr.get_server_status.side_effect = _status
+
         screen = self._make_screen(mgr)
         async with CoverageHostApp(screen).run_test() as pilot:
             await pilot.pause()
@@ -134,6 +147,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         mgr = MagicMock()
         mgr.load_servers.return_value = servers
         mgr.clients = {}
+        mgr.get_server_status.return_value = {"tools": 0}
         screen = self._make_screen(mgr)
         async with CoverageHostApp(screen).run_test() as pilot:
             await pilot.pause()
@@ -170,7 +184,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_warmup_tools_success_mounted(self):
         mgr = MagicMock()
-        mgr.get_active_tools.return_value = []
+        mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
         screen = self._make_screen(mgr)
         screen.refresh_list = MagicMock()
         screen.refresh_list.reset_mock()
@@ -182,7 +196,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_warmup_tools_not_mounted_skips_refresh(self):
         mgr = MagicMock()
-        mgr.get_active_tools.return_value = []
+        mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
         screen = self._make_screen(mgr)
         screen.refresh_list = MagicMock()
         # Not mounted -> is_mounted getter False
@@ -191,7 +205,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_warmup_tools_exception(self):
         mgr = MagicMock()
-        mgr.get_active_tools.side_effect = Exception("boom")
+        mgr.ensure_tools_ready_async = AsyncMock(side_effect=Exception("boom"))
         screen = self._make_screen(mgr)
         screen.refresh_list = MagicMock()
         await screen._warmup_tools()

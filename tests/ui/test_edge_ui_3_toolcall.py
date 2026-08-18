@@ -149,5 +149,57 @@ class TestEdgeToolCallMarkRunning(unittest.TestCase):
         self.assertEqual(widget.result_text, "working")
 
 
+class TestEdgeToolCallMCPFlag(unittest.TestCase):
+    def test_is_mcp_flag_snake_cases_header_name(self):
+        # MCP tools often use dashes ("get-file-info"); the is_mcp flag lets the
+        # header display snake_case them instead of raw names.
+        widget = ToolCallWidget("get-file-info", "t", "", args={"path": "/"}, is_mcp=True)
+        widget.render_header()
+        self.assertIn("get_file_info", widget.header_label.render().plain)
+
+    def test_non_mcp_keeps_raw_name(self):
+        widget = ToolCallWidget("get-file-info", "t", "", args={"path": "/"}, is_mcp=False)
+        widget.render_header()
+        self.assertIn("get-file-info", widget.header_label.render().plain)
+
+    def test_default_flag_false(self):
+        widget = ToolCallWidget("custom-tool", "t")
+        self.assertFalse(widget.is_mcp)
+
+
+class TestEdgeToolCallRenderVersionGuard(unittest.IsolatedAsyncioTestCase):
+    """A superseded async render must never overwrite fresher content."""
+
+    def _widget(self):
+        from unittest.mock import MagicMock
+
+        widget = ToolCallWidget("shell", "ls")
+        # Pretend mounted so the is_mounted guard doesn't short-circuit first.
+        widget._is_mounted = True
+        widget._apply_content = MagicMock()
+        widget._compute_content = MagicMock(return_value=("markup", "content"))
+        return widget
+
+    async def test_stale_version_skipped(self):
+        widget = self._widget()
+        widget._render_version = 2
+        await widget._async_render_content(1)
+        widget._apply_content.assert_not_called()
+
+    async def test_current_version_applied(self):
+        widget = self._widget()
+        widget._render_version = 1
+        await widget._async_render_content(1)
+        widget._apply_content.assert_called_once_with("markup", "content")
+
+    async def test_render_content_bumps_version_and_uses_it(self):
+        widget = self._widget()
+        widget.render_content()
+        gate = widget._render_gate
+        self.assertIsNotNone(gate)
+        await gate
+        widget._apply_content.assert_called_once_with("markup", "content")
+
+
 if __name__ == "__main__":
     unittest.main()

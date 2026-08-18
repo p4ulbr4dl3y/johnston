@@ -1,5 +1,7 @@
+import difflib
 import inspect
 import json
+import time
 from typing import Any, Dict, Type
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
@@ -49,6 +51,44 @@ def _close_match_candidates() -> list[str]:
         return _CLOSE_MATCH_CANDIDATES
     _CLOSE_MATCH_CANDIDATES[:] = _build_close_match_candidates()
     return _CLOSE_MATCH_CANDIDATES
+
+
+# Negative-lookup cache: a full MCP listing that already failed to find a tool
+# name is remembered briefly so a hallucinated name (LLM-invented) can't spawn
+# every MCP server on every agent turn. Bounded and TTL-expiring.
+_MCP_MISS_TTL = 30.0
+_MCP_MISS_MAX = 512
+_mcp_name_misses: Dict[str, float] = {}
+
+
+def _mcp_name_recently_missed(name: str) -> bool:
+    """True if a full MCP listing recently failed to find ``name``."""
+    ts = _mcp_name_misses.get(name)
+    if ts is None:
+        return False
+    if time.time() - ts > _MCP_MISS_TTL:
+        _mcp_name_misses.pop(name, None)
+        return False
+    return True
+
+
+def _remember_mcp_miss(name: str) -> None:
+    if len(_mcp_name_misses) >= _MCP_MISS_MAX:
+        _mcp_name_misses.clear()
+    _mcp_name_misses[name] = time.time()
+
+
+def _forget_mcp_miss(name: str) -> None:
+    _mcp_name_misses.pop(name, None)
+
+
+def _unknown_tool_result(name: str, clean_name: str) -> ToolResult:
+    """Build the 'unknown tool' error, with a close-match hint when available."""
+    matches = difflib.get_close_matches(clean_name, _close_match_candidates(), n=2, cutoff=0.4)
+    hint = ""
+    if matches:
+        hint = f" [Hint: Did you mean '{matches[0]}'?]"
+    return ToolResult.error("unknown", detail=hint.strip(), name=name)
 
 
 def get_default_tools() -> list[Dict[str, Any]]:
@@ -142,7 +182,11 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     if not is_mcp:
         # Full listing fallback: starts/refreshes servers that cache misses
-        # could not cover (e.g. very first call before any warmup ran).
+        # could not cover (e.g. very first call before any warmup ran). A name
+        # that already failed a full listing very recently is skipped: re-listing
+        # would spawn every server just to confirm a hallucinated tool name.
+        if _mcp_name_recently_missed(name):
+            return _unknown_tool_result(name, clean_name)
         try:
             if hasattr(mcp_mgr, "get_active_tools_async") and not mock_mgr:
                 res_or_coro = mcp_mgr.get_active_tools_async()
@@ -152,17 +196,15 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if listed_tools:
                 active_mcp_tools = list(listed_tools)
             is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+            if is_mcp:
+                _forget_mcp_miss(name)
+            else:
+                _remember_mcp_miss(name)
         except Exception as e:
             return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
 
     if not is_mcp:
-        import difflib
-
-        matches = difflib.get_close_matches(clean_name, _close_match_candidates(), n=2, cutoff=0.4)
-        hint = ""
-        if matches:
-            hint = f" [Hint: Did you mean '{matches[0]}'?]"
-        return ToolResult.error("unknown", detail=hint.strip(), name=name)
+        return _unknown_tool_result(name, clean_name)
 
     from tools.base import check_mcp_role_policy
 

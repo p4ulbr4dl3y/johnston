@@ -367,6 +367,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         args: dict = None,
         status: str = None,
         returncode: int = None,
+        is_mcp: bool = False,
     ):
         classes = f"tool-call tool-{(tool_type or '').lower()}"
         if is_sequential:
@@ -382,6 +383,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.result_text = result_text
         self.args = args or {}
         self.returncode = returncode
+        self.is_mcp = is_mcp
         self.is_expanded = False
         if status is not None:
             self.status = status
@@ -530,7 +532,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             from core.infrastructure.presentation.tool_display import format_compact_dict
 
             compact = format_compact_dict(self.args if isinstance(self.args, dict) else {})
-            is_mcp = (self.tool_type or "").startswith("mcp_") or getattr(self, "is_mcp", False)
+            is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
             escaped_compact = escape(compact)
             self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
@@ -836,18 +838,27 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 gate: asyncio.Task | None = self._render_gate if hasattr(self, "_render_gate") else None
                 if gate is not None and not gate.done():
                     gate.cancel()
-                self._render_gate = loop.create_task(self._async_render_content())
+                # Invalidation counter: a superseded render (or an unmount that
+                # left a cancelled gate's worker thread still running) must not
+                # overwrite fresher content when its thread eventually returns.
+                self._render_version = getattr(self, "_render_version", 0) + 1
+                version = self._render_version
+                self._render_gate = loop.create_task(self._async_render_content(version))
             else:
                 kind, value = self._compute_content()
                 self._apply_content(kind, value)
         except Exception:
             pass
 
-    async def _async_render_content(self) -> None:
+    async def _async_render_content(self, version: int) -> None:
         try:
             kind, value = await asyncio.to_thread(self._compute_content)
         except Exception:
             kind, value = "markup", self._clean_markup_text(self.result_text or "")
+        # A newer render superseded this one (or the widget was unmounted): the
+        # stale result must never overwrite fresher content.
+        if version != getattr(self, "_render_version", 0):
+            return
         if not getattr(self, "is_mounted", True):
             return
         self._apply_content(kind, value)
