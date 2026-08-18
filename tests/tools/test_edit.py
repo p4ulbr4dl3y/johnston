@@ -1,13 +1,13 @@
 import os
-import tempfile
 import unittest
 
+from tests.conftest import WindowsSafeTemporaryDirectory
 from tools.edit import EditTool, MultiEditTool, apply_chunk_replacements
 
 
 class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = WindowsSafeTemporaryDirectory()
         self.test_dir = self.temp_dir.name
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)

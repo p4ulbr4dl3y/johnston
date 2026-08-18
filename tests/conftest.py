@@ -7,6 +7,7 @@ The private ``_make_*`` functions back them and are importable directly if a tes
 cluster prefers ``from tests.conftest import ...``.
 """
 
+import tempfile
 from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock
 
@@ -172,3 +173,22 @@ def mock_pm():
 def mock_tool_context():
     """A real ToolContext over a mock app, pre-built."""
     return _make_tool_context()
+
+
+class WindowsSafeTemporaryDirectory(tempfile.TemporaryDirectory):
+    """TemporaryDirectory whose cleanup retries on Windows sharing violations.
+
+    git/CI Windows runners routinely hit `PermissionError: [WinError 32]` when
+    deleting a freshly written temp dir because Defender is still scanning the
+    files. Retry briefly before propagating so teardown stays green.
+    """
+
+    def cleanup(self) -> None:
+        import time
+
+        for _ in range(8):
+            try:
+                return super().cleanup()
+            except PermissionError:
+                time.sleep(0.25)
+        super().cleanup()

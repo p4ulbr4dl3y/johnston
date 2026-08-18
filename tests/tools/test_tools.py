@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 
+from tests.conftest import WindowsSafeTemporaryDirectory
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool
 from tools.read import ReadTool
@@ -27,7 +28,7 @@ class MockApp:
 
 class TestTools(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = WindowsSafeTemporaryDirectory()
         self.test_dir = self.temp_dir.name
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
