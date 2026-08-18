@@ -1050,8 +1050,12 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await ProvidersCommand().execute(app)
 
         # Flush the asyncio.create_task(_open_with_key) scheduled on failure path.
-        for _ in range(10):
-            await asyncio.sleep(0)
+        # Poll with a real delay: to_thread hops to a worker thread, so bare
+        # sleep(0) does not guarantee the task completes under load.
+        for _ in range(100):
+            if app.pushed.count("ProvidersScreen") >= 2:
+                break
+            await asyncio.sleep(0.01)
         self.assertEqual(len(entered_keys), 1)
         self.assertGreaterEqual(app.pushed.count("ProvidersScreen"), 2)
 
