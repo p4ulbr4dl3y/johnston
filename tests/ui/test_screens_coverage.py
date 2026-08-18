@@ -145,22 +145,52 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(rendered, "executor load never re-scheduled the render")
             self.assertEqual(screen.filtered_servers[1]["name"], "alpha")
 
+    async def _press_spam(self, pilot, opt_list, seconds_gap=0.02):
+        """Return elapsed seconds for a burst of enter presses."""
+        import time
+
+        opt_list.highlighted = 1
+        start = time.monotonic()
+        for _ in range(6):
+            await pilot.press("enter")
+            await asyncio.sleep(seconds_gap)
+        return time.monotonic() - start
+
     async def test_enter_spam_does_not_block_ui(self):
         # Regression: toggling ran synchronously on the UI thread; a blocking
         # toggle (config write + client stop, up to seconds) froze the modal
         # on every enter. It must run off-thread with duplicate toggles for
         # the same server dropped while one is in flight.
-        import time
+        import threading
 
         servers = [
             {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
         ]
+
+        # Baseline: measure how long a burst of 6 enters takes when the toggle
+        # is instant. Compare the slow-toggle burst against this baseline so the
+        # assertion scales with machine load instead of an absolute wallclock.
+        baseline_mgr = self._mock_mgr(list(servers))
+        baseline_calls: list[str] = []
+        baseline_mgr.toggle_server = lambda name: (baseline_calls.append(name), True)[1]
+
+        baseline_screen = self._make_screen(baseline_mgr)
+        async with CoverageHostApp(baseline_screen).run_test() as baseline_pilot:
+            await baseline_pilot.pause()
+            await self._wait_until(lambda: baseline_screen.filtered_servers)
+            baseline_opt = baseline_screen.query_one("#mcp-option-list", OptionList)
+            baseline_elapsed = await self._press_spam(baseline_pilot, baseline_opt)
+
         mgr = self._mock_mgr(servers)
         calls: list[str] = []
+        # Deterministic in-flight lock: the toggle blocks in a worker thread
+        # until released, so it can never complete (and drop the pending guard)
+        # mid-burst regardless of how slowly/paused the presses are delivered.
+        release_toggle = threading.Event()
 
         def slow_toggle(name):
             calls.append(name)
-            time.sleep(1.0)
+            release_toggle.wait()
             return True
 
         mgr.toggle_server = slow_toggle
@@ -169,22 +199,20 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             await self._wait_until(lambda: screen.filtered_servers)
             opt_list = screen.query_one("#mcp-option-list", OptionList)
-            opt_list.highlighted = 1
-            start = time.monotonic()
-            for _ in range(6):
-                await pilot.press("enter")
-                await asyncio.sleep(0.02)
-            elapsed = time.monotonic() - start
-            # 6 sequential sync toggles would take ~6s; the modal must stay
-            # responsive and only the first enter actually toggles while the
-            # in-flight one is pending (1s >> spam window).
-            self.assertLess(elapsed, 2.5, "enter spam blocked the UI thread")
+            elapsed = await self._press_spam(pilot, opt_list)
+            # A serial UI blocker would add ~4s per press (blocked toggles) over
+            # the baseline; the off-thread path adds only a small constant, and
+            # the blocked in-flight toggle keeps the duplicate guard active for
+            # the whole burst (exactly one enter gets through).
+            self.assertLess(elapsed, baseline_elapsed + 3.0, "enter spam blocked the UI thread")
             self.assertEqual(calls, ["alpha"])
             # Modal kept its rows while the toggle was in flight.
             self.assertTrue(screen.filtered_servers)
-            # Let the in-flight toggle finish and re-render.
-            await asyncio.sleep(0.4)
+            # Release the in-flight toggle and wait for it to finish + re-render.
+            release_toggle.set()
+            await asyncio.sleep(0.3)
             await self._wait_until(lambda: not screen._pending_toggles)
+            self.assertEqual(calls, ["alpha"])
 
     async def test_enter_after_toggle_finishes_toggles_again(self):
         # Once the in-flight toggle completes, a later enter toggles again

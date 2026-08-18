@@ -200,7 +200,9 @@ class ProviderManager:
                 continue
             providers[pkey] = ProviderDef.from_dict(pkey, pdata, disabled=pkey in disabled_set).to_dict()
         if len(self._providers_memo) >= 16:
-            dict.popitem(self._providers_memo, last=False)
+            # FIFO eviction: drop the oldest memo entry. ``dict.popitem`` takes
+            # no args (and pops LIFO), so remove the first-inserted key instead.
+            self._providers_memo.pop(next(iter(self._providers_memo)))
         self._providers_memo[cache_key] = providers
         return providers
 

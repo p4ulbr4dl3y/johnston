@@ -584,7 +584,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def _get_running_shell_task(self) -> Any:
         """Find active background shell task associated with this tool call, if any."""
-        if not self.app or not hasattr(self.app, "task_manager"):
+        try:
+            app = self.app
+        except Exception:
+            return None
+        if not app or not hasattr(app, "task_manager"):
             return None
         tid = None
         if isinstance(self.args, dict):
@@ -595,7 +599,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 tid = bg_match.group(1)
         if not tid:
             return None
-        for t in self.app.task_manager:
+        for t in app.task_manager:
             if (
                 getattr(t, "task_id", "") == tid
                 and getattr(t, "kind", "") == "shell"

@@ -42,7 +42,12 @@ def compute_dir_signature(
         suffixes = None
 
     entries: List[SignatureEntry] = []
-    for dpath, *_rest in dirs:
+    for item in dirs:
+        # ``dirs`` may hold plain paths (str) or (dir, extra) tuples. Unpacking
+        # a str directly (``for dpath, *_ in dirs``) would slice it per
+        # character, so derive the path explicitly to keep str and tuple forms
+        # working.
+        dpath = item if isinstance(item, str) else item[0]
         if not os.path.isdir(dpath):
             continue
         try:
