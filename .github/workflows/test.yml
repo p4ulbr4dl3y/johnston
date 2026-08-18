@@ -52,6 +52,7 @@ jobs:
         run: uv run pytest -n auto -m "not slow"
 
       - name: Test (slow, serial)
+        if: runner.os != 'Windows'
         run: uv run pytest -m slow
 
       - name: Test Install Script (Bash)

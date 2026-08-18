@@ -39,11 +39,17 @@ class LifecycleMixin:
 
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
-        if getattr(self, "resume_session_id", None) or os.environ.get("PYTEST_CURRENT_TEST"):
+        if (
+            getattr(self, "resume_session_id", None)
+            or os.environ.get("PYTEST_CURRENT_TEST")
+            or not getattr(self, "is_app_active", True)
+        ):
             return
         providers = self.pm.load_providers()
         connected = any(self.pm.is_provider_connected(k, v) for k, v in providers.items())
         if not connected:
+            if not getattr(self, "is_app_active", True):
+                return
             from widgets.commands import ProvidersCommand
 
             await ProvidersCommand().execute(self)
