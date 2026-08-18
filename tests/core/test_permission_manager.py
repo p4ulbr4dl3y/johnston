@@ -185,6 +185,10 @@ class TestPermissionManager(unittest.TestCase):
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "deny")
                 with open(cfg_file, "w", encoding="utf-8") as f:
                     json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
+                # Windows filesystems may keep a coarse mtime; bump it so the
+                # permission cache invalidation is deterministic.
+                st = os.stat(cfg_file)
+                os.utime(cfg_file, (st.st_atime, st.st_mtime + 2))
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
 
 

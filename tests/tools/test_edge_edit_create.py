@@ -5,8 +5,11 @@ Uses .txt extension everywhere to avoid the linter manager adding noise.
 """
 import os
 import stat
+import sys
 import tempfile
 import unittest
+
+import pytest
 
 from tools.create import CreateTool
 from tools.edit import EditTool, MultiEditTool, apply_chunk_replacements
@@ -27,7 +30,8 @@ class _Base(unittest.IsolatedAsyncioTestCase):
     def write(self, path, data, encoding="utf-8"):
         full = os.path.join(self.tmp, path)
         os.makedirs(os.path.dirname(full), exist_ok=True)
-        with open(full, "w", encoding=encoding) as f:
+        # newline="" keeps \r\n verbatim so CRLF fixtures are not doubled on Windows.
+        with open(full, "w", encoding=encoding, newline="") as f:
             f.write(data)
         return full
 
@@ -287,6 +291,7 @@ class TestEditToolFiles(_Base):
             if os.path.exists(outside):
                 os.remove(outside)
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="quotes are invalid in Windows filenames")
     async def test_edit_unicode_cyrillic_path(self):
         tool = EditTool()
         p = self.write("файл пробел \"кавычки\".txt", "data\n")
@@ -507,6 +512,7 @@ class TestCreateTool(_Base):
         # The blocker file must NOT be clobbered.
         self.assertEqual(open(os.path.join(self.tmp, "p", "blocker"), encoding="utf-8").read(), "i am a file, not a dir")
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="chmod read-only dir is ineffective on Windows")
     async def test_create_no_write_permission_returns_err(self):
         tool = CreateTool()
         ro_dir = os.path.join(self.tmp, "ro")

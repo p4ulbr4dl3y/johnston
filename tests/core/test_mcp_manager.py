@@ -7,6 +7,8 @@ import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from core.infrastructure.mcp import MCPManager, MCPProcessClient
 from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
 from widgets.app.dispatch import COMMAND_REGISTRY
@@ -418,6 +420,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
 
 
 class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
+    @pytest.mark.slow
     async def test_async_cancellation_does_not_deadlock(self):
         import asyncio
         from unittest.mock import MagicMock

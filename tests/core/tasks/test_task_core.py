@@ -67,6 +67,7 @@ def test_output_buffer_history():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_shell_task_reads_real_echo():
     proc = await asyncio.create_subprocess_exec(
@@ -94,6 +95,7 @@ async def test_shell_task_kill_sets_killed_status():
     assert not task.is_running
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_shell_task_send_input_missing_stdin_reports_error():
     proc = await asyncio.create_subprocess_exec(
@@ -118,6 +120,7 @@ async def test_shell_task_move_to_background_sets_flag_and_event():
     assert task.background_event.is_set()
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_shell_task_on_completed_only_when_background():
     completed_calls = []

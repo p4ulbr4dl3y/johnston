@@ -4,8 +4,11 @@ Focus: find bugs (crashes on valid input, path traversal, data loss, broken
 surrogates). Red tests = real code bugs (kept failing intentionally).
 """
 import os
+import sys
 import tempfile
 import unittest
+
+import pytest
 
 from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.tasks.output import tail_output
@@ -83,6 +86,7 @@ class TestResolvePathEdge(unittest.TestCase):
     def test_none_returns_base(self):
         self.assertTrue(os.path.isabs(resolve_path(None, None)))
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX path semantics")
     def test_absolute_wins(self):
         base = tempfile.gettempdir()
         res = resolve_path("/etc/hosts", base)
@@ -271,6 +275,7 @@ class TestFormatLinePaginationEdge(unittest.TestCase):
 
 
 class TestPathTraversalContext(unittest.TestCase):
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX path semantics")
     def test_abs_path_kept(self):
         # resolve_path keeps absolute paths as-is (no confinement)
         base = tempfile.mkdtemp()

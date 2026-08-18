@@ -1,4 +1,7 @@
+import sys
 import unittest
+
+import pytest
 
 from core.infrastructure.presentation.tool_display import extract_tool_display
 
@@ -10,6 +13,7 @@ class TestToolDisplay(unittest.TestCase):
     def test_read_path(self):
         self.assertEqual(extract_tool_display("read", {"path": "x.py"}), "x.py")
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="expects POSIX-style separators")
     def test_path_formatting_relative_and_absolute(self):
         import os
 

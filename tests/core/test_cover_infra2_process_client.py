@@ -2,7 +2,10 @@
 
 import asyncio
 import json
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 import core.infrastructure.mcp.process_client as core_infra_process_client
 from core.infrastructure.mcp.process_client import MCPProcessClient
@@ -153,6 +156,7 @@ class TestCoverTerminate:
         client.process = proc
         return client, proc
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.killpg is POSIX-only")
     def test_terminate_posix_killpg_and_wait_fail(self):
         client, proc = self._base()
         proc.wait.side_effect = [OSError("w1"), OSError("w2")]
@@ -173,6 +177,7 @@ class TestCoverTerminate:
             client._terminate_process_group()
         proc.kill.assert_called_once()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="os.killpg is POSIX-only")
     def test_terminate_stream_none_skipped(self):
         client, proc = self._base()
         proc.stdout = None

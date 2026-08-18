@@ -23,6 +23,7 @@ from widgets.presentation.widgets.chat_messages import UserMessage
 
 
 class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
+    @pytest.mark.slow
     async def test_chat_app_flow(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:

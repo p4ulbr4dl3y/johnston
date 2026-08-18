@@ -25,6 +25,7 @@ def run_git(
             cwd=cwd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             env=env,
             timeout=timeout,
         )

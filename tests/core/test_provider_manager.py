@@ -172,6 +172,10 @@ class TestProviderManager(unittest.TestCase):
         # Rewrite with updated provider name; mtime change invalidates the memo.
         with open(providers_file, "w", encoding="utf-8") as f:
             json.dump({"pp": {"key": "pp", "name": "PP2", "base_url": "", "models": []}}, f)
+        # Some filesystems (Windows) have coarse mtime granularity; bump the
+        # timestamp explicitly so the memo invalidation is deterministic.
+        st = os.stat(providers_file)
+        os.utime(providers_file, (st.st_atime, st.st_mtime + 2))
 
         p2 = self.pm.load_providers()
         self.assertEqual(p2["pp"]["name"], "PP2")
@@ -527,6 +531,7 @@ def test_save_secret_not_in_caplog(pm, caplog):
     assert "SUPER-SECRET-KEY-123" not in caplog.text
 
 
+@pytest.mark.skipif(os.name == "nt", reason="chmod read-only dir is ineffective on Windows")
 def test_save_readonly_path_permission_error(pm, tmp_path):
     (tmp_path / "config.json").write_text("{}", encoding="utf-8")
     os.chmod(tmp_path, 0o500)

@@ -1,7 +1,9 @@
 import asyncio
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
 from textual.app import App, ComposeResult
 
 from core.infrastructure.tasks.manager import TaskManager
@@ -337,6 +339,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(footer.is_generating)
             self.assertIsNone(footer._spinner_timer)
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="expects POSIX-style separators")
     def test_format_display_path(self):
         import os
 

@@ -405,6 +405,7 @@ async def test_subagent_timeout_read_task_exception_ignored(tool, make_app_mock,
         assert "ERR: timeout 'shell': timed out after 1s" in res
 
 
+@pytest.mark.slow
 async def test_subagent_shell_execution_cancelled(tool, make_tool_context):
     ctx = make_tool_context(is_subagent=True)
     p = _process(stdout=None)
@@ -595,6 +596,7 @@ async def test_or_short_circuit(tool, make_tool_context):
     assert "SHOULD_NOT_RUN" not in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="bash pipe syntax (PowerShell incompatible)")
 async def test_pipe_chains(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo pipe_data | cat"}, ctx=_ctx(make_tool_context)))
     assert "pipe_data" in res
@@ -605,6 +607,7 @@ async def test_redirect_stdout_to_devnull_loses_output(tool, make_tool_context):
     assert "hidden" not in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="/dev/null is POSIX-only")
 async def test_redirect_append(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo x >> /dev/null"}, ctx=_ctx(make_tool_context)))
     assert res == "(no output)"
@@ -630,12 +633,14 @@ async def test_arithmetic_substitution(tool, make_tool_context):
     assert "5" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="bash ! negation is not valid PowerShell")
 async def test_not_bang_operator(tool, make_tool_context):
     # `! echo -n ; echo $?` → negation gives exit 1 → $? == 1
     res = str(await tool.execute({"command": "! true; echo exit=$?"}, ctx=_ctx(make_tool_context)))
     assert "exit=1" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="PowerShell does not glob-expand echo *")
 async def test_wildcard_glob_expands(tool, make_tool_context):
     with tempfile.TemporaryDirectory() as d:
         with open(os.path.join(d, "apple.txt"), "w") as f:
@@ -647,6 +652,7 @@ async def test_wildcard_glob_expands(tool, make_tool_context):
     assert "banana.txt" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="PowerShell ~ is not an absolute path")
 async def test_tilde_expands(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo ~"}, ctx=_ctx(make_tool_context)))
     assert os.path.isabs(res.strip())
@@ -666,6 +672,7 @@ async def test_unicode_and_emoji_roundtrip(tool, make_tool_context):
     assert payload in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="PowerShell argument quoting differs")
 async def test_argv_with_spaces_quoted(tool, make_tool_context):
     res = str(await tool.execute({"command": 'echo "a b  c" d'}, ctx=_ctx(make_tool_context)))
     assert "a b  c d" in res
@@ -680,6 +687,7 @@ async def test_very_long_command_many_args(tool, make_tool_context):
 # ---------- timeout kills runaway ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="/bin/sleep is POSIX-only")
 async def test_timeout_kills_subagent_subprocess(tool, make_tool_context):
     # /bin/sleep bypasses SLEEP_CHAIN_REGEX; must be terminated by timeout.
     t0 = asyncio.get_running_loop().time()
@@ -731,6 +739,7 @@ async def test_crlf_normalized(tool, make_tool_context):
     assert "two" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="python3 on PATH is not guaranteed")
 async def test_very_large_output_truncated(tool, make_tool_context):
     cmd = "python3 -c 'import sys; sys.stdout.write(\"X\"*6000)'" if os.name != "nt" else "echo"
     res = str(await tool.execute({"command": cmd}, ctx=_ctx(make_tool_context)))
@@ -749,11 +758,13 @@ async def test_nonexistent_cwd_falls_back(tool, make_tool_context):
     assert "cwd_fallback" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="pwd output format is PowerShell-specific")
 async def test_relative_cwd(tool, make_tool_context):
     res = str(await tool.execute({"command": "pwd"}, ctx=_ctx(make_tool_context)))
     assert os.path.isabs(res.strip())
 
 
+@pytest.mark.skipif(os.name == "nt", reason="cd && pwd is bash syntax")
 async def test_cd_command_inside(tool, make_tool_context):
     with tempfile.TemporaryDirectory() as sub:
         res = str(await tool.execute({"command": f"cd {shlex.quote(sub)} && pwd"}, ctx=_ctx(make_tool_context)))
@@ -763,6 +774,7 @@ async def test_cd_command_inside(tool, make_tool_context):
 # ---------- env behavior ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="${VAR} expansion is bash syntax")
 async def test_env_inherited(tool, make_tool_context):
     key = "JOHNSTON_EDGE_ENV_TEST"
     os.environ[key] = "inherited_value"
@@ -788,6 +800,7 @@ async def test_missing_env_var_empty(tool, make_tool_context):
 # ---------- permission denied / non-executable ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="chmod +x semantics are POSIX-only")
 async def test_non_executable_script_denied(tool, make_tool_context):
     with tempfile.TemporaryDirectory() as d:
         script = os.path.join(d, "noexec.sh")
@@ -802,6 +815,7 @@ async def test_non_executable_script_denied(tool, make_tool_context):
 # ---------- destructive safety (claimed in description) ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="rm -rf is POSIX-only")
 async def test_rm_rf_not_blocked_default(tool, make_tool_context):
     # Description claims "Destructive commands confirm." Verify whether any
     # protection exists in execute(). Deleting our own tmp dir is safe.

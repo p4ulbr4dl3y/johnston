@@ -48,8 +48,11 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
-      - name: Test
-        run: uv run pytest
+      - name: Test (fast, parallel)
+        run: uv run pytest -n auto -m "not slow"
+
+      - name: Test (slow, serial)
+        run: uv run pytest -m slow
 
       - name: Test Install Script (Bash)
         if: runner.os != 'Windows'

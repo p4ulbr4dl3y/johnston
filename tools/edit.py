@@ -56,6 +56,15 @@ def find_actual_target_and_replacement(text: str, target: str, replacement: str)
         if idx != -1:
             actual_target = text[idx : idx + len(target)]
             actual_replacement = _preserve_quote_style(target, actual_target, replacement)
+        else:
+            # CRLF <-> LF mismatch: retry with the line endings swapped so a
+            # CRLF file can still be edited with an LF old_str and vice versa.
+            swapped = target.replace("\n", "\r\n") if "\r\n" not in target else target.replace("\r\n", "\n")
+            if swapped != target and swapped in text:
+                actual_target = swapped
+                actual_replacement = (
+                    replacement.replace("\n", "\r\n") if "\r\n" in swapped else replacement.replace("\r\n", "\n")
+                )
 
     if actual_replacement == "" and not actual_target.endswith(("\n", "\r")):
         if actual_target + "\r\n" in text:

@@ -4,6 +4,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from widgets.status_footer import StatusFooter, SubagentStatusFooter, format_display_path
 
 
@@ -42,6 +44,7 @@ class TestStatusFooterCoverage(unittest.TestCase):
             res = format_display_path(link)
             self.assertEqual(res, "~/johnston")
 
+    @pytest.mark.skipif(os.name == "nt", reason="expects POSIX-style separators")
     def test_format_display_path_len_three_parts(self):
         self.assertEqual(format_display_path("/aa/bb", max_length=3), "/.../bb")
 

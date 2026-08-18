@@ -182,6 +182,7 @@ async def test_path_with_unicode_and_cyrillic(ctx, tmp_path):
     assert "кириллица юникод" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="quotes are invalid in Windows filenames")
 @pytest.mark.asyncio
 async def test_path_with_quotes_and_escaped(ctx, tmp_path):
     p = wb(tmp_path, 'quo"te\\ name.txt', b"quotes\n")

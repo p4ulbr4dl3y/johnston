@@ -17,7 +17,7 @@ class TestRunGit(unittest.TestCase):
         self.assertEqual(res.returncode, 0)
         self.assertEqual(res.stdout, "clean")
         mock_run.assert_called_once_with(
-            ["git", "status"], cwd="/tmp", capture_output=True, text=True, env=None, timeout=5
+            ["git", "status"], cwd="/tmp", capture_output=True, text=True, encoding="utf-8", env=None, timeout=5
         )
 
     def test_timeout_returns_124(self):

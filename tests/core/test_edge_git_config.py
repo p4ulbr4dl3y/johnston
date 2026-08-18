@@ -270,6 +270,7 @@ def test_atomic_write_json_unicode_ensure_ascii_false(tmp_path):
     assert "текст" in content and "🎉" in content
 
 
+@pytest.mark.skipif(os.name == "nt", reason="chmod read-only dir is ineffective on Windows")
 def test_atomic_write_json_to_readonly_dir_fails(tmp_path):
     """Writing into a read-only directory must raise, not silently lose data."""
     ro = tmp_path / "ro"
@@ -282,6 +283,7 @@ def test_atomic_write_json_to_readonly_dir_fails(tmp_path):
         os.chmod(ro, 0o755)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="chmod read-only dir is ineffective on Windows")
 def test_atomic_write_json_write_to_nonexistent_nested_readonly_dir(tmp_path):
     """Non-existent parent under a read-only dir must raise, not silently lose data."""
     ro = tmp_path / "ro"

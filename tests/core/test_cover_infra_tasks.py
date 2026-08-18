@@ -6,6 +6,7 @@ existing tasks/test_task_core.py style.
 """
 
 import asyncio
+import sys
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -270,6 +271,7 @@ async def test_kill_sync_process_kill_raises_and_cancels_read_task():
     assert task._status.value == "killed"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.killpg is POSIX-only")
 @pytest.mark.asyncio
 async def test_kill_sync_killpg_raises(monkeypatch):
     task = ShellTask(task_id="t13", command="echo")

@@ -79,7 +79,9 @@ def atomic_write_text(path: str, content: str) -> None:
 
     fd, tmp_path = tempfile.mkstemp(prefix=".johnston-", suffix=".tmp", dir=directory, text=True)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        # newline="" keeps \r\n line endings verbatim: default text mode would
+        # translate each \n to \r\n on Windows, corrupting CRLF content to \r\r\n.
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
             f.write(content)
             f.flush()
         os.replace(tmp_path, path)

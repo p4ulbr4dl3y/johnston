@@ -128,6 +128,8 @@ class TestRulesManagerEdge(unittest.TestCase):
         self.assertEqual(rules[0].name, "broken")
 
     def test_unreadable_file_returns_none(self):
+        if not hasattr(os, "geteuid"):
+            self.skipTest("POSIX-only (os.geteuid)")
         if os.geteuid() == 0:
             self.skipTest("running as root, chmod ineffective")
         _write_rule(self.tmpdir, "a.md", "---\nname: A\n---\ncontent")
