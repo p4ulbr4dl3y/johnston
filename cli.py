@@ -201,22 +201,6 @@ def print_roles():
             print()
 
 
-def print_subagents():
-    """Print available subagent roles to stdout"""
-    from core.role_registry import RoleRegistry
-
-    registry = RoleRegistry.get_instance()
-    defs = registry.list_subagent_roles()
-    print("Available Subagent Roles:")
-    if not defs:
-        print("  No subagent roles found.")
-        return
-    for dname, dval in defs.items():
-        tools_str = f" | Tools: {', '.join(dval.allowed_tools)}" if dval.allowed_tools else ""
-        model_str = f" | Model: {dval.model}" if dval.model else ""
-        print(f"  * {dname} [{dval.source}]{tools_str}{model_str}")
-
-
 def main():
     import argparse
 
@@ -233,9 +217,8 @@ def main():
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
-    parser.add_argument("--roles", action="store_true", help="List available agent roles (main + subagents)")
+    parser.add_argument("--roles", action="store_true", help="List available agent roles (execution modes + subagents)")
     parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
-    parser.add_argument("--subagents", action="store_true", help="List available subagent roles and sessions")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
     args = parser.parse_args()
@@ -262,10 +245,6 @@ def main():
 
     if args.rules:
         print_rules()
-        sys.exit(0)
-
-    if args.subagents:
-        print_subagents()
         sys.exit(0)
 
     app = JohnstonApp(

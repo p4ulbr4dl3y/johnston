@@ -10,7 +10,6 @@ from cli import (
     print_roles,
     print_rules,
     print_skills,
-    print_subagents,
 )
 from core.application.skills.manager import Skill, SkillScope
 
@@ -85,13 +84,6 @@ class TestCLI(unittest.TestCase):
             print_roles()
         output = f.getvalue()
         self.assertIn("Available Agent Roles & Modes:", output)
-
-    def test_print_subagents(self):
-        f = io.StringIO()
-        with redirect_stdout(f):
-            print_subagents()
-        output = f.getvalue()
-        self.assertIn("Available Subagent Roles:", output)
 
     @patch("sys.argv", ["johnston", "-v"])
     def test_main_version(self):
@@ -342,33 +334,6 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("Worker (worker)", out)
         self.assertIn("Disallowed tools: rm", out)
 
-    def test_print_subagents_empty(self):
-        f = io.StringIO()
-        with patch("core.role_registry.RoleRegistry") as mock_cls:
-            reg = MagicMock()
-            reg.list_subagent_roles.return_value = {}
-            mock_cls.get_instance.return_value = reg
-            with redirect_stdout(f):
-                print_subagents()
-        self.assertIn("No subagent roles found", f.getvalue())
-
-    def test_print_subagents_with_defs(self):
-        f = io.StringIO()
-        with patch("core.role_registry.RoleRegistry") as mock_cls:
-            reg = MagicMock()
-            dval = MagicMock()
-            dval.allowed_tools = ["shell"]
-            dval.model = "gpt-4o"
-            dval.source = "builtin"
-            reg.list_subagent_roles.return_value = {"worker": dval}
-            mock_cls.get_instance.return_value = reg
-            with redirect_stdout(f):
-                print_subagents()
-        out = f.getvalue()
-        self.assertIn("worker", out)
-        self.assertIn("Tools: shell", out)
-        self.assertIn("Model: gpt-4o", out)
-
 
 class TestMainFlags(unittest.TestCase):
     def test_main_models_flag(self):
@@ -410,15 +375,6 @@ class TestMainFlags(unittest.TestCase):
     def test_main_rules_flag(self):
         with patch("sys.argv", ["johnston", "--rules"]):
             with patch("cli.print_rules"):
-                with self.assertRaises(SystemExit) as cm:
-                    from cli import main
-
-                    main()
-        self.assertEqual(cm.exception.code, 0)
-
-    def test_main_subagents_flag(self):
-        with patch("sys.argv", ["johnston", "--subagents"]):
-            with patch("cli.print_subagents"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
 
