@@ -306,7 +306,9 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         self.update(grid)
 
     def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
-        """MCP indicator: show active/total count as 'N/M'."""
+        """MCP indicator: show active/total count as 'N/M', or '0' when none configured."""
+        if mcp_total <= 0:
+            return f"{prefix} [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
         return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
 
     def update_status(

@@ -246,8 +246,8 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(footer._mcp_footer_text(1, 2), "MCP: [#f4f4f5]1/2[/#f4f4f5]")
         # Fully loaded -> plain count
         self.assertEqual(footer._mcp_footer_text(2, 2), "MCP: [#f4f4f5]2/2[/#f4f4f5]")
-        # No servers configured -> 0/0
-        self.assertEqual(footer._mcp_footer_text(0, 0), "MCP: [#f4f4f5]0/0[/#f4f4f5]")
+        # No servers configured -> 0
+        self.assertEqual(footer._mcp_footer_text(0, 0), "MCP: [#f4f4f5]0[/#f4f4f5]")
 
     async def test_poll_mcp_refresh_triggers_on_loading(self):
         footer = StatusFooter()
