@@ -10,7 +10,7 @@
 - Spec-cases handled in code (no dedicated preset): `ollama` and `lmstudio` (local backends, no API key required).
 
 ## Config.json Keys (`~/.johnston/config.json`)
-- `api_keys`: provider API keys (managed via `johnston --models`), not environment variables.
+- `api_keys`: provider API keys (managed via the in-app `/providers` screen), not environment variables. `johnston --models` only lists providers/models.
 - `active_provider`: currently selected provider key.
 - `provider_models`: per-provider chosen model (`{provider: model}`).
 - `provider_thinking_efforts`: per-provider/per-model reasoning effort overrides.
