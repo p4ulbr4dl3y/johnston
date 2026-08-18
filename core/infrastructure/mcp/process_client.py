@@ -740,6 +740,13 @@ class MCPProcessClient:
 
             try:
                 await self._send_async(req)
+            except asyncio.CancelledError:
+                # Dropped while the write was in flight: remove the pending
+                # future so a cancelled call can never leave a dangling entry
+                # (the outer finally only covers the read phase).
+                self._pending_futures.pop(current_id, None)
+                fut.cancel()
+                raise
             except Exception as e:
                 self._pending_futures.pop(current_id, None)
                 return f"Error writing to MCP server '{self.name}': {e}"

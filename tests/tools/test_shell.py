@@ -414,7 +414,7 @@ async def test_subagent_shell_execution_cancelled(tool, make_tool_context):
 
     async def _mock_wait():
         wait_invoked.set()
-        return asyncio.Future()  # never resolves
+        await asyncio.Event().wait()  # never resolves; cancellable
 
     p.wait = _mock_wait
 

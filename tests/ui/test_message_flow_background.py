@@ -1,9 +1,12 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app import JohnstonApp
 
 
+@pytest.mark.slow
 class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
     async def test_completed_not_active_returns(self):
         app = JohnstonApp()

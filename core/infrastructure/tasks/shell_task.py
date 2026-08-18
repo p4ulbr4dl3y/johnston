@@ -179,16 +179,15 @@ class ShellTask(BaseTask):
             finally:
                 self.close_pty()
                 self.close_log()
-                self._mark_terminated()
-                # Flush signal: subscribers (e.g. a console view) release any
-                # buffered partial line they still hold.
-                self._notify_listeners("")
 
+                # Reap the process BEFORE publishing the terminal status so a
+                # just-finished process is never reported as RUNNING by the
+                # `process alive` check in BaseTask.status.
                 if self.process is not None:
                     try:
                         if self.process.returncode is None:
                             try:
-                                await asyncio.wait_for(asyncio.shield(self.process.wait()), timeout=0.1)
+                                await asyncio.wait_for(asyncio.shield(self.process.wait()), timeout=1.0)
                             except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
                                 pass
                     except Exception:
@@ -200,6 +199,13 @@ class ShellTask(BaseTask):
                         on_completed(self.task_id, self.command, out or "(no output)")
                     except Exception:
                         pass
+
+                # Publishing _done LAST guarantees wait() only returns after the
+                # process is reaped and on_completed has been delivered.
+                self._mark_terminated()
+                # Flush signal: subscribers (e.g. a console view) release any
+                # buffered partial line they still hold.
+                self._notify_listeners("")
 
         self.read_task = asyncio.create_task(_read())
         return self.read_task
