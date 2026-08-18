@@ -8,7 +8,6 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.infrastructure.mcp import get_mcp_manager
-from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
@@ -249,11 +248,18 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             enabled = await asyncio.to_thread(self.mm.toggle_server, name)
             if enabled:
                 # Freshly-enabled server: kick the (coalesced, async) warmup so
-                # the row can show "N tools" without reopening the modal. Warmup
-                # is async and never occupies a worker thread, so a cold npx/uvx
-                # server cannot starve the modal's own background loader.
+                # the row can show "N tools" without reopening the modal.
                 try:
                     await self.mm.ensure_tools_ready_async()
+                    warm_task = getattr(self.mm, "_tools_refresh_task", None)
+                    if warm_task is not None and not warm_task.done():
+                        def _on_warmed(_done):
+                            if getattr(self, "is_mounted", True):
+                                self.refresh_list()
+                                if hasattr(self.app, "refresh_status_footer"):
+                                    self.app.refresh_status_footer()
+
+                        warm_task.add_done_callback(_on_warmed)
                 except Exception:
                     pass
         except asyncio.CancelledError:
