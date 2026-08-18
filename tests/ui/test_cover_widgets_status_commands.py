@@ -959,6 +959,34 @@ class TestStatusFooterCoverage(unittest.TestCase):
             footer._spin()
             usf.assert_called_once()
 
+    def test_stream_frame_not_generating_returns(self):
+        footer = FooterHarness()
+        footer.is_generating = False
+        footer._last_grid_rows = [["a"]]
+        with patch.object(footer, "update") as upd:
+            footer._render_stream_frame()
+            upd.assert_not_called()
+
+    def test_stream_frame_no_cached_rows_returns(self):
+        footer = FooterHarness()
+        footer.is_generating = True
+        footer._last_grid_rows = None
+        with patch.object(footer, "update") as upd:
+            footer._render_stream_frame()
+            upd.assert_not_called()
+
+    def test_stream_frame_update_exception_suppressed(self):
+        footer = FooterHarness()
+        footer.is_generating = True
+        footer._spinner_idx = 3
+        footer._last_grid_rows = [["a b c"], ["d"]]
+        with patch.object(footer, "update", side_effect=Exception("boom")):
+            footer._render_stream_frame()  # must not raise
+
+    def test_stream_frame_swap_no_bracket_returns_left(self):
+        footer = FooterHarness()
+        self.assertEqual(footer._swap_frame("no-bracket", "x"), "no-bracket")
+
     def test_update_subagent_footer_running(self):
         agent = MagicMock()
         agent.role = "explorer"

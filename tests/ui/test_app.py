@@ -1,4 +1,9 @@
+import asyncio
+import os
+import runpy
+import sys
 import threading
+import types
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -132,6 +137,56 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await app.on_paste(events.Paste("file:///tmp/dropped_script.py"))
             await pilot.pause(0.1)
             self.assertEqual(chat_input.text, "@/tmp/dropped_script.py ")
+
+    async def test_copy_to_clipboard_os_async(self):
+        app = JohnstonApp()
+        calls = []
+
+        async def fake_clip(text):
+            calls.append(text)
+
+        with patch("textual.app.App.copy_to_clipboard") as sc, patch(
+            "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
+            side_effect=fake_clip,
+        ):
+            app.copy_to_clipboard("hello")
+        sc.assert_called_once_with("hello")
+        await asyncio.sleep(0)
+        self.assertEqual(calls, ["hello"])
+
+    async def test_copy_to_clipboard_super_raises(self):
+        app = JohnstonApp()
+        calls = []
+
+        async def fake_clip(text):
+            calls.append(text)
+
+        with patch("textual.app.App.copy_to_clipboard", side_effect=Exception("boom")), patch(
+            "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
+            side_effect=fake_clip,
+        ):
+            app.copy_to_clipboard("hello")  # must not raise
+        await asyncio.sleep(0)
+        self.assertEqual(calls, ["hello"])
+
+    def test_app_main_entry_point(self):
+        fake = types.ModuleType("cli")
+        ran = []
+        fake.main = lambda: ran.append(True)
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "app.py",
+        )
+        saved = sys.modules.get("cli")
+        sys.modules["cli"] = fake
+        try:
+            runpy.run_path(os.path.abspath(path), run_name="__main__")
+        finally:
+            if saved is None:
+                sys.modules.pop("cli", None)
+            else:
+                sys.modules["cli"] = saved
+        self.assertEqual(ran, [True])
 
     async def test_message_queue(self):
         app = JohnstonApp()
