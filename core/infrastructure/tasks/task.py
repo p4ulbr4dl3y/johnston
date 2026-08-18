@@ -1,8 +1,7 @@
-"""Abstract task contract for the unified task-core module.
+"""Abstract task contract for background tasks managed by TaskManager.
 
-Defines the base abstraction every concrete task implementation (shell,
-subagent) implements, plus the snapshot type passed to the UI layer to avoid
-races on live objects.
+Defines the base abstraction for concrete task implementations (such as
+ShellTask).
 """
 
 import time
@@ -10,8 +9,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional
 
-# Literal kind strings a task may carry ("shell" or "subagent").
-TASK_KINDS = ("shell", "subagent")
+# Literal kind strings a background task may carry.
+TASK_KINDS = ("shell",)
 
 
 class TaskStatus(str, Enum):

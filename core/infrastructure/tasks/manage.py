@@ -1,9 +1,7 @@
-"""Shared management operations for shell and subagent tasks.
+"""Shared management operations for background shell tasks.
 
-Both ManageShellTool and ManageSubagentTool used to duplicate the same
-scoping/status/kill logic. This module centralizes that logic behind a small
-surface that each tool delegates to, so behaviour stays consistent and the
-duplication is removed.
+Provides scoping, search, and formatting helpers for ManageShellTool
+and TaskManager tasks.
 """
 
 from typing import Any, List

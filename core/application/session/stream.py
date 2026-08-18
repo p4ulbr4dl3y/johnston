@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
-from core.domain.defaults.errors import parse_tool_result_step
+from core.domain.defaults.errors import ToolResult, parse_tool_result_step
 from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING
 from core.session_manager import AgentSession
 
@@ -132,7 +132,7 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
 logger = logging.getLogger(__name__)
 
 
-def _safe_save(store: Any, session: AgentSession) -> None:
+async def _safe_save(store: Any, session: AgentSession) -> None:
     """Persist a session, logging and re-raising on storage failure.
 
     A silent swallow meant a failed save still marked the subagent COMPLETED,
@@ -141,7 +141,7 @@ def _safe_save(store: Any, session: AgentSession) -> None:
     contain the error may catch it explicitly.
     """
     try:
-        store.save(session)
+        await asyncio.to_thread(store.save, session)
     except Exception:
         logger.exception("Failed to save subagent session %s", session.id)
         raise
@@ -180,7 +180,7 @@ async def _run_single_subagent_message(
             session.finish(STATUS_ERROR, last_api_error[0])
         else:
             session.finish(STATUS_COMPLETED)
-        _safe_save(store, session)
+        await _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
         session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
@@ -190,7 +190,7 @@ async def _run_single_subagent_message(
         session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
         session.finish(STATUS_CANCELLED, "Cancelled by user")
         try:
-            _safe_save(store, session)
+            await _safe_save(store, session)
         except Exception as err:
             acc[0] = f"[{error_prefix}: failed to save cancelled session: {err}]"
     except Exception as err:
@@ -204,7 +204,7 @@ async def _run_single_subagent_message(
         session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
         session.finish(STATUS_ERROR, str(err))
         try:
-            _safe_save(store, session)
+            await _safe_save(store, session)
         except Exception:
             pass
     return acc[0]
@@ -250,7 +250,10 @@ async def run_subagent_stream_bg(
     finally:
         if cleanup_fn:
             try:
-                cleanup_fn(acc)
+                if asyncio.iscoroutinefunction(cleanup_fn):
+                    await cleanup_fn(acc)
+                else:
+                    await asyncio.to_thread(cleanup_fn, acc)
             except Exception:
                 pass
         merge_subagent_metrics(subagent, ctx)
@@ -301,3 +304,108 @@ def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int
         store.save(sess)
         cancelled += 1
     return cancelled
+
+
+async def send_subagent_followup(
+    session: AgentSession,
+    message: str,
+    ctx: Any,
+    store: Any,
+) -> ToolResult:
+    """Send a follow-up message to an existing subagent session.
+
+    Resumes in the background; queues the message if the subagent is already busy.
+    """
+    if not message:
+        return ToolResult.error("params", name="message", detail="required for 'send_message'")
+
+    # Mirror the main agent's semantics: a follow-up can be sent in any
+    # status. If the subagent is currently busy (live async_task), the
+    # message is queued and drained by the running stream; otherwise it
+    # starts immediately.
+    if session.async_task and hasattr(session.async_task, "done") and not session.async_task.done():
+        if not hasattr(session, "pending_messages"):
+            session.pending_messages = []
+        session.pending_messages.append(message)
+        from tools.invoke_subagent import _mark_subagent_running
+
+        _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
+        return ToolResult.done(f"queued for {session.id}")
+
+    try:
+        subagent = session.agent
+        if not subagent:
+            subagent = ctx.create_agent()
+            if subagent:
+                hist = session.agent_history
+                if hist:
+                    subagent.history = hist
+                # Restore role behavior (system prompt, model, tool filtering)
+                # so follow-ups match the original spawn, even after restart.
+                configure_subagent_agent(
+                    subagent,
+                    session.role,
+                    app=ctx.host,
+                    project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
+                )
+                session.agent = subagent
+
+        # Restore the isolated worktree context for follow-up so the subagent
+        # keeps working on its own branch/cwd instead of silently falling back
+        # to the parent checkout (worktree is removed on completion).
+        if subagent and session.project_dir and session.branch_name:
+            from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+
+            project_dir = await SubagentWorktreeManager.ensure_worktree_available_async(
+                session, parent_dir=ctx.project_dir
+            )
+            subagent.project_dir = project_dir
+            subagent.cwd = project_dir
+
+        if not subagent:
+            return ToolResult.error("context", name=session.id, detail="no active agent")
+
+        session.status = "running"
+        session.agent = subagent
+        subagent.session = session
+        session.add_event({"type": "user", "text": message})
+        session.add_event({"type": "status_change", "status": "running"})
+
+        from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+        from tools.base import format_background_notification
+
+        cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
+            ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
+        )
+
+        notification_hdr = format_background_notification(
+            "Subagent follow-up", session.description, session.id, "{result_text}"
+        )
+
+        # The stream drains session.pending_messages inline, so only the
+        # first (this) message is passed; queued follow-ups are consumed
+        # by the loop until empty, keeping session running.
+        bg_task = asyncio.create_task(
+            run_subagent_stream_bg(
+                subagent,
+                message,
+                session,
+                ctx,
+                store,
+                cleanup_fn=cleanup_fn,
+                error_prefix="Subagent message error",
+                notification_template=notification_hdr,
+                session_id=session.id,
+                truncate_result=True,
+            )
+        )
+        session.async_task = bg_task
+
+        from tools.invoke_subagent import _mark_subagent_running
+
+        _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
+        return ToolResult.done(f"message sent to {session.id}")
+    except Exception as err:
+        session.finish(STATUS_ERROR, str(err))
+        store.save(session)
+        return ToolResult.error("subagent_setup", detail=str(err), name=session.id)

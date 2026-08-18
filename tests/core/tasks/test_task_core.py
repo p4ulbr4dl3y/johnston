@@ -393,7 +393,7 @@ def test_make_log_path_caps_long_prefix(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_task_kind_literals():
-    assert ("shell", "subagent") == TASK_KINDS
+    assert ("shell",) == TASK_KINDS
     assert TaskStatus.RUNNING.value == "running"
 
 
