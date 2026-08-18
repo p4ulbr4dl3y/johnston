@@ -32,15 +32,15 @@ class TestTruncateOutput(unittest.TestCase):
         text1 = "TOOL_1_" + ("A" * 2000)
         text2 = "TOOL_2_" + ("B" * 2000)
 
-        res1 = truncate_output(text1, max_chars=100, tool_name="shell", tool_id="call_1")
-        res2 = truncate_output(text2, max_chars=100, tool_name="shell", tool_id="call_2")
+        res1 = truncate_output(text1, max_chars=100, tool_name="shell")
+        res2 = truncate_output(text2, max_chars=100, tool_name="shell")
 
-        self.assertIn("shell_call_1.log", res1)
-        self.assertIn("shell_call_2.log", res2)
+        path1 = [word for word in res1.split() if ".log" in word][0].rstrip(".")
+        path2 = [word for word in res2.split() if ".log" in word][0].rstrip(".")
 
-        path1 = [line for line in res1.split() if "shell_call_1.log" in line][0].rstrip(".")
-        path2 = [line for line in res2.split() if "shell_call_2.log" in line][0].rstrip(".")
-
+        # Same tool name, different snapshots -> distinct unique files.
+        self.assertNotEqual(path1, path2)
+        self.assertTrue(os.path.basename(path1).startswith("shell-"))
         self.assertTrue(os.path.exists(path1))
         self.assertTrue(os.path.exists(path2))
 
@@ -64,17 +64,48 @@ class TestTruncateOutput(unittest.TestCase):
         single_line_json = json.dumps(large_json_dict)
         self.assertNotIn("\n", single_line_json)
 
-        res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test", tool_id="json_1")
+        res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test")
         self.assertIn("Format: JSON.", res)
         self.assertIn("inspect formatted JSON log", res)
 
-        log_path = [line for line in res.split() if "mcp_test_json_1.log" in line][0].rstrip(".")
+        log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
         with open(log_path, "r", encoding="utf-8") as f:
             log_content = f.read()
 
         # Verify saved log was pretty-printed into multiple lines
         self.assertIn("\n", log_content)
         self.assertEqual(json.loads(log_content), large_json_dict)
+
+    def test_truncate_output_clips_log_at_max_size(self):
+        import unittest.mock as mock
+
+        from tools import base as tools_base
+
+        with mock.patch.object(tools_base, "MAX_SNAPSHOT_LOG_BYTES", 1000):
+            res = truncate_output("X" * 5000, max_chars=100, tool_name="clip")
+        log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
+
+        with open(log_path, "r", encoding="utf-8") as f:
+            log_content = f.read()
+
+        self.assertIn("snapshot clipped at max size", log_content)
+        self.assertTrue(len(log_content) <= 1000 + len("\n... [snapshot clipped at max size]\n"))
+
+    def test_truncate_output_mcp_name_has_no_duplicate_prefix(self):
+        res = truncate_output("M" * 5000, max_chars=100, tool_name="mcp_huge_tool")
+        log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
+        base = os.path.basename(log_path)
+
+        self.assertTrue(base.startswith("mcp_huge_tool-"), base)
+        self.assertNotIn("mcp_mcp_", base)
+
+    def test_truncate_output_long_tool_name_capped(self):
+        res = truncate_output("L" * 5000, max_chars=100, tool_name="very_long_tool_name_" * 5)
+        log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
+        base = os.path.basename(log_path)
+
+        # Prefix capped at 40 chars + "-" + 4 hex + ".log"
+        self.assertTrue(len(base) <= 40 + 1 + 4 + 4, base)
 
     def test_format_line_pagination_single_line_error_hint(self):
         from tools.utils import format_line_pagination

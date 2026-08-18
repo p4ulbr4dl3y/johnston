@@ -243,7 +243,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                     tool_res.content,
                     max_chars=8000,
                     hint="Refine parameters or request partial data if complete response is needed.",
-                    tool_name=f"mcp_{name}",
+                    tool_name=name,
                 )
             return tool_res
     except Exception as e:

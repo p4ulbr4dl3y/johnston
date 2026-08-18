@@ -332,6 +332,27 @@ def test_make_log_path_non_unique_keeps_bare_prefix(monkeypatch, tmp_path):
     assert path == os.path.join(str(tmp_path), "shell_1.log")
 
 
+def test_make_log_path_unique_adds_short_suffix(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    path = _out.make_log_path("shell", unique=True)
+    base = os.path.basename(path)
+    # {prefix}-{hex4}.log
+    assert len(base) == len("shell") + 1 + 4 + len(".log")
+    assert base.startswith("shell-")
+    assert path.endswith(".log")
+
+
+def test_make_log_path_caps_long_prefix(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    path = _out.make_log_path("x" * 200, unique=False)
+    base = os.path.basename(path)
+    assert len(base) == _out.MAX_LOG_PREFIX_CHARS + len(".log")
+
+
 @pytest.mark.asyncio
 async def test_task_kind_literals():
     assert ("shell", "subagent") == TASK_KINDS

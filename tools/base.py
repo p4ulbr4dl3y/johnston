@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, Optional, Set
 
 from core.domain.defaults.errors import ToolResult
+from core.infrastructure.platform.paths import LOGS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text
 from tools.context import ToolContext
 
@@ -98,37 +99,32 @@ def _schedule_background(coro: Any) -> None:
     task.add_done_callback(_BACKGROUND_WRITE_TASKS.discard)
 
 
-def _write_output_log(
-    log_content: str,
-    *,
-    tool_name: str = "",
-    tool_id: str = "",
-    session_id: str = "",
-) -> Optional[str]:
+# Hard cap on a single snapshot log so a runaway tool output cannot fill disk.
+MAX_SNAPSHOT_LOG_BYTES = 50 * 1024 * 1024
+
+
+def _write_output_log(log_content: str, *, tool_name: str = "") -> Optional[str]:
     """Writes full output to a unique log file under LOGS_DIR and returns its path.
 
     Returns None if logging is skipped (empty content) or the write fails.
     Runs the blocking ``os.makedirs``/``open().write()`` off the event loop via
     ``asyncio.to_thread`` when an async context is active so a large snapshot in
     an async ``execute`` never stalls the loop; falls back to a synchronous write
-    for sync callers (no running loop).
+    for sync callers (no running loop). Content beyond ``MAX_SNAPSHOT_LOG_BYTES``
+    is clipped with a marker.
     """
     content = log_content or ""
     if not content.strip():
         return None
 
-    import uuid
+    from core.infrastructure.tasks.output import make_log_path
 
-    from core.infrastructure.platform.paths import LOGS_DIR
+    log_path = make_log_path(tool_name or "tool", unique=True)
+    if not log_path:
+        return None
 
-    if session_id:
-        seed = f"{session_id}-{uuid.uuid4().hex[:4]}"
-        filename = f"{seed}.log"
-    else:
-        name_prefix = f"{tool_name}_" if tool_name else "tool_"
-        unique_id = tool_id if tool_id else uuid.uuid4().hex[:8]
-        filename = f"{name_prefix}{unique_id}.log"
-    log_path = os.path.join(LOGS_DIR, filename)
+    if len(content) > MAX_SNAPSHOT_LOG_BYTES:
+        content = content[:MAX_SNAPSHOT_LOG_BYTES] + "\n... [snapshot clipped at max size]\n"
 
     def _write() -> None:
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -151,7 +147,6 @@ def truncate_output(
     hint: str = "",
     save_log: bool = True,
     tool_name: str = "",
-    tool_id: str = "",
     from_end: bool = False,
 ) -> str:
     """Truncates text safely if it exceeds max_chars, saving full output to a unique log file."""
@@ -178,7 +173,7 @@ def truncate_output(
 
     log_path = None
     if save_log:
-        log_path = _write_output_log(log_content, tool_name=tool_name, tool_id=tool_id)
+        log_path = _write_output_log(log_content, tool_name=tool_name)
 
     format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
 

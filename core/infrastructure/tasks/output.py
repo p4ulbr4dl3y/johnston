@@ -119,17 +119,20 @@ def tail_output(text: str, max_chars: int = 2000) -> str:
 # ---------------------------------------------------------------------------
 
 
+# Max length of the readable prefix in a log filename. Keeps snapshot paths
+# short so the model does not waste tokens on long names in truncation hints.
+MAX_LOG_PREFIX_CHARS = 40
+
+
 def make_log_path(prefix: str = "", unique: bool = True) -> Optional[str]:
     """Build a log path under LOGS_DIR for a ``prefix``.
 
-    Central generator so every caller (tool snapshots and the background task
-    logger) shares one filename scheme and directory bootstrap. When ``unique``
-    is True a short random suffix keeps multiple snapshots (e.g. same session_id)
-    from colliding; callers with a native-unique prefix (like a ``task_id``) pass
-    ``unique=False`` for a clean, predictable name. Returns None if the directory
-    could not be created / path is unusable.
+    Single naming scheme: ``{prefix}-{hex4}.log`` when ``unique`` is True,
+    else ``{prefix}.log``. Prefix is sanitized (slashes -> underscores) and
+    capped at ``MAX_LOG_PREFIX_CHARS``. Returns None if the directory could not
+    be created / path is unusable.
     """
-    prefix = re.sub(r"[/\\]+", "_", (prefix or "task").strip()) or "task"
+    prefix = re.sub(r"[/\\]+", "_", (prefix or "task").strip())[:MAX_LOG_PREFIX_CHARS] or "task"
     filename = prefix + (f"-{uuid.uuid4().hex[:4]}" if unique else "") + ".log"
     log_path = os.path.join(LOGS_DIR, filename)
     try:
