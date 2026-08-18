@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import re
 import time
 from typing import Any, Dict
 
@@ -16,7 +15,6 @@ from core.infrastructure.tasks.output import tail_output
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
-SLEEP_CHAIN_REGEX = re.compile(r"^sleep\s+([0-9]+(?:\.[0-9]+)?)\s*(?:(?:&&|;)\s*(.*))?$", re.DOTALL)
 _TASK_ID_COUNTER = itertools.count(1)
 
 
@@ -108,17 +106,6 @@ class ShellTool(BaseTool):
             timeout = max(1, min(int(raw_timeout), 600))
         except (ValueError, TypeError):
             timeout = 120
-
-        m = SLEEP_CHAIN_REGEX.match(cmd)
-        if m:
-            sec = float(m.group(1))
-            remainder = (m.group(2) or "").strip()
-            if sec > timeout:
-                return ToolResult.error("reject", detail=f"sleep {sec}s exceeds timeout {timeout}s")
-            await asyncio.sleep(sec)
-            if not remainder:
-                return ToolResult.done(f"slept {sec}s")
-            cmd = remainder
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None

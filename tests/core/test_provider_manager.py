@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from core.models_catalog import catalog
 from core.provider_manager import ProviderManager
 
 
@@ -143,11 +144,14 @@ class TestProviderManager(unittest.TestCase):
     @patch("httpx.AsyncClient")
     def test_fetch_models_grouped(self, mock_client_cls):
         mock_client = MagicMock()
+        mock_client.is_closed = False
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"data": [{"id": "m1"}]}
         mock_client.get = AsyncMock(return_value=mock_resp)
+        mock_client_cls.return_value = mock_client
         mock_client_cls.return_value.__aenter__.return_value = mock_client
+        catalog._client = None
 
         res = asyncio.run(self.pm.fetch_models_grouped(force_refresh=True, connected_only=False))
         self.assertIn("openai", res)

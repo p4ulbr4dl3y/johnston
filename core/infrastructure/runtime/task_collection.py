@@ -37,5 +37,29 @@ def collect_current_tasks(app, current_session_id: str) -> TaskCollection:
         from core.session_manager import SessionStore
 
         store = SessionStore.get_instance()
-    sessions = store.children(current_session_id) if current_session_id else store.list(kind="subagent")
+
+    # Fast in-memory resolution to avoid disk signature / listdir on UI ticks
+    if hasattr(store, "_sessions") and isinstance(store._sessions, dict):
+        all_sess = dict(getattr(store, "_disk_cache", None) or {})
+        all_sess.update(store._sessions)
+        if current_session_id:
+            sessions = [
+                s
+                for s in all_sess.values()
+                if getattr(s, "parent_id", None) == current_session_id
+                and getattr(getattr(s, "kind", None), "value", getattr(s, "kind", None)) == "subagent"
+            ]
+        else:
+            sessions = [
+                s
+                for s in all_sess.values()
+                if getattr(getattr(s, "kind", None), "value", getattr(s, "kind", None)) == "subagent"
+            ]
+    elif current_session_id and hasattr(store, "children"):
+        sessions = store.children(current_session_id)
+    elif hasattr(store, "list"):
+        sessions = store.list(kind="subagent")
+    else:
+        sessions = []
+
     return TaskCollection(shell_tasks=bg_tasks, subagent_tasks=sessions)

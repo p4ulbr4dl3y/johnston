@@ -461,7 +461,8 @@ class FailingStore:
 
 
 class TestSafeSaves:
-    def test_error_logged_not_swallowed(self, caplog):
+    @pytest.mark.asyncio
+    async def test_error_logged_not_swallowed(self, caplog):
         import logging as _logging
 
         from core.application.session.stream import _safe_save
@@ -469,15 +470,16 @@ class TestSafeSaves:
         s = make_session()
         with caplog.at_level(_logging.ERROR):
             with pytest.raises(OSError):
-                _safe_save(FailingStore(), s)
+                await _safe_save(FailingStore(), s)
         assert "Failed to save subagent session" in caplog.text
 
-    def test_error_propagates_to_caller(self):
+    @pytest.mark.asyncio
+    async def test_error_propagates_to_caller(self):
         from core.application.session.stream import _safe_save
 
         s = make_session()
         with pytest.raises(OSError):
-            _safe_save(FailingStore(), s)
+            await _safe_save(FailingStore(), s)
 
     @pytest.mark.asyncio
     async def test_save_failure_not_left_completed(self):

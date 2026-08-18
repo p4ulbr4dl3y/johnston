@@ -72,7 +72,11 @@ class ShellTask(BaseTask):
                 self._log.append(backfill)
             # Readers may inspect the log before the worker drains; flush now so
             # the backfilled output is visible synchronously on disk.
-            self._log.flush_now()
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(asyncio.to_thread(self._log.flush_now))
+            except RuntimeError:
+                self._log.flush_now()
             return self.log_path
         self._log = None
         return None
@@ -81,6 +85,12 @@ class ShellTask(BaseTask):
         if self._log is not None:
             self._log.close()
             self._log = None
+
+    async def close_log_async(self) -> None:
+        if self._log is not None:
+            log = self._log
+            self._log = None
+            await log.close_async()
 
     def _done_future(self) -> asyncio.Future:
         if self._done is None:
@@ -161,12 +171,12 @@ class ShellTask(BaseTask):
                     chunk_data = None
                     if self.reader is not None:
                         try:
-                            chunk_data = await self.reader.read(1024)
+                            chunk_data = await self.reader.read(32768)
                         except (OSError, Exception):
                             break
                     elif self.process is not None:
                         try:
-                            chunk_data = await self.process.stdout.read(1024)
+                            chunk_data = await self.process.stdout.read(32768)
                         except (OSError, Exception):
                             break
                     else:
@@ -178,7 +188,7 @@ class ShellTask(BaseTask):
                 pass
             finally:
                 self.close_pty()
-                self.close_log()
+                await self.close_log_async()
 
                 # Reap the process BEFORE publishing the terminal status so a
                 # just-finished process is never reported as RUNNING by the
@@ -251,7 +261,7 @@ class ShellTask(BaseTask):
         self.was_killed = True
         self.is_background = False
         self.close_pty()
-        self.close_log()
+        await self.close_log_async()
         if self.process is not None:
             await terminate_process(self.process)
         if self.read_task is not None and not self.read_task.done():

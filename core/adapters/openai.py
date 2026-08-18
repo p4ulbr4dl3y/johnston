@@ -73,7 +73,7 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
                             raw_args = fn.get("arguments", "{}")
                             if not isinstance(raw_args, str):
                                 raw_args = json.dumps(raw_args)
-                            else:
+                            elif raw_args != "{}":
                                 try:
                                     json.loads(raw_args)
                                 except Exception:
@@ -192,14 +192,14 @@ class OpenAIAdapter(BaseApiAdapter):
                 for tc in delta.tool_calls:
                     idx = tc.index
                     if idx not in tool_calls:
-                        tool_calls[idx] = {"id": "", "name": "", "arguments": ""}
+                        tool_calls[idx] = {"id": "", "name": "", "args_parts": []}
                     if tc.id:
                         tool_calls[idx]["id"] = tc.id
                     if tc.function:
                         if tc.function.name:
                             tool_calls[idx]["name"] = tc.function.name
                         if tc.function.arguments:
-                            tool_calls[idx]["arguments"] += tc.function.arguments
+                            tool_calls[idx]["args_parts"].append(tc.function.arguments)
         for idx in sorted(tool_calls):
             tc = tool_calls[idx]
             if tc["name"]:
@@ -208,6 +208,6 @@ class OpenAIAdapter(BaseApiAdapter):
                     {
                         "id": tc["id"] or new_tool_call_id(idx),
                         "name": tc["name"],
-                        "arguments": tc["arguments"] or "{}",
+                        "arguments": "".join(tc["args_parts"]) or "{}",
                     },
                 )

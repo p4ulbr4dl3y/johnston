@@ -5,6 +5,7 @@ background_task.py and shell.py: ANSI stripping, carriage-return collapsing,
 and a hard byte cap with a truncation marker.
 """
 
+import asyncio
 import collections
 import os
 import queue
@@ -202,7 +203,8 @@ class OutputLog:
                     break
                 try:
                     f.write(item)
-                    f.flush()
+                    if self._queue.empty():
+                        f.flush()
                 except Exception:
                     pass
             finally:
@@ -228,6 +230,10 @@ class OutputLog:
             return
         self._queue.join()
 
+    async def flush_now_async(self) -> None:
+        """Async variant of flush_now off the event loop."""
+        await asyncio.to_thread(self.flush_now)
+
     def close(self) -> None:
         if self._file is not None:
             self._file = None
@@ -238,6 +244,10 @@ class OutputLog:
             self._queue.join()
             self._thread = None
         self._closed = True
+
+    async def close_async(self) -> None:
+        """Async variant of close off the event loop."""
+        await asyncio.to_thread(self.close)
 
     def __enter__(self) -> "OutputLog":
         return self

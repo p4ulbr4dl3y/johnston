@@ -109,12 +109,20 @@ class GeminiAdapter(BaseApiAdapter):
 
                 tcontent = msg.get("content", "")
                 if isinstance(tcontent, str):
-                    try:
-                        resp_obj = json.loads(tcontent) if tcontent.strip() else {}
-                    except Exception:
+                    tcontent_stripped = tcontent.strip()
+                    if tcontent_stripped.startswith("{") and tcontent_stripped.endswith("}"):
+                        try:
+                            resp_obj = json.loads(tcontent_stripped)
+                        except Exception:
+                            resp_obj = {"result": tcontent}
+                    elif not tcontent_stripped:
+                        resp_obj = {}
+                    else:
                         resp_obj = {"result": tcontent}
-                else:
+                elif isinstance(tcontent, dict):
                     resp_obj = tcontent
+                else:
+                    resp_obj = {"result": tcontent}
                 if not isinstance(resp_obj, dict):
                     resp_obj = {"result": resp_obj}
                 pending_tools.append({"functionResponse": {"name": name, "response": resp_obj}})

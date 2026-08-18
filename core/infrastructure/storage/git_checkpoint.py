@@ -22,10 +22,20 @@ class GitCheckpointManager:
     EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
     DEFAULT_EXCLUDES = DEFAULT_EXCLUDES
 
-    # Serializes workspace/shadow-repo mutations (create/restore/purge) so a
-    # rewind restore cannot interleave with a concurrent checkpoint snapshot of
+    # Serializes workspace/shadow-repo mutations (create/restore/purge) per project/session
+    # so a rewind restore cannot interleave with a concurrent checkpoint snapshot of
     # the same worktree. Run-git calls happen in worker threads (asyncio.to_thread).
-    _MUTATION_LOCK = threading.RLock()
+    _LOCKS_GUARD = threading.Lock()
+    _LOCKS: dict[str, threading.RLock] = {}
+
+    @classmethod
+    def _get_lock(cls, key: str) -> threading.RLock:
+        with cls._LOCKS_GUARD:
+            lock = cls._LOCKS.get(key)
+            if lock is None:
+                lock = threading.RLock()
+                cls._LOCKS[key] = lock
+            return lock
 
     @classmethod
     def _ensure_shadow_exclude(cls, shadow_dir: str) -> None:
@@ -174,11 +184,12 @@ class GitCheckpointManager:
         Saves commit SHA in refs/johnston/checkpoints/<session_id>/<message_index> inside shadow repo.
         Returns commit SHA if created, None if not initialized and auto_init=False.
         """
-        with cls._MUTATION_LOCK:
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        lock_key = f"{cwd}:{session_id}" if session_id else cwd
+        with cls._get_lock(lock_key):
             if not cls.is_valid_checkpoint_target(project_path):
                 return None
 
-            shadow_dir, cwd = cls._get_shadow_dir(project_path)
             if auto_init:
                 if not cls.ensure_git_repo(cwd):
                     return None
@@ -222,8 +233,9 @@ class GitCheckpointManager:
         project_path: Optional[str] = None,
     ) -> bool:
         """Restores repository working tree state to saved checkpoint."""
-        with cls._MUTATION_LOCK:
-            shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        lock_key = f"{cwd}:{session_id}" if session_id else cwd
+        with cls._get_lock(lock_key):
             if not cls.is_git_repo(cwd):
                 return False
 
@@ -267,8 +279,9 @@ class GitCheckpointManager:
         project_path: Optional[str] = None,
     ) -> None:
         """Deletes checkpoints with index > target_message_index for given session."""
-        with cls._MUTATION_LOCK:
-            shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        lock_key = f"{cwd}:{session_id}" if session_id else cwd
+        with cls._get_lock(lock_key):
             if not cls.is_git_repo(cwd):
                 return
 

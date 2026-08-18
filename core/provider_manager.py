@@ -5,8 +5,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-import httpx
-
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.platform.paths import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
@@ -118,6 +116,13 @@ class ProviderManager:
 
     def invalidate_cache(self):
         self._providers_memo = {}
+
+    async def close(self) -> None:
+        """Close shared HTTP clients and resources on shutdown."""
+        await catalog.close()
+
+    async def aclose(self) -> None:
+        await self.close()
 
     def _cached_json(self, path: str, default: Any) -> Any:
         """Reads a JSON file, returning a cached value when the file is unchanged (by mtime).
@@ -419,20 +424,20 @@ class ProviderManager:
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
             timeout_sec = 0.8 if provider_key in ("ollama", "lmstudio") else 3.0
             try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        for m in data.get("data", []):
-                            if isinstance(m, dict) and "id" in m:
-                                m_id = m["id"]
-                                models.append(m_id)
-                                m_name = m.get("name")
-                                if m_name:
-                                    catalog.update_model_names({m_id: m_name, m_id.split("/")[-1]: m_name})
-                                ctx_len = extract_context_length(m)
-                                if ctx_len:
-                                    model_limits[m_id] = ctx_len
+                client = catalog.get_client()
+                resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for m in data.get("data", []):
+                        if isinstance(m, dict) and "id" in m:
+                            m_id = m["id"]
+                            models.append(m_id)
+                            m_name = m.get("name")
+                            if m_name:
+                                catalog.update_model_names({m_id: m_name, m_id.split("/")[-1]: m_name})
+                            ctx_len = extract_context_length(m)
+                            if ctx_len:
+                                model_limits[m_id] = ctx_len
             except Exception as e:
                 logger.warning("Error fetching models for %s: %s", provider_key, e)
 

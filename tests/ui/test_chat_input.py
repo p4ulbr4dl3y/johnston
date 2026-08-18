@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import tempfile
@@ -231,6 +232,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
                 ci.add_to_history("Global prompt 1")
                 ci.add_to_history("Global prompt 2")
+                await asyncio.sleep(0.05)
                 self.assertTrue(os.path.exists(tmp_history_file))
 
                 # New ChatInput instance loads persisted history

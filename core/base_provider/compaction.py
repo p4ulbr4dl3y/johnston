@@ -280,14 +280,23 @@ class CompactionMixin:
                 elif "[Context Summary of earlier conversation]:" in content_str:
                     previous_summary = content_str.split("[Context Summary of earlier conversation]:", 1)[1].strip()
 
-        # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
-        sanitized_history_to_compact = self.sanitize_history_for_model(history_to_compact)
-
         # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
         max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)
-        while sanitized_history_to_compact and (sys_tokens + estimate_tokens(sanitized_history_to_compact)) > max_summarize_tokens:
-            sanitized_history_to_compact.pop(0)
-            sanitized_history_to_compact = self.sanitize_history_for_model(sanitized_history_to_compact)
+        available_tokens = max(0, max_summarize_tokens - sys_tokens)
+
+        # Estimate tokens on individual messages and slice in a single pass from the tail
+        start_idx = 0
+        total_tokens = 0
+        for i in range(len(history_to_compact) - 1, -1, -1):
+            msg_tokens = estimate_tokens(history_to_compact[i])
+            if total_tokens + msg_tokens > available_tokens:
+                start_idx = i + 1
+                break
+            total_tokens += msg_tokens
+
+        trimmed_history = history_to_compact[start_idx:]
+        # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
+        sanitized_history_to_compact = self.sanitize_history_for_model(trimmed_history)
 
         summary_template = (
             "You are performing a CONTEXT CHECKPOINT COMPACTION.\n"

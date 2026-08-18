@@ -109,6 +109,70 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
     return ""
 
 
+def _find_line_span(lines: List[str], start_char: int, end_char: int) -> Tuple[int, int]:
+    """Given character start and end offsets in ''.join(lines), return (start_line_idx, end_line_idx)."""
+    curr = 0
+    start_idx = None
+    end_idx = None
+    for idx, line in enumerate(lines):
+        next_curr = curr + len(line)
+        if start_idx is None and next_curr > start_char:
+            start_idx = idx
+        if next_curr >= end_char:
+            end_idx = idx + 1
+            break
+        curr = next_curr
+    if start_idx is None:
+        start_idx = 0
+    if end_idx is None:
+        end_idx = len(lines)
+    return start_idx, end_idx
+
+
+def _apply_replacement_to_lines(lines: List[str], target: str, replacement: str, allow_mult: bool = False) -> None:
+    current_text = "".join(lines)
+    if not allow_mult:
+        pos = current_text.find(target)
+        if pos == -1:
+            return
+        start_idx, end_idx = _find_line_span(lines, pos, pos + len(target))
+        sub_lines = lines[start_idx:end_idx]
+        sub_text = "".join(sub_lines)
+        new_sub_text = sub_text.replace(target, replacement, 1)
+        sub_replacement_lines = new_sub_text.splitlines(keepends=True)
+        if (
+            sub_text.endswith(("\n", "\r"))
+            and sub_replacement_lines
+            and not sub_replacement_lines[-1].endswith(("\n", "\r"))
+        ):
+            eol = "\r\n" if sub_text.endswith("\r\n") else "\n"
+            sub_replacement_lines[-1] += eol
+        lines[start_idx:end_idx] = sub_replacement_lines
+    else:
+        positions = []
+        pos = 0
+        while True:
+            pos = current_text.find(target, pos)
+            if pos == -1:
+                break
+            positions.append(pos)
+            pos += len(target)
+        for p in reversed(positions):
+            start_idx, end_idx = _find_line_span(lines, p, p + len(target))
+            sub_lines = lines[start_idx:end_idx]
+            sub_text = "".join(sub_lines)
+            new_sub_text = sub_text.replace(target, replacement, 1)
+            sub_replacement_lines = new_sub_text.splitlines(keepends=True)
+            if (
+                sub_text.endswith(("\n", "\r"))
+                and sub_replacement_lines
+                and not sub_replacement_lines[-1].endswith(("\n", "\r"))
+            ):
+                eol = "\r\n" if sub_text.endswith("\r\n") else "\n"
+                sub_replacement_lines[-1] += eol
+            lines[start_idx:end_idx] = sub_replacement_lines
+
+
 def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], path: str) -> Tuple[str, str]:
     if not raw_chunks:
         raise ValueError(format_tool_error("params", "no replacement chunks provided"))
@@ -168,8 +232,6 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
         e_line = c["end_line"]
         allow_mult = c["allow_multiple"]
 
-        current_text = "".join(lines)
-
         if s_line is not None or e_line is not None:
             in_bounds = True
             if s_line is not None and s_line > len(lines):
@@ -193,14 +255,14 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
                 actual_replacement = replacement
 
             if count == 0:
+                current_text = "".join(lines)
                 actual_target_full, actual_replacement_full = find_actual_target_and_replacement(
                     current_text, target, replacement
                 )
                 full_count = current_text.count(actual_target_full)
 
                 if full_count == 1:
-                    new_text = current_text.replace(actual_target_full, actual_replacement_full, 1)
-                    lines = new_text.splitlines(keepends=True)
+                    _apply_replacement_to_lines(lines, actual_target_full, actual_replacement_full, allow_mult=False)
                     continue
 
                 if not in_bounds:
@@ -279,8 +341,7 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
                     )
                 )
 
-            new_text = current_text.replace(actual_target, actual_replacement, 1 if not allow_mult else -1)
-            lines = new_text.splitlines(keepends=True)
+            _apply_replacement_to_lines(lines, actual_target, actual_replacement, allow_mult=allow_mult)
 
     new_content = "".join(lines)
     diff_output = make_git_diff(content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")

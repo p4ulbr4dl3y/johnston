@@ -263,7 +263,7 @@ class AnthropicAdapter(BaseApiAdapter):
                     idx = evt.get("index")
                     cb = evt.get("content_block") or {}
                     if cb.get("type") == "tool_use":
-                        tool_blocks[idx] = {"id": cb.get("id", ""), "name": cb.get("name", ""), "args_buf": ""}
+                        tool_blocks[idx] = {"id": cb.get("id", ""), "name": cb.get("name", ""), "args_parts": []}
                 elif etype == "content_block_delta":
                     idx = evt.get("index")
                     delta = evt.get("delta") or {}
@@ -278,7 +278,9 @@ class AnthropicAdapter(BaseApiAdapter):
                             yield ("adapter_thought", thought)
                     elif dtype == "input_json_delta":
                         if idx in tool_blocks:
-                            tool_blocks[idx]["args_buf"] += delta.get("partial_json", "")
+                            part = delta.get("partial_json", "")
+                            if part:
+                                tool_blocks[idx]["args_parts"].append(part)
                 elif etype == "content_block_stop":
                     idx = evt.get("index")
                     if idx in tool_blocks:
@@ -288,7 +290,7 @@ class AnthropicAdapter(BaseApiAdapter):
                             {
                                 "id": tb["id"] or new_tool_call_id(),
                                 "name": tb["name"],
-                                "arguments": tb["args_buf"] or "{}",
+                                "arguments": "".join(tb["args_parts"]) or "{}",
                             },
                         )
                 elif etype == "message_delta":

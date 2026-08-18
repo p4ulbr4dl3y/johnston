@@ -79,6 +79,11 @@ def _convert_content_to_md_sync(
                 pass
 
 
+async def _guard_request(req: "httpx.Request") -> None:
+    if await _is_private_host(str(req.url)):
+        raise httpx.RequestError("private/loopback redirect target is not allowed", request=req)
+
+
 class WebFetchTool(BaseTool):
     name = "web_fetch"
     description = "Fetch a URL. Converts HTML/PDF/DOCX to Markdown. raw returns raw text."
@@ -98,7 +103,24 @@ class WebFetchTool(BaseTool):
         },
     }
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or getattr(self._client, "is_closed", False) is True:
+            self._client = httpx.AsyncClient(
+                follow_redirects=True, timeout=20.0, event_hooks={"request": [_guard_request]}
+            )
+        return self._client
+
+    async def aclose(self) -> None:
+        if self._client is not None and getattr(self._client, "is_closed", False) is False:
+            await self._client.aclose()
+            self._client = None
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
+        """Fetch URL content with follow_redirects=True and _is_private_host security guard."""
         args = args or {}
         url = (args.get("url") or "").strip()
         if not url:
@@ -118,39 +140,33 @@ class WebFetchTool(BaseTool):
             "Accept-Language": "en-US,en;q=0.5",
         }
 
-        async def _guard_request(req: "httpx.Request") -> None:
-            if await _is_private_host(str(req.url)):
-                raise httpx.RequestError("private/loopback redirect target is not allowed", request=req)
-
+        client = self._get_client()
         try:
-            async with httpx.AsyncClient(
-                follow_redirects=True, timeout=20.0, event_hooks={"request": [_guard_request]}
-            ) as client:
-                async with client.stream("GET", url, headers=headers) as response:
-                    response.raise_for_status()
-                    content_type = response.headers.get("content-type", "").lower()
-                    # Pre-check Content-Length to fail fast on oversized responses.
-                    cl = response.headers.get("content-length")
-                    if cl:
-                        try:
-                            if int(cl) > MAX_TOOL_PAYLOAD_BYTES:
-                                return ToolResult.error(
-                                    "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
-                                )
-                        except ValueError:
-                            pass
-                    # Stream the body with a hard cap so an oversized or chunked
-                    # response cannot exhaust memory before the size check can trigger.
-                    total = 0
-                    chunks = []
-                    async for chunk in response.aiter_bytes():
-                        total += len(chunk)
-                        if total > MAX_TOOL_PAYLOAD_BYTES:
+            async with client.stream("GET", url, headers=headers) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").lower()
+                # Pre-check Content-Length to fail fast on oversized responses.
+                cl = response.headers.get("content-length")
+                if cl:
+                    try:
+                        if int(cl) > MAX_TOOL_PAYLOAD_BYTES:
                             return ToolResult.error(
                                 "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
                             )
-                        chunks.append(chunk)
-                    content_bytes = b"".join(chunks)
+                    except ValueError:
+                        pass
+                # Stream the body with a hard cap so an oversized or chunked
+                # response cannot exhaust memory before the size check can trigger.
+                total = 0
+                chunks = []
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    if total > MAX_TOOL_PAYLOAD_BYTES:
+                        return ToolResult.error(
+                            "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
+                        )
+                    chunks.append(chunk)
+                content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
             return ToolResult.error("http", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
         except httpx.TimeoutException:

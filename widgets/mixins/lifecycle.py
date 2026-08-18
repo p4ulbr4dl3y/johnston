@@ -98,6 +98,19 @@ class LifecycleMixin:
         except Exception as err:
             logger.debug(f"MCP cleanup error: {err}")
 
+        try:
+            from core.models_catalog import catalog
+
+            if loop is not None and loop.is_running():
+                loop.create_task(catalog.close())
+            else:
+                try:
+                    asyncio.run(catalog.close())
+                except Exception:
+                    pass
+        except Exception as err:
+            logger.debug(f"Catalog cleanup error: {err}")
+
     async def _kill_all_tasks(self) -> None:
         try:
             await self.task_manager.kill_all()

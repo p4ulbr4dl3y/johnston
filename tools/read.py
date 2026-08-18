@@ -375,10 +375,14 @@ class ReadTool(BaseTool):
                         if e_line is not None:
                             # Read only up to the requested end line.
                             remaining = max(1, e_line - max(1, s_line or 1) + 1)
-                            raw_lines = [f.readline() for _ in range(remaining)]
-                            raw_lines = [ln for ln in raw_lines if ln]
                         else:
-                            raw_lines = f.read().splitlines(keepends=True)
+                            remaining = DEFAULT_LINE_WINDOW
+                        raw_lines = []
+                        for _ in range(remaining):
+                            ln = f.readline()
+                            if not ln:
+                                break
+                            raw_lines.append(ln)
                         lines = [ln.rstrip(b"\r\n").decode("utf-8", errors="replace") for ln in raw_lines]
                         return lines, total
 

@@ -269,7 +269,11 @@ class MessageFlowMixin:
                             msg["result_text"] = final_result
                             msg["status"] = status
                             break
-                    self.sm.save(session)
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(asyncio.to_thread(self.sm.save, session))
+                    except RuntimeError:
+                        self.sm.save(session)
             except Exception as e:
                 logger.warning("Failed to update session for background shell %s: %s", task_id, e)
 
@@ -304,6 +308,10 @@ class MessageFlowMixin:
                                 msg["result_text"] = result or "(no output)"
                                 msg["status"] = final_status
                                 break
-                    self.sm.save(session)
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.create_task(asyncio.to_thread(self.sm.save, session))
+                    except RuntimeError:
+                        self.sm.save(session)
         except Exception as e:
             logger.warning("Subagent tool completion handling failed: %s", e)

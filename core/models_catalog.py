@@ -9,7 +9,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Iterable, Set
+from typing import Any, Dict, Iterable, Optional, Set
 
 import httpx
 
@@ -80,7 +80,23 @@ class ModelsCatalog:
         self._pricing: Dict[str, Dict[str, float]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
+        self._client: Optional[httpx.AsyncClient] = None
         self.load_cache()
+
+    def get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                limits=httpx.Limits(max_keepalive_connections=20, max_connections=50)
+            )
+        return self._client
+
+    async def close(self) -> None:
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
+    async def aclose(self) -> None:
+        await self.close()
 
     def load_cache(self) -> bool:
         data = read_json(CACHE_FILE)
@@ -120,12 +136,12 @@ class ModelsCatalog:
         model_pricing: Dict[str, Dict[str, float]] = {}
 
         try:
-            async with httpx.AsyncClient() as client:
-                mdev_res, openrouter_res = await asyncio.gather(
-                    client.get(MODELS_DEV_URL, timeout=10),
-                    client.get(OPENROUTER_MODELS_URL, timeout=10),
-                    return_exceptions=True,
-                )
+            client = self.get_client()
+            mdev_res, openrouter_res = await asyncio.gather(
+                client.get(MODELS_DEV_URL, timeout=10),
+                client.get(OPENROUTER_MODELS_URL, timeout=10),
+                return_exceptions=True,
+            )
 
             # 1. Parse models.dev response
             if isinstance(mdev_res, httpx.Response) and mdev_res.status_code == 200:

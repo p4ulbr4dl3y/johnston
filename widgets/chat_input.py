@@ -59,14 +59,22 @@ class ChatInput(TextArea):
             pass
         return []
 
-    def save_prompt_history(self) -> None:
-        """Save global prompt history to disk"""
+    def _save_prompt_history_to_disk(self, history: list[str]) -> None:
         try:
             os.makedirs(config.CONFIG_DIR, exist_ok=True)
             with open(config.PROMPT_HISTORY_FILE, "w", encoding="utf-8") as f:
-                json.dump(self.prompt_history[-self.MAX_PROMPT_HISTORY :], f, ensure_ascii=False, indent=2)
+                json.dump(history[-self.MAX_PROMPT_HISTORY :], f, ensure_ascii=False, indent=2)
         except Exception:
             pass
+
+    def save_prompt_history(self) -> None:
+        """Save global prompt history to disk asynchronously off the event loop."""
+        history_copy = list(self.prompt_history)
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(asyncio.to_thread(self._save_prompt_history_to_disk, history_copy))
+        except RuntimeError:
+            self._save_prompt_history_to_disk(history_copy)
 
     def on_mount(self) -> None:
         self.focus()

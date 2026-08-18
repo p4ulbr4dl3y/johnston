@@ -76,12 +76,14 @@ def test_new_task_id():
 
 
 async def test_sleep_chain_no_remainder(tool):
-    res = str(await tool.execute({"command": "sleep 0.001"}))
-    assert res == "slept 0.001s"
+    cmd = "sleep 0.001" if os.name != "nt" else "cd ."
+    res = str(await tool.execute({"command": cmd}))
+    assert res == "(no output)"
 
 
 async def test_sleep_chain_with_remainder(tool):
-    res = str(await tool.execute({"command": "sleep 0.001 && echo after_sleep"}))
+    cmd = "sleep 0.001 && echo after_sleep" if os.name != "nt" else "echo after_sleep"
+    res = str(await tool.execute({"command": cmd}))
     assert "after_sleep" in res
 
 
@@ -328,9 +330,10 @@ async def test_sync_task_cleaned_up_from_background_tasks(tool, make_app_mock):
     assert len([t for t in app.task_manager]) == 0
 
 
+@pytest.mark.skipif(os.name == "nt", reason="sleep is POSIX-only")
 async def test_sleep_chain_exceeds_timeout(tool):
     res = str(await tool.execute({"command": "sleep 5", "timeout": 1}))
-    assert res == "ERR: reject: sleep 5.0s exceeds timeout 1s"
+    assert "ERR: timeout 'shell': timed out after 1s" in res
 
 
 # --------------------------------------------------------------------------- #
@@ -689,7 +692,7 @@ async def test_very_long_command_many_args(tool, make_tool_context):
 
 @pytest.mark.skipif(os.name == "nt", reason="/bin/sleep is POSIX-only")
 async def test_timeout_kills_subagent_subprocess(tool, make_tool_context):
-    # /bin/sleep bypasses SLEEP_CHAIN_REGEX; must be terminated by timeout.
+    # Long-running command must be terminated by timeout.
     t0 = asyncio.get_running_loop().time()
     res = str(await tool.execute({"command": "/bin/sleep 30", "timeout": 1}, ctx=_ctx(make_tool_context)))
     elapsed = asyncio.get_running_loop().time() - t0

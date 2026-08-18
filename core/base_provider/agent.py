@@ -40,10 +40,27 @@ def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
     for m in msgs:
         out.append(str(m.get("role")))
         c = m.get("content")
-        out.append(c if isinstance(c, str) else json.dumps(c, ensure_ascii=False, sort_keys=True))
-        out.append(str(m.get("tool_call_id")))
+        if isinstance(c, str):
+            out.append(c)
+        elif c is None:
+            out.append("")
+        else:
+            out.append(str(c))
+        out.append(str(m.get("tool_call_id") or ""))
         tc = m.get("tool_calls")
-        out.append(json.dumps(tc, ensure_ascii=False, sort_keys=True) if tc else "")
+        if tc and isinstance(tc, list):
+            tc_parts = []
+            for item in tc:
+                if isinstance(item, dict):
+                    fn = item.get("function") or {}
+                    tc_parts.append(f"{item.get('id')}:{fn.get('name')}:{fn.get('arguments')}")
+                else:
+                    tc_parts.append(str(item))
+            out.append("|".join(tc_parts))
+        elif tc:
+            out.append(str(tc))
+        else:
+            out.append("")
     return ("\x1f".join(out)).encode("utf-8")
 
 
@@ -661,11 +678,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     raw_args = tc.get("arguments", "{}")
                     if not isinstance(raw_args, str):
                         raw_args = json.dumps(raw_args)
-                    else:
-                        try:
-                            json.loads(raw_args)
-                        except Exception:
-                            raw_args = "{}"
                     cleaned_tool_calls.append(
                         {
                             "id": tc["id"],
