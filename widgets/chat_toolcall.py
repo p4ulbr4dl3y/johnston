@@ -408,7 +408,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return ""
         clean = self._clean_hints_for_ui(text)
         clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
-        return escape(clean)
+        return clean
 
     def compose(self) -> ComposeResult:
         yield self.header_label

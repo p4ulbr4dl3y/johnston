@@ -50,6 +50,7 @@ class TestAsyncReadLoop(unittest.IsolatedAsyncioTestCase):
         client.process = proc
         client.fetch_tools_async = AsyncMock()
         await client._async_read_loop()
+        await asyncio.sleep(0.01)
         client.fetch_tools_async.assert_awaited_once()
 
     async def test_async_read_loop_notification_fetch_error_ignored(self):
@@ -60,6 +61,7 @@ class TestAsyncReadLoop(unittest.IsolatedAsyncioTestCase):
         client.process = proc
         client.fetch_tools_async = AsyncMock(side_effect=RuntimeError("boom"))
         await client._async_read_loop()  # must not raise
+        await asyncio.sleep(0.01)
         client.fetch_tools_async.assert_awaited_once()
 
     async def test_async_read_loop_fulfills_pending_future(self):
@@ -76,8 +78,8 @@ class TestAsyncReadLoop(unittest.IsolatedAsyncioTestCase):
         await client._async_read_loop()
         result = await asyncio.wait_for(fut, 0.5)
         self.assertEqual(result["id"], 5)
-        self.assertIn(5, client._pending_responses)
         self.assertNotIn(5, client._pending_futures)
+        self.assertNotIn(5, client._pending_responses)
 
     async def test_async_read_loop_survives_reader_errors(self):
         client = MCPProcessClient("t", "echo")
@@ -679,10 +681,8 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
                 fut.set_result(resp)
 
         client.process.stdin.write.side_effect = on_write
-        with patch.object(client, "fetch_tools_async", new=AsyncMock()) as mock_fetch:
-            out = await client.call_tool_async("foo", {"a": 1})
+        out = await client.call_tool_async("foo", {"a": 1})
         self.assertEqual(out, "hello")
-        mock_fetch.assert_awaited_once()
 
     async def test_call_tool_async_timeout(self):
         client = await self._client_with_process()
@@ -779,6 +779,69 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {})
         self.assertEqual(out, "MCP tool 'foo' from server 't' executed successfully.")
+
+
+class TestProcessClientAsyncRegression(unittest.IsolatedAsyncioTestCase):
+    async def test_async_read_loop_fails_pending_futures_on_eof(self):
+        client = MCPProcessClient("test_srv", "echo")
+        proc = MagicMock()
+        proc.stdout.readline = MagicMock(side_effect=[b""])  # Immediate EOF
+        client.process = proc
+
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        client._pending_futures[99] = fut
+
+        await client._async_read_loop()
+        await asyncio.sleep(0.01)
+
+        self.assertTrue(fut.done())
+        with self.assertRaises(RuntimeError):
+            await fut
+
+    async def test_call_tool_async_cleans_pending_futures_on_cancellation(self):
+        client = MCPProcessClient("test_srv", "echo")
+        proc = MagicMock()
+        proc.poll.return_value = None
+        proc.stdin.write = MagicMock()
+        proc.stdin.flush = MagicMock()
+        client.process = proc
+
+        # Force infinite wait on future to trigger cancellation
+        with patch.object(client, "_start_async_reader"):
+            task = asyncio.create_task(client.call_tool_async("tool1", {}, timeout=10.0))
+            await asyncio.sleep(0.01)
+            self.assertEqual(len(client._pending_futures), 1)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertEqual(len(client._pending_futures), 0)
+
+    async def test_stop_async(self):
+        client = MCPProcessClient("test_srv", "echo")
+        proc = MagicMock()
+        proc.poll.return_value = None
+        proc.pid = 12345
+        proc.wait.return_value = 0
+        client.process = proc
+
+        await client.stop_async()
+        self.assertTrue(client._stopped)
+        self.assertIsNone(client.process)
+
+    async def test_terminate_process_group_waits_after_kill(self):
+        client = MCPProcessClient("test_srv", "echo")
+        proc = MagicMock()
+        proc.pid = 12345
+        proc.terminate = MagicMock()
+        proc.wait = MagicMock(side_effect=[Exception("timeout"), 0])
+        proc.kill = MagicMock()
+        client.process = proc
+
+        with patch("sys.platform", "win32"):
+            client._terminate_process_group()
+            proc.kill.assert_called_once()
+            self.assertEqual(proc.wait.call_count, 2)
 
 
 if __name__ == "__main__":

@@ -1095,7 +1095,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_hints_for_ui("text\n[Hint: do x]"), "text")
         self.assertEqual(widget._clean_hints_for_ui("text [Hint: inline] rest"), "text")
         self.assertEqual(widget._clean_hints_for_ui(""), "")
-        self.assertEqual(widget._clean_markup_text("[b]bold[/b]\n[Hint: nope]"), "\\[b]bold\\[/b]")
+        self.assertEqual(widget._clean_markup_text("[b]bold[/b]\n[Hint: nope]"), "[b]bold[/b]")
 
     def test_try_parse_json(self):
         widget = ToolCallWidget("shell", "cmd")

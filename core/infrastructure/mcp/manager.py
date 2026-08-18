@@ -115,6 +115,30 @@ class MCPManager:
                 logger.warning("Failed to stop MCP client", exc_info=True)
         self.clients.clear()
 
+    async def stop_all_async(self):
+        """Stops all running MCP client processes concurrently without blocking."""
+        self._generation += 1
+        locks = self._start_locks
+        if locks is not None:
+            locks.clear()
+        task = self._tools_refresh_task
+        if task is not None and not task.done():
+            task.cancel()
+        clients = list(self.clients.values())
+        self.clients.clear()
+        if clients:
+            coros = []
+            for client in clients:
+                stop_async = getattr(client, "stop_async", None)
+                if callable(stop_async):
+                    coros.append(stop_async())
+                else:
+                    stop = getattr(client, "stop", None)
+                    if callable(stop):
+                        coros.append(asyncio.to_thread(stop))
+            if coros:
+                await asyncio.gather(*coros, return_exceptions=True)
+
     def _reset_clients_for_project(self):
         """Stops and drops clients whose cwd belongs to a now-inactive project.
 
@@ -493,7 +517,8 @@ class MCPManager:
             await client.stop_async()
         except Exception:
             logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
-        self.clients.pop(name, None)
+        finally:
+            self.clients.pop(name, None)
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
@@ -599,7 +624,7 @@ class MCPManager:
             # (spawning would orphan the first task and its done-callback).
             return self.get_cached_tools()
 
-        if task is not None and (now - self._tools_refresh_time) < max_age:
+        if (now - self._tools_refresh_time) < max_age:
             # Most recent warmup finished within the freshness window.
             return self.get_cached_tools()
 
@@ -608,6 +633,10 @@ class MCPManager:
 
         def _on_done(done: asyncio.Task) -> None:
             self._tools_refresh_time = time.monotonic()
+            if not done.cancelled():
+                exc = done.exception()
+                if exc:
+                    logger.debug("Background MCP warmup failed: %s", exc)
             if self._tools_refresh_task is done:
                 self._tools_refresh_task = None
 
@@ -697,6 +726,15 @@ class MCPManager:
         Executes an MCP tool call by name across active MCP clients.
         Supports both direct tool_name, namespaced server_name__tool_name, or explicit target_server.
         """
+        if target_server and target_server in self.clients:
+            client = self.clients[target_server]
+            raw_name = tool_name
+            if "__" in tool_name and tool_name.startswith(f"{target_server}__"):
+                raw_name = tool_name.split("__", 1)[1]
+            return client.call_tool(
+                raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
+            )
+
         active_tools = self.get_active_tools()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
@@ -712,6 +750,15 @@ class MCPManager:
         target_server: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> Optional[str]:
+        if target_server and target_server in self.clients:
+            client = self.clients[target_server]
+            raw_name = tool_name
+            if "__" in tool_name and tool_name.startswith(f"{target_server}__"):
+                raw_name = tool_name.split("__", 1)[1]
+            return await client.call_tool_async(
+                raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
+            )
+
         active_tools = await self.get_active_tools_async()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:

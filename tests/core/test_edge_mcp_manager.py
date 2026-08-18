@@ -759,6 +759,40 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
         # Only "ok" finished loading tools without error.
         self.assertEqual(m.active_server_count(), 1)
 
+    async def test_stop_all_async_stops_clients_concurrently(self):
+        m = make_manager(self.tmp)
+        c1 = MagicMock()
+        c1.stop_async = AsyncMock()
+        c2 = MagicMock()
+        c2.stop_async = AsyncMock()
+        m.clients = {"c1": c1, "c2": c2}
+
+        await m.stop_all_async()
+
+        self.assertEqual(len(m.clients), 0)
+        c1.stop_async.assert_awaited_once()
+        c2.stop_async.assert_awaited_once()
+
+    async def test_ensure_tools_ready_async_fresh_ttl_does_not_spawn_task(self):
+        m = make_manager(self.tmp)
+        m._tools_refresh_time = time.monotonic()
+        m._tools_refresh_task = None
+        m.get_cached_tools = MagicMock(return_value=[{"tool": 1}])
+        with patch.object(m, "get_active_tools_async") as mock_get:
+            tools = await m.ensure_tools_ready_async(max_age=60.0)
+            self.assertEqual(tools, [{"tool": 1}])
+            mock_get.assert_not_called()
+
+    async def test_call_tool_async_fast_path_with_target_server(self):
+        m = make_manager(self.tmp)
+        client = MagicMock()
+        client.call_tool_async = AsyncMock(return_value="tool_result")
+        m.clients = {"srv_a": client}
+
+        res = await m.call_tool_async("srv_a__query", {"q": 1}, target_server="srv_a")
+        self.assertEqual(res, "tool_result")
+        client.call_tool_async.assert_awaited_once_with("query", {"q": 1}, timeout=120.0)
+
 
 if __name__ == "__main__":
     unittest.main()

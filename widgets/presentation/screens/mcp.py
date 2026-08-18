@@ -70,6 +70,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             # blocks on a cold (npx/uvx) server. Tools are rendered from cache
             # once the warmup finishes.
             await self.mm.ensure_tools_ready_async()
+            task = getattr(self.mm, "_tools_refresh_task", None)
+            if task is not None and not task.done():
+                await task
             if getattr(self, "is_mounted", True):
                 self.refresh_list()
         except Exception:
@@ -250,8 +253,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     pass
         except asyncio.CancelledError:
             raise
-        except Exception:
-            pass
+        except Exception as err:
+            if hasattr(self, "notify"):
+                self.notify(f"Failed to toggle {name}: {err}", severity="error")
         finally:
             self._pending_toggles.discard(name)
             if getattr(self, "is_mounted", True):

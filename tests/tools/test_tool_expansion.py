@@ -359,7 +359,7 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertEqual(content, r"Found error: \[tag=e1]")
+        self.assertEqual(content, "Found error: [tag=e1]")
 
     def test_chat_view_toggle_expand(self):
         from unittest.mock import PropertyMock, patch

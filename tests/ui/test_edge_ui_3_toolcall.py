@@ -201,5 +201,13 @@ class TestEdgeToolCallRenderVersionGuard(unittest.IsolatedAsyncioTestCase):
         widget._apply_content.assert_called_once_with("markup", "content")
 
 
+class TestCleanMarkupText(unittest.TestCase):
+    def test_clean_markup_text_preserves_brackets_without_escaping(self):
+        widget = ToolCallWidget("mcp_tool", "t", "[DEBUG] key: [1, 2, 3]")
+        clean = widget._clean_markup_text("[DEBUG] key: [1, 2, 3]")
+        self.assertEqual(clean, "[DEBUG] key: [1, 2, 3]")
+        self.assertNotIn("\\[", clean)
+
+
 if __name__ == "__main__":
     unittest.main()

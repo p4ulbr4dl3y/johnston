@@ -70,9 +70,15 @@ class MCPProcessClient:
         # registration and stdin write) so concurrent callers never pick a
         # duplicate req_id or leave an unregistered future behind.
         self._call_lock = asyncio.Lock()
+        self._start_lock = asyncio.Lock()
         # Monotonic timestamp of the last successful tools/list fetch, used to
         # rate-limit the per-call post-call refresh (avoids a duplicate fetch).
         self._tools_fetch_time = 0.0
+
+    def _next_req_id(self) -> int:
+        with self._lock:
+            self.req_id += 1
+            return self.req_id
 
     @staticmethod
     def _parse_line(line_str: str) -> Optional[Dict[str, Any]]:
@@ -205,48 +211,47 @@ class MCPProcessClient:
         loop = asyncio.get_running_loop()
         self._queue = asyncio.Queue()
         self._spawn_reader_thread(loop)
-        while not self._stopped:
-            try:
-                line_bytes = await self._queue.get()
-            except asyncio.CancelledError:
-                break
-            if line_bytes is None:
-                # Reader thread signaled EOF/termination.
-                break
-            line_str = (
-                line_bytes.decode("utf-8", errors="replace").strip()
-                if isinstance(line_bytes, bytes)
-                else str(line_bytes).strip()
-            )
-            data = self._parse_line(line_str)
-            if data is None:
-                continue
+        try:
+            while not self._stopped:
+                try:
+                    line_bytes = await self._queue.get()
+                except asyncio.CancelledError:
+                    break
+                if line_bytes is None:
+                    # Reader thread signaled EOF/termination.
+                    self._fail_pending_futures()
+                    break
+                line_str = (
+                    line_bytes.decode("utf-8", errors="replace").strip()
+                    if isinstance(line_bytes, bytes)
+                    else str(line_bytes).strip()
+                )
+                data = self._parse_line(line_str)
+                if data is None:
+                    continue
 
-            if "method" in data and "id" not in data:
-                if data.get("method") == "notifications/tools/list_changed":
-                    try:
-                        await self.fetch_tools_async()
-                    except Exception:
-                        logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
-                continue
+                if "method" in data and "id" not in data:
+                    if data.get("method") == "notifications/tools/list_changed":
+                        asyncio.create_task(self.fetch_tools_async())
+                    continue
 
-            res_id = data.get("id")
-            if res_id is not None:
-                fut = self._pending_futures.pop(res_id, None)
-                if fut and not fut.done():
-                    fut.set_result(data)
-                # Cache the response for the sync _read_response path. Bound the
-                # cache so long-running async sessions don't leak entries that
-                # were already consumed by their matching future.
-                if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
-                    self._pending_responses.pop(next(iter(self._pending_responses)), None)
-                self._pending_responses[res_id] = data
+                res_id = data.get("id")
+                if res_id is not None:
+                    fut = self._pending_futures.pop(res_id, None)
+                    if fut and not fut.done():
+                        fut.set_result(data)
+                    else:
+                        # Cache response for sync _read_response path only if no future handled it
+                        if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
+                            self._pending_responses.pop(next(iter(self._pending_responses)), None)
+                        self._pending_responses[res_id] = data
+        finally:
+            self._fail_pending_futures()
 
     def _send_request_sync(
         self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
     ) -> Optional[Dict[str, Any]]:
-        self.req_id += 1
-        current_id = self.req_id
+        current_id = self._next_req_id()
         req = {"jsonrpc": "2.0", "id": current_id, "method": method}
         if params is not None:
             req["params"] = params
@@ -263,8 +268,7 @@ class MCPProcessClient:
 
         self._start_async_reader()
         async with self._call_lock:
-            self.req_id += 1
-            current_id = self.req_id
+            current_id = self._next_req_id()
             req = {"jsonrpc": "2.0", "id": current_id, "method": method}
             if params is not None:
                 req["params"] = params
@@ -339,30 +343,31 @@ class MCPProcessClient:
             return False
 
     async def start_async(self) -> bool:
-        self._stopped = False
-        if self.process and self.process.poll() is None:
-            self._start_async_reader()
-            return True
+        async with self._start_lock:
+            self._stopped = False
+            if self.process and self.process.poll() is None:
+                self._start_async_reader()
+                return True
 
-        self.last_error = None
-        try:
-            kwargs = self._build_popen_kwargs()
-            args = kwargs.pop("args")
-            self.process = await asyncio.to_thread(subprocess.Popen, args, **kwargs)
-            self._spawn_stderr_drain()
-            self._start_async_reader()
-            init_ok = await self._initialize_async()
-            if not init_ok:
-                if not self.last_error:
-                    self.last_error = "Server initialization timed out or returned error"
+            self.last_error = None
+            try:
+                kwargs = self._build_popen_kwargs()
+                args = kwargs.pop("args")
+                self.process = await asyncio.to_thread(subprocess.Popen, args, **kwargs)
+                self._spawn_stderr_drain()
+                self._start_async_reader()
+                init_ok = await self._initialize_async()
+                if not init_ok:
+                    if not self.last_error:
+                        self.last_error = "Server initialization timed out or returned error"
+                    self.stop()
+                    self._maybe_append_stderr_tail()
+                return init_ok
+            except Exception as e:
+                self.last_error = f"Process start failed: {e}"
                 self.stop()
                 self._maybe_append_stderr_tail()
-            return init_ok
-        except Exception as e:
-            self.last_error = f"Process start failed: {e}"
-            self.stop()
-            self._maybe_append_stderr_tail()
-            return False
+                return False
 
     def _cancel_read_task_threadsafe(self) -> None:
         """Cancel the async reader without touching the task from a foreign thread."""
@@ -407,15 +412,6 @@ class MCPProcessClient:
         pid = getattr(proc, "pid", None)
         use_pg = sys.platform != "win32" and isinstance(pid, int) and pid > 0
 
-        for name in ("stdin", "stdout", "stderr"):
-            stream = getattr(proc, name, None)
-            if stream is None:
-                continue
-            try:
-                stream.close()
-            except Exception:
-                logger.debug("Error closing MCP server '%s' %s stream", self.name, name, exc_info=True)
-
         try:
             try:
                 if use_pg:
@@ -431,7 +427,14 @@ class MCPProcessClient:
                         except Exception:
                             pass
                     else:
-                        proc.kill()
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+                    try:
+                        proc.wait(timeout=1)
+                    except Exception:
+                        pass
             except Exception:
                 if use_pg:
                     try:
@@ -443,7 +446,19 @@ class MCPProcessClient:
                         proc.kill()
                     except Exception:
                         logger.debug("Failed to kill MCP server '%s'", self.name, exc_info=True)
+                try:
+                    proc.wait(timeout=1)
+                except Exception:
+                    pass
         finally:
+            for name in ("stdin", "stdout", "stderr"):
+                stream = getattr(proc, name, None)
+                if stream is None:
+                    continue
+                try:
+                    stream.close()
+                except Exception:
+                    logger.debug("Error closing MCP server '%s' %s stream", self.name, name, exc_info=True)
             self.process = None
 
     def stop(self):
@@ -584,10 +599,10 @@ class MCPProcessClient:
         return None
 
     def _initialize(self) -> bool:
-        self.req_id += 1
+        current_id = self._next_req_id()
         init_req = {
             "jsonrpc": "2.0",
-            "id": self.req_id,
+            "id": current_id,
             "method": "initialize",
             "params": {
                 "protocolVersion": MCP_PROTOCOL_VERSION,
@@ -596,7 +611,7 @@ class MCPProcessClient:
             },
         }
         self._send(init_req)
-        res = self._read_response(req_id=self.req_id, timeout=INIT_TIMEOUT)
+        res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
@@ -637,8 +652,7 @@ class MCPProcessClient:
 
     def fetch_tools(self) -> List[Dict[str, Any]]:
         with self._lock:
-            self.req_id += 1
-            current_id = self.req_id
+            current_id = self._next_req_id()
             req = {"jsonrpc": "2.0", "id": current_id, "method": "tools/list"}
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
@@ -660,8 +674,7 @@ class MCPProcessClient:
 
     def _build_call_payload(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         """Helper to create JSON-RPC tool call payload with incremented request id."""
-        self.req_id += 1
-        current_id = self.req_id
+        current_id = self._next_req_id()
         req = {
             "jsonrpc": "2.0",
             "id": current_id,
@@ -706,11 +719,6 @@ class MCPProcessClient:
             current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
             res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
-            if self.is_tools_stale():
-                try:
-                    self.fetch_tools()
-                except Exception:
-                    logger.debug("Failed to refresh tools after MCP tool call", exc_info=True)
             return self._parse_tool_response(tool_name, res)
 
     async def call_tool_async(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
@@ -737,32 +745,18 @@ class MCPProcessClient:
                 return f"Error writing to MCP server '{self.name}': {e}"
 
         try:
-            if timeout is not None:
-                res = await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
-            else:
-                res = await asyncio.wait_for(asyncio.shield(fut), timeout=DEFAULT_TOOLS_CALL_TIMEOUT)
+            effective_timeout = timeout if timeout is not None else DEFAULT_TOOLS_CALL_TIMEOUT
+            res = await asyncio.wait_for(asyncio.shield(fut), timeout=effective_timeout)
         except asyncio.TimeoutError:
-            self._pending_futures.pop(current_id, None)
             return f"Error: No response from MCP server '{self.name}'"
         except asyncio.CancelledError:
-            self._pending_futures.pop(current_id, None)
             raise
         except RuntimeError as e:
             # Server stopped while we awaited; surface gracefully instead of crashing.
-            self._pending_futures.pop(current_id, None)
             return f"Error: {e}"
         except Exception as e:
-            self._pending_futures.pop(current_id, None)
             return f"Error: {e}"
-
-        # Refresh tools only if the list may have changed since the last fetch
-        # (e.g. a server reporting new tools). Without this rate limit every call
-        # would trigger a redundant tools/list right after get_active_tools_async
-        # already fetched it.
-        if self.is_tools_stale():
-            try:
-                await self.fetch_tools_async()
-            except Exception:
-                logger.debug("Failed to refresh tools after async MCP tool call", exc_info=True)
+        finally:
+            self._pending_futures.pop(current_id, None)
 
         return self._parse_tool_response(tool_name, res)

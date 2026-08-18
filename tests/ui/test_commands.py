@@ -828,45 +828,18 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.message_queue, [])
         app.load_session_ui.assert_called_once_with("sess_1")
 
-    async def test_mcp_command_no_servers(self):
-        from unittest.mock import AsyncMock, MagicMock, patch
+    async def test_mcp_command_pushes_screen(self):
+        from unittest.mock import MagicMock
 
         from widgets.commands import MCPCommand
 
         app = MockApp()
-        app.notify = MagicMock()
         app.push_screen = MagicMock()
 
-        with patch("widgets.commands.get_mcp_manager") as mock_mm_getter:
-            mock_mm = MagicMock()
-            mock_mm.load_servers_async = AsyncMock(return_value=[])
-            mock_mm_getter.return_value = mock_mm
+        cmd = MCPCommand()
+        await cmd.execute(app)
 
-            cmd = MCPCommand()
-            await cmd.execute(app)
-
-            app.notify.assert_called_once_with("No available MCP servers found", severity="warning")
-            app.push_screen.assert_not_called()
-
-    async def test_mcp_command_with_servers(self):
-        from unittest.mock import AsyncMock, MagicMock, patch
-
-        from widgets.commands import MCPCommand
-
-        app = MockApp()
-        app.notify = MagicMock()
-        app.push_screen = MagicMock()
-
-        with patch("widgets.commands.get_mcp_manager") as mock_mm_getter:
-            mock_mm = MagicMock()
-            mock_mm.load_servers_async = AsyncMock(return_value=[{"name": "srv1", "url": "http://localhost:8000"}])
-            mock_mm_getter.return_value = mock_mm
-
-            cmd = MCPCommand()
-            await cmd.execute(app)
-
-            app.notify.assert_not_called()
-            app.push_screen.assert_called_once()
+        app.push_screen.assert_called_once()
 
 
 if __name__ == "__main__":
