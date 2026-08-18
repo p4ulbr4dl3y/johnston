@@ -1,4 +1,4 @@
-"""Edge-case tests for widgets/command_suggestions.py (bug-hunting round)."""
+import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -116,6 +116,116 @@ class TestOnOptionListOptionSelected(unittest.IsolatedAsyncioTestCase):
         event = MagicMock()
         self.sugg.on_option_list_option_selected(event)
         event.stop.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class TestCommandSuggestionsCoverage(unittest.IsolatedAsyncioTestCase):
+    async def test_no_running_loop_workspace_files_sync(self):
+        sugg = CommandSuggestions()
+        with patch("asyncio.to_thread", new=AsyncMock(return_value=["a.py", "b/"])):
+            res = await sugg.get_workspace_files()
+        self.assertEqual(res, ["a.py", "b/"])
+        # cached second call
+        res2 = await sugg.get_workspace_files()
+        self.assertEqual(res2, ["a.py", "b/"])
+
+    async def test_workspace_walk_capped(self):
+        sugg = CommandSuggestions()
+        real_walk = os.walk
+
+        def fake_walk(cwd):
+            # home/root scenario: two levels
+            yield (cwd, ["dir1", "dir2", ".git"], ["a.py"])
+            yield os.path.join(cwd, "dir1"), [".inside", "sub"], ["b.py", "c.py"]
+            yield os.path.join(cwd, "dir1", "sub"), [], ["d.py"]
+
+        os.walk = fake_walk
+        try:
+            files = sugg._load_workspace_files()
+        finally:
+            os.walk = real_walk
+        self.assertIsInstance(files, list)
+
+    async def test_workspace_walk_raises_swallowed(self):
+        sugg = CommandSuggestions()
+        real_walk = os.walk
+        os.walk = lambda cwd: (_ for _ in ()).throw(Exception("boom"))
+        try:
+            files = sugg._load_workspace_files()
+        finally:
+            os.walk = real_walk
+        self.assertEqual(files, [])
+
+    async def test_file_suggestion_max_50(self):
+        sugg = CommandSuggestions()
+        with patch.object(
+            sugg,
+            "get_workspace_files",
+            new=AsyncMock(return_value=[f"f{i}.py" for i in range(100)]),
+        ):
+            res = await sugg.update_query("@", "@", 1)
+        self.assertEqual(len(res), 50)
+        self.assertTrue(sugg.display)
+
+    async def test_long_command_desc_truncated(self):
+        sugg = CommandSuggestions()
+        cmds = [("/test", "x" * 200)]
+        with patch("widgets.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)):
+            res = await sugg.update_query("/test", "/test", 5)
+        self.assertEqual(res, ["/test"])
+        opt_text = str(sugg.options[0].prompt)
+        self.assertLessEqual(len(opt_text.split("  ")[1]), 60)
+
+    async def test_option_selected_command_and_file_mount(self):
+        from widgets.chat_input import ChatInput
+
+        class SuggApp(App[None]):
+            def __init__(self, sugg, input_widget):
+                super().__init__()
+                self.sugg = sugg
+                self.input_widget = input_widget
+
+            def compose(self) -> ComposeResult:
+                yield self.input_widget
+                yield self.sugg
+
+        chat_input = ChatInput(id="message-input")
+        chat_input.apply_suggestion = MagicMock()
+        chat_input.apply_file_suggestion = MagicMock()
+        chat_input.focus = MagicMock()
+        sugg = CommandSuggestions()
+
+        async def _run(setup_state):
+            app = SuggApp(sugg, chat_input)
+            async with app.run_test():
+                setup_state()
+                sugg.on_option_list_option_selected(MagicMock())
+                return sugg
+
+        await _run(
+            lambda: (
+                setattr(sugg, "current_matched", ["/help"]),
+                setattr(sugg, "mode", "command"),
+                setattr(sugg, "at_start_idx", 0),
+                sugg.add_option("/help Help about commands"),
+                setattr(sugg, "highlighted", 0),
+            )
+        )
+        chat_input.apply_suggestion.assert_called_once_with("/help", 0)
+
+        await _run(
+            lambda: (
+                setattr(sugg, "current_matched", ["f.py"]),
+                setattr(sugg, "mode", "file"),
+                setattr(sugg, "at_start_idx", 1),
+                sugg.add_option("f.py"),
+                setattr(sugg, "highlighted", 0),
+            )
+        )
+        chat_input.apply_file_suggestion.assert_called_once_with("f.py", 1)
 
 
 if __name__ == "__main__":
