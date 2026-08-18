@@ -17,6 +17,7 @@ from core.application.session.actions import (
     rewind_session,
 )
 from core.application.skills.manager import SkillManager
+from core.infrastructure.mcp import get_mcp_manager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.presentation.screens.constants import MESSAGE_INPUT
@@ -432,6 +433,10 @@ class MCPCommand(BaseCommand):
     description = "Manage MCP servers (toggle enabled/disabled)"
 
     async def execute(self, app) -> None:
+        servers = await get_mcp_manager().load_servers_async()
+        if not servers:
+            app.notify("No available MCP servers found", severity="warning")
+            return
         app.push_screen(MCPScreen())
 
 

@@ -38,6 +38,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self.filtered_servers: list[Dict[str, Any]] = []
         self.search_query = ""
         self._warmup_task: asyncio.Task | None = None
+        self._pending_toggles: set[str] = set()
+        self._toggle_tasks: set[asyncio.Task] = set()
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -59,6 +61,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def on_unmount(self) -> None:
         if self._warmup_task and not self._warmup_task.done():
             self._warmup_task.cancel()
+        for task in list(self._toggle_tasks):
+            task.cancel()
 
     async def _warmup_tools(self) -> None:
         try:
@@ -73,7 +77,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def _load_servers_bg(self, refresh: bool = True) -> None:
         """Load MCP servers off the event loop and refresh the list when ready."""
-        import asyncio as _async
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
 
         def _load() -> None:
             try:
@@ -81,28 +88,28 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             except Exception:
                 servers = getattr(self, "servers", []) or []
             self.servers = servers
-            if refresh and getattr(self, "is_mounted", True):
+            # Re-schedule the render on the loop that submitted the executor
+            # work: get_running_loop() inside this worker thread raises
+            # RuntimeError, so the loop must be captured up front.
+            if refresh and loop is not None and getattr(self, "is_mounted", True):
                 try:
-                    _async.get_running_loop().call_soon_threadsafe(self._render_from_cache)
+                    loop.call_soon_threadsafe(self._render_from_cache)
                 except RuntimeError:
                     pass
 
-        try:
-            import asyncio as _async
-
-            _async.get_running_loop().run_in_executor(None, _load)
-        except RuntimeError:
+        if loop is not None:
+            loop.run_in_executor(None, _load)
+        else:
             _load()
 
     def refresh_list(self) -> None:
         """Refresh the MCP server list. Disk/file loading runs off the event loop."""
-        # If we already have servers loaded, render immediately from cache; the
-        # background loader refreshes them without blocking keystroke handling.
-        if getattr(self, "servers", None):
-            self._render_from_cache()
-            self._load_servers_bg(refresh=True)
-        else:
-            self._load_servers_bg(refresh=True)
+        # Always render immediately (even with a cold cache, so the modal never
+        # shows an empty box while a background load is queued behind other
+        # worker-thread work); the background loader refreshes the rows without
+        # blocking keystroke handling.
+        self._render_from_cache()
+        self._load_servers_bg(refresh=True)
 
     def _render_from_cache(self) -> None:
         try:
@@ -214,6 +221,44 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             self.search_query = event.value
             self.refresh_list()
 
+    def _toggle_server_async(self, name: str) -> None:
+        """Toggle a server off the UI thread; duplicate toggles for the same
+        server while one is in flight are dropped (enter-spam guard).
+
+        ``toggle_server`` performs a blocking file read-modify-write and, for a
+        running client, a blocking process teardown (up to a few seconds) — both
+        must never run on the UI thread or the modal freezes.
+        """
+        if name in self._pending_toggles:
+            return
+        self._pending_toggles.add(name)
+        task = asyncio.create_task(self._do_toggle(name))
+        self._toggle_tasks.add(task)
+        task.add_done_callback(self._toggle_tasks.discard)
+
+    async def _do_toggle(self, name: str) -> None:
+        try:
+            enabled = await asyncio.to_thread(self.mm.toggle_server, name)
+            if enabled:
+                # Freshly-enabled server: kick the (coalesced, async) warmup so
+                # the row can show "N tools" without reopening the modal. Warmup
+                # is async and never occupies a worker thread, so a cold npx/uvx
+                # server cannot starve the modal's own background loader.
+                try:
+                    await self.mm.ensure_tools_ready_async()
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        finally:
+            self._pending_toggles.discard(name)
+            if getattr(self, "is_mounted", True):
+                self.refresh_list()
+                if hasattr(self.app, "refresh_status_footer"):
+                    self.app.refresh_status_footer()
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:
             opt_list = self.query_one("#mcp-option-list", OptionList)
@@ -222,11 +267,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 target = self.filtered_servers[idx]
                 if target is None:
                     return
-                s_name = target["name"]
-                self.mm.toggle_server(s_name)
-                self.refresh_list()
-                if hasattr(self.app, "refresh_status_footer"):
-                    self.app.refresh_status_footer()
+                self._toggle_server_async(target["name"])
 
     def _on_key(self, event: events.Key) -> None:
         self._handle_search_navigation(event)
@@ -241,11 +282,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             target = self.filtered_servers[event.option_index]
             if target is None:
                 return
-            s_name = target["name"]
-            self.mm.toggle_server(s_name)
-            self.refresh_list()
+            self._toggle_server_async(target["name"])
             opt_list = self.query_one("#mcp-option-list", OptionList)
             opt_list.highlighted = event.option_index
-
-            if hasattr(self.app, "refresh_status_footer"):
-                self.app.refresh_status_footer()

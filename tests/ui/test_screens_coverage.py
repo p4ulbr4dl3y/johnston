@@ -5,11 +5,13 @@ key handlers, and selection handlers) using a mounted host app with mocked
 query_one / event objects, matching the mocking style in tests/ui/test_screens_pilot.py.
 """
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App
 from textual.events import Key
+from textual.widgets import OptionList
 
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.mcp import MCPScreen
@@ -46,6 +48,221 @@ async def run_mounted(screen, test):
         await pilot.pause()
         test(screen)
         await pilot.pause()
+
+
+class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
+    """Regression: opening the MCP modal must render configured servers.
+
+    The background loader runs in a ThreadPoolExecutor and re-schedules the
+    render via call_soon_threadsafe on the captured event loop; if that
+    callback is lost (e.g. get_running_loop() called inside the worker
+    thread), the OptionList stays empty and the modal shows no servers.
+    """
+
+    def _make_screen(self, mgr):
+        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
+            mock_get.return_value = mgr
+            return MCPScreen()
+
+    def _mock_mgr(self, servers):
+        mgr = MagicMock()
+        mgr.load_servers.return_value = servers
+        mgr.clients = {}
+        mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
+        mgr.get_server_status.return_value = {"tools": 0, "error": None, "running": False}
+        return mgr
+
+    async def _wait_until(self, cond, attempts=150):
+        """Poll until the executor callback lands (loop closes at teardown)."""
+        for _ in range(attempts):
+            if cond():
+                return True
+            await asyncio.sleep(0.01)
+        return False
+
+    async def test_modal_renders_configured_servers(self):
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "beta", "command": "py", "disabled": True, "scope": "global"},
+            {"name": "gamma", "command": "py", "disabled": False, "scope": "project"},
+        ]
+        screen = self._make_screen(self._mock_mgr(servers))
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            rendered = await self._wait_until(lambda: screen.filtered_servers)
+            self.assertTrue(rendered, "modal never rendered any server row")
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            self.assertGreater(opt_list.option_count, 0)
+            names = [s["name"] for s in screen.filtered_servers if s is not None]
+            self.assertEqual(names, ["alpha", "beta", "gamma"])
+            # Header rows present in lockstep position
+            self.assertIsNone(screen.filtered_servers[0])
+
+    async def test_modal_empty_config_placeholder(self):
+        screen = self._make_screen(self._mock_mgr([]))
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            rendered = await self._wait_until(
+                lambda: screen.servers == [] and screen.filtered_servers == []
+            )
+            self.assertTrue(rendered, "placeholder row never rendered")
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            self.assertGreater(opt_list.option_count, 0)
+            first = opt_list.get_option_at_index(0).prompt
+            self.assertIn("No MCP servers configured", str(first))
+
+    async def test_modal_refresh_after_background_load_keeps_rows(self):
+        # Modal opened before the config cache was warm: the first background
+        # load lands after on_mount, and a second refresh (e.g. after warmup)
+        # must not blank the list.
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+        ]
+        screen = self._make_screen(self._mock_mgr(servers))
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            rendered = await self._wait_until(lambda: screen.servers)
+            self.assertTrue(rendered)
+            screen.refresh_list()
+            await self._wait_until(lambda: screen.filtered_servers)
+            self.assertEqual(screen.filtered_servers[1]["name"], "alpha")
+
+    async def test_load_servers_bg_renders_after_executor(self):
+        # Cold cache: refresh_list only submitted the executor load; the modal
+        # must still render once the worker thread finishes. This is the exact
+        # reported bug — the async callback back onto the event loop was lost,
+        # leaving the OptionList permanently empty.
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+        ]
+        screen = self._make_screen(self._mock_mgr(servers))
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            screen.servers = []
+            screen.filtered_servers = []
+            screen._load_servers_bg(refresh=True)
+            rendered = await self._wait_until(lambda: screen.filtered_servers)
+            self.assertTrue(rendered, "executor load never re-scheduled the render")
+            self.assertEqual(screen.filtered_servers[1]["name"], "alpha")
+
+    async def test_enter_spam_does_not_block_ui(self):
+        # Regression: toggling ran synchronously on the UI thread; a blocking
+        # toggle (config write + client stop, up to seconds) froze the modal
+        # on every enter. It must run off-thread with duplicate toggles for
+        # the same server dropped while one is in flight.
+        import time
+
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+        ]
+        mgr = self._mock_mgr(servers)
+        calls: list[str] = []
+
+        def slow_toggle(name):
+            calls.append(name)
+            time.sleep(1.0)
+            return True
+
+        mgr.toggle_server = slow_toggle
+        screen = self._make_screen(mgr)
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            await self._wait_until(lambda: screen.filtered_servers)
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            opt_list.highlighted = 1
+            start = time.monotonic()
+            for _ in range(6):
+                await pilot.press("enter")
+                await asyncio.sleep(0.02)
+            elapsed = time.monotonic() - start
+            # 6 sequential sync toggles would take ~6s; the modal must stay
+            # responsive and only the first enter actually toggles while the
+            # in-flight one is pending (1s >> spam window).
+            self.assertLess(elapsed, 2.5, "enter spam blocked the UI thread")
+            self.assertEqual(calls, ["alpha"])
+            # Modal kept its rows while the toggle was in flight.
+            self.assertTrue(screen.filtered_servers)
+            # Let the in-flight toggle finish and re-render.
+            await asyncio.sleep(0.4)
+            await self._wait_until(lambda: not screen._pending_toggles)
+
+    async def test_enter_after_toggle_finishes_toggles_again(self):
+        # Once the in-flight toggle completes, a later enter toggles again
+        # (no permanent lock on the server).
+        import time
+
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+        ]
+        mgr = self._mock_mgr(servers)
+        calls: list[str] = []
+
+        def slow_toggle(name):
+            calls.append(name)
+            time.sleep(0.1)
+            return True
+
+        mgr.toggle_server = slow_toggle
+        screen = self._make_screen(mgr)
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            await self._wait_until(lambda: screen.filtered_servers)
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            opt_list.highlighted = 1
+            await pilot.press("enter")
+            await self._wait_until(lambda: not screen._pending_toggles)
+            await pilot.press("enter")
+            await self._wait_until(lambda: not screen._pending_toggles)
+            self.assertEqual(calls, ["alpha", "alpha"])
+
+    async def test_toggle_enable_kicks_warmup_and_shows_tool_count(self):
+        # Enabling a server in the modal must refresh the row with "N tools"
+        # once the (async, coalesced) warmup lands — no reopen needed.
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": True, "scope": "global"},
+        ]
+        mgr = self._mock_mgr(servers)
+        state = {"disabled": True}
+
+        def toggle(name):
+            state["disabled"] = not state["disabled"]
+            return not state["disabled"]
+
+        mgr.toggle_server = toggle
+        mgr.load_servers = lambda: [
+            {"name": "alpha", "command": "py", "disabled": state["disabled"], "scope": "global"}
+        ]
+
+        async def warmup():
+            mgr.get_server_status.return_value = {"tools": 2, "error": None, "running": True}
+            return []
+
+        mgr.ensure_tools_ready_async = warmup
+        screen = self._make_screen(mgr)
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            await self._wait_until(lambda: screen.filtered_servers)
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            opt_list.highlighted = 1
+            await pilot.press("enter")
+            await self._wait_until(lambda: not screen._pending_toggles)
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            texts = [str(opt_list.get_option_at_index(i).prompt) for i in range(opt_list.option_count)]
+            self.assertTrue(any("2 tools" in t for t in texts), texts)
+
+    async def test_modal_never_blank_while_background_load_queued(self):
+        # Regression: a busy worker pool (long to_thread toggles from an
+        # earlier modal) delays the background load; the modal must render the
+        # placeholder row synchronously from on_mount instead of a blank box.
+        servers = [
+            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+        ]
+        screen = self._make_screen(self._mock_mgr(servers))
+        async with CoverageHostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            self.assertGreater(opt_list.option_count, 0)
+            await self._wait_until(lambda: screen.filtered_servers)
 
 
 class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
@@ -253,6 +470,9 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             event = MagicMock()
             event.input.id = "modal-search-input"
             screen.on_input_submitted(event)
+            # Toggle runs off the UI thread; give the worker time to land.
+            await pilot.pause()
+            await asyncio.sleep(0.05)
             mgr.toggle_server.assert_called_once_with("srv")
 
     async def test_on_option_selected(self):
@@ -267,6 +487,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             event = MagicMock()
             event.option_index = 0
             screen.on_option_list_option_selected(event)
+            await pilot.pause()
+            await asyncio.sleep(0.05)
             mgr.toggle_server.assert_called_once_with("srv")
             self.assertEqual(opt_list.highlighted, 0)
 
