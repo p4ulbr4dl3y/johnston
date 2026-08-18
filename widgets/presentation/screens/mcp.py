@@ -121,7 +121,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             opt_list.clear_options()
 
             if not self.servers:
-                opt_list.add_option(f"*No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)*")
+                opt_list.add_option(
+                    Option("No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)", disabled=True)
+                )
                 self.filtered_servers = []
                 return
 
