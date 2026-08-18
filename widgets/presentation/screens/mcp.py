@@ -34,7 +34,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def __init__(self):
         super().__init__()
         self.mm = get_mcp_manager()
-        self.servers: list[Dict[str, Any]] = []
+        try:
+            self.servers = self.mm.load_servers()
+        except Exception:
+            self.servers = []
         self.filtered_servers: list[Dict[str, Any]] = []
         self.search_query = ""
         self._warmup_task: asyncio.Task | None = None

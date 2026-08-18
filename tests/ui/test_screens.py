@@ -90,6 +90,7 @@ class TestMCPScreen(unittest.TestCase):
     @patch("widgets.presentation.screens.mcp.get_mcp_manager")
     def test_init(self, mock_get_mgr):
         mock_mgr = MagicMock()
+        mock_mgr.load_servers.return_value = []
         mock_get_mgr.return_value = mock_mgr
         from widgets.presentation.screens.mcp import MCPScreen
 
