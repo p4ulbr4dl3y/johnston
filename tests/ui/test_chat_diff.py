@@ -1,0 +1,161 @@
+import unittest
+
+from widgets.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
+
+
+class TestDiffRenderable(unittest.TestCase):
+    def test_diff_renderable_console_and_measure(self):
+        from rich.console import Console
+        from rich.text import Text
+
+        lines = [Text("old line"), Text("new line")] * 2
+        renderable = DiffRenderable(lines)
+        console = Console(width=20, record=True)
+        console.print(renderable)
+        self.assertIn("old line", console.export_text())
+        self.assertIsNotNone(renderable.__rich_measure__(console, console.options))
+        self.assertEqual(renderable.plain, "old line\nnew line\nold line\nnew line")
+
+    def test_diff_renderable_pads_short_lines(self):
+        from rich.console import Console
+        from rich.text import Text
+
+        lines = [Text("short"), Text("a much longer line that exceeds")]
+        renderable = DiffRenderable(lines)
+        console = Console(width=10, record=True)
+        console.print(renderable)
+        self.assertIn("short", console.export_text())
+
+
+class TestFormatEditDiff(unittest.TestCase):
+    def test_format_edit_diff_basic_hunk(self):
+        diff = "--- a/file.py\n+++ b/file.py\n@@ -1,3 +1,3 @@\n def keep():\n-    old = 1\n+    new = 2\n     return\n"
+        result = format_edit_diff(diff, "file.py")
+        self.assertIsInstance(result, DiffRenderable)
+        text = result.plain
+        self.assertIn("keep", text)
+        self.assertIn("old = 1", text)
+        self.assertIn("new = 2", text)
+
+        diff2 = "Success: file 'f.py' updated\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
+        result2 = format_edit_diff(diff2, "f.py")
+        self.assertNotIn("Success", result2.plain)
+
+    def test_format_edit_diff_no_hunk_and_unknown_lexer(self):
+        diff = "just a plain status line\nmore status\n"
+        result = format_edit_diff(diff, "unknown.xyz")
+        self.assertIsInstance(result, DiffRenderable)
+        self.assertIn("just a plain status line", result.plain)
+
+    def test_format_edit_diff_html_js_and_css_detection(self):
+        html_js = (
+            "--- a/index.html\n"
+            "+++ b/index.html\n"
+            "@@ -1,2 +1,2 @@\n"
+            "-<script>console.log(1)</script>\n"
+            "+function run() { return 1; }\n"
+        )
+        result = format_edit_diff(html_js, "index.html")
+        self.assertIn("console", result.plain)
+
+        html_css = "--- a/style.html\n+++ b/style.html\n@@ -1,1 +1,1 @@\n-body { color: red; }\n+div { color: blue; }\n"
+        result2 = format_edit_diff(html_css, "style.html")
+        self.assertIn("color", result2.plain)
+
+    def test_format_edit_diff_backslash_and_outside_hunk_lines(self):
+        diff = (
+            "--- a/f.py\n"
+            "+++ b/f.py\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-old\n"
+            "\\ No newline at end of file\n"
+            "+new\n"
+            "\\ No newline at end of file\n"
+            "trailing garbage line\n"
+        )
+        result = format_edit_diff(diff, "f.py")
+        self.assertIn("trailing garbage line", result.plain)
+
+    def test_format_edit_diff_empty_code_lines_and_no_lexer(self):
+        diff = "--- a/f.txt\n+++ b/f.txt\n@@ -1,1 +1,1 @@\n-\n+\n"
+        result = format_edit_diff(diff, "f.txt")
+        self.assertIsInstance(result, DiffRenderable)
+
+    def test_format_edit_diff_http_path_and_multi_hunk_numbers(self):
+        diff = "--- a/f.py\n+++ b/f.py\n@@ -1,2 +10,2 @@\n-line1\n-line2\n+lineA\n+lineB\n"
+        result = format_edit_diff(diff, "https://example.com/f.py")
+        self.assertIsInstance(result, DiffRenderable)
+        self.assertIn("lineA", result.plain)
+
+    def test_format_edit_diff_empty_lines_and_hunk_marker_without_ranges(self):
+        diff = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n context\n-\n+\n tail\n"
+        result = format_edit_diff(diff, "f.py")
+        self.assertIsInstance(result, DiffRenderable)
+
+    def test_format_edit_diff_success_ok_and_status_lines_outside_hunk(self):
+        diff = (
+            "OK: did something\n"
+            "file.py updated\n"
+            "file created\n"
+            "file saved\n"
+            "--- a/f.py\n"
+            "+++ b/f.py\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-a\n"
+            "+b\n"
+        )
+        result = format_edit_diff(diff, "f.py")
+        self.assertIn("1 + b", result.plain)
+
+    def test_format_edit_diff_filters_ok_lines_without_hunk(self):
+        diff = "OK: did something\nplain status\n"
+        result = format_edit_diff(diff, "f.py")
+        self.assertNotIn("OK:", result.plain)
+        self.assertIn("plain status", result.plain)
+
+    def test_format_edit_diff_html_with_style_block_detection(self):
+        diff = (
+            "--- a/s.html\n"
+            "+++ b/s.html\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-<style>body { color: red; }</style>\n"
+            "+<style>div { color: blue; }</style>\n"
+        )
+        result = format_edit_diff(diff, "s.html")
+        self.assertIn("color", result.plain)
+
+    def test_format_edit_diff_plain_lines_before_hunk_kept_dim(self):
+        diff = "preamble line\n--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n"
+        result = format_edit_diff(diff, "f.py")
+        self.assertIn("preamble line", result.plain)
+
+    def test_format_edit_diff_empty_path_and_empty_context_line(self):
+        diff = "--- a/f\n+++ b/f\n@@ -1,2 +1,2 @@\n a\n\n-b\n+c\n"
+        result = format_edit_diff(diff, "")
+        self.assertIsInstance(result, DiffRenderable)
+
+    def test_format_edit_diff_html_script_tags_detection(self):
+        diff = (
+            "--- a/p.html\n"
+            "+++ b/p.html\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-<script>const x = 1;</script>\n"
+            "+<script>const y = 2;</script>\n"
+        )
+        result = format_edit_diff(diff, "p.html")
+        self.assertIn("const", result.plain)
+
+    def test_format_edit_diff_css_after_script_detection(self):
+        diff = "--- a/q.html\n+++ b/q.html\n@@ -1,1 +1,1 @@\n-body { margin: 0; }\n+div { padding: 0; }\n"
+        result = format_edit_diff(diff, "q.html")
+        self.assertIn("margin", result.plain)
+
+    def test_format_edit_diff_js_without_script_tag(self):
+        diff = "--- a/r.html\n+++ b/r.html\n@@ -1,1 +1,1 @@\n-function init() { return 1; }\n+const value = 2;\n"
+        result = format_edit_diff(diff, "r.html")
+        self.assertIn("function", result.plain)
+
+    def test_format_edit_diff_lexer_exception_fallback(self):
+        diff = "--- a/f.unknownext\n+++ b/f.unknownext\n@@ -1,1 +1,1 @@\n-line one\n+line two\n"
+        result = format_edit_diff(diff, "f.unknownext")
+        self.assertIn("line one", result.plain)

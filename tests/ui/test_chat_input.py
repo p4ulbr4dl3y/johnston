@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -7,6 +8,7 @@ from PIL import Image
 from textual.app import App, ComposeResult
 from textual.events import Key, Paste
 
+from widgets import chat_input as chat_input_mod
 from widgets.chat_input import ChatInput, ClipboardAttachment
 
 
@@ -422,3 +424,380 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
+    async def test_try_paste_clipboard_image_file_path(self):
+        chat_input = ChatInput()
+        chat_input.insert = MagicMock()
+        chat_input._on_input_change = MagicMock()
+
+        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=("/tmp/sample.png", None)):
+            res = await chat_input.try_paste_clipboard_image()
+            self.assertTrue(res)
+            chat_input.insert.assert_called_once_with("@/tmp/sample.png ")
+            chat_input._on_input_change.assert_called_once()
+
+    async def test_try_paste_clipboard_image_data(self):
+        chat_input = ChatInput()
+        chat_input.update_attachment_bar = MagicMock()
+
+        mock_img = Image.new("RGB", (100, 50))
+        with (
+            patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+            patch("os.makedirs"),
+            patch("os.path.getsize", return_value=1024),
+            patch.object(Image.Image, "save"),
+        ):
+            res = await chat_input.try_paste_clipboard_image()
+            self.assertTrue(res)
+            self.assertEqual(len(chat_input.clipboard_attachments), 1)
+            chat_input.update_attachment_bar.assert_called_once()
+
+    async def test_try_paste_clipboard_image_none(self):
+        chat_input = ChatInput()
+        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, None)):
+            res = await chat_input.try_paste_clipboard_image()
+            self.assertFalse(res)
+            self.assertEqual(len(chat_input.clipboard_attachments), 0)
+
+
+def _make_input():
+    ci = ChatInput()
+    app = DummyChatApp(ci)
+    return ci, app, app.run_test()
+
+
+class TestLoadTextEmpty(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        self.pilot = await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_load_none_clears(self):
+        self.ci.load_text("sometext")
+        self.ci.load_text(None)
+        self.assertEqual(self.ci.text, "")
+
+    async def test_load_newlines_updates_height(self):
+        self.ci.load_text("a\n\nb")
+        self.ci.update_height()
+        self.assertGreaterEqual(self.ci.styles.height.value, 3)
+
+    async def test_pasted_texts_cleared_on_empty_load(self):
+        self.ci.pasted_texts["[Pasted text #1 +3 lines]"] = "x\ny\nz"
+        self.ci.load_text("")
+        self.assertEqual(self.ci.pasted_texts, {})
+
+
+class TestSanitizeMouseArtifacts(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_artifact_removed_multiline_at_end_no_crash(self):
+        self.ci.load_text("line1\nline2 M<65;1272;815M")
+        self.assertNotIn("M<", self.ci.text)
+
+
+class TestFullTextWithTags(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_tag_expansion_preserves_newlines(self):
+        raw = "a\nb\nc"
+        self.ci.pasted_texts["[TAG]"] = raw
+        self.ci.load_text("before [TAG] after")
+        self.assertEqual(self.ci.get_full_text(), "before a\nb\nc after")
+
+    async def test_tag_in_unicode_text(self):
+        self.ci.pasted_texts["[TAG]"] = "привет"
+        self.ci.load_text("скажи [TAG]")
+        self.assertEqual(self.ci.get_full_text(), "скажи привет")
+
+
+class TestApplySuggestionEdge(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_apply_mid_line_keeps_after_text(self):
+        self.ci.load_text("do /he please")
+        self.ci.move_cursor((0, 6))
+        self.ci.apply_suggestion("/help", 3)
+        self.assertEqual(self.ci.text, "do /help  please")
+
+    async def test_apply_file_suggestion_at_zero(self):
+        self.ci.load_text("@main")
+        self.ci.move_cursor((0, len("@main")))
+        self.ci.apply_file_suggestion("main.py", 0)
+        self.assertEqual(self.ci.text, "@main.py ")
+
+    async def test_apply_file_suggestion_no_duplicate_at(self):
+        self.ci.load_text("@main")
+        self.ci.move_cursor((0, len("@main")))
+        self.ci.apply_file_suggestion("@main.py", 0)
+        self.assertEqual(self.ci.text, "@main.py ")
+
+
+class TestSubmitWhitespace(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_enter_submits_whitespace_message_value(self):
+        self.ci.load_text("   ")
+        event_enter = Key("enter", "enter")
+        event_enter.prevent_default = MagicMock()
+        event_enter.stop = MagicMock()
+        with patch.object(self.ci, "post_message") as post:
+            await self.ci._on_key(event_enter)
+        values = [
+            c[0][0].value for c in post.call_args_list if c[0] and hasattr(c[0][0], "value") and c[0][0].__class__.__name__ == "Submitted"
+        ]
+        self.assertIn("   ", values)
+
+    async def test_history_ignores_whitespace_add(self):
+        self.ci.prompt_history = []
+        self.ci.add_to_history("   ")
+        self.assertEqual(self.ci.prompt_history, [])
+
+    async def test_history_dedup_consecutive(self):
+        self.ci.prompt_history = []
+        self.ci.add_to_history("a")
+        self.ci.add_to_history("a")
+        self.assertEqual(self.ci.prompt_history, ["a"])
+
+
+class TestFormatPastedPathEdge(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_empty_input_returns_same(self):
+        self.assertEqual(self.ci.format_pasted_file_path(""), "")
+
+    async def test_none_input_returns_same(self):
+        self.assertEqual(self.ci.format_pasted_file_path(None), None)
+
+    async def test_windows_style_path(self):
+        res = self.ci.format_pasted_file_path(r"C:\Users\me\file.py")
+        self.assertIn("file.py", res)
+
+    async def test_spaces_in_path_kept(self):
+        with tempfile.NamedTemporaryFile(suffix=".txt", prefix="my file ") as tmp:
+            res = self.ci.format_pasted_file_path(tmp.name)
+            self.assertEqual(res, f"@{tmp.name} ")
+
+    async def test_multibyte_path(self):
+        with tempfile.NamedTemporaryFile(suffix=".txt", prefix="файл ") as tmp:
+            res = self.ci.format_pasted_file_path(tmp.name)
+            self.assertTrue(res.startswith("@"))
+            self.assertTrue(res.endswith(" "))
+            self.assertIn("файл", res)
+
+
+class TestOnPasteEdge(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.ci, self.app, self._ctx = _make_input()
+        await self._ctx.__aenter__()
+
+    async def asyncTearDown(self):
+        await self._ctx.__aexit__(None, None, None)
+
+    async def test_paste_empty_is_noop(self):
+        from textual.events import Paste
+
+        with patch.object(self.ci, "format_pasted_file_path", return_value=""), patch.object(
+            self.ci, "_decode_pasted_path", return_value=""
+        ):
+            event = Paste("")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await self.ci.on_paste(event)  # empty paste must not raise
+            self.assertEqual(self.ci.text, "")
+
+    async def test_paste_multiline_under_threshold_no_crash(self):
+        from textual.events import Paste
+
+        with patch.object(self.ci, "format_pasted_file_path", return_value="a\nb"), patch.object(
+            self.ci, "_decode_pasted_path", return_value="a\nb"
+        ):
+            event = Paste("a\nb")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await self.ci.on_paste(event)
+            self.assertIn("a\nb", self.ci.text)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+
+class TestChatInputHistoryFile(unittest.TestCase):
+    def test_load_prompt_history_invalid_json_returns_empty(self):
+        ci = ChatInput()
+        with patch.object(chat_input_mod.config, "PROMPT_HISTORY_FILE", "/nonexistent/history.json"):
+            with patch("widgets.chat_input.os.path.exists", return_value=True):
+                with patch("widgets.chat_input.json.load", side_effect=json.JSONDecodeError("x", "d", 0)):
+                    self.assertEqual(ci.load_prompt_history(), [])
+
+    def test_save_prompt_history_swallows_write_error(self):
+        ci = ChatInput()
+        ci.prompt_history = ["a", "b"]
+        with patch("widgets.chat_input.json.dump", side_effect=OSError("disk full")):
+            ci.save_prompt_history()  # must not raise
+
+
+class TestChatInputScheduleSuggestions(unittest.TestCase):
+    def test_schedule_not_mounted_returns(self):
+        ci = ChatInput()
+        self.assertIsNone(ci._schedule_suggestions_update())
+
+    def test_schedule_runtime_error_swallowed(self):
+        ci = ChatInput()
+        with patch.object(type(ci), "is_mounted", new_callable=PropertyMock, return_value=True):
+            with patch("widgets.chat_input.asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+                ci._schedule_suggestions_update()  # must not raise
+
+
+class TestChatInputFormatPasted(unittest.TestCase):
+    def test_blank_line_preserved_in_multi_line(self):
+        ci = ChatInput()
+        result = ci.format_pasted_file_path("line1\n\nline3")
+        self.assertEqual(result, "line1\n\nline3")
+
+    def test_clear_attachments_swallows_oserror(self):
+        ci = ChatInput()
+        with tempfile.TemporaryDirectory(prefix="temp_images") as tmp:
+            path = f"{tmp}/img.png"
+            att = chat_input_mod.ClipboardAttachment(path)
+            ci.clipboard_attachments = [att]
+            with patch("widgets.chat_input.os.path.exists", return_value=True):
+                with patch("widgets.chat_input.os.remove", side_effect=OSError("busy")):
+                    ci.clear_clipboard_attachments()
+            self.assertEqual(ci.clipboard_attachments, [])
+
+
+class TestChatInputOnPaste(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_paste_with_clipboard_image_returns(self):
+        ci = ChatInput()
+        event = Paste("")
+        event.prevent_default = MagicMock()
+        event.stop = MagicMock()
+        with patch.object(ci, "format_pasted_file_path", return_value=""), patch.object(
+            ci, "_decode_pasted_path", return_value=""
+        ):
+            with patch.object(ci, "try_paste_clipboard_image", new=AsyncMock(return_value=True)):
+                with patch.object(ci, "insert") as insert:
+                    await ci.on_paste(event)
+            insert.assert_not_called()
+
+
+class TestChatInputHistoryTrim(unittest.TestCase):
+    def test_add_to_history_trims_over_max(self):
+        ci = ChatInput()
+        ci.MAX_PROMPT_HISTORY = 2
+        ci.prompt_history = ["a", "b"]
+        with patch.object(ci, "save_prompt_history") as save:
+            ci.add_to_history("c")
+        self.assertEqual(ci.prompt_history, ["b", "c"])
+        save.assert_called_once()
+
+
+class TestChatInputTagDeletion(unittest.IsolatedAsyncioTestCase):
+    async def _bootstrap(self):
+        ci, ctx = _app_context()
+        pilot = await ctx.__aenter__()
+        return ci, ctx, pilot
+
+    async def test_empty_pasted_texts_returns_false(self):
+        ci, ctx, _pilot = await self._bootstrap()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        self.assertFalse(ci._handle_tag_deletion("backspace"))
+
+    async def test_duplicate_tags_loop_terminates(self):
+        ci, ctx, _pilot = await self._bootstrap()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        ci.load_text("[TAG]x[TAG]")
+        ci.move_cursor((0, 0))
+        ci.pasted_texts = {"[TAG]": "raw"}
+        self.assertFalse(ci._handle_tag_deletion("backspace"))
+        # Both [TAG] markers still present (nothing deleted).
+        self.assertEqual(ci.text, "[TAG]x[TAG]")
+
+
+class TestChatInputTabFileMode(unittest.IsolatedAsyncioTestCase):
+    async def test_tab_file_suggestion_applies(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        with patch.object(ci, "apply_file_suggestion") as apply:
+            with patch.object(ci.app, "query_one", return_value=_make_fake_suggestions("file")):
+                event = Key("tab", "tab")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+        apply.assert_called_once_with("/main.py", 0)
+
+    async def test_tab_query_error_swallowed(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        with patch.object(ci.app, "query_one", side_effect=Exception("no widget")):
+            event = Key("tab", "tab")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)  # must not raise
+
+
+class TestChatInputEnterCommandSelection(unittest.IsolatedAsyncioTestCase):
+    async def test_enter_selects_command_suggestion(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        sugg = _make_fake_suggestions("command")
+        with patch.object(ci, "apply_suggestion") as apply:
+            with patch.object(ci.app, "query_one", return_value=sugg):
+                event = Key("enter", "enter")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+        apply.assert_called_once_with("/help", 0)
+        self.assertFalse(sugg.display)
+        event.prevent_default.assert_called()
+
+
+def _app_context():
+    ci = ChatInput()
+    ctx = DummyChatApp(ci).run_test()
+    return ci, ctx
+
+
+def _make_fake_suggestions(mode="command"):
+    sugg = MagicMock()
+    sugg.display = True
+    sugg.highlighted = 0
+    sugg.mode = mode
+    sugg.current_matched = ["/help"] if mode == "command" else ["/main.py"]
+    sugg.at_start_idx = 0
+    return sugg
