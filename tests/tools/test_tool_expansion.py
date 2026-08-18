@@ -422,6 +422,74 @@ class TestToolExpansion(unittest.TestCase):
         running.status = "running"
         self.assertTrue(running.is_expandable())
 
+    def test_ask_user_display_no_qa_prefix(self):
+        widget = ToolCallWidget(
+            tool_type="ask_user",
+            target="ask_user",
+            result_text="Question: What is your name?\nAnswer: Johnston",
+            args={"questions": [{"question_text": "What is your name?", "options": ["Johnston"]}]},
+        )
+        display = widget._format_ask_user_display()
+        self.assertIsInstance(display, Text)
+        plain = display.plain
+        self.assertNotIn("Q:", plain)
+        self.assertNotIn("A:", plain)
+        self.assertIn("What is your name?", plain)
+        self.assertIn("Johnston", plain)
+
+    def test_shell_running_bg_task_click_opens_console_modal(self):
+        task_mock = MagicMock()
+        task_mock.task_id = "task-123"
+        task_mock.kind = "shell"
+        task_mock.is_running = True
+        self.mock_app.task_manager = [task_mock]
+
+        widget = ToolCallWidget(
+            tool_type="shell",
+            target="sleep 10",
+            result_text="[Background Task ID: task-123] 'sleep 10' moved to background.",
+            args={"command": "sleep 10"},
+        )
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        widget.on_click(event)
+        event.stop.assert_called_once()
+        self.mock_app.push_screen.assert_called_once()
+        screen_pushed = self.mock_app.push_screen.call_args[0][0]
+        from widgets.presentation.screens.tasks import TaskConsoleScreen
+
+        self.assertIsInstance(screen_pushed, TaskConsoleScreen)
+        self.assertEqual(screen_pushed.bg_task, task_mock)
+
+    def test_shell_completed_bg_task_click_toggles_expansion(self):
+        task_mock = MagicMock()
+        task_mock.task_id = "task-123"
+        task_mock.kind = "shell"
+        task_mock.is_running = False
+        self.mock_app.task_manager = [task_mock]
+
+        widget = ToolCallWidget(
+            tool_type="shell",
+            target="echo ok",
+            result_text="[Background Task ID: task-123] 'echo ok' moved to background.\nok",
+            args={"command": "echo ok"},
+        )
+        event = MagicMock()
+        self.assertFalse(widget.is_expanded)
+        widget.on_click(event)
+        self.assertTrue(widget.is_expanded)
+        self.mock_app.push_screen.assert_not_called()
+
+    def test_shell_auto_collapses_when_backgrounded(self):
+        widget = ToolCallWidget(
+            tool_type="shell",
+            target="long_job",
+            args={"command": "long_job"},
+        )
+        widget.is_expanded = True
+        widget.set_result("[Background Task ID: bg_1] 'long_job' moved to background.", status="running")
+        self.assertFalse(widget.is_expanded)
+
 
 if __name__ == "__main__":
     unittest.main()

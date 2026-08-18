@@ -34,12 +34,20 @@ class ActionsMixin:
         shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
         for t in list(shell_tasks):
             if getattr(t, "is_running", False) and not getattr(t, "is_background", False):
+                tid = getattr(t, "task_id", None)
                 if hasattr(t, "move_to_background"):
                     t.move_to_background()
                     count += 1
                 else:
                     t.is_background = True
                     count += 1
+                reg = getattr(self, "_background_shell_widgets", None) or {}
+                widget = reg.get(tid)
+                if widget is not None:
+                    if hasattr(widget, "collapse"):
+                        widget.collapse()
+                    elif getattr(widget, "is_expanded", False) and hasattr(widget, "toggle_expanded"):
+                        widget.toggle_expanded()
         if count == 0:
             self.notify("No active foreground tasks to move to background", severity="warning")
 

@@ -100,8 +100,8 @@ class FormattingMixin:
                 t.append("\n")
             q_text = q.get("question_text", "")
             ans = answers.get(i, {}).get("answer", "")
-            t.append(f"Q: {q_text}\n", style="bold #ffffff")
-            t.append(f"A: {ans}", style="#a1a1aa" if not ans else None)
+            t.append(f"{q_text}\n", style="bold #ffffff")
+            t.append(f"{ans}", style="#a1a1aa" if not ans else None)
         if not t:
             t.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
         return t
@@ -356,7 +356,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return self.tool_type in self.EXPANDABLE_TOOLS
 
     def is_clickable_header(self) -> bool:
-        return self.is_expandable() or self.canonical_tool in ("invoke_subagent", "ask_user")
+        return (
+            self.is_expandable()
+            or self.canonical_tool in ("invoke_subagent", "ask_user")
+            or (self.canonical_tool in ("shell", "manage_shell") and self._get_running_shell_task() is not None)
+        )
 
     def __init__(
         self,
@@ -449,6 +453,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.tool_type == "shell":
             if cleaned:
                 self.result_text = cleaned
+            if status == "running" and "[Background Task ID:" in cleaned:
+                self.collapse()
         elif self.canonical_tool == "invoke_subagent":
             self.result_text = cleaned
             self.render_header()
@@ -540,7 +546,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def on_click(self, event) -> None:
         if not self.is_clickable_header():
             return
-        if self.canonical_tool in ("invoke_subagent", "ask_user"):
+        if self.canonical_tool in ("invoke_subagent", "ask_user", "shell", "manage_shell"):
             if self.canonical_tool == "invoke_subagent":
                 args = self.args if isinstance(self.args, dict) else {}
                 nargs = args
@@ -554,15 +560,49 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     pass
                 event.stop()
                 return
-            if getattr(self.app, "_pending_ask_user", None) is not None:
-                self._resume_ask_user_wizard()
-                event.stop()
-                return
-            # No pending wizard: fall through to inline expand/collapse.
+            if self.canonical_tool == "ask_user":
+                if getattr(self.app, "_pending_ask_user", None) is not None:
+                    self._resume_ask_user_wizard()
+                    event.stop()
+                    return
+            if self.canonical_tool in ("shell", "manage_shell"):
+                running_task = self._get_running_shell_task()
+                if running_task is not None:
+                    try:
+                        from widgets.presentation.screens.tasks import TaskConsoleScreen
+
+                        self.app.push_screen(TaskConsoleScreen(running_task))
+                        event.stop()
+                        return
+                    except Exception:
+                        pass
+            # No pending wizard or running bg task: fall through to inline expand/collapse.
 
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
+
+    def _get_running_shell_task(self) -> Any:
+        """Find active background shell task associated with this tool call, if any."""
+        if not self.app or not hasattr(self.app, "task_manager"):
+            return None
+        tid = None
+        if isinstance(self.args, dict):
+            tid = self.args.get("task_id") or self.args.get("TaskId")
+        if not tid:
+            bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
+            if bg_match:
+                tid = bg_match.group(1)
+        if not tid:
+            return None
+        for t in self.app.task_manager:
+            if (
+                getattr(t, "task_id", "") == tid
+                and getattr(t, "kind", "") == "shell"
+                and getattr(t, "is_running", False)
+            ):
+                return t
+        return None
 
     def _resume_ask_user_wizard(self) -> None:
         """Resume a minimized ask_user wizard if present."""
@@ -607,6 +647,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             if i not in answers:
                 answers[i] = {"answer": "(No response)"}
         return answers
+
+    def collapse(self) -> None:
+        """Collapse expanded content if currently open."""
+        if not self.is_expanded:
+            return
+        self.is_expanded = False
+        self.render_header()
+        self.content_widget.display = False
+        self.md_widget.display = False
 
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
