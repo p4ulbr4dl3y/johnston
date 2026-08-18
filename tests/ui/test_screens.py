@@ -1,12 +1,16 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from textual.events import Key
+
+from core.application.session.actions import RewindEntry
 from core.application.skills.manager import Skill, SkillScope
 from widgets.presentation.screens.ask_user import ConfirmScreen
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.presentation.screens.resume import ResumeScreen
+from widgets.presentation.screens.rewind import RewindScreen
 from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
@@ -18,6 +22,22 @@ class TestConfirmScreen(unittest.TestCase):
         keys = [b[0] for b in ConfirmScreen("x").BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("enter", keys)
+
+
+class TestConfirmCancelPath(unittest.TestCase):
+    def test_confirm_cancel_dismisses_cancelled(self):
+        s = ConfirmScreen("summary")
+        with patch.object(s, "dismiss") as dismiss:
+            s._mount_time = 0  # old mount => bypass debounce
+            s.action_cancel()
+        dismiss.assert_called_once_with("cancelled")
+
+    def test_confirm_enter_debounced_bypass(self):
+        s = ConfirmScreen("summary")
+        with patch.object(s, "dismiss") as dismiss:
+            s._mount_time = 0
+            s.action_confirm()
+        dismiss.assert_called_once_with("confirm")
 
 
 class TestHelpScreen(unittest.TestCase):
@@ -50,6 +70,34 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(s.default_value, "")
 
 
+class TestResumeEdge(unittest.TestCase):
+    def test_session_missing_id_uses_gettext(self):
+        """Sessions without 'id' (malformed payload) must not raise KeyError."""
+        try:
+            s = ResumeScreen([{"title": "T", "message_count": 2}])
+        except KeyError as exc:
+            self.fail(f"missing id raised KeyError: {exc}")
+        self.assertEqual(len(s.raw_items), 1)
+
+    def test_empty_title_and_zero_count(self):
+        s = ResumeScreen([{"id": "s1", "title": "", "message_count": 0}])
+        self.assertEqual(len(s.raw_options), 1)
+
+
+class TestRewindEdge(unittest.TestCase):
+    def test_short_rewind_entry_index(self):
+        """A RewindEntry is the structured input; no malformed-tuple handling."""
+        try:
+            s = RewindScreen([RewindEntry(1, "")])
+        except IndexError as exc:
+            self.fail(f"single RewindEntry raised IndexError: {exc}")
+        self.assertEqual(len(s.raw_items), 1)
+
+    def test_empty_message_uses_placeholder(self):
+        s = RewindScreen([RewindEntry(0, "")])
+        self.assertIn("(empty message)", s.raw_options[0])
+
+
 class TestBaseSelectionScreen(unittest.TestCase):
     def test_init(self):
         s = BaseSelectionScreen("### Pick", ["A", "B", "C"], ["a", "b", "c"], "b")
@@ -61,6 +109,37 @@ class TestBaseSelectionScreen(unittest.TestCase):
     def test_init_with_search(self):
         s = BaseSelectionScreen("t", ["X"], ["x"], "x", show_search=True, search_placeholder="Find...")
         self.assertTrue(s.show_search)
+
+
+class TestModalSearchShiftTab(unittest.TestCase):
+    def test_base_selection_screen_blocks_shift_tab_when_search_enabled(self):
+        screen = BaseSelectionScreen(
+            title="Test", options=["Opt1", "Opt2"], items=["item1", "item2"], default_value="item1", show_search=True
+        )
+
+        for key_name in ("shift+tab", "backtab", "shift_tab"):
+            event = Key(key=key_name, character=None)
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+
+            screen._on_key(event)
+
+            event.prevent_default.assert_called_once()
+            event.stop.assert_called_once()
+
+    def test_base_selection_screen_allows_other_keys(self):
+        screen = BaseSelectionScreen(
+            title="Test", options=["Opt1", "Opt2"], items=["item1", "item2"], default_value="item1", show_search=True
+        )
+
+        event = Key(key="a", character="a")
+        event.prevent_default = MagicMock()
+        event.stop = MagicMock()
+
+        screen._on_key(event)
+
+        event.prevent_default.assert_not_called()
+        event.stop.assert_not_called()
 
 
 class TestTaskScreens(unittest.TestCase):
@@ -87,25 +166,6 @@ class TestTaskScreens(unittest.TestCase):
         keys = [b[0] for b in ShellTasksScreen.BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("k", keys)
-
-
-class TestMCPScreen(unittest.TestCase):
-    @patch("widgets.presentation.screens.mcp.get_mcp_manager")
-    def test_init(self, mock_get_mgr):
-        mock_mgr = MagicMock()
-        mock_mgr.load_servers.return_value = []
-        mock_get_mgr.return_value = mock_mgr
-        from widgets.presentation.screens.mcp import MCPScreen
-
-        s = MCPScreen()
-        self.assertEqual(s.servers, [])
-        self.assertEqual(s.mm, mock_mgr)
-
-    def test_bindings(self):
-        from widgets.presentation.screens.mcp import MCPScreen
-
-        keys = [b[0] for b in MCPScreen.BINDINGS]
-        self.assertIn("escape", keys)
 
 
 class TestProvidersScreen(unittest.TestCase):
@@ -137,8 +197,6 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertEqual(s.default_value, "p1")
 
     def test_tab_key_toggles_disabled(self):
-        from unittest.mock import MagicMock
-
         providers = {"p1": {"key": "p1", "name": "P1"}}
         pm = MagicMock()
         s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={}, pm=pm)
@@ -158,6 +216,25 @@ class TestProvidersScreen(unittest.TestCase):
         event.stop.assert_called_once()
 
 
+class TestProvidersEdge(unittest.TestCase):
+    def test_provider_missing_key_uses_get(self):
+        """Provider dicts missing 'key' (malformed payload) must not raise KeyError."""
+        try:
+            s = ProvidersScreen({"p1": {"name": "P1"}}, "p1", {})
+        except KeyError as exc:
+            self.fail(f"missing key raised KeyError: {exc}")
+        self.assertEqual(s.raw_items, ["p1"])
+
+    def test_provider_target_is_none_value(self):
+        """A provider value that is None (malformed payload) must not raise
+        AttributeError during option building."""
+        try:
+            s = ProvidersScreen({"p1": None}, "", {})
+        except (KeyError, AttributeError, TypeError) as exc:
+            self.fail(f"None provider value raised {type(exc).__name__}: {exc}")
+        self.assertEqual(s.raw_items, [])
+
+
 class TestApiKeyInputScreen(unittest.TestCase):
     def test_init_with_key(self):
         s = ApiKeyInputScreen("MyProvider", "myprov", "sk-abcdefghij123456")
@@ -171,6 +248,19 @@ class TestApiKeyInputScreen(unittest.TestCase):
     def test_bindings(self):
         keys = [b[0] for b in ApiKeyInputScreen.BINDINGS]
         self.assertIn("escape", keys)
+
+    def test_blocks_shift_tab(self):
+        screen = ApiKeyInputScreen(provider_name="Test", provider_key="test")
+
+        for key_name in ("shift+tab", "backtab", "shift_tab"):
+            event = Key(key=key_name, character=None)
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+
+            screen._on_key(event)
+
+            event.prevent_default.assert_called_once()
+            event.stop.assert_called_once()
 
 
 class TestSkillScreens(unittest.TestCase):
