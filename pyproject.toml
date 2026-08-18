@@ -60,6 +60,9 @@ minversion = "8.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+markers = [
+    "slow: timing-sensitive UI/latency tests, run serially via -m slow",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

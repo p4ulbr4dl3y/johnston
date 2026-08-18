@@ -2,9 +2,14 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app import JohnstonApp
 from core.base_provider import BaseAgent
 from widgets.presentation.widgets.chat_container import ChatView
+
+# Async-race / timing-sensitive UI tests — run serially via ``-m slow``.
+pytestmark = pytest.mark.slow
 
 
 def _configure_connected(app, stream_fn):

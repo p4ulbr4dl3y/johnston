@@ -8,8 +8,8 @@ Johnston: Python terminal AI assistant, Textual UI. Entry: `app.py` (app), `cli.
 
 - `uv run python cli.py` — CLI entry.
 - `uv run python app.py` — app during UI work.
-- `uv run pytest -n auto` — test suite, parallel (all cores).
-- `uv run coverage run -m pytest && uv run coverage report -m` — coverage (fail_under=90).
+- `uv run pytest -n auto -m "not slow"` — test suite, parallel (all cores). `slow` (timing-sensitive UI/latency) tests are excluded; run them serially as a separate stage: `uv run pytest -m slow`.
+- `uv run coverage run -m pytest && uv run coverage report -m` — coverage (fail_under=90). Note: this runs the full suite serially, including `slow` tests (takes longer); coverage threshold assumes all tests run.
 - `uv run ruff check .` — lint.
 - `uv build` — build artifacts.
 

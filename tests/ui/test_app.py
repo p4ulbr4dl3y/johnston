@@ -7,6 +7,8 @@ import types
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app import JohnstonApp
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
@@ -268,6 +270,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
                 self.assertFalse(app.is_generating)
                 self.assertEqual(len(app.message_queue), 0)
 
+    @pytest.mark.slow
     async def test_esc_key_cancellation_real_flow(self):
         import asyncio
         from unittest.mock import MagicMock, patch
