@@ -304,9 +304,9 @@ class CompactionMixin:
         if len(self.history) <= 4:
             return False, "History is too short to compact (<= 4 messages)"
 
-        from core.base_provider.tools import build_prompt_context
+        from core.base_provider.tools import build_prompt_context_async
 
-        _, _, sys_tokens = build_prompt_context(self)
+        _, _, sys_tokens = await build_prompt_context_async(self)
 
         tokens_before = (
             self.last_context_tokens
@@ -407,8 +407,8 @@ class CompactionMixin:
             "Generate the structured context handoff summary now based on the conversation history."
         )
 
-        from core.base_provider.tools import build_prompt_context
-        sys_prompt, all_tools, _ = build_prompt_context(self)
+        from core.base_provider.tools import build_prompt_context_async
+        sys_prompt, all_tools, _ = await build_prompt_context_async(self)
 
         compact_messages = (
             [{"role": "system", "content": sys_prompt}]

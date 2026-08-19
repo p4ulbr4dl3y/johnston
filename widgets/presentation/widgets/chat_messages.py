@@ -271,7 +271,18 @@ class BotMessage(Vertical):
                 is_at_bot = getattr(self.parent, "is_at_bottom", lambda: True)()
                 is_loading = getattr(self.parent, "_is_loading_session", False)
                 if is_at_bot and not is_loading:
-                    self.parent.call_after_refresh(self.parent.scroll_end, animate=False)
+                    parent = self.parent
+                    if not getattr(parent, "_scroll_pending", False):
+                        parent._scroll_pending = True
+
+                        def _do_scroll():
+                            try:
+                                parent._scroll_pending = False
+                                parent.scroll_end(animate=False)
+                            except Exception:
+                                pass
+
+                        parent.call_after_refresh(_do_scroll)
         except Exception:
             pass
 

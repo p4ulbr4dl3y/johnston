@@ -489,7 +489,7 @@ class SessionStore:
                 fpath = self._subagent_path(sess.parent_id, sess.id)
             else:
                 fpath = self._main_path(sess.id)
-            atomic_write_json(fpath, sess.to_dict(), indent=2)
+            atomic_write_json(fpath, sess.to_dict(), indent=None)
             self._sessions[sess.id] = sess
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess

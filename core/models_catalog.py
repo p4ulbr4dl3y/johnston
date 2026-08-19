@@ -81,7 +81,6 @@ class ModelsCatalog:
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
-        self.load_cache()
 
     def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -397,6 +396,8 @@ class ModelsCatalog:
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:
             return ""
+        if not self._names and not self._limits:
+            self.load_cache()
 
         suffix_tag = ""
         if ":" in model_id:

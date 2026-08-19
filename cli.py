@@ -204,7 +204,6 @@ def print_roles():
 def main():
     import argparse
 
-    from app import JohnstonApp
     from core.infrastructure.platform.logging_setup import setup_logging
 
     setup_logging()
@@ -246,6 +245,8 @@ def main():
     if args.rules:
         print_rules()
         sys.exit(0)
+
+    from app import JohnstonApp
 
     app = JohnstonApp(
         resume_session_id=args.resume,

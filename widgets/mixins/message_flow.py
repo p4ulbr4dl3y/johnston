@@ -287,7 +287,7 @@ class MessageFlowMixin:
             return
         try:
             reg = getattr(self, "_subagent_tools", None)
-            widget = reg.get(session_id) if isinstance(reg, dict) else None
+            widget = reg.pop(session_id, None) if isinstance(reg, dict) else None
             status_clean = (status or "").lower()
             if widget is not None:
                 if status_clean == "cancelled":
