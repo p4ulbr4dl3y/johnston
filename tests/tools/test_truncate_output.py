@@ -66,15 +66,26 @@ class TestTruncateOutput(unittest.TestCase):
 
         res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test")
         self.assertIn("Format: JSON.", res)
-        self.assertIn("inspect formatted JSON log", res)
+        self.assertIn("inspect formatted JSON", res)
 
-        log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
+        log_path = [word for word in res.split() if ".json" in word][0].rstrip(".")
         with open(log_path, "r", encoding="utf-8") as f:
             log_content = f.read()
 
-        # Verify saved log was pretty-printed into multiple lines
+        # Verify saved file was pretty-printed into multiple lines and has .json extension
         self.assertIn("\n", log_content)
+        self.assertTrue(log_path.endswith(".json"))
         self.assertEqual(json.loads(log_content), large_json_dict)
+
+    def test_truncate_output_custom_extension(self):
+        text = "# Markdown Title\n" + ("content " * 500)
+        res = truncate_output(text, max_chars=50, tool_name="web_fetch", ext=".md")
+        self.assertIn(".md", res)
+        path = [word for word in res.split() if ".md" in word][0].rstrip(".")
+        self.assertTrue(os.path.exists(path))
+        self.assertTrue(path.endswith(".md"))
+        with open(path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), text)
 
     def test_truncate_output_clips_log_at_max_size(self):
         import unittest.mock as mock

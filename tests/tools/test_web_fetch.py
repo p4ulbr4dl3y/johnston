@@ -244,6 +244,26 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"url": "https://example.com/data.xlsx"}))
         self.assertIn("PK\x03\x04 fake xlsx", res)
 
+    @patch("httpx.AsyncClient")
+    async def test_truncation_saves_md_by_default(self, mock_client_cls):
+        body = b"<h1>Title</h1>" + (b"<p>paragraph</p>" * 1000)
+        mock_client_cls.return_value = _make_stream_client(body, "text/html")
+
+        tool = WebFetchTool()
+        res = str(await tool.execute({"url": "https://example.com/page"}))
+        self.assertIn("Full output saved to", res)
+        self.assertIn(".md", res)
+
+    @patch("httpx.AsyncClient")
+    async def test_truncation_raw_html_saves_html(self, mock_client_cls):
+        body = b"<div>" + (b"long raw html content " * 1000) + b"</div>"
+        mock_client_cls.return_value = _make_stream_client(body, "text/html")
+
+        tool = WebFetchTool()
+        res = str(await tool.execute({"url": "https://example.com/raw_page", "raw": True}))
+        self.assertIn("Full output saved to", res)
+        self.assertIn(".html", res)
+
 
 if __name__ == "__main__":
     unittest.main()

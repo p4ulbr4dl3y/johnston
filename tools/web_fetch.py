@@ -209,14 +209,33 @@ class WebFetchTool(BaseTool):
                     # _convert_content_to_md_sync (which accepts one), so a cancelled
                     # fetch aborts the subprocess/worker promptly without explicit wiring.
                     text_content = await run_cancellable(_convert_content_to_md_sync, content_bytes, suffix)
-                    text_content = _sanitize_web_content(text_content)
                 except Exception:
                     text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
+
+        if raw_mode:
+            if "json" in content_type:
+                out_ext = ".json"
+            elif "html" in content_type:
+                out_ext = ".html"
+            elif "xml" in content_type:
+                out_ext = ".xml"
+            elif "csv" in content_type:
+                out_ext = ".csv"
+            else:
+                out_ext = ".txt"
+        else:
+            if "json" in content_type:
+                out_ext = ".json"
+            elif "text/plain" in content_type:
+                out_ext = ".txt"
+            else:
+                out_ext = ".md"
 
         return ToolResult.done(
             truncate_output(
                 text_content,
                 max_chars=8000,
                 tool_name="web_fetch",
+                ext=out_ext,
             )
         )

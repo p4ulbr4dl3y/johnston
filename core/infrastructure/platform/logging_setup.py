@@ -33,13 +33,15 @@ _NOISY_LOGGER_NAMES = (
     "PIL",
 )
 
+SNAPSHOT_EXTENSIONS = (".log", ".txt", ".md", ".json", ".html", ".xml", ".csv")
+
 _configured = False
 
 
 def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: int = MAX_LOG_AGE_DAYS) -> int:
-    """Remove stale per-tool/task log files under ``logs_dir``.
+    """Remove stale per-tool/task snapshot files under ``logs_dir``.
 
-    Deletes ``*.log`` files whose mtime is older than ``max_age_days``. The app
+    Deletes snapshot files whose mtime is older than ``max_age_days``. The app
     log (``johnston.log``) and its rotations are always preserved: the rotating
     handler keeps an open handle, and unlinking it would silently drop new
     records (writes land in the unlinked inode). Returns the number of removed
@@ -50,7 +52,7 @@ def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: int = MAX_LOG_AGE_DAYS)
     cutoff = time.time() - max_age_days * 24 * 3600
     removed = 0
     for name in os.listdir(logs_dir):
-        if not name.endswith(".log") or name.startswith("johnston.log"):
+        if not name.endswith(SNAPSHOT_EXTENSIONS) or name.startswith("johnston.log"):
             continue
         path = os.path.join(logs_dir, name)
         try:

@@ -16,6 +16,7 @@ __all__ = [
     "try_int",
     "get_fuzzy_matches",
     "truncate_output",
+    "_write_output_log",
     "format_background_notification",
     "execute_mcp_tool",
     "check_mcp_role_policy",
@@ -103,8 +104,8 @@ def _schedule_background(coro: Any) -> None:
 MAX_SNAPSHOT_LOG_BYTES = 50 * 1024 * 1024
 
 
-def _write_output_log(log_content: str, *, tool_name: str = "") -> Optional[str]:
-    """Writes full output to a unique log file under LOGS_DIR and returns its path.
+def _write_output_log(log_content: str, *, tool_name: str = "", ext: str = ".log") -> Optional[str]:
+    """Writes full output to a unique snapshot file under LOGS_DIR and returns its path.
 
     Returns None if logging is skipped (empty content) or the write fails.
     Runs the blocking ``os.makedirs``/``open().write()`` off the event loop via
@@ -119,7 +120,7 @@ def _write_output_log(log_content: str, *, tool_name: str = "") -> Optional[str]
 
     from core.infrastructure.tasks.output import make_log_path
 
-    log_path = make_log_path(tool_name or "tool", unique=True)
+    log_path = make_log_path(tool_name or "tool", unique=True, ext=ext)
     if not log_path:
         return None
 
@@ -148,8 +149,9 @@ def truncate_output(
     save_log: bool = True,
     tool_name: str = "",
     from_end: bool = False,
+    ext: Optional[str] = None,
 ) -> str:
-    """Truncates text safely if it exceeds max_chars, saving full output to a unique log file."""
+    """Truncates text safely if it exceeds max_chars, saving full output to a unique file."""
     if len(text) <= max_chars:
         return text
 
@@ -171,9 +173,11 @@ def truncate_output(
         except Exception:
             pass
 
+    file_ext = ext if ext is not None else (".json" if is_json else ".log")
+
     log_path = None
     if save_log:
-        log_path = _write_output_log(log_content, tool_name=tool_name)
+        log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext)
 
     format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
 
@@ -185,11 +189,11 @@ def truncate_output(
             if format_desc:
                 header += f" {format_desc}"
             if is_json:
-                header += " Use read tool or shell (jq/grep) to inspect formatted JSON log."
+                header += " Use read tool or shell (jq/grep) to inspect formatted JSON."
             elif "\n" not in text:
-                header += " Log is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full log."
+                header += " Output is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full output."
             else:
-                header += " Use read tool or shell (grep/head/tail) to inspect or filter full log."
+                header += " Use read tool or shell (grep/head/tail) to inspect or filter full output."
         if hint:
             header += f" {hint}"
         header += "]\n...\n"
@@ -205,11 +209,11 @@ def truncate_output(
             if format_desc:
                 footer += f" {format_desc}"
             if is_json:
-                footer += " Use read tool or shell (jq/grep) to inspect formatted JSON log."
+                footer += " Use read tool or shell (jq/grep) to inspect formatted JSON."
             elif "\n" not in text:
-                footer += " Log is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full log."
+                footer += " Output is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full output."
             else:
-                footer += f" Use read tool (start_line={next_line}) or shell (grep/head/tail) to inspect remaining log."
+                footer += f" Use read tool (start_line={next_line}) or shell (grep/head/tail) to inspect remaining output."
         if hint:
             footer += f" {hint}"
         footer += "]"

@@ -307,6 +307,32 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         args, kwargs = mock_web_execute.call_args
         self.assertEqual(args[0], {"url": "https://example.com/page.html", "raw": False})
 
+    @patch("tools.read.convert_doc_to_markdown_sync")
+    async def test_read_doc_truncation_saves_markdown_snapshot(self, mock_convert):
+        long_md = "\n".join([f"# Header {i}\nParagraph content line {i}" for i in range(1, 600)])
+        mock_convert.return_value = long_md
+
+        tool = ReadTool()
+        file_path = os.path.join(self.test_dir, "large_report.pdf")
+        with open(file_path, "wb") as f:
+            f.write(b"%PDF-1.4 dummy")
+
+        res = str(await tool.execute({"path": file_path}))
+
+        self.assertIn("Full converted Markdown saved to", res)
+        self.assertIn(".md", res)
+        self.assertIn("Use shell (grep/head/tail) to inspect", res)
+
+        import asyncio
+
+        await asyncio.sleep(0.05)
+
+        # Extract path and verify file exists on disk
+        saved_path = [w for w in res.split() if w.endswith(".md") or ".md." in w][0].rstrip(".").rstrip("]")
+        self.assertTrue(os.path.exists(saved_path))
+        with open(saved_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), long_md)
+
 
 if __name__ == "__main__":
     unittest.main()

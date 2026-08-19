@@ -391,6 +391,16 @@ def test_make_log_path_caps_long_prefix(monkeypatch, tmp_path):
     assert len(base) == _out.MAX_LOG_PREFIX_CHARS + len(".log")
 
 
+def test_make_log_path_custom_extension(monkeypatch, tmp_path):
+    import core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    path_md = _out.make_log_path("doc", ext=".md")
+    assert path_md.endswith(".md")
+    path_json = _out.make_log_path("data", unique=False, ext="json")
+    assert path_json == os.path.join(str(tmp_path), "data.json")
+
+
 @pytest.mark.asyncio
 async def test_task_kind_literals():
     assert ("shell",) == TASK_KINDS

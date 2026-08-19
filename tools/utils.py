@@ -40,6 +40,7 @@ def format_line_pagination(
     path: str = "",
     total_lines: int | None = None,
     window_start: int | None = None,
+    converted_path: str | None = None,
 ) -> str:
     """Formats lines with 1-based line numbers and paginates by start_line/end_line range.
 
@@ -122,6 +123,8 @@ def format_line_pagination(
         hint_text = f"\n[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]"
         if actual_end < end:
             hint_text += f" [Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]"
+        if converted_path:
+            hint_text += f" [Full converted Markdown saved to {converted_path}. Use shell (grep/head/tail) to inspect or filter full output.]"
         header += hint_text
 
     return f"{header}\n{result_body}"

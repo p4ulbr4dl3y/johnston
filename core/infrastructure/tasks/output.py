@@ -125,16 +125,17 @@ def tail_output(text: str, max_chars: int = 2000) -> str:
 MAX_LOG_PREFIX_CHARS = 40
 
 
-def make_log_path(prefix: str = "", unique: bool = True) -> Optional[str]:
-    """Build a log path under LOGS_DIR for a ``prefix``.
+def make_log_path(prefix: str = "", unique: bool = True, ext: str = ".log") -> Optional[str]:
+    """Build a log/snapshot path under LOGS_DIR for a ``prefix``.
 
-    Single naming scheme: ``{prefix}-{hex4}.log`` when ``unique`` is True,
-    else ``{prefix}.log``. Prefix is sanitized (slashes -> underscores) and
+    Single naming scheme: ``{prefix}-{hex4}{ext}`` when ``unique`` is True,
+    else ``{prefix}{ext}``. Prefix is sanitized (slashes -> underscores) and
     capped at ``MAX_LOG_PREFIX_CHARS``. Returns None if the directory could not
     be created / path is unusable.
     """
+    ext = ("." + ext.lstrip(".")) if ext else ".log"
     prefix = re.sub(r"[/\\]+", "_", (prefix or "task").strip())[:MAX_LOG_PREFIX_CHARS] or "task"
-    filename = prefix + (f"-{uuid.uuid4().hex[:4]}" if unique else "") + ".log"
+    filename = prefix + (f"-{uuid.uuid4().hex[:4]}" if unique else "") + ext
     log_path = os.path.join(LOGS_DIR, filename)
     try:
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -261,31 +262,31 @@ MAX_SUBAGENT_RESULT_CHARS = 15000
 
 def truncate_subagent_result(text: str, session_id: str = "") -> str:
     """Clip a subagent's final result so a verbose subagent does not flood the
-    parent agent's context with a huge <task_result> block. The full session log
+    parent agent's context with a huge <task_result> block. The full session output
     is saved on truncation and the path is returned in the hint.
     """
     text = (text or "").strip()
     if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
         return text
 
-    log_path = _write_result_log(text, session_id=session_id or "subagent") or "log file"
+    log_path = _write_result_log(text, session_id=session_id or "subagent", ext=".md") or "output file"
     truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
     shown_lines = truncated.count("\n") + (1 if truncated else 0)
     next_line = shown_lines + 1
     return (
         truncated
-        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full log saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
+        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full output saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
     )
 
 
-def _write_result_log(content: str, *, session_id: str = "") -> Optional[str]:
-    """Writes full output to a unique log file under LOGS_DIR and returns its path.
+def _write_result_log(content: str, *, session_id: str = "", ext: str = ".md") -> Optional[str]:
+    """Writes full output to a unique file under LOGS_DIR and returns its path.
 
     Returns None if logging is skipped (empty content) or the write fails.
     """
     if not (content or "").strip():
         return None
-    log_path = make_log_path(session_id or "subagent")
+    log_path = make_log_path(session_id or "subagent", ext=ext)
     if not log_path:
         return None
     try:

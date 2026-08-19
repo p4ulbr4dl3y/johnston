@@ -336,11 +336,16 @@ class ReadTool(BaseTool):
             except Exception as e:
                 return ToolResult.error("image", detail=str(e), name=path)
 
+        converted_path = None
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
             try:
                 md_text = await run_cancellable(convert_doc_to_markdown_sync, path)
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
+                from tools.base import _write_output_log
+
+                base_name = os.path.splitext(os.path.basename(path))[0]
+                converted_path = _write_output_log(md_text, tool_name=f"read_{base_name}", ext=".md")
             except Exception as e:
                 return ToolResult.error("doc", detail=str(e), name=path)
         else:
@@ -414,5 +419,6 @@ class ReadTool(BaseTool):
                 window_start=window_start,
                 max_chars=100000,
                 path=path,
+                converted_path=converted_path,
             )
         )

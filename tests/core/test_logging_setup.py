@@ -15,19 +15,25 @@ def touch(path: str, age_days: float) -> None:
 
 
 def test_cleanup_logs_removes_only_stale_snapshots(tmp_path):
-    stale = str(tmp_path / "web_fetch_aa11.log")
+    stale_log = str(tmp_path / "shell_aa11.log")
+    stale_md = str(tmp_path / "web_fetch_aa11.md")
+    stale_json = str(tmp_path / "mcp_bb22.json")
     fresh = str(tmp_path / "shell_bb22.log")
     johnston = str(tmp_path / "johnston.log")
     rotation = str(tmp_path / "johnston.log.1")
-    touch(stale, age_days=30)
+    touch(stale_log, age_days=30)
+    touch(stale_md, age_days=30)
+    touch(stale_json, age_days=30)
     touch(fresh, age_days=0)
     touch(johnston, age_days=30)  # stale but must survive (open handle)
     touch(rotation, age_days=30)
 
     removed = cleanup_logs(str(tmp_path), max_age_days=7)
 
-    assert removed == 1
-    assert not os.path.exists(stale)
+    assert removed == 3
+    assert not os.path.exists(stale_log)
+    assert not os.path.exists(stale_md)
+    assert not os.path.exists(stale_json)
     assert os.path.exists(fresh)
     assert os.path.exists(johnston)
     assert os.path.exists(rotation)
@@ -37,8 +43,8 @@ def test_cleanup_logs_missing_dir_returns_zero(tmp_path):
     assert cleanup_logs(str(tmp_path / "nope"), max_age_days=7) == 0
 
 
-def test_cleanup_logs_ignores_non_log_files(tmp_path):
-    other = tmp_path / "notes.txt"
+def test_cleanup_logs_ignores_non_snapshot_files(tmp_path):
+    other = tmp_path / "notes.bin"
     stale_log = tmp_path / "mcp_big_data_zz.log"
     touch(other, age_days=30)
     touch(stale_log, age_days=30)
