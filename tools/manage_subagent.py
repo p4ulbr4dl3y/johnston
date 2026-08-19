@@ -8,7 +8,10 @@ from tools.base import BaseTool
 
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
-    description = "Interact with active subagents (list, kill, or send follow-up message)."
+    description = (
+        "Manage subagents: list active sessions, kill running tasks, or send follow-up messages. "
+        "Follow-ups resume finished agents or queue if busy."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -16,11 +19,20 @@ class ManageSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "kill", "send_message"]},
-                    "session_id": {"type": "string", "description": "Target subagent session_id"},
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "kill", "send_message"],
+                        "description": "Action to perform",
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Subagent session_id (required for 'kill' and 'send_message')",
+                    },
                     "message": {
                         "type": "string",
-                        "description": "Follow-up message for subagent. Resumes in background; delivers result via System Notification.",
+                        "description": (
+                            "Follow-up text for 'send_message' (queues if running, resumes if completed)"
+                        ),
                     },
                 },
                 "required": ["action"],

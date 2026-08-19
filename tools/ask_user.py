@@ -27,7 +27,10 @@ def _sort_recommended_first(options: list[str]) -> list[str]:
 
 class AskUserTool(BaseTool):
     name = "ask_user"
-    description = "Ask the user questions with options and write-in answers. Use when intent is ambiguous."
+    description = (
+        "Ask interactive multiple-choice questions when requirements or design decisions are ambiguous. "
+        "Include '(Recommended)' prefix on suggested choices."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -37,15 +40,17 @@ class AskUserTool(BaseTool):
                 "properties": {
                     "questions": {
                         "type": "array",
-                        "description": "List of questions with pre-defined options and write-in choices",
+                        "description": "List of questions to ask the user",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "question_text": {"type": "string", "description": "Main question"},
+                                "question_text": {"type": "string", "description": "Question text"},
                                 "options": {
                                     "type": "array",
                                     "items": {"type": "string"},
-                                    "description": "List of selectable options. If recommending an option, mark it with '(Recommended)'.",
+                                    "description": (
+                                        "Selectable options (prefix recommended option with '(Recommended)')"
+                                    ),
                                 },
                             },
                             "required": ["question_text", "options"],

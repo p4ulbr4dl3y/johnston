@@ -222,7 +222,9 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
 
 class ReadTool(BaseTool):
     name = "read"
-    description = f"Read files (max {DEFAULT_LINE_WINDOW} lines). Auto-converts PDF/DOCX to Markdown, supports images."
+    description = (
+        f"Read file contents (text, images, PDF/DOCX/XLSX). Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -230,14 +232,18 @@ class ReadTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "Absolute or relative file path"},
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
                     "content_offset": {
                         "type": "integer",
-                        "description": "Byte offset (only for single-line or huge binary/log files)",
+                        "description": "Byte offset for large files without line breaks",
                     },
-                    "detail": {"type": "string", "description": "Image detail: high (default), low, original"},
+                    "detail": {
+                        "type": "string",
+                        "enum": ["high", "low", "original"],
+                        "description": "Image detail level (default: high)",
+                    },
                 },
                 "required": ["path"],
             },

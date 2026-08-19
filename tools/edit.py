@@ -378,7 +378,10 @@ async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], 
 
 class EditTool(BaseTool):
     name = "edit"
-    description = "Replace a single contiguous code block in a file."
+    description = (
+        "Replace one contiguous block in a file. For multiple edits in the same file, use 'multi_edit'. "
+        "Set 'start_line'/'end_line' if 'old_str' is not unique."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -386,12 +389,12 @@ class EditTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
-                    "old_str": {"type": "string", "description": "Code block to replace"},
-                    "new_str": {"type": "string", "description": "New code block"},
+                    "path": {"type": "string", "description": "Absolute or relative file path"},
+                    "old_str": {"type": "string", "description": "Exact text to replace"},
+                    "new_str": {"type": "string", "description": "New replacement text"},
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"},
+                    "allow_multiple": {"type": "boolean", "description": "Replace all occurrences (default: false)"},
                 },
                 "required": ["path", "old_str", "new_str"],
             },
@@ -416,7 +419,10 @@ class EditTool(BaseTool):
 
 class MultiEditTool(BaseTool):
     name = "multi_edit"
-    description = "Replace multiple non-contiguous code blocks in one file."
+    description = (
+        "Atomically replace multiple non-overlapping blocks in one file in a single call. "
+        "Prefer over multiple 'edit' calls. Chunks must not overlap."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -424,7 +430,7 @@ class MultiEditTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "File path"},
+                    "path": {"type": "string", "description": "Absolute or relative file path"},
                     "edits": {
                         "type": "array",
                         "description": "List of edit chunks",
@@ -432,11 +438,15 @@ class MultiEditTool(BaseTool):
                             "type": "object",
                             "properties": {
                                 "old_str": {"type": "string", "description": "Exact text to replace"},
-                                "new_str": {"type": "string", "description": "New code block"},
+                                "new_str": {"type": "string", "description": "New replacement text"},
                                 "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                                 "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                                "allow_multiple": {"type": "boolean", "description": "Allow multiple matches"},
+                                "allow_multiple": {
+                                    "type": "boolean",
+                                    "description": "Replace all occurrences (default: false)",
+                                },
                             },
+                            "required": ["old_str", "new_str"],
                         },
                     },
                 },

@@ -65,7 +65,10 @@ def _truncate_output(res: str) -> str:
 
 class ShellTool(BaseTool):
     name = "shell"
-    description = "Run a terminal command synchronously or in the background (background: true)."
+    description = (
+        "Execute non-interactive shell commands. For long-running servers/tasks set background=true "
+        "(notifies automatically on completion; manage via 'manage_shell')."
+    )
 
     schema = {
         "type": "function",
@@ -76,12 +79,15 @@ class ShellTool(BaseTool):
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Terminal command to run (relative to cwd)",
+                        "description": "Shell command to run",
                     },
-                    "timeout": {"type": "integer", "description": "Timeout in seconds (default 120, max 600)"},
+                    "timeout": {"type": "integer", "description": "Timeout in seconds (default: 120, max: 600)"},
                     "background": {
                         "type": "boolean",
-                        "description": "Run asynchronously in background; completion arrives via System Notification",
+                        "description": (
+                            "Run in background. Returns task_id and live log path; "
+                            "completion notifies automatically (default: false)"
+                        ),
                     },
                 },
                 "required": ["command"],

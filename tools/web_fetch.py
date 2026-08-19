@@ -86,7 +86,7 @@ async def _guard_request(req: "httpx.Request") -> None:
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch a URL. Converts HTML/PDF/DOCX to Markdown. raw returns raw text."
+    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents to Markdown."
 
     schema = {
         "type": "function",
@@ -95,8 +95,11 @@ class WebFetchTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "HTTP or HTTPS URL to fetch"},
-                    "raw": {"type": "boolean", "description": "Skip Markdown conversion, return raw response"},
+                    "url": {"type": "string", "description": "HTTP or HTTPS URL"},
+                    "raw": {
+                        "type": "boolean",
+                        "description": "Return raw response without Markdown conversion (default: false)",
+                    },
                 },
                 "required": ["url"],
             },

@@ -7,7 +7,7 @@ from tools.base import BaseTool
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Interact with active background processes (send stdin or kill)."
+    description = "Manage background shell processes: list running tasks, send stdin input, or kill."
     schema = {
         "type": "function",
         "function": {
@@ -15,9 +15,19 @@ class ManageShellTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["list", "send_input", "kill"]},
-                    "task_id": {"type": "string", "description": "Background task ID"},
-                    "input": {"type": "string", "description": "Input text for send_input"},
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "send_input", "kill"],
+                        "description": "Action to perform",
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": "Background task_id (required for 'send_input' and 'kill')",
+                    },
+                    "input": {
+                        "type": "string",
+                        "description": "Input text to write to process stdin (required for 'send_input')",
+                    },
                 },
                 "required": ["action"],
             },

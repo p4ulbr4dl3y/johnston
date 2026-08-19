@@ -7,11 +7,11 @@ from tools.base import BaseTool
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Track task checklist. Rules: "
-        "1) Steps short (<=7 words). "
-        "2) Exactly one 'in_progress' step. "
-        "3) Update BEFORE executing next step actions. "
-        "4) Do not repeat plan in chat."
+        "Update multi-step plan checklist. Rules: "
+        "1) Short steps (<=7 words). "
+        "2) Exactly one 'in_progress' step at a time. "
+        "3) Update BEFORE executing step actions. "
+        "4) Do not repeat plan in response text."
     )
     schema = {
         "type": "function",
@@ -20,14 +20,14 @@ class UpdatePlanTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "explanation": {"type": "string", "description": "Why plan changed (optional)"},
+                    "explanation": {"type": "string", "description": "Optional reason for plan update"},
                     "plan": {
                         "type": "array",
-                        "description": "Full ordered checklist",
+                        "description": "Full ordered list of all steps",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "step": {"type": "string", "description": "Short step (<=7 words)"},
+                                "step": {"type": "string", "description": "Short step title (<=7 words)"},
                                 "status": {
                                     "type": "string",
                                     "enum": ["pending", "in_progress", "completed"],

@@ -65,10 +65,8 @@ def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        f"Launch an autonomous subagent in the background for a bounded subtask (max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
-        "Returns session_id immediately. When finished, final output is delivered automatically via a "
-        "[System Notification] message. branch='<name>' runs on that git branch (main tree if matching current branch, "
-        "otherwise in an isolated worktree)."
+        "Launch an autonomous subagent in the background for a bounded task. "
+        "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
     )
     schema = {
         "type": "function",
@@ -79,16 +77,18 @@ class InvokeSubagentTool(BaseTool):
                 "properties": {
                     "prompt": {
                         "type": "string",
-                        "description": "Task prompt with relative paths, boundaries, output format",
+                        "description": "Task instructions with clear boundaries and expected output format",
                     },
-                    "description": {"type": "string", "description": "Short summary (3-5 words)"},
+                    "description": {"type": "string", "description": "Short task title (3-5 words)"},
                     "type": {
                         "type": "string",
-                        "description": "Subagent role/type (e.g. 'worker' [default], 'explorer')",
+                        "description": "Subagent role name from available roles (default: 'worker')",
                     },
                     "branch": {
                         "type": "string",
-                        "description": "Git branch to work on. If it matches the current branch, the subagent works in the main tree; otherwise it runs in an isolated worktree on that branch (created if missing).",
+                        "description": (
+                            "Git branch name. Use distinct branches for parallel write tasks to isolate worktrees."
+                        ),
                     },
                 },
                 "required": ["prompt", "description", "branch"],

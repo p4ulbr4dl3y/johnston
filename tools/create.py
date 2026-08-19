@@ -9,7 +9,10 @@ from tools.cancel import run_cancellable
 
 class CreateTool(BaseTool):
     name = "create"
-    description = "Create or update a file with content. Creates parent dirs automatically."
+    description = (
+        "Create a new file or overwrite an existing file. Automatically creates parent directories. "
+        "For partial edits in existing files, use 'edit' or 'multi_edit'."
+    )
     schema = {
         "type": "function",
         "function": {
@@ -18,7 +21,7 @@ class CreateTool(BaseTool):
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Absolute or relative file path"},
-                    "content": {"type": "string", "description": "Full file content"},
+                    "content": {"type": "string", "description": "Full content of the file"},
                 },
                 "required": ["path", "content"],
             },
