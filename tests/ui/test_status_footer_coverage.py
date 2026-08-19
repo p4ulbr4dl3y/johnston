@@ -32,6 +32,7 @@ _mcp_mgr_patch = "core.infrastructure.mcp.get_mcp_manager"
 
 
 class TestStatusFooterCoverage(unittest.TestCase):
+    @pytest.mark.skipif(os.name == "nt", reason="Windows symlink resolution requires target existence and special privileges")
     def test_format_display_path_symlink_into_home(self):
         home = os.path.realpath(os.path.expanduser("~"))
         target = os.path.join(home, "johnston")
