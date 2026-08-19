@@ -319,6 +319,12 @@ async def generate_ai_response(
     except Exception as e:  # noqa: BLE001
         canvas.notify(f"Generation failed: {e}", severity="error")
     finally:
+        if thinking_handle is not None and getattr(thinking_handle, "is_thinking", False):
+            try:
+                duration = time.time() - start_time
+                thinking_handle.finish_thinking(duration)
+            except Exception:  # noqa: BLE001
+                pass
         if bot_handle is not None and not getattr(bot_handle, "content", "").strip():
             try:
                 bot_handle.remove()

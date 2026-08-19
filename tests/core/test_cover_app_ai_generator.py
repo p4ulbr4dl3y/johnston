@@ -328,3 +328,24 @@ async def test_interruption_finalize_stream_error_swallowed():
     agent = _FakeAgent(stream)
     with pytest.raises(asyncio.CancelledError):
         await generate_ai_response(agent, _fake_session(), canvas, session_id="s1", user_text="hi")
+
+
+@pytest.mark.asyncio
+async def test_generation_failure_during_thinking_finishes_thinking_widget():
+    thinking = MagicMock(is_thinking=True, finish_thinking=MagicMock())
+    canvas = _canvas(
+        add_thinking_widget=AsyncMock(return_value=thinking),
+    )
+
+    async def stream(prompt, attachments=None):
+        yield ("thinking_start", "thinking...")
+        yield ("thinking_delta", "analyzing...")
+        raise ConnectionError("connection dropped")
+
+    agent = _FakeAgent(stream)
+    session = _fake_session()
+    await generate_ai_response(agent, session, canvas, session_id="s1", user_text="hi")
+
+    thinking.finish_thinking.assert_called_once()
+    canvas.notify.assert_called_once()
+
