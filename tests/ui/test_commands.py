@@ -82,6 +82,7 @@ class MockApp:
         self.notified = []
         self.status_refreshed = False
         self.ai_prompts = []
+        self.ai_kwargs = []
         self.chat_view = MockChatView()
         self.task_manager = TaskManager()
 
@@ -94,11 +95,15 @@ class MockApp:
     def save_current_session(self):
         pass
 
-    def generate_ai_response(self, prompt: str, show_in_ui: bool = True):
+    def generate_ai_response(self, prompt: str, show_in_ui: bool = True, **kwargs):
         self.ai_prompts.append((prompt, show_in_ui))
+        if hasattr(self, "ai_kwargs"):
+            self.ai_kwargs.append(kwargs)
 
-    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False):
+    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, **kwargs):
         self.ai_prompts.append((prompt, show_in_ui))
+        if hasattr(self, "ai_kwargs"):
+            self.ai_kwargs.append(kwargs)
 
     def push_screen(self, screen, callback=None):
         self.pushed_screen = screen
@@ -548,7 +553,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
-        self.assertFalse(show_in_ui)
+        self.assertTrue(show_in_ui)
+        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/init")
         self.assertIn('<SKILL path=', prompt)
 
     async def test_multiple_skills_command(self):
@@ -557,7 +563,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
-        self.assertFalse(show_in_ui)
+        self.assertTrue(show_in_ui)
+        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/init /handoff analyze project")
         self.assertIn('<SKILL path=', prompt)
         self.assertIn('<SKILL path=', prompt)
         self.assertIn("User request: analyze project", prompt)

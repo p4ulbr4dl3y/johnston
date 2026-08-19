@@ -118,6 +118,17 @@ class TestSessionPersistence(unittest.IsolatedAsyncioTestCase):
         cv.call_after_refresh.assert_called()  # exception swallowed (98-99)
         self.assertEqual(host.footer_refreshed, 1)
 
+    async def test_load_session_ui_restores_display_text(self):
+        cv = _fake_chat_view()
+        msgs = [
+            {"type": "user", "text": "full prompt with skill...", "display_text": "/caveman test", "show_in_ui": True},
+        ]
+        sess = _session(messages=msgs)
+        host = _PersistHost(sess, chat_view=cv)
+        SessionPersistenceMixin.load_session_ui(host, "s1")
+        await host.run_worker_coro
+        cv.add_user_message.assert_awaited_once_with("/caveman test", animate=False, attachments_count=0)
+
     async def test_load_session_ui_inner_exception(self):
         cv = _fake_chat_view()
         cv.children = [MagicMock() for _ in range(5)]

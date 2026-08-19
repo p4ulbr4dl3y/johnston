@@ -527,9 +527,10 @@ class SessionStore:
     @staticmethod
     def _title_from_messages(sess: AgentSession) -> str:
         for m in sess.messages:
-            if isinstance(m, dict) and m.get("type") == "user" and m.get("text"):
-                text = str(m["text"])
-                return text[:30] + "..." if len(text) > 30 else text
+            if isinstance(m, dict) and m.get("type") == "user":
+                text = str(m.get("display_text") or m.get("text", "")).strip()
+                if text:
+                    return text[:30] + "..." if len(text) > 30 else text
         return "Untitled"
 
     @staticmethod

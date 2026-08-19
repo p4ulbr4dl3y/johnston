@@ -494,12 +494,24 @@ class CompactCommand(BaseCommand):
             if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):
                 next_item = app._pop_queued_for_current_session()
                 if next_item is not None:
-                    asyncio.create_task(app._process_queued_message(next_item[0], next_item[1], next_item[2]))
+                    kw = {}
+                    if len(next_item) > 4 and next_item[4]:
+                        kw["display_text"] = next_item[4]
+                    asyncio.create_task(
+                        app._process_queued_message(
+                            next_item[0],
+                            next_item[1],
+                            next_item[2],
+                            **kw,
+                        )
+                    )
             elif getattr(app, "message_queue", None):
                 next_item = app.message_queue.pop(0)
                 prompt = next_item[0]
                 show_in_ui = next_item[1] if len(next_item) > 1 else True
                 kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
+                if len(next_item) > 4 and next_item[4]:
+                    kwargs["display_text"] = next_item[4]
                 if hasattr(app, "trigger_ai_response"):
                     app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 

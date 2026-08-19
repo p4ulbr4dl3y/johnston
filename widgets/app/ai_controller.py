@@ -45,6 +45,7 @@ async def run_ai_generation(
     show_in_ui: bool,
     attachments: Optional[list] = None,
     project_path: Optional[str] = None,
+    display_text: Optional[str] = None,
 ) -> None:
     """Thin wrapper over the generation engine, forwarding the call unchanged.
 
@@ -61,4 +62,5 @@ async def run_ai_generation(
         show_in_ui=show_in_ui,
         attachments=attachments,
         project_path=project_path,
+        display_text=display_text,
     )

@@ -121,15 +121,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
         else:
             prompt = f"The following skill(s) have been invoked:\n\n{skills_content}"
 
-        try:
-            from widgets.presentation.widgets.chat_container import ChatView
-
-            chat_view = app.query_one(ChatView)
-
-            asyncio.create_task(chat_view.add_user_message(command_text))
-            app.trigger_ai_response(prompt, show_in_ui=False)
-        except Exception:
-            app.trigger_ai_response(prompt, show_in_ui=True)
+        app.trigger_ai_response(prompt, show_in_ui=True, display_text=command_text)
         return True
 
     return False

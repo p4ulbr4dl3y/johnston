@@ -47,10 +47,17 @@ class MessageFlowMixin:
         except Exception as e:
             self.notify(f"Command execution failed: {e}", severity="error")
 
-    def _queue_message_ui(self, prompt: str, show_in_ui: bool = True, attachments: list = None) -> None:
+    def _queue_message_ui(
+        self, prompt: str, show_in_ui: bool = True, attachments: list = None, display_text: str = None
+    ) -> None:
         """Queue message to be executed after current generation finishes."""
         curr_sid = getattr(self, "current_session_id", None)
-        item = (prompt, show_in_ui, attachments, curr_sid) if attachments else (prompt, show_in_ui, None, curr_sid)
+        if display_text:
+            item = (prompt, show_in_ui, attachments, curr_sid, display_text)
+        elif attachments:
+            item = (prompt, show_in_ui, attachments, curr_sid)
+        else:
+            item = (prompt, show_in_ui, None, curr_sid)
         self.message_queue.append(item)
         if show_in_ui:
             try:
@@ -81,17 +88,24 @@ class MessageFlowMixin:
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
 
-    def trigger_ai_response(self, prompt: str, show_in_ui: bool = False, attachments: list = None) -> None:
+    def trigger_ai_response(
+        self, prompt: str, show_in_ui: bool = False, attachments: list = None, **kwargs
+    ) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
         if getattr(self, "is_generating", False):
-            self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments)
+            self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
         else:
             self.is_generating = True
-            kwargs = {"attachments": attachments} if attachments else {}
-            self.generate_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
+            kw = {}
+            if attachments:
+                kw["attachments"] = attachments
+            kw.update(kwargs)
+            self.generate_ai_response(prompt, show_in_ui=show_in_ui, **kw)
 
     @work(exclusive=True, thread=False)
-    async def generate_ai_response(self, user_text: str, show_in_ui: bool = True, attachments: list = None) -> None:
+    async def generate_ai_response(
+        self, user_text: str, show_in_ui: bool = True, attachments: list = None, display_text: str = None
+    ) -> None:
         """Stream AI response generation with cancellation support via Esc.
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
@@ -147,6 +161,7 @@ class MessageFlowMixin:
                 show_in_ui=show_in_ui,
                 attachments=attachments,
                 project_path=project_path,
+                display_text=display_text,
             )
         except asyncio.CancelledError:
             # The engine raises CancelledError outwards after cleaning up
@@ -174,7 +189,17 @@ class MessageFlowMixin:
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
                 if next_item is not None:
-                    asyncio.create_task(self._process_queued_message(next_item[0], next_item[1], next_item[2]))
+                    kw = {}
+                    if len(next_item) > 4 and next_item[4]:
+                        kw["display_text"] = next_item[4]
+                    asyncio.create_task(
+                        self._process_queued_message(
+                            next_item[0],
+                            next_item[1],
+                            next_item[2],
+                            **kw,
+                        )
+                    )
 
     def _pop_queued_for_current_session(self):
         """Pop the first queued message bound to the current session, or None."""
@@ -185,10 +210,10 @@ class MessageFlowMixin:
                 return self.message_queue.pop(idx)
         return None
 
-    async def _process_queued_message(self, prompt, show_in_ui=True, attachments=None) -> None:
+    async def _process_queued_message(self, prompt, show_in_ui=True, attachments=None, **kwargs) -> None:
         """Run a queued message on the next event-loop iteration after the @work task."""
         await asyncio.sleep(0)
-        self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments)
+        self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
         """Callback when background shell command finishes.

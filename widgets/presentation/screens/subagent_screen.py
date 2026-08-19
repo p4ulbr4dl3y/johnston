@@ -188,7 +188,7 @@ class SubagentViewScreen(Screen[None]):
             if not att_count and evt.get("attachments"):
                 att_count = len(evt.get("attachments"))
             await chat_view.add_user_message(
-                evt.get("text", ""),
+                evt.get("display_text") or evt.get("text", ""),
                 animate=animate,
                 attachments_count=att_count,
             )

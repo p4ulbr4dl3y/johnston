@@ -40,7 +40,7 @@ class SessionPersistenceMixin:
                         if mtype == "user":
                             if not is_ui_visible_user_message(msg):
                                 continue
-                            text = msg.get("text", "")
+                            text = msg.get("display_text") or msg.get("text", "")
                             att_count = msg.get("attachments_count", 0)
                             if not att_count and msg.get("attachments"):
                                 att_count = len(msg.get("attachments"))

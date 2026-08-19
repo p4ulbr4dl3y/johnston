@@ -222,6 +222,15 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertEqual(sess.messages[0]["type"], "bot")
         self.assertEqual(sess.messages[1]["type"], "tool")
 
+    def test_title_from_messages_uses_display_text(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.messages = [
+            {"type": "user", "text": "The following skill(s) have been invoked: <SKILL>...", "display_text": "/caveman help"}
+        ]
+        title = self.store._title_from_messages(sess)
+        self.assertEqual(title, "/caveman help")
+
 
 if __name__ == "__main__":
     unittest.main()

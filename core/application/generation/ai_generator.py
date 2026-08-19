@@ -150,6 +150,7 @@ async def generate_ai_response(
     show_in_ui: bool = True,
     attachments: Optional[list] = None,
     project_path: Optional[str] = None,
+    display_text: Optional[str] = None,
 ) -> None:
     """Run the agent stream for a user prompt, recording transcript events and
     driving UI handles via ``canvas``.
@@ -161,11 +162,13 @@ async def generate_ai_response(
 
     # Prepare the turn: record the user message, render it, snapshot a checkpoint.
     user_event = {"type": "user", "text": user_text, "show_in_ui": show_in_ui}
+    if display_text:
+        user_event["display_text"] = display_text
     if attachments:
         user_event["attachments_count"] = len(attachments)
     session.add_event(user_event)
     if show_in_ui:
-        await canvas.add_user_message(user_text, attachments)
+        await canvas.add_user_message(display_text or user_text, attachments)
 
     await _create_git_checkpoint_async(canvas, session_id, project_path)
 

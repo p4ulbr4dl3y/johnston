@@ -252,3 +252,33 @@ async def test_user_message_recorded_with_attachments():
     assert {"type": "user", "text": "hi", "show_in_ui": True, "attachments_count": 2} in session.events
 
 
+@pytest.mark.asyncio
+async def test_user_message_with_display_text():
+    seen = []
+
+    async def stream(prompt, attachments=None):
+        seen.append(prompt)
+        yield ("bot_text", "ok", "")
+
+    session = _fake_session()
+    canvas = _canvas()
+    await generate_ai_response(
+        _FakeAgent(stream),
+        session,
+        canvas,
+        session_id="s1",
+        user_text="full prompt with skill <SKILL>...",
+        show_in_ui=True,
+        display_text="/caveman test",
+    )
+    assert seen == ["full prompt with skill <SKILL>..."]
+    canvas.add_user_message.assert_awaited_once_with("/caveman test", None)
+    assert {
+        "type": "user",
+        "text": "full prompt with skill <SKILL>...",
+        "display_text": "/caveman test",
+        "show_in_ui": True,
+    } in session.events
+
+
+
