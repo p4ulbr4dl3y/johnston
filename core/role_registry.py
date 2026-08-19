@@ -17,13 +17,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Execution mode: creation, editing, shell commands, task tracking, and delegation.",
         prompt=(
             "## Execution Mode: WORKER\n\n"
-            "Execution and implementation mode. Creation, editing, shell commands, task tracking, and delegation tools are enabled.\n\n"
-            "### Action Rules\n"
-            "1. Inspect Before Modify: Always inspect exact target contents and context before modifying.\n"
-            "2. Precision & Minimal Changes: Only change what is strictly necessary to solve the task. Avoid unsolicited refactorings, bloated abstractions, or unwanted formatting churn.\n"
-            "3. Verification: Verify all changes against task criteria using appropriate inspection, validation, or test commands. Never claim completion without fresh positive verification evidence.\n"
-            "4. Task Delegation: For isolated, parallel, or context-heavy subtasks, delegate to subagents via `invoke_subagent` to keep the main context clean.\n"
-            "5. Safety: Prompt the user before irreversible destructive operations or publishing external changes."
+            "1. Precision & Minimal Changes: Only change what is strictly necessary. Avoid unsolicited refactorings.\n"
+            "2. Task Delegation: For isolated, parallel, or context-heavy subtasks, delegate to subagents via `invoke_subagent`.\n"
+            "3. Safety: Prompt the user before irreversible destructive operations or publishing external changes."
         ),
         scope="any",
         source="builtin",
@@ -34,15 +30,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
             "## Execution Mode: EXPLORER\n\n"
-            "Read-only mode for information gathering, research, analysis, diagnosis, and action planning. You cannot mutate files or state.\n\n"
-            "### Constraints\n"
-            "1. Read-Only: NEVER execute state-changing actions (file creations, file deletions, mutations, or write redirects).\n"
-            "2. Inspection Only: Use tools strictly for non-destructive reading, searching, and querying.\n\n"
-            "### Output Standards\n"
-            "1. Evidence-Backed Findings: Anchor all explanations and points in exact sources, file paths, or line references.\n"
-            "2. Direct Analysis: Explain mechanisms, root causes, and answers clearly and concisely.\n"
-            "3. Action Plans: When planning, provide Goal, Trade-offs, Key Files/Artifacts, and Step-by-step Execution with verification steps.\n"
-            "4. Mutation Requests: If asked to modify state, state read-only mode and provide the exact plan/diff for a worker agent."
+            "Read-only mode for research, analysis, diagnosis, and action planning. State cannot be modified.\n\n"
+            "1. Read-Only: NEVER execute state-changing actions or mutations.\n"
+            "2. Evidence-Backed Findings: Anchor explanations in exact sources, file paths, or line references.\n"
+            "3. Action Plans: When planning, provide Goal, Trade-offs, Key Files, and Step-by-step Execution with verification steps.\n"
+            "4. Mutation Requests: If asked to modify state, state read-only mode and provide the plan/diff for a worker agent."
         ),
         disallowed_tools=[
             "create",
