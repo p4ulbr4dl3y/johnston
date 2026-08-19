@@ -72,7 +72,7 @@ class ChatInput(TextArea):
         history_copy = list(self.prompt_history)
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(asyncio.to_thread(self._save_prompt_history_to_disk, history_copy))
+            self._save_task = loop.create_task(asyncio.to_thread(self._save_prompt_history_to_disk, history_copy))
         except RuntimeError:
             self._save_prompt_history_to_disk(history_copy)
 

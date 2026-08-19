@@ -232,7 +232,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
                 ci.add_to_history("Global prompt 1")
                 ci.add_to_history("Global prompt 2")
-                await asyncio.sleep(0.05)
+                if getattr(ci, "_save_task", None):
+                    await ci._save_task
+                else:
+                    for _ in range(20):
+                        if os.path.exists(tmp_history_file):
+                            break
+                        await asyncio.sleep(0.05)
                 self.assertTrue(os.path.exists(tmp_history_file))
 
                 # New ChatInput instance loads persisted history
