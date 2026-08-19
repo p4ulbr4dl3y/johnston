@@ -97,7 +97,7 @@ class TestSessionManager(unittest.TestCase):
         self.store.save(main)
         self.store.save(sub)
 
-        sub_path = os.path.join(self.store.sessions_dir, f"{main.id}.subagents", "sub-1.json")
+        sub_path = os.path.join(self.store.sessions_dir, f"{main.id}.subagents", "sub-1.jsonl")
         self.assertTrue(os.path.exists(sub_path))
 
         self.store._sessions.clear()
@@ -127,14 +127,14 @@ class TestSessionManagerRegression(unittest.TestCase):
         self.store = _make_store(self.test_dir)
 
     def test_load_session_returns_none_for_malformed_json(self):
-        bad_path = os.path.join(self.store.sessions_dir, "broken.json")
+        bad_path = os.path.join(self.store.sessions_dir, "broken.jsonl")
         with open(bad_path, "w", encoding="utf-8") as f:
             f.write("{not json")
 
         self.assertIsNone(self.store.get("broken"))
 
     def test_list_main_sessions_ignores_malformed_json_without_deleting_it(self):
-        bad_path = os.path.join(self.store.sessions_dir, "broken.json")
+        bad_path = os.path.join(self.store.sessions_dir, "broken.jsonl")
         with open(bad_path, "w", encoding="utf-8") as f:
             f.write("{not json")
 
@@ -148,7 +148,7 @@ class TestSessionManagerRegression(unittest.TestCase):
         sess = self.store.create_main(sid)
         self.store.save(sess)
 
-        self.assertTrue(os.path.exists(os.path.join(self.store.sessions_dir, f"{sid}.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.store.sessions_dir, f"{sid}.jsonl")))
         self.assertEqual(self.store.list_main_sessions(), [])
 
     def test_atomic_save_session_persists_data_and_cleans_up_tmp(self):
@@ -157,7 +157,7 @@ class TestSessionManagerRegression(unittest.TestCase):
         sess.messages = [{"type": "user", "text": "test_atomic"}]
         self.store.save(sess)
 
-        filepath = os.path.join(self.store.sessions_dir, f"{sid}.json")
+        filepath = os.path.join(self.store.sessions_dir, f"{sid}.jsonl")
         self.assertTrue(os.path.exists(filepath))
         loaded = self.store.get(sid)
         self.assertEqual(loaded.messages[0]["text"], "test_atomic")

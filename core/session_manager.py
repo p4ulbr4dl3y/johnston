@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 import time
@@ -13,7 +14,7 @@ from core.domain.entities.session import (
     _coerce_int,
 )
 from core.infrastructure.platform.paths import PROJECTS_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 
 logger = logging.getLogger(__name__)
@@ -187,6 +188,37 @@ class AgentSession:
             "branch_name": self.branch_name,
         }
 
+    def to_jsonl_lines(self) -> List[Dict[str, Any]]:
+        history = getattr(self.agent, "history", None)
+        if history is None:
+            history = self.agent_history
+        meta = {
+            "_type": "meta",
+            "id": self.id,
+            "kind": self.kind.value,
+            "parent_id": self.parent_id,
+            "role": self.role,
+            "status": self.status,
+            "project_key": self.project_key,
+            "description": self.description,
+            "prompt": self.prompt,
+            "tokens_input": self.tokens_input,
+            "tokens_output": self.tokens_output,
+            "total_tokens": self.total_tokens,
+            "cost_usd": self.cost_usd,
+            "last_context_tokens": self.last_context_tokens,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "project_dir": self.project_dir,
+            "branch_name": self.branch_name,
+        }
+        lines: List[Dict[str, Any]] = [meta]
+        for m in self.messages:
+            lines.append({"_type": "msg", "data": m})
+        for h in history:
+            lines.append({"_type": "history", "data": h})
+        return lines
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentSession":
         raw_kind = data.get("kind", SessionKind.MAIN.value)
@@ -217,6 +249,49 @@ class AgentSession:
         sess.branch_name = data.get("branch_name", "")
         return sess
 
+    @classmethod
+    def from_file(cls, fpath: str) -> Optional["AgentSession"]:
+        if not fpath or not os.path.exists(fpath):
+            return None
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+                if not first_line:
+                    return None
+                try:
+                    first = json.loads(first_line)
+                except Exception:
+                    return None
+
+                if not isinstance(first, dict) or first.get("_type") != "meta":
+                    return None
+
+                sess = cls.from_dict(first)
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    if not isinstance(entry, dict):
+                        continue
+                    etype = entry.get("_type")
+                    if etype == "msg":
+                        data = entry.get("data")
+                        sess.messages.append(data if data is not None else {})
+                    elif etype == "history":
+                        data = entry.get("data")
+                        sess.agent_history.append(data if data is not None else {})
+                    elif "role" in entry:
+                        sess.agent_history.append(entry)
+                    elif "type" in entry:
+                        sess.messages.append(entry)
+                return sess
+        except Exception:
+            return None
+
 
 def get_session_store(ctx_or_app: Any) -> "SessionStore":
     """Resolve the session store from a ctx/app that may carry ``.sm``.
@@ -237,8 +312,8 @@ class SessionStore:
     Disk layout:
         ~/.johnston/projects/<project_key>/
             config.json
-            sessions/<main_id>.json
-            sessions/<main_id>.subagents/<subagent_id>.json
+            sessions/<main_id>.jsonl
+            sessions/<main_id>.subagents/<subagent_id>.jsonl
     """
 
     _instance: Optional["SessionStore"] = None
@@ -258,8 +333,8 @@ class SessionStore:
 
         self._sessions: Dict[str, AgentSession] = {}
         # In-memory cache of the parsed disk session tree, keyed by a signature
-        # of (relpath, mtime_ns, size) across all session JSON files. Avoids
-        # re-reading/parsing every JSON on each list()/children() call.
+        # of (relpath, mtime_ns, size) across all session JSONL files. Avoids
+        # re-reading/parsing every file on each list()/children() call.
         self._disk_cache_signature: Optional[int] = None
         self._disk_cache: Optional[Dict[str, AgentSession]] = None
         self.ensure_dirs()
@@ -283,7 +358,7 @@ class SessionStore:
 
     def _main_path(self, session_id: str) -> str:
         safe_id = os.path.basename(session_id or "")
-        return os.path.join(self.sessions_dir, f"{safe_id}.json")
+        return os.path.join(self.sessions_dir, f"{safe_id}.jsonl")
 
     def _subagent_dir(self, parent_id: str) -> str:
         safe_parent = os.path.basename(parent_id or "")
@@ -291,7 +366,7 @@ class SessionStore:
 
     def _subagent_path(self, parent_id: str, subagent_id: str) -> str:
         safe_sub = os.path.basename(subagent_id or "")
-        return os.path.join(self._subagent_dir(parent_id), f"{safe_sub}.json")
+        return os.path.join(self._subagent_dir(parent_id), f"{safe_sub}.jsonl")
 
     # -- CRUD --------------------------------------------------------------
 
@@ -348,9 +423,8 @@ class SessionStore:
             if not fpath or not os.path.exists(fpath):
                 continue
             try:
-                data = read_json(fpath)
-                if data:
-                    sess = AgentSession.from_dict(data)
+                sess = AgentSession.from_file(fpath)
+                if sess:
                     self._sessions[sess.id] = sess
                     return sess
             except Exception:
@@ -363,7 +437,8 @@ class SessionStore:
         for fname in os.listdir(self.sessions_dir):
             if not fname.endswith(".subagents"):
                 continue
-            fpath = os.path.join(self.sessions_dir, fname, f"{subagent_id}.json")
+            sdir = os.path.join(self.sessions_dir, fname)
+            fpath = os.path.join(sdir, f"{subagent_id}.jsonl")
             if os.path.exists(fpath):
                 return fpath
         return None
@@ -395,23 +470,20 @@ class SessionStore:
                 fpath = os.path.join(self.sessions_dir, fname)
                 if os.path.isdir(fpath):
                     if fname.endswith(".subagents"):
-                        for sub_name in os.listdir(fpath):
-                            if sub_name.endswith(".json"):
+                        for sub_name in sorted(os.listdir(fpath)):
+                            if sub_name.endswith(".jsonl"):
                                 self._load_file(sessions, os.path.join(fpath, sub_name))
-                elif fname.endswith(".json"):
+                elif fname.endswith(".jsonl"):
                     self._load_file(sessions, fpath)
         self._disk_cache = sessions
         self._disk_cache_signature = signature
         return sessions
 
     def _disk_signature(self) -> Optional[int]:
-        """Hash of (path, mtime_ns, size) for every session JSON on disk,
+        """Hash of (path, mtime_ns, size) for every session JSONL on disk,
         used to detect external changes without re-reading file contents."""
         if not os.path.isdir(self.sessions_dir):
             return None
-        # Sessions may live in the root dir or in one-level "<name>.subagents"
-        # subdirs. Both are scanned by the shared helper; XOR-hash order is
-        # irrelevant so aggregation is order-independent.
         sub_dirs = []
         try:
             for fname in sorted(os.listdir(self.sessions_dir)):
@@ -420,10 +492,7 @@ class SessionStore:
                     sub_dirs.append(fpath)
         except OSError:
             return None
-        # Helper returns None when the dirs are empty; keep the original "0"
-        # value for an empty-but-present dir so the (int) cache signature
-        # compares consistently.
-        return compute_dir_signature_hash([self.sessions_dir, *sub_dirs], [".json"]) or 0
+        return compute_dir_signature_hash([self.sessions_dir, *sub_dirs], [".jsonl"]) or 0
 
     def _invalidate_disk_cache(self) -> None:
         self._disk_cache_signature = None
@@ -431,9 +500,8 @@ class SessionStore:
 
     def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
         try:
-            data = read_json(fpath)
-            if data:
-                sess = AgentSession.from_dict(data)
+            sess = AgentSession.from_file(fpath)
+            if sess:
                 sessions[sess.id] = sess
         except Exception:
             logger.warning("Failed to load session file: %s", fpath, exc_info=True)
@@ -459,8 +527,8 @@ class SessionStore:
     @staticmethod
     def _title_from_messages(sess: AgentSession) -> str:
         for m in sess.messages:
-            if m.get("type") == "user" and m.get("text"):
-                text = m["text"]
+            if isinstance(m, dict) and m.get("type") == "user" and m.get("text"):
+                text = str(m["text"])
                 return text[:30] + "..." if len(text) > 30 else text
         return "Untitled"
 
@@ -472,7 +540,7 @@ class SessionStore:
         tool executions, then final answer).
         """
         if sess.agent_history:
-            assistant_msgs = [m for m in sess.agent_history if m.get("role") == "assistant"]
+            assistant_msgs = [m for m in sess.agent_history if isinstance(m, dict) and m.get("role") == "assistant"]
             if assistant_msgs:
                 return len(assistant_msgs)
         return 0
@@ -489,7 +557,7 @@ class SessionStore:
                 fpath = self._subagent_path(sess.parent_id, sess.id)
             else:
                 fpath = self._main_path(sess.id)
-            atomic_write_json(fpath, sess.to_dict(), indent=None)
+            atomic_write_jsonl(fpath, sess.to_jsonl_lines())
             self._sessions[sess.id] = sess
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess
@@ -510,6 +578,11 @@ class SessionStore:
         elif sess:
             try:
                 os.remove(self._subagent_path(sess.parent_id, session_id))
+            except OSError:
+                pass
+        else:
+            try:
+                os.remove(self._main_path(session_id))
             except OSError:
                 pass
         self._sessions.pop(session_id, None)

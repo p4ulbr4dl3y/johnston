@@ -57,8 +57,26 @@ def store(tmp_path):
 
 def _write_session_json(store, name, data):
     path = os.path.join(store.sessions_dir, name)
+    if isinstance(data, dict):
+        if "_type" not in data:
+            meta = dict(data)
+            meta["_type"] = "meta"
+            messages = meta.pop("messages", [])
+            history = meta.pop("agent_history", [])
+            lines = [json.dumps(meta, ensure_ascii=False)]
+            for m in messages:
+                lines.append(json.dumps({"_type": "msg", "data": m}, ensure_ascii=False))
+            for h in history:
+                lines.append(json.dumps({"_type": "history", "data": h}, ensure_ascii=False))
+            content = "\n".join(lines) + "\n"
+        else:
+            content = json.dumps(data, ensure_ascii=False) + "\n"
+    elif isinstance(data, list):
+        content = "\n".join(json.dumps(item, ensure_ascii=False) for item in data) + "\n"
+    else:
+        content = str(data) + "\n"
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+        f.write(content)
     return path
 
 
@@ -267,9 +285,9 @@ def test_list_ignores_junk_non_json_files(store):
 
 
 def test_list_skips_json_scalar_and_list(store):
-    _write_session_json(store, "scalar.json", "justanystring")
-    _write_session_json(store, "array.json", [1, 2, 3])
-    _write_session_json(store, "twop.json", {"id": "twop", "kind": "main", "messages": []})
+    _write_session_json(store, "scalar.jsonl", "justanystring")
+    _write_session_json(store, "array.jsonl", [1, 2, 3])
+    _write_session_json(store, "twop.jsonl", {"id": "twop", "kind": "main", "messages": []})
     listed = store.list()
     ids = {s.id for s in listed}
     assert "scalar" not in ids
@@ -310,7 +328,7 @@ def test_duplicate_id_disk_and_memory(store):
     sess.messages = [{"type": "user", "text": "memory version"}]
     store.save(sess)
     # create a conflicting disk-only copy
-    _write_session_json(store, "dup.json", {"id": "dup", "kind": "main", "messages": [{"type": "user", "text": "disk version"}]})
+    _write_session_json(store, "dup.jsonl", {"id": "dup", "kind": "main", "messages": [{"type": "user", "text": "disk version"}]})
     store._invalidate_disk_cache()
     listed = [s for s in store.list() if s.id == "dup"]
     assert len(listed) == 1  # no duplicate keys

@@ -105,6 +105,17 @@ def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
     atomic_write_text(path, content)
 
 
+def atomic_write_jsonl(path: str, data: Any) -> None:
+    """Writes JSONL content atomically. Accepts list of dicts/lines or str."""
+    if isinstance(data, str):
+        content = data if data.endswith("\n") else data + "\n"
+    else:
+        import json
+
+        content = "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in data)
+    atomic_write_text(path, content)
+
+
 def read_json(path: str, default: Any = None) -> Any:
     """Reads JSON file safely, returning default if missing, empty, or invalid."""
     if not path or not os.path.exists(path):
@@ -117,6 +128,24 @@ def read_json(path: str, default: Any = None) -> Any:
             if not content:
                 return default
             return json.loads(content)
+    except Exception:
+        return default
+
+
+def read_jsonl(path: str, default: Any = None) -> Any:
+    """Reads JSONL file safely, returning list of parsed JSON objects."""
+    if not path or not os.path.exists(path):
+        return default
+    try:
+        import json
+
+        items = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    items.append(json.loads(line))
+        return items if items else default
     except Exception:
         return default
 

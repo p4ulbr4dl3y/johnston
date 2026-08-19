@@ -34,8 +34,26 @@ def store(tmp_path):
 
 def _write_session_json(store, name, data):
     path = os.path.join(store.sessions_dir, name)
+    if isinstance(data, dict):
+        if "_type" not in data:
+            meta = dict(data)
+            meta["_type"] = "meta"
+            messages = meta.pop("messages", [])
+            history = meta.pop("agent_history", [])
+            lines = [json.dumps(meta, ensure_ascii=False)]
+            for m in messages:
+                lines.append(json.dumps({"_type": "msg", "data": m}, ensure_ascii=False))
+            for h in history:
+                lines.append(json.dumps({"_type": "history", "data": h}, ensure_ascii=False))
+            content = "\n".join(lines) + "\n"
+        else:
+            content = json.dumps(data, ensure_ascii=False) + "\n"
+    elif isinstance(data, list):
+        content = "\n".join(json.dumps(item, ensure_ascii=False) for item in data) + "\n"
+    else:
+        content = str(data) + "\n"
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+        f.write(content)
     return path
 
 
@@ -142,10 +160,10 @@ def test_from_dict_created_at_none_gets_default(store):
     sess = store.create_main("ts")
     sess.messages = [{"type": "user", "text": "x"}]
     store.save(sess)
-    data = json.load(open(os.path.join(store.sessions_dir, "ts.json"), encoding="utf-8"))
+    data = json.loads(open(os.path.join(store.sessions_dir, "ts.jsonl"), encoding="utf-8").readline())
     data["created_at"] = None
     data["updated_at"] = None
-    _write_session_json(store, "ts.json", data)
+    _write_session_json(store, "ts.jsonl", data)
     loaded = _reload(store, "ts")
     assert loaded is not None
     assert loaded.created_at is not None, (
@@ -167,7 +185,7 @@ def test_mid_write_crash_leaves_original_intact(store, monkeypatch):
     sess = store.create_main("crash")
     sess.messages = [{"type": "user", "text": "original"}]
     store.save(sess)
-    fpath = os.path.join(store.sessions_dir, "crash.json")
+    fpath = os.path.join(store.sessions_dir, "crash.jsonl")
     original_content = open(fpath, encoding="utf-8").read()
 
     from core.infrastructure.platform import platform_utils
@@ -212,9 +230,9 @@ def test_no_tmp_junk_after_successful_save(store):
 # ===========================================================================
 
 def test_recovery_broken_json_no_crash(store):
-    _write_session_json(store, "broken.json", "{not valid json ]}}")
+    _write_session_json(store, "broken.jsonl", "{not valid json ]}}")
     # corrupted as a raw string is stored; simulate a truly broken file:
-    p = os.path.join(store.sessions_dir, "broken.json")
+    p = os.path.join(store.sessions_dir, "broken.jsonl")
     with open(p, "w", encoding="utf-8") as f:
         f.write("{not json at all")
     # list() and get() must not raise; file not deleted
@@ -226,7 +244,7 @@ def test_recovery_broken_json_no_crash(store):
 
 def test_recovery_truncated_valid_prefix(store):
     """An object truncated partway (valid JSON prefix, then cut) must not crash."""
-    p = os.path.join(store.sessions_dir, "trunc.json")
+    p = os.path.join(store.sessions_dir, "trunc.jsonl")
     with open(p, "w", encoding="utf-8") as f:
         f.write('{"id": "trunc", "kind": "main", "messages": [{"type": "use')
     assert store.get("trunc") is None
@@ -236,14 +254,14 @@ def test_recovery_truncated_valid_prefix(store):
 
 def test_recovery_empty_file(store):
     """A zero-byte file must be treated as missing (return default), not crash."""
-    p = os.path.join(store.sessions_dir, "zero.json")
+    p = os.path.join(store.sessions_dir, "zero.jsonl")
     open(p, "w").close()
     assert store.get("zero") is None, "empty file must load as None, not crash"
     assert all(s.id != "zero" for s in store.list())
 
 
 def test_recovery_whitespace_only_file(store):
-    p = os.path.join(store.sessions_dir, "spaces.json")
+    p = os.path.join(store.sessions_dir, "spaces.jsonl")
     with open(p, "w", encoding="utf-8") as f:
         f.write("   \n\t  ")
     assert store.get("spaces") is None
@@ -252,7 +270,7 @@ def test_recovery_whitespace_only_file(store):
 
 def test_recovery_non_utf8_file(store):
     """A non-UTF8 (e.g. latin-1) session file must not crash load."""
-    p = os.path.join(store.sessions_dir, "latin.json")
+    p = os.path.join(store.sessions_dir, "latin.jsonl")
     with open(p, "wb") as f:
         f.write(b"\x80\x81\x99 = not utf8 = \xff\xfe")
     assert store.get("latin") is None
@@ -264,7 +282,7 @@ def test_recovery_huge_file_no_crash(store):
     sess = store.create_main("huge")
     sess.messages = [{"type": "bot", "text": "x" * (2 * 1024 * 1024)}]  # ~4MB JSON
     store.save(sess)
-    size = os.path.getsize(os.path.join(store.sessions_dir, "huge.json"))
+    size = os.path.getsize(os.path.join(store.sessions_dir, "huge.jsonl"))
     assert size > 2 * 1024 * 1024
     loaded = _reload(store, "huge")
     assert loaded is not None
@@ -274,7 +292,7 @@ def test_recovery_huge_file_no_crash(store):
 def test_recovery_json_dict_without_id(store):
     """Valid JSON object with no 'id' must produce a session with id from file name
     or default '' — should not crash."""
-    _write_session_json(store, "noid.json", {"kind": "main", "messages": [{"type": "user", "text": "x"}]})
+    _write_session_json(store, "noid.jsonl", {"kind": "main", "messages": [{"type": "user", "text": "x"}]})
     assert store.get("noid") is None or store.get("noid").kind == "main"
 
 
@@ -295,7 +313,7 @@ def test_metadata_description_none_and_huge(store):
 def test_metadata_description_none_presented_correctly(store):
     """description absent/None in JSON must not crash and yield '' default."""
     data = {"id": "m2", "kind": "main", "messages": [], "description": None}
-    _write_session_json(store, "m2.json", data)
+    _write_session_json(store, "m2.jsonl", data)
     loaded = store.get("m2")
     if loaded is not None:
         assert loaded.description == ""
@@ -313,7 +331,7 @@ def test_metadata_wrong_typed_fields(store):
         "cost_usd": None,            # None where float expected
         "total_tokens": "42",
     }
-    _write_session_json(store, "types.json", data)
+    _write_session_json(store, "types.jsonl", data)
     loaded = store.get("types")
     assert loaded is not None
     # int fields must be usable as ints (crash detection)
@@ -340,7 +358,7 @@ def test_finish_and_status_change_persisted(store):
 
 def test_list_invalid_filename_not_crashed(store):
     """A junk filename with invalid JSON content must be ignored, not crash list()."""
-    p = os.path.join(store.sessions_dir, "weird name!.json")
+    p = os.path.join(store.sessions_dir, "weird name!.jsonl")
     with open(p, "w", encoding="utf-8") as f:
         f.write("total garbage")
     ids = {s.id for s in store.list()}
