@@ -436,7 +436,7 @@ class PromptBuilder:
         _cache_set(_STABLE_CORE_CACHE, key, sys_prompt, _STABLE_CORE_CACHE_MAX)
         return sys_prompt
 
-    def build_tools(self, provider_key: str = "") -> List[Dict[str, Any]]:
+    def build_tools(self) -> List[Dict[str, Any]]:
         from core.domain.policies.role_policy import role_tool_error
         from core.infrastructure.mcp import get_mcp_manager
         from core.role_registry import RoleRegistry

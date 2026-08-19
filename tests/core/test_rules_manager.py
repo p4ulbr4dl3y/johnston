@@ -36,10 +36,9 @@ Always run uv instead of pip.""")
             self.assertEqual(rule.name, "python_uv")
             self.assertEqual(rule.roles, ["worker", "explorer"])
             self.assertIn("Always run uv instead of pip.", rule.content)
-
-            formatted = rm.get_formatted_rules(role="worker", project_dir=tmpdir)
-            self.assertIn("### Rule: python_uv", formatted)
-            self.assertIn("Always run uv instead of pip.", formatted)
+            active_rules = rm.get_active_rules(role="worker", project_dir=tmpdir, include_global=False)
+            self.assertEqual(len(active_rules), 1)
+            self.assertEqual(active_rules[0].name, "python_uv")
 
     def test_deduplicate_when_global_and_project_paths_match(self):
         with tempfile.TemporaryDirectory() as tmpdir:

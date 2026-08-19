@@ -67,12 +67,12 @@ class TestRulesManagerEdge(unittest.TestCase):
         self.assertTrue(rule.is_active_for_roles("WORKER"))
         self.assertTrue(rule.is_active_for_roles("  Worker  "))
 
-    def test_get_formatted_rules_no_match_empty(self):
+    def test_get_active_rules_no_match_empty(self):
         _write_rule(self.tmpdir, "a.md", "---\nrole: worker\n---\nx")
         with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
             rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
             self.assertEqual(len(rules), 1)
-            self.assertEqual(self.rm.get_formatted_rules(role="explorer", project_dir=self.tmpdir), "")
+            self.assertEqual(self.rm.get_active_rules(role="explorer", project_dir=self.tmpdir), [])
 
     def test_load_rules_include_global_false(self):
         with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):

@@ -345,7 +345,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:
             user_content: List[Dict[str, Any]] = [{"type": "text", "text": user_text}]
-            for idx, att in enumerate(attachments):
+            for att in attachments:
                 att_path = getattr(att, "path", str(att))
                 img_item = await self._process_attachment_image(att_path)
                 if img_item:

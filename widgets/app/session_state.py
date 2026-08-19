@@ -48,7 +48,7 @@ def collect_session_data(app: Any) -> Optional[dict]:
     }
 
 
-def recompute_context_tokens(agent: Any, session: Any, ctx: int) -> int:
+def recompute_context_tokens(agent: Any, ctx: int) -> int:
     """Recompute the context-token estimate when a session has none recorded.
 
     Returns the current ``ctx`` unless the session tracked none and the agent has
@@ -69,5 +69,5 @@ def recompute_context_tokens(agent: Any, session: Any, ctx: int) -> int:
         subagent_schema=getattr(agent, "subagent_schema", None),
     )
     sys_prompt = builder.build_system_prompt()
-    all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))
+    all_tools = builder.build_tools()
     return estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(agent.history)

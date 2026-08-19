@@ -128,32 +128,6 @@ def test_shell_task_repr_and_open_log_failure(monkeypatch):
     assert task._log is None
 
 
-def test_shell_task_close_pty_transport_raises():
-    task = ShellTask(task_id="t1", command="echo")
-    class Tr:
-        def close(self):
-            raise RuntimeError("close fail")
-
-    task.transport = Tr()
-    task.master_fd = 5
-    task.close_pty()
-    assert task.transport is None
-    assert task.master_fd is None
-
-
-def test_shell_task_close_pty_fd_close_raises(monkeypatch):
-    task = ShellTask(task_id="t2", command="echo")
-    task.transport = None
-    task.master_fd = 7
-
-    def _boom(fd):
-        raise OSError("close fd fail")
-
-    monkeypatch.setattr("core.infrastructure.tasks.shell_task.os.close", _boom)
-    task.close_pty()
-    assert task.master_fd is None
-
-
 def test_notify_listeners_swallows_callback_errors():
     task = ShellTask(task_id="t3", command="echo")
 
@@ -168,7 +142,7 @@ def test_notify_listeners_swallows_callback_errors():
 
 @pytest.mark.asyncio
 async def test_read_no_source_breaks_immediately():
-    task = ShellTask(task_id="t4", command="echo", process=None, reader=None)
+    task = ShellTask(task_id="t4", command="echo", process=None)
     task.start_reading()
     await task.wait()
     assert task._status.value == "completed"  # _mark_terminated ran via finally
@@ -176,11 +150,13 @@ async def test_read_no_source_breaks_immediately():
 
 @pytest.mark.asyncio
 async def test_read_bad_chunk_type_hits_outer_except():
-    class R:
-        async def read(self, n):
-            return "not-bytes"  # decode_output raises -> outer except swallows
+    class FakeProc:
+        def __init__(self):
+            self.stdout = AsyncMock()
+            self.stdout.read = AsyncMock(return_value="not-bytes")  # decode_output raises -> outer except swallows
+            self.returncode = 0
 
-    task = ShellTask(task_id="t5", command="echo", process=None, reader=R())
+    task = ShellTask(task_id="t5", command="echo", process=FakeProc())
     task.start_reading()
     await task.wait()
     assert task._status.value == "completed"
@@ -225,18 +201,6 @@ async def test_tail_returns_buffered_output():
     task = ShellTask(task_id="t8", command="echo")
     task.output.append("abcdefghij")
     assert await task.tail(5) == "fghij"
-
-
-@pytest.mark.asyncio
-async def test_send_input_write_to_master_fd(monkeypatch):
-    task = ShellTask(task_id="t9", command="echo")
-    task.master_fd = 3
-    written = []
-
-    monkeypatch.setattr("core.infrastructure.tasks.shell_task.os.write", lambda fd, data: written.append(data))
-    res = await task.send_input("hello")
-    assert "OK" in res
-    assert written == [b"hello\n"]
 
 
 @pytest.mark.asyncio

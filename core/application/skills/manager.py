@@ -294,31 +294,3 @@ class SkillManager:
         application module does not own rendering output.
         """
         return self.list_skills(include_hidden=False, for_system_prompt=True)
-
-    def get_system_prompt_snippet(self) -> str:
-        skills = self.get_system_prompt_skills()
-        if not skills:
-            return ""
-
-        global_skills = []
-        project_skills = []
-
-        for s in skills:
-            desc = f": {s.description}" if s.description else ""
-            line = f"- `{s.name}`{desc}"
-            if s.scope == SkillScope.PROJECT:
-                project_skills.append(line)
-            else:
-                global_skills.append(line)
-
-        lines = ["## Skills (read SKILL.md on user request or trigger)"]
-
-        if global_skills:
-            lines.append("\n### Global (`~/.johnston/skills/<name>/SKILL.md`)")
-            lines.extend(global_skills)
-
-        if project_skills:
-            lines.append("\n### Project (`.johnston/skills/<name>/SKILL.md`)")
-            lines.extend(project_skills)
-
-        return "\n".join(lines)

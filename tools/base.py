@@ -290,16 +290,8 @@ async def confirm_permission(
 
 
 async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
-    """Invokes an MCP tool, preferring the async API when available.
-
-    Mirrors the historical dispatch: managers whose type name ends with "Mock" or
-    that lack `call_tool_async` use the synchronous `call_tool` path. The
-    `target_server` keyword is only forwarded when provided (to preserve callers
-    that historically invoked the manager without it).
-    """
-    kwargs: Dict[str, Any] = {}
-    if target_server is not None:
-        kwargs["target_server"] = target_server
+    """Invokes an MCP tool, preferring the async API when available."""
+    kwargs = {"target_server": target_server} if target_server is not None else {}
     if not is_mock_manager(mcp_mgr) and hasattr(mcp_mgr, "call_tool_async"):
         res_or_coro = mcp_mgr.call_tool_async(tool_name, arguments, **kwargs)
     else:

@@ -15,7 +15,7 @@ class TestSubagentRoles(unittest.TestCase):
 
         explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "Explorer")
-        self.assertIn("## Execution Mode: EXPLORER", explorer_def.system_prompt)
+        self.assertIn("## Execution Mode: EXPLORER", explorer_def.prompt)
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -56,13 +56,13 @@ You run tests and report coverage.""")
             self.assertEqual(reviewer_def.description, "Code reviewer subagent")
             self.assertEqual(reviewer_def.allowed_tools, ["read", "grep", "glob"])
             self.assertEqual(reviewer_def.model, "deepseek-v4-flash")
-            self.assertIn("senior code reviewer", reviewer_def.system_prompt)
+            self.assertIn("senior code reviewer", reviewer_def.prompt)
 
             tester_def = registry.get_role("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
             self.assertEqual(tester_def.allowed_tools, ["shell"])
             self.assertEqual(tester_def.model, "gpt-4o")
-            self.assertIn("run tests and report coverage", tester_def.system_prompt)
+            self.assertIn("run tests and report coverage", tester_def.prompt)
 
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
             self.assertIn("## Subagents (use as `type` in `invoke_subagent`)", snippet)

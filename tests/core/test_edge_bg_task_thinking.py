@@ -54,20 +54,20 @@ class TestShellTaskRunEdge(unittest.IsolatedAsyncioTestCase):
 
     async def test_reader_raises_immediately_is_handled(self):
         # Reader raises a raw exception on first read -> read loop must not propagate.
-        t = ShellTask("t_boom", "cmd", None, reader=None)
+        proc = self._make_proc()
         async def bad_read(_n):
             raise OSError("boom")
-        t.reader = bad_read
-        t.process = self._make_proc()
+        proc.stdout.read = bad_read
+        t = ShellTask("t_boom", "cmd", proc)
         t.start_reading()
         await t.read_task
         self.assertFalse(t.is_running)
 
     async def test_reader_raises_mid_stream_and_stops(self):
         # Reader yields one chunk then raises -> loop must stop and keep the chunk.
-        t = ShellTask("t_mid", "cmd", None, reader=None)
-        t.reader = self._make_rw_reader([b"first chunk\n"])
-        t.process = self._make_proc()
+        proc = self._make_proc()
+        proc.stdout = self._make_rw_reader([b"first chunk\n"])
+        t = ShellTask("t_mid", "cmd", proc)
         t.start_reading()
         await t.read_task
         self.assertFalse(t.is_running)
@@ -75,7 +75,6 @@ class TestShellTaskRunEdge(unittest.IsolatedAsyncioTestCase):
 
     async def test_reader_never_ends_can_be_killed(self):
         # A reader that never returns EOF must not hang; kill() must cancel it.
-        t = ShellTask("t_hang", "cmd", None, reader=None)
         never = asyncio.Event()
 
         class _HangReader:
@@ -83,8 +82,9 @@ class TestShellTaskRunEdge(unittest.IsolatedAsyncioTestCase):
                 await never.wait()
                 return b""
 
-        t.reader = _HangReader()
-        t.process = self._make_proc()
+        proc = self._make_proc()
+        proc.stdout = _HangReader()
+        t = ShellTask("t_hang", "cmd", proc)
         t.start_reading()
         await asyncio.sleep(0.05)
         self.assertTrue(t.is_running)
@@ -145,18 +145,20 @@ class TestShellTaskKillEdge(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(t.was_killed)
 
     async def test_kill_mid_read_cancels_reader(self):
-        t = ShellTask("t_midkill", "cmd", None, reader=None)
         never = asyncio.Event()
 
         async def never_read(_n):
             await never.wait()
             return b""
 
-        t.reader = never_read
-        t.process = self._make_proc()
+        proc = self._make_proc()
+        proc.stdout.read = never_read
+        t = ShellTask("t_midkill", "cmd", proc)
         t.start_reading()
         await asyncio.sleep(0.05)
         await t.kill()
+        never.set()
+        await asyncio.sleep(0.05)
         self.assertTrue(t.read_task.cancelled() or t.read_task.done())
 
 

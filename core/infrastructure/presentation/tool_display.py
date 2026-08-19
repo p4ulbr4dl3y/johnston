@@ -99,7 +99,7 @@ def _display_cache_key(tool_name: str, args: Dict[str, Any]) -> tuple:
     return (str(tool_name), _canonical_args(args))
 
 
-def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
+def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
     """Build a short, human-readable label describing what a tool call targets.
 
     This is presentation-only metadata for the chat tool chip and is intentionally
@@ -108,7 +108,6 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
     lowercase registry names. Results are memoized by (tool_name, args) so the
     agent loop doesn't rebuild identical labels on every tool call.
     """
-    # cwd affects truncate()? No — truncate is arg-only. Cache solely on args.
     key = _display_cache_key(tool_name, args)
     hit = _DISPLAY_CACHE.get(key)
     if hit is not None:
@@ -116,7 +115,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
         return hit
 
     # Ensure OrderedDict imported for the cache annotation (no runtime dep).
-    result = _extract_tool_display_inner(tool_name, args, cwd)
+    result = _extract_tool_display_inner(tool_name, args)
 
     _DISPLAY_CACHE[key] = result
     while len(_DISPLAY_CACHE) > _DISPLAY_CACHE_MAX:
@@ -124,7 +123,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], cwd: str | None =
     return result
 
 
-def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], cwd: str | None = None) -> str:
+def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
     from tools.registry import REGISTRY
     from tools.registry import normalize_tool_name as _normalize
 

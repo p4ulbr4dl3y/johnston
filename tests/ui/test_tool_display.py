@@ -19,10 +19,10 @@ class TestToolDisplay(unittest.TestCase):
 
         root = os.path.realpath("/app/project")
         in_path = os.path.join(root, "src", "main.py")
-        self.assertEqual(extract_tool_display("create", {"path": in_path}, cwd=root), in_path)
+        self.assertEqual(extract_tool_display("create", {"path": in_path}), in_path)
 
         out_path = os.path.realpath("/tmp/other/file.py")
-        self.assertEqual(extract_tool_display("create", {"path": out_path}, cwd=root), out_path)
+        self.assertEqual(extract_tool_display("create", {"path": out_path}), out_path)
 
     def test_ask_user_questions(self):
         res = extract_tool_display("ask_user", {"questions": [{"question_text": "Which framework?"}]})

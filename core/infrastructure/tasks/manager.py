@@ -5,7 +5,7 @@ and answers queries for the UI/footer.
 """
 
 import asyncio
-from typing import Any, Dict
+from typing import Dict
 
 from core.infrastructure.tasks.task import BaseTask
 
@@ -13,7 +13,7 @@ from core.infrastructure.tasks.task import BaseTask
 class TaskManager:
     """Registry of live tasks."""
 
-    def __init__(self, app: Any = None) -> None:
+    def __init__(self) -> None:
         self._tasks: Dict[str, BaseTask] = {}
 
     # -- registration -------------------------------------------------------

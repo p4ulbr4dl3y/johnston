@@ -96,7 +96,7 @@ def build_prompt_context(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
         subagent_schema=getattr(agent, "subagent_schema", None),
     )
     sys_prompt = builder.build_system_prompt()
-    all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))
+    all_tools = builder.build_tools()
     sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
     return sys_prompt, all_tools, sys_tokens
 
@@ -126,6 +126,6 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         subagent_schema=getattr(agent, "subagent_schema", None),
     )
     sys_prompt = await builder.build_system_prompt_async()
-    all_tools = builder.build_tools(provider_key=getattr(agent, "provider_key", ""))
+    all_tools = builder.build_tools()
     sys_tokens = estimate_tokens(sys_prompt) + estimate_tokens(all_tools)
     return sys_prompt, all_tools, sys_tokens

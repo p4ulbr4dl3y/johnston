@@ -18,7 +18,7 @@ _TASK_TERMINATED_BY_USER = "\n[Task terminated by user]\n"
 
 
 class ShellTask(BaseTask):
-    """Manages a background bash/pty subprocess with real-time output and input."""
+    """Manages a background subprocess with real-time output and input."""
 
     def __init__(
         self,
@@ -26,16 +26,10 @@ class ShellTask(BaseTask):
         command: str,
         process: Any = None,
         *,
-        master_fd: Optional[int] = None,
-        reader: Any = None,
-        transport: Any = None,
         session_id: Optional[str] = None,
     ) -> None:
         super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)
         self.process = process
-        self.master_fd = master_fd
-        self.reader = reader
-        self.transport = transport
         self.session_id = session_id
         self.output = OutputBuffer()
         self.is_background = False
@@ -107,21 +101,6 @@ class ShellTask(BaseTask):
         """Return the fully formatted output (truncation marker + stripped text)."""
         return self.output.formatted()
 
-    def close_pty(self) -> None:
-        if self.transport is not None:
-            try:
-                self.transport.close()
-            except Exception:
-                pass
-            self.transport = None
-            self.master_fd = None
-        elif self.master_fd is not None:
-            try:
-                os.close(self.master_fd)
-            except Exception:
-                pass
-            self.master_fd = None
-
     # -- output listeners ----------------------------------------------------
 
     def add_listener(self, callback: Callable[[str], None]) -> None:
@@ -165,12 +144,7 @@ class ShellTask(BaseTask):
             try:
                 while True:
                     chunk_data = None
-                    if self.reader is not None:
-                        try:
-                            chunk_data = await self.reader.read(32768)
-                        except (OSError, Exception):
-                            break
-                    elif self.process is not None:
+                    if self.process is not None and getattr(self.process, "stdout", None) is not None:
                         try:
                             chunk_data = await self.process.stdout.read(32768)
                         except (OSError, Exception):
@@ -183,7 +157,6 @@ class ShellTask(BaseTask):
             except Exception:
                 pass
             finally:
-                self.close_pty()
                 await self.close_log_async()
 
                 # Reap the process BEFORE publishing the terminal status so a
@@ -199,19 +172,29 @@ class ShellTask(BaseTask):
                     except Exception:
                         pass
 
-                if on_completed is not None and not self.was_killed and self.is_background:
+                # Final notification signal: empty string tells subscribers that
+                # stream closed so they can flush buffered partial lines.
+                self._notify_listeners("")
+
+                exit_code = 0
+                if self.process is not None:
                     try:
-                        out = self.output.formatted()
-                        on_completed(self.task_id, self.command, out or "(no output)")
+                        exit_code = self.process.returncode or 0
+                    except Exception:
+                        exit_code = 0
+
+                # Background tasks: announce completion via modal notify / callback.
+                if self.is_background and on_completed is not None:
+                    try:
+                        on_completed(self.task_id, self.command, self.output.formatted())
                     except Exception:
                         pass
 
-                # Publishing _done LAST guarantees wait() only returns after the
-                # process is reaped and on_completed has been delivered.
-                self._mark_terminated()
-                # Flush signal: subscribers (e.g. a console view) release any
-                # buffered partial line they still hold.
-                self._notify_listeners("")
+                self._mark_terminated(
+                    TaskStatus.KILLED
+                    if self.was_killed
+                    else (TaskStatus.COMPLETED if exit_code == 0 else TaskStatus.ERROR)
+                )
 
         self.read_task = asyncio.create_task(_read())
         return self.read_task
@@ -240,10 +223,7 @@ class ShellTask(BaseTask):
             return format_tool_error("task", f"{self.task_id} not running")
         data = (text + "\n").encode("utf-8")
         try:
-            if self.master_fd is not None:
-                await asyncio.to_thread(os.write, self.master_fd, data)
-                return f"OK: input sent to {self.task_id}"
-            if self.process is not None and self.process.stdin is not None:
+            if self.process is not None and getattr(self.process, "stdin", None) is not None:
                 await asyncio.to_thread(self.process.stdin.write, data)
                 await self.process.stdin.drain()
                 return f"OK: input sent to {self.task_id}"
@@ -256,7 +236,6 @@ class ShellTask(BaseTask):
     async def kill(self) -> None:
         self.was_killed = True
         self.is_background = False
-        self.close_pty()
         await self.close_log_async()
         if self.process is not None:
             await terminate_process(self.process)
@@ -269,7 +248,6 @@ class ShellTask(BaseTask):
         """Synchronous kill used by exit paths that run outside the event loop."""
         self.was_killed = True
         self.is_background = False
-        self.close_pty()
         self.close_log()
         if self.process is not None:
             try:
@@ -284,5 +262,5 @@ class ShellTask(BaseTask):
                 pass
         if self.read_task is not None and not self.read_task.done():
             self.read_task.cancel()
-        self.output.append("\n[Task terminated]\n")
+        self.output.append(_TASK_TERMINATED_BY_USER)
         self._mark_terminated(TaskStatus.KILLED)

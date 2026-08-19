@@ -99,7 +99,6 @@ async def handle_slash_command(app, command_text: str) -> bool:
         return True
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
-    words = command_text.strip().split()
     other_words = []
     for w in words:
         if not w.startswith("/"):

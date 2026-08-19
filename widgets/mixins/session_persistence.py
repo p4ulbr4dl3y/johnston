@@ -112,7 +112,7 @@ class SessionPersistenceMixin:
             if not ctx and self.agent.history:
                 from widgets.app.session_state import recompute_context_tokens
 
-                ctx = recompute_context_tokens(self.agent, session, session.last_context_tokens)
+                ctx = recompute_context_tokens(self.agent, session.last_context_tokens)
             self.agent.last_context_tokens = ctx
 
         self.refresh_status_footer()

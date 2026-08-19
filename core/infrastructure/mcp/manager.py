@@ -337,11 +337,6 @@ class MCPManager:
 
         return target
 
-    async def _update_server_config_async(self, name: str, key_updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Async variant of ``_update_server_config``: the read-modify-write of
-        the config file runs on a worker thread so the event loop is not blocked."""
-        return await asyncio.to_thread(self._update_server_config, name, key_updates)
-
     def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
         """Formats tool dict to OpenAI function format and handles name collisions across servers."""
         t_name = tool.get("name")

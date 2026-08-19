@@ -44,7 +44,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
         self.pm = ProviderManager()
         self.sm = SessionStore()
-        self.task_manager = TaskManager(self)
+        self.task_manager = TaskManager()
         self._subagent_tools: dict[str, Any] = {}
         # task_id -> shell tool card: completion handle for the message-flow
         # repaint once a background shell task exits (chunks stream via the

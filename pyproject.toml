@@ -80,7 +80,7 @@ ignore = ["E501"]
 
 [tool.coverage.run]
 source = ["app", "cli", "core", "tools", "widgets"]
-omit = ["*/__init__.py", "core/defaults/skills/*"]
+omit = ["*/__init__.py", "core/domain/defaults/skills/*"]
 
 [tool.coverage.report]
 fail_under = 90

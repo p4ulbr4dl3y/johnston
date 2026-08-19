@@ -94,9 +94,6 @@ class ModelsCatalog:
             await self._client.aclose()
             self._client = None
 
-    async def aclose(self) -> None:
-        await self.close()
-
     def load_cache(self) -> bool:
         data = read_json(CACHE_FILE)
         if data and isinstance(data, dict):

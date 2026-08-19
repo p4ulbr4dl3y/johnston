@@ -121,9 +121,6 @@ class ProviderManager:
         """Close shared HTTP clients and resources on shutdown."""
         await catalog.close()
 
-    async def aclose(self) -> None:
-        await self.close()
-
     def _cached_json(self, path: str, default: Any) -> Any:
         """Reads a JSON file, returning a cached value when the file is unchanged (by mtime).
 

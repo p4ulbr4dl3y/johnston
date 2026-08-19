@@ -199,12 +199,12 @@ def test_toggle_hidden_write_error_returns_previous_state(harness):
         assert sm.toggle_hidden("errorskill") is True
 
 
-def test_system_prompt_snippet_empty(harness):
+def test_system_prompt_skills_empty(harness):
     with patch.object(harness.sm, "list_skills", return_value=[]):
-        assert harness.sm.get_system_prompt_snippet() == ""
+        assert harness.sm.get_system_prompt_skills() == []
 
 
-def test_system_prompt_snippet_global_and_project(harness):
+def test_system_prompt_skills_global_and_project(harness):
     global_skill = Skill(
         name="glob",
         description="Global desc",
@@ -222,8 +222,7 @@ def test_system_prompt_snippet_global_and_project(harness):
         hidden=False,
     )
     with patch.object(harness.sm, "list_skills", return_value=[global_skill, project_skill]):
-        snippet = harness.sm.get_system_prompt_snippet()
-    assert "- `glob`: Global desc" in snippet
-    assert "- `proj`" in snippet
-    assert "### Global" in snippet
-    assert "### Project" in snippet
+        skills = harness.sm.get_system_prompt_skills()
+    assert len(skills) == 2
+    assert skills[0].name == "glob"
+    assert skills[1].name == "proj"

@@ -176,14 +176,6 @@ async def test_update_server_config_write_error_is_swallowed(tmp_path):
     assert res is not None  # target still returned despite write failure
 
 
-@pytest.mark.asyncio
-async def test_update_server_config_async_variant():
-    m = make_manager()
-    m._update_server_config = MagicMock(return_value={"name": "x"})
-    res = await m._update_server_config_async("x", {"disabled": True})
-    assert res["name"] == "x"
-
-
 def test_toggle_server_target_missing(tmp_path):
     m = make_manager(str(tmp_path))
     m.load_servers = lambda: []

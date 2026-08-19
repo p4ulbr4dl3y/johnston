@@ -1,7 +1,7 @@
 """Access bundled default skill definitions from package data.
 
 Each default skill lives as a directory ``<skill_name>/`` under
-``core/defaults/skills/`` containing ``SKILL.md`` and optional extra files
+``core/domain/defaults/skills/`` containing ``SKILL.md`` and optional extra files
 (e.g. ``johnston-guide/references/*.md``). These are provisioned into the
 user's global skills directory on first run. Bundled files are read via
 :mod:`importlib.resources` so they also work from an installed wheel.

@@ -57,16 +57,12 @@ class AgentRole:
         self.source = source
         self.tool_name_normalizer = tool_name_normalizer
 
-    @property
-    def system_prompt(self) -> str:
-        return self.prompt
-
     def is_tool_allowed(self, tool_name: str) -> Optional[ToolResult]:
         """Returns an error ToolResult if this role disables tool_name, else None."""
         return role_tool_error(self, tool_name, tool_name_normalizer=getattr(self, "tool_name_normalizer", None))
 
 
-# Single source of truth for role/mode tool-policy checks. Used by
+# Single source of truth for role tool-policy checks. Used by
 # role_tool_error, AgentRole.is_tool_allowed, roles/tools, and application.generation.prompt_builder so
 # disallowed, allowed_tools, and subagent exclusions are honored in one place.
 def _tool_policy_result(
@@ -75,19 +71,15 @@ def _tool_policy_result(
     is_subagent: bool = False,
     tool_name_normalizer: Optional[Callable[[str], str]] = None,
 ) -> Tuple[bool, Optional[str]]:
-    """Evaluate a tool call against a role or mode object.
+    """Evaluate a tool call against a role definition.
 
-    Returns (allowed, reason). reason is None when allowed. Works with both
-    AgentRole instances and duck-typed mode objects exposing disallowed_tools,
-    allowed_tools, and name attributes. When ``is_subagent`` is set,
-    subagent-excluded tools are always denied. ``tool_name_normalizer`` canonicalizes
-    tool names; when None (or on error) the name is used as-is.
+    Returns (allowed, reason). reason is None when allowed. When ``is_subagent``
+    is set, subagent-excluded tools are always denied. ``tool_name_normalizer``
+    canonicalizes tool names; when None (or on error) the name is used as-is.
     """
     if not tool_name:
         return True, None
     clean = normalize_tool_name(tool_name)
-    if clean.startswith("functions."):
-        clean = clean.split(".", 1)[1]
 
     try:
         resolved = tool_name_normalizer(clean) if tool_name_normalizer else clean

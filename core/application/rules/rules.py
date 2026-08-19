@@ -56,7 +56,7 @@ class RulesManager:
         return list(self.rules)
 
     def invalidate_cache(self) -> None:
-        """Force the next load_rules/get_formatted_rules to re-scan from disk."""
+        """Force the next load_rules to re-scan from disk."""
         self._cache.invalidate()
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
@@ -79,22 +79,12 @@ class RulesManager:
             return None
 
     def get_active_rules(
-        self, role: str = "worker", project_dir: Optional[str] = None
+        self, role: str = "worker", project_dir: Optional[str] = None, include_global: bool = True
     ) -> List[RuleDefinition]:
         """Return the ``RuleDefinition`` objects active for ``role``.
 
         Data-only: leaves Markdown assembly (``### Rule: ...``) to the prompt
         builder so this application module does not own rendering output.
         """
-        rules = self.load_rules(project_dir=project_dir)
+        rules = self.load_rules(project_dir=project_dir, include_global=include_global)
         return [r for r in rules if r.is_active_for_roles(role)]
-
-    def get_formatted_rules(
-        self, role: str = "worker", project_dir: Optional[str] = None
-    ) -> str:
-        rules = self.get_active_rules(role=role, project_dir=project_dir)
-        matching = []
-        for r in rules:
-            matching.append(f"### Rule: {r.name}\n{r.content}")
-
-        return "\n\n".join(matching)

@@ -53,7 +53,7 @@ class UpdatePlanTool(BaseTool):
             return ToolResult.error("params", name="plan", detail="must be non-empty")
 
         validated_plan: List[Dict[str, str]] = []
-        for idx, item in enumerate(raw_plan, start=1):
+        for item in raw_plan:
             if not isinstance(item, dict):
                 continue
             step_text = str(item.get("step") or "").strip()

@@ -55,7 +55,6 @@ You are a senior code reviewer role.""")
             self.assertEqual(rev.provider, "clinepass")
             self.assertEqual(rev.scope, "subagent")
             self.assertIn("senior code reviewer role", rev.prompt)
-            self.assertEqual(rev.system_prompt, rev.prompt)  # Alias check
 
     def test_project_roles_folder(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -217,7 +216,6 @@ class TestAgentRoleConstruction:
     def test_missing_all_optional_fields(self):
         r = AgentRole(key="minimal")
         assert r.prompt == ""
-        assert r.system_prompt == ""
         assert r.provider == ""
         assert r.model == ""
         assert r.scope == "any"
@@ -239,7 +237,6 @@ class TestAgentRoleConstruction:
     def test_unicode_prompt_roundtrip(self):
         prompt = "Привет, мир! Роль: 🧠 测试 テスト"
         r = AgentRole(key="uni", prompt=prompt)
-        assert r.system_prompt == prompt
         assert r.prompt == prompt
 
 
@@ -300,12 +297,6 @@ class TestIsToolAllowed:
         # disallowed wins over allowed
         r = AgentRole(key="x", allowed_tools=["read"], disallowed_tools=["read"])
         assert r.is_tool_allowed("read") is not None
-
-    def test_functions_prefix_stripped(self):
-        r = AgentRole(key="x", disallowed_tools=["read"])
-        assert r.is_tool_allowed("functions.read") is not None
-        r2 = AgentRole(key="y", allowed_tools=["read"])
-        assert r2.is_tool_allowed("functions.read") is None
 
     def test_allowed_empty_vs_allowed_set(self):
         # WARNING: allowed_tools=[] allows everything (falsy). This means an
