@@ -61,6 +61,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(chat_input.text, "Third message")
 
             # 4. Test /resume
+            sess = app.sm.create_main("session_test_resume")
+            sess.messages = [{"type": "user", "text": "hello"}]
             await handle_slash_command(app, "/resume")
             await pilot.pause(0.2)
             self.assertIsInstance(app.screen, ResumeScreen)

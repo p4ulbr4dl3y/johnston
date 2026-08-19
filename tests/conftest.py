@@ -24,6 +24,92 @@ DEFAULT_TOOLS: List[Dict[str, Any]] = [
 
 
 # --------------------------------------------------------------------------- #
+# Global isolation fixture (autouse across all tests)
+# --------------------------------------------------------------------------- #
+
+@pytest.fixture(autouse=True)
+def isolate_johnston_env(tmp_path, monkeypatch):
+    """Isolate all Johnston configuration, logs, cache, sessions, and shadow repos to a tmp directory."""
+    test_config_dir = tmp_path / "johnston_test_home"
+    test_config_dir.mkdir(parents=True, exist_ok=True)
+    cfg_dir_str = str(test_config_dir)
+
+    projects_dir = str(test_config_dir / "projects")
+    config_file = str(test_config_dir / "config.json")
+    providers_file = str(test_config_dir / "providers.json")
+    logs_dir = str(test_config_dir / "logs")
+    temp_images_dir = str(test_config_dir / "temp_images")
+    worktrees_dir = str(test_config_dir / "worktrees")
+    prompt_history_file = str(test_config_dir / "prompt_history.json")
+    cache_file = str(test_config_dir / "cache" / "models_catalog_cache.json")
+    skills_dir = str(test_config_dir / "skills")
+    mcp_file = str(test_config_dir / "mcp.json")
+    log_file = str(test_config_dir / "logs" / "johnston.log")
+
+    # 1. Base functions
+    monkeypatch.setattr("core.infrastructure.platform.platform_utils.johnston_config_dir", lambda: test_config_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.johnston_config_dir", lambda: test_config_dir)
+
+    # 2. paths constants
+    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.infrastructure.platform.paths.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_FILE", config_file)
+    monkeypatch.setattr("core.infrastructure.platform.paths.PROVIDERS_JSON_FILE", providers_file)
+    monkeypatch.setattr("core.infrastructure.platform.paths.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", temp_images_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", prompt_history_file)
+
+    # 3. Module-level bound constants
+    monkeypatch.setattr("core.session_manager.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("core.permission_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("core.provider_manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.provider_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", providers_file)
+    monkeypatch.setattr("core.models_catalog.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.models_catalog.CACHE_FILE", cache_file)
+    monkeypatch.setattr("core.application.skills.manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.application.skills.manager.GLOBAL_SKILLS_DIR", skills_dir)
+    monkeypatch.setattr("core.infrastructure.mcp.manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.infrastructure.mcp.manager.GLOBAL_MCP_FILE", mcp_file)
+    monkeypatch.setattr("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.infrastructure.runtime.subagent_worktree.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOG_FILE", log_file)
+    monkeypatch.setattr("core.infrastructure.tasks.output.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("tools.base.LOGS_DIR", logs_dir)
+
+    # 4. Reset singletons before test
+    import core.models_catalog as models_catalog_mod
+    from core.application.rules.rules import RulesManager
+    from core.application.skills.manager import SkillManager
+    from core.infrastructure.mcp.manager import MCPManager
+    from core.permission_manager import PermissionManager
+    from core.role_registry import RoleRegistry
+    from core.session_manager import SessionStore
+
+    SessionStore._instance = None
+    PermissionManager._instance = None
+    RulesManager._instance = None
+    RoleRegistry._instance = None
+    SkillManager._dirs_ensured = False
+    MCPManager._mcp_manager_instance = None
+    models_catalog_mod._json_read_cache.clear()
+
+    yield
+
+    # Reset singletons after test
+    SessionStore._instance = None
+    PermissionManager._instance = None
+    RulesManager._instance = None
+    RoleRegistry._instance = None
+    SkillManager._dirs_ensured = False
+    MCPManager._mcp_manager_instance = None
+    models_catalog_mod._json_read_cache.clear()
+
+
+
+# --------------------------------------------------------------------------- #
 # Builders (private functions — exposed via factory fixtures below)
 # --------------------------------------------------------------------------- #
 

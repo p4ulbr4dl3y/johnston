@@ -6,7 +6,7 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.infrastructure.platform.paths import WORKTREES_DIR
+from core.infrastructure.platform import paths
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
 
@@ -22,12 +22,12 @@ class TestCoverWorktree:
         import shutil
 
         shutil.rmtree(self.tmp, ignore_errors=True)
-        wt = os.path.join(WORKTREES_DIR, "cov-session")
+        wt = os.path.join(paths.WORKTREES_DIR, "cov-session")
         if os.path.isdir(wt):
             shutil.rmtree(wt, ignore_errors=True)
 
     def test_create_worktree_uses_existing_branch(self):
-        wt_path = os.path.join(WORKTREES_DIR, "cov-session")
+        wt_path = os.path.join(paths.WORKTREES_DIR, "cov-session")
 
         def fake(args, **kw):
             if len(args) >= 2 and args[0] == "worktree" and args[1] == "remove":
@@ -49,7 +49,7 @@ class TestCoverWorktree:
         assert SubagentWorktreeManager.attach_worktree(self.tmp, "a", "b") is None
 
     def test_attach_worktree_success(self):
-        wt_path = os.path.join(WORKTREES_DIR, "cov-session")
+        wt_path = os.path.join(paths.WORKTREES_DIR, "cov-session")
 
         def fake(args, **kw):
             if args[0] == "worktree":

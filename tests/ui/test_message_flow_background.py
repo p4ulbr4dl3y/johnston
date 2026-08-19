@@ -78,7 +78,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             app.is_generating = False
-            app.on_background_shell_completed("missing", "ls", "out")
+            with patch.object(app, "generate_ai_response"):
+                app.on_background_shell_completed("missing", "ls", "out")
             self.assertEqual(len(app.message_queue), 0)
 
     async def test_subagent_completed_widget_done(self):
