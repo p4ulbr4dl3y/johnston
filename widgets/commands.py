@@ -479,7 +479,15 @@ class CompactCommand(BaseCommand):
                 on_divider_update=on_divider_update,
                 refresh_footer_cb=lambda: app.refresh_status_footer(),
             )
-            if not outcome.success:
+            if outcome.success:
+                try:
+                    if hasattr(app, "sm") and hasattr(app, "current_session_id") and app.current_session_id:
+                        sess = app.sm.get(app.current_session_id, reload=False)
+                        if sess:
+                            sess.add_event({"type": "event_divider", "text": outcome.title or "Session Compacted"})
+                except Exception:
+                    pass
+            else:
                 app.notify(outcome.message or "Context compaction failed", severity="warning")
         finally:
             app.is_generating = False

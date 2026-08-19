@@ -15,6 +15,80 @@ def should_compact(history_len: int, sys_overhead: int, history_tokens: int, thr
     return history_len > 4 and (sys_overhead + history_tokens) > threshold
 
 
+def is_checkpoint_message(msg: Any) -> bool:
+    """Check if message is a compaction checkpoint or previous summary."""
+    if not isinstance(msg, dict):
+        return False
+    content = msg.get("content", "")
+    if isinstance(content, str):
+        return "<conversation-checkpoint>" in content or "<summary>" in content
+    if isinstance(content, list):
+        for part in content:
+            if isinstance(part, dict) and ("<conversation-checkpoint>" in str(part.get("text", "")) or "<summary>" in str(part.get("text", ""))):
+                return True
+    return False
+
+
+def is_system_note(msg: Any) -> bool:
+    """Check if message is a synthetic system note (e.g. interruption)."""
+    if not isinstance(msg, dict):
+        return False
+    content = msg.get("content", "")
+    if isinstance(content, str) and content.startswith("[System Note:"):
+        return True
+    return False
+
+
+def collect_user_messages(
+    history: List[Dict[str, Any]],
+    max_tokens: int = 20_000,
+    is_subagent: bool = False,
+) -> List[Dict[str, Any]]:
+    """Collects real user messages to preserve across compaction checkpoints.
+
+    - Excludes <conversation-checkpoint> items and [System Note:] synthetic notes.
+    - If is_subagent=True, guarantees the root task prompt (1st real user message) is always preserved.
+    - Preserves user messages up to `max_tokens` budget.
+    """
+    real_user_msgs = []
+    for msg in history:
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            if not is_checkpoint_message(msg) and not is_system_note(msg):
+                real_user_msgs.append(msg)
+
+    if not real_user_msgs:
+        return []
+
+    if is_subagent:
+        root_prompt = real_user_msgs[0]
+        subsequent = real_user_msgs[1:]
+        root_tokens = estimate_tokens(root_prompt)
+        available = max(0, max_tokens - root_tokens)
+        kept_subsequent = []
+        cur_tokens = 0
+        for m in reversed(subsequent):
+            t = estimate_tokens(m)
+            if cur_tokens + t <= available:
+                kept_subsequent.append(m)
+                cur_tokens += t
+            else:
+                break
+        kept_subsequent.reverse()
+        return [root_prompt] + kept_subsequent
+
+    kept = []
+    cur_tokens = 0
+    for m in reversed(real_user_msgs):
+        t = estimate_tokens(m)
+        if cur_tokens + t <= max_tokens:
+            kept.append(m)
+            cur_tokens += t
+        else:
+            break
+    kept.reverse()
+    return kept
+
+
 class CompactionMixin:
     """Mixin providing context-window properties, history sanitization, and compaction for BaseAgent."""
 
@@ -44,10 +118,7 @@ class CompactionMixin:
         for idx, msg in enumerate(self.history):
             if msg.get("role") != "user":
                 continue
-            content = msg.get("content", "")
-            if isinstance(content, str) and (
-                "<conversation-checkpoint>" in content or content.startswith("[System Note:")
-            ):
+            if is_checkpoint_message(msg) or is_system_note(msg):
                 continue
             if user_count == user_msg_index:
                 cutoff_idx = idx
@@ -56,21 +127,15 @@ class CompactionMixin:
 
         if user_count >= user_msg_index:
             kept = self.history[:cutoff_idx]
-            # Interruption notes are not user turns; drop any that fell inside
-            # the kept tail so the model does not see stale "[System Note...]".
             self.history = [
                 m
                 for m in kept
                 if not (
                     m.get("role") == "user"
-                    and isinstance(m.get("content", ""), str)
-                    and m["content"].startswith("[System Note:")
+                    and is_system_note(m)
                 )
             ]
         else:
-            # The selected user message predates the compaction checkpoint (or
-            # history is shorter than the UI): roll back to a clean slate to
-            # avoid stale memory of turns that were removed from the UI.
             self.clear_history()
 
         sys_tok = getattr(self, "_last_sys_tokens", 0)
@@ -249,14 +314,13 @@ class CompactionMixin:
             else (sys_tokens + estimate_tokens(self.history))
         )
 
-        # Preserve recent context tail (prefer recent user boundary in the last 2-6 messages,
-        # otherwise bound recent tail to the last 4 messages to avoid retaining huge in-turn tool cascades).
+        # Preserved recent context tail: keep recent active tool sequence or user turn
         split_idx = None
         min_tail_idx = max(1, len(self.history) - 6)
         max_tail_idx = max(1, len(self.history) - 2)
 
         for idx in range(min_tail_idx, max_tail_idx + 1):
-            if self.history[idx].get("role") == "user":
+            if self.history[idx].get("role") == "user" and not is_checkpoint_message(self.history[idx]) and not is_system_note(self.history[idx]):
                 split_idx = idx
                 break
 
@@ -264,11 +328,10 @@ class CompactionMixin:
             split_idx = max(1, len(self.history) - 4)
 
         recent_tail = self.history[split_idx:]
-        history_to_compact = self.history[:split_idx]
 
         # Extract previous summary for incremental updating if present
         previous_summary = None
-        for msg in history_to_compact:
+        for msg in self.history:
             if isinstance(msg, dict) and msg.get("role") == "user":
                 content_str = str(msg.get("content", ""))
                 if "<summary>" in content_str and "</summary>" in content_str:
@@ -287,14 +350,14 @@ class CompactionMixin:
         # Estimate tokens on individual messages and slice in a single pass from the tail
         start_idx = 0
         total_tokens = 0
-        for i in range(len(history_to_compact) - 1, -1, -1):
-            msg_tokens = estimate_tokens(history_to_compact[i])
+        for i in range(len(self.history) - 1, -1, -1):
+            msg_tokens = estimate_tokens(self.history[i])
             if total_tokens + msg_tokens > available_tokens:
                 start_idx = i + 1
                 break
             total_tokens += msg_tokens
 
-        trimmed_history = history_to_compact[start_idx:]
+        trimmed_history = self.history[start_idx:]
         # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
         sanitized_history_to_compact = self.sanitize_history_for_model(trimmed_history)
 
@@ -345,7 +408,7 @@ class CompactionMixin:
         )
 
         from core.base_provider.tools import build_prompt_context
-        sys_prompt, _, _ = build_prompt_context(self)
+        sys_prompt, all_tools, _ = build_prompt_context(self)
 
         compact_messages = (
             [{"role": "system", "content": sys_prompt}]
@@ -355,6 +418,7 @@ class CompactionMixin:
 
         summary_text = ""
         last_err = None
+        tools_payload = all_tools if all_tools else None
         try:
             # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
             try:
@@ -367,7 +431,7 @@ class CompactionMixin:
                     getattr(self, "api_key", ""),
                     getattr(self, "model", ""),
                     compact_messages,
-                    tools=None,
+                    tools=tools_payload,
                     max_tokens=getattr(self, "max_tokens", 4096),
                 ):
                     if tag == "adapter_text" and payload:
@@ -380,9 +444,10 @@ class CompactionMixin:
             # 2. Fallback to direct client completions if adapter stream produced no content
             if not summary_text and hasattr(self.client, "chat") and hasattr(self.client.chat, "completions"):
                 try:
-                    res = await self.client.chat.completions.create(
-                        model=self.model, messages=compact_messages, stream=False
-                    )
+                    kwargs = {"model": self.model, "messages": compact_messages, "stream": False}
+                    if tools_payload:
+                        kwargs["tools"] = tools_payload
+                    res = await self.client.chat.completions.create(**kwargs)
                     if res:
                         choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
                         if not choices:
@@ -424,8 +489,17 @@ class CompactionMixin:
                 f"<summary>\n{summary_text}\n</summary>\n"
                 "</conversation-checkpoint>"
             )
+            checkpoint_item = {"role": "user", "content": checkpoint_content}
 
-            new_history = [{"role": "user", "content": checkpoint_content}] + recent_tail
+            # Collect preserved user messages
+            is_sub = getattr(self, "is_subagent", False)
+            preserved_users = collect_user_messages(self.history, is_subagent=is_sub)
+
+            # Avoid duplicate user messages that are already in recent_tail
+            tail_ids = {id(m) for m in recent_tail}
+            preserved_prefix = [m for m in preserved_users if id(m) not in tail_ids]
+
+            new_history = preserved_prefix + [checkpoint_item] + recent_tail
             self.history = self.sanitize_history_for_model(new_history)
             tokens_after = sys_tokens + estimate_tokens(self.history)
             self.last_context_tokens = tokens_after

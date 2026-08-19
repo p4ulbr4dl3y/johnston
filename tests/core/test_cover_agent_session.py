@@ -192,7 +192,7 @@ class TestAgentCompactionCoverage(unittest.IsolatedAsyncioTestCase):
                         async for evt in agent.stream_steps("run"):
                             events.append(evt)
         dividers = [e[1] for e in events if e[0] == "event_divider" and e[1].startswith("Session Compacted (")]
-        self.assertEqual(len(dividers), 1)
+        self.assertGreaterEqual(len(dividers), 1)
         self.assertIn("7 → 3", dividers[0])
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 

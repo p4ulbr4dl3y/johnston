@@ -72,11 +72,7 @@ class ShellTask(BaseTask):
                 self._log.append(backfill)
             # Readers may inspect the log before the worker drains; flush now so
             # the backfilled output is visible synchronously on disk.
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(asyncio.to_thread(self._log.flush_now))
-            except RuntimeError:
-                self._log.flush_now()
+            self._log.flush_now()
             return self.log_path
         self._log = None
         return None

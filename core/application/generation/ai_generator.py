@@ -297,7 +297,9 @@ async def generate_ai_response(
                 except Exception:  # noqa: BLE001
                     pass
             elif event_type == "event_divider":
-                await canvas.add_event_divider(val1 or "Session Compacted")
+                div_text = val1 or "Session Compacted"
+                session.add_event({"type": "event_divider", "text": div_text})
+                await canvas.add_event_divider(div_text)
                 canvas.refresh_status_footer()
                 try:
                     save_db.schedule()
@@ -306,6 +308,7 @@ async def generate_ai_response(
     except (asyncio.CancelledError, RuntimeError):
         await _handle_interruption(
             agent,
+            session,
             canvas,
             thinking_handle,
             bot_handle,
@@ -329,6 +332,7 @@ async def generate_ai_response(
 
 async def _handle_interruption(
     agent: Any,
+    session: Any,
     canvas: GenCanvas,
     thinking_handle: Any,
     bot_handle: Any,
@@ -361,6 +365,11 @@ async def _handle_interruption(
             hist_tok = estimate_tokens(agent.history)
             agent.last_context_tokens = sys_tok + hist_tok
             canvas.refresh_status_footer()
+        except Exception:  # noqa: BLE001
+            pass
+    if session and hasattr(session, "add_event"):
+        try:
+            session.add_event({"type": "event_divider", "text": "Response Interrupted"})
         except Exception:  # noqa: BLE001
             pass
     try:

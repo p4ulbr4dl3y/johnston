@@ -55,10 +55,70 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
             self.assertTrue(success)
             self.assertIn("compacted successfully", msg)
-            self.assertEqual(len(agent.history), 4)  # 1 summary + 3 tail messages starting at user turn
-            self.assertIn("<conversation-checkpoint>", agent.history[0]["content"])
-            self.assertIn("## Objective", agent.history[0]["content"])
-            self.assertIn("auth.py", agent.history[0]["content"])
+            self.assertEqual(len(agent.history), 5)  # preserved user turn + 1 summary checkpoint + 3 tail messages
+            self.assertEqual(agent.history[0]["content"], "Fix bug in auth.py")
+            self.assertIn("<conversation-checkpoint>", agent.history[1]["content"])
+            self.assertIn("## Objective", agent.history[1]["content"])
+            self.assertIn("auth.py", agent.history[1]["content"])
+
+    async def test_compact_history_subagent_root_prompt_anchoring(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.is_subagent = True
+        agent.history = [
+            {"role": "user", "content": "Refactor database models in db/schema.py with strict constraints."},
+            {"role": "assistant", "content": "Reading file", "tool_calls": [{"id": "c1", "type": "function", "function": {"name": "read", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "c1", "content": "class User: pass"},
+            {"role": "assistant", "content": "Editing file", "tool_calls": [{"id": "c2", "type": "function", "function": {"name": "edit", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "c2", "content": "done"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = "## Objective\n- Refactor db/schema.py\n\n## Relevant Files\n- db/schema.py"
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+            self.assertTrue(success)
+            # The root subagent prompt must be preserved at index 0
+            self.assertEqual(agent.history[0]["content"], "Refactor database models in db/schema.py with strict constraints.")
+            self.assertIn("<conversation-checkpoint>", agent.history[1]["content"])
+
+    async def test_compaction_sends_full_history_prefix_for_prompt_caching(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="System instructions", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.history = [
+            {"role": "user", "content": "Task A"},
+            {"role": "assistant", "content": "Reply A"},
+            {"role": "user", "content": "Task B"},
+            {"role": "assistant", "content": "Reply B"},
+            {"role": "user", "content": "Task C"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = "## Objective\n- Tasks\n\n## Next Move\n1. Next"
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            await agent.compact_history()
+            call_kwargs = mock_create.call_args[1]
+            sent_messages = call_kwargs["messages"]
+            # Message 0 is system, followed by full intact history, followed by summarizer instruction
+            self.assertEqual(sent_messages[0]["role"], "system")
+            self.assertEqual(sent_messages[1]["content"], "Task A")
+            self.assertEqual(sent_messages[2]["content"], "Reply A")
+            self.assertEqual(sent_messages[3]["content"], "Task B")
+            self.assertEqual(sent_messages[4]["content"], "Reply B")
+            self.assertEqual(sent_messages[5]["content"], "Task C")
+            self.assertIn("CONTEXT CHECKPOINT COMPACTION", sent_messages[6]["content"])
 
     async def test_compact_history_drops_empty_tool_content(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
@@ -132,11 +192,12 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
             self.assertTrue(success)
             self.assertIn("compacted successfully", msg)
-            # The 50-step cascade must be compacted down to checkpoint + bounded recent tail (<= 5 messages)
-            self.assertLessEqual(len(agent.history), 5)
-            self.assertIn("<conversation-checkpoint>", agent.history[0]["content"])
-            self.assertIn("## Key Decisions & User Constraints", agent.history[0]["content"])
-            self.assertIn("## Relevant Files & Context", agent.history[0]["content"])
+            # The 50-step cascade must be compacted down to preserved user prompt + checkpoint + bounded recent tail (<= 6 messages)
+            self.assertLessEqual(len(agent.history), 6)
+            self.assertEqual(agent.history[0]["content"], "Fix all 50 issues")
+            self.assertIn("<conversation-checkpoint>", agent.history[1]["content"])
+            self.assertIn("## Key Decisions & User Constraints", agent.history[1]["content"])
+            self.assertIn("## Relevant Files & Context", agent.history[1]["content"])
 
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
@@ -359,3 +420,62 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(notices), 1)
         self.assertEqual(len(dividers), 1)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
+
+    async def test_model_downshift_triggers_auto_compaction(self):
+        agent = self._make_agent()
+        agent._last_model_limit = 100_000
+        agent.history = [
+            {"role": "user", "content": "hello " * 500},
+            {"role": "assistant", "content": "world " * 500},
+            {"role": "user", "content": "test " * 500},
+            {"role": "assistant", "content": "done " * 500},
+            {"role": "user", "content": "next " * 500},
+        ]
+        with unittest.mock.patch(
+            "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+        ) as mock_limit:
+            mock_limit.return_value = 1_000  # downshift from 100k to 1k
+            with unittest.mock.patch.object(
+                agent, "compact_history", new_callable=unittest.mock.AsyncMock
+            ) as mock_comp:
+                mock_comp.return_value = (True, "downshift compacted")
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
+                    mock_create.side_effect = Exception("Stop stream")
+                    try:
+                        async for _ in agent.stream_steps("trigger"):
+                            pass
+                    except Exception:
+                        pass
+                mock_comp.assert_called_once()
+
+    async def test_rolling_midturn_compaction_multiple_times(self):
+        agent = self._make_agent()
+        compact_calls = 0
+
+        async def fake_compact(messages, sys_overhead, threshold):
+            nonlocal compact_calls
+            compact_calls += 1
+            return (messages, True, "(1000 -> 200 tokens)")
+
+        # 3 tool turns within a single user message
+        first = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
+        second = _MockStream([_tool_call_chunk(0, "tc_2", "read", '{"path": "b.txt"}')])
+        third = _MockStream([_text_chunk("done everything")])
+
+        with unittest.mock.patch.object(agent, "_compact_messages_if_needed", side_effect=fake_compact):
+            with unittest.mock.patch.object(
+                agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+            ) as mock_create:
+                mock_create.side_effect = [first, second, third]
+                agent.tool_executor = unittest.mock.AsyncMock(return_value="tool output large " * 100)
+                events = []
+                async for evt in agent.stream_steps("run multiple tools"):
+                    events.append(evt)
+
+        # Verified that mid-turn compaction ran on both tool turns (rolling)
+        self.assertEqual(compact_calls, 2)
+        dividers = [e for e in events if e[0] == "event_divider" and "Session Compacted" in e[1]]
+        self.assertEqual(len(dividers), 2)
+        self.assertEqual(events[-1], ("bot_text", "done everything", ""))

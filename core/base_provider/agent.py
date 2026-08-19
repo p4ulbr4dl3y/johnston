@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -306,20 +307,34 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self._last_sys_tokens = sys_tokens
 
         # Automatic context compaction when total context (system prompt + tools + history)
-        # exceeds 75% of the context window. Counting history alone ignores the system
-        # prompt / tool schema overhead (often 2-4k tokens), which would let the real
-        # context silently overflow before this threshold ever triggers.
+        # exceeds 75% of the context window, when switching to a smaller model (downshift),
+        # or when system prompt/tool schemas changed significantly.
         from core.domain.defaults.config import CONTEXT_COMPACTION_THRESHOLD_RATIO, DEFAULT_CONTEXT_LIMIT
 
-        threshold = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * CONTEXT_COMPACTION_THRESHOLD_RATIO)
+        cur_limit = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
+        threshold = int(cur_limit * CONTEXT_COMPACTION_THRESHOLD_RATIO)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
-        compacted_this_turn = False
-        if should_compact(len(self.history), sys_overhead, estimate_tokens(self.history), threshold):
+        history_tokens = estimate_tokens(self.history) if self.history else 0
+        total_tokens = sys_overhead + history_tokens
+
+        # 1. Model Downshift detection
+        last_limit = getattr(self, "_last_model_limit", None)
+        self._last_model_limit = cur_limit
+        model_downshift = last_limit is not None and last_limit > cur_limit and total_tokens > cur_limit
+
+        # 2. Instruction / Tool schema hash change detection
+        cur_hash = hashlib.sha256(f"{sys_prompt}:{repr(all_tools)}".encode("utf-8")).hexdigest()
+        last_hash = getattr(self, "_last_comp_hash", None)
+        self._last_comp_hash = cur_hash
+        hash_changed = last_hash is not None and last_hash != cur_hash and len(self.history) > 4 and total_tokens > threshold * 0.8
+
+        need_compact = should_compact(len(self.history), sys_overhead, history_tokens, threshold) or model_downshift or hash_changed
+        self._compacted_count_this_turn = 0
+        if need_compact:
             yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
             try:
                 success, msg = await self.compact_history()
                 if success:
-                    compacted_this_turn = True
                     divider_text = "Session Compacted"
                     if "(" in msg and ")" in msg:
                         divider_text = f"Session Compacted ({msg[msg.find('(') + 1: msg.rfind(')')]})"
@@ -753,9 +768,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 # once here and reuse the latest slice on the next iteration.
                 history_snapshot = await asyncio.to_thread(list, messages[1:])
                 self.history = history_snapshot
-                if compacted_this_turn:
-                    messages, compacted_in_loop, compact_msg = messages, False, ""
-                else:
+                compacted_count = getattr(self, "_compacted_count_this_turn", 0)
+                if compacted_count < 10:
                     compact_res = await self._compact_messages_if_needed(messages, self._last_sys_tokens, threshold)
                     if isinstance(compact_res, tuple) and len(compact_res) == 3:
                         messages, compacted_in_loop, compact_msg = compact_res
@@ -764,9 +778,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         compact_msg = ""
                     else:
                         messages, compacted_in_loop, compact_msg = messages, False, ""
+                else:
+                    messages, compacted_in_loop, compact_msg = messages, False, ""
 
                 if compacted_in_loop:
-                    compacted_this_turn = True
+                    self._compacted_count_this_turn = compacted_count + 1
                     divider_text = "Session Compacted"
                     if "(" in compact_msg and ")" in compact_msg:
                         divider_text = f"Session Compacted ({compact_msg[compact_msg.find('(') + 1: compact_msg.rfind(')')]})"
