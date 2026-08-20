@@ -57,7 +57,7 @@ def _truncate_output(res: str) -> str:
     return truncate_output(
         res,
         max_chars=4000,
-        hint="Pipe output to grep/head/tail if complete log is needed.",
+        hint="Pipe command to grep/head, or inspect full log if needed.",
         tool_name="shell",
         from_end=True,
     )
@@ -66,8 +66,8 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Execute non-interactive shell commands. For long-running servers/tasks set background=true "
-        "(notifies automatically on completion; manage via 'manage_shell')."
+        "Execute non-interactive shell command. Always specify explicit path (e.g. 'rg foo .') "
+        "to avoid stdin hang. Set background=true for servers/long jobs."
     )
 
     schema = {

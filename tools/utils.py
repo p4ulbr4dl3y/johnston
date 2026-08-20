@@ -124,7 +124,7 @@ def format_line_pagination(
         if actual_end < end:
             hint_text += f" [Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]"
         if converted_path:
-            hint_text += f" [Full converted Markdown saved to {converted_path}. Use shell (grep/head/tail) to inspect or filter full output.]"
+            hint_text += f" [Full converted Markdown saved to {converted_path}. Use shell (grep/tail) to inspect or filter full output.]"
         header += hint_text
 
     return f"{header}\n{result_body}"

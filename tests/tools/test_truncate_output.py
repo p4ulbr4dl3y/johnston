@@ -10,7 +10,7 @@ class TestTruncateOutput(unittest.TestCase):
         res = truncate_output(large_text, max_chars=1000)
 
         self.assertIn("Full output saved to", res)
-        self.assertIn("Use read tool or shell (grep/head/tail) to inspect", res)
+        self.assertIn("Use read tool or shell (grep/tail) to inspect", res)
         log_path = (
             [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0]
             .rstrip(".")
@@ -51,9 +51,10 @@ class TestTruncateOutput(unittest.TestCase):
             self.assertEqual(f.read(), text2)
 
     def test_truncate_output_from_end(self):
-        text = "HEAD_" + ("X" * 1000) + "_TAIL"
-        res = truncate_output(text, max_chars=100, from_end=True, save_log=False)
-        self.assertTrue(res.startswith("[Output truncated. Showing last 100 chars."))
+        text = "HEAD_\n" + ("X\n" * 100) + "_TAIL"
+        res = truncate_output(text, max_chars=50, from_end=True, save_log=False)
+        self.assertIn("Showing last 50 chars", res)
+        self.assertIn("lines shown", res)
         self.assertTrue(res.endswith("_TAIL"))
         self.assertNotIn("HEAD_", res)
 

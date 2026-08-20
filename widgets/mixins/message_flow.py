@@ -234,7 +234,7 @@ class MessageFlowMixin:
                 truncate_output(
                     result,
                     max_chars=4000,
-                    hint="Pipe output to grep/head/tail if complete log is needed.",
+                    hint="Pipe command to grep/head, or inspect full log if needed.",
                     tool_name="shell",
                     from_end=True,
                     save_log=False,
@@ -260,7 +260,7 @@ class MessageFlowMixin:
         final_result = truncate_output(
             result or "(no output)",
             max_chars=4000,
-            hint="Pipe output to grep/head/tail if complete log is needed.",
+            hint="Pipe command to grep/head, or inspect full log if needed.",
             tool_name="shell",
             from_end=True,
             save_log=False,

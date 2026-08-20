@@ -321,7 +321,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("Full converted Markdown saved to", res)
         self.assertIn(".md", res)
-        self.assertIn("Use shell (grep/head/tail) to inspect", res)
+        self.assertIn("Use shell (grep/tail) to inspect", res)
 
         import asyncio
 

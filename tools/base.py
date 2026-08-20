@@ -183,7 +183,8 @@ def truncate_output(
 
     if from_end:
         truncated = text[-max_chars:]
-        header = f"[Output truncated. Showing last {max_chars} chars."
+        shown_lines = truncated.count("\n") + (1 if truncated else 0)
+        header = f"[Output truncated. Showing last {max_chars} chars ({shown_lines} lines shown)."
         if save_log:
             header += f" Full output saved to {log_path}."
             if format_desc:
@@ -191,9 +192,9 @@ def truncate_output(
             if is_json:
                 header += " Use read tool or shell (jq/grep) to inspect formatted JSON."
             elif "\n" not in text:
-                header += " Output is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full output."
+                header += " Output is single-line (use content_offset). Use read tool or shell (grep/head) to inspect or filter full output."
             else:
-                header += " Use read tool or shell (grep/head/tail) to inspect or filter full output."
+                header += " Use read tool or shell (grep/head) to inspect or filter full output."
         if hint:
             header += f" {hint}"
         header += "]\n...\n"
@@ -211,9 +212,9 @@ def truncate_output(
             if is_json:
                 footer += " Use read tool or shell (jq/grep) to inspect formatted JSON."
             elif "\n" not in text:
-                footer += " Output is single-line (use content_offset). Use read tool or shell (grep/head/tail) to inspect or filter full output."
+                footer += " Output is single-line (use content_offset). Use read tool or shell (grep/tail) to inspect or filter full output."
             else:
-                footer += f" Use read tool (start_line={next_line}) or shell (grep/head/tail) to inspect remaining output."
+                footer += f" Use read tool (start_line={next_line}) or shell (grep/tail) to inspect remaining output."
         if hint:
             footer += f" {hint}"
         footer += "]"
