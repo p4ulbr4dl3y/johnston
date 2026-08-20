@@ -189,7 +189,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             append_diff_line(num_str, "+", code_text, style_bg="on #12261e", style_fg="#3fb950")
             new_line += 1
         elif line.startswith("\\"):
-            formatted_lines.append(Text(line, style="dim", overflow="crop"))
+            continue
         else:
             num_str = str(new_line).rjust(max_num_digits)
             content = line[1:] if line.startswith(" ") else line

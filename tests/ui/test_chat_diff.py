@@ -74,6 +74,7 @@ class TestFormatEditDiff(unittest.TestCase):
             "trailing garbage line\n"
         )
         result = format_edit_diff(diff, "f.py")
+        self.assertNotIn("No newline at end of file", result.plain)
         self.assertIn("trailing garbage line", result.plain)
 
     def test_format_edit_diff_empty_code_lines_and_no_lexer(self):
