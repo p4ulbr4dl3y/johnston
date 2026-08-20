@@ -14,7 +14,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
-        for name in ("mcp_tool_test", "exposed_mcp_tool", "faulty_mcp", "none_mcp", "async_mcp"):
+        for name in ("mcp_tool_test", "exposed_mcp_tool", "faulty_mcp", "none_mcp", "async_mcp", "err_mcp"):
             pm.set_session_override(name, "allow")
 
     def test_normalize_tool_name(self):
@@ -293,6 +293,23 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.content, "ERR: denied 'gh__search': by permission policy")
         mock_pm.check_permission.assert_called_once_with("gh__search", {"q": "x"})
 
+    async def test_execute_tool_mcp_error_string_marked_error(self):
+        # MCP failures now surface as ERR:-prefixed strings (JSON-RPC error,
+        # isError result, transport failure), so the registry classifies them as
+        # real tool errors (is_error=True) exactly like native-tool failures.
+        mock_mcp_mgr = MagicMock()
+        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "err_mcp"}}]
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr.call_tool.return_value = "ERR: mcp 'err_mcp': boom"
+
+        with (
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            self._mock_mode(),
+        ):
+            res = await execute_tool("err_mcp", {})
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: mcp 'err_mcp': boom", res.content)
+        self.assertIsNone(res.returncode)
 
     async def test_execute_tool_mcp_output_truncated(self):
         huge_output = "X" * 15000

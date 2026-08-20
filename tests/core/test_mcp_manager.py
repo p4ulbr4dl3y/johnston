@@ -371,7 +371,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 err_res = {"jsonrpc": "2.0", "id": 4, "error": {"message": "Invalid args"}}
                 read_responses = [err_res]
                 res_err = client.call_tool("foo", {})
-                self.assertIn("MCP Error: Invalid args", res_err)
+                self.assertIn("ERR: mcp 'foo': Invalid args", res_err)
 
                 # Test call_tool no response timeout
                 read_responses = [None]
@@ -757,7 +757,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
             return res
 
         res = await scenario()
-        self.assertIn("Error", res)
+        self.assertIn("ERR: mcp 't': MCP server 's' stopped", res)
 
 
 class NamespaceResolutionEdge(unittest.TestCase):

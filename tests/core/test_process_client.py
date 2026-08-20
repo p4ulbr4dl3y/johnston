@@ -668,7 +668,7 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
         client.process = None
         with patch.object(client, "start_async", new=AsyncMock(return_value=False)):
             out = await client.call_tool_async("foo", {})
-        self.assertIn("is not running", out)
+        self.assertIn("ERR: mcp 'foo': MCP server 't' process is not running", out)
 
     async def test_call_tool_async_success(self):
         client = await self._client_with_process()
@@ -687,14 +687,14 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
     async def test_call_tool_async_timeout(self):
         client = await self._client_with_process()
         out = await client.call_tool_async("foo", {}, timeout=0.01)
-        self.assertIn("No response from MCP server", out)
+        self.assertIn("ERR: mcp 'foo': No response from MCP server 't'", out)
         self.assertNotIn(1, client._pending_futures)
 
     async def test_call_tool_async_write_error(self):
         client = await self._client_with_process()
         client.process.stdin.write.side_effect = OSError("pipe closed")
         out = await client.call_tool_async("foo", {})
-        self.assertIn("Error writing to MCP server", out)
+        self.assertIn("ERR: mcp 'foo': failed to write to MCP server 't': pipe closed", out)
 
     async def test_call_tool_async_no_response(self):
         client = await self._client_with_process()
@@ -707,7 +707,7 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
 
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {})
-        self.assertIn("No response from MCP server", out)
+        self.assertIn("ERR: mcp 'foo': No response from MCP server 't'", out)
 
     async def test_call_tool_async_error_response(self):
         client = await self._client_with_process()
@@ -721,7 +721,7 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
 
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {})
-        self.assertIn("MCP Error: bad args", out)
+        self.assertIn("ERR: mcp 'foo': bad args", out)
 
     async def test_call_tool_async_error_response_non_dict(self):
         client = await self._client_with_process()
@@ -735,7 +735,41 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
 
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {})
-        self.assertIn("MCP Error: oops", out)
+        self.assertIn("ERR: mcp 'foo': oops", out)
+
+    async def test_call_tool_async_result_is_error(self):
+        # Per MCP spec, a result with isError: true is a tool-level failure even
+        # though the JSON-RPC round-trip succeeded; it must be surfaced as ERR:.
+        client = await self._client_with_process()
+        resp = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"isError": True, "content": [{"type": "text", "text": "permission denied"}]},
+        }
+
+        def on_write(line):
+            req = json.loads(line)
+            fut = client._pending_futures.get(req["id"])
+            if fut and not fut.done():
+                fut.set_result(resp)
+
+        client.process.stdin.write.side_effect = on_write
+        out = await client.call_tool_async("foo", {})
+        self.assertEqual(out, "ERR: mcp 'foo': permission denied")
+
+    async def test_call_tool_async_result_is_error_without_content(self):
+        client = await self._client_with_process()
+        resp = {"jsonrpc": "2.0", "id": 1, "result": {"isError": True, "content": []}}
+
+        def on_write(line):
+            req = json.loads(line)
+            fut = client._pending_futures.get(req["id"])
+            if fut and not fut.done():
+                fut.set_result(resp)
+
+        client.process.stdin.write.side_effect = on_write
+        out = await client.call_tool_async("foo", {})
+        self.assertEqual(out, "ERR: mcp 'foo': Tool reported isError without content")
 
     async def test_call_tool_async_non_text_content(self):
         client = await self._client_with_process()

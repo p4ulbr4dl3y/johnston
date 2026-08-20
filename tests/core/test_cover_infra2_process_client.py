@@ -244,4 +244,4 @@ class TestCoverCallToolAsyncGenericError:
 
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {}, timeout=2.0)
-        assert "Error:" in out
+        assert "ERR: mcp 'foo': bad thing" in out

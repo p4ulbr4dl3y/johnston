@@ -15,6 +15,8 @@ import threading
 import time
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
+from core.domain.defaults.errors import format_tool_error
+
 logger = logging.getLogger(__name__)
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
@@ -686,25 +688,40 @@ class MCPProcessClient:
         }
         return current_id, req
 
-    def _parse_tool_response(self, tool_name: str, res: Optional[Dict[str, Any]]) -> str:
-        """Helper to parse MCP tool call JSON-RPC response or error dict into string output."""
-        if not res:
-            return f"Error: No response from MCP server '{self.name}'"
-        if "error" in res:
-            err_val = res["error"]
-            err_msg = err_val.get("message", str(err_val)) if isinstance(err_val, dict) else str(err_val)
-            return f"MCP Error: {err_msg}"
-
-        result = res.get("result", {})
-        content_items = result.get("content", [])
+    @staticmethod
+    def _format_content(result: Any) -> str:
+        """Serialize a tools/call result ``content`` list into one output string."""
+        content_items = result.get("content", []) if isinstance(result, dict) else []
         output_parts = []
         for item in content_items:
-            if item.get("type") == "text":
+            if isinstance(item, dict) and item.get("type") == "text":
                 output_parts.append(item.get("text", ""))
             else:
                 output_parts.append(json.dumps(item, ensure_ascii=False))
+        return "\n".join(output_parts).strip()
 
-        output_text = "\n".join(output_parts).strip()
+    def _parse_tool_response(self, tool_name: str, res: Optional[Dict[str, Any]]) -> str:
+        """Helper to parse MCP tool call JSON-RPC response or error dict into string output.
+
+        Every failure path returns an ``ERR:``-prefixed string so upper layers
+        (``tools.registry._wrap_execute``, agent ``_normalize_tool_result``)
+        classify it as an error just like native-tool failures. Per the MCP
+        spec, a result with ``isError: true`` is a tool-level failure even
+        though the JSON-RPC round-trip itself succeeded.
+        """
+        if not res:
+            return format_tool_error("mcp", detail=f"No response from MCP server '{self.name}'", name=tool_name)
+        if "error" in res:
+            err_val = res["error"]
+            err_msg = err_val.get("message", str(err_val)) if isinstance(err_val, dict) else str(err_val)
+            return format_tool_error("mcp", detail=err_msg, name=tool_name)
+
+        result = res.get("result", {})
+        if isinstance(result, dict) and result.get("isError"):
+            detail = self._format_content(result) or "Tool reported isError without content"
+            return format_tool_error("mcp", detail=detail, name=tool_name)
+
+        output_text = self._format_content(result)
         if output_text:
             return output_text
 
@@ -714,7 +731,9 @@ class MCPProcessClient:
         with self._lock:
             if not self.process or self.process.poll() is not None:
                 if not self.start():
-                    return f"Error: MCP server '{self.name}' process is not running"
+                    return format_tool_error(
+                        "mcp", detail=f"MCP server '{self.name}' process is not running", name=tool_name
+                    )
 
             current_id, req = self._build_call_payload(tool_name, arguments)
             self._send(req)
@@ -729,7 +748,9 @@ class MCPProcessClient:
 
         if not self.process or self.process.poll() is not None:
             if not await self.start_async():
-                return f"Error: MCP server '{self.name}' process is not running"
+                return format_tool_error(
+                    "mcp", detail=f"MCP server '{self.name}' process is not running", name=tool_name
+                )
 
         self._start_async_reader()
         async with self._call_lock:
@@ -749,20 +770,22 @@ class MCPProcessClient:
                 raise
             except Exception as e:
                 self._pending_futures.pop(current_id, None)
-                return f"Error writing to MCP server '{self.name}': {e}"
+                return format_tool_error(
+                    "mcp", detail=f"failed to write to MCP server '{self.name}': {e}", name=tool_name
+                )
 
         try:
             effective_timeout = timeout if timeout is not None else DEFAULT_TOOLS_CALL_TIMEOUT
             res = await asyncio.wait_for(asyncio.shield(fut), timeout=effective_timeout)
         except asyncio.TimeoutError:
-            return f"Error: No response from MCP server '{self.name}'"
+            return format_tool_error("mcp", detail=f"No response from MCP server '{self.name}'", name=tool_name)
         except asyncio.CancelledError:
             raise
         except RuntimeError as e:
             # Server stopped while we awaited; surface gracefully instead of crashing.
-            return f"Error: {e}"
+            return format_tool_error("mcp", detail=str(e), name=tool_name)
         except Exception as e:
-            return f"Error: {e}"
+            return format_tool_error("mcp", detail=str(e), name=tool_name)
         finally:
             self._pending_futures.pop(current_id, None)
 
