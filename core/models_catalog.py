@@ -44,15 +44,21 @@ def _get_match(cache: "OrderedDict", key: tuple):
     return None
 
 
-# Shared JSON read cache keyed by path -> (mtime, parsed dict). Avoids a disk
-# read on repeated reads of unchanged files; deduplicates the JSON caching logic
-# also used by provider_manager (see cached_json_read).
 _json_read_cache: Dict[str, tuple] = {}
+
+
+def invalidate_json_read_cache(path: Optional[str] = None) -> None:
+    """Invalidate cached JSON file entries."""
+    if path is None:
+        _json_read_cache.clear()
+    else:
+        _json_read_cache.pop(path, None)
 
 
 def cached_json_read(path: str, default: Any = None) -> Any:
     """Reads a JSON file, returning a cache value when the file mtime is unchanged."""
     if not os.path.exists(path):
+        _json_read_cache.pop(path, None)
         return default
     try:
         mtime = os.path.getmtime(path)

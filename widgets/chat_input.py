@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import re
 import urllib.parse
@@ -10,6 +9,7 @@ from textual.widgets import TextArea
 
 from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
+from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
@@ -48,22 +48,14 @@ class ChatInput(TextArea):
 
     def load_prompt_history(self) -> list[str]:
         """Load global prompt history from disk"""
-        if not os.path.exists(config.PROMPT_HISTORY_FILE):
-            return []
-        try:
-            with open(config.PROMPT_HISTORY_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return [str(item) for item in data][-self.MAX_PROMPT_HISTORY :]
-        except Exception:
-            pass
+        data = read_json(config.PROMPT_HISTORY_FILE, default=[])
+        if isinstance(data, list):
+            return [str(item) for item in data][-self.MAX_PROMPT_HISTORY :]
         return []
 
     def _save_prompt_history_to_disk(self, history: list[str]) -> None:
         try:
-            os.makedirs(config.CONFIG_DIR, exist_ok=True)
-            with open(config.PROMPT_HISTORY_FILE, "w", encoding="utf-8") as f:
-                json.dump(history[-self.MAX_PROMPT_HISTORY :], f, ensure_ascii=False, indent=2)
+            atomic_write_json(config.PROMPT_HISTORY_FILE, history[-self.MAX_PROMPT_HISTORY :], indent=2)
         except Exception:
             pass
 
@@ -72,7 +64,17 @@ class ChatInput(TextArea):
         history_copy = list(self.prompt_history)
         try:
             loop = asyncio.get_running_loop()
-            self._save_task = loop.create_task(asyncio.to_thread(self._save_prompt_history_to_disk, history_copy))
+            prev_task = getattr(self, "_save_task", None)
+
+            async def _do_save():
+                if prev_task and not prev_task.done():
+                    try:
+                        await prev_task
+                    except Exception:
+                        pass
+                await asyncio.to_thread(self._save_prompt_history_to_disk, history_copy)
+
+            self._save_task = loop.create_task(_do_save())
         except RuntimeError:
             self._save_prompt_history_to_disk(history_copy)
 

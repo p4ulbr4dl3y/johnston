@@ -10,7 +10,7 @@ from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.platform.paths import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
-from core.models_catalog import cached_json_read, catalog
+from core.models_catalog import cached_json_read, catalog, invalidate_json_read_cache
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +116,8 @@ class ProviderManager:
 
     def invalidate_cache(self):
         self._providers_memo = {}
+        invalidate_json_read_cache(CONFIG_FILE)
+        invalidate_json_read_cache(PROVIDERS_JSON_FILE)
 
     async def close(self) -> None:
         """Close shared HTTP clients and resources on shutdown."""
@@ -140,9 +142,11 @@ class ProviderManager:
 
     def _save_config(self, data: Dict[str, Any]) -> None:
         atomic_write_json(CONFIG_FILE, data, indent=2)
+        invalidate_json_read_cache(CONFIG_FILE)
 
     def _save_providers_json(self, data: Dict[str, Any]) -> None:
         atomic_write_json(PROVIDERS_JSON_FILE, data, indent=2)
+        invalidate_json_read_cache(PROVIDERS_JSON_FILE)
 
     def ensure_config_dir(self):
         os.makedirs(CONFIG_DIR, exist_ok=True)

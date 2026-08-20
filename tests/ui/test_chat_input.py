@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import tempfile
 import unittest
@@ -665,14 +664,13 @@ class TestChatInputHistoryFile(unittest.TestCase):
     def test_load_prompt_history_invalid_json_returns_empty(self):
         ci = ChatInput()
         with patch.object(chat_input_mod.config, "PROMPT_HISTORY_FILE", "/nonexistent/history.json"):
-            with patch("widgets.chat_input.os.path.exists", return_value=True):
-                with patch("widgets.chat_input.json.load", side_effect=json.JSONDecodeError("x", "d", 0)):
-                    self.assertEqual(ci.load_prompt_history(), [])
+            with patch("widgets.chat_input.read_json", return_value=None):
+                self.assertEqual(ci.load_prompt_history(), [])
 
     def test_save_prompt_history_swallows_write_error(self):
         ci = ChatInput()
         ci.prompt_history = ["a", "b"]
-        with patch("widgets.chat_input.json.dump", side_effect=OSError("disk full")):
+        with patch("widgets.chat_input.atomic_write_json", side_effect=OSError("disk full")):
             ci.save_prompt_history()  # must not raise
 
 
