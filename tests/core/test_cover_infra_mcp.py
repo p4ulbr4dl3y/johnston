@@ -6,6 +6,7 @@ mocks, mirroring the existing test_mcp_manager / test_edge_mcp_manager style.
 """
 
 import asyncio
+import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -151,7 +152,7 @@ def test_load_config_file_missing_and_bad_entries(tmp_path):
 async def test_update_server_config_target_missing(tmp_path):
     m = make_manager(str(tmp_path))
     m.load_servers = lambda: [{"name": "other", "command": "p"}]
-    assert m._update_server_config("missing", {"disabled": True}) is None
+    assert m._update_server_config("missing", {"enabled": False}) is None
 
 
 async def test_update_server_config_creates_new_entry_and_adds_key(tmp_path):
@@ -159,21 +160,43 @@ async def test_update_server_config_creates_new_entry_and_adds_key(tmp_path):
     # global file exists but has no "mcpServers" key -> line adds it then creates entry
     with open(m.global_file, "w", encoding="utf-8") as f:
         f.write("{}")
-    m.load_servers = lambda: [{"name": "new", "command": "python", "args": ["-m", "x"], "disabled": False, "scope": "global"}]
-    target = m._update_server_config("new", {"disabled": True})
+    m.load_servers = lambda: [{"name": "new", "command": "python", "args": ["-m", "x"], "scope": "global"}]
+    target = m._update_server_config("new", {"enabled": False})
     assert target is not None
-    import json
 
     written = json.load(open(m.global_file, encoding="utf-8"))
-    assert written["mcpServers"]["new"]["disabled"] is True
+    assert written["mcpServers"]["new"]["enabled"] is False
 
 
 async def test_update_server_config_write_error_is_swallowed(tmp_path):
     m = make_manager(str(tmp_path))
     m.load_servers = lambda: [{"name": "x", "command": "p", "scope": "global"}]
     with patch("core.infrastructure.mcp.manager.atomic_write_json", side_effect=OSError("disk")):
-        res = m._update_server_config("x", {"disabled": True})
+        res = m._update_server_config("x", {"enabled": False})
     assert res is not None  # target still returned despite write failure
+
+
+async def test_update_server_config_reenabling_drops_enabled_key(tmp_path):
+    m = make_manager(str(tmp_path))
+    with open(m.global_file, "w", encoding="utf-8") as f:
+        json.dump({"mcpServers": {"x": {"command": "p", "enabled": False}}}, f)
+    m.load_servers = lambda: [{"name": "x", "command": "p", "enabled": False, "scope": "global"}]
+    # Re-enabling must drop the redundant "enabled" key — absent means enabled.
+    m._update_server_config("x", {"enabled": True})
+    written = json.load(open(m.global_file, encoding="utf-8"))
+    assert "enabled" not in written["mcpServers"]["x"]
+
+
+async def test_update_server_config_new_entry_omits_enabled_key(tmp_path):
+    m = make_manager(str(tmp_path))
+    with open(m.global_file, "w", encoding="utf-8") as f:
+        f.write("{}")
+    m.load_servers = lambda: [{"name": "new", "command": "python", "args": ["-m", "x"], "scope": "global"}]
+    m._update_server_config("new", {"env": {"A": "1"}})
+    written = json.load(open(m.global_file, encoding="utf-8"))
+    written_entry = written["mcpServers"]["new"]
+    assert "enabled" not in written_entry
+    assert written_entry["env"] == {"A": "1"}
 
 
 def test_toggle_server_target_missing(tmp_path):
@@ -182,9 +205,18 @@ def test_toggle_server_target_missing(tmp_path):
     assert m.toggle_server("nope") is False
 
 
+def test_server_enabled_semantics():
+    m = make_manager()
+    assert m.server_enabled({}) is True  # absent key means enabled
+    assert m.server_enabled({"enabled": True}) is True
+    assert m.server_enabled({"enabled": False}) is False
+    # Only the canonical key matters: legacy "disabled" is ignored.
+    assert m.server_enabled({"disabled": True}) is True
+
+
 def test_toggle_server_update_failure_returns_false(tmp_path):
     m = make_manager(str(tmp_path))
-    m.load_servers = lambda: [{"name": "x", "command": "p", "disabled": False}]
+    m.load_servers = lambda: [{"name": "x", "command": "p"}]
     m._update_server_config = MagicMock(return_value=None)
     assert m.toggle_server("x") is False
 
@@ -193,7 +225,7 @@ def test_toggle_server_disables_and_stops_client(tmp_path):
     m = make_manager(str(tmp_path))
     client = MagicMock()
     m.clients = {"x": client}
-    m.load_servers = lambda: [{"name": "x", "command": "p", "disabled": False}]
+    m.load_servers = lambda: [{"name": "x", "command": "p"}]
     m._update_server_config = MagicMock(return_value={"name": "x"})
     assert m.toggle_server("x") is False  # now disabled
     client.stop.assert_called_once()
@@ -324,7 +356,7 @@ async def test_load_server_tools_async_is_tools_stale_raises():
 @pytest.mark.asyncio
 async def test_get_active_tools_async_handles_exceptions():
     m = make_manager()
-    m.load_servers_async = AsyncMock(return_value=[{"name": "s", "command": "python", "disabled": False}])
+    m.load_servers_async = AsyncMock(return_value=[{"name": "s", "command": "python"}])
     m._load_server_tools_async = AsyncMock(side_effect=ValueError("boom"))
     assert await m.get_active_tools_async() == []
 

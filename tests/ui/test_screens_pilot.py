@@ -50,7 +50,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get_mgr:
             mock_mgr = MagicMock()
             mock_mgr.load_servers.return_value = [
-                {"name": "srv1", "command": "python", "disabled": False, "scope": "global"}
+                {"name": "srv1", "command": "python", "scope": "global"}
             ]
             mock_mgr.toggle_server.return_value = False
             mock_get_mgr.return_value = mock_mgr
@@ -60,7 +60,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             async with app.run_test() as pilot:
                 await pilot.pause()
-                # Toggle disabled state
+                # Toggle disabled->enabled state
                 await pilot.press("enter")
                 await pilot.pause()
 

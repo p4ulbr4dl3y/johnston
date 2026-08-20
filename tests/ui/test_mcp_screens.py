@@ -108,9 +108,9 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
 
     async def test_modal_renders_configured_servers(self):
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
-            {"name": "beta", "command": "py", "disabled": True, "scope": "global"},
-            {"name": "gamma", "command": "py", "disabled": False, "scope": "project"},
+            {"name": "alpha", "command": "py", "scope": "global"},
+            {"name": "beta", "command": "py", "enabled": False, "scope": "global"},
+            {"name": "gamma", "command": "py", "scope": "project"},
         ]
         screen = _make_screen(_mock_mgr(servers))
         async with _MCPScreenHost(screen).run_test() as pilot:
@@ -142,7 +142,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # load lands after on_mount, and a second refresh (e.g. after warmup)
         # must not blank the list.
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
         ]
         screen = _make_screen(_mock_mgr(servers))
         async with _MCPScreenHost(screen).run_test() as pilot:
@@ -159,7 +159,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # reported bug — the async callback back onto the event loop was lost,
         # leaving the OptionList permanently empty.
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
         ]
         screen = _make_screen(_mock_mgr(servers))
         async with _MCPScreenHost(screen).run_test() as pilot:
@@ -186,7 +186,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # on every enter. It must run off-thread with duplicate toggles for
         # the same server dropped while one is in flight.
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
         ]
 
         # Baseline: measure how long a burst of 6 enters takes when the toggle
@@ -240,7 +240,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # Once the in-flight toggle completes, a later enter toggles again
         # (no permanent lock on the server).
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
         ]
         mgr = _mock_mgr(servers)
         calls: list[str] = []
@@ -267,18 +267,18 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # Enabling a server in the modal must refresh the row with "N tools"
         # once the (async, coalesced) warmup lands — no reopen needed.
         servers = [
-            {"name": "alpha", "command": "py", "disabled": True, "scope": "global"},
+            {"name": "alpha", "command": "py", "enabled": False, "scope": "global"},
         ]
         mgr = _mock_mgr(servers)
-        state = {"disabled": True}
+        state = {"enabled": False}
 
         def toggle(name):
-            state["disabled"] = not state["disabled"]
-            return not state["disabled"]
+            state["enabled"] = not state["enabled"]
+            return state["enabled"]
 
         mgr.toggle_server = toggle
         mgr.load_servers = lambda: [
-            {"name": "alpha", "command": "py", "disabled": state["disabled"], "scope": "global"}
+            {"name": "alpha", "command": "py", "enabled": state["enabled"], "scope": "global"}
         ]
 
         async def warmup():
@@ -303,7 +303,7 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
         # earlier modal) delays the background load; the modal must render the
         # placeholder row synchronously from on_mount instead of a blank box.
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
         ]
         screen = _make_screen(_mock_mgr(servers))
         async with _MCPScreenHost(screen).run_test() as pilot:
@@ -326,13 +326,13 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_refresh_list_all_statuses(self):
         servers = [
-            {"name": "disc", "command": "x", "disabled": True, "scope": "global"},
-            {"name": "tsrv", "command": "py", "disabled": False, "scope": "global"},
-            {"name": "urlsrv", "url": "http://host", "disabled": False, "scope": "global"},
-            {"name": "sfail", "command": "x", "disabled": False, "scope": "global"},
-            {"name": "tmo", "command": "x", "disabled": False, "scope": "global"},
-            {"name": "ambi", "command": "x", "url": "http://u", "disabled": False, "scope": "global"},
-            {"name": "nocmd", "disabled": False, "scope": "global"},
+            {"name": "disc", "command": "x", "enabled": False, "scope": "global"},
+            {"name": "tsrv", "command": "py", "scope": "global"},
+            {"name": "urlsrv", "url": "http://host", "scope": "global"},
+            {"name": "sfail", "command": "x", "scope": "global"},
+            {"name": "tmo", "command": "x", "scope": "global"},
+            {"name": "ambi", "command": "x", "url": "http://u", "scope": "global"},
+            {"name": "nocmd", "scope": "global"},
         ]
         client_with_tools = MagicMock()
         client_with_tools.tools = [{"name": "t1"}, {"name": "t2"}]
@@ -401,8 +401,8 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_refresh_list_filter_with_prev_highlight(self):
         servers = [
-            {"name": "alpha", "command": "py", "disabled": False, "scope": "global"},
-            {"name": "beta", "command": "py", "disabled": False, "scope": "global"},
+            {"name": "alpha", "command": "py", "scope": "global"},
+            {"name": "beta", "command": "py", "scope": "global"},
         ]
         mgr = MagicMock()
         mgr.load_servers.return_value = servers
@@ -474,7 +474,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_on_input_changed(self):
         mgr = MagicMock()
         mgr.load_servers.return_value = [
-            {"name": "srv", "command": "py", "disabled": False, "scope": "global"}
+            {"name": "srv", "command": "py", "scope": "global"}
         ]
         screen = _make_screen(mgr)
         async with _MCPScreenHost(screen).run_test() as pilot:
@@ -506,7 +506,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         screen = _make_screen(mgr)
         async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
-            screen.filtered_servers = [{"name": "srv", "disabled": False}]
+            screen.filtered_servers = [{"name": "srv"}]
             opt_list = MagicMock()
             opt_list.highlighted = 0
             screen.query_one = MagicMock(return_value=opt_list)
@@ -524,7 +524,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         screen = _make_screen(mgr)
         async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
-            screen.filtered_servers = [{"name": "srv", "disabled": False}]
+            screen.filtered_servers = [{"name": "srv"}]
             opt_list = MagicMock()
             screen.query_one = MagicMock(return_value=opt_list)
             event = MagicMock()
@@ -703,7 +703,7 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         mgr = MagicMock()
         mgr.get_server_status.side_effect = Exception("boom")
         screen.mm = mgr
-        screen.servers = [{"name": "a", "command": "x", "scope": "global", "disabled": False}]
+        screen.servers = [{"name": "a", "command": "x", "scope": "global"}]
         screen.search_query = ""
         opt_list = MagicMock()
         opt_list.highlighted = None
@@ -716,14 +716,14 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         screen.mm = MagicMock()
         screen.mm.get_server_status.side_effect = Exception("boom")
         opt_list = MagicMock()
-        screen._add_server_row(opt_list, {"name": "s", "command": "c", "disabled": False}, {})
+        screen._add_server_row(opt_list, {"name": "s", "command": "c"}, {})
 
     async def test_add_server_row_plain_error(self):
         screen = MCPScreen.__new__(MCPScreen)
         screen.mm = MagicMock()
         screen.mm.get_server_status.return_value = {"error": "boom boom"}
         opt_list = MagicMock()
-        screen._add_server_row(opt_list, {"name": "s", "command": "c", "disabled": False}, {})
+        screen._add_server_row(opt_list, {"name": "s", "command": "c"}, {})
 
     async def test_do_toggle_enabled_warmup_callback(self):
         mgr = MagicMock()

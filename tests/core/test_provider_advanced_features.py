@@ -59,7 +59,7 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                     self.assertIn("xai", pm.get_disabled_providers())
 
                     providers_all = pm.load_providers(include_disabled=True)
-                    self.assertTrue(providers_all["xai"]["disabled"])
+                    self.assertFalse(providers_all["xai"]["enabled"])
 
                     providers_enabled = pm.load_providers(include_disabled=False)
                     self.assertNotIn("xai", providers_enabled)

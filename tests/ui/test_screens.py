@@ -172,7 +172,7 @@ class TestProvidersScreen(unittest.TestCase):
     def test_build_options_status_tags(self):
         providers = {
             "active": {"key": "active", "name": "ActiveProv"},
-            "off": {"key": "off", "name": "OffProv", "disabled": True},
+            "off": {"key": "off", "name": "OffProv", "enabled": False},
             "auth": {"key": "auth", "name": "AuthProv"},
             "on": {"key": "on", "name": "OnProv"},
         }

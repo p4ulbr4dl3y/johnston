@@ -49,7 +49,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             name = p.get("name") or pkey
             has_key = bool(self.configured_keys.get(key))
             is_active = key == self.active_key
-            is_disabled = key in self.disabled_set or p.get("disabled", False)
+            is_disabled = key in self.disabled_set or not p.get("enabled", True)
 
             if is_disabled:
                 stag = status_tag("OFF")

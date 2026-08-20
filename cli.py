@@ -76,7 +76,7 @@ def print_skills():
 
 def print_mcp():
     """Print configured MCP servers to stdout"""
-    from core.infrastructure.mcp import get_mcp_manager
+    from core.infrastructure.mcp import MCPManager, get_mcp_manager
 
     mgr = get_mcp_manager()
     servers = mgr.load_servers()
@@ -97,8 +97,8 @@ def print_mcp():
         pass
 
     for idx, s in enumerate(servers):
-        disabled = s.get("disabled", False)
-        status = "[disabled]" if disabled else "[active]"
+        enabled = MCPManager.server_enabled(s)
+        status = "[enabled]" if enabled else "[disabled]"
         scope = f"[{s.get('scope', 'global')}]"
         name = s.get("name")
 
@@ -115,7 +115,7 @@ def print_mcp():
         print(f"  * {name} {scope} {status}")
         print(f"    {cmd_str}")
 
-        if disabled:
+        if not enabled:
             if idx < len(servers) - 1:
                 print()
             continue

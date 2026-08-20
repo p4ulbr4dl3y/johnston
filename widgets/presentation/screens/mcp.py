@@ -7,7 +7,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
-from core.infrastructure.mcp import get_mcp_manager
+from core.infrastructure.mcp import MCPManager, get_mcp_manager
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
@@ -189,10 +189,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             pass
 
     def _add_server_row(self, opt_list: OptionList, s: Dict[str, Any], tools_per_server: Dict[str, int]) -> None:
-        disabled = s.get("disabled", False)
         name = s["name"]
-
-        if disabled:
+        if not MCPManager.server_enabled(s):
             opt_list.add_option(f"   {status_tag('OFF')} {name}")
             return
 

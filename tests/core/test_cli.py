@@ -44,7 +44,7 @@ class TestCLI(unittest.TestCase):
     @patch("core.infrastructure.mcp.MCPManager.load_servers")
     def test_print_mcp_url_error(self, mock_load):
         mock_load.return_value = [
-            {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global", "disabled": False}
+            {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global"}
         ]
         f = io.StringIO()
         with redirect_stdout(f):
@@ -58,7 +58,7 @@ class TestCLI(unittest.TestCase):
     @patch("core.infrastructure.mcp.MCPManager.get_active_tools")
     def test_print_mcp_with_tools(self, mock_tools, mock_load):
         mock_load.return_value = [
-            {"name": "my_server", "command": "node server.js", "scope": "project", "disabled": False}
+            {"name": "my_server", "command": "node server.js", "scope": "project"}
         ]
         mock_tools.return_value = [
             {"_mcp_server": "my_server", "_mcp_tool_name": "tool_a"},
@@ -249,7 +249,7 @@ class TestCLIAdvanced(unittest.TestCase):
                     "command": "node",
                     "args": ["a", "b"],
                     "scope": "project",
-                    "disabled": True,
+                    "enabled": False,
                 }
             ]
             mgr.get_active_tools.return_value = []

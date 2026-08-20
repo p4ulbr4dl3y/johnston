@@ -45,12 +45,12 @@ class ProviderDef:
     retry_delay: float = DEFAULT_RETRY_DELAY
     retry_backoff: float = DEFAULT_RETRY_BACKOFF
     max_retry_delay: float = DEFAULT_MAX_RETRY_DELAY
-    disabled: bool = False
+    enabled: bool = True
     api_key: str = ""
     requires_key: Optional[bool] = None
 
     @classmethod
-    def from_dict(cls, key: str, data: Dict[str, Any], *, disabled: bool = False) -> "ProviderDef":
+    def from_dict(cls, key: str, data: Dict[str, Any], *, enabled: bool = True) -> "ProviderDef":
         """Build a ProviderDef from a raw provider JSON dict, applying defaults."""
         return cls(
             key=key,
@@ -69,7 +69,7 @@ class ProviderDef:
             retry_delay=float(data.get("retry_delay") or DEFAULT_RETRY_DELAY),
             retry_backoff=float(data.get("retry_backoff") or DEFAULT_RETRY_BACKOFF),
             max_retry_delay=float(data.get("max_retry_delay") or DEFAULT_MAX_RETRY_DELAY),
-            disabled=disabled,
+            enabled=enabled,
             api_key=data.get("api_key") or "",
             requires_key=data.get("requires_key"),
         )
@@ -93,7 +93,7 @@ class ProviderDef:
             "retry_delay": self.retry_delay,
             "retry_backoff": self.retry_backoff,
             "max_retry_delay": self.max_retry_delay,
-            "disabled": self.disabled,
+            "enabled": self.enabled,
         }
 
     def models_fallback(self) -> List[str]:
@@ -204,7 +204,7 @@ class ProviderManager:
         for pkey, pdata in json_providers.items():
             if not include_disabled and pkey in disabled_set:
                 continue
-            providers[pkey] = ProviderDef.from_dict(pkey, pdata, disabled=pkey in disabled_set).to_dict()
+            providers[pkey] = ProviderDef.from_dict(pkey, pdata, enabled=pkey not in disabled_set).to_dict()
         if len(self._providers_memo) >= 16:
             # FIFO eviction: drop the oldest memo entry. ``dict.popitem`` takes
             # no args (and pops LIFO), so remove the first-inserted key instead.
@@ -218,7 +218,7 @@ class ProviderManager:
         pdata = providers.get(provider_key)
         if pdata is None:
             return None
-        return ProviderDef.from_dict(provider_key, pdata, disabled=pdata.get("disabled", False))
+        return ProviderDef.from_dict(provider_key, pdata, enabled=pdata.get("enabled", True))
 
     def get_active_provider_key(self) -> str:
         return self._get_config_data().get("active_provider", "")
@@ -467,7 +467,7 @@ class ProviderManager:
         if pdata is None:
             providers = self.load_providers(include_disabled=True)
             pdata = providers.get(provider_key, {})
-        if not pdata or pdata.get("disabled", False) or provider_key in self.get_disabled_providers():
+        if not pdata or not pdata.get("enabled", True) or provider_key in self.get_disabled_providers():
             return False
         api_type = str(pdata.get("api_type", "openai")).lower()
         if api_type in ("ollama", "lmstudio") or pdata.get("requires_key") is False:
@@ -483,7 +483,7 @@ class ProviderManager:
         active_providers = [
             (p_key, p_data)
             for p_key, p_data in providers.items()
-            if include_disabled or not p_data.get("disabled", False)
+            if include_disabled or p_data.get("enabled", True)
         ]
         if connected_only:
             connected = [

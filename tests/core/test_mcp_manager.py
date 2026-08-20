@@ -57,7 +57,7 @@ class TestMCPManager(unittest.TestCase):
             json.dump(
                 {
                     "mcpServers": {
-                        "global-server": {"command": "python", "args": ["-m", "mcp_server"], "disabled": False}
+                        "global-server": {"command": "python", "args": ["-m", "mcp_server"]}
                     }
                 },
                 f,
@@ -67,7 +67,7 @@ class TestMCPManager(unittest.TestCase):
         os.makedirs(os.path.dirname(mm.project_file), exist_ok=True)
         with open(mm.project_file, "w", encoding="utf-8") as f:
             json.dump(
-                {"mcpServers": {"project-server": {"command": "node", "args": ["server.js"], "disabled": False}}}, f
+                {"mcpServers": {"project-server": {"command": "node", "args": ["server.js"]}}}, f
             )
 
         servers = mm.load_servers()
@@ -77,11 +77,11 @@ class TestMCPManager(unittest.TestCase):
 
         # Test toggle
         state = mm.toggle_server("project-server")
-        self.assertFalse(state)  # toggled from False -> True (disabled)
+        self.assertFalse(state)  # toggled from enabled -> disabled
 
         updated_servers = mm.load_servers()
         p_server = next(s for s in updated_servers if s["name"] == "project-server")
-        self.assertTrue(p_server["disabled"])
+        self.assertFalse(p_server["enabled"])
 
     def test_same_file_global_and_project(self):
         mcp_file = os.path.join(self.test_dir, "mcp.json")
@@ -127,8 +127,8 @@ class TestMCPManager(unittest.TestCase):
 
         # Mock load_servers
         mm.load_servers = lambda: [
-            {"name": "serverA", "command": "python", "disabled": False},
-            {"name": "serverB", "command": "python", "disabled": False},
+            {"name": "serverA", "command": "python"},
+            {"name": "serverB", "command": "python"},
         ]
 
         tools = mm.get_active_tools()
@@ -167,8 +167,8 @@ class TestMCPManager(unittest.TestCase):
         mm.clients = {"serverA": c1, "serverB": c2}
 
         mm.load_servers = lambda: [
-            {"name": "serverA", "command": "python", "disabled": False},
-            {"name": "serverB", "command": "python", "disabled": False},
+            {"name": "serverA", "command": "python"},
+            {"name": "serverB", "command": "python"},
         ]
 
         all_tools = mm.get_active_tools()
@@ -209,8 +209,8 @@ class TestMCPManagerRegression(unittest.TestCase):
         mm = MCPManager(project_dir=self.test_dir)
         mm.clients = {"enabled": DummyClient("enabled"), "disabled": DummyClient("disabled")}
         mm.load_servers = lambda: [
-            {"name": "enabled", "command": "python", "disabled": False},
-            {"name": "disabled", "command": "python", "disabled": True},
+            {"name": "enabled", "command": "python"},
+            {"name": "disabled", "command": "python", "enabled": False},
         ]
 
         names = [t["function"]["name"] for t in mm.get_active_tools()]
@@ -230,7 +230,6 @@ class TestMCPManagerRegression(unittest.TestCase):
             {
                 "name": "serverA",
                 "command": "python",
-                "disabled": False,
                 "capabilities": {"serverA__search": ["network", "read"]},
             }
         ]
@@ -607,7 +606,7 @@ class ToolSchemaEdge(unittest.TestCase):
         c.tools = [{"description": "no name"}, {"name": "", "description": "empty"}]
         c.start.return_value = True
         m.clients["s"] = c
-        m.load_servers = lambda: [{"name": "s", "command": "python", "disabled": False}]
+        m.load_servers = lambda: [{"name": "s", "command": "python"}]
         tools = m.get_active_tools()
         self.assertEqual(tools, [])
 
@@ -617,7 +616,7 @@ class ToolSchemaEdge(unittest.TestCase):
         c.tools = [{"name": "t", "description": "d"}]
         c.start.return_value = True
         m.clients["s"] = c
-        m.load_servers = lambda: [{"name": "s", "command": "python", "disabled": False}]
+        m.load_servers = lambda: [{"name": "s", "command": "python"}]
         tools = m.get_active_tools()
         self.assertEqual(tools[0]["function"]["parameters"], {"type": "object", "properties": {}})
 
@@ -1199,7 +1198,7 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
             {"name": "ok", "command": "py", "scope": "global"},
             {"name": "bad", "command": "py", "scope": "global"},
             {"name": "urlsrv", "url": "http://x", "scope": "global"},
-            {"name": "off", "command": "py", "disabled": True, "scope": "global"},
+            {"name": "off", "command": "py", "enabled": False, "scope": "global"},
         ]
 
         st = m.get_server_status("ok")

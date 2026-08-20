@@ -11,12 +11,14 @@
     "memory": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "env": {},
-      "disabled": false
+      "env": {}
     }
   }
 }
 ```
+
+- `enabled` is optional. An enabled server simply omits it — only `"enabled": false` is stored for turned-off servers.
+- `command` (string or list) is required; `args`, `env`, `cwd` are optional.
 
 ## Transport
 - **stdio** (via `command` + `args`) is the only executed transport.

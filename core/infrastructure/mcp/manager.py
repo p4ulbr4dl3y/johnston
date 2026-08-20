@@ -182,6 +182,14 @@ class MCPManager:
             logger.warning("Failed to load MCP servers config %s: invalid JSON", path)
 
     @staticmethod
+    def server_enabled(server: Dict[str, Any]) -> bool:
+        """True if the server entry is enabled.
+
+        ``enabled`` is the canonical config key; an absent key means enabled.
+        """
+        return bool(server.get("enabled", True))
+
+    @staticmethod
     def _command_parts_valid(cmd: Any) -> bool:
         """Validate a server command before it reaches subprocess launch.
 
@@ -319,17 +327,22 @@ class MCPManager:
                 cfg["mcpServers"] = {}
 
             if name in cfg["mcpServers"]:
-                cfg["mcpServers"][name].update(key_updates)
+                entry = cfg["mcpServers"][name]
+                entry.update(key_updates)
             else:
-                server_dict = {
+                entry = {
                     "command": target.get("command"),
                     "args": target.get("args"),
                     "env": target.get("env"),
                     "url": target.get("url"),
-                    "disabled": target.get("disabled", False),
                 }
-                server_dict.update(key_updates)
-                cfg["mcpServers"][name] = server_dict
+                entry.update(key_updates)
+                cfg["mcpServers"][name] = entry
+
+            # A missing "enabled" means enabled, so only "enabled": false is
+            # stored; (re-)enabling drops the key.
+            if entry.get("enabled", True) is not False:
+                entry.pop("enabled", None)
 
             atomic_write_json(file_to_update, cfg, indent=2)
         except Exception as e:
@@ -362,7 +375,7 @@ class MCPManager:
 
     def toggle_server(self, name: str) -> bool:
         """
-        Toggles disabled state of server by name.
+        Toggles enabled state of server by name.
         Saves updated state to the appropriate config file (project or global).
         Returns new enabled state (True = enabled, False = disabled).
         """
@@ -371,16 +384,16 @@ class MCPManager:
         if not target:
             return False
 
-        new_disabled = not target.get("disabled", False)
-        if self._update_server_config(name, {"disabled": new_disabled}) is None:
+        new_enabled = not self.server_enabled(target)
+        if self._update_server_config(name, {"enabled": new_enabled}) is None:
             return False
 
         # Stop client if disabled
-        if new_disabled and name in self.clients:
+        if not new_enabled and name in self.clients:
             self.clients[name].stop()
             del self.clients[name]
 
-        return not new_disabled
+        return new_enabled
 
     def get_active_tools(self) -> List[Dict[str, Any]]:
         """Connects to enabled MCP servers and returns their tools in OpenAI function format."""
@@ -389,7 +402,7 @@ class MCPManager:
         seen_names: Dict[str, str] = {}  # tool_name -> server_name
 
         for s in servers:
-            if s.get("disabled", False):
+            if not self.server_enabled(s):
                 continue
 
             name = s["name"]
@@ -518,7 +531,7 @@ class MCPManager:
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
 
-        eligible = [s for s in servers if not s.get("disabled", False) and s.get("command")]
+        eligible = [s for s in servers if self.server_enabled(s) and s.get("command")]
         # Start every server concurrently with an isolated per-server deadline so
         # a slow/cold (npx/uvx) or broken server cannot stall the others. Tool
         # naming/formatting happens afterwards, sequentially in config order, so
@@ -544,7 +557,7 @@ class MCPManager:
         seen_names: Dict[str, str] = {}
 
         for server in self.load_servers():
-            if server.get("disabled", False):
+            if not self.server_enabled(server):
                 continue
 
             server_name = server.get("name", "")
@@ -592,7 +605,7 @@ class MCPManager:
         for s in servers:
             if s.get("url") and not s.get("command"):
                 continue
-            if s.get("disabled", False):
+            if not self.server_enabled(s):
                 continue
             st = self.get_server_status(s.get("name", ""))
             if st["tools"] > 0 and not st["error"]:

@@ -167,10 +167,10 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             footer = app.query_one(StatusFooter)
             mgr = MagicMock()
             mgr.load_servers.return_value = [
-                {"name": "url-only", "url": "http://x", "command": None, "disabled": False},
-                {"name": "err-client", "command": "python", "disabled": False},
-                {"name": "good", "command": "python", "disabled": False},
-                {"name": "off", "command": "python", "disabled": True},
+                {"name": "url-only", "url": "http://x", "command": None},
+                {"name": "err-client", "command": "python"},
+                {"name": "good", "command": "python"},
+                {"name": "off", "command": "python", "enabled": False},
             ]
             mgr.clients = {
                 "err-client": MagicMock(last_error="boom"),
