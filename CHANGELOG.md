@@ -7,6 +7,16 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.22.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.22.0...johnston-v0.22.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* atomic prompt history persistence and json cache invalidation ([b90640c](https://github.com/p4ulbr4dl3y/johnston/commit/b90640c5b8abbe037b9f0c892ca2c63a5a54233c))
+* **generation:** finalize thinking widget on stream error or disconnection ([18a176e](https://github.com/p4ulbr4dl3y/johnston/commit/18a176e566165efd74aa9a599b9864a1da9f9786))
+* **skills:** preserve and restore skill command messages in chat history ([e7851e1](https://github.com/p4ulbr4dl3y/johnston/commit/e7851e1e3531b2d1f8bab1dd5c93a8009d88b210))
+* windows test hangs, shell process execution and unicode encoding ([e992242](https://github.com/p4ulbr4dl3y/johnston/commit/e992242f387db09b340a761ebcb2bbd7cb46c17d))
+
 ## [0.22.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.21.0...johnston-v0.22.0) (2026-08-19)
 
 
