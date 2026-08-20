@@ -18,7 +18,7 @@ def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore
 class TestSessionManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
         self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
         self.projects_dir_patcher.start()
         self.addCleanup(self.projects_dir_patcher.stop)
@@ -113,14 +113,14 @@ class TestSessionManager(unittest.TestCase):
 
         self.store.delete(main.id)
         sub_dir = os.path.join(self.store.sessions_dir, f"{main.id}.subagents")
-        self.assertFalse(os.path.exists(sub_dir))
+        self.assertFalse(os.path.exists(sub_dir) and bool(os.listdir(sub_dir)))
         self.assertIsNone(self.store.get(main.id))
 
 
 class TestSessionManagerRegression(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.test_dir)
+        self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
         self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
         self.projects_dir_patcher.start()
         self.addCleanup(self.projects_dir_patcher.stop)

@@ -71,7 +71,7 @@ def test_output_buffer_history():
 @pytest.mark.asyncio
 async def test_shell_task_reads_real_echo():
     proc = await asyncio.create_subprocess_exec(
-        "echo", "hello from shell",
+        sys.executable, "-c", "print('hello from shell')",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -86,7 +86,7 @@ async def test_shell_task_reads_real_echo():
 @pytest.mark.asyncio
 async def test_shell_task_kill_sets_killed_status():
     proc = await asyncio.create_subprocess_exec(
-        "sleep", "30", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        sys.executable, "-c", "import time; time.sleep(30)", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
     )
     task = ShellTask(task_id="t2", command="sleep 30", process=proc)
     # No reading loop: the process is simply killed to check the terminal status.
@@ -99,7 +99,7 @@ async def test_shell_task_kill_sets_killed_status():
 @pytest.mark.asyncio
 async def test_shell_task_send_input_missing_stdin_reports_error():
     proc = await asyncio.create_subprocess_exec(
-        "echo", "hi", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        sys.executable, "-c", "print('hi')", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
     )
     task = ShellTask(task_id="t3", command="echo hi", process=proc)
     task.start_reading()
@@ -130,7 +130,7 @@ async def test_shell_task_on_completed_only_when_background():
 
     # Foreground task: on_completed must NOT be called
     proc1 = await asyncio.create_subprocess_exec(
-        "echo", "foreground",
+        sys.executable, "-c", "print('foreground')",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -141,7 +141,7 @@ async def test_shell_task_on_completed_only_when_background():
 
     # Background task: on_completed MUST be called
     proc2 = await asyncio.create_subprocess_exec(
-        "echo", "background",
+        sys.executable, "-c", "print('background')",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -166,7 +166,7 @@ async def test_shell_task_widget_streaming_appends_output():
 
     widget = DummyWidget()
     proc = await asyncio.create_subprocess_exec(
-        "echo", "widget hello",
+        sys.executable, "-c", "print('widget hello')",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -227,7 +227,7 @@ async def test_shell_task_listeners_are_isolated_and_removable():
 
     a, b = DummyWidget(), DummyWidget()
     proc = await asyncio.create_subprocess_exec(
-        "echo", "fanout",
+        sys.executable, "-c", "print('fanout')",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
     )
@@ -421,7 +421,7 @@ async def test_manager_register_iterate_drop():
 @pytest.mark.asyncio
 async def test_manager_kill_all():
     proc = await asyncio.create_subprocess_exec(
-        "sleep", "30", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        sys.executable, "-c", "import time; time.sleep(30)", stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
     )
     task = ShellTask(task_id="t9", command="sleep 30", process=proc)
     mgr = TaskManager()

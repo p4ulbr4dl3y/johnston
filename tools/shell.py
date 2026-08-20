@@ -252,6 +252,11 @@ class ShellTool(BaseTool):
     async def _create_windows_process(self, command: str, env: dict[str, str], cwd: str = None):
         shell = shell_executable()
         if shell and shell.lower().endswith(("pwsh.exe", "pwsh", "powershell.exe", "powershell")):
+            full_command = (
+                f"$OutputEncoding = [System.Text.Encoding]::UTF8; "
+                f"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+                f"{command}"
+            )
             return await asyncio.create_subprocess_exec(
                 shell,
                 "-NoProfile",
@@ -259,7 +264,7 @@ class ShellTool(BaseTool):
                 "-ExecutionPolicy",
                 "Bypass",
                 "-Command",
-                command,
+                full_command,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,

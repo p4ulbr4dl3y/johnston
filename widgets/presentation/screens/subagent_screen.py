@@ -89,7 +89,7 @@ class SubagentViewScreen(Screen[None]):
         grid = Table.grid(expand=True)
         grid.add_column(justify="left")
         grid.add_column(justify="right")
-        grid.add_row(text, "[dim]esc: cancel[/dim]")
+        grid.add_row(text, "[dim]esc: close[/dim]")
         label = self.query_one("#subagent-info", SubagentInfoLabel)
         label._raw_text = text
         label.update(grid)

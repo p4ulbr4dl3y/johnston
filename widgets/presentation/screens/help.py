@@ -52,7 +52,7 @@ class HelpScreen(BaseModalScreen[None]):
         with Vertical(id="modal-dialog"):
             yield Markdown(self._get_header_md(), id="help-header-md", classes="modal-markdown modal-markdown-centered")
             yield Markdown(COMMANDS_BODY_MD, id="help-body-md", classes="modal-markdown")
-            yield Label("tab / ←/→: switch • esc: cancel", id="modal-hint")
+            yield Label("tab / ←/→: switch • esc: close", id="modal-hint")
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):

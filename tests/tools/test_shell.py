@@ -469,6 +469,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         assert len([t for t in app.task_manager]) == 1
 
 
+@pytest.mark.skipif(os.name == "nt", reason="cat streaming is POSIX-only")
 async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     # Real end-to-end: explicit background task (cat keeps stdin/stdout
     # open). manage_shell must list it as RUNNING (process alive), send
@@ -592,6 +593,7 @@ async def test_ampersand_and_executes(tool, make_tool_context):
     assert "b" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="PowerShell 5.1 does not support || operator")
 async def test_or_short_circuit(tool, make_tool_context):
     # First cmd succeeds -> second must NOT run (|| short-circuit).
     res = str(await tool.execute({"command": "echo ok || echo SHOULD_NOT_RUN"}, ctx=_ctx(make_tool_context)))
@@ -605,6 +607,7 @@ async def test_pipe_chains(tool, make_tool_context):
     assert "pipe_data" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="/dev/null is POSIX-only")
 async def test_redirect_stdout_to_devnull_loses_output(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo hidden > /dev/null"}, ctx=_ctx(make_tool_context)))
     assert "hidden" not in res
@@ -616,6 +619,7 @@ async def test_redirect_append(tool, make_tool_context):
     assert res == "(no output)"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="/dev/null and < redirection are POSIX-only")
 async def test_input_redirect(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo from_stdin < /dev/null"}, ctx=_ctx(make_tool_context)))
     assert "from_stdin" in res
@@ -704,6 +708,7 @@ async def test_timeout_kills_subagent_subprocess(tool, make_tool_context):
 # ---------- exit codes ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="false is POSIX-only")
 async def test_false_exit_code_is_lost(tool, make_tool_context):
     # `false` exits 1 but the tool never surfaces the exit code.
     res = str(await tool.execute({"command": "false"}, ctx=_ctx(make_tool_context)))
@@ -731,11 +736,13 @@ async def test_kill_signal_behaves(tool, make_tool_context):
 # ---------- unicode/binary output, CRLF, huge output ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="printf is POSIX-only")
 async def test_binary_bytes_no_crash(tool, make_tool_context):
     res = str(await tool.execute({"command": "printf '\\x01\\x02\\xff\\x00data'"}, ctx=_ctx(make_tool_context)))
     assert "data" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="printf is POSIX-only")
 async def test_crlf_normalized(tool, make_tool_context):
     res = str(await tool.execute({"command": "printf 'one\\r\\ntwo\\r\\n'"}, ctx=_ctx(make_tool_context)))
     assert "one" in res

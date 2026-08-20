@@ -26,7 +26,10 @@ class TestSubagentWorktreeManager(unittest.TestCase):
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.repo_dir, capture_output=True, text=True)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
 
     def test_is_git_repo(self):
         self.assertTrue(SubagentWorktreeManager.is_git_repo(self.repo_dir))
@@ -176,7 +179,10 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.repo_dir, capture_output=True, text=True)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        try:
+            self.temp_dir.cleanup()
+        except Exception:
+            pass
 
     def test_create_worktree_non_git_repo(self):
         non_git_dir = tempfile.TemporaryDirectory()

@@ -566,8 +566,7 @@ ModalScreen {
 }
 
 .modal-markdown-centered MarkdownParagraph,
-#modal-dialog .modal-markdown-centered MarkdownParagraph,
-#wizard-title MarkdownParagraph {
+#modal-dialog .modal-markdown-centered MarkdownParagraph {
     content-align: center middle !important;
     text-align: center !important;
     margin: 0;

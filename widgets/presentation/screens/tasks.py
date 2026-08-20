@@ -56,7 +56,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown("### **Console Output**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield RichLog(id="console-log", highlight=False, markup=False)
-            yield Label("esc: cancel", id=MODAL_HINT_ID)
+            yield Label("esc: back", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -150,7 +150,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
                 self._get_header_md(), id="shell-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
             yield HeaderWrapOptionList(id="shell-option-list")
-            yield Label("enter: view console • k: kill • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: view console • k: kill • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._last_signatures = None
@@ -303,7 +303,7 @@ class SubagentsScreen(BaseModalScreen[None]):
                 self._get_header_md(), id="subagents-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
             yield HeaderWrapOptionList(id="subagents-option-list")
-            yield Label("enter: view details • k: kill • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: view details • k: kill • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._last_signatures = None
