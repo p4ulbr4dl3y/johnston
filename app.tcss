@@ -304,16 +304,20 @@ MarkdownFence .fence-copy-btn {
     min-height: 1;
     min-width: 6;
     border: none;
-    background: #3f3f46;
-    color: #ffffff;
+    background: transparent;
+    color: #71717a;
+    text-style: none;
     padding: 0 1;
     margin: 0;
 }
 
 CustomMarkdownFence .fence-copy-btn:hover,
-MarkdownFence .fence-copy-btn:hover {
-    background: #ffffff;
-    color: #09090b;
+MarkdownFence .fence-copy-btn:hover,
+CustomMarkdownFence .fence-copy-btn:focus,
+MarkdownFence .fence-copy-btn:focus {
+    background: transparent;
+    color: #ffffff;
+    text-style: none;
 }
 
 CustomMarkdownFence .fence-scroll-box,

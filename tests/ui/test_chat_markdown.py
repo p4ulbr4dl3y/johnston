@@ -47,8 +47,10 @@ class TestMarkdownHelpers(unittest.TestCase):
             fence.markdown = MagicMock(theme=None)
             widgets = list(fence.compose())
             self.assertGreater(len(widgets), 0)
+            self.assertFalse(getattr(widgets[0], "ALLOW_SELECT", True))
             labels = [w for w in widgets if isinstance(w, Label)]
             self.assertEqual(str(labels[0].render()), "python")
+            self.assertFalse(getattr(labels[0], "ALLOW_SELECT", True))
 
             fence2 = CustomMarkdownFence.__new__(CustomMarkdownFence)
             fence2.lexer = "text"
