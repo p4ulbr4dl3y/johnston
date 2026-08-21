@@ -160,3 +160,23 @@ class TestFormatEditDiff(unittest.TestCase):
         diff = "--- a/f.unknownext\n+++ b/f.unknownext\n@@ -1,1 +1,1 @@\n-line one\n+line two\n"
         result = format_edit_diff(diff, "f.unknownext")
         self.assertIn("line one", result.plain)
+
+    def test_diff_renderable_hanging_indent_wrapping(self):
+        from rich.console import Console
+        from rich.text import Text
+
+        from widgets.presentation.widgets.chat_diff import DiffLine
+
+        pfx = Text(" 10 + ")
+        code = Text("a very long code line that should wrap to next line")
+        dl = DiffLine(pfx, code, style_bg="on #12261e")
+        renderable = DiffRenderable([dl])
+        console = Console(width=25, record=True)
+        console.print(renderable)
+        exported = console.export_text()
+        self.assertIn("10 +", exported)
+        self.assertIn("a very", exported)
+        lines = exported.strip().splitlines()
+        self.assertGreater(len(lines), 1)
+        # Continuation line must be indented with blanks under gutter
+        self.assertTrue(lines[1].startswith("      "))

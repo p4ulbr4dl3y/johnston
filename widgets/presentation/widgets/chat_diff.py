@@ -7,30 +7,77 @@ from rich.text import Span, Text
 from widgets.utils.lexer import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
 
 
-class DiffRenderable:
-    """Custom Rich renderable for diff views to prevent console line wrapping"""
+class DiffLine:
+    """Represents a single formatted diff line with gutter prefix and code text."""
 
-    def __init__(self, formatted_lines: list[Text]):
+    def __init__(self, prefix: Text, code: Text, style_bg: str | None = None):
+        self.prefix = prefix
+        self.code = code
+        self.style_bg = style_bg
+        self.prefix_len = prefix.cell_len
+
+    @property
+    def plain(self) -> str:
+        return self.to_text().plain
+
+    @property
+    def cell_len(self) -> int:
+        return self.prefix_len + self.code.cell_len
+
+    def to_text(self) -> Text:
+        line = Text.assemble(self.prefix, self.code)
+        if self.style_bg:
+            line.stylize(self.style_bg)
+        return line
+
+
+class DiffRenderable:
+    """Custom Rich renderable for diff views with full-width background and line wrapping."""
+
+    def __init__(self, formatted_lines: list[Any]):
         self.formatted_lines = formatted_lines
-        self._text = Text("\n").join(formatted_lines)
-        self._text.overflow = "crop"
-        self._text.no_wrap = True
+        plain_texts = [line.to_text() if hasattr(line, "to_text") else line for line in formatted_lines]
+        self._text = Text("\n").join(plain_texts)
+        self._text.overflow = "fold"
+        self._text.no_wrap = False
 
     def __rich_console__(self, console, options):
-        new_opts = options.update(no_wrap=True, overflow="crop")
-        max_line_len = max((line.cell_len for line in self.formatted_lines), default=0)
-        target_width = max(options.max_width, max_line_len)
+        new_opts = options.update(no_wrap=False, overflow="fold")
+        target_width = options.max_width
         for line in self.formatted_lines:
-            line_copy = line.copy()
-            pad_count = max(0, target_width - line_copy.cell_len)
-            if pad_count > 0:
-                old_len = len(line_copy.plain)
-                line_copy.pad_right(pad_count)
-                new_len = len(line_copy.plain)
-                line_copy._spans = [
-                    Span(s.start, new_len, s.style) if s.end == old_len else s for s in line_copy._spans
-                ]
-            yield from console.render(line_copy, new_opts)
+            if hasattr(line, "prefix") and hasattr(line, "code"):
+                prefix = line.prefix
+                code = line.code
+                style_bg = line.style_bg
+                prefix_len = line.prefix_len
+                code_width = max(10, target_width - prefix_len)
+
+                if code.cell_len > code_width and target_width > prefix_len + 10:
+                    chunks = code.wrap(console, code_width, overflow="fold")
+                else:
+                    chunks = [code]
+
+                blank_gutter = Text(" " * prefix_len)
+                for idx, chunk in enumerate(chunks):
+                    pfx = prefix.copy() if idx == 0 else blank_gutter.copy()
+                    full_line = Text.assemble(pfx, chunk)
+                    pad_count = max(0, target_width - full_line.cell_len)
+                    if pad_count > 0:
+                        full_line.pad_right(pad_count)
+                    if style_bg:
+                        full_line.stylize(style_bg)
+                    yield from console.render(full_line, new_opts)
+            else:
+                line_copy = line.copy()
+                pad_count = max(0, target_width - line_copy.cell_len)
+                if pad_count > 0:
+                    old_len = len(line_copy.plain)
+                    line_copy.pad_right(pad_count)
+                    new_len = len(line_copy.plain)
+                    line_copy._spans = [
+                        Span(s.start, new_len, s.style) if s.end == old_len else s for s in line_copy._spans
+                    ]
+                yield from console.render(line_copy, new_opts)
 
     def __rich_measure__(self, console, options):
         return self._text.__rich_measure__(console, options)
@@ -144,18 +191,14 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     new_idx = 0
 
     def append_diff_line(num_str: str, symbol: str, code_text: Text, style_bg: str = None, style_fg: str = None):
-        full_line = Text()
+        prefix = Text()
         if style_fg:
-            full_line.append(f"{num_str} ", style=style_fg)
-            full_line.append(f"{symbol} ", style=f"bold {style_fg}")
+            prefix.append(f"{num_str} ", style=style_fg)
+            prefix.append(f"{symbol} ", style=f"bold {style_fg}")
         else:
-            full_line.append(f"{num_str} ", style="#6e7681")
-            full_line.append("  ")
-        full_line.append(code_text)
-
-        if style_bg:
-            full_line.stylize(style_bg)
-        formatted_lines.append(full_line)
+            prefix.append(f"{num_str} ", style="#6e7681")
+            prefix.append("  ")
+        formatted_lines.append(DiffLine(prefix, code_text, style_bg=style_bg))
 
     in_hunk = False
     for line in lines:

@@ -159,7 +159,6 @@ WelcomeWidget {
 .tool-scroll-box {
     width: 100%;
     height: auto;
-    overflow-x: auto;
     scrollbar-size: 0 0 !important;
 }
 
@@ -182,15 +181,14 @@ WelcomeWidget {
 }
 
 .tool-content, .tool-content-md {
-    width: auto;
-    min-width: 100%;
+    width: 100%;
     height: auto;
     margin: 1 1 0 0;
     padding: 0 1;
     background: #18181b;
     color: #e4e4e7;
     border-left: solid #3f3f46;
-    text-wrap: nowrap;
+    text-wrap: wrap;
 }
 
 .tool-call Markdown {
@@ -199,14 +197,13 @@ WelcomeWidget {
 }
 
 .tool-diff-view {
-    width: auto;
-    min-width: 100%;
+    width: 100%;
     height: auto;
     margin-top: 1;
     padding: 0 1;
     background: #09090b;
     color: #e4e4e7;
-    text-wrap: nowrap;
+    text-wrap: wrap;
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
@@ -627,14 +624,13 @@ SubagentViewScreen {
 }
 
 #modal-dialog.bash-confirm-dialog .modal-diff-view {
-    width: auto;
-    min-width: 100%;
+    width: 100%;
     height: auto;
     background: #27272a;
     color: #f4f4f5;
     padding: 0 1;
     margin: 0;
-    text-wrap: nowrap;
+    text-wrap: wrap;
 }
 
 

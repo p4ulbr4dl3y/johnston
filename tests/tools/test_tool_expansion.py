@@ -207,7 +207,7 @@ class TestToolExpansion(unittest.TestCase):
         has_styled_spans = any(span.style is not None for span in content._spans)
         self.assertTrue(has_styled_spans)
 
-        self.assertEqual(content.overflow, "crop")
+        self.assertEqual(content.overflow, "fold")
 
     def test_edit_tool_html_tags_rendering(self):
         diff_text = (
