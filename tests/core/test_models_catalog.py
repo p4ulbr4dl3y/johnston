@@ -716,3 +716,36 @@ async def test_refresh_missing_models_key(iso_cat):
     with _client_side([("models.dev", mdev), ("openrouter", or_)]):
         limits = await iso_cat.refresh()
     assert limits == {}
+
+
+async def test_refresh_extracts_discovered_providers(iso_cat):
+    mdev = httpx.Response(200, json={
+        "sambanova": {
+            "name": "SambaNova",
+            "api": "https://api.sambanova.ai/v1",
+            "npm": "@ai-sdk/openai-compatible",
+            "models": {"llama-3": {"name": "Llama 3", "limit": {"context": 8192}}},
+        },
+        "custom-anthropic": {
+            "name": "Custom Anthropic",
+            "npm": "@ai-sdk/anthropic",
+            "models": {"claude-3": {"name": "Claude 3"}},
+        }
+    })
+    or_ = httpx.Response(200, json={"data": []})
+    with _client_side([("models.dev", mdev), ("openrouter", or_)]):
+        await iso_cat.refresh()
+
+    provs = iso_cat.get_discovered_providers()
+    assert "sambanova" in provs
+    assert provs["sambanova"]["name"] == "SambaNova"
+    assert provs["sambanova"]["base_url"] == "https://api.sambanova.ai/v1"
+    assert provs["sambanova"]["api_type"] == "openai"
+    assert "llama-3" in provs["sambanova"]["models"]
+
+    assert "custom-anthropic" in provs
+    assert provs["custom-anthropic"]["api_type"] == "anthropic"
+
+    assert iso_cat.get_catalog_provider("sambanova") is not None
+    assert iso_cat.get_catalog_provider("nonexistent") is None
+

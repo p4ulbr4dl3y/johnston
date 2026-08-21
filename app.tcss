@@ -22,14 +22,20 @@ Screen {
     layers: default overlay;
 }
 
-ScrollBar, ScrollBarCorner {
+* {
+    scrollbar-size: 0 0 !important;
+    scrollbar-size-vertical: 0 !important;
+    scrollbar-size-horizontal: 0 !important;
+}
+
+ScrollBar, ScrollBarCorner, ScrollBar > *, ScrollBarCorner > * {
     display: none !important;
     visibility: hidden !important;
     width: 0 !important;
     height: 0 !important;
 }
 
-Screen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
+Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
     scrollbar-size: 0 0 !important;
     scrollbar-size-vertical: 0 !important;
     scrollbar-size-horizontal: 0 !important;
@@ -449,6 +455,8 @@ Toast.-error {
 ModalScreen {
     align: center middle;
     background: rgba(9, 9, 11, 0.85);
+    overflow: hidden;
+    scrollbar-size: 0 0 !important;
 }
 
 #modal-dialog {

@@ -216,9 +216,16 @@ class ProviderManager:
         """Return a structured ProviderDef for a provider (or None if unknown)."""
         providers = self.load_providers(include_disabled=True)
         pdata = providers.get(provider_key)
-        if pdata is None:
-            return None
-        return ProviderDef.from_dict(provider_key, pdata, enabled=pdata.get("enabled", True))
+        if pdata is not None:
+            return ProviderDef.from_dict(provider_key, pdata, enabled=pdata.get("enabled", True))
+        cat_pdata = catalog.get_catalog_provider(provider_key)
+        if cat_pdata is not None:
+            return ProviderDef.from_dict(provider_key, cat_pdata, enabled=True)
+        return None
+
+    def get_catalog_providers(self) -> Dict[str, Dict[str, Any]]:
+        """Returns all providers discovered dynamically from models.dev catalog."""
+        return catalog.get_discovered_providers()
 
     def get_active_provider_key(self) -> str:
         return self._get_config_data().get("active_provider", "")

@@ -47,7 +47,7 @@ def harness(tmp_path):
 
 
 def test_provision_skill_write_error_is_swallowed(harness):
-    skill = get_bundled_skill("init")
+    skill = get_bundled_skill("johnston-guide")
 
     def boom(path, content):
         raise OSError("disk full")

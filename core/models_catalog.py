@@ -23,6 +23,7 @@ from core.infrastructure.adapters.models_source import (
     MODELS_DEV_URL,
     OPENROUTER_MODELS_URL,
     extract_context_length,
+    extract_provider_def,
 )
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
@@ -84,6 +85,7 @@ class ModelsCatalog:
         self._limits: Dict[str, int] = {}
         self._names: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
+        self._providers: Dict[str, Dict[str, Any]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
@@ -106,6 +108,7 @@ class ModelsCatalog:
             self._limits = data.get("model_limits", {})
             self._names = data.get("model_names", {})
             self._pricing = data.get("model_pricing", {})
+            self._providers = data.get("providers", {})
             self._updated_at = float(data.get("updated_at", 0.0))
             return True
         return False
@@ -115,6 +118,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = None,
         model_names: Dict[str, str] = None,
         model_pricing: Dict[str, Dict[str, float]] = None,
+        providers: Dict[str, Dict[str, Any]] = None,
     ):
         try:
             now = time.time()
@@ -124,6 +128,7 @@ class ModelsCatalog:
                 "model_limits": model_limits if model_limits is not None else self._limits,
                 "model_names": model_names if model_names is not None else self._names,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
+                "providers": providers if providers is not None else self._providers,
             }
             atomic_write_json(CACHE_FILE, payload, indent=2)
         except Exception as e:
@@ -136,6 +141,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = {}
         model_names: Dict[str, str] = {}
         model_pricing: Dict[str, Dict[str, float]] = {}
+        provider_catalog: Dict[str, Dict[str, Any]] = {}
 
         try:
             client = self.get_client()
@@ -153,6 +159,9 @@ class ModelsCatalog:
                         for prov_key, prov_info in mdev_data.items():
                             if not isinstance(prov_info, dict):
                                 continue
+                            pdef = extract_provider_def(prov_key, prov_info)
+                            if pdef:
+                                provider_catalog[prov_key] = pdef
                             models_dict = prov_info.get("models", {})
                             if not isinstance(models_dict, dict):
                                 continue
@@ -221,12 +230,26 @@ class ModelsCatalog:
             self._limits = model_limits
             self._names = model_names
             self._pricing = model_pricing
+            if provider_catalog:
+                self._providers = provider_catalog
             self._match_cache.clear()
 
             self.save_cache()
         except Exception as e:
             logger.warning("Error fetching models catalog: %s", e)
         return self._limits
+
+    def get_discovered_providers(self) -> Dict[str, Dict[str, Any]]:
+        """Returns dynamically discovered provider definitions from models.dev."""
+        if not self._providers:
+            self.load_cache()
+        return dict(self._providers)
+
+    def get_catalog_provider(self, provider_key: str) -> Optional[Dict[str, Any]]:
+        """Returns a provider definition discovered from models.dev by its key."""
+        if not self._providers:
+            self.load_cache()
+        return self._providers.get(provider_key)
 
     def _get_all_catalog_keys(self) -> Set[str]:
         return set().union(

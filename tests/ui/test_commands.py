@@ -547,25 +547,31 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.chat_view.dividers), 1)
         self.assertEqual(app.chat_view.dividers[0].divider_title, "Compaction Cancelled")
 
-    async def test_init_skill_command(self):
+    async def test_johnston_guide_skill_slash_command(self):
         app = MockApp()
-        handled = await handle_slash_command(app, "/init")
+        handled = await handle_slash_command(app, "/johnston-guide")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
-        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/init")
+        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/johnston-guide")
         self.assertIn('<SKILL path=', prompt)
 
     async def test_multiple_skills_command(self):
+        from unittest.mock import patch
+
+        from core.application.skills.manager import Skill, SkillScope
+
         app = MockApp()
-        handled = await handle_slash_command(app, "/init /handoff analyze project")
+        skill_a = Skill(name="foo", description="Foo", location="/tmp/foo/SKILL.md", content="Foo body", scope=SkillScope.GLOBAL, hidden=False)
+        skill_b = Skill(name="bar", description="Bar", location="/tmp/bar/SKILL.md", content="Bar body", scope=SkillScope.GLOBAL, hidden=False)
+        with patch("core.application.skills.manager.SkillManager.get_skill", side_effect=lambda n: {"foo": skill_a, "bar": skill_b}.get(n)):
+            handled = await handle_slash_command(app, "/foo /bar analyze project")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
-        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/init /handoff analyze project")
-        self.assertIn('<SKILL path=', prompt)
+        self.assertEqual(app.ai_kwargs[0].get("display_text"), "/foo /bar analyze project")
         self.assertIn('<SKILL path=', prompt)
         self.assertIn("User request: analyze project", prompt)
 
@@ -735,12 +741,12 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(commands_dict["/model"], "Alias for /models")
         self.assertIn("Manage AI providers", commands_dict["/providers"])
 
-    async def test_handoff_skill_command(self):
+    async def test_johnston_guide_skill_command(self):
         app = MockApp()
-        handled = await handle_slash_command(app, "/handoff")
+        handled = await handle_slash_command(app, "/johnston-guide")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
-        self.assertIn("handoff", app.ai_prompts[0][0])
+        self.assertIn("johnston-guide", app.ai_prompts[0][0])
 
     async def test_new_command_clears_background_tasks(self):
         from unittest.mock import AsyncMock, MagicMock
@@ -852,7 +858,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.load_session_ui.assert_called_once_with("sess_1")
 
     async def test_mcp_command_pushes_screen(self):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         from widgets.commands import MCPCommand
 
@@ -860,9 +866,25 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.push_screen = MagicMock()
 
         cmd = MCPCommand()
-        await cmd.execute(app)
+        with patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[{"name": "srv"}]):
+            await cmd.execute(app)
 
         app.push_screen.assert_called_once()
+
+    async def test_mcp_command_no_servers(self):
+        from unittest.mock import MagicMock, patch
+
+        from widgets.commands import MCPCommand
+
+        app = MockApp()
+        app.push_screen = MagicMock()
+
+        cmd = MCPCommand()
+        with patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[]):
+            await cmd.execute(app)
+
+        app.push_screen.assert_not_called()
+        self.assertEqual(app.notified, [("No configured MCP servers found", "warning")])
 
 
 if __name__ == "__main__":

@@ -146,7 +146,7 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
         async for app, screen, pilot in self._run("z", "z", "z"):
             self.assertEqual(len([s for s in screen.filtered_skills if s is not None]), 0)
             opt_list = screen.query_one("#skills-option-list", OptionList)
-            self.assertIn("No matching skills", str(opt_list._options[0].prompt))
+            self.assertEqual(opt_list.option_count, 0)
 
     async def test_filter_matches_description_and_scope(self):
         # "suite" only in test-runner description, "pro" only in test-runner scope (project)

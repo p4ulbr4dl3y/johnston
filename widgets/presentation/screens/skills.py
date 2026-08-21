@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -7,6 +8,7 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.skills.manager import SkillManager
+from core.domain.defaults.config import THEME_MUTED
 from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
@@ -129,10 +131,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()
             if not self.skills:
-                opt_list.add_option(f"*No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/*")
+                opt_list.add_option(
+                    Text(f"No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/.", style=THEME_MUTED)
+                )
                 return
             if not any(s is not None for s in self.filtered_skills):
-                opt_list.add_option("*No matching skills found*")
+                opt_list.highlighted = None
                 return
             opt_list.add_options(self.filtered_options)
             # First selectable row

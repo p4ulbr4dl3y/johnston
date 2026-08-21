@@ -116,7 +116,6 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         suggestions = asyncio.run(run())
         cmd_names = [name for name, _ in suggestions]
         self.assertIn("/skills", cmd_names)
-        self.assertIn("/handoff", cmd_names)
         self.assertIn("/johnston-guide", cmd_names)
 
     def test_johnston_guide_references_created(self):

@@ -1,13 +1,16 @@
 import asyncio
 from typing import Any, Dict
 
+from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
+from core.domain.defaults.config import THEME_MUTED
 from core.infrastructure.mcp import MCPManager, get_mcp_manager
+from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
@@ -124,7 +127,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             if not self.servers:
                 opt_list.add_option(
-                    Option("No MCP servers configured (~/.johnston/mcp.json or .johnston/mcp.json)", disabled=True)
+                    Text(f"No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json).", style=THEME_MUTED)
                 )
                 self.filtered_servers = []
                 return
@@ -171,7 +174,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     self.filtered_servers.append(s)
 
             if not self.filtered_servers:
-                opt_list.add_option("*No matching MCP servers found*")
+                opt_list.highlighted = None
                 return
 
             if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):

@@ -73,7 +73,7 @@ class SkillManager:
         os.makedirs(self.global_dir, exist_ok=True)
         from core.infrastructure.platform.platform_utils import atomic_write_text
 
-        # Provision bundled default skills (init, handoff, johnston-guide) into
+        # Provision bundled default skills (johnston-guide) into
         # the user's global skills dir. Each skill is a directory with SKILL.md
         # and optional extra files. Existing files are left untouched so users
         # can edit/remove their local copies.

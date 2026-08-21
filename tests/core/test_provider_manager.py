@@ -637,3 +637,24 @@ def test_cache_reload_after_providers_change(pm, tmp_path):
     time.sleep(0.01)
     _write(pfile, {"custom": {"key": "custom", "name": "Two", "model": "m2"}})
     assert pm.load_providers()["custom"]["name"] == "Two"
+
+
+def test_load_provider_def_from_catalog_fallback(pm):
+    with patch.object(catalog, "get_catalog_provider") as mock_get_cat:
+        mock_get_cat.return_value = {
+            "key": "chutes",
+            "name": "Chutes AI",
+            "base_url": "https://chutes.ai/v1",
+            "api_type": "openai",
+            "models": ["chutes-model-1"],
+        }
+        pdef = pm.load_provider_def("chutes")
+        assert pdef is not None
+        assert pdef.key == "chutes"
+        assert pdef.name == "Chutes AI"
+        assert pdef.base_url == "https://chutes.ai/v1"
+
+    # also test get_catalog_providers
+    with patch.object(catalog, "get_discovered_providers", return_value={"p1": {}}):
+        assert "p1" in pm.get_catalog_providers()
+
