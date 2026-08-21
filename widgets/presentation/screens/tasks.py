@@ -17,6 +17,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
 )
+from widgets.utils.key_aliases import expand_bindings
 
 
 def format_task_row(cmd: str) -> str:
@@ -103,10 +104,10 @@ class TaskConsoleScreen(BaseModalScreen[None]):
 class ShellTasksScreen(BaseModalScreen[None]):
     """Modal screen listing background shell tasks with console view and kill."""
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
         ("k", "kill_task", "Kill Task"),
-    ]
+    ])
 
     def __init__(self):
         super().__init__()
@@ -237,10 +238,10 @@ class ShellTasksScreen(BaseModalScreen[None]):
 class SubagentsScreen(BaseModalScreen[None]):
     """Modal screen listing running/completed subagents with detail view and kill."""
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
         ("k", "kill_task", "Kill Task"),
-    ]
+    ])
 
     def __init__(self):
         super().__init__()

@@ -8,6 +8,10 @@ Each widget id has two forms:
 * ``*_SEL`` - the CSS selector (``#id``) used in ``query_one`` calls
 """
 
+from widgets.utils.key_aliases import SHIFT_TAB_KEYS, TAB_KEYS
+
+__all__ = ["SHIFT_TAB_KEYS", "TAB_KEYS"]
+
 # Modal dialog container / common widgets
 MODAL_DIALOG_ID = "modal-dialog"
 
@@ -30,10 +34,6 @@ TOOL_SCROLL_BOX = "tool-scroll-box"
 # Tool call widget header classes
 TOOL_HEADER = "tool-header"
 TOOL_HEADER_EXPANDABLE = "tool-header-expandable"
-
-# Tab / Shift+Tab key aliases (used to prevent focus jumping across widgets in modals)
-SHIFT_TAB_KEYS = ("shift+tab", "backtab", "shift_tab")
-TAB_KEYS = ("tab", "shift+tab", "backtab", "shift_tab")
 
 # Main app widgets
 STATUS_FOOTER = "#status-footer"

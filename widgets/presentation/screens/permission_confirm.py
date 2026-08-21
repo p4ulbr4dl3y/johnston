@@ -9,13 +9,14 @@ from textual.widgets import Label, Markdown, Static
 from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.utils.key_aliases import expand_bindings
 
 
 class PermissionConfirmScreen(BaseModalScreen[str]):
     """Modal screen asking user for permission before executing a tool in human-friendly format."""
 
     ALLOW_SELECT = False
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("enter", "approve", "Approve Once"),
         ("a", "always_allow", "Always Allow (Session)"),
         ("escape", "deny", "Deny"),
@@ -28,7 +29,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
-    ]
+    ])
 
     def __init__(
         self,

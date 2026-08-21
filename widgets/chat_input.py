@@ -11,6 +11,7 @@ from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
+from widgets.utils.key_aliases import KEY_DETACH, KEY_NEWLINE, KEY_PASTE, KEY_QUIT, KEY_TOGGLE_ROLE
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
@@ -332,13 +333,13 @@ class ChatInput(TextArea):
         return False
 
     async def _on_key(self, event: events.Key) -> None:
-        if event.key in ("ctrl+v", "cmd+v", "ctrl+м", "ctrl+m"):
+        if event.key in KEY_PASTE:
             if await self.try_paste_clipboard_image():
                 event.prevent_default()
                 event.stop()
                 return
 
-        if event.key in ("ctrl+d", "cmd+d", "ctrl+в", "ctrl+В") and self.clipboard_attachments:
+        if event.key in KEY_DETACH and self.clipboard_attachments:
             self.clear_clipboard_attachments()
             event.prevent_default()
             event.stop()
@@ -350,8 +351,8 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Global Exit shortcut: Ctrl+C / Ctrl+Q
-        if event.key in ("ctrl+c", "ctrl+q"):
+        # Global Exit shortcut: Ctrl+C / Ctrl+Q (and layout aliases)
+        if event.key in KEY_QUIT:
             event.prevent_default()
             event.stop()
             self.app.exit()
@@ -406,7 +407,7 @@ class ChatInput(TextArea):
                 pass
 
         # Shift+Tab press to toggle mode (Action / Explore)
-        if event.key in ("shift+tab", "backtab", "shift_tab"):
+        if event.key in KEY_TOGGLE_ROLE:
             event.prevent_default()
             event.stop()
             if hasattr(self.app, "action_toggle_role"):
@@ -518,7 +519,7 @@ class ChatInput(TextArea):
             self.add_to_history(text)
             self.load_text("")
             self.post_message(self.Submitted(text, attachments=atts))
-        elif event.key in ("ctrl+enter", "ctrl+j", "shift+enter"):
+        elif event.key in KEY_NEWLINE:
             event.prevent_default()
             event.stop()
             self.insert("\n")

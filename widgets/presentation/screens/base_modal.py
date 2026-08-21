@@ -2,6 +2,8 @@ from typing import TypeVar
 
 from textual.screen import ModalScreen
 
+from widgets.utils.key_aliases import expand_bindings
+
 T = TypeVar("T")
 
 
@@ -15,11 +17,11 @@ class BaseModalScreen(ModalScreen[T]):
     """Base class for all Johnston modal screens with standard exit keybindings."""
 
     ALLOW_SELECT = False
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
-    ]
+    ])
 
     def action_quit_app(self) -> None:
         self.app.exit()

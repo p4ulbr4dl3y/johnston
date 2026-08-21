@@ -15,6 +15,7 @@ from widgets.mixins.actions import ActionsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.message_flow import MessageFlowMixin
 from widgets.mixins.session_persistence import SessionPersistenceMixin
+from widgets.utils.key_aliases import expand_bindings
 
 _CSS_PATH = Path(__file__).resolve().parents[2] / "app.tcss"
 
@@ -24,14 +25,13 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = str(_CSS_PATH)
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("ctrl+c", "quit", "Exit"),
         ("ctrl+q", "quit", "Exit"),
         ("ctrl+b", "background_all", "Background All"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("shift+tab", "toggle_role", "Toggle Role"),
-        ("backtab", "toggle_role", "Toggle Role"),
-    ]
+    ])
 
     def __init__(self, resume_session_id: str | None = None):
         super().__init__()

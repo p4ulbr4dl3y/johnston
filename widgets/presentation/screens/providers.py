@@ -14,6 +14,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT,
     TAB_KEYS,
 )
+from widgets.utils.key_aliases import KEY_TOGGLE_DISABLED, expand_bindings
 
 
 class ProvidersScreen(BaseSelectionScreen[str]):
@@ -64,10 +65,10 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             items.append(key)
         return options, items
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("tab", "toggle_disabled", "Toggle Disabled"),
         ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
-    ]
+    ])
 
     def action_toggle_disabled(self) -> None:
         opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
@@ -95,7 +96,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
                     opt_list.highlighted = min(idx, len(self.filtered_items) - 1)
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("tab", "ctrl+t", "ctrl_t", "ctrl+i"):
+        if event.key in KEY_TOGGLE_DISABLED:
             self.action_toggle_disabled()
             event.prevent_default()
             event.stop()
