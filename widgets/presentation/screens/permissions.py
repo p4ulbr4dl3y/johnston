@@ -49,7 +49,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._mcp_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield Markdown(
                 "### **Manage Tool Permissions**",
                 id="permissions-header-md",

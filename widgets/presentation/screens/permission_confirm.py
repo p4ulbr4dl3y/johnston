@@ -119,15 +119,25 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     f"Agent wants to `{act}` subagent `{s_id}`" if s_id else "Agent wants to manage subagents"
                 )
         elif self.tool_name == "update_plan":
-            action_desc = "Agent wants to update the plan"
+            plan = (nargs.get("plan") or "").strip()
+            action_desc = "Agent wants to update the plan:" if plan else "Agent wants to update the plan"
         elif self.tool_name == "ask_user":
             qs = nargs.get("questions") or []
-            if isinstance(qs, list) and len(qs) > 1:
-                action_desc = f"Agent wants to ask {len(qs)} questions:"
-            elif isinstance(qs, list) and len(qs) == 1:
-                action_desc = "Agent wants to ask 1 question:"
+            q_texts = []
+            if isinstance(qs, list):
+                for q in qs:
+                    if isinstance(q, dict):
+                        t = q.get("question_text") or q.get("question") or ""
+                    else:
+                        t = str(q)
+                    t = t.strip()
+                    if t:
+                        q_texts.append(t)
+            if q_texts:
+                formatted_qs = ", ".join(f"`{t}`" for t in q_texts)
+                action_desc = f"Agent wants to ask {formatted_qs}"
             else:
-                action_desc = "Agent wants to ask a question:"
+                action_desc = "Agent wants to ask a question"
         elif self.tool_name == "shell":
             action_desc = "Agent wants to run shell command:"
         else:
@@ -136,7 +146,25 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             else:
                 action_desc = f"Agent wants to execute `{self.tool_name}`"
 
-        with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
+        is_wide = (
+            self.tool_name in ("create", "edit", "multi_edit", "shell")
+            or bool(self.diff)
+            or (
+                bool(self.args)
+                and self.tool_name not in (
+                    "read",
+                    "web_fetch",
+                    "manage_shell",
+                    "manage_subagent",
+                    "invoke_subagent",
+                    "update_plan",
+                    "ask_user",
+                )
+            )
+        )
+        dialog_classes = "bash-confirm-dialog modal-dialog-wide" if is_wide else "bash-confirm-dialog"
+
+        with Vertical(id="modal-dialog", classes=dialog_classes):
             yield Markdown("### **Confirm Tool Action**", classes="modal-markdown modal-markdown-centered")
             yield Markdown(action_desc, classes="modal-markdown")
 
@@ -171,17 +199,44 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 inp = nargs.get("input") or ""
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```text\n{inp.strip()}\n```", classes="modal-diff-view")
+            elif self.tool_name in ("manage_subagent",) and (nargs.get("action") or "").lower() == "send_message":
+                msg = nargs.get("message") or ""
+                if msg:
+                    with ToolScrollBox(classes="tool-scroll-box"):
+                        yield Markdown(f"```text\n{msg.strip()}\n```", classes="modal-diff-view")
             elif self.tool_name == "invoke_subagent":
                 prompt = nargs.get("prompt") or ""
                 if prompt:
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```text\n{prompt.strip()}\n```", classes="modal-diff-view")
+            elif self.tool_name == "update_plan":
+                plan = nargs.get("plan") or ""
+                if plan:
+                    with ToolScrollBox(classes="tool-scroll-box"):
+                        yield Markdown(f"```markdown\n{plan.strip()}\n```", classes="modal-diff-view")
+            elif self.tool_name == "ask_user":
+                qs = nargs.get("questions") or []
+                if isinstance(qs, list) and any(isinstance(q, dict) and q.get("options") for q in qs):
+                    lines = []
+                    for i, q in enumerate(qs, 1):
+                        if isinstance(q, dict) and q.get("options"):
+                            q_text = q.get("question_text") or q.get("question") or ""
+                            opts = q.get("options") or []
+                            opts_str = "\n  - " + "\n  - ".join(str(o) for o in opts)
+                            prefix = f"{i}. " if len(qs) > 1 else ""
+                            lines.append(f"{prefix}`{q_text}`{opts_str}")
+                    if lines:
+                        with ToolScrollBox(classes="tool-scroll-box"):
+                            yield Markdown("\n\n".join(lines), classes="modal-diff-view")
             elif self.args and self.tool_name not in (
                 "shell",
                 "read",
                 "web_fetch",
                 "manage_shell",
+                "manage_subagent",
                 "invoke_subagent",
+                "update_plan",
+                "ask_user",
             ):
                 args_str = json.dumps(self.args, indent=2, ensure_ascii=False)
                 with ToolScrollBox(classes="tool-scroll-box"):
@@ -189,27 +244,33 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
             yield Label("enter: approve • a: always allow session • esc/d: deny", id="modal-hint")
 
+    def _get_scroll_target(self):
+        try:
+            return self.query_one(".tool-scroll-box")
+        except Exception:
+            return self.query_one("#modal-dialog")
+
     def action_scroll_up(self) -> None:
         try:
-            self.query_one("#modal-dialog").scroll_up(animate=False)
+            self._get_scroll_target().scroll_up(animate=False)
         except Exception:
             pass
 
     def action_scroll_down(self) -> None:
         try:
-            self.query_one("#modal-dialog").scroll_down(animate=False)
+            self._get_scroll_target().scroll_down(animate=False)
         except Exception:
             pass
 
     def action_page_up(self) -> None:
         try:
-            self.query_one("#modal-dialog").scroll_page_up(animate=False)
+            self._get_scroll_target().scroll_page_up(animate=False)
         except Exception:
             pass
 
     def action_page_down(self) -> None:
         try:
-            self.query_one("#modal-dialog").scroll_page_down(animate=False)
+            self._get_scroll_target().scroll_page_down(animate=False)
         except Exception:
             pass
 

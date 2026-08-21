@@ -103,6 +103,12 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             ("invoke_subagent", {"role": "coder", "prompt": "fix bug"}),
             ("manage_shell", {"action": "kill", "task_id": "t1"}),
             ("manage_shell", {"action": "send_input", "task_id": "t1", "input": "hello"}),
+            ("manage_subagent", {"action": "list"}),
+            ("manage_subagent", {"action": "kill", "session_id": "s1"}),
+            ("manage_subagent", {"action": "send_message", "session_id": "s1", "message": "hello sub"}),
+            ("update_plan", {"plan": "1. Step one\n2. Step two"}),
+            ("ask_user", {"questions": [{"question": "Q1", "options": ["opt1", "opt2"]}]}),
+            ("ask_user", {"questions": ["Q1", "Q2"]}),
             ("other_tool", {"foo": "bar"}),
         ]
 

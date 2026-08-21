@@ -512,10 +512,13 @@ class SessionStore:
         for sess in self.list(kind="main"):
             if not sess.messages and not sess.agent_history:
                 continue
+            title = self._title_from_messages(sess)
+            if title == "Untitled" and sess.description:
+                title = sess.description[:55] + "..." if len(sess.description) > 55 else sess.description
             sessions.append(
                 {
                     "id": sess.id,
-                    "title": sess.description or self._title_from_messages(sess),
+                    "title": title,
                     "created_at": sess.created_at,
                     "updated_at": sess.updated_at,
                     "message_count": self._message_count(sess),
@@ -530,7 +533,7 @@ class SessionStore:
             if isinstance(m, dict) and m.get("type") == "user":
                 text = str(m.get("display_text") or m.get("text", "")).strip()
                 if text:
-                    return text[:30] + "..." if len(text) > 30 else text
+                    return text[:55] + "..." if len(text) > 55 else text
         return "Untitled"
 
     @staticmethod

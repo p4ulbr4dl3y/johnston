@@ -100,6 +100,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         search_placeholder: str = "Search...",
         hint_text: str = "enter: select • ↑/↓: navigate • esc: cancel",
         option_list_id: str = MODAL_OPTION_LIST_ID,
+        dialog_classes: str = "",
     ):
         super().__init__()
         self.title = title
@@ -110,12 +111,13 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         self.search_placeholder = search_placeholder
         self.hint_text = hint_text
         self.option_list_id = option_list_id
+        self.dialog_classes = dialog_classes
         self.filtered_items = list(items)
         self.filtered_options = list(options)
         self._norm_targets: dict[int, str] = {}
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes or None):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)

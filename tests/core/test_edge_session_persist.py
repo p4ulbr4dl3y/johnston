@@ -490,7 +490,7 @@ def test_title_from_messages_unicode_surrogate(store):
     sess = store.create_main("tu")
     sess.messages = [{"type": "user", "text": "éäöü😀" * 10}]
     title = store._title_from_messages(sess)
-    assert len(title) <= 33
+    assert len(title) <= 58
 
 
 def test_search_empty(store):

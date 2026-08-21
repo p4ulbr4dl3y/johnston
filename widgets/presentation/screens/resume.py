@@ -10,7 +10,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         options = []
         for s in sessions:
             title = " ".join(str(s.get("title", "")).replace("\n", " ").replace("\r", " ").split())
-            max_title_len = 30
+            max_title_len = 55
             title_text = f"{title[:max_title_len]}..." if len(title) > max_title_len else title
             escaped_title = escape(title_text)
             count = s.get("message_count", 0)
@@ -26,4 +26,5 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search sessions...",
+            dialog_classes="modal-dialog-medium",
         )

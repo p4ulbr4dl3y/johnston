@@ -21,8 +21,8 @@ from widgets.presentation.screens.constants import (
 
 def format_task_row(cmd: str) -> str:
     """Format a task command line for display in the option list."""
-    if len(cmd) > 35:
-        cmd = cmd[:32] + "..."
+    if len(cmd) > 55:
+        cmd = cmd[:52] + "..."
     return f"   {cmd}".rstrip()
 
 

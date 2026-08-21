@@ -18,7 +18,7 @@ class RewindScreen(BaseSelectionScreen[int]):
             diff_stat = msg.git_stats
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            max_text_len = 28
+            max_text_len = 55
             opt_text = f"{clean[:max_text_len]}..." if len(clean) > max_text_len else clean
             opt_text = opt_text or "(empty message)"
             escaped_text = escape(opt_text)
@@ -34,4 +34,10 @@ class RewindScreen(BaseSelectionScreen[int]):
 
         items = [m.index for m in user_messages]
         default_val = items[-1] if items else -1
-        super().__init__(title=title, options=options, items=items, default_value=default_val)
+        super().__init__(
+            title=title,
+            options=options,
+            items=items,
+            default_value=default_val,
+            dialog_classes="modal-dialog-medium",
+        )

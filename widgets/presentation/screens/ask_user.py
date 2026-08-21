@@ -144,7 +144,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         self.options = []
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="wizard-dialog"):
             yield Markdown("", id="wizard-title", classes=MODAL_MARKDOWN)
             yield OptionList(id=OPTIONS_LIST_ID)
             yield WriteInInput(placeholder="Type response here and press Enter...", id=WRITE_IN_INPUT_ID)
