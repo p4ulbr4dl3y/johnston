@@ -12,6 +12,7 @@ __all__ = [
     "LOGS_DIR",
     "TEMP_IMAGES_DIR",
     "WORKTREES_DIR",
+    "SHADOW_REPOS_DIR",
     "PROMPT_HISTORY_FILE",
 ]
 
@@ -23,4 +24,5 @@ PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 WORKTREES_DIR = os.path.join(CONFIG_DIR, "worktrees")
+SHADOW_REPOS_DIR = os.path.join(CONFIG_DIR, "shadow_repos")
 PROMPT_HISTORY_FILE = os.path.join(CONFIG_DIR, "prompt_history.json")

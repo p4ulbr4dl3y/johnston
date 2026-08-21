@@ -59,6 +59,9 @@ def is_windows() -> bool:
 
 
 def johnston_config_dir() -> Path:
+    override = os.environ.get("JOHNSTON_CONFIG_DIR")
+    if override:
+        return Path(override)
     if is_windows():
         base = os.environ.get("APPDATA")
         if base:

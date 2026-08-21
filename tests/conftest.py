@@ -45,6 +45,10 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     skills_dir = str(test_config_dir / "skills")
     mcp_file = str(test_config_dir / "mcp.json")
     log_file = str(test_config_dir / "logs" / "johnston.log")
+    shadow_repos_dir = str(test_config_dir / "shadow_repos")
+
+    # 0. Environment variable
+    monkeypatch.setenv("JOHNSTON_CONFIG_DIR", cfg_dir_str)
 
     # 1. Base functions
     monkeypatch.setattr("core.infrastructure.platform.platform_utils.johnston_config_dir", lambda: test_config_dir)
@@ -58,6 +62,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.infrastructure.platform.paths.LOGS_DIR", logs_dir)
     monkeypatch.setattr("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", temp_images_dir)
     monkeypatch.setattr("core.infrastructure.platform.paths.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.SHADOW_REPOS_DIR", shadow_repos_dir)
     monkeypatch.setattr("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", prompt_history_file)
 
     # 3. Module-level bound constants
@@ -74,6 +79,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.infrastructure.mcp.manager.GLOBAL_MCP_FILE", mcp_file)
     monkeypatch.setattr("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.runtime.subagent_worktree.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("core.infrastructure.storage.git_checkpoint.SHADOW_REPOS_DIR", shadow_repos_dir)
     monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOGS_DIR", logs_dir)
     monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOG_FILE", log_file)
     monkeypatch.setattr("core.infrastructure.tasks.output.LOGS_DIR", logs_dir)

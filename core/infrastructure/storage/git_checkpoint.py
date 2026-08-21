@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Generator, List, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
-from core.infrastructure.platform.platform_utils import johnston_config_dir
+from core.infrastructure.platform.paths import SHADOW_REPOS_DIR
 from core.infrastructure.runtime.git_utils import is_git_repository, run_git
 
 
@@ -108,7 +108,7 @@ class GitCheckpointManager:
     def _get_shadow_dir(cls, project_path: Optional[str] = None) -> tuple[str, str]:
         cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
         hash_id = hashlib.md5(cwd.encode("utf-8")).hexdigest()
-        shadow_dir = os.path.join(str(johnston_config_dir()), "shadow_repos", f"{hash_id}.git")
+        shadow_dir = os.path.join(SHADOW_REPOS_DIR, f"{hash_id}.git")
         return shadow_dir, cwd
 
     @classmethod
