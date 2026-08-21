@@ -140,7 +140,7 @@ class CustomMarkdownFence(MarkdownFence):
 
         theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
         code_content = TransparentSyntax(
-            self.code, lexer=target_lexer, theme=theme, word_wrap=False, background_color="default"
+            self.code, lexer=target_lexer, theme=theme, word_wrap=True, background_color="default"
         )
         if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
             code_content.code = code_content.code.rstrip("\r\n")
@@ -152,7 +152,7 @@ class CustomMarkdownFence(MarkdownFence):
         if hasattr(content, "code") and isinstance(getattr(content, "code", None), str):
             content.code = content.code.rstrip("\r\n")
         if hasattr(content, "word_wrap"):
-            content.word_wrap = False
+            content.word_wrap = True
         try:
             self.query_one("#code-content", Label).update(content)
         except Exception:

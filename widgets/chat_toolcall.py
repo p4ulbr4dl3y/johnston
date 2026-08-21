@@ -239,7 +239,7 @@ class ParsingMixin:
         if parsed is not None:
             pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
             syntax = TransparentSyntax(
-                pretty_json, "json", theme=CODE_THEME, word_wrap=False, background_color="default"
+                pretty_json, "json", theme=CODE_THEME, word_wrap=True, background_color="default"
             )
             if footer:
                 return Group(syntax, Text("\n" + footer.strip()))
@@ -728,7 +728,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             lexer,
                             theme=CODE_THEME,
                             line_numbers=True,
-                            word_wrap=False,
+                            word_wrap=True,
                             background_color="default",
                         )
                         return "raw", syntax
@@ -777,7 +777,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                                 theme=CODE_THEME,
                                 line_numbers=True,
                                 start_line=start_line,
-                                word_wrap=False,
+                                word_wrap=True,
                                 background_color="default",
                             )
                             return "raw", syntax
@@ -814,7 +814,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             theme=CODE_THEME,
                             line_numbers=True,
                             start_line=start_line,
-                            word_wrap=False,
+                            word_wrap=True,
                             background_color="default",
                         )
                         return "raw", syntax

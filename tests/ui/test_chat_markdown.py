@@ -85,10 +85,10 @@ class TestMarkdownHelpers(unittest.TestCase):
 
         content = MagicMock()
         content.code = "line1\nline2\r\n"
-        content.word_wrap = True
+        content.word_wrap = False
         fence.set_content(content)
         self.assertEqual(content.code, "line1\nline2")
-        self.assertFalse(content.word_wrap)
+        self.assertTrue(content.word_wrap)
         label.update.assert_called_once_with(content)
 
         fence2 = CustomMarkdownFence.__new__(CustomMarkdownFence)

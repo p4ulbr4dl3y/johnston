@@ -320,18 +320,16 @@ CustomMarkdownFence .fence-scroll-box,
 MarkdownFence .fence-scroll-box {
     width: 100%;
     height: auto;
-    overflow-x: auto;
     scrollbar-size: 0 0 !important;
 }
 
 CustomMarkdownFence #code-content,
 MarkdownFence #code-content {
-    width: auto;
-    min-width: 100%;
+    width: 100%;
     height: auto;
     padding: 0 1;
     background: #18181b;
-    text-wrap: nowrap;
+    text-wrap: wrap;
 }
 
 /* OptionList Base Styles */
