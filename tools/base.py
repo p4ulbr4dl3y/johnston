@@ -180,22 +180,31 @@ def truncate_output(
         log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext)
 
     format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
+    total_lines = text.count("\n") + (1 if text else 0)
 
     if from_end:
         truncated = text[-max_chars:]
         shown_lines = truncated.count("\n") + (1 if truncated else 0)
-        header = f"[Output truncated. Showing last {max_chars} chars ({shown_lines} lines shown)."
-        if save_log:
-            header += f" Full output saved to {log_path}."
+        start_line_shown = max(1, total_lines - shown_lines + 1)
+        if total_lines > 1:
+            line_info = f"lines {start_line_shown}-{total_lines} of {total_lines}"
+        else:
+            line_info = f"{shown_lines} lines shown"
+
+        header = f"[Output truncated: showing last {max_chars} chars ({line_info})."
+        if save_log and log_path:
+            header += f" Full log: {log_path}."
             if format_desc:
                 header += f" {format_desc}"
-            if is_json:
-                header += " Use read tool or shell (jq/grep) to inspect formatted JSON."
+            if hint:
+                header += f" {hint}"
+            elif is_json:
+                header += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
             elif "\n" not in text:
-                header += " Output is single-line (use content_offset). Use read tool or shell (grep/head) to inspect or filter full output."
+                header += f" Output is single-line (use content_offset). Use read(path='{log_path}') or shell to inspect."
             else:
-                header += " Use read tool or shell (grep/head) to inspect or filter full output."
-        if hint:
+                header += f" Use read(path='{log_path}') or shell (grep/head) to inspect full log."
+        elif hint:
             header += f" {hint}"
         header += "]\n...\n"
         return header + truncated
@@ -204,18 +213,25 @@ def truncate_output(
 
         truncated, shown_lines = truncate_leading(text, max_chars)
         next_line = shown_lines + 1
-        footer = f"\n... [Output truncated at {max_chars} chars (lines 1-{shown_lines} shown)."
-        if save_log:
-            footer += f" Full output saved to {log_path}."
+        if total_lines > 1:
+            line_info = f"lines 1-{shown_lines} of {total_lines}"
+        else:
+            line_info = f"{shown_lines} lines shown"
+
+        footer = f"\n... [Output truncated: showing first {max_chars} chars ({line_info})."
+        if save_log and log_path:
+            footer += f" Full log: {log_path}."
             if format_desc:
                 footer += f" {format_desc}"
-            if is_json:
-                footer += " Use read tool or shell (jq/grep) to inspect formatted JSON."
+            if hint:
+                footer += f" {hint}"
+            elif is_json:
+                footer += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
             elif "\n" not in text:
-                footer += " Output is single-line (use content_offset). Use read tool or shell (grep/tail) to inspect or filter full output."
+                footer += f" Output is single-line (use content_offset). Use read(path='{log_path}') or shell to inspect."
             else:
-                footer += f" Use read tool (start_line={next_line}) or shell (grep/tail) to inspect remaining output."
-        if hint:
+                footer += f" Use read(path='{log_path}', start_line={next_line}) or shell (grep/tail) to inspect."
+        elif hint:
             footer += f" {hint}"
         footer += "]"
         return truncated + footer

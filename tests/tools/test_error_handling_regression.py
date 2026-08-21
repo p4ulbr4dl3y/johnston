@@ -101,7 +101,7 @@ class TestAskUserCancellationRaises(unittest.IsolatedAsyncioTestCase):
 
         mock_app.ask_user = cancelled
         with self.assertRaises(asyncio.CancelledError):
-            await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=mock_app)
+            await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=mock_app)
         self.assertIsNone(mock_app._pending_ask_user)
 
 

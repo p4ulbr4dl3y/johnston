@@ -128,7 +128,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             if isinstance(qs, list):
                 for q in qs:
                     if isinstance(q, dict):
-                        t = q.get("question_text") or q.get("question") or ""
+                        t = q.get("question") or ""
                     else:
                         t = str(q)
                     t = t.strip()
@@ -221,7 +221,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     lines = []
                     for i, q in enumerate(qs, 1):
                         if isinstance(q, dict) and q.get("options"):
-                            q_text = q.get("question_text") or q.get("question") or ""
+                            q_text = q.get("question") or ""
                             opts = q.get("options") or []
                             opts_str = "\n  - " + "\n  - ".join(str(o) for o in opts)
                             prefix = f"{i}. " if len(qs) > 1 else ""

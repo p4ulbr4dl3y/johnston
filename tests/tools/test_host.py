@@ -32,7 +32,7 @@ class TestToolContextAsyncHost(unittest.IsolatedAsyncioTestCase):
 
         host = _AsyncHost()
         ctx = ToolContext(host)
-        res = await ctx.ask_user([{"question_text": "Pick", "options": ["a"]}])
+        res = await ctx.ask_user([{"question": "Pick", "options": ["a"]}])
         self.assertEqual(res, "Question: Q\nAnswer: A")
         self.assertEqual(len(host.question_calls), 1)
 
@@ -60,7 +60,7 @@ class TestToolContextDegradation(unittest.TestCase):
 
         async def run():
             ctx = ToolContext(host)
-            return await ctx.ask_user([{"question_text": "Q", "options": ["X"]}])
+            return await ctx.ask_user([{"question": "Q", "options": ["X"]}])
 
         res = asyncio.run(run())
         self.assertIn("Answer: X", res)

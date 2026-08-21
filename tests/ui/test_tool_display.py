@@ -25,7 +25,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(extract_tool_display("create", {"path": out_path}), out_path)
 
     def test_ask_user_questions(self):
-        res = extract_tool_display("ask_user", {"questions": [{"question_text": "Which framework?"}]})
+        res = extract_tool_display("ask_user", {"questions": [{"question": "Which framework?"}]})
         self.assertEqual(res, '"Which framework?"')
 
     def test_subagent_description(self):

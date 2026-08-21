@@ -196,17 +196,17 @@ class TestActionsExtra(unittest.IsolatedAsyncioTestCase):
 
     async def test_ask_user_normal_answer(self):
         obj = self._ask_host(lambda cb: cb("GPT-4"))
-        res = await ActionsMixin.ask_user(obj, [{"question_text": "Q1", "options": ["A", "B"]}])
+        res = await ActionsMixin.ask_user(obj, [{"question": "Q1", "options": ["A", "B"]}])
         self.assertEqual(res, "GPT-4")
 
     async def test_ask_user_cancelled_answer(self):
         obj = self._ask_host(lambda cb: cb(""))
-        res = await ActionsMixin.ask_user(obj, [{"question_text": "Q1", "options": []}])
+        res = await ActionsMixin.ask_user(obj, [{"question": "Q1", "options": []}])
         self.assertEqual(res, "cancelled by user")
 
     async def test_ask_user_minimize(self):
         obj = self._ask_host(lambda cb: cb({"action": "minimize", "answers": {}, "q_idx": 1}))
-        task = asyncio.create_task(ActionsMixin.ask_user(obj, [{"question_text": "Q1", "options": ["A"]}]))
+        task = asyncio.create_task(ActionsMixin.ask_user(obj, [{"question": "Q1", "options": ["A"]}]))
         await asyncio.sleep(0.05)
         obj.notify.assert_called_once()
         self.assertTrue(callable(obj._pending_ask_user))
@@ -218,7 +218,7 @@ class TestActionsExtra(unittest.IsolatedAsyncioTestCase):
         obj = MagicMock()
         obj.notify = MagicMock(side_effect=Exception("no notify"))
         obj.push_screen = MagicMock(side_effect=lambda screen, callback=None: callback({"action": "minimize", "answers": {}, "q_idx": 1}))
-        task = asyncio.create_task(ActionsMixin.ask_user(obj, [{"question_text": "Q1", "options": ["A"]}]))
+        task = asyncio.create_task(ActionsMixin.ask_user(obj, [{"question": "Q1", "options": ["A"]}]))
         await asyncio.sleep(0.05)
         self.assertTrue(callable(obj._pending_ask_user))
         task.cancel()

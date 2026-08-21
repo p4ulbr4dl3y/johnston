@@ -264,7 +264,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget2 = self._widget("invoke_subagent", "do stuff", args={"prompt": "hello"})
         widget2.render_header()
 
-        widget3 = self._widget("ask_user", "", args={"questions": [{"question_text": "q?", "options": []}]})
+        widget3 = self._widget("ask_user", "", args={"questions": [{"question": "q?", "options": []}]})
         widget3.render_header()
 
         widget4 = self._widget("manage_shell", "", args={"task_id": "t1"})
@@ -325,7 +325,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         event.stop.assert_not_called()
 
     def test_on_click_ask_user_resumes_pending(self):
-        widget = self._widget("ask_user", "q", args={"questions": [{"question_text": "Q", "options": ["A"]}]})
+        widget = self._widget("ask_user", "q", args={"questions": [{"question": "Q", "options": ["A"]}]})
         event = MagicMock()
         with (
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
@@ -341,7 +341,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "Q1", "options": ["A", "B"]}]},
+            args={"questions": [{"question": "Q1", "options": ["A", "B"]}]},
             result_text="Question: Q1\nAnswer: A",
         )
         event = MagicMock()
@@ -357,14 +357,14 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         event.stop.assert_called_once()
 
     def test_ask_user_not_expandable_without_answers(self):
-        widget = self._widget("ask_user", "q", args={"questions": [{"question_text": "Q1", "options": ["A"]}]})
+        widget = self._widget("ask_user", "q", args={"questions": [{"question": "Q1", "options": ["A"]}]})
         self.assertFalse(widget.is_expandable())
 
     def test_parse_ask_user_answers_multi_question(self):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "Q1", "options": ["A", "B"]}, {"question_text": "Q2", "options": ["C"]}]},
+            args={"questions": [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": ["C"]}]},
             result_text="Question: Q1\nAnswer: A\nQuestion: Q2\nAnswer: C",
         )
         qs = widget._parse_ask_user_questions()
@@ -376,7 +376,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "Q1", "options": ["A"]}, {"question_text": "Q2", "options": ["C"]}]},
+            args={"questions": [{"question": "Q1", "options": ["A"]}, {"question": "Q2", "options": ["C"]}]},
             result_text="Question: Q1\nAnswer: Question: foo\nQuestion: Q2\nAnswer: C",
         )
         qs = widget._parse_ask_user_questions()
@@ -388,7 +388,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "Q1", "options": ["A"]}, {"question_text": "Q2", "options": ["C"]}]},
+            args={"questions": [{"question": "Q1", "options": ["A"]}, {"question": "Q2", "options": ["C"]}]},
             result_text="Question: Q1\nAnswer: A",
         )
         qs = widget._parse_ask_user_questions()
@@ -400,7 +400,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "Q1", "options": ["A"]}]},
+            args={"questions": [{"question": "Q1", "options": ["A"]}]},
             result_text="Cancelled by user.",
         )
         qs = widget._parse_ask_user_questions()
@@ -411,11 +411,11 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget(
             "ask_user",
             "q",
-            args={"questions": [{"question_text": "F", "options": ["X", "Y"]}]},
+            args={"questions": [{"question": "F", "options": ["X", "Y"]}]},
             result_text="Question: F\nAnswer: X",
         )
         qs = widget._parse_ask_user_questions()
-        self.assertEqual(qs, [{"question_text": "F", "options": ["X", "Y"]}])
+        self.assertEqual(qs, [{"question": "F", "options": ["X", "Y"]}])
         self.assertEqual(widget._parse_ask_user_answers(qs), {0: {"answer": "X"}})
 
     def test_on_click_exception_is_suppressed(self):

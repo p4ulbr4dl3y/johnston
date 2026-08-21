@@ -141,7 +141,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
         if isinstance(qs, list) and qs:
             formatted = []
             for q in qs:
-                q_text = q.get("question_text") if isinstance(q, dict) else ""
+                q_text = q.get("question") if isinstance(q, dict) else ""
                 if q_text:
                     formatted.append(truncate(q_text))
             if formatted:

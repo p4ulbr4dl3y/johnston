@@ -223,7 +223,7 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
 class ReadTool(BaseTool):
     name = "read"
     description = (
-        f"Read file contents (text, images, PDF/DOCX/XLSX). Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
+        f"Read file contents (text, images, PDF/DOCX/XLSX converted to Markdown). Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
     )
     schema = {
         "type": "function",

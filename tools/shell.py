@@ -57,7 +57,7 @@ def _truncate_output(res: str) -> str:
     return truncate_output(
         res,
         max_chars=4000,
-        hint="Pipe command to grep/head, or inspect full log if needed.",
+        hint="Pipe command to grep/head, or read full log.",
         tool_name="shell",
         from_end=True,
     )

@@ -9,8 +9,8 @@ class TestTruncateOutput(unittest.TestCase):
         large_text = "A" * 5000
         res = truncate_output(large_text, max_chars=1000)
 
-        self.assertIn("Full output saved to", res)
-        self.assertIn("Use read tool or shell (grep/tail) to inspect", res)
+        self.assertIn("Full log:", res)
+        self.assertIn("Use read(path=", res)
         log_path = (
             [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0]
             .rstrip(".")
@@ -26,7 +26,8 @@ class TestTruncateOutput(unittest.TestCase):
         multi_line_text = "\n".join([f"Line {i}" for i in range(1, 200)])
         res = truncate_output(multi_line_text, max_chars=100)
         self.assertIn("lines 1-", res)
-        self.assertIn("Use read tool (start_line=", res)
+        self.assertIn("Use read(path=", res)
+        self.assertIn("start_line=", res)
 
     def test_truncate_output_unique_log_per_tool(self):
         text1 = "TOOL_1_" + ("A" * 2000)
@@ -53,8 +54,8 @@ class TestTruncateOutput(unittest.TestCase):
     def test_truncate_output_from_end(self):
         text = "HEAD_\n" + ("X\n" * 100) + "_TAIL"
         res = truncate_output(text, max_chars=50, from_end=True, save_log=False)
-        self.assertIn("Showing last 50 chars", res)
-        self.assertIn("lines shown", res)
+        self.assertIn("showing last 50 chars", res)
+        self.assertIn("lines ", res)
         self.assertTrue(res.endswith("_TAIL"))
         self.assertNotIn("HEAD_", res)
 

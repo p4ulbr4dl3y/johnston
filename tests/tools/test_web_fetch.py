@@ -126,8 +126,8 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com/long"}))
 
-        self.assertIn("Output truncated at 8000 chars", res)
-        self.assertIn("Full output saved to", res)
+        self.assertIn("Output truncated: showing first 8000 chars", res)
+        self.assertIn("Full log:", res)
 
     async def test_convert_content_to_md_sync_unlink_oserror(self):
         # A failing tmp-file cleanup must be swallowed while the converted
@@ -251,7 +251,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com/page"}))
-        self.assertIn("Full output saved to", res)
+        self.assertIn("Full log:", res)
         self.assertIn(".md", res)
 
     @patch("httpx.AsyncClient")
@@ -261,7 +261,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com/raw_page", "raw": True}))
-        self.assertIn("Full output saved to", res)
+        self.assertIn("Full log:", res)
         self.assertIn(".html", res)
 
 

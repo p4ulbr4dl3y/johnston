@@ -197,7 +197,7 @@ class TestConfirmScreenUnit(unittest.TestCase):
 
 class TestAskUserWizardScreenUnit(unittest.TestCase):
     def test_wizard_screen_basic(self):
-        questions = [{"question_text": "Q1", "options": ["A", "B"]}, {"question_text": "Q2", "options": []}]
+        questions = [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": []}]
         ws = AskUserWizardScreen(questions)
         ws._mount_time = 0.0
 
@@ -259,7 +259,7 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.dismiss_result, "cancelled")
 
     async def test_wizard_screen_pilot_navigation_and_cancel(self):
-        questions = [{"question_text": "Q1", "options": ["A", "B"]}, {"question_text": "Q2", "options": ["X", "Y"]}]
+        questions = [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": ["X", "Y"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 
@@ -284,8 +284,8 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_wizard_new_question_highlights_first_option(self):
         questions = [
-            {"question_text": "Q1", "options": ["A", "B", "C"]},
-            {"question_text": "Q2", "options": ["X", "Y", "Z"]},
+            {"question": "Q1", "options": ["A", "B", "C"]},
+            {"question": "Q2", "options": ["X", "Y", "Z"]},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -305,8 +305,8 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_wizard_go_back_restores_previous_highlight(self):
         questions = [
-            {"question_text": "Q1", "options": ["A", "B", "C"]},
-            {"question_text": "Q2", "options": ["X", "Y", "Z"]},
+            {"question": "Q1", "options": ["A", "B", "C"]},
+            {"question": "Q2", "options": ["X", "Y", "Z"]},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -330,8 +330,8 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_wizard_confirm_summary_class_applied_and_removed(self):
         questions = [
-            {"question_text": "Q1", "options": ["A", "B"]},
-            {"question_text": "Q2", "options": ["X", "Y"]},
+            {"question": "Q1", "options": ["A", "B"]},
+            {"question": "Q2", "options": ["X", "Y"]},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -357,9 +357,9 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_wizard_right_arrow_navigates_without_selecting(self):
         questions = [
-            {"question_text": "Q1", "options": ["A", "B"]},
-            {"question_text": "Q2", "options": ["X", "Y"]},
-            {"question_text": "Q3", "options": ["M", "N"]},
+            {"question": "Q1", "options": ["A", "B"]},
+            {"question": "Q2", "options": ["X", "Y"]},
+            {"question": "Q3", "options": ["M", "N"]},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)

@@ -182,7 +182,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         if self.q_idx < len(self.questions):
             title_md.remove_class("confirm-summary")
             q = self.questions[self.q_idx]
-            q_text = q.get("question_text", "")
+            q_text = q.get("question", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
             hint.update("enter: confirm • space: toggle • ←: back • →: next • tab: minimize • esc: cancel")
 
@@ -238,7 +238,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         else:
             blocks = []
             for idx, q in enumerate(self.questions):
-                q_clean = q.get("question_text", "")
+                q_clean = q.get("question", "")
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
@@ -337,7 +337,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
         else:
             out_summary = ""
             for idx, q in enumerate(self.questions):
-                q_clean = q.get("question_text", "")
+                q_clean = q.get("question", "")
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"

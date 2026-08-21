@@ -320,8 +320,8 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
-            {"question_text": "Pick color", "options": ["Red", "Blue"]},
-            {"question_text": "Enter name", "options": []},
+            {"question": "Pick color", "options": ["Red", "Blue"]},
+            {"question": "Enter name", "options": []},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -352,7 +352,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
-        questions = [{"question_text": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}]
+        questions = [{"question": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 
@@ -383,8 +383,8 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
-            {"question_text": "Enter custom text", "options": []},
-            {"question_text": "Question 2", "options": []},
+            {"question": "Enter custom text", "options": []},
+            {"question": "Question 2", "options": []},
         ]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
@@ -410,7 +410,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
-        questions = [{"question_text": "Q1", "options": ["Opt1"]}, {"question_text": "Q2", "options": ["Opt2"]}]
+        questions = [{"question": "Q1", "options": ["Opt1"]}, {"question": "Q2", "options": ["Opt2"]}]
         screen = AskUserWizardScreen(questions)
         app = DummyHostApp(screen)
 

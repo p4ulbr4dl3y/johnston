@@ -329,7 +329,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             res = await execute_tool("mcp_huge_tool", {"arg": "val"})
 
         self.assertFalse(res.is_error)
-        self.assertIn("[Output truncated at 8000 chars", res.content)
+        self.assertIn("[Output truncated: showing first 8000 chars", res.content)
         self.assertIn("Refine parameters or request partial data", res.content)
 
 

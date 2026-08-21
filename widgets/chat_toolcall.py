@@ -98,7 +98,7 @@ class FormattingMixin:
         for i, q in enumerate(questions):
             if i:
                 t.append("\n")
-            q_text = q.get("question_text", "")
+            q_text = q.get("question", "")
             ans = answers.get(i, {}).get("answer", "")
             t.append(f"{q_text}\n", style="bold #ffffff")
             t.append(f"{ans}", style="#a1a1aa" if not ans else None)
@@ -666,10 +666,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             for q in qs:
                 if not isinstance(q, dict):
                     continue
-                q_text = q.get("question_text") or ""
+                q_text = q.get("question") or ""
                 opts = q.get("options")
                 if q_text and isinstance(opts, list):
-                    out.append({"question_text": str(q_text), "options": [str(o) for o in opts]})
+                    out.append({"question": str(q_text), "options": [str(o) for o in opts]})
         return out
 
     def _parse_ask_user_answers(self, questions: list[dict]) -> dict:
@@ -687,7 +687,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             for i, q in enumerate(questions):
                 if i in used:
                     continue
-                if (q.get("question_text") or "").strip() == q_text.strip():
+                if (q.get("question") or "").strip() == q_text.strip():
                     answers[i] = {"answer": ans.strip()}
                     used.add(i)
                     break

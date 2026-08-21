@@ -288,11 +288,11 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({}))
         self.assertIn("ERR", res)
 
-    async def test_empty_question_text_skipped(self):
+    async def test_empty_question_skipped(self):
         tool = self._tool()
         app = MagicMock()
         app.ask_user = AsyncMock(return_value="ok")
-        res = str(await tool.execute({"questions": [{"question_text": "", "options": ["a"]}]}, ctx=app))
+        res = str(await tool.execute({"questions": [{"question": "", "options": ["a"]}]}, ctx=app))
         self.assertIn("missing or invalid", res)
 
     async def test_all_questions_invalid_returns_error(self):
@@ -305,8 +305,8 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
             {
                 "questions": [
                     "not a dict",
-                    {"question_text": "ok", "options": None},
-                    {"question_text": "", "options": ["a"]},
+                    {"question": "ok", "options": None},
+                    {"question": "", "options": ["a"]},
                     {"options": ["x"]},
                 ]
             },
@@ -321,7 +321,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         tool = self._tool()
         app = MagicMock()
         del app.ask_user  # no ask_user attribute at all
-        res = str(await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app))
+        res = str(await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=app))
         self.assertIn("ERR: context 'app': unavailable", res)
 
     async def test_many_options_forwarded_uncapped(self):
@@ -337,7 +337,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.ask_user = fake
         res = str(await tool.execute(
-            {"questions": [{"question_text": "Q", "options": [f"o{i}" for i in range(500)]}]}, ctx=app
+            {"questions": [{"question": "Q", "options": [f"o{i}" for i in range(500)]}]}, ctx=app
         ))
         self.assertEqual(seen["n"], 500)
         self.assertIn("a", res)
@@ -353,7 +353,7 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.ask_user = _cancelled
         with self.assertRaises(asyncio.CancelledError):
-            await tool.execute({"questions": [{"question_text": "Q?", "options": ["a"]}]}, ctx=app)
+            await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=app)
 
     async def test_options_with_none_and_ints_coerced(self):
         # Non-string option values are coerced to str rather than crashing.
@@ -367,13 +367,13 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.ask_user = fake
         res = str(await tool.execute(
-            {"questions": [{"question_text": "Q", "options": ["a", None, 5, ["b"]]}]}, ctx=app
+            {"questions": [{"question": "Q", "options": ["a", None, 5, ["b"]]}]}, ctx=app
         ))
         self.assertEqual(seen["opts"], ["a", "None", "5", "['b']"])
         self.assertIn("x", res)
 
     async def test_single_question_form_rejected(self):
-        # The flat {question: ...} form was removed; only questions[].question_text is accepted.
+        # The flat {question: ...} form was removed; only questions[].question is accepted.
         tool = self._tool()
         res = str(await tool.execute({"question": "Only text?"}, ctx=MagicMock(app=MagicMock())))
         self.assertIn("ERR: params 'questions'", res)

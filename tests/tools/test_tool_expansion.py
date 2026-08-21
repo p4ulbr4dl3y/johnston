@@ -427,7 +427,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="ask_user",
             target="ask_user",
             result_text="Question: What is your name?\nAnswer: Johnston",
-            args={"questions": [{"question_text": "What is your name?", "options": ["Johnston"]}]},
+            args={"questions": [{"question": "What is your name?", "options": ["Johnston"]}]},
         )
         display = widget._format_ask_user_display()
         self.assertIsInstance(display, Text)

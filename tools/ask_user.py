@@ -44,7 +44,7 @@ class AskUserTool(BaseTool):
                         "items": {
                             "type": "object",
                             "properties": {
-                                "question_text": {"type": "string", "description": "Question text"},
+                                "question": {"type": "string", "description": "Question text"},
                                 "options": {
                                     "type": "array",
                                     "items": {"type": "string"},
@@ -53,7 +53,7 @@ class AskUserTool(BaseTool):
                                     ),
                                 },
                             },
-                            "required": ["question_text", "options"],
+                            "required": ["question", "options"],
                         },
                     }
                 },
@@ -74,12 +74,12 @@ class AskUserTool(BaseTool):
         for q in questions_list:
             if not isinstance(q, dict):
                 continue
-            q_text = str(q.get("question_text") or "").strip()
+            q_text = str(q.get("question") or "").strip()
             options = q.get("options")
             if not q_text or not isinstance(options, list):
                 continue
             validated_questions.append(
-                {"question_text": q_text, "options": _sort_recommended_first([str(opt) for opt in options])}
+                {"question": q_text, "options": _sort_recommended_first([str(opt) for opt in options])}
             )
 
         if not validated_questions:

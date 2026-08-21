@@ -40,13 +40,13 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
     """Additional branches of ask_user.py complementing test_ask_user_screen.py."""
 
     async def test_force_modal_focus_not_mounted(self):
-        screen = _ask_screen(questions=[{"question_text": "Q"}], raw_options=["A"])
+        screen = _ask_screen(questions=[{"question": "Q"}], raw_options=["A"])
         screen._force_modal_focus()  # is_mounted False -> early return
 
     async def test_force_modal_focus_query_exceptions(self):
         from widgets.presentation.screens.ask_user import WRITE_IN_INPUT
 
-        screen = _ask_screen(questions=[{"question_text": "Q"}])
+        screen = _ask_screen(questions=[{"question": "Q"}])
         screen._is_mounted = True
 
         def fake_qo(sel, cls):
@@ -85,7 +85,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_step_write_in_tag_flows(self):
         screen = _ask_screen(
-            [{"question_text": "Q1", "options": ["A", "B"]}],
+            [{"question": "Q1", "options": ["A", "B"]}],
             raw_options=["A", "B"],
             options=["A", "B", "Write-in..."],
         )
@@ -122,7 +122,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_option_highlighted_and_selected(self):
         screen = _ask_screen(
-            [{"question_text": "Q", "options": ["A", "B"]}],
+            [{"question": "Q", "options": ["A", "B"]}],
             raw_options=["A", "B"],
             options=["A", "B", "Write-in..."],
         )
@@ -143,18 +143,18 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
 
     async def test_selected_guards(self):
         # guard return: q_idx >= len(questions) (303)
-        screen = _ask_screen([{"question_text": "Q"}], q_idx=1, raw_options=["A"], options=["A"])
+        screen = _ask_screen([{"question": "Q"}], q_idx=1, raw_options=["A"], options=["A"])
         screen._is_mounted = True
         screen.query_one = MagicMock()
         screen.on_option_list_option_selected(MagicMock())
         # guard return: no raw_options (303)
-        screen = _ask_screen([{"question_text": "Q"}], q_idx=0, raw_options=[], options=[])
+        screen = _ask_screen([{"question": "Q"}], q_idx=0, raw_options=[], options=[])
         screen._is_mounted = True
         screen.query_one = MagicMock()
         screen.on_option_list_option_selected(MagicMock())
 
     async def test_selected_mount_time_and_input_submitted_guard(self):
-        screen = _ask_screen([{"question_text": "Q"}], raw_options=["A"], options=["A"])
+        screen = _ask_screen([{"question": "Q"}], raw_options=["A"], options=["A"])
         screen._is_mounted = True
         screen.query_one = MagicMock(return_value=MagicMock())
         screen._mount_time = time.time()  # too recent -> 307 return
@@ -162,7 +162,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
         screen.on_input_submitted(MagicMock())  # -> 317 return
 
     async def test_action_toggle_selection_branches(self):
-        screen = _ask_screen([{"question_text": "Q", "options": ["A"]}], raw_options=["A"], options=["A"])
+        screen = _ask_screen([{"question": "Q", "options": ["A"]}], raw_options=["A"], options=["A"])
         # guard return: q_idx too high (349)
         screen.q_idx = 1
         screen.query_one = MagicMock()
