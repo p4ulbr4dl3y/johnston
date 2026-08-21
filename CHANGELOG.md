@@ -7,6 +7,21 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.23.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.22.1...johnston-v0.23.0) (2026-08-21)
+
+
+### Features
+
+* **providers:** update default providers, models source, and skills screens ([ccd0c18](https://github.com/p4ulbr4dl3y/johnston/commit/ccd0c189a7c9f7e61b038c8221553fc2b1c2bf0f))
+
+
+### Bug Fixes
+
+* **mcp:** surface tool failures with ERR prefix ([460a991](https://github.com/p4ulbr4dl3y/johnston/commit/460a991297b7eb12de5bf76f04d7d1e2b95c6f2d))
+* **storage:** isolate shadow repos and support JOHNSTON_CONFIG_DIR override ([e505844](https://github.com/p4ulbr4dl3y/johnston/commit/e50584496ca20eafaa0bf933e6fc334057a1e184))
+* **tools:** refine truncation line counts and inspection hints ([1db54f4](https://github.com/p4ulbr4dl3y/johnston/commit/1db54f4b7e8b552e2c3e3d34c2b6b3804886a857))
+* **widgets:** skip non-numbered lines in chat diff ([190dcee](https://github.com/p4ulbr4dl3y/johnston/commit/190dcee44b71747cb29eee94a96af3d731633c0a))
+
 ## [0.22.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.22.0...johnston-v0.22.1) (2026-08-20)
 
 
