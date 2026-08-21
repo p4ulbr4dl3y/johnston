@@ -379,6 +379,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         super().__init__(classes=classes)
         from tools.registry import normalize_tool_name
 
+        self.is_sequential = is_sequential
         self.tool_type = tool_type
         self.canonical_tool = normalize_tool_name(tool_type)
         if isinstance(target, str):
@@ -422,6 +423,51 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.content_widget.display = False
         self.md_widget.display = False
         self.render_header()
+        self._sync_sequential_with_prev()
+
+    def _update_next_sibling_spacing(self) -> None:
+        if not self.parent:
+            return
+        children = list(self.parent.children)
+        try:
+            idx = children.index(self)
+        except ValueError:
+            return
+        for child in children[idx + 1 :]:
+            from widgets.presentation.widgets.chat_messages import BotMessage
+
+            if isinstance(child, BotMessage):
+                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
+                if not (c_str or "").strip():
+                    continue
+            if isinstance(child, ToolCallWidget) and getattr(child, "is_sequential", False):
+                if self.is_expanded:
+                    child.remove_class("tool-sequential")
+                else:
+                    child.add_class("tool-sequential")
+            break
+
+    def _sync_sequential_with_prev(self) -> None:
+        if not getattr(self, "is_sequential", False) or not self.parent:
+            return
+        children = list(self.parent.children)
+        try:
+            idx = children.index(self)
+        except ValueError:
+            return
+        for child in reversed(children[:idx]):
+            from widgets.presentation.widgets.chat_messages import BotMessage
+
+            if isinstance(child, BotMessage):
+                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
+                if not (c_str or "").strip():
+                    continue
+            if isinstance(child, ToolCallWidget):
+                if child.is_expanded:
+                    self.remove_class("tool-sequential")
+                else:
+                    self.add_class("tool-sequential")
+            break
 
     def set_result(
         self,
@@ -465,11 +511,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.result_text = cleaned
 
         if not self.is_clickable_header():
+            was_expanded = self.is_expanded
             self.is_expanded = False
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)
             self.content_widget.display = False
             self.md_widget.display = False
+            if was_expanded:
+                self._update_next_sibling_spacing()
         self.render_header()
         if self.is_expanded:
             self.render_content()
@@ -655,6 +704,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
         self.content_widget.display = False
         self.md_widget.display = False
+        self._update_next_sibling_spacing()
 
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
@@ -666,6 +716,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.content_widget.display = False
             self.md_widget.display = False
+        self._update_next_sibling_spacing()
 
     _RAW_BASH_LIMIT = 200 * 1024  # 200 KB retained raw buffer
     _RAW_BASH_TRUNC = "[…[truncated]]\n"

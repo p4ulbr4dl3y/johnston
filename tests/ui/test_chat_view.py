@@ -172,6 +172,24 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("tool-sequential", first.classes)
             self.assertIn("tool-sequential", second.classes)
 
+            # Expanding first removes tool-sequential on second so it gets top margin
+            first.toggle_expanded()
+            self.assertNotIn("tool-sequential", second.classes)
+
+            # Collapsing first restores tool-sequential on second
+            first.toggle_expanded()
+            self.assertIn("tool-sequential", second.classes)
+
+    async def test_add_tool_call_sequential_flag_when_first_already_expanded(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            first = await chat_view.add_tool_call("shell", "cmd", "out1", animate=False)
+            first.toggle_expanded()
+            second = await chat_view.add_tool_call("shell", "cmd2", "out2", animate=False)
+            await pilot.pause()
+            self.assertNotIn("tool-sequential", second.classes)
+
     async def test_add_tool_call_sequential_flag_ignores_empty_bot_message(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
