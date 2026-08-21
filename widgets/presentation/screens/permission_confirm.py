@@ -4,14 +4,14 @@ from typing import Any, Dict, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.screen import ModalScreen
 from textual.widgets import Label, Markdown, Static
 
 from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
+from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 
 
-class PermissionConfirmScreen(ModalScreen[str]):
+class PermissionConfirmScreen(BaseModalScreen[str]):
     """Modal screen asking user for permission before executing a tool in human-friendly format."""
 
     ALLOW_SELECT = False
@@ -26,7 +26,8 @@ class PermissionConfirmScreen(ModalScreen[str]):
         ("right", "scroll_right", "Scroll Right"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
-        ("ctrl+c", "quit", "Exit"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ]
 
     def __init__(
@@ -233,5 +234,9 @@ class PermissionConfirmScreen(ModalScreen[str]):
     def action_deny(self) -> None:
         self.dismiss("deny")
 
+    def action_cancel(self) -> None:
+        self.dismiss("deny")
+
     def action_quit(self) -> None:
-        self.app.exit()
+        self.action_quit_app()
+

@@ -19,6 +19,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
+    TAB_KEYS,
 )
 
 
@@ -86,7 +87,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search skills...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield Label("enter: activate • tab: toggle hidden • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: select • tab: toggle hidden • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
@@ -166,6 +167,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             self.dismiss(None)
 
     def _on_key(self, event: events.Key) -> None:
+        if event.key in TAB_KEYS:
+            if event.key == "tab":
+                self.action_toggle_hidden()
+            event.prevent_default()
+            event.stop()
+            return
         self._handle_search_navigation(event)
 
     def action_toggle_hidden(self) -> None:

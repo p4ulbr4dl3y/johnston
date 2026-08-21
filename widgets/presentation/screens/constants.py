@@ -31,8 +31,9 @@ TOOL_SCROLL_BOX = "tool-scroll-box"
 TOOL_HEADER = "tool-header"
 TOOL_HEADER_EXPANDABLE = "tool-header-expandable"
 
-# Shift+Tab key aliases (used to dismiss/escape modal focus)
+# Tab / Shift+Tab key aliases (used to prevent focus jumping across widgets in modals)
 SHIFT_TAB_KEYS = ("shift+tab", "backtab", "shift_tab")
+TAB_KEYS = ("tab", "shift+tab", "backtab", "shift_tab")
 
 # Main app widgets
 STATUS_FOOTER = "#status-footer"

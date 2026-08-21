@@ -20,6 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
+    TAB_KEYS,
 )
 
 
@@ -286,6 +287,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 self._toggle_server_async(target["name"])
 
     def _on_key(self, event: events.Key) -> None:
+        if event.key in TAB_KEYS:
+            event.prevent_default()
+            event.stop()
+            return
         self._handle_search_navigation(event)
 
     def action_cancel(self) -> None:

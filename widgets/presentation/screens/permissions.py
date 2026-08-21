@@ -18,6 +18,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
+    TAB_KEYS,
 )
 from widgets.tool_helpers import get_all_tool_types
 
@@ -56,7 +57,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             )
             yield Input(placeholder="Search permissions...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="permissions-option-list")
-            yield Label("enter: toggle • esc: close", id=MODAL_HINT_ID)
+            yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -250,6 +251,10 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self.toggle_selected_permission(event.option_index)
 
     def _on_key(self, event: events.Key) -> None:
+        if event.key in TAB_KEYS:
+            event.prevent_default()
+            event.stop()
+            return
         if event.key in ("down", "up"):
             self._handle_search_navigation(event)
 

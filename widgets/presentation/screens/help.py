@@ -4,6 +4,12 @@ from textual.containers import Vertical
 from textual.widgets import Label, Markdown
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
+from widgets.presentation.screens.constants import (
+    MODAL_DIALOG_ID,
+    MODAL_HINT_ID,
+    MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
+)
 
 COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
 * `/models` — Switch active model across providers
@@ -49,10 +55,14 @@ class HelpScreen(BaseModalScreen[None]):
         return f"### **Johnston Help**\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1}"
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="modal-dialog"):
-            yield Markdown(self._get_header_md(), id="help-header-md", classes="modal-markdown modal-markdown-centered")
-            yield Markdown(COMMANDS_BODY_MD, id="help-body-md", classes="modal-markdown")
-            yield Label("tab / ←/→: switch • esc: close", id="modal-hint")
+        with Vertical(id=MODAL_DIALOG_ID):
+            yield Markdown(
+                self._get_header_md(),
+                id="help-header-md",
+                classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
+            )
+            yield Markdown(COMMANDS_BODY_MD, id="help-body-md", classes=MODAL_MARKDOWN)
+            yield Label("tab / ←/→: switch • esc: cancel", id=MODAL_HINT_ID)
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):
