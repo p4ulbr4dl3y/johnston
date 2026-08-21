@@ -115,6 +115,62 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("invoke_subagent", tool_names)
         self.assertNotIn("manage_shell", tool_names)
 
+    async def test_invoke_subagent_without_branch_succeeds(self):
+        from unittest.mock import MagicMock
+
+        tool = InvokeSubagentTool()
+
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        res = await tool.execute({"prompt": "inspect repo", "description": "inspect"})
+        self.assertEqual(res.status.value, "running")
+        sessions = self.store.list(kind="subagent")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].branch_name, "")
+        self.assertEqual(sessions[0].project_dir, "")
+
+    async def test_invoke_subagent_with_branch_non_git_sets_empty_branch(self):
+        from unittest.mock import MagicMock
+
+        tool = InvokeSubagentTool()
+
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        res = await tool.execute({"prompt": "inspect repo", "description": "inspect", "branch": "feat-x"})
+        self.assertEqual(res.status.value, "running")
+        sessions = self.store.list(kind="subagent")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].branch_name, "")
+        self.assertEqual(sessions[0].project_dir, "")
+
     def test_truncate_subagent_result_short(self):
         self.assertEqual(truncate_subagent_result("short result"), "short result")
         self.assertEqual(truncate_subagent_result(""), "")

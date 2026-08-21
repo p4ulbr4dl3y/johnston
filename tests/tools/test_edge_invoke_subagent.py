@@ -616,3 +616,15 @@ async def test_error_format_matches_err_convention():
         assert res == "ERR: params 'prompt': required", res
     finally:
         tmp.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_launch_without_branch_defaults_to_main_dir():
+    agent = _agent_with_stream(_gen_ok)
+    store, app, tool, tmp = _make_env(agent)
+    try:
+        res, sess = await _launch_and_wait(tool, {"prompt": "hi", "description": "no branch"}, app, store)
+        assert sess.branch_name == ""
+        assert sess.project_dir == ""
+    finally:
+        tmp.cleanup()

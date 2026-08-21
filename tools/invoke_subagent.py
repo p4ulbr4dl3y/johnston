@@ -87,11 +87,11 @@ class InvokeSubagentTool(BaseTool):
                     "branch": {
                         "type": "string",
                         "description": (
-                            "Git branch name. Use distinct branches for parallel write tasks to isolate worktrees."
+                            "Git branch name for worktree isolation. MUST be used when running parallel write/edit tasks to avoid file conflicts. If omitted or same as current branch, runs in main workspace."
                         ),
                     },
                 },
-                "required": ["prompt", "description", "branch"],
+                "required": ["prompt", "description"],
             },
         },
     }
@@ -106,9 +106,6 @@ class InvokeSubagentTool(BaseTool):
 
         if not prompt:
             return ToolResult.error("params", name="prompt", detail="required")
-
-        if not branch_name:
-            return ToolResult.error("params", name="branch", detail="required")
 
         session_id = f"subagent-{uuid.uuid4().hex[:6]}"
         args = {**args, "session_id": session_id}
@@ -140,14 +137,15 @@ class InvokeSubagentTool(BaseTool):
 
         from core.infrastructure.runtime.git_utils import run_git_async
 
+        is_git = SubagentWorktreeManager.is_git_repo(project_dir)
         current_branch = ""
-        if SubagentWorktreeManager.is_git_repo(project_dir):
+        if is_git:
             res = await run_git_async(["branch", "--show-current"], cwd=project_dir, timeout=5)
             current_branch = res.stdout.strip()
 
-        # Same branch as the main tree -> work directly in it; otherwise isolate
-        # in a worktree on the requested branch (created if missing).
-        if branch_name != current_branch:
+        # Same branch as the main tree or no branch requested -> work directly in it;
+        # otherwise isolate in a worktree on the requested branch (created if missing).
+        if is_git and branch_name and branch_name != current_branch:
             wt_path, wt_branch = await SubagentWorktreeManager.create_worktree_async(
                 project_dir, session_id, branch_name
             )
@@ -174,7 +172,7 @@ class InvokeSubagentTool(BaseTool):
             prompt=prompt,
             status="running",
             project_dir=wt_path or "",
-            branch_name=wt_branch or branch_name,
+            branch_name=wt_branch or (branch_name if is_git else ""),
         )
         session.agent = subagent
         subagent.session = session

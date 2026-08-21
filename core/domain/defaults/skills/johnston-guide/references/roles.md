@@ -33,6 +33,6 @@ System prompt instructions for the role...
 - `provider`: Specific provider override (subagents). Defaults to parent's active provider.
 
 ## Tool Isolation & Worktree Modes
-Subagents are invoked via `invoke_subagent` with a `branch='<name>'` parameter:
-- Same branch as the main tree: subagent works directly in the main tree.
-- Different (or missing) branch: subagent runs in an isolated Git worktree on that branch (created if missing).
+Subagents are invoked via `invoke_subagent` with an optional `branch='<name>'` parameter:
+- Omitted or same branch as main tree: subagent works directly in the main workspace.
+- Different branch: subagent runs in an isolated Git worktree on that branch (created if missing).

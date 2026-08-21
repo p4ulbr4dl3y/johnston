@@ -46,7 +46,7 @@ class TestToolSchemas(unittest.TestCase):
 
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("branch", props)
-        self.assertIn("branch", InvokeSubagentTool.schema["function"]["parameters"]["required"])
+        self.assertNotIn("branch", InvokeSubagentTool.schema["function"]["parameters"]["required"])
         self.assertNotIn("session_id", props)
         self.assertNotIn("task_id", props)
 
