@@ -264,6 +264,26 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Full log:", res)
         self.assertIn(".html", res)
 
+    @patch("httpx.AsyncClient")
+    @patch("socket.getaddrinfo")
+    async def test_fake_ip_proxy_range_allowed(self, mock_gai, mock_client_cls):
+        # 198.18.0.0/15 fake-IP used by proxies/VPNs must not be blocked as private
+        mock_gai.return_value = [(2, 1, 6, "", ("198.18.0.14", 0))]
+        body = b"<html><body><h1>GitHub</h1></body></html>"
+        mock_client_cls.return_value = _make_stream_client(body, "text/html")
+
+        tool = WebFetchTool()
+        res = str(await tool.execute({"url": "https://github.com/repo"}))
+        self.assertIn("# GitHub", res)
+
+    @patch("socket.getaddrinfo")
+    async def test_private_lan_and_loopback_blocked(self, mock_gai):
+        tool = WebFetchTool()
+        for ip in ("127.0.0.1", "10.0.0.1", "192.168.1.1", "172.16.0.1", "169.254.1.1"):
+            mock_gai.return_value = [(2, 1, 6, "", (ip, 0))]
+            res = str(await tool.execute({"url": "http://internal-service.local/"}))
+            self.assertIn("blocked", res)
+
 
 if __name__ == "__main__":
     unittest.main()

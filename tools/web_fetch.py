@@ -21,6 +21,16 @@ DEFAULT_USER_AGENT = (
 )
 
 
+_FAKE_IP_NET = ipaddress.ip_network("198.18.0.0/15")
+
+
+def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    # 198.18.0.0/15 is used by transparent proxies / VPNs (Clash, Surge, Sing-box) as Fake-IP pool
+    if isinstance(addr, ipaddress.IPv4Address) and addr in _FAKE_IP_NET:
+        return False
+    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
+
+
 async def _is_private_host(url: str) -> bool:
     """True if URL resolves to a private/loopback/link-local address (SSRF guard)."""
     try:
@@ -32,7 +42,7 @@ async def _is_private_host(url: str) -> bool:
     # Literal IPv6/IPv4 fast path
     try:
         addr = ipaddress.ip_address(host.split("%")[0])
-        return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
+        return _is_blocked_ip(addr)
     except ValueError:
         pass
     # Hostname: resolve; block any private/loopback result.
@@ -47,7 +57,7 @@ async def _is_private_host(url: str) -> bool:
             addr = ipaddress.ip_address(info[4][0])
         except ValueError:
             continue
-        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+        if _is_blocked_ip(addr):
             return True
     return False
 
