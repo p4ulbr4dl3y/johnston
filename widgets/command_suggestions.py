@@ -5,9 +5,10 @@ import time
 from textual.widgets import OptionList
 
 from widgets.app.command_provider import get_all_command_suggestions
+from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 
 
-class CommandSuggestions(OptionList):
+class CommandSuggestions(HeaderWrapOptionList):
     """Dropdown suggestions menu for slash commands (/help, /rewind) and file attachments (@file)"""
 
     can_focus = False

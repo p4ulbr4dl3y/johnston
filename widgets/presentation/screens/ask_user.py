@@ -4,6 +4,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
+from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT,
@@ -146,7 +147,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="wizard-dialog"):
             yield Markdown("", id="wizard-title", classes=MODAL_MARKDOWN)
-            yield OptionList(id=OPTIONS_LIST_ID)
+            yield HeaderWrapOptionList(id=OPTIONS_LIST_ID)
             yield WriteInInput(placeholder="Type response here and press Enter...", id=WRITE_IN_INPUT_ID)
             yield Label("", id=MODAL_HINT_ID)
 

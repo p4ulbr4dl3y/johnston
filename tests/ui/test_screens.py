@@ -1,12 +1,12 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.events import Key
 
 from core.application.session.actions import RewindEntry
 from core.application.skills.manager import Skill, SkillScope
 from widgets.presentation.screens.ask_user import ConfirmScreen
-from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.presentation.screens.resume import ResumeScreen
@@ -142,6 +142,36 @@ class TestModalSearchShiftTab(unittest.TestCase):
         event.stop.assert_not_called()
 
 
+class TestHeaderWrapOptionList(unittest.TestCase):
+    def test_mouse_move_updates_highlighted(self):
+        from rich.style import Style
+        from textual.widgets.option_list import Option
+
+        opt_list = HeaderWrapOptionList(
+            Option("Disabled Header", disabled=True),
+            Option("Option 1"),
+            Option("Option 2"),
+        )
+        opt_list.highlighted = 1
+
+        # Hover over Option 2 (index 2)
+        mock_event = MagicMock()
+        mock_event.style = Style(meta={"option": 2})
+        opt_list._on_mouse_move(mock_event)
+        self.assertEqual(opt_list.highlighted, 2)
+
+        # Hover over Disabled Header (index 0) - should NOT change highlighted
+        mock_event.style = Style(meta={"option": 0})
+        opt_list._on_mouse_move(mock_event)
+        self.assertEqual(opt_list.highlighted, 2)
+
+        # Hover over no option
+        mock_event.style = Style(meta={})
+        opt_list._on_mouse_move(mock_event)
+        self.assertEqual(opt_list.highlighted, 2)
+
+
+
 class TestTaskScreens(unittest.TestCase):
     def test_console_init(self):
         mock_task = MagicMock()
@@ -166,6 +196,29 @@ class TestTaskScreens(unittest.TestCase):
         keys = [b[0] for b in ShellTasksScreen.BINDINGS]
         self.assertIn("escape", keys)
         self.assertIn("k", keys)
+
+    def test_shell_tasks_screen_empty_dismisses(self):
+        s = ShellTasksScreen()
+        s.dismiss = MagicMock()
+        mock_opt = MagicMock()
+        with patch.object(ShellTasksScreen, "is_mounted", new_callable=PropertyMock, return_value=True), \
+             patch.object(s, "_get_filtered_tasks", return_value=[]), \
+             patch.object(s, "query_one", return_value=mock_opt):
+            s.update_tasks_list()
+            s.dismiss.assert_called_once()
+            self.assertEqual(s.filtered_tasks, [])
+
+    def test_subagents_screen_empty_dismisses(self):
+        s = SubagentsScreen()
+        s.dismiss = MagicMock()
+        mock_opt = MagicMock()
+        with patch.object(SubagentsScreen, "is_mounted", new_callable=PropertyMock, return_value=True), \
+             patch.object(s, "_get_filtered_tasks", return_value=[]), \
+             patch.object(s, "_get_option_list", return_value=mock_opt):
+            s.update_tasks_list()
+            s.dismiss.assert_called_once()
+            self.assertEqual(s.filtered_tasks, [])
+
 
 
 class TestProvidersScreen(unittest.TestCase):

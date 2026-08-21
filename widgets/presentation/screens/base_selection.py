@@ -32,6 +32,13 @@ class HeaderWrapOptionList(OptionList):
     "Global") stays visible above the highlighted first skill.
     """
 
+    def _on_mouse_move(self, event: events.MouseMove) -> None:
+        super()._on_mouse_move(event)
+        option_index = event.style.meta.get("option")
+        if option_index is not None and 0 <= option_index < len(self.options):
+            if not self.options[option_index].disabled and self.highlighted != option_index:
+                self.highlighted = option_index
+
     def action_cursor_down(self) -> None:
         last = find_last_enabled(self.options)
         if self.highlighted is not None and last is not None and self.highlighted == last:

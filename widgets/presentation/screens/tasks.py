@@ -1,13 +1,11 @@
 import time
 from typing import Optional
 
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
-from core.domain.defaults.config import THEME_MUTED
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -176,8 +174,8 @@ class ShellTasksScreen(BaseModalScreen[None]):
 
         opt_list.clear_options()
         if not tasks:
-            opt_list.add_option(Text("No shell tasks found.", style=THEME_MUTED))
             self.filtered_tasks = []
+            self.dismiss()
             return
 
         self.filtered_tasks = []
@@ -329,8 +327,8 @@ class SubagentsScreen(BaseModalScreen[None]):
 
         opt_list.clear_options()
         if not tasks:
-            opt_list.add_option(Text("No subagents found.", style=THEME_MUTED))
             self.filtered_tasks = []
+            self.dismiss()
             return
 
         # Build display rows in lockstep with self.filtered_tasks: a None marks a

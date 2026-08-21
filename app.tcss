@@ -344,7 +344,8 @@ OptionList {
 }
 
 OptionList > .option-list--option-highlighted,
-OptionList > .option-list--option-blur-highlighted {
+OptionList > .option-list--option-blur-highlighted,
+OptionList > .option-list--option-hover {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
@@ -373,7 +374,8 @@ OptionList > .option-list--option-blur-highlighted {
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted,
-#command-suggestions OptionList > .option-list--option-blur-highlighted {
+#command-suggestions OptionList > .option-list--option-blur-highlighted,
+#command-suggestions OptionList > .option-list--option-hover {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
@@ -692,7 +694,8 @@ SubagentViewScreen {
 }
 
 #modal-dialog OptionList > .option-list--option-highlighted,
-#modal-dialog OptionList > .option-list--option-blur-highlighted {
+#modal-dialog OptionList > .option-list--option-blur-highlighted,
+#modal-dialog OptionList > .option-list--option-hover {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
