@@ -506,16 +506,6 @@ ModalScreen {
     display: none;
 }
 
-.modal-title {
-    dock: top;
-    width: 100%;
-    text-align: left;
-    color: #ffffff;
-    text-style: bold;
-    margin-bottom: 1;
-    padding: 0 1;
-}
-
 #wizard-title {
     width: 100%;
     height: auto;
@@ -536,12 +526,6 @@ ModalScreen {
 
 #modal-search-input {
     margin: 0 0 1 0;
-}
-
-.modal-body {
-    width: 100%;
-    color: #e4e4e7;
-    margin-bottom: 1;
 }
 
 .modal-markdown {
@@ -903,7 +887,3 @@ ModalScreen LoadingIndicator,
 #modal-dialog LoadingIndicator {
     background: #18181b;
 }
-
-
-
-
