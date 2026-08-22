@@ -188,6 +188,17 @@ async def _run_single_subagent_message(
         session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
         session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
         session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
+        if (
+            hasattr(session, "messages")
+            and session.messages
+            and session.messages[-1].get("type") == "tool"
+            and "result_text" not in session.messages[-1]
+        ):
+            session.add_event({
+                "type": "tool",
+                "result_text": "[Tool call interrupted or cancelled]",
+                "status": "cancelled",
+            })
         session.finish(STATUS_CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)
