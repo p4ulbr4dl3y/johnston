@@ -13,11 +13,15 @@ from unittest.mock import MagicMock as MMock
 import pytest
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
-from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR
+from core.domain.entities.session import SessionStatus
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
 from core.session_manager import SessionStore
 from tools.context import ToolContext
 from tools.invoke_subagent import InvokeSubagentTool
+
+STATUS_CANCELLED = SessionStatus.CANCELLED
+STATUS_COMPLETED = SessionStatus.COMPLETED
+STATUS_ERROR = SessionStatus.ERROR
 
 
 class _FakeRole:

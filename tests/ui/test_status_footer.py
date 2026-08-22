@@ -138,7 +138,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test():
             footer = app.query_one(StatusFooter)
-            with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("boom")):
+            with patch("widgets.app.status_state.build_status_kwargs", side_effect=Exception("boom")):
                 with patch.object(footer, "update_status") as mock_us:
                     footer.refresh_footer()
                     mock_us.assert_called_once_with(provider_key="default")
@@ -241,41 +241,14 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                     provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="gpt-4o"
                 )
 
-    async def test_mcp_footer_text_loading_counter(self):
-        footer = StatusFooter()
-        # Partial load -> active/total counter
-        self.assertEqual(footer._mcp_footer_text(0, 2), "MCP: [#f4f4f5]0/2[/#f4f4f5]")
-        self.assertEqual(footer._mcp_footer_text(1, 2), "MCP: [#f4f4f5]1/2[/#f4f4f5]")
-        # Fully loaded -> plain count
-        self.assertEqual(footer._mcp_footer_text(2, 2), "MCP: [#f4f4f5]2/2[/#f4f4f5]")
-        # No servers configured -> 0
-        self.assertEqual(footer._mcp_footer_text(0, 0), "MCP: [#f4f4f5]0[/#f4f4f5]")
-
     async def test_poll_mcp_refresh_triggers_on_loading(self):
         footer = StatusFooter()
         mgr = MagicMock()
-        mgr.is_loading.return_value = True
-        mgr.active_server_count.return_value = 0
-        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
+        mgr.is_warming_up.return_value = True
+        with patch("core.infrastructure.mcp._mcp_manager_instance", mgr):
             with patch.object(footer, "refresh_footer") as mock_rf:
                 footer._poll_mcp_refresh()
                 mock_rf.assert_called_once()
-                self.assertTrue(getattr(footer, "_mcp_was_loading", False))
-
-                mgr.is_loading.return_value = False
-                mock_rf.reset_mock()
-                footer._poll_mcp_refresh()
-                mock_rf.assert_called_once()  # final cleanup call
-                self.assertFalse(getattr(footer, "_mcp_was_loading", False))
-
-                mock_rf.reset_mock()
-                footer._poll_mcp_refresh()
-                mock_rf.assert_called_once()  # first idle detects count change (None -> 0)
-                self.assertEqual(footer._mcp_last_active, 0)
-
-                mock_rf.reset_mock()
-                footer._poll_mcp_refresh()
-                mock_rf.assert_not_called()  # idle, count unchanged
 
     async def test_subagent_footer_mount_unmount_and_spin(self):
         from widgets.status_footer import SubagentStatusFooter

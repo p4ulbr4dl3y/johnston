@@ -196,16 +196,6 @@ WelcomeWidget {
     color: #e4e4e7;
 }
 
-.tool-diff-view {
-    width: 100%;
-    height: auto;
-    margin-top: 1;
-    padding: 0 1;
-    background: #09090b;
-    color: #e4e4e7;
-    text-wrap: wrap;
-}
-
 /* Strict Height Auto & Zero Margin for Markdown Elements */
 Markdown, MarkdownBlock, MarkdownParagraph {
     link-color: #ffffff;
@@ -240,9 +230,7 @@ MarkdownBlockQuote MarkdownParagraph {
 }
 
 MarkdownBulletList MarkdownParagraph,
-MarkdownOrderedList MarkdownParagraph,
-Markdown BulletList MarkdownParagraph,
-Markdown OrderedList MarkdownParagraph {
+MarkdownOrderedList MarkdownParagraph {
     margin: 0;
     padding: 0;
 }
@@ -259,9 +247,7 @@ MarkdownHeader {
 }
 
 MarkdownBulletList,
-MarkdownOrderedList,
-Markdown BulletList,
-Markdown OrderedList {
+MarkdownOrderedList {
     height: auto;
     margin: 0;
     padding: 0;
@@ -500,10 +486,6 @@ ModalScreen {
     padding: 1 2 1 2;
     background: #09090b;
     scrollbar-size: 0 0;
-}
-
-#subagent-info {
-    display: none;
 }
 
 #wizard-title {
@@ -753,33 +735,6 @@ ModalScreen OptionList > .option-list--option-hover {
     color: #09090b;
 }
 
-.modal-buttons {
-    dock: bottom;
-    width: 100%;
-    height: auto;
-    layout: horizontal;
-    align: right middle;
-    margin-top: 1;
-    margin-bottom: 0;
-}
-
-.modal-buttons Button {
-    width: auto;
-    min-width: 12;
-    margin-left: 1;
-    margin-bottom: 0;
-    border: none;
-    background: #27272a;
-    color: #e4e4e7;
-}
-
-.modal-buttons Button:focus,
-.modal-buttons Button:hover {
-    background: #ffffff;
-    color: #09090b;
-    text-style: bold;
-}
-
 #modal-hint {
     width: 100%;
     text-align: left;
@@ -885,15 +840,4 @@ MarkdownBlock:light > .code_inline,
 MarkdownBlock > .code_inline {
     background: #27272a;
     color: #ffffff;
-}
-
-/* Monochrome LoadingIndicator */
-LoadingIndicator {
-    color: #a1a1aa;
-    background: #09090b;
-}
-
-ModalScreen LoadingIndicator,
-#modal-dialog LoadingIndicator {
-    background: #18181b;
 }

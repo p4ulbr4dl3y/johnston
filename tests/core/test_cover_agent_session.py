@@ -196,9 +196,9 @@ class TestAgentCompactionCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("7 → 3", dividers[0])
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 
-    async def test_compact_res_non_tuple(self):
+    async def test_compact_res_no_compaction(self):
         agent = self._make_agent()
-        with patch.object(agent, "_compact_messages_if_needed", new=AsyncMock(return_value="not-a-tuple")):
+        with patch.object(agent, "_compact_messages_if_needed", new=AsyncMock(return_value=([], False, ""))):
             with patch.object(
                 agent.client.chat.completions,
                 "create",

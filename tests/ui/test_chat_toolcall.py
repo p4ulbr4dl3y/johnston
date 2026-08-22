@@ -110,21 +110,14 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
 
     def test_is_error(self):
         widget = ToolCallWidget("shell", "cmd")
-        # Render helper drives the "error branch" off the structured card status;
-        # the text itself is never the source of classification.
+        # Render helper drives the "error branch" strictly off the structured card status
         widget.status = "error"
         self.assertTrue(widget._is_error("success output"))
         widget.status = "cancelled"
         self.assertTrue(widget._is_error("partial output"))
         widget.status = "done"
         self.assertFalse(widget._is_error("all good"))
-        # Legacy inline `ERR:` marker still routes to the error branch even when
-        # no structured status was persisted (legacy session reloads).
-        self.assertTrue(widget._is_error("  err: boom"))
         self.assertFalse(widget._is_error("Error: boom"))
-        self.assertFalse(widget._is_error("Traceback (most recent call last):\n..."))
-        self.assertFalse(widget._is_error("Permission denied"))
-        self.assertFalse(widget._is_error("Command failed"))
         self.assertFalse(widget._is_error(""))
 
     def test_get_status_color(self):

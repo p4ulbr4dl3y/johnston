@@ -9,7 +9,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import ToolResult, parse_tool_result_step
-from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR, SUBAGENT_STATUS_RUNNING
+from core.domain.entities.session import SessionStatus
 from core.session_manager import AgentSession
 
 
@@ -177,9 +177,9 @@ async def _run_single_subagent_message(
                 acc[0] = f"[{last_api_error[0]}]"
             else:
                 acc[0] = f"{acc[0]}\n\n[{last_api_error[0]}]"
-            session.finish(STATUS_ERROR, last_api_error[0])
+            session.finish(SessionStatus.ERROR, last_api_error[0])
         else:
-            session.finish(STATUS_COMPLETED)
+            session.finish(SessionStatus.COMPLETED)
         await _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
@@ -199,7 +199,7 @@ async def _run_single_subagent_message(
                 "result_text": "[Tool call interrupted or cancelled]",
                 "status": "cancelled",
             })
-        session.finish(STATUS_CANCELLED, "Cancelled by user")
+        session.finish(SessionStatus.CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)
         except Exception as err:
@@ -213,7 +213,7 @@ async def _run_single_subagent_message(
         session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
         session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
         session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
-        session.finish(STATUS_ERROR, str(err))
+        session.finish(SessionStatus.ERROR, str(err))
         try:
             await _safe_save(store, session)
         except Exception:
@@ -253,9 +253,9 @@ async def run_subagent_stream_bg(
             # Drain follow-up messages queued while the previous message ran.
             if session.pending_messages:
                 message = session.pending_messages.pop(0)
-                session.status = SUBAGENT_STATUS_RUNNING
+                session.status = SessionStatus.RUNNING
                 session.add_event({"type": "user", "text": message})
-                session.add_event({"type": "status_change", "status": SUBAGENT_STATUS_RUNNING})
+                session.add_event({"type": "status_change", "status": SessionStatus.RUNNING})
                 continue
             break
     finally:
@@ -303,7 +303,7 @@ def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int
 
     cancelled = 0
     for sess in sessions:
-        if getattr(sess, "status", "") != SUBAGENT_STATUS_RUNNING:
+        if getattr(sess, "status", "") != SessionStatus.RUNNING:
             continue
         async_task = getattr(sess, "async_task", None)
         if async_task and not async_task.done():
@@ -311,7 +311,7 @@ def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int
                 async_task.cancel()
             except Exception:
                 pass
-        sess.finish(STATUS_CANCELLED, "Cancelled")
+        sess.finish(SessionStatus.CANCELLED, "Cancelled")
         store.save(sess)
         cancelled += 1
     return cancelled
@@ -366,7 +366,10 @@ async def send_subagent_followup(
         # to the parent checkout (worktree is removed on completion).
         if subagent and session.project_dir and session.branch_name:
             from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+            from core.roles.provider import rebind_provider
 
+            # Keep subagent provider credentials current with any host changes
+            rebind_provider(subagent, ctx.host)
             project_dir = await SubagentWorktreeManager.ensure_worktree_available_async(
                 session, parent_dir=ctx.project_dir
             )
@@ -376,11 +379,11 @@ async def send_subagent_followup(
         if not subagent:
             return ToolResult.error("context", name=session.id, detail="no active agent")
 
-        session.status = "running"
+        session.status = SessionStatus.RUNNING
         session.agent = subagent
         subagent.session = session
         session.add_event({"type": "user", "text": message})
-        session.add_event({"type": "status_change", "status": "running"})
+        session.add_event({"type": "status_change", "status": SessionStatus.RUNNING})
 
         from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
         from tools.base import format_background_notification
@@ -417,6 +420,6 @@ async def send_subagent_followup(
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
         return ToolResult.done(f"message sent to {session.id}")
     except Exception as err:
-        session.finish(STATUS_ERROR, str(err))
+        session.finish(SessionStatus.ERROR, str(err))
         store.save(session)
         return ToolResult.error("subagent_setup", detail=str(err), name=session.id)

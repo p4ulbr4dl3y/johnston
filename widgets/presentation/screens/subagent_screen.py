@@ -3,18 +3,10 @@ import asyncio
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Label
 
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import SubagentStatusFooter
 from widgets.utils.message_visibility import is_ui_visible_user_message
-
-
-class SubagentInfoLabel(Label):
-    """Header label for the subagent screen: not selectable, dimmed esc hint."""
-
-    ALLOW_SELECT = False
-    can_focus = False
 
 
 class SubagentViewScreen(Screen[None]):
@@ -37,14 +29,12 @@ class SubagentViewScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield SubagentInfoLabel("", id="subagent-info")
             yield SubagentStatusFooter(id="subagent-status-footer")
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.focus()
         chat_view.clear_welcome()
-        self._update_info_label(self.session_id_or_desc)
 
         store = getattr(self.app, "sm", None) if self.app else None
         if store is None:
@@ -66,9 +56,6 @@ class SubagentViewScreen(Screen[None]):
             self.run_worker(_no_sess())
             return
 
-        if getattr(self.session, "description", None):
-            self._update_info_label(self.session.description)
-
         footer = self.query_one("#subagent-status-footer", SubagentStatusFooter)
         footer.update_session(self.session)
 
@@ -82,17 +69,6 @@ class SubagentViewScreen(Screen[None]):
         self._footer_refresh = self.set_interval(1.0, lambda: footer.update_session(self.session))
 
         self._history_worker = self.run_worker(self._load_history_session())
-
-    def _update_info_label(self, text: str) -> None:
-        from rich.table import Table
-
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-        grid.add_row(text, "[dim]esc: close[/dim]")
-        label = self.query_one("#subagent-info", SubagentInfoLabel)
-        label._raw_text = text
-        label.update(grid)
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -257,6 +233,3 @@ class SubagentViewScreen(Screen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
-
-    def action_quit_app(self) -> None:
-        self.app.exit()

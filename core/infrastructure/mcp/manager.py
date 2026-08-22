@@ -712,15 +712,6 @@ class MCPManager:
                 if client:
                     return client, o_name
 
-        if not target_server and "__" in tool_name:
-            req_server, req_tool = tool_name.split("__", 1)
-            for t in active_tools:
-                s_name = t.get("_mcp_server")
-                o_name = t.get("_mcp_tool_name")
-                if s_name == req_server and o_name == req_tool:
-                    client = self.clients.get(s_name)
-                    if client:
-                        return client, o_name
         return None, None
 
     def call_tool(

@@ -269,9 +269,6 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             except Exception:
                 pass
 
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_items):
             item = self.filtered_items[event.option_index]

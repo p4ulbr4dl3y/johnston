@@ -36,9 +36,9 @@ def _collect_cache(app):
     except Exception:
         skills_total, skills_visible = 0, 0
     try:
-        from core.infrastructure.mcp import get_mcp_manager
+        import core.infrastructure.mcp as mcp_mod
 
-        mcp_servers = get_mcp_manager().load_servers()
+        mcp_servers = mcp_mod.get_mcp_manager().load_servers()
     except Exception:
         mcp_servers = []
     return providers, skills_visible, skills_total, mcp_servers
@@ -166,7 +166,15 @@ def build_status_kwargs(app, widget=None) -> dict:
         if s.get("url") and not s.get("command"):
             continue
         mcp_total += 1
-    mcp_active = widget._active_mcp_count(mcp_servers) if widget is not None else 0
+    import core.infrastructure.mcp as mcp_mod
+
+    count_fn = getattr(mcp_mod.get_mcp_manager(), "active_server_count", None)
+    mcp_active = 0
+    if callable(count_fn):
+        try:
+            mcp_active = count_fn(mcp_servers) or 0
+        except Exception:
+            mcp_active = 0
 
     tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
     bg_tasks = tasks.shell_tasks

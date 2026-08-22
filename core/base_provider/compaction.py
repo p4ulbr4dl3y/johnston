@@ -340,8 +340,6 @@ class CompactionMixin:
                     m = re.search(r"<summary>(.*?)</summary>", content_str, re.DOTALL)
                     if m:
                         previous_summary = m.group(1).strip()
-                elif "[Context Summary of earlier conversation]:" in content_str:
-                    previous_summary = content_str.split("[Context Summary of earlier conversation]:", 1)[1].strip()
 
         # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
         max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)

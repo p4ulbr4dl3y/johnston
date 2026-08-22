@@ -47,7 +47,7 @@ def generate_chunk_unified_diff(
     return d_lines
 
 
-def build_edit_diff_text(args: dict, file_path: str = "file", tool_name: str = "edit") -> str:
+def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
     """Generates unified diff text from tool arguments."""
     if not isinstance(args, dict):
         return ""

@@ -10,8 +10,8 @@ from widgets.status_footer import StatusFooter, SubagentStatusFooter, format_dis
 
 
 class FooterHarness(StatusFooter):
-    def __init__(self, is_subagent=False, width=120, app=None):
-        super().__init__(is_subagent=is_subagent)
+    def __init__(self, width=120, app=None):
+        super().__init__()
         self._harness_app = app
         self._harness_width = width
         self.last_update = None
@@ -83,15 +83,8 @@ class TestStatusFooterCoverage(unittest.TestCase):
 
     def test_poll_mcp_refresh_exception(self):
         footer = FooterHarness()
-        with patch(_mcp_mgr_patch, side_effect=Exception("boom")):
+        with patch("core.infrastructure.mcp._mcp_manager_instance", side_effect=Exception("boom")):
             footer._poll_mcp_refresh()  # must not raise
-
-    def test_active_mcp_count_exception(self):
-        footer = FooterHarness()
-        mgr = MagicMock()
-        mgr.active_server_count.side_effect = Exception("boom")
-        with patch(_mcp_mgr_patch, return_value=mgr):
-            self.assertEqual(footer._active_mcp_count([]), 0)
 
     def test_on_unmount_timer_stop_raises(self):
         footer = FooterHarness()
@@ -121,21 +114,6 @@ class TestStatusFooterCoverage(unittest.TestCase):
         self.assertIs(footer._resize_timer, new_timer)
         footer.set_timer.assert_called_once()
 
-    def test_spin_subagent_with_and_without_rows(self):
-        sess = SimpleNamespace(status="running")
-        footer = FooterHarness(is_subagent=True)
-        footer._subagent_session = sess
-        footer._last_grid_rows = [("a", "")]
-        with patch.object(footer, "_render_stream_frame") as rsf, patch.object(
-            footer, "update_subagent_footer"
-        ) as usf:
-            footer._spin()
-            rsf.assert_called_once()
-
-            footer._last_grid_rows = None
-            footer._spin()
-            usf.assert_called_once()
-
     def test_stream_frame_not_generating_returns(self):
         footer = FooterHarness()
         footer.is_generating = False
@@ -163,63 +141,6 @@ class TestStatusFooterCoverage(unittest.TestCase):
     def test_stream_frame_swap_no_bracket_returns_left(self):
         footer = FooterHarness()
         self.assertEqual(footer._swap_frame("no-bracket", "x"), "no-bracket")
-
-    def test_update_subagent_footer_running(self):
-        agent = MagicMock()
-        agent.role = "explorer"
-        agent.thinking_effort = "high"
-        agent.provider_key = "openai"
-        agent.model = "gpt-4o"
-        agent.get_metrics.return_value = {}
-        agent.context_limit = 128000
-        session = MagicMock()
-        session.status = "running"
-        session.branch_name = "feat"
-        session.agent = agent
-        session.project_dir = "/tmp/x"
-        session.last_context_tokens = 0
-        session.total_tokens = 0
-        session.cost_usd = 0.0
-
-        app = MagicMock()
-        cm = MagicMock()
-        cm.get_active_provider_key.return_value = "openai"
-        cm.load_providers.return_value = {"openai": {"name": "OpenAI"}}
-        cm.is_provider_connected.return_value = False
-        app.pm = cm
-        footer = FooterHarness(app=app)
-        with patch("widgets.status_footer.catalog.get_model_display_name", return_value="GPT-4o"), patch.object(
-            footer, "_git_diff_stats", return_value=""
-        ), patch.object(footer, "set_interval", return_value=MagicMock()):
-            footer.update_subagent_footer(session)
-        self.assertTrue(footer.is_generating)
-        self.assertIsNotNone(footer._last_grid_rows)
-
-        # now switching to completed stops the spinner
-        timer = MagicMock()
-        session.status = "completed"
-        footer.is_generating = True
-        footer._spinner_timer = timer
-        with patch("widgets.status_footer.catalog.get_model_display_name", return_value="GPT-4o"), patch.object(
-            footer, "_git_diff_stats", return_value=""
-        ):
-            footer.update_subagent_footer(session)
-        self.assertFalse(footer.is_generating)
-        self.assertIsNone(footer._spinner_timer)
-
-    def test_update_status_subagent_branch(self):
-        footer = FooterHarness(is_subagent=True)
-        with patch.object(footer, "_git_branch", return_value="main"), patch.object(
-            footer, "_git_diff_stats", return_value=""
-        ):
-            footer.update_status(
-                provider_key="openai",
-                provider_display="OpenAI",
-                clean_model="GPT-4o",
-                is_connected=True,
-                model_name="gpt-4o",
-            )
-        self.assertIsNotNone(footer._last_grid_rows)
 
     def test_update_status_compact_with_diff(self):
         footer = FooterHarness(width=40)

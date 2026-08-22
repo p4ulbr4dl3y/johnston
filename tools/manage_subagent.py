@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from core.domain.entities.session import STATUS_CANCELLED
+from core.domain.entities.session import SessionStatus
 from tools.base import BaseTool
 
 
@@ -83,7 +83,7 @@ class ManageSubagentTool(BaseTool):
                 except Exception:
                     pass
 
-            session.finish(STATUS_CANCELLED, "Cancelled via subagent tool")
+            session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
             store.save(session)
             return ToolResult.done(f"{session.id} terminated")
 

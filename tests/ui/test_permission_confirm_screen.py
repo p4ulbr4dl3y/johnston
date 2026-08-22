@@ -167,7 +167,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
             with patch.object(screen.app, "exit") as mock_exit:
-                screen.action_quit()
+                screen.action_quit_app()
                 mock_exit.assert_called_once()
 
 

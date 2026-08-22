@@ -770,16 +770,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 self.history = history_snapshot
                 compacted_count = getattr(self, "_compacted_count_this_turn", 0)
                 if compacted_count < 10:
-                    compact_res = await self._compact_messages_if_needed(messages, self._last_sys_tokens, threshold)
-                    if isinstance(compact_res, tuple) and len(compact_res) == 3:
-                        messages, compacted_in_loop, compact_msg = compact_res
-                    elif isinstance(compact_res, tuple) and len(compact_res) == 2:
-                        messages, compacted_in_loop = compact_res[0], compact_res[1]
-                        compact_msg = ""
-                    else:
-                        messages, compacted_in_loop, compact_msg = messages, False, ""
+                    messages, compacted_in_loop, compact_msg = await self._compact_messages_if_needed(
+                        messages, self._last_sys_tokens, threshold
+                    )
                 else:
-                    messages, compacted_in_loop, compact_msg = messages, False, ""
+                    compacted_in_loop, compact_msg = False, ""
 
                 if compacted_in_loop:
                     self._compacted_count_this_turn = compacted_count + 1

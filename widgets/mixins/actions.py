@@ -2,7 +2,6 @@ import asyncio
 from typing import Any, Dict
 
 from textual import events
-from textual.widgets import Select
 
 from widgets.chat_input import ChatInput
 from widgets.presentation.widgets.chat_container import ChatView
@@ -123,13 +122,6 @@ class ActionsMixin:
         else:
             self.screen.clear_selection()
 
-    def on_select_changed(self, event: Select.Changed) -> None:
-        """Switch agent provider from ~/.johnston config"""
-        if event.value and isinstance(event.value, str) and event.value != "none":
-            sess = self.sm.get(self.current_session_id)
-            history = sess.agent_history if sess else None
-            self.pm.recreate_active_agent(self, provider_key=event.value, history=history)
-
     async def confirm_permission(
         self, screen_name: str, args: Dict[str, Any], reason: str, perm_name: str | None = None
     ) -> bool:
@@ -145,23 +137,15 @@ class ActionsMixin:
         pm = PermissionManager.get_instance()
         screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
 
-        result = None
-        if hasattr(self, "push_screen_wait"):
-            try:
-                result = await self.push_screen_wait(screen)
-            except TypeError:
-                result = None
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
 
-        if result is None:
-            loop = asyncio.get_running_loop()
-            future = loop.create_future()
+        def on_dismiss(r: Any) -> None:
+            if not future.done():
+                future.set_result(r)
 
-            def on_dismiss(r: Any) -> None:
-                if not future.done():
-                    future.set_result(r)
-
-            self.push_screen(screen, callback=on_dismiss)
-            result = await future
+        self.push_screen(screen, callback=on_dismiss)
+        result = await future
 
         if result == "always_allow":
             if perm_name:

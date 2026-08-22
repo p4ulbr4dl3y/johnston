@@ -13,8 +13,6 @@ QWERTY_TO_RU: dict[str, str] = {
     "z": "я", "x": "ч", "c": "с", "v": "м", "b": "и", "n": "т", "m": "ь",
 }
 
-RU_TO_QWERTY: dict[str, str] = {v: k for k, v in QWERTY_TO_RU.items()}
-
 # Tab / Shift+Tab aliases
 SHIFT_TAB_KEYS: tuple[str, ...] = ("shift+tab", "backtab", "shift_tab")
 TAB_KEYS: tuple[str, ...] = ("tab", "shift+tab", "backtab", "shift_tab")
@@ -25,8 +23,6 @@ KEY_PASTE: tuple[str, ...] = (
     "ctrl+v", "cmd+v", "ctrl+м", "ctrl+М", "cmd+м", "cmd+М", "ctrl+m", "ctrl+M"
 )
 KEY_DETACH: tuple[str, ...] = ("ctrl+d", "cmd+d", "ctrl+в", "ctrl+В", "cmd+в", "cmd+В")
-KEY_BACKGROUND_ALL: tuple[str, ...] = ("ctrl+b", "ctrl+и", "ctrl+И")
-KEY_TOGGLE_EXPAND: tuple[str, ...] = ("ctrl+o", "ctrl+щ", "ctrl+Щ")
 KEY_TOGGLE_ROLE: tuple[str, ...] = SHIFT_TAB_KEYS
 KEY_NEWLINE: tuple[str, ...] = ("ctrl+enter", "ctrl+j", "shift+enter")
 KEY_TOGGLE_DISABLED: tuple[str, ...] = ("tab", "ctrl+t", "ctrl_t", "ctrl+i", "ctrl+е", "ctrl+Е")

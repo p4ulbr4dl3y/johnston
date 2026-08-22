@@ -8,8 +8,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from core.domain.entities.session import (
-    MAIN_STATUS_ACTIVE,
-    SUBAGENT_STATUS_RUNNING,
+    SessionStatus,
     _coerce_float,
     _coerce_int,
 )
@@ -62,7 +61,7 @@ class AgentSession:
         kind: SessionKind = SessionKind.MAIN,
         parent_id: Optional[str] = None,
         role: str = "worker",
-        status: str = MAIN_STATUS_ACTIVE,
+        status: str = SessionStatus.ACTIVE,
         project_key: str = "",
         description: str = "",
         prompt: str = "",
@@ -231,7 +230,7 @@ class AgentSession:
             kind=kind,
             parent_id=data.get("parent_id"),
             role=data.get("role", "worker"),
-            status=data.get("status", MAIN_STATUS_ACTIVE),
+            status=data.get("status", SessionStatus.ACTIVE),
             project_key=data.get("project_key", ""),
             description=data.get("description") or "",
             prompt=data.get("prompt") or "",
@@ -284,10 +283,6 @@ class AgentSession:
                     elif etype == "history":
                         data = entry.get("data")
                         sess.agent_history.append(data if data is not None else {})
-                    elif "role" in entry:
-                        sess.agent_history.append(entry)
-                    elif "type" in entry:
-                        sess.messages.append(entry)
                 return sess
         except Exception:
             return None
@@ -375,7 +370,7 @@ class SessionStore:
             session_id=session_id or self.generate_session_id(),
             kind=SessionKind.MAIN,
             role=role,
-            status=MAIN_STATUS_ACTIVE,
+            status=SessionStatus.ACTIVE,
             project_key=self.project_key,
         )
         self._sessions[sess.id] = sess
@@ -388,7 +383,7 @@ class SessionStore:
         role: str = "worker",
         description: str = "",
         prompt: str = "",
-        status: str = SUBAGENT_STATUS_RUNNING,
+        status: str = SessionStatus.RUNNING,
         project_dir: str = "",
         branch_name: str = "",
         background: bool = True,

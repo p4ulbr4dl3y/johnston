@@ -11,8 +11,12 @@ from core.application.session.stream import (
     record_subagent_step,
     run_subagent_stream_bg,
 )
-from core.domain.entities.session import STATUS_CANCELLED, STATUS_COMPLETED, STATUS_ERROR
+from core.domain.entities.session import SessionStatus
 from core.session_manager import AgentSession
+
+STATUS_CANCELLED = SessionStatus.CANCELLED
+STATUS_COMPLETED = SessionStatus.COMPLETED
+STATUS_ERROR = SessionStatus.ERROR
 
 
 def make_session(description="d", status="running"):

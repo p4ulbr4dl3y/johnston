@@ -186,10 +186,7 @@ class SkillManager:
 
                 name = fm.get("name")
                 if not name:
-                    if os.path.basename(filepath) == "SKILL.md":
-                        name = os.path.basename(os.path.dirname(filepath))
-                    else:
-                        name = os.path.splitext(os.path.basename(filepath))[0]
+                    name = os.path.basename(os.path.dirname(filepath))
 
                 if not name or name.startswith("."):
                     continue
@@ -203,10 +200,7 @@ class SkillManager:
                     ]
                     desc = lines[0] if lines else ""
 
-                hidden_val = str(fm.get("hidden", "")).lower()
-                user_invocable_val = str(fm.get("user_invocable", "")).lower()
-
-                is_hidden = hidden_val in ("true", "1", "yes") or user_invocable_val in ("false", "0", "no")
+                is_hidden = str(fm.get("hidden", "")).lower() in ("true", "1", "yes")
 
                 skills_map[name] = Skill(
                     name=name,
@@ -262,8 +256,6 @@ class SkillManager:
                         if sline.startswith("hidden:"):
                             found_hidden = True
                             new_fm_lines.append(f"hidden: {str(new_hidden).lower()}")
-                        elif sline.startswith("user_invocable:"):
-                            new_fm_lines.append(f"user_invocable: {str(not new_hidden).lower()}")
                         else:
                             new_fm_lines.append(line)
 

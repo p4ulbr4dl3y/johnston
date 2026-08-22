@@ -20,15 +20,8 @@ class SessionStatus(str, Enum):
     CANCELLED = "cancelled"
     ERROR = "error"
 
-
-# Compatible aliases for the legacy module-level constants. Consumers rely on
-# these plain strings (JSON persistence, UI rendering), so they stay ``.value``.
-MAIN_STATUS_ACTIVE = SessionStatus.ACTIVE.value
-SUBAGENT_STATUS_RUNNING = SessionStatus.RUNNING.value
-STATUS_COMPLETED = SessionStatus.COMPLETED.value
-STATUS_CANCELLED = SessionStatus.CANCELLED.value
-STATUS_ERROR = SessionStatus.ERROR.value
-
+    def __str__(self) -> str:
+        return self.value
 
 
 def _coerce_int(val: Any) -> int:

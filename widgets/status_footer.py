@@ -177,11 +177,9 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     """Two-line status footer below chat"""
 
     can_focus = False
-    ALLOW_SELECT = False
 
-    def __init__(self, *args, is_subagent: bool = False, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.is_subagent: bool = is_subagent
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
@@ -205,13 +203,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        if self.is_subagent:
-            if getattr(self, "_subagent_session", None):
-                if getattr(self, "_last_grid_rows", None):
-                    self._render_stream_frame()
-                else:
-                    self.update_subagent_footer(self._subagent_session)
-        elif hasattr(self, "_last_status_args"):
+        if hasattr(self, "_last_status_args"):
             # Only the spinner frame changed: redraw cheaply from cached rows
             # instead of rebuilding git/table data on every tick.
             self._render_stream_frame()
@@ -219,12 +211,11 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             self.refresh_footer()
 
     def on_mount(self) -> None:
-        if not self.is_subagent:
-            self.refresh_footer()
-            # While MCP servers are still warming up (or their tool counts change),
-            # poll so the footer spinner and loaded-server count stay current even
-            # when not generating.
-            self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
+        self.refresh_footer()
+        # While MCP servers are still warming up (or their tool counts change),
+        # poll so the footer spinner and loaded-server count stay current even
+        # when not generating.
+        self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
 
     def on_unmount(self) -> None:
         if getattr(self, "_spinner_timer", None):
@@ -247,41 +238,29 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             self._resize_timer = None
 
     def _poll_mcp_refresh(self) -> None:
+        """Periodic MCP tick: updates footer when server tool discovery completes."""
         try:
-            from core.infrastructure.mcp import get_mcp_manager
+            from core.infrastructure.mcp import _mcp_manager_instance
 
-            mm = get_mcp_manager()
-            is_loading = mm.is_loading()
-            was_loading = getattr(self, "_mcp_was_loading", False)
-            if is_loading or was_loading:
-                self._mcp_was_loading = is_loading
-                self.refresh_footer()
+            if _mcp_manager_instance is None:
                 return
-            # Not loading: keep the loaded-server count live so the footer
-            # reflects MCP servers that finished warming up after the window
-            # above (or drifted since). `refresh_footer` caches mcp servers for
-            # 5s, but the client/tool state is read fresh each call, so this is
-            # cheap enough at a 1s cadence.
-            active = self._active_mcp_count(get_mcp_manager().load_servers())
-            if active != getattr(self, "_mcp_last_active", None):
-                self._mcp_last_active = active
+            mgr = _mcp_manager_instance
+            warming = getattr(mgr, "is_warming_up", None)
+            is_warming = warming() if callable(warming) else False
+            if is_warming:
                 self.refresh_footer()
+            else:
+                tools = getattr(mgr, "get_cached_tools", lambda: [])()
+                count = len(tools) if isinstance(tools, list) else 0
+                if count != getattr(self, "_last_polled_mcp_count", -1):
+                    self._last_polled_mcp_count = count
+                    self.refresh_footer()
         except Exception:
             pass
 
-    def _active_mcp_count(self, servers) -> int:
-        """Count enabled MCP servers that finished loading tools (no error, has tools)."""
-        from core.infrastructure.mcp import get_mcp_manager
-
-        count_fn = getattr(get_mcp_manager(), "active_server_count", None)
-        if callable(count_fn):
-            try:
-                return count_fn(servers) or 0
-            except Exception:
-                pass
-        return 0
-
     def refresh_footer(self) -> None:
+        if not self.app:
+            return
         try:
             from widgets.app.status_state import build_status_kwargs
 
@@ -290,79 +269,6 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             self.update_status(**kwargs)
         except Exception:
             self.update_status(provider_key="default")
-
-    def update_subagent_footer(self, session) -> None:
-        """Render footer for a subagent session using its own agent/dir/branch/metrics."""
-        self._subagent_session = session
-        try:
-            from widgets.app.status_state import build_subagent_status_kwargs
-
-            # Live spinner while the subagent session is still streaming/running.
-            # (widget manages spinner timer state; aggregation stays in status_state)
-            is_running = getattr(session, "status", "") == "running"
-            if is_running and not self.is_generating:
-                self.is_generating = True
-                if not self._spinner_timer:
-                    self._spinner_timer = self.set_interval(0.2, self._spin)
-            elif not is_running and self.is_generating:
-                self.is_generating = False
-                if self._spinner_timer:
-                    self._spinner_timer.stop()
-                    self._spinner_timer = None
-                self._spinner_idx = 0
-
-            kwargs = build_subagent_status_kwargs(
-                self.app,
-                session,
-                spinner_running=self.is_generating,
-                spinner_idx=self._spinner_idx,
-            )
-            self._render_subagent(*kwargs, branch_name=getattr(session, "branch_name", ""))
-        except Exception:
-            pass
-
-    def _render_subagent(
-        self,
-        role_formatted: str,
-        provider_display: str,
-        clean_model: str,
-        is_connected: bool,
-        model_name: str,
-        context_used: int,
-        total_tokens: int,
-        context_limit: int,
-        context_window: str,
-        cost_usd: float,
-        thinking_effort: str,
-        directory: str = "",
-        branch_name: str = "",
-    ) -> None:
-        """Footer for the subagent screen: role/model, context/tokens, dir/branch."""
-        branch = branch_name or self._git_branch(cwd=directory)
-        grid, rows = _build_subagent_grid(
-            role_formatted=role_formatted,
-            provider_display=provider_display,
-            clean_model=clean_model,
-            is_connected=is_connected,
-            model_name=model_name,
-            context_used=context_used,
-            total_tokens=total_tokens,
-            context_limit=context_limit,
-            context_window=context_window,
-            cost_usd=cost_usd,
-            thinking_effort=thinking_effort,
-            directory=directory,
-            branch=branch,
-            git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
-        )
-        self._last_grid_rows = rows
-        self.update(grid)
-
-    def _mcp_footer_text(self, mcp_active: int, mcp_total: int, prefix: str = "MCP:") -> str:
-        """MCP indicator: show active/total count as 'N/M', or '0' when none configured."""
-        if mcp_total <= 0:
-            return f"{prefix} [{THEME_SECONDARY}]0[/{THEME_SECONDARY}]"
-        return f"{prefix} [{THEME_SECONDARY}]{mcp_active}/{mcp_total}[/{THEME_SECONDARY}]"
 
     def update_status(
         self,
@@ -411,23 +317,6 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             role_formatted = f"{frame} {role_str}"
         else:
             role_formatted = role_str
-
-        if self.is_subagent:
-            self._render_subagent(
-                role_formatted=role_formatted,
-                provider_display=provider_display or provider_key.capitalize(),
-                clean_model=clean_model or "[Select model: /models]",
-                is_connected=is_connected,
-                model_name=model_name,
-                context_used=context_used,
-                total_tokens=total_tokens,
-                context_limit=context_limit,
-                context_window=context_window,
-                cost_usd=cost_usd,
-                thinking_effort=thinking_effort,
-                directory=directory,
-            )
-            return
 
         app_width = 80
         try:

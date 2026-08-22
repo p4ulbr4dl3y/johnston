@@ -296,16 +296,10 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"path": file_path, "offset": 3}))
         self.assertIn("line 1", res)
 
-    @patch("tools.web_fetch.WebFetchTool.execute")
-    async def test_read_http_url_delegates_to_web_fetch(self, mock_web_execute):
-        mock_web_execute.return_value = "# Web Page Content"
+    async def test_read_nonexistent_file(self):
         tool = ReadTool()
         res = str(await tool.execute({"path": "https://example.com/page.html"}))
-
-        self.assertEqual(res, "# Web Page Content")
-        mock_web_execute.assert_called_once()
-        args, kwargs = mock_web_execute.call_args
-        self.assertEqual(args[0], {"url": "https://example.com/page.html", "raw": False})
+        self.assertIn("not found", res)
 
     @patch("tools.read.convert_doc_to_markdown_sync")
     async def test_read_doc_truncation_saves_markdown_snapshot(self, mock_convert):

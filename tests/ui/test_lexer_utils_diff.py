@@ -47,22 +47,22 @@ class TestBuildEditDiffText(unittest.TestCase):
                 {"old_str": "x", "new_str": "y", "start_line": 5},
             ]
         }
-        out = build_edit_diff_text(args, "x.py", "edit")
+        out = build_edit_diff_text(args, "x.py")
         self.assertIn("-b", out)
         self.assertIn("+c", out)
         self.assertIn("-x", out)
         self.assertIn("+y", out)
 
     def test_old_str_new_str_form(self):
-        out = build_edit_diff_text({"old_str": "a\nb", "new_str": "a\nc"}, "x.py", "edit")
+        out = build_edit_diff_text({"old_str": "a\nb", "new_str": "a\nc"}, "x.py")
         self.assertIn("-b", out)
         self.assertIn("+c", out)
 
     def test_non_dict_args_returns_empty(self):
-        self.assertEqual(build_edit_diff_text("not a dict", "x.py", "edit"), "")
+        self.assertEqual(build_edit_diff_text("not a dict", "x.py"), "")
 
     def test_empty_returns_empty(self):
-        self.assertEqual(build_edit_diff_text({}, "x.py", "edit"), "")
+        self.assertEqual(build_edit_diff_text({}, "x.py"), "")
 
 
 class TestLexBlockToLineTexts(unittest.TestCase):

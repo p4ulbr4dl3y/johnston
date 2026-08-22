@@ -190,12 +190,6 @@ class TestAskUserWizardScreenUnit(unittest.TestCase):
         ws._on_key(event_tab)
         event_tab.prevent_default.assert_called_once()
 
-        # action_quit
-        mock_app = MagicMock()
-        with patch.object(AskUserWizardScreen, "app", new_callable=PropertyMock, return_value=mock_app):
-            ws.action_quit()
-            mock_app.exit.assert_called_once()
-
 
 class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

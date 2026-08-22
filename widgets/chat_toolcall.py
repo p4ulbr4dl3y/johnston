@@ -274,21 +274,8 @@ class ParsingMixin:
         return None
 
     def _is_error(self, text: str) -> bool:
-        """True only when the tool card carries the `status == "error"` state.
-
-        The presentation layer never parses result text to classify a tool's
-        outcome: status is received as a structured field from the stream event
-        (``is_error``/``status``). The text is left untouched for display. This
-        helper is kept for the render paths so the "error branch" is reached for
-        both the card's error status and any legacy inline ``ERR:`` marker that
-        predates structured status (e.g. legacy session reloads that never
-        persisted a status).
-        """
-        if self.status in ("error", "cancelled"):
-            return True
-        if not text:
-            return False
-        return text.lstrip().lower().startswith("err:")
+        """True only when the tool card carries the `status == "error"` or `"cancelled"` state."""
+        return self.status in ("error", "cancelled")
 
     def _get_status_color(self) -> str:
         if self.status == "running":
@@ -301,42 +288,21 @@ class ParsingMixin:
             return "#98c379"
 
 
-class _DisplayNamesDict(dict):
-    CANONICAL_NAMES = {
-        "read": "Read",
-        "create": "Create",
-        "edit": "Edit",
-        "multi_edit": "Edit",
-        "shell": "Shell",
-        "ask_user": "AskUser",
-        "manage_shell": "ManageShell",
-        "invoke_subagent": "InvokeSubagent",
-        "manage_subagent": "ManageSubagent",
-        "web_fetch": "WebFetch",
-        "update_plan": "UpdatePlan",
-    }
+DISPLAY_NAMES: dict[str, str] = {
+    "read": "Read",
+    "create": "Create",
+    "edit": "Edit",
+    "multi_edit": "Edit",
+    "shell": "Shell",
+    "ask_user": "AskUser",
+    "manage_shell": "ManageShell",
+    "invoke_subagent": "InvokeSubagent",
+    "manage_subagent": "ManageSubagent",
+    "web_fetch": "WebFetch",
+    "update_plan": "UpdatePlan",
+}
 
-    def get(self, key, default=None):
-        from tools.registry import normalize_tool_name
-
-        canonical = normalize_tool_name(key)
-        if canonical in self.CANONICAL_NAMES:
-            return self.CANONICAL_NAMES[canonical]
-        return super().get(key, default)
-
-
-class _SystemToolsSet(set):
-    def __contains__(self, item):
-        if not isinstance(item, str):
-            return False
-        from tools.registry import normalize_tool_name
-        from widgets.tool_helpers import is_system_tool
-
-        lower = item.lower()
-        canonical = normalize_tool_name(lower)
-        if is_system_tool(canonical):
-            return True
-        return super().__contains__(item) or super().__contains__(lower)
+SYSTEM_TOOLS: frozenset[str] = frozenset(DISPLAY_NAMES.keys())
 
 
 class ToolScrollBox(Vertical):
@@ -602,8 +568,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.result_text = text.strip()
         self.render_header()
 
-    DISPLAY_NAMES = _DisplayNamesDict()
-    SYSTEM_TOOLS = _SystemToolsSet()
+    DISPLAY_NAMES = DISPLAY_NAMES
+    SYSTEM_TOOLS = SYSTEM_TOOLS
 
     def render_header(self) -> None:
         c = self._get_status_color()
@@ -620,16 +586,16 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     )
                     target_str = f"[{completed}/{total} completed]"
             self.header_label.update(f"[{c}]● [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
-        elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
+        elif self.canonical_tool in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
             "manage_shell",
             "ask_user",
         ):
-            display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
+            display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type)
             from core.infrastructure.presentation.tool_display import extract_tool_display
 
-            target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
+            target_str = extract_tool_display(self.canonical_tool, self.args) if self.args else self.target
             self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
             # MCP/custom tool: single format — ToolName({k: v, ...}).
@@ -646,9 +612,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         if self.canonical_tool == "invoke_subagent":
             args = self.args if isinstance(self.args, dict) else {}
-            nargs = args
             session_id = getattr(self, "subagent_session_id", None)
-            identifier = session_id or nargs.get("title") or nargs.get("prompt") or self.target
+            identifier = session_id or args.get("title") or args.get("prompt") or self.target
             try:
                 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
@@ -809,7 +774,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if not diff_text or "@@" not in diff_text:
                     from widgets.lexer_utils import build_edit_diff_text
 
-                    diff_text = build_edit_diff_text(self.args, file_path or "file", self.tool_type)
+                    diff_text = build_edit_diff_text(self.args, file_path or "file")
 
                 if diff_text:
                     return "raw", self._format_edit_diff(diff_text, file_path)
@@ -823,7 +788,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return "raw", self._format_plan_display(plan_items, explanation)
             elif self.canonical_tool == "ask_user":
                 return "raw", self._format_ask_user_display()
-            elif self.tool_type in ("web_fetch", "WebFetch"):
+            elif self.canonical_tool == "web_fetch":
                 raw_text = self.result_text or ""
                 if self._is_error(raw_text):
                     return "raw", Text(raw_text.strip(), style="bold #ffffff")
@@ -852,7 +817,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     return "markup", self._clean_markup_text(self.result_text or "(No content)")
                 clean_code = self._fix_markdown_nested_lists(clean_code)
                 return "md", clean_code.rstrip("\r\n") or "(No content)"
-            elif self.tool_type in ("read", "Read"):
+            elif self.canonical_tool == "read":
                 raw_text = self.result_text or ""
                 if self._is_error(raw_text):
                     return "raw", Text(raw_text.strip(), style="bold #ffffff")

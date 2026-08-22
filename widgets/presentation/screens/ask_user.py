@@ -30,10 +30,7 @@ class WriteInInput(Input):
 
             self.selection = Selection(val_len, val_len)
         except Exception:
-            try:
-                self.selection = (val_len, val_len)
-            except Exception:
-                pass
+            pass
 
     def _on_focus(self, event: events.Focus) -> None:
         super()._on_focus(event)
@@ -346,9 +343,6 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             self.update_step()
         else:
             self.submit_current_step()
-
-    def action_quit(self) -> None:
-        self.app.exit()
 
     def _on_key(self, event: events.Key) -> None:
         if event.key in SHIFT_TAB_KEYS:

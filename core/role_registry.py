@@ -158,7 +158,7 @@ class RoleRegistry:
             meta, prompt = parse_frontmatter(raw)
             prompt = prompt.strip()
 
-            key = meta.get("key") or meta.get("name") or meta.get("subagent_type") or base_key
+            key = meta.get("key") or meta.get("name") or base_key
             name = meta.get("name") or key.capitalize()
             desc = meta.get("description", "")
             model = meta.get("model", "")

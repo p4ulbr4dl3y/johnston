@@ -1,26 +1,22 @@
 import unittest
 
 from widgets.utils.key_aliases import (
-    KEY_BACKGROUND_ALL,
     KEY_DETACH,
     KEY_NEWLINE,
     KEY_PASTE,
     KEY_QUIT,
     KEY_TOGGLE_DISABLED,
-    KEY_TOGGLE_EXPAND,
     KEY_TOGGLE_ROLE,
     QWERTY_TO_RU,
-    RU_TO_QWERTY,
     expand_bindings,
     get_key_aliases,
 )
 
 
 class TestKeyAliases(unittest.TestCase):
-    def test_qwerty_ru_bijective_mapping(self):
-        self.assertEqual(len(QWERTY_TO_RU), len(RU_TO_QWERTY))
-        for latin, ru in QWERTY_TO_RU.items():
-            self.assertEqual(RU_TO_QWERTY[ru], latin)
+    def test_qwerty_to_ru_mapping(self):
+        self.assertIn("q", QWERTY_TO_RU)
+        self.assertEqual(QWERTY_TO_RU["q"], "й")
 
     def test_get_key_aliases_ctrl_combinations(self):
         # Ctrl+C
@@ -113,8 +109,6 @@ class TestKeyAliases(unittest.TestCase):
         self.assertTrue(len(KEY_QUIT) > 0)
         self.assertTrue(len(KEY_PASTE) > 0)
         self.assertTrue(len(KEY_DETACH) > 0)
-        self.assertTrue(len(KEY_BACKGROUND_ALL) > 0)
-        self.assertTrue(len(KEY_TOGGLE_EXPAND) > 0)
         self.assertTrue(len(KEY_TOGGLE_ROLE) > 0)
         self.assertTrue(len(KEY_NEWLINE) > 0)
         self.assertTrue(len(KEY_TOGGLE_DISABLED) > 0)

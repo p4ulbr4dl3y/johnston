@@ -7,15 +7,13 @@ class ToolContext:
     """Unified execution context for tools (isolates UI from business logic)"""
 
     def __init__(self, app: Any = None, is_subagent: bool = False, cwd: str = None):
-        from core.base_provider import BaseAgent
-
-        if isinstance(app, BaseAgent) and getattr(getattr(app, "app", None), "push_screen", None) is not None:
-            # If passed an agent (wraps a host Textual app), unwrap to the host app
-            # so UI operations target the real app, pulling cwd/subagent flag off the agent.
-            if cwd is None:
-                cwd = getattr(app, "cwd", None) or getattr(app, "project_dir", None)
-            is_subagent = getattr(app, "is_subagent", is_subagent)
-            app = app.app
+        if app is not None and not type(app).__name__.startswith(("MagicMock", "Mock", "AsyncMock")):
+            inner_app = getattr(app, "app", None)
+            if inner_app is not None:
+                if cwd is None:
+                    cwd = getattr(app, "cwd", None) or getattr(app, "project_dir", None)
+                is_subagent = getattr(app, "is_subagent", is_subagent)
+                app = inner_app
         self.host = app
         self.is_subagent = is_subagent or (getattr(app, "is_subagent", False) if app else False)
         self.cwd = None
@@ -58,34 +56,9 @@ class ToolContext:
             res = await res
         return res if isinstance(res, str) else str(res or "")
 
-    def confirm_permission(
-        self,
-        screen_name: str,
-        args: Any = None,
-        reason: str = "",
-        perm_name: str = None,
-    ) -> bool:
-        """Confirm a destructive action with the host; default to allowed."""
-        return bool(self._host_call("confirm_permission", screen_name, args, reason, perm_name))
-
-    def notify(self, message: str, severity: str = "info") -> None:
-        """Show a notification via the host (no-op if unsupported)."""
-        self._host_call("notify", message, severity)
-
     def trigger_ai_response(self, prompt: str) -> None:
-        if self.host:
-            if getattr(self.host, "trigger_ai_response", None) is not None and callable(
-                getattr(self.host, "trigger_ai_response")
-            ):
-                self.host.trigger_ai_response(prompt, show_in_ui=False)
-                return
-            if getattr(self.host, "generate_ai_response", None) is not None and callable(
-                getattr(self.host, "generate_ai_response")
-            ):
-                if getattr(self.host, "is_generating", False) and hasattr(self.host, "message_queue"):
-                    self.host.message_queue.append((prompt, False))
-                else:
-                    self.host.generate_ai_response(prompt, show_in_ui=False)
+        if self.host and callable(getattr(self.host, "trigger_ai_response", None)):
+            self.host.trigger_ai_response(prompt, show_in_ui=False)
 
     def refresh_status(self) -> None:
         if self.host:

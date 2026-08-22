@@ -8,9 +8,7 @@ def apply_prompt(subagent, definition) -> None:
     subagent.role = definition.key
     model_label = (getattr(definition, "model", None) or "").strip() or "an expert AI assistant"
     prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT.replace("{model_name}", model_label)
-    body = getattr(definition, "prompt", None)
-    if body is None:
-        body = getattr(definition, "system_prompt", "")
+    body = getattr(definition, "prompt", "")
     subagent.system_prompt = f"{prompt}\n\n{body}"
     if getattr(definition, "model", None):
         subagent.model = definition.model

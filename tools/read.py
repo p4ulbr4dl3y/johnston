@@ -242,6 +242,11 @@ class ReadTool(BaseTool):
                             "Pass the exact offset number provided in the truncation message."
                         ),
                     },
+                    "detail": {
+                        "type": "string",
+                        "enum": ["low", "high", "original"],
+                        "description": "Image quality mode for vision models ('low', 'high', 'original'). Defaults to 'high'.",
+                    },
                 },
                 "required": ["path"],
             },
@@ -252,10 +257,6 @@ class ReadTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
-        if raw_path.startswith("http://") or raw_path.startswith("https://"):
-            from tools.web_fetch import WebFetchTool
-
-            return await WebFetchTool().execute({"url": raw_path, "raw": bool(args.get("raw", False))}, ctx=ctx)
         path = resolve_path(raw_path, cwd=ctx.cwd)
         def _inspect_path() -> ToolResult | tuple[str, str | None]:
             if not os.path.exists(path):

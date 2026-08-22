@@ -6,7 +6,7 @@ real JohnstonApp where possible, matching the style in tests/ui/test_app.py.
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from app import JohnstonApp
 from widgets.mixins.actions import ActionsMixin
@@ -402,47 +402,6 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Copy failed", app.notify.call_args.args[0])
 
 
-class TestActionsSelectChanged(unittest.TestCase):
-    def test_on_select_changed(self):
-        obj = MagicMock()
-        obj.role = "worker"
-        obj.pm = MagicMock()
-        obj.agent = MagicMock(role="worker", history=[])
-        obj.sm = MagicMock()
-        obj.sm.get.return_value = MagicMock(agent_history=[{"role": "user", "content": "hi"}])
-        obj.current_session_id = "sess1"
-        event = MagicMock()
-        event.value = "openai"
-        ActionsMixin.on_select_changed(obj, event)
-        obj.pm.recreate_active_agent.assert_called_once_with(
-            obj, provider_key="openai", history=[{"role": "user", "content": "hi"}]
-        )
-
-    def test_on_select_changed_none_value(self):
-        obj = MagicMock()
-        obj.role = "worker"
-        obj.pm = MagicMock()
-        obj.agent = MagicMock()
-        event = MagicMock()
-        event.value = "none"
-        ActionsMixin.on_select_changed(obj, event)
-        obj.pm.set_active_provider_key.assert_not_called()
-
-    def test_on_select_changed_no_history(self):
-        obj = MagicMock()
-        obj.role = "worker"
-        obj.pm = MagicMock()
-        obj.agent = MagicMock(role="worker")
-        del obj.agent.history
-        obj.sm = MagicMock()
-        obj.sm.get.return_value = None
-        obj.current_session_id = "sess1"
-        event = MagicMock()
-        event.value = "anthropic"
-        ActionsMixin.on_select_changed(obj, event)
-        obj.pm.recreate_active_agent.assert_called_once_with(obj, provider_key="anthropic", history=None)
-
-
 class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
     async def test_confirm_permission_always_allow_sets_overrides(self):
         from core.permission_manager import PermissionManager
@@ -452,8 +411,11 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
 
         app = JohnstonApp()
         async with app.run_test():
+            def on_push(screen, callback):
+                callback("always_allow")
+
             with (
-                patch.object(app, "push_screen_wait", new=AsyncMock(return_value="always_allow")),
+                patch.object(app, "push_screen", side_effect=on_push),
                 patch("core.permission_manager.PermissionManager.get_instance", return_value=pm),
             ):
                 result = await app.confirm_permission("shell", {"command": "ls"}, "Destructive", "shell")
@@ -470,25 +432,20 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
 
         app = JohnstonApp()
         async with app.run_test():
-            with patch.object(app, "push_screen_wait", new=AsyncMock(return_value="no")):
+            def on_push(screen, callback):
+                callback("deny")
+
+            with patch.object(app, "push_screen", side_effect=on_push):
                 result = await app.confirm_permission("read", {"path": "x"}, "Confirm")
             self.assertFalse(result)
 
-    async def test_confirm_permission_callable_fallback(self):
+    async def test_confirm_permission_allow(self):
         app = JohnstonApp()
         async with app.run_test():
-            with patch.object(app, "push_screen", new=MagicMock()) as mock_ps:
+            def on_push(screen, callback):
+                callback("allow")
 
-                async def resolve():
-                    pass
-
-                app.push_screen_wait = AsyncMock(side_effect=TypeError("no wait"))
-
-                # push_screen callback path: invoke callback with "allow"
-                def on_dismiss(screen, callback):
-                    callback("allow")
-
-                mock_ps.side_effect = on_dismiss
+            with patch.object(app, "push_screen", side_effect=on_push):
                 result = await app.confirm_permission("read", {"path": "x"}, "Confirm")
             self.assertTrue(result)
 

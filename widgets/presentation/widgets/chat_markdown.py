@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 import re
-import warnings
 from typing import Any
 
 from markdown_it import MarkdownIt
@@ -22,8 +21,6 @@ from textual.widgets._markdown import (
     MarkdownTableCellContents,
     MarkdownTableContent,
 )
-
-warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*await_update.*")
 
 
 class TransparentSyntax(Syntax):

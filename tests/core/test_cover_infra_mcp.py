@@ -445,11 +445,9 @@ def test_resolve_target_client_and_tool_edges():
     client, o = m._resolve_target_client_and_tool("tool", tools, target_server="other")
     assert client is None and o is None
 
-    # namespace split path: exposed name differs, legacy ns name resolves
-    tools2 = [{"_mcp_server": "srv", "_mcp_tool_name": "oldtool", "function": {"name": "deprecated__oldtool"}}]
-    client, o = m._resolve_target_client_and_tool("srv__oldtool", tools2)
-    assert client == "CLIENT"
-    assert o == "oldtool"
+    # unknown tool -> no match
+    client, o = m._resolve_target_client_and_tool("unknown_tool", tools)
+    assert client is None and o is None
 
 
 # ---------------------------------------------------------------------------

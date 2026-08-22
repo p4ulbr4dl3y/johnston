@@ -144,11 +144,6 @@ def _make_agent_mock(
     return agent
 
 
-def _make_orchestrator_mock(**overrides: Any) -> MagicMock:
-    """Build a MagicMock orchestrator agent (an agent with role='orchestrator')."""
-    return _make_agent_mock(role="orchestrator", **overrides)
-
-
 def _make_pm_mock(agent: MagicMock | None = None, **overrides: Any) -> MagicMock:
     """Build a MagicMock provider manager with the standard wiring."""
     pm = MagicMock()
@@ -214,11 +209,6 @@ def make_agent_mock():
 
 
 @pytest.fixture
-def make_orchestrator_mock():
-    return _make_orchestrator_mock
-
-
-@pytest.fixture
 def make_pm_mock():
     return _make_pm_mock
 
@@ -247,12 +237,6 @@ def mock_app(tmp_path):
 def mock_agent():
     """A pre-built worker agent mock."""
     return _make_agent_mock()
-
-
-@pytest.fixture
-def mock_orchestrator():
-    """A pre-built orchestrator agent mock."""
-    return _make_orchestrator_mock()
 
 
 @pytest.fixture

@@ -57,7 +57,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         if self.tool_name in ("edit", "multi_edit"):
             from widgets.lexer_utils import build_edit_diff_text
 
-            return build_edit_diff_text(self.args, target_path or "file", self.tool_name)
+            return build_edit_diff_text(self.args, target_path or "file")
 
         return ""
 
@@ -302,7 +302,4 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def action_cancel(self) -> None:
         self.dismiss("deny")
-
-    def action_quit(self) -> None:
-        self.action_quit_app()
 

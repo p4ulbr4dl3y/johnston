@@ -410,7 +410,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
 
         async def fake_compact(messages, sys_overhead, threshold):
-            return (messages, True)
+            return (messages, True, "Session Compacted")
 
         first = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
         second = _MockStream([_text_chunk("ok")])

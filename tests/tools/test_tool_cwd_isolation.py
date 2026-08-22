@@ -31,27 +31,24 @@ def make_agent(app, cwd=None, is_subagent=False):
 
 
 class TestToolContextCwdIsolation(unittest.TestCase):
-    def test_agent_unwrap_to_host_app(self):
+    def test_host_and_cwd_assignment(self):
         host = MockTextualApp()
         with tempfile.TemporaryDirectory() as base:
-            agent = make_agent(host, cwd=base, is_subagent=True)
-            ctx = ToolContext(agent)
+            ctx = ToolContext(host, cwd=base, is_subagent=True)
             self.assertIs(ctx.host, host)
             self.assertTrue(ctx.is_subagent)
             self.assertEqual(ctx.cwd, os.path.realpath(base))
 
-    def test_agent_untrusted_nonexistent_cwd_ignored(self):
+    def test_untrusted_nonexistent_cwd_ignored(self):
         host = MockTextualApp()
-        agent = make_agent(host, cwd="/definitely/not/a/real/dir", is_subagent=True)
-        ctx = ToolContext(agent)
+        ctx = ToolContext(host, cwd="/definitely/not/a/real/dir", is_subagent=True)
         self.assertIs(ctx.host, host)
         self.assertTrue(ctx.is_subagent)
         self.assertIsNone(ctx.cwd)
 
-    def test_main_agent_no_isolation(self):
+    def test_main_no_isolation(self):
         host = MockTextualApp()
-        agent = make_agent(host)
-        ctx = ToolContext(agent)
+        ctx = ToolContext(host)
         self.assertIs(ctx.host, host)
         self.assertFalse(ctx.is_subagent)
         self.assertIsNone(ctx.cwd)
