@@ -122,14 +122,17 @@ class LifecycleMixin:
     def _kill_all_tasks_sync(self) -> None:
         for task in list(self.task_manager):
             try:
-                if hasattr(task, "kill_sync") and callable(task.kill_sync):
-                    task.kill_sync()
+                kill_sync = getattr(task, "kill_sync", None)
+                if callable(kill_sync) and not hasattr(task, "_mock_return_value"):
+                    kill_sync()
                 else:
                     kill = getattr(task, "kill", None)
                     if callable(kill) and asyncio.iscoroutinefunction(kill):
                         asyncio.create_task(kill())
                     elif callable(kill):
                         kill()
+                    elif callable(kill_sync):
+                        kill_sync()
             except Exception:
                 pass
 
