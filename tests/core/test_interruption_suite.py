@@ -609,3 +609,27 @@ class TestGeneratorStreamInterruptionFlow:
         keys = [b[0] for b in AskUserWizardScreen.BINDINGS]
         assert "ctrl+c" in keys
         assert "ctrl+q" in keys
+
+    def test_mark_cancelled_preserves_accumulated_shell_output(self):
+        from widgets.chat_toolcall import ToolCallWidget
+
+        w = ToolCallWidget("shell", "pytest")
+        w.status = "running"
+        w.result_text = "PASSED test_1.py\nFAILED test_2.py"
+        w.mark_cancelled()
+        assert w.status == "cancelled"
+        assert "PASSED test_1.py" in w.result_text
+        assert "FAILED test_2.py" in w.result_text
+        assert "[Command interrupted by user]" in w.result_text
+        # Clickable / expandable if output is present
+        assert w.is_clickable_header() is True
+
+    def test_mark_cancelled_without_prior_output_sets_default_message(self):
+        from widgets.chat_toolcall import ToolCallWidget
+
+        w = ToolCallWidget("shell", "pytest")
+        w.status = "running"
+        w.result_text = ""
+        w.mark_cancelled()
+        assert w.status == "cancelled"
+        assert w.result_text == "[Tool call interrupted or cancelled]"

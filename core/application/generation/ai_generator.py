@@ -376,6 +376,11 @@ async def _handle_interruption(
             canvas.refresh_status_footer()
         except Exception:  # noqa: BLE001
             pass
+    if tool_handle is not None:
+        try:
+            tool_handle.mark_cancelled()
+        except Exception:  # noqa: BLE001
+            pass
     if session and hasattr(session, "add_event"):
         if tool_handle is not None or (
             hasattr(session, "messages")
@@ -384,9 +389,10 @@ async def _handle_interruption(
             and "result_text" not in session.messages[-1]
         ):
             try:
+                res_text = getattr(tool_handle, "result_text", "") or "[Tool call interrupted or cancelled]"
                 session.add_event({
                     "type": "tool",
-                    "result_text": "[Tool call interrupted or cancelled]",
+                    "result_text": res_text,
                     "status": "cancelled",
                 })
             except Exception:  # noqa: BLE001
@@ -399,8 +405,3 @@ async def _handle_interruption(
         await canvas.add_event_divider("Response Interrupted")
     except Exception:  # noqa: BLE001
         pass
-    if tool_handle is not None:
-        try:
-            tool_handle.mark_cancelled()
-        except Exception:  # noqa: BLE001
-            pass

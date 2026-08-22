@@ -66,7 +66,19 @@ class SessionPersistenceMixin:
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
                             status = msg.get("status")
-                            if not status and not rtext:
+                            if status == "running":
+                                task_id = None
+                                if "[Background Task ID:" in (rtext or ""):
+                                    import re
+
+                                    bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", rtext)
+                                    if bg_m:
+                                        task_id = bg_m.group(1)
+                                mgr = getattr(self, "task_manager", None)
+                                is_live = bool(task_id and mgr is not None and getattr(mgr, "_tasks", {}).get(task_id) is not None)
+                                if not is_live:
+                                    status = "done" if rtext else "cancelled"
+                            elif not status and not rtext:
                                 status = "cancelled"
                             await chat_view.add_tool_call(
                                 ttype,
