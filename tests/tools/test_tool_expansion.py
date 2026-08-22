@@ -437,7 +437,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("What is your name?", plain)
         self.assertIn("Johnston", plain)
 
-    def test_shell_running_bg_task_click_opens_console_modal(self):
+    def test_shell_running_bg_task_click_toggles_expansion(self):
         task_mock = MagicMock()
         task_mock.task_id = "task-123"
         task_mock.kind = "shell"
@@ -452,14 +452,11 @@ class TestToolExpansion(unittest.TestCase):
         )
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
+        self.assertFalse(widget.is_expanded)
         widget.on_click(event)
         event.stop.assert_called_once()
-        self.mock_app.push_screen.assert_called_once()
-        screen_pushed = self.mock_app.push_screen.call_args[0][0]
-        from widgets.presentation.screens.tasks import TaskConsoleScreen
-
-        self.assertIsInstance(screen_pushed, TaskConsoleScreen)
-        self.assertEqual(screen_pushed.bg_task, task_mock)
+        self.assertTrue(widget.is_expanded)
+        self.mock_app.push_screen.assert_not_called()
 
     def test_shell_completed_bg_task_click_toggles_expansion(self):
         task_mock = MagicMock()

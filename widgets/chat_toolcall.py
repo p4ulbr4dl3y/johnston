@@ -396,7 +396,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return (
             self.is_expandable()
             or self.canonical_tool in ("invoke_subagent", "ask_user")
-            or (self.canonical_tool in ("shell", "manage_shell") and self._get_running_shell_task() is not None)
         )
 
     def __init__(
@@ -645,76 +644,28 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def on_click(self, event) -> None:
         if not self.is_clickable_header():
             return
-        if self.canonical_tool in ("invoke_subagent", "ask_user", "shell", "manage_shell"):
-            if self.canonical_tool == "invoke_subagent":
-                args = self.args if isinstance(self.args, dict) else {}
-                nargs = args
-                session_id = getattr(self, "subagent_session_id", None)
-                identifier = session_id or nargs.get("title") or nargs.get("prompt") or self.target
-                try:
-                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+        if self.canonical_tool == "invoke_subagent":
+            args = self.args if isinstance(self.args, dict) else {}
+            nargs = args
+            session_id = getattr(self, "subagent_session_id", None)
+            identifier = session_id or nargs.get("title") or nargs.get("prompt") or self.target
+            try:
+                from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
-                    self.app.push_screen(SubagentViewScreen(identifier))
-                except Exception:
-                    pass
+                self.app.push_screen(SubagentViewScreen(identifier))
+            except Exception:
+                pass
+            event.stop()
+            return
+        if self.canonical_tool == "ask_user":
+            if getattr(self.app, "_pending_ask_user", None) is not None:
+                self._resume_ask_user_wizard()
                 event.stop()
                 return
-            if self.canonical_tool == "ask_user":
-                if getattr(self.app, "_pending_ask_user", None) is not None:
-                    self._resume_ask_user_wizard()
-                    event.stop()
-                    return
-            if self.canonical_tool in ("shell", "manage_shell"):
-                running_task = self._get_running_shell_task()
-                if running_task is not None:
-                    try:
-                        from widgets.presentation.screens.tasks import TaskConsoleScreen
-
-                        self.app.push_screen(TaskConsoleScreen(running_task))
-                        event.stop()
-                        return
-                    except Exception:
-                        pass
-            # No pending wizard or running bg task: fall through to inline expand/collapse.
 
         if self.is_expandable():
             self.toggle_expanded()
             event.stop()
-
-    def _get_running_shell_task(self) -> Any:
-        """Find active background shell task associated with this tool call, if any."""
-        try:
-            app = self.app
-        except Exception:
-            return None
-        if not app or not hasattr(app, "task_manager"):
-            return None
-        tid = getattr(self, "background_task_id", None) or getattr(self, "task_id", None)
-        if not tid and isinstance(self.args, dict):
-            tid = self.args.get("task_id") or self.args.get("TaskId")
-        if not tid:
-            bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
-            if bg_match:
-                tid = bg_match.group(1)
-        if not tid:
-            cmd = (self.args.get("command") or "").strip() if isinstance(self.args, dict) else ""
-            if cmd:
-                for t in app.task_manager:
-                    if (
-                        getattr(t, "kind", "") == "shell"
-                        and getattr(t, "is_running", False)
-                        and getattr(t, "command", "").strip() == cmd
-                    ):
-                        return t
-            return None
-        for t in app.task_manager:
-            if (
-                getattr(t, "task_id", "") == tid
-                and getattr(t, "kind", "") == "shell"
-                and getattr(t, "is_running", False)
-            ):
-                return t
-        return None
 
     def _resume_ask_user_wizard(self) -> None:
         """Resume a minimized ask_user wizard if present."""

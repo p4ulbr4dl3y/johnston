@@ -29,7 +29,7 @@ class AskUserTool(BaseTool):
     name = "ask_user"
     description = (
         "Ask interactive multiple-choice questions when requirements or design decisions are ambiguous. "
-        "Include '(Recommended)' prefix on suggested choices."
+        "Include '(Recommended)' suffix on suggested choices."
     )
     schema = {
         "type": "function",
@@ -49,7 +49,7 @@ class AskUserTool(BaseTool):
                                     "type": "array",
                                     "items": {"type": "string"},
                                     "description": (
-                                        "Selectable options (prefix recommended option with '(Recommended)')"
+                                        "Selectable options (add '(Recommended)' at the end of recommended option)"
                                     ),
                                 },
                             },
