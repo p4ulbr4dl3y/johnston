@@ -28,7 +28,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             items=items,
             default_value=default_val,
             show_search=True,
-            search_placeholder="Search models...",
+            search_placeholder="Search...",
         )
 
     @staticmethod

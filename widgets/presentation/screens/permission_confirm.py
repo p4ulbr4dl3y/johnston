@@ -243,7 +243,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            yield Label("enter: approve • a: always allow session • esc/d: deny", id="modal-hint")
+            yield Label("enter: allow • a: session • esc/d: deny", id="modal-hint")
 
     def _get_scroll_target(self):
         try:

@@ -85,9 +85,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            yield Input(placeholder="Search skills...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield Label("enter: select • tab: toggle hidden • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: select • space/tab: toggle • ↑↓: nav • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
@@ -168,11 +168,17 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def _on_key(self, event: events.Key) -> None:
         if event.key in TAB_KEYS:
-            if event.key == "tab":
-                self.action_toggle_hidden()
+            self.action_toggle_hidden()
             event.prevent_default()
             event.stop()
             return
+        if event.key == "space":
+            search_input = self.query_one_optional(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            if not search_input or not search_input.has_focus or not search_input.value:
+                self.action_toggle_hidden()
+                event.prevent_default()
+                event.stop()
+                return
         self._handle_search_navigation(event)
 
     def action_toggle_hidden(self) -> None:
@@ -184,8 +190,16 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
                 return
             s_name = target["name"]
             self.sm.toggle_hidden(s_name)
-            self.refresh_list()
-            opt_list.highlighted = highlighted
+            target["hidden"] = not target.get("hidden", False)
+            stat_t = status_tag("HIDDEN" if target["hidden"] else "VISIBLE")
+            new_opt = f"   {stat_t} {s_name}"
+            if highlighted < len(self.filtered_options):
+                self.filtered_options[highlighted] = new_opt
+            try:
+                opt_list.replace_option_prompt_at_index(highlighted, new_opt)
+            except Exception:
+                self.refresh_list()
+                opt_list.highlighted = highlighted
         except Exception:
             pass
 

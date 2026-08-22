@@ -55,9 +55,9 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 id="permissions-header-md",
                 classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
             )
-            yield Input(placeholder="Search permissions...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="permissions-option-list")
-            yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter/space/tab: toggle • ↑↓: nav • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -226,14 +226,16 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             return
         next_act = self._cycle_action(target["action"])
         self.pm.update_permission(target["type"], target["name"], next_act)
-        self.refresh_list()
-        new_idx = next(
-            (i for i, it in enumerate(self.filtered_items) if it["type"] == target["type"] and it["name"] == target["name"]),
-            None,
-        )
-        if new_idx is not None:
-            opt_list = self.query_one("#permissions-option-list", OptionList)
-            opt_list.highlighted = new_idx
+        target["action"] = next_act
+        act = next_act.upper()
+        status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
+        new_label = f"   {status} {target['label']}"
+        opt_list = self.query_one("#permissions-option-list", OptionList)
+        try:
+            opt_list.replace_option_prompt_at_index(idx, new_label)
+        except Exception:
+            self.refresh_list()
+            opt_list.highlighted = idx
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:
@@ -252,9 +254,23 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def _on_key(self, event: events.Key) -> None:
         if event.key in TAB_KEYS:
+            opt_list = self.query_one("#permissions-option-list", OptionList)
+            idx = opt_list.highlighted
+            if idx is not None:
+                self.toggle_selected_permission(idx)
             event.prevent_default()
             event.stop()
             return
+        if event.key == "space":
+            search_input = self.query_one_optional(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            if not search_input or not search_input.has_focus or not search_input.value:
+                opt_list = self.query_one("#permissions-option-list", OptionList)
+                idx = opt_list.highlighted
+                if idx is not None:
+                    self.toggle_selected_permission(idx)
+                event.prevent_default()
+                event.stop()
+                return
         if event.key in ("down", "up"):
             self._handle_search_navigation(event)
 

@@ -11,7 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
     MODAL_OPTION_LIST,
-    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
 from widgets.utils.key_aliases import KEY_TOGGLE_DISABLED, expand_bindings
@@ -36,8 +36,8 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             items=items,
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
-            search_placeholder="Search providers...",
-            hint_text="enter: connect • tab: toggle • ↑/↓: navigate • esc: cancel",
+            search_placeholder="Search...",
+            hint_text="enter: connect • space/tab: toggle • ↑↓: nav • esc: cancel",
         )
 
     def _build_options(self):
@@ -90,17 +90,29 @@ class ProvidersScreen(BaseSelectionScreen[str]):
                 options, items = self._build_options()
                 self.raw_options = options
                 self.raw_items = items
-                search_input = self.query_one(MODAL_SEARCH_INPUT, Input)
-                self.on_input_changed(Input.Changed(search_input, search_input.value))
-                if self.filtered_items:
-                    opt_list.highlighted = min(idx, len(self.filtered_items) - 1)
+                if pkey in items:
+                    raw_idx = items.index(pkey)
+                    new_label = options[raw_idx]
+                    if idx < len(self.filtered_options):
+                        self.filtered_options[idx] = new_label
+                    try:
+                        opt_list.replace_option_prompt_at_index(idx, new_label)
+                    except Exception:
+                        pass
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in KEY_TOGGLE_DISABLED:
+        if event.key in KEY_TOGGLE_DISABLED or event.key in TAB_KEYS:
             self.action_toggle_disabled()
             event.prevent_default()
             event.stop()
             return
+        if event.key == "space":
+            search_input = self.query_one_optional(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            if not search_input or not search_input.has_focus or not search_input.value:
+                self.action_toggle_disabled()
+                event.prevent_default()
+                event.stop()
+                return
         super()._on_key(event)
 
 

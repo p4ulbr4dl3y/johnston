@@ -344,11 +344,14 @@ OptionList {
 }
 
 OptionList > .option-list--option-highlighted,
-OptionList > .option-list--option-blur-highlighted,
-OptionList > .option-list--option-hover {
+OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
+}
+
+OptionList > .option-list--option-hover {
+    background: transparent;
 }
 
 /* Command Suggestions Popup - Square Solid Dark Border */
@@ -374,11 +377,14 @@ OptionList > .option-list--option-hover {
 }
 
 #command-suggestions OptionList > .option-list--option-highlighted,
-#command-suggestions OptionList > .option-list--option-blur-highlighted,
-#command-suggestions OptionList > .option-list--option-hover {
+#command-suggestions OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
+}
+
+#command-suggestions OptionList > .option-list--option-hover {
+    background: transparent;
 }
 
 /* Dynamic Auto-Expanding ChatInput - Flat Zinc-900 with bottom padding */
@@ -462,7 +468,8 @@ ModalScreen {
 
 #modal-dialog {
     width: 90%;
-    max-width: 64;
+    min-width: 72;
+    max-width: 78;
     height: auto;
     max-height: 85%;
     padding: 1 2;
@@ -471,15 +478,17 @@ ModalScreen {
     overflow-y: auto;
 }
 
-#modal-dialog.modal-dialog-wide {
-    max-width: 100;
-}
-
 #modal-dialog.modal-dialog-medium,
 #modal-dialog.wizard-dialog {
     width: 90%;
-    min-width: 68;
-    max-width: 80;
+    min-width: 76;
+    max-width: 86;
+}
+
+#modal-dialog.modal-dialog-wide {
+    width: 90%;
+    min-width: 80;
+    max-width: 104;
 }
 
 #subagent-container {
@@ -503,10 +512,11 @@ ModalScreen {
 .modal-title {
     dock: top;
     width: 100%;
-    text-align: center;
+    text-align: left;
     color: #ffffff;
     text-style: bold;
     margin-bottom: 1;
+    padding: 0 1;
 }
 
 #wizard-title {
@@ -516,7 +526,7 @@ ModalScreen {
 }
 
 #wizard-title MarkdownHeader {
-    text-align: center;
+    text-align: left;
     color: #ffffff;
     margin: 0 0 1 0;
 }
@@ -526,11 +536,6 @@ ModalScreen {
     color: #e4e4e7;
     margin: 0;
 }
-
-
-
-
-
 
 #modal-search-input {
     margin: 0 0 1 0;
@@ -572,16 +577,17 @@ ModalScreen {
 #wizard-title MarkdownH1,
 #wizard-title MarkdownH2,
 #wizard-title MarkdownH3 {
-    content-align: center middle !important;
-    text-align: center !important;
+    content-align: left top !important;
+    text-align: left !important;
     color: #ffffff;
     margin: 0 0 1 0;
 }
 
 .modal-markdown-centered MarkdownParagraph,
 #modal-dialog .modal-markdown-centered MarkdownParagraph {
-    content-align: center middle !important;
-    text-align: center !important;
+    content-align: left top !important;
+    text-align: left !important;
+    color: #e4e4e7;
     margin: 0;
 }
 
@@ -593,9 +599,6 @@ ModalScreen {
     margin-bottom: 0;
 }
 
-
-
-
 SubagentViewScreen {
     background: #09090b;
 }
@@ -603,7 +606,7 @@ SubagentViewScreen {
 #modal-dialog.bash-confirm-dialog {
     width: 90%;
     min-width: 62;
-    max-width: 66;
+    max-width: 68;
     height: auto;
     max-height: 85%;
     overflow-y: hidden;
@@ -665,22 +668,31 @@ SubagentViewScreen {
     text-wrap: nowrap;
 }
 
-
-
-
-
 #modal-dialog OptionList,
-#modal-dialog OptionList:focus {
+#modal-dialog OptionList:focus,
+#modal-dialog OptionList:hover,
+#modal-dialog HeaderWrapOptionList,
+#modal-dialog HeaderWrapOptionList:focus,
+#modal-dialog HeaderWrapOptionList:hover,
+ModalScreen OptionList,
+ModalScreen OptionList:focus,
+ModalScreen OptionList:hover {
     height: auto;
-    max-height: 10;
+    max-height: 12;
     margin: 0;
     border: none;
-    background: #27272a;
+    background: transparent !important;
     scrollbar-size: 0 0;
     text-overflow: ellipsis;
 }
 
-#modal-dialog OptionList > .option-list--option-disabled {
+#modal-dialog OptionList > .option-list--option,
+ModalScreen OptionList > .option-list--option {
+    background: transparent;
+}
+
+#modal-dialog OptionList > .option-list--option-disabled,
+ModalScreen OptionList > .option-list--option-disabled {
     color: #71717a;
     text-style: bold;
     opacity: 100%;
@@ -688,41 +700,66 @@ SubagentViewScreen {
 
 #modal-dialog OptionList > .option-list--option-highlighted,
 #modal-dialog OptionList > .option-list--option-blur-highlighted,
-#modal-dialog OptionList > .option-list--option-hover {
+ModalScreen OptionList > .option-list--option-highlighted,
+ModalScreen OptionList > .option-list--option-blur-highlighted {
     background: #ffffff;
     color: #09090b;
     text-style: bold;
 }
 
+#modal-dialog OptionList > .option-list--option-hover,
+ModalScreen OptionList > .option-list--option-hover {
+    background: transparent;
+}
+
 #modal-dialog Input,
+#modal-dialog Input:focus,
 #write-in-input,
+#write-in-input:focus,
 #modal-search-input,
-#api-key-input {
+#modal-search-input:focus,
+#api-key-input,
+#api-key-input:focus {
+    width: 100%;
+    height: 1;
     margin: 0 0 1 0;
-    background: #09090b;
-    border: solid #27272a;
+    padding: 0 1;
+    border: none;
+    background: transparent !important;
     color: #f4f4f5;
 }
 
-#modal-dialog Input:focus,
-#write-in-input:focus,
-#modal-search-input:focus,
-#api-key-input:focus {
-    border: solid #52525b;
+#modal-dialog Input > .input--placeholder,
+#modal-search-input > .input--placeholder,
+#write-in-input > .input--placeholder,
+#api-key-input > .input--placeholder {
+    color: #71717a;
+    background: transparent;
+}
+
+#modal-dialog Input > .input--selection,
+#modal-search-input > .input--selection,
+#write-in-input > .input--selection,
+#api-key-input > .input--selection {
+    background: #ffffff;
+    color: #09090b;
 }
 
 .modal-buttons {
     dock: bottom;
     width: 100%;
     height: auto;
-    align: center middle;
+    layout: horizontal;
+    align: right middle;
     margin-top: 1;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 .modal-buttons Button {
-    width: 100%;
-    margin-bottom: 1;
+    width: auto;
+    min-width: 12;
+    margin-left: 1;
+    margin-bottom: 0;
     border: none;
     background: #27272a;
     color: #e4e4e7;
@@ -737,9 +774,11 @@ SubagentViewScreen {
 
 #modal-hint {
     width: 100%;
-    text-align: center;
+    text-align: left;
     color: #71717a;
     margin-top: 1;
+    padding: 0 1;
+    text-wrap: nowrap;
 }
 
 #attachment-bar {

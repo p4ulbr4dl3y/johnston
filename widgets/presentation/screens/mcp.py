@@ -50,9 +50,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown("### **Manage MCP Servers**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            yield Input(placeholder="Search MCP servers...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield Label("enter: toggle • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter/space/tab: toggle • ↑↓: nav • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -276,21 +276,31 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 if hasattr(self.app, "refresh_status_footer"):
                     self.app.refresh_status_footer()
 
+    def _toggle_highlighted(self) -> None:
+        opt_list = self.query_one("#mcp-option-list", OptionList)
+        idx = opt_list.highlighted
+        if idx is not None and 0 <= idx < len(self.filtered_servers):
+            target = self.filtered_servers[idx]
+            if target is not None:
+                self._toggle_server_async(target["name"])
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:
-            opt_list = self.query_one("#mcp-option-list", OptionList)
-            idx = opt_list.highlighted
-            if idx is not None and 0 <= idx < len(self.filtered_servers):
-                target = self.filtered_servers[idx]
-                if target is None:
-                    return
-                self._toggle_server_async(target["name"])
+            self._toggle_highlighted()
 
     def _on_key(self, event: events.Key) -> None:
         if event.key in TAB_KEYS:
+            self._toggle_highlighted()
             event.prevent_default()
             event.stop()
             return
+        if event.key == "space":
+            search_input = self.query_one_optional(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            if not search_input or not search_input.has_focus or not search_input.value:
+                self._toggle_highlighted()
+                event.prevent_default()
+                event.stop()
+                return
         self._handle_search_navigation(event)
 
     def action_cancel(self) -> None:

@@ -25,6 +25,6 @@ class ResumeScreen(BaseSelectionScreen[str]):
             items=items,
             default_value=default_val,
             show_search=True,
-            search_placeholder="Search sessions...",
+            search_placeholder="Search...",
             dialog_classes="modal-dialog-medium",
         )

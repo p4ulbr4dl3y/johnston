@@ -6,6 +6,7 @@ from textual._widget_navigation import find_first_enabled, find_last_enabled
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets.option_list import Option
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
@@ -105,7 +106,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str = "enter: select • ↑/↓: navigate • esc: cancel",
+        hint_text: str = "enter: select • ↑↓: nav • esc: cancel",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
     ):
@@ -165,6 +166,7 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
             current_header_opt = None
             current_header_item = None
             current_section_matches = []
+            first_matched_group = True
 
             for idx, (opt, item) in enumerate(zip(self.raw_options, self.raw_items)):
                 if item is None:
@@ -173,6 +175,10 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
                         continue
                     if current_section_matches:
                         if current_header_opt is not None:
+                            if not first_matched_group:
+                                filtered_options.append(Option("", disabled=True))
+                                filtered_items.append(None)
+                            first_matched_group = False
                             filtered_options.append(current_header_opt)
                             filtered_items.append(current_header_item)
                         for m_opt, m_item in current_section_matches:
@@ -197,6 +203,9 @@ class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
 
             if current_section_matches:
                 if current_header_opt is not None:
+                    if not first_matched_group:
+                        filtered_options.append(Option("", disabled=True))
+                        filtered_items.append(None)
                     filtered_options.append(current_header_opt)
                     filtered_items.append(current_header_item)
                 for m_opt, m_item in current_section_matches:

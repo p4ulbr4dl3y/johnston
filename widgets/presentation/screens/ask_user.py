@@ -185,7 +185,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
-            hint.update("enter: confirm • space: toggle • ←: back • →: next • tab: minimize • esc: cancel")
+            hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
