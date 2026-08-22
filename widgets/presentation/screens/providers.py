@@ -126,16 +126,16 @@ class ApiKeyInputScreen(BaseModalScreen[str | None]):
         self.current_key = current_key
 
     def compose(self) -> ComposeResult:
-        if self.current_key and len(self.current_key) > 8:
-            masked = f"{self.current_key[:4]}...{self.current_key[-4:]}"
-        else:
-            masked = self.current_key if self.current_key else "not set"
-
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(
                 f"### **Connect {self.provider_name}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
-            yield Markdown(f"Current API Key: `{masked}`", classes=MODAL_MARKDOWN)
+            if self.current_key:
+                if len(self.current_key) > 8:
+                    masked = f"{self.current_key[:4]}...{self.current_key[-4:]}"
+                else:
+                    masked = self.current_key
+                yield Markdown(f"Current API Key: `{masked}`", id="api-key-current", classes=MODAL_MARKDOWN)
             yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
             yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
 

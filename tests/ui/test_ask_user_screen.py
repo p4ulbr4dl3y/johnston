@@ -1,7 +1,6 @@
 import os
 import shutil
 import tempfile
-import time
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -11,7 +10,6 @@ from textual.widgets import Markdown, OptionList
 
 from widgets.presentation.screens.ask_user import (
     AskUserWizardScreen,
-    ConfirmScreen,
     WriteInInput,
 )
 
@@ -172,29 +170,6 @@ class TestWriteInInput(unittest.IsolatedAsyncioTestCase):
                 mock_screen.action_go_next.assert_called_once()
 
 
-class TestConfirmScreenUnit(unittest.TestCase):
-    def test_actions(self):
-        cs = ConfirmScreen("Summary here")
-        cs._mount_time = 0.0
-        cs.dismiss = MagicMock()
-
-        cs.action_confirm()
-        cs.dismiss.assert_called_with("confirm")
-
-        cs.action_go_back()
-        cs.dismiss.assert_called_with("back")
-
-        cs.action_cancel()
-        cs.dismiss.assert_called_with("cancelled")
-
-    def test_action_confirm_debounce(self):
-        cs = ConfirmScreen("Summary")
-        cs._mount_time = time.time()
-        cs.dismiss = MagicMock()
-        cs.action_confirm()
-        cs.dismiss.assert_not_called()
-
-
 class TestAskUserWizardScreenUnit(unittest.TestCase):
     def test_wizard_screen_basic(self):
         questions = [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": []}]
@@ -231,32 +206,6 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
-
-    async def test_confirm_screen_pilot(self):
-        screen = ConfirmScreen("Do you agree?")
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-
-            await pilot.press("enter")
-            await pilot.pause()
-
-            self.assertEqual(app.dismiss_result, "confirm")
-
-    async def test_confirm_screen_pilot_cancel(self):
-        screen = ConfirmScreen("Do you agree?")
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            screen._mount_time = 0
-            await pilot.pause()
-
-            await pilot.press("escape")
-            await pilot.pause()
-
-            self.assertEqual(app.dismiss_result, "cancelled")
 
     async def test_wizard_screen_pilot_navigation_and_cancel(self):
         questions = [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": ["X", "Y"]}]

@@ -514,7 +514,8 @@ class SessionStore:
                 continue
             title = self._title_from_messages(sess)
             if title == "Untitled" and sess.description:
-                title = sess.description[:55] + "..." if len(sess.description) > 55 else sess.description
+                desc = " ".join(str(sess.description).split())
+                title = desc[:55] + "..." if len(desc) > 55 else desc
             sessions.append(
                 {
                     "id": sess.id,
@@ -533,7 +534,8 @@ class SessionStore:
             if isinstance(m, dict) and m.get("type") == "user":
                 text = str(m.get("display_text") or m.get("text", "")).strip()
                 if text:
-                    return text[:55] + "..." if len(text) > 55 else text
+                    clean = " ".join(text.split())
+                    return clean[:55] + "..." if len(clean) > 55 else clean
         return "Untitled"
 
     @staticmethod

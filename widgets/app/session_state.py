@@ -27,8 +27,9 @@ def collect_session_data(app: Any) -> Optional[dict]:
     title = ""
     for msg in messages:
         if isinstance(msg, dict) and msg.get("type") == "user" and is_ui_visible_user_message(msg):
-            first_msg = msg.get("display_text") or msg.get("text", "")
-            title = first_msg[:55] + "..." if len(first_msg) > 55 else first_msg
+            first_msg = str(msg.get("display_text") or msg.get("text", "")).strip()
+            clean = " ".join(first_msg.split())
+            title = clean[:55] + "..." if len(clean) > 55 else clean
             break
     if not title:
         return None

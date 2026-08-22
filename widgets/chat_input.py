@@ -114,7 +114,7 @@ class ChatInput(TextArea):
 
                 has_attachments = bool(getattr(self, "clipboard_attachments", None))
                 att_offset = 1 if has_attachments else 0
-                footer_offset = 2
+                footer_offset = 3
                 margin_b = target_height + footer_offset + att_offset
 
                 sugg = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)

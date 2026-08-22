@@ -359,7 +359,7 @@ OptionList > .option-list--option-hover {
     display: none;
     layer: overlay;
     dock: bottom;
-    margin-bottom: 4;
+    margin-bottom: 5;
     width: 100%;
     height: auto;
     max-height: 5;
@@ -468,7 +468,6 @@ ModalScreen {
 
 #modal-dialog {
     width: 90%;
-    min-width: 72;
     max-width: 78;
     height: auto;
     max-height: 85%;
@@ -481,13 +480,11 @@ ModalScreen {
 #modal-dialog.modal-dialog-medium,
 #modal-dialog.wizard-dialog {
     width: 90%;
-    min-width: 76;
     max-width: 86;
 }
 
 #modal-dialog.modal-dialog-wide {
     width: 90%;
-    min-width: 80;
     max-width: 104;
 }
 
@@ -552,11 +549,21 @@ ModalScreen {
     height: auto;
     color: #e4e4e7;
     margin-bottom: 0;
+    padding: 0 1;
+}
+
+#help-body-md {
+    margin-top: 1;
+}
+
+#api-key-current {
+    margin-bottom: 1;
 }
 
 .modal-markdown-centered {
     dock: top;
-    margin-bottom: 1;
+    margin-bottom: 0;
+    padding: 0 1;
 }
 
 .modal-markdown-centered MarkdownHeader,
@@ -605,7 +612,6 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog {
     width: 90%;
-    min-width: 62;
     max-width: 68;
     height: auto;
     max-height: 85%;
@@ -614,7 +620,6 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog.modal-dialog-wide {
     width: 90%;
-    min-width: 80;
     max-width: 104;
 }
 
@@ -629,7 +634,7 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence,
 #modal-dialog.bash-confirm-dialog MarkdownFence {
-    background: #27272a;
+    background: transparent;
     border: none;
     color: #f4f4f5;
     padding: 0;
@@ -643,9 +648,9 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence #code-content,
 #modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
-    background: #27272a;
+    background: transparent;
     color: #f4f4f5;
-    padding: 0 1;
+    padding: 0;
     margin: 0;
 }
 
@@ -654,16 +659,18 @@ SubagentViewScreen {
     max-height: 18;
     overflow-y: auto;
     overflow-x: auto;
-    background: #27272a;
+    background: transparent;
+    border-left: solid #3f3f46;
+    padding: 0 1;
     scrollbar-size: 0 0 !important;
 }
 
 #modal-dialog.bash-confirm-dialog .modal-diff-view {
     width: 100%;
     height: auto;
-    background: #27272a;
+    background: transparent;
     color: #f4f4f5;
-    padding: 0 1;
+    padding: 0;
     margin: 0;
     text-wrap: nowrap;
 }
@@ -727,6 +734,13 @@ ModalScreen OptionList > .option-list--option-hover {
     border: none;
     background: transparent !important;
     color: #f4f4f5;
+}
+
+#modal-dialog #write-in-input,
+#modal-dialog #write-in-input:focus,
+#write-in-input,
+#write-in-input:focus {
+    margin: 1 0 0 0;
 }
 
 #modal-dialog Input > .input--placeholder,
@@ -803,8 +817,8 @@ AttachmentChip {
 #status-footer,
 #subagent-status-footer {
     width: 100%;
-    height: 2;
-    padding: 0 1;
+    height: 3;
+    padding: 0 1 1 1;
     background: #18181b;
     color: #71717a;
 }

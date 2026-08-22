@@ -20,9 +20,8 @@ from widgets.utils.key_aliases import expand_bindings
 
 def format_task_row(cmd: str) -> str:
     """Format a task command line for display in the option list."""
-    if len(cmd) > 55:
-        cmd = cmd[:52] + "..."
-    return f"   {cmd}".rstrip()
+    clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split())
+    return f"   {clean}".rstrip()
 
 
 def _filter_and_sort_tasks(items: list, search_query: str) -> list:

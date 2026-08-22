@@ -23,35 +23,6 @@ from widgets.presentation.screens.constants import (
 )
 
 
-class SkillDetailScreen(BaseModalScreen[bool]):
-    """Modal screen displaying full details of a skill with option to activate"""
-
-    BINDINGS = [
-        ("escape", "cancel", "Back"),
-        ("enter", "activate", "Activate"),
-    ]
-
-    def __init__(self, skill: Dict[str, Any]):
-        super().__init__()
-        self.skill = skill
-
-    def compose(self) -> ComposeResult:
-        scope_str = self.skill.get("scope", "global")
-        header_md = f"### **Skill: {self.skill['name']}** (`{status_tag(scope_str)}`)"
-        desc = self.skill.get("description", "").strip() or "No description provided."
-
-        with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown(header_md, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            yield Markdown(desc, classes=MODAL_MARKDOWN)
-            yield Label("enter: activate • esc: cancel", id=MODAL_HINT_ID)
-
-    def action_cancel(self) -> None:
-        self.dismiss(False)
-
-    def action_activate(self) -> None:
-        self.dismiss(True)
-
-
 class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]]):
     """Modal screen for listing available skills (global and project) as one-liners"""
 

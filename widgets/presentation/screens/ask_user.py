@@ -10,7 +10,6 @@ from widgets.presentation.screens.constants import (
     MODAL_HINT,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     OPTIONS_LIST,
     OPTIONS_LIST_ID,
     SHIFT_TAB_KEYS,
@@ -84,44 +83,6 @@ class WriteInInput(Input):
                     return
 
         await super()._on_key(event)
-
-
-class ConfirmScreen(BaseModalScreen[str]):
-    """Modal screen for requesting confirmation from the user (yes/no/cancel)"""
-
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
-        ("left", "go_back", "Back"),
-        ("enter", "confirm", "Confirm"),
-    ]
-
-    def __init__(self, summary: str):
-        super().__init__()
-        self.summary = summary
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown("### **Confirmation Required**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            yield Markdown(self.summary, classes=MODAL_MARKDOWN)
-            yield Label("enter: confirm • ←: back • esc: cancel", id=MODAL_HINT_ID)
-
-    def on_mount(self) -> None:
-        import time
-
-        self._mount_time = time.time()
-
-    def action_confirm(self) -> None:
-        import time
-
-        if hasattr(self, "_mount_time") and (time.time() - self._mount_time < 0.25):
-            return
-        self.dismiss("confirm")
-
-    def action_go_back(self) -> None:
-        self.dismiss("back")
-
-    def action_cancel(self) -> None:
-        self.dismiss("cancelled")
 
 
 class AskUserWizardScreen(BaseModalScreen[str]):

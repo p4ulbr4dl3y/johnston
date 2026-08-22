@@ -3,11 +3,11 @@ from unittest.mock import patch
 
 from textual.app import App
 from textual.events import Key
-from textual.widgets import Input, Markdown, OptionList
+from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.skills.manager import Skill, SkillManager, SkillScope
-from widgets.presentation.screens.skills import SkillDetailScreen, SkillsScreen
+from widgets.presentation.screens.skills import SkillsScreen
 
 
 class DummyHostApp(App[None]):
@@ -44,54 +44,6 @@ def sample_skills():
             hidden=True,
         ),
     ]
-
-
-class TestSkillDetailScreen(unittest.IsolatedAsyncioTestCase):
-    async def test_compose_default_scope_and_no_description(self):
-        screen = SkillDetailScreen({"name": "alpha", "description": "   "})
-        app = DummyHostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            text = " ".join(str(m._markdown) for m in screen.query(Markdown))
-            self.assertIn("[GLOBAL]", text)
-            self.assertIn("alpha", text)
-            self.assertIn("No description provided.", text)
-
-    async def test_compose_project_scope_and_description(self):
-        screen = SkillDetailScreen({"name": "alpha", "description": "A useful skill", "scope": "project"})
-        app = DummyHostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            text = " ".join(str(m._markdown) for m in screen.query(Markdown))
-            self.assertIn("[PROJECT]", text)
-            self.assertIn("A useful skill", text)
-
-    async def test_action_cancel_dismisses_false(self):
-        screen = SkillDetailScreen({"name": "alpha"})
-        app = DummyHostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            await pilot.press("escape")
-            await pilot.pause()
-            self.assertFalse(app.dismiss_result)
-
-    async def test_action_activate_dismisses_true(self):
-        screen = SkillDetailScreen({"name": "alpha"})
-        app = DummyHostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            await pilot.press("enter")
-            await pilot.pause()
-            self.assertTrue(app.dismiss_result)
-
-    async def test_action_quit_app(self):
-        screen = SkillDetailScreen({"name": "alpha"})
-        app = DummyHostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            with patch.object(screen.app, "exit") as mock_exit:
-                screen.action_quit_app()
-                mock_exit.assert_called_once()
 
 
 class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):

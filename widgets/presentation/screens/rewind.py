@@ -18,9 +18,7 @@ class RewindScreen(BaseSelectionScreen[int]):
             diff_stat = msg.git_stats
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            max_text_len = 55
-            opt_text = f"{clean[:max_text_len]}..." if len(clean) > max_text_len else clean
-            opt_text = opt_text or "(empty message)"
+            opt_text = clean or "(empty message)"
             escaped_text = escape(opt_text)
 
             if checkpoints_enabled:

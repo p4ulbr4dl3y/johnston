@@ -10,9 +10,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         options = []
         for s in sessions:
             title = " ".join(str(s.get("title", "")).replace("\n", " ").replace("\r", " ").split())
-            max_title_len = 55
-            title_text = f"{title[:max_title_len]}..." if len(title) > max_title_len else title
-            escaped_title = escape(title_text)
+            escaped_title = escape(title)
             count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"
             options.append(f"{escaped_title} [dim]{escape(f'[{count} {step_str}]')}[/dim]")

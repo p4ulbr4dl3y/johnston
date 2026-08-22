@@ -5,39 +5,12 @@ from textual.events import Key
 
 from core.application.session.actions import RewindEntry
 from core.application.skills.manager import Skill, SkillScope
-from widgets.presentation.screens.ask_user import ConfirmScreen
 from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.rewind import RewindScreen
 from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
-
-
-class TestConfirmScreen(unittest.TestCase):
-    def test_init(self):
-        self.assertEqual(ConfirmScreen("Summary text").summary, "Summary text")
-
-    def test_bindings(self):
-        keys = [b[0] for b in ConfirmScreen("x").BINDINGS]
-        self.assertIn("escape", keys)
-        self.assertIn("enter", keys)
-
-
-class TestConfirmCancelPath(unittest.TestCase):
-    def test_confirm_cancel_dismisses_cancelled(self):
-        s = ConfirmScreen("summary")
-        with patch.object(s, "dismiss") as dismiss:
-            s._mount_time = 0  # old mount => bypass debounce
-            s.action_cancel()
-        dismiss.assert_called_once_with("cancelled")
-
-    def test_confirm_enter_debounced_bypass(self):
-        s = ConfirmScreen("summary")
-        with patch.object(s, "dismiss") as dismiss:
-            s._mount_time = 0
-            s.action_confirm()
-        dismiss.assert_called_once_with("confirm")
 
 
 class TestHelpScreen(unittest.TestCase):
@@ -317,22 +290,6 @@ class TestApiKeyInputScreen(unittest.TestCase):
 
 
 class TestSkillScreens(unittest.TestCase):
-    @patch("widgets.presentation.screens.skills.SkillManager")
-    def test_detail_init(self, _):
-        from widgets.presentation.screens.skills import SkillDetailScreen
-
-        skill = {"name": "my-skill", "description": "Does things", "scope": "project"}
-        s = SkillDetailScreen(skill)
-        self.assertEqual(s.skill, skill)
-
-    @patch("widgets.presentation.screens.skills.SkillManager")
-    def test_detail_bindings(self, _):
-        from widgets.presentation.screens.skills import SkillDetailScreen
-
-        keys = [b[0] for b in SkillDetailScreen.BINDINGS]
-        self.assertIn("escape", keys)
-        self.assertIn("enter", keys)
-
     @patch("widgets.presentation.screens.skills.SkillManager")
     def test_list_init_with_skills(self, mock_sm_cls):
         mock_sm = MagicMock()

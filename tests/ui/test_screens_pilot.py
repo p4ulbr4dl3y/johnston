@@ -432,6 +432,18 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             input_field = screen.query_one("#write-in-input", Input)
             self.assertEqual(input_field.value, "")
 
+    async def test_modal_responsive_narrow_terminal(self):
+        screen = HelpScreen()
+        app = DummyHostApp(screen)
+        async with app.run_test(size=(50, 20)) as pilot:
+            await pilot.pause()
+            modal = screen.query_one("#modal-dialog")
+            self.assertLessEqual(modal.region.width, 50)
+            self.assertGreater(modal.region.width, 0)
+            self.assertGreaterEqual(modal.region.x, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
