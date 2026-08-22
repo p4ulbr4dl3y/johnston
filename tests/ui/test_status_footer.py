@@ -418,10 +418,10 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 active_bg_tasks=2,
             )
             rows = footer._last_grid_rows
-            row3_right = rows[2][1]
-            self.assertIn("Background:", row3_right)
-            self.assertIn("1 agent", row3_right)
-            self.assertIn("2 shell", row3_right)
+            row2_right = rows[1][1]
+            self.assertIn("⚡", row2_right)
+            self.assertIn("1 agent", row2_right)
+            self.assertIn("2 shell", row2_right)
 
     async def test_update_status_background_label_empty(self):
         app = FooterTestApp()
@@ -429,34 +429,34 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             footer = app.query_one(StatusFooter)
             footer.update_status(provider_key="openai", model_name="gpt-4o")
             rows = footer._last_grid_rows
-            self.assertEqual(rows[2][1], "")
+            self.assertEqual(rows[1][1], "")
 
-    async def test_update_status_attachments_indicator(self):
-        app = FooterTestApp()
-        async with app.run_test():
-            footer = app.query_one(StatusFooter)
-            # 1 image attached
-            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=1)
-            row1_left = footer._last_grid_rows[0][0]
-            self.assertIn("1 image attached", row1_left)
+    async def test_attachment_bar_updates(self):
+        from widgets.presentation.widgets.attachment_bar import AttachmentBar, AttachmentChip
 
-            # 2 images attached
-            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=2)
-            row1_left = footer._last_grid_rows[0][0]
-            self.assertIn("2 images attached", row1_left)
+        bar = AttachmentBar()
+        bar.update_attachments([])
+        self.assertEqual(bar.styles.display, "none")
 
-            # 0 attachments
-            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=0)
-            row1_left = footer._last_grid_rows[0][0]
-            self.assertNotIn("attached", row1_left)
+        mock_att = MagicMock(path="/tmp/test_image.png")
+        bar.update_attachments([mock_att])
+        self.assertEqual(bar.styles.display, "block")
 
-    async def test_update_status_compact_attachments_indicator(self):
-        app = FooterTestApp()
-        async with app.run_test(size=(60, 24)):
-            footer = app.query_one(StatusFooter)
-            footer.update_status(provider_key="openai", model_name="gpt-4o", attachments_count=1)
-            row1 = footer._last_grid_rows[0][0]
-            self.assertIn("1 image attached", row1)
+        chip = AttachmentChip(mock_att)
+        self.assertIn("test_image.png", str(chip.render()))
+        self.assertIn("\u00a0", str(chip.render()))
+
+        long_att = MagicMock(path="/tmp/very_long_attachment_file_name_123456789.png")
+        long_chip = AttachmentChip(long_att)
+        self.assertIn("…", str(long_chip.render()))
+
+        # Test single chip click calls remove_clipboard_attachment
+        mock_ci = MagicMock()
+        mock_app = MagicMock()
+        mock_app.query_one.return_value = mock_ci
+        with patch.object(AttachmentChip, "app", new=mock_app):
+            chip.on_click()
+        mock_ci.remove_clipboard_attachment.assert_called_once_with(mock_att)
 
 
 

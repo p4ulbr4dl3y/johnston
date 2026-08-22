@@ -566,7 +566,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         if isinstance(item, dict) and item.get("status") == "completed"
                     )
                     target_str = f"[{completed}/{total} completed]"
-            self.header_label.update(f"[{c}]⚙ [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
+            self.header_label.update(f"[{c}]● [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
         elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
@@ -576,7 +576,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             from core.infrastructure.presentation.tool_display import extract_tool_display
 
             target_str = extract_tool_display(self.tool_type, self.args) if self.args else self.target
-            self.header_label.update(f"[{c}]⚙ [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
+            self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
             # MCP/custom tool: single format — ToolName({k: v, ...}).
             from core.infrastructure.presentation.tool_display import format_compact_dict
@@ -585,7 +585,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
             escaped_compact = escape(compact)
-            self.header_label.update(f"[{c}]⚙ [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
+            self.header_label.update(f"[{c}]● [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
 
     def on_click(self, event) -> None:
         if not self.is_clickable_header():

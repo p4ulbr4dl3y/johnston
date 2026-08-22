@@ -294,6 +294,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.last_context_tokens = 0
         session.total_tokens = 200
         session.cost_usd = 0.0
+        session.description = "Test Subagent Task"
 
         app = MagicMock()
         cm = MagicMock()
@@ -302,12 +303,48 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         cm.is_provider_connected.return_value = False
         app.pm = cm
         footer._harness_app = app
+        footer.session = session
         with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
             "widgets.status_footer.catalog.get_model_pricing",
             side_effect=lambda p, m: {"prompt": 1.0, "completion": 2.0} if p == "openai" else None,
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
+        self.assertIn("Test Subagent Task", footer._last_grid_rows[0][0])
+        self.assertIn("esc: back", footer._last_grid_rows[1][1])
+
+    def test_render_footer_compact_mode(self):
+        footer = SubagentStatusFooter()
+        session = MagicMock()
+        session.agent = None
+        session.role = "researcher"
+        session.project_dir = "/tmp/my_repo"
+        session.branch_name = "feat/test"
+        session.messages = None
+        session.last_context_tokens = 0
+        session.total_tokens = 200
+        session.cost_usd = 0.05
+        session.description = "Compact Task Name Very Long"
+
+        app = MagicMock()
+        app.size = MagicMock(width=60)
+        cm = MagicMock()
+        cm.get_active_provider_key.return_value = "openai"
+        cm.load_providers.return_value = {}
+        cm.is_provider_connected.return_value = True
+        app.pm = cm
+        footer._harness_app = app
+        footer.session = session
+        with patch("widgets.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
+            footer, "_git_diff_stats", return_value="+2/-1"
+        ):
+            footer._render_footer()
+        self.assertIsNotNone(footer._last_grid_rows)
+        self.assertIn("Researcher", footer._last_grid_rows[0][0])
+        self.assertIn("gpt-4o", footer._last_grid_rows[0][0])
+        self.assertIn("ctx", footer._last_grid_rows[0][1])
+        self.assertIn("my_repo", footer._last_grid_rows[1][0])
+        self.assertIn("esc: back", footer._last_grid_rows[1][1])
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()

@@ -35,7 +35,7 @@ class TestToolExpansion(unittest.TestCase):
         self.assertFalse(widget.is_expanded)
         self.assertEqual(widget.tool_type, "create")
         self.assertEqual(widget.args["content"], "hello\nworld")
-        self.assertIn("⚙", str(widget.header_label.render()))
+        self.assertIn("●", str(widget.header_label.render()))
 
     def test_tool_call_widget_toggle_expand_syntax(self):
         widget = ToolCallWidget(
@@ -43,7 +43,7 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
-        self.assertIn("⚙", str(widget.header_label.render()))
+        self.assertIn("●", str(widget.header_label.render()))
         content = getattr(widget.content_widget, "_Static__content")
         self.assertIsInstance(content, Syntax)
         self.assertEqual(content.lexer.name, "Python")

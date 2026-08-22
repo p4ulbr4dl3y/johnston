@@ -53,12 +53,12 @@ class TestBasicRender(unittest.TestCase):
 
     def test_connected_with_model_shows_context_and_tokens(self):
         out = self._render(context_used=5000, total_tokens=1234, context_window="128k", context_limit=128000)
-        self.assertIn("Context:", out)
-        self.assertIn("1,234 tok", out)
+        self.assertIn("128k", out)
+        self.assertIn("1.2k tok", out)
 
     def test_context_display_thousands_separated(self):
         out = self._render(total_tokens=1234567, context_used=1000, context_window="200k", context_limit=200000)
-        self.assertIn("1,234,567 tok", out)
+        self.assertIn("1.2M tok", out)
 
     def test_disconnected_zero_context_no_exception(self):
         out = self._render(
@@ -80,12 +80,21 @@ class TestBasicRender(unittest.TestCase):
 
     def test_negative_context_clamped(self):
         out = self._render(context_used=-10, total_tokens=0, context_window="128k", context_limit=128000)
-        self.assertIn("Context:", out)
+        self.assertIn("128k", out)
 
     def test_compact_mode(self):
         self.f.harness_width = 40
-        out = self._render(context_used=0, total_tokens=0, context_window="128k", context_limit=128000)
-        self.assertIn("MCP:", out)
+        out = self._render(
+            context_used=0,
+            total_tokens=0,
+            context_window="128k",
+            context_limit=128000,
+            mcp_total=2,
+            mcp_active=1,
+        )
+        self.assertIn("1mcp", out)
+        self.assertIn("⚡", out)
+        self.assertIn("0% ctx", out)
 
     def test_capitalizes_role(self):
         out = self._render(agent_role="explore")

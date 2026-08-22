@@ -108,6 +108,20 @@ class ChatInput(TextArea):
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height
 
+        try:
+            if self.is_mounted and self.app:
+                from widgets.command_suggestions import CommandSuggestions
+
+                has_attachments = bool(getattr(self, "clipboard_attachments", None))
+                att_offset = 1 if has_attachments else 0
+                footer_offset = 2
+                margin_b = target_height + footer_offset + att_offset
+
+                sugg = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
+                sugg.styles.margin = (0, 0, margin_b, 0)
+        except Exception:
+            pass
+
     async def update_suggestions(self) -> None:
         """Update slash command and file suggestions list"""
         try:
@@ -219,10 +233,29 @@ class ChatInput(TextArea):
     def update_attachment_bar(self) -> None:
         try:
             if self.is_mounted and self.app:
+                from widgets.presentation.widgets.attachment_bar import AttachmentBar
+
+                bar = self.app.query_one("#attachment-bar", AttachmentBar)
+                bar.update_attachments(self.clipboard_attachments)
+        except Exception:
+            pass
+        try:
+            if self.is_mounted and self.app:
                 footer = self.app.query_one(STATUS_FOOTER)
                 footer.refresh_footer()
         except Exception:
             pass
+
+    def remove_clipboard_attachment(self, attachment) -> None:
+        """Removes a single attachment and cleans up its temp file."""
+        if attachment in self.clipboard_attachments:
+            if hasattr(attachment, "path") and os.path.exists(attachment.path) and "temp_images" in attachment.path:
+                try:
+                    os.remove(attachment.path)
+                except OSError:
+                    pass
+            self.clipboard_attachments.remove(attachment)
+            self.update_attachment_bar()
 
     def clear_clipboard_attachments(self) -> None:
         for att in list(self.clipboard_attachments):
@@ -485,6 +518,8 @@ class ChatInput(TextArea):
                             chosen_cmd = suggestions.current_matched[suggestions.highlighted]
                             self.apply_suggestion(chosen_cmd, suggestions.at_start_idx)
                             suggestions.display = False
+                            if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
+                                suggestions._set_display(False)
                             event.prevent_default()
                             event.stop()
                             return
@@ -493,6 +528,8 @@ class ChatInput(TextArea):
                             chosen_file = suggestions.current_matched[suggestions.highlighted]
                             self.apply_file_suggestion(chosen_file, suggestions.at_start_idx)
                             suggestions.display = False
+                            if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
+                                suggestions._set_display(False)
                             event.prevent_default()
                             event.stop()
                             return
@@ -508,6 +545,8 @@ class ChatInput(TextArea):
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 suggestions.display = False
+                if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
+                    suggestions._set_display(False)
             except Exception:
                 pass
 

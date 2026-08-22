@@ -109,11 +109,23 @@ class CommandSuggestions(HeaderWrapOptionList):
                     break
         self.current_matched = matched_files
         if matched_files:
-            self.display = True
+            self._set_display(True)
             self.highlighted = 0
         else:
-            self.display = False
+            self._set_display(False)
         return matched_files
+
+    def _set_display(self, show: bool) -> None:
+        self.display = show
+        if show:
+            try:
+                if self.app:
+                    from widgets.chat_input import ChatInput
+
+                    ci = self.app.query_one("#message-input", ChatInput)
+                    ci.update_height()
+            except Exception:
+                pass
 
     async def update_query(self, full_text: str, current_line: str = "", cursor_col: int | None = None) -> list[str]:
         """Updates matches list formatted for /commands and @files"""
@@ -144,10 +156,10 @@ class CommandSuggestions(HeaderWrapOptionList):
 
                     self.current_matched = matched_cmds
                     if matched_cmds:
-                        self.display = True
+                        self._set_display(True)
                         self.highlighted = 0
                     else:
-                        self.display = False
+                        self._set_display(False)
                     return matched_cmds
 
         # 2. Check for @file input
@@ -165,7 +177,7 @@ class CommandSuggestions(HeaderWrapOptionList):
 
         if self.mode is not None or self.display or self.option_count:
             self.clear_options()
-            self.display = False
+            self._set_display(False)
         self.mode = None
         self.current_matched = []
         self.at_start_idx = -1
@@ -187,7 +199,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                 elif self.mode == "file":
                     chosen_file = self.current_matched[self.highlighted]
                     chat_input.apply_file_suggestion(chosen_file, self.at_start_idx)
-                self.display = False
+                self._set_display(False)
                 chat_input.focus()
             except Exception:
                 pass

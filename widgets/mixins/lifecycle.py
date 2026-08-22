@@ -8,6 +8,7 @@ from textual.containers import Vertical
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
+from widgets.presentation.widgets.attachment_bar import AttachmentBar
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import StatusFooter
 
@@ -21,6 +22,7 @@ class LifecycleMixin:
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
             yield CommandSuggestions(id="command-suggestions")
+            yield AttachmentBar(id="attachment-bar")
             yield ChatInput(id="message-input", show_line_numbers=False)
             yield StatusFooter(id="status-footer")
 

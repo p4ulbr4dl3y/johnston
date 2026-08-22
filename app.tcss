@@ -356,7 +356,7 @@ OptionList > .option-list--option-hover {
     display: none;
     layer: overlay;
     dock: bottom;
-    margin-bottom: 6;
+    margin-bottom: 4;
     width: 100%;
     height: auto;
     max-height: 5;
@@ -497,14 +497,7 @@ ModalScreen {
 }
 
 #subagent-info {
-    width: 100%;
-    min-height: 2;
-    max-height: 2;
-    margin: 0;
-    padding: 0 1 1 1;
-    border: none;
-    background: #18181b;
-    color: #f4f4f5;
+    display: none;
 }
 
 .modal-title {
@@ -749,11 +742,29 @@ SubagentViewScreen {
     margin-top: 1;
 }
 
+#attachment-bar {
+    width: 100%;
+    height: 1;
+    display: none;
+    padding: 0 1;
+    background: #18181b;
+    color: #71717a;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+AttachmentChip {
+    width: auto;
+    height: 1;
+    margin-right: 1;
+    color: #71717a;
+}
+
 /* Status Footer - Matching dark grey background with muted zinc text */
 #status-footer,
 #subagent-status-footer {
     width: 100%;
-    height: 4;
+    height: 2;
     padding: 0 1;
     background: #18181b;
     color: #71717a;
