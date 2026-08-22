@@ -7,6 +7,24 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.24.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.23.0...johnston-v0.24.0) (2026-08-22)
+
+
+### Features
+
+* **ui:** add cross-layout keybinding aliases and centralize key helpers ([f8c2147](https://github.com/p4ulbr4dl3y/johnston/commit/f8c21475fb2b620d142756985ba6aec492798be1))
+* **ui:** add hanging indent line wrapping for diffs and remove horizontal scroll ([70036f1](https://github.com/p4ulbr4dl3y/johnston/commit/70036f172a2dd6eca80675cdccef473702ab3991))
+* **ui:** remove horizontal scroll and enable word wrapping for markdown fences and tool outputs ([ba2d8a8](https://github.com/p4ulbr4dl3y/johnston/commit/ba2d8a8e1fc56346eba25d39ecf9990461da9215))
+
+
+### Bug Fixes
+
+* **tools:** allow fake-ip range 198.18.0.0/15 in web_fetch SSRF guard ([4bc8a54](https://github.com/p4ulbr4dl3y/johnston/commit/4bc8a54b3f3fd978eaebf5e5ab327377b96dc15a))
+* **tools:** make branch optional in invoke_subagent and handle non-git repos ([3f8761d](https://github.com/p4ulbr4dl3y/johnston/commit/3f8761d610e0815eaab1c97ea6f15d447943dd25))
+* **ui:** dismiss empty task modals and update active option on mouse hover ([6f05bcb](https://github.com/p4ulbr4dl3y/johnston/commit/6f05bcbc1c4731d53774eb0d928e9302d7d5488f))
+* **ui:** dynamic sequential toolcall spacing on expand/collapse ([6f257a7](https://github.com/p4ulbr4dl3y/johnston/commit/6f257a71540fc81b962701d8e9ad1f65e8d4fa5d))
+* **ui:** improve modal sizing, diff scrolling, and title truncation ([8bdba1a](https://github.com/p4ulbr4dl3y/johnston/commit/8bdba1a9ea73b2e12b4a89cd91f315dd2f4418d8))
+
 ## [0.23.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.22.1...johnston-v0.23.0) (2026-08-21)
 
 
