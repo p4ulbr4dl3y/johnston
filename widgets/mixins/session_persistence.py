@@ -122,6 +122,7 @@ class SessionPersistenceMixin:
             self.agent.tokens_output = session.tokens_output
             self.agent.total_tokens = session.total_tokens
             self.agent.cost_usd = session.cost_usd
+            self.agent.tokens_cache_read = session.tokens_cache_read
 
             ctx = session.last_context_tokens
             if not ctx and self.agent.history:
@@ -159,6 +160,7 @@ class SessionPersistenceMixin:
         session.total_tokens = session_data.get("total_tokens", 0)
         session.cost_usd = session_data.get("cost_usd", 0.0)
         session.last_context_tokens = session_data.get("last_context_tokens", 0)
+        session.tokens_cache_read = session_data.get("tokens_cache_read", 0)
         session.touch()
         self.sm.save(session)
         self.sm.set_active_session_id(self.current_session_id)

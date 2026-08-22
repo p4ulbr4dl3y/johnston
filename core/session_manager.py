@@ -83,6 +83,7 @@ class AgentSession:
         self.total_tokens: int = 0
         self.cost_usd: float = 0.0
         self.last_context_tokens: int = 0
+        self.tokens_cache_read: int = 0
         self.created_at = created_at or _now()
         self.updated_at = updated_at or self.created_at
 
@@ -181,6 +182,7 @@ class AgentSession:
             "total_tokens": self.total_tokens,
             "cost_usd": self.cost_usd,
             "last_context_tokens": self.last_context_tokens,
+            "tokens_cache_read": self.tokens_cache_read,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "project_dir": self.project_dir,
@@ -206,6 +208,7 @@ class AgentSession:
             "total_tokens": self.total_tokens,
             "cost_usd": self.cost_usd,
             "last_context_tokens": self.last_context_tokens,
+            "tokens_cache_read": self.tokens_cache_read,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "project_dir": self.project_dir,
@@ -244,6 +247,7 @@ class AgentSession:
         sess.total_tokens = _coerce_int(data.get("total_tokens"))
         sess.cost_usd = _coerce_float(data.get("cost_usd"))
         sess.last_context_tokens = _coerce_int(data.get("last_context_tokens"))
+        sess.tokens_cache_read = _coerce_int(data.get("tokens_cache_read"))
         sess.project_dir = data.get("project_dir", "")
         sess.branch_name = data.get("branch_name", "")
         return sess

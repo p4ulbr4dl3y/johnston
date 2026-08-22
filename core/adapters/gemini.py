@@ -211,8 +211,12 @@ class GeminiAdapter(BaseApiAdapter):
                 if um:
                     p_tok = um.get("promptTokenCount", 0) or 0
                     c_tok = um.get("candidatesTokenCount", 0) or 0
+                    # Implicit caching: cachedContentTokenCount is the portion of
+                    # the prompt served from Gemini's automatic cache.
+                    cached_tok = um.get("cachedContentTokenCount", 0) or 0
                     yield build_adapter_usage_event(
                         p_tok,
                         c_tok,
                         um.get("totalTokenCount") or (p_tok + c_tok),
+                        cache_read_tokens=cached_tok,
                     )

@@ -40,16 +40,9 @@ def _get_sorted_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return sorted_tools
 
 
-def apply_anthropic_rolling_cache(anthropic_msgs: List[Dict[str, Any]]) -> None:
-    """Places a rolling Anthropic cache_control breakpoint on the 2nd-to-last user message in history."""
-    user_indices = [i for i, m in enumerate(anthropic_msgs) if m.get("role") == "user"]
-    if len(user_indices) < 2:
-        return
-
-    target_idx = user_indices[-2]
-    msg = anthropic_msgs[target_idx]
+def _set_ephemeral(msg: Dict[str, Any]) -> None:
+    """Attach a cache_control breakpoint to the last content block of a message."""
     content = msg.get("content")
-
     if isinstance(content, str):
         if content:
             msg["content"] = [{"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}]
@@ -59,6 +52,28 @@ def apply_anthropic_rolling_cache(anthropic_msgs: List[Dict[str, Any]]) -> None:
             cloned_block = dict(last_block)
             cloned_block["cache_control"] = {"type": "ephemeral"}
             msg["content"] = content[:-1] + [cloned_block]
+
+
+def apply_anthropic_rolling_cache(anthropic_msgs: List[Dict[str, Any]]) -> None:
+    """Place up to two rolling cache_control breakpoints on the conversation tail.
+
+    Anthropic allows max 4 breakpoints per request; the adapter uses the other
+    two on the system prompt and the last tool. Here:
+
+    - breakpoint 1: 2nd-to-last user message — the classic rolling anchor. Its
+      prefix is stable across turns, so it always lands a cache hit.
+    - breakpoint 2: last user message — covers the fresh tail (big tool_result
+      blocks from the previous exchange). Without it that tail is written as
+      uncached (1x) this turn and only becomes cacheable next turn, when its
+      position has shifted. With it, the tail is written to cache now (1.25x)
+      and read back at 0.1x on the next turn.
+    """
+    user_indices = [i for i, m in enumerate(anthropic_msgs) if m.get("role") == "user"]
+    if len(user_indices) < 2:
+        return
+
+    _set_ephemeral(anthropic_msgs[user_indices[-2]])
+    _set_ephemeral(anthropic_msgs[user_indices[-1]])
 
 
 class AnthropicAdapter(BaseApiAdapter):

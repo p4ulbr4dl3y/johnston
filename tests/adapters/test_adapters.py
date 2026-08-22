@@ -36,12 +36,47 @@ class TestAdapters(unittest.TestCase):
             {"role": "user", "content": "Hello 3"},
         ]
         apply_anthropic_rolling_cache(msgs)
-        # user turn 2 (index 2) should have cache_control breakpoint
+        # user turn 2 (index 2): rolling anchor breakpoint
         self.assertEqual(
             msgs[2]["content"],
             [{"type": "text", "text": "Hello 2", "cache_control": {"type": "ephemeral"}}],
         )
-        self.assertEqual(msgs[4]["content"], "Hello 3")
+        # last user turn (index 4): fresh-tail breakpoint (2nd of max 4)
+        self.assertEqual(
+            msgs[4]["content"],
+            [{"type": "text", "text": "Hello 3", "cache_control": {"type": "ephemeral"}}],
+        )
+
+    def test_apply_anthropic_rolling_cache_single_user_message(self):
+        msgs = [
+            {"role": "user", "content": "Only turn"},
+            {"role": "assistant", "content": "Hi"},
+        ]
+        apply_anthropic_rolling_cache(msgs)
+        # < 2 user messages: no breakpoints placed at all
+        self.assertEqual(msgs[0]["content"], "Only turn")
+        self.assertEqual(msgs[1]["content"], "Hi")
+
+    def test_apply_anthropic_rolling_cache_tool_result_tail(self):
+        # Realistic tail: tool results arrive as user-role content block lists.
+        msgs = [
+            {"role": "user", "content": [{"type": "text", "text": "List files"}]},
+            {"role": "assistant", "content": "checking"},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "content": "a.py\nb.py"},
+                    {"type": "tool_result", "tool_use_id": "t2", "content": "big output" * 1000},
+                ],
+            },
+        ]
+        apply_anthropic_rolling_cache(msgs)
+        content = msgs[2]["content"]
+        # Breakpoint lands on the last block; earlier blocks untouched.
+        self.assertNotIn("cache_control", content[0])
+        self.assertEqual(content[-1]["cache_control"], {"type": "ephemeral"})
+        # Clone-on-write: a fresh list is assigned rather than in-place mutation.
+        self.assertEqual(len(content), 2)
 
 
 class TestAdapterMessageNormalization(unittest.TestCase):
@@ -448,6 +483,33 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("".join(texts), "Hello")
         usage = [e for e in events if e[0] == "adapter_usage"]
         self.assertEqual(usage[0][1]["total_tokens"], 15)
+
+    async def test_stream_usage_implicit_cache(self):
+        lines = [
+            'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
+            'data: {"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":5,'
+            '"totalTokenCount":105,"cachedContentTokenCount":80}}',
+        ]
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        usage = [e for e in events if e[0] == "adapter_usage"][0][1]
+        self.assertEqual(usage["cache_read_tokens"], 80)
+        # prompt_tokens stays the full prompt; uncached is derived downstream.
+        self.assertEqual(usage["prompt_tokens"], 100)
+
+    async def test_stream_usage_no_cache_field(self):
+        lines = [
+            'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
+            'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
+        ]
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        usage = [e for e in events if e[0] == "adapter_usage"][0][1]
+        self.assertEqual(usage["cache_read_tokens"], 0)
 
     async def test_stream_function_call(self):
         lines = [

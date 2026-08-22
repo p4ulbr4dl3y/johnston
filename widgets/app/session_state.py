@@ -46,6 +46,7 @@ def collect_session_data(app: Any) -> Optional[dict]:
         "total_tokens": getattr(app.agent, "total_tokens", 0),
         "cost_usd": getattr(app.agent, "cost_usd", 0.0),
         "last_context_tokens": getattr(app.agent, "last_context_tokens", 0),
+        "tokens_cache_read": getattr(app.agent, "tokens_cache_read", 0),
     }
 
 
