@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import re
 from typing import Any
 
@@ -930,6 +931,18 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return "markup", self._clean_markup_text(self.result_text or "(No content)")
             elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)
+                log_match = re.search(r"Full Log:\s*([^\s\(\)]+)", self.result_text or "")
+                if log_match:
+                    log_path = log_match.group(1)
+                    if os.path.isfile(log_path):
+                        try:
+                            from widgets.utils.file_reader import read_file_content
+
+                            log_content = read_file_content(log_path)
+                            if log_content and log_content.strip():
+                                output_text = log_content.rstrip("\r\n")
+                        except Exception:
+                            pass
                 if not output_text.strip():
                     if self.app and hasattr(self.app, "task_manager"):
                         bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")

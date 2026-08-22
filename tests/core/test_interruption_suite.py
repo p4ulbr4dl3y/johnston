@@ -633,3 +633,19 @@ class TestGeneratorStreamInterruptionFlow:
         w.mark_cancelled()
         assert w.status == "cancelled"
         assert w.result_text == "[Tool call interrupted or cancelled]"
+
+    def test_shell_expand_loads_background_log_file(self, tmp_path):
+        from widgets.chat_toolcall import ToolCallWidget
+
+        log_f = tmp_path / "test.log"
+        log_f.write_text("collected 50 items\n50 passed in 2.0s\n")
+
+        w = ToolCallWidget(
+            "shell",
+            "pytest -m slow",
+            result_text=f"[Background Task ID: 123] moved to background.\nFull Log: {log_f} (live)",
+            status="done",
+        )
+        kind, content = w._compute_content()
+        assert kind == "markup"
+        assert "50 passed in 2.0s" in content
