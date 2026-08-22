@@ -53,6 +53,8 @@ class RulesManager:
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
         try:
+            from core.infrastructure.runtime.frontmatter import parse_frontmatter
+
             with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                 raw = f.read().strip()
             if not raw:
@@ -60,23 +62,14 @@ class RulesManager:
 
             base_name = os.path.splitext(os.path.basename(fpath))[0]
             name = base_name
-            lines = raw.splitlines()
+            fm, body = parse_frontmatter(raw)
+            if "name" in fm and fm["name"]:
+                name = str(fm["name"]).strip()
+
+            lines = body.splitlines()
             idx = 0
-
-            # If legacy frontmatter is present, skip past it
-            if lines and lines[0].strip() == "---":
-                idx = 1
-                while idx < len(lines):
-                    if lines[idx].strip() == "---":
-                        idx += 1
-                        break
-                    idx += 1
-
-            # Skip leading empty lines
             while idx < len(lines) and not lines[idx].strip():
                 idx += 1
-
-            content = "\n".join(lines[idx:]).strip()
 
             # Extract # Heading as rule name if present
             if idx < len(lines):
@@ -86,6 +79,10 @@ class RulesManager:
                     if header_title:
                         name = header_title
                     content = "\n".join(lines[idx + 1 :]).strip()
+                else:
+                    content = "\n".join(lines[idx:]).strip()
+            else:
+                content = ""
 
             return RuleDefinition(name=name, content=content, source=source)
         except Exception:

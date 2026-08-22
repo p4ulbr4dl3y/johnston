@@ -24,8 +24,28 @@ from widgets.utils.lexer import guess_lexer_name
 _MISSING = object()
 
 
+def _clean_truncation_marker(match: re.Match) -> str:
+    prefix = match.group(1) or ""
+    inner = match.group(2)
+    showing_match = re.search(
+        r"showing\s+(?:first|last|recent)\s+[^\s.(),|]+(?:\s+chars|\s+output)?",
+        inner,
+        re.IGNORECASE,
+    )
+    log_match = re.search(r"(?:Full\s+)?log:\s*([^\s\]|]+)", inner, re.IGNORECASE)
+
+    if showing_match or log_match:
+        showing = showing_match.group(0).strip() if showing_match else "showing truncated output"
+        if log_match:
+            log_path = log_match.group(1).rstrip(".]")
+            return f"{prefix}[Output truncated: {showing} | Log: {log_path}]"
+        return f"{prefix}[Output truncated: {showing}]"
+
+    return match.group(0)
+
+
 def _strip_hints_and_background(text: str) -> str:
-    """Strip [Hint:…] and [Background Task:…] markers from tool output."""
+    """Strip [Hint:…] and [Background Task:…] markers and simplify truncation boilerplate for UI."""
     if not text:
         return ""
     cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
@@ -33,6 +53,12 @@ def _strip_hints_and_background(text: str) -> str:
     cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", cleaned)
     cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
     cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
+    cleaned = re.sub(
+        r"(\.\.\.\s*)?\[Output truncated([^\]]*)\]",
+        _clean_truncation_marker,
+        cleaned,
+        flags=re.IGNORECASE,
+    )
     return cleaned.strip()
 
 

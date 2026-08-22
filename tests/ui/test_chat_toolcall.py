@@ -63,6 +63,41 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_markup_text(""), "")
         self.assertEqual(widget._clean_markup_text(None), "")
 
+    def test_strip_hints_and_background_truncation(self):
+        from widgets.chat_toolcall import _strip_hints_and_background
+
+        # Shell truncation header with log path & LLM hint
+        header = (
+            "[Output truncated: showing last 4000 chars (lines 256–338 of 338). "
+            "Full log: /Users/yegor/.johnston/logs/shell-c14f.log. "
+            "Pipe command to grep/head, or read full log.]\n...\ndiff content"
+        )
+        cleaned = _strip_hints_and_background(header)
+        self.assertEqual(
+            cleaned,
+            "[Output truncated: showing last 4000 chars | Log: /Users/yegor/.johnston/logs/shell-c14f.log]\n...\ndiff content",
+        )
+
+        # Footer with log path
+        footer = (
+            "diff content\n... [Output truncated: showing first 8000 chars (lines 1-100 of 500). "
+            "Full log: /path/to/log. Use read to inspect.]"
+        )
+        cleaned_footer = _strip_hints_and_background(footer)
+        self.assertEqual(
+            cleaned_footer,
+            "diff content\n... [Output truncated: showing first 8000 chars | Log: /path/to/log]",
+        )
+
+        # Truncated without log
+        recent = "[Output truncated: showing recent output]\nsome output"
+        self.assertEqual(_strip_hints_and_background(recent), "[Output truncated: showing recent output]\nsome output")
+
+        # Double cleaning / idempotency
+        double_cleaned = _strip_hints_and_background(cleaned)
+        self.assertEqual(double_cleaned, cleaned)
+
+
     def test_format_json_result(self):
         widget = ToolCallWidget("read", "")
         self.assertIsNone(widget._format_json_result(""))
