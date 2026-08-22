@@ -65,12 +65,15 @@ class SessionPersistenceMixin:
                             target = msg.get("target", "")
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
+                            status = msg.get("status")
+                            if not status and not rtext:
+                                status = "cancelled"
                             await chat_view.add_tool_call(
                                 ttype,
                                 target,
                                 result_text=rtext,
                                 args=targs,
-                                status=msg.get("status"),
+                                status=status,
                                 returncode=msg.get("returncode"),
                                 animate=False,
                             )

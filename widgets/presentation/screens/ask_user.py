@@ -16,6 +16,7 @@ from widgets.presentation.screens.constants import (
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
+from widgets.utils.key_aliases import expand_bindings
 
 
 class WriteInInput(Input):
@@ -88,14 +89,16 @@ class WriteInInput(Input):
 class AskUserWizardScreen(BaseModalScreen[str]):
     """Unified modal screen that handles multi-question wizard without flickering."""
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("tab", "minimize", "Minimize"),
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
         ("enter", "go_next", "Next / Confirm"),
         ("space", "toggle_selection", "Toggle Selection"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self, questions: list[dict], answers: dict | None = None, q_idx: int = 0):
         super().__init__()

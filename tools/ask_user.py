@@ -88,7 +88,10 @@ class AskUserTool(BaseTool):
         if not callable(getattr(ctx.host, "ask_user", None)):
             return ToolResult.error("context", name="app", detail="unavailable")
         try:
-            return ToolResult.done(await ctx.ask_user(validated_questions))
+            res = await ctx.ask_user(validated_questions)
+            if isinstance(res, str) and res.strip().lower() in ("cancelled", "cancelled by user", "cancelled by user."):
+                return ToolResult.cancelled(res)
+            return ToolResult.done(res)
         except asyncio.CancelledError:
             # A real task cancellation (e.g. the agent run being interrupted): clear
             # any pending wizard state, then re-raise so cooperative cancellation

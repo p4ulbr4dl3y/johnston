@@ -308,7 +308,7 @@ async def generate_ai_response(
                     save_db.schedule()
                 except Exception:  # noqa: BLE001
                     pass
-    except (asyncio.CancelledError, RuntimeError):
+    except (asyncio.CancelledError, RuntimeError, KeyboardInterrupt):
         await _handle_interruption(
             agent,
             session,
@@ -377,6 +377,20 @@ async def _handle_interruption(
         except Exception:  # noqa: BLE001
             pass
     if session and hasattr(session, "add_event"):
+        if tool_handle is not None or (
+            hasattr(session, "messages")
+            and session.messages
+            and session.messages[-1].get("type") == "tool"
+            and "result_text" not in session.messages[-1]
+        ):
+            try:
+                session.add_event({
+                    "type": "tool",
+                    "result_text": "[Tool call interrupted or cancelled]",
+                    "status": "cancelled",
+                })
+            except Exception:  # noqa: BLE001
+                pass
         try:
             session.add_event({"type": "event_divider", "text": "Response Interrupted"})
         except Exception:  # noqa: BLE001

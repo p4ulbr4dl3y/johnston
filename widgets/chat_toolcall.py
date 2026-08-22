@@ -382,6 +382,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return self.tool_type in self.EXPANDABLE_TOOLS
 
     def is_clickable_header(self) -> bool:
+        if self.status in ("error", "cancelled"):
+            return self.canonical_tool == "invoke_subagent"
         return (
             self.is_expandable()
             or self.canonical_tool in ("invoke_subagent", "ask_user")
@@ -565,6 +567,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         self.status = "cancelled"
         self.result_text = "[Tool call interrupted or cancelled]"
+        if not self.is_clickable_header():
+            self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.add_class(TOOL_HEADER)
+            self.content_widget.display = False
+            self.md_widget.display = False
         self.render_header()
 
     def mark_running(self, text: str = "") -> None:

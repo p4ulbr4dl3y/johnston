@@ -178,9 +178,11 @@ class ActionsMixin:
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()
+        active_screen = None
 
         def _show_wizard(question_list, answers=None, q_idx=0):
-            screen = AskUserWizardScreen(question_list, answers=answers, q_idx=q_idx)
+            nonlocal active_screen
+            active_screen = AskUserWizardScreen(question_list, answers=answers, q_idx=q_idx)
 
             def on_dismiss(result):
                 if isinstance(result, dict) and result.get("action") == "minimize":
@@ -202,7 +204,7 @@ class ActionsMixin:
                     if not future.done():
                         future.set_result(result)
 
-            self.push_screen(screen, callback=on_dismiss)
+            self.push_screen(active_screen, callback=on_dismiss)
 
         _show_wizard(questions)
 
@@ -211,6 +213,13 @@ class ActionsMixin:
         finally:
             if hasattr(self, "_pending_ask_user") and future.done():
                 setattr(self, "_pending_ask_user", None)
+            if not future.done():
+                future.cancel()
+                if active_screen is not None:
+                    try:
+                        active_screen.dismiss(None)
+                    except Exception:
+                        pass
 
         if isinstance(res, str) and res.strip() and res != "cancelled":
             return res
