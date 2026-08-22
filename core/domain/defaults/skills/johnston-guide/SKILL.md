@@ -11,22 +11,22 @@ You are operating inside Johnston CLI. Use this master guide to understand and c
 
 When performing specific configuration tasks, inspect ONLY the relevant reference document:
 
-1. **CLI Flags & Startup Options**: [references/cli_flags.md](file://references/cli_flags.md)
+1. **CLI Flags & Startup Options**: [references/cli_flags.md](references/cli_flags.md)
    - Command line flags (`--models`, `--skills`, `--mcp`, `--roles`, `--rules`, `--resume`, `--version`).
 
-2. **MCP Servers**: [references/mcp.md](file://references/mcp.md)
+2. **MCP Servers**: [references/mcp.md](references/mcp.md)
    - Configuration files, JSON schema, stdio commands, registration, and debugging (`johnston --mcp`).
 
-3. **Roles (Execution Modes & Subagents)**: [references/roles.md](file://references/roles.md)
+3. **Roles (Execution Modes & Subagents)**: [references/roles.md](references/roles.md)
    - Unified role definitions for execution modes and subagents (`~/.johnston/roles/` or `.johnston/roles/`, `johnston --roles`).
 
-4. **Rules & Project Guidelines**: [references/rules.md](file://references/rules.md)
+4. **Rules & Project Guidelines**: [references/rules.md](references/rules.md)
    - Global rules (`~/.johnston/rules/`), project rules (`.johnston/rules/`), role filtering, and `AGENTS.md` integration (`johnston --rules`).
 
-5. **LLM Providers & Keys**: [references/providers.md](file://references/providers.md)
+5. **LLM Providers & Keys**: [references/providers.md](references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
 
-6. **Builtin Tools**: [references/tools.md](file://references/tools.md)
+6. **Builtin Tools**: [references/tools.md](references/tools.md)
    - Builtin tool execution, shell permissions, and per-tool permission config.
 
 ## Token Optimization & Execution Rules

@@ -10,9 +10,9 @@
 name: reviewer
 description: Code reviewer subagent
 scope: subagent
-allowed_tools: read, grep, glob
-model: deepseek-v4-flash
-provider: clinepass
+allowed_tools: read, shell, web_fetch
+model: deepseek-chat
+provider: deepseek
 ---
 
 System prompt instructions for the role...
