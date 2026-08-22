@@ -336,3 +336,17 @@ async def test_status_action_removed(tool, make_app_mock):
     for kwargs in ({"action": "status", "task_id": "t-run"}, {"action": "status"}):
         res = str(await tool.execute(kwargs, ctx=app))
         assert "ERR: action 'status'" in res
+
+
+async def test_manage_shell_missing_task_id_self_healing(tool, make_app_mock):
+    t1 = _make_task("t1", "echo hello", proc=MagicMock())
+    app = _app(make_app_mock, [t1])
+
+    res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
+    assert "required for 'kill'" in res_kill
+    assert "manage_shell(action='list')" in res_kill
+
+    res_send = str(await tool.execute({"action": "send_input", "input": "yes"}, ctx=app))
+    assert "required for 'send_input'" in res_send
+    assert "manage_shell(action='list')" in res_send
+

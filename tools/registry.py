@@ -92,7 +92,15 @@ def _unknown_tool_result(name: str, clean_name: str) -> ToolResult:
 
 
 def get_default_tools() -> list[Dict[str, Any]]:
-    return [cls.schema for cls in TOOL_CLASSES if getattr(cls, "schema", None)]
+    tools = []
+    for cls in TOOL_CLASSES:
+        if getattr(cls, "schema", None):
+            try:
+                inst = cls()
+                tools.append(inst.get_schema() if hasattr(inst, "get_schema") else cls.schema)
+            except Exception:
+                tools.append(cls.schema)
+    return tools
 
 
 async def check_and_confirm_permission(

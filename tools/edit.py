@@ -394,7 +394,13 @@ class EditTool(BaseTool):
                     "new_str": {"type": "string", "description": "New replacement text"},
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
-                    "allow_multiple": {"type": "boolean", "description": "Replace all occurrences (default: false)"},
+                    "allow_multiple": {
+                        "type": "boolean",
+                        "description": (
+                            "Replace all occurrences. When false (default), fails if old_str is not unique "
+                            "(use start_line/end_line to disambiguate)."
+                        ),
+                    },
                 },
                 "required": ["path", "old_str", "new_str"],
             },
@@ -443,7 +449,10 @@ class MultiEditTool(BaseTool):
                                 "end_line": {"type": "integer", "description": "End line (inclusive)"},
                                 "allow_multiple": {
                                     "type": "boolean",
-                                    "description": "Replace all occurrences (default: false)",
+                                    "description": (
+                                        "Replace all occurrences. When false (default), fails if old_str is not unique "
+                                        "(use start_line/end_line to disambiguate)."
+                                    ),
                                 },
                             },
                             "required": ["old_str", "new_str"],

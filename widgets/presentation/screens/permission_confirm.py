@@ -196,11 +196,15 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name in ("manage_shell",) and (nargs.get("action") or "").lower() == "send_input":
+            elif (
+                self.tool_name in ("manage_shell",) and (nargs.get("action") or "").lower() == "send_input"
+            ):
                 inp = nargs.get("input") or ""
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```text\n{inp.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name in ("manage_subagent",) and (nargs.get("action") or "").lower() == "send_message":
+            elif (
+                self.tool_name in ("manage_subagent",) and (nargs.get("action") or "").lower() == "send_message"
+            ):
                 msg = nargs.get("message") or ""
                 if msg:
                     with ToolScrollBox(classes="tool-scroll-box"):

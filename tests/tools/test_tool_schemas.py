@@ -41,10 +41,40 @@ class TestToolSchemas(unittest.TestCase):
         )
         self.assertIn("action", params["required"])
 
-    def test_subagent_schema_has_branch_and_no_session_id(self):
+    def test_invoke_subagent_dynamic_role_enum(self):
+        from tools.invoke_subagent import InvokeSubagentTool
+
+        tool = InvokeSubagentTool()
+        schema = tool.get_schema()
+        type_prop = schema["function"]["parameters"]["properties"]["type"]
+        self.assertIn("enum", type_prop)
+        self.assertIn("worker", type_prop["enum"])
+        self.assertIn("explorer", type_prop["enum"])
+
+    def test_read_content_offset_schema(self):
+        from tools.read import ReadTool
+
+        props = ReadTool.schema["function"]["parameters"]["properties"]
+        self.assertIn("content_offset", props)
+        self.assertIn("offset", props["content_offset"]["description"].lower())
+        self.assertNotIn("detail", props)
+
+    def test_manage_shell_schema(self):
+        from tools.manage_shell import ManageShellTool
+
+        props = ManageShellTool.schema["function"]["parameters"]["properties"]
+        self.assertIn("action", props)
+        self.assertIn("task_id", props)
+        self.assertIn("input", props)
+        self.assertEqual(ManageShellTool.schema["function"]["parameters"]["required"], ["action"])
+
+    def test_subagent_schema_has_title_and_branch_and_no_session_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
 
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
+        self.assertIn("title", props)
+        self.assertNotIn("description", props)
+        self.assertIn("title", InvokeSubagentTool.schema["function"]["parameters"]["required"])
         self.assertIn("branch", props)
         self.assertNotIn("branch", InvokeSubagentTool.schema["function"]["parameters"]["required"])
         self.assertNotIn("session_id", props)

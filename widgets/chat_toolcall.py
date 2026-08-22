@@ -374,7 +374,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if canonical == "ask_user":
             # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
             return "Answer:" in (self.result_text or "")
-        if canonical in ("read", "web_fetch", "manage_shell", "manage_subagent", "invoke_subagent"):
+        if canonical in (
+            "read",
+            "web_fetch",
+            "manage_shell",
+            "manage_subagent",
+            "invoke_subagent",
+        ):
             return False
         if canonical in self.EXPANDABLE_TOOLS:
             return True
@@ -618,6 +624,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         elif self.tool_type in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
+            "manage_shell",
             "ask_user",
         ):
             display_name = self.DISPLAY_NAMES.get(self.tool_type, self.tool_type)
@@ -643,7 +650,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 args = self.args if isinstance(self.args, dict) else {}
                 nargs = args
                 session_id = getattr(self, "subagent_session_id", None)
-                identifier = session_id or nargs.get("description") or nargs.get("prompt") or self.target
+                identifier = session_id or nargs.get("title") or nargs.get("prompt") or self.target
                 try:
                     from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 

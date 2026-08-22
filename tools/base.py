@@ -201,7 +201,7 @@ def truncate_output(
             elif is_json:
                 header += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
             elif "\n" not in text:
-                header += f" Output is single-line (use content_offset). Use read(path='{log_path}') or shell to inspect."
+                header += f" Output is single-line. Use read(path='{log_path}') or shell to inspect."
             else:
                 header += f" Use read(path='{log_path}') or shell (grep/head) to inspect full log."
         elif hint:
@@ -228,7 +228,10 @@ def truncate_output(
             elif is_json:
                 footer += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
             elif "\n" not in text:
-                footer += f" Output is single-line (use content_offset). Use read(path='{log_path}') or shell to inspect."
+                footer += (
+                    f" Output is single-line. "
+                    f"Use read(path='{log_path}', content_offset={max_chars}) or shell to inspect next chunk."
+                )
             else:
                 footer += f" Use read(path='{log_path}', start_line={next_line}) or shell (grep/tail) to inspect."
         elif hint:

@@ -404,6 +404,19 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"action": "send_message", "session_id": "sub-noreg", "message": "hi"}, ctx=app))
         self.assertIn("message sent to sub-noreg", res)
 
+    async def test_manage_subagent_missing_session_id_self_healing(self):
+        sess = self._mk_subagent("sub-1", role="worker")
+        app, _ = self._app_with_widget(sess)
+        tool = ManageSubagentTool()
+
+        res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
+        self.assertIn("required for 'kill'", res_kill)
+        self.assertIn("manage_subagent(action='list')", res_kill)
+
+        res_msg = str(await tool.execute({"action": "send_message", "message": "hello"}, ctx=app))
+        self.assertIn("required for 'send_message'", res_msg)
+        self.assertIn("manage_subagent(action='list')", res_msg)
+
 
 if __name__ == "__main__":
     unittest.main()

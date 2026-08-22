@@ -237,12 +237,10 @@ class ReadTool(BaseTool):
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
                     "content_offset": {
                         "type": "integer",
-                        "description": "Byte offset for large files without line breaks",
-                    },
-                    "detail": {
-                        "type": "string",
-                        "enum": ["high", "low", "original"],
-                        "description": "Image detail level (default: high)",
+                        "description": (
+                            "Byte offset to continue reading large or minified single-line files. "
+                            "Pass the exact offset number provided in the truncation message."
+                        ),
                     },
                 },
                 "required": ["path"],

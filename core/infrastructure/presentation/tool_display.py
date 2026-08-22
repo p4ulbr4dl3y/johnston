@@ -149,11 +149,10 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
         return ""
 
     if name == "invoke_subagent":
-        desc = args.get("description")
-        if isinstance(desc, str) and desc:
-            return truncate(f'"{desc}"')
+        title = args.get("title")
+        if isinstance(title, str) and title:
+            return truncate(f'"{title}"')
         return ""
-
     if name in ("manage_shell", "manage_subagent"):
         act = args.get("action") or ""
         tid = args.get("session_id" if name == "manage_subagent" else "task_id") or ""

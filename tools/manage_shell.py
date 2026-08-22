@@ -43,31 +43,36 @@ class ManageShellTool(BaseTool):
         tasks = ctx.background_tasks
         if not tasks and not ctx.host:
             return ToolResult.error("manager", name="none", detail="available")
-
-        # Scope to the current session, matching the tasks screen and status footer.
         curr_sid = ctx.session_id
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
             return ToolResult.done(list_lines(tasks))
 
-        elif action == "send_input":
+        if action == "send_input":
             if not task_id:
-                return ToolResult.error("params", name="task_id", detail="required for 'send_input'")
+                return ToolResult.error(
+                    "params",
+                    name="task_id",
+                    detail="required for 'send_input'. Run manage_shell(action='list') to get active task IDs.",
+                )
             input_text = args.get("input", "") or ""
             t = find_any(tasks, task_id)
             if t is None:
                 return ToolResult.done(not_found_message(task_id, tasks, "background"))
             if not getattr(t, "is_running", False):
                 return ToolResult.error("notrunning", name=task_id)
-
             if hasattr(t, "send_input"):
                 return ToolResult.done(await t.send_input(input_text))
             return ToolResult.error("nowrite", name=task_id, detail="stdin not writable")
 
         elif action == "kill":
             if not task_id:
-                return ToolResult.error("params", name="task_id", detail="required for 'kill'")
+                return ToolResult.error(
+                    "params",
+                    name="task_id",
+                    detail="required for 'kill'. Run manage_shell(action='list') to get active task IDs.",
+                )
             t = find_any(tasks, task_id)
             if t is None:
                 return ToolResult.done(not_found_message(task_id, tasks, "background"))

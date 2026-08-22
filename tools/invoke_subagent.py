@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import uuid
 from typing import Any, Dict
 
@@ -75,13 +76,14 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "title": {"type": "string", "description": "Short task title (3-5 words)"},
                     "prompt": {
                         "type": "string",
                         "description": "Task instructions with clear boundaries and expected output format",
                     },
-                    "description": {"type": "string", "description": "Short task title (3-5 words)"},
                     "type": {
                         "type": "string",
+                        "enum": ["worker", "explorer"],
                         "description": "Subagent role name from available roles (default: 'worker')",
                     },
                     "branch": {
@@ -91,16 +93,28 @@ class InvokeSubagentTool(BaseTool):
                         ),
                     },
                 },
-                "required": ["prompt", "description"],
+                "required": ["title", "prompt"],
             },
         },
     }
 
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        from core.role_registry import RoleRegistry
+
+        schema = copy.deepcopy(self.schema)
+        try:
+            roles = sorted(RoleRegistry.get_instance().list_subagent_roles().keys())
+            if roles and "type" in schema.get("function", {}).get("parameters", {}).get("properties", {}):
+                schema["function"]["parameters"]["properties"]["type"]["enum"] = roles
+        except Exception:
+            pass
+        return schema
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         ctx = self._ensure_context(ctx)
         args = args or {}
-        prompt = args.get("prompt", "").strip()
-        description = args.get("description", prompt[:30] or "subagent task").strip()
+        prompt = (args.get("prompt") or "").strip()
+        title = (args.get("title") or prompt[:30] or "subagent task").strip()
         subagent_type = args.get("type", "worker").strip().lower()
         branch_name = args.get("branch", "").strip()
 
@@ -168,7 +182,7 @@ class InvokeSubagentTool(BaseTool):
             parent_id=parent_session_id or "",
             subagent_id=session_id,
             role=canonical_role,
-            description=description,
+            description=title,
             prompt=prompt,
             status="running",
             project_dir=wt_path or "",
@@ -187,7 +201,7 @@ class InvokeSubagentTool(BaseTool):
         from tools.base import format_background_notification
 
         notification_hdr = format_background_notification(
-            "Background subagent", description, session_id, "{result_text}"
+            "Background subagent", title, session_id, "{result_text}"
         )
         notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.)"
 
@@ -214,5 +228,5 @@ class InvokeSubagentTool(BaseTool):
         # text. The completion callback later repaints it to DONE/ERROR/CANCELLED.
         return ToolResult(
             status=ToolResultStatus.RUNNING,
-            content=f"subagent '{description}' launched (session_id: {session_id})",
+            content=f"subagent '{title}' launched (session_id: {session_id})",
         )

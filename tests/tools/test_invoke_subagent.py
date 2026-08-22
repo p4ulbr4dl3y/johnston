@@ -43,7 +43,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # Attempt to spawn one more
-        res = str(await tool.execute({"prompt": "another task", "description": "Over limit", "branch": "main"}))
+        res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
     async def test_explore_subagent_tool_filtering(self):
@@ -136,7 +136,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        res = await tool.execute({"prompt": "inspect repo", "description": "inspect"})
+        res = await tool.execute({"prompt": "inspect repo", "title": "inspect"})
         self.assertEqual(res.status.value, "running")
         sessions = self.store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
