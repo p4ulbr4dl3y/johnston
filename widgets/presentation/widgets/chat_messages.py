@@ -14,6 +14,13 @@ from widgets.presentation.widgets.chat_markdown import (
 )
 
 
+def _clean_divider_title(title: str, max_len: int = 100) -> str:
+    cleaned = " ".join((title or "").split())
+    if len(cleaned) > max_len:
+        return cleaned[: max_len - 3] + "..."
+    return cleaned
+
+
 class EventDivider(Static):
     """Full-width centered divider for session events (compaction, interruption, etc)"""
 
@@ -21,12 +28,14 @@ class EventDivider(Static):
     ALLOW_SELECT = False
 
     def __init__(self, title: str = "Session Compacted"):
-        self.divider_title = title
-        super().__init__(Rule(title, style="dim #71717a"), classes="event-divider")
+        cleaned = _clean_divider_title(title)
+        self.divider_title = cleaned
+        super().__init__(Rule(cleaned, style="dim #71717a"), classes="event-divider")
 
     def update_title(self, title: str) -> None:
-        self.divider_title = title
-        self.update(Rule(title, style="dim #71717a"))
+        cleaned = _clean_divider_title(title)
+        self.divider_title = cleaned
+        self.update(Rule(cleaned, style="dim #71717a"))
 
 
 class UserMessageAttachment(Static):

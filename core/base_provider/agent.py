@@ -792,6 +792,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         except Exception as err:
             error_msg = format_api_error(err)
             clean_msg = error_msg.replace("**API Error:**", "API Error:").replace("**", "").replace("`", "").strip()
+            clean_msg = " ".join(clean_msg.split())
             yield ("event_divider", clean_msg, "")
         finally:
             if len(messages) > 1:

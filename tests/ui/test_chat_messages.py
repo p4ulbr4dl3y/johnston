@@ -15,6 +15,15 @@ class TestEventDivider(unittest.TestCase):
         divider.update_title("New Title")
         self.assertEqual(divider.divider_title, "New Title")
 
+    def test_event_divider_sanitizes_newlines_and_truncates(self):
+        divider = EventDivider("  Line 1 \n  Line 2   \n")
+        self.assertEqual(divider.divider_title, "Line 1 Line 2")
+
+        long_text = "A" * 120
+        divider.update_title(long_text)
+        self.assertEqual(len(divider.divider_title), 100)
+        self.assertTrue(divider.divider_title.endswith("..."))
+
 
 class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
     async def test_schedule_stream_update_runtime_error_and_flush_unattached(self):

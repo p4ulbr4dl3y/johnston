@@ -166,7 +166,7 @@ async def compact_session(
             refresh_footer_cb()
         else:
             outcome = CompactionOutcome(status=CompactionStatus.FAILED, message=msg)
-            on_divider_update(f"Compaction Failed: {msg}")
+            on_divider_update("Compaction Failed")
         return outcome
     except asyncio.CancelledError:
         on_divider_update("Compaction Cancelled")

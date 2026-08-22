@@ -135,7 +135,7 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(outcome.success)
         self.assertEqual(outcome.status.value, "failed")
         self.assertEqual(outcome.message, "Compaction failed (some err)")
-        self.assertEqual(divider, ["Compaction Failed: Compaction failed (some err)"])
+        self.assertEqual(divider, ["Compaction Failed"])
         self.assertEqual(saved, [True])
         self.assertEqual(footer, [])
 
