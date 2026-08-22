@@ -5,13 +5,10 @@
 - Project rules: `.johnston/rules/<name>.md`
 - Repository rules (auto-loaded from repo root): `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules`, `CONVENTIONS.md`.
 
-## Frontmatter Format
-```markdown
----
-name: python_style
-role: worker, explorer
----
-Rule instructions here...
-```
+## Format
+Plain Markdown files. If a top `# Rule Name` heading is present, it is used as the rule name; otherwise, the filename without extension is used.
 
-(Frontmatter fields supported: `name`; `role`/`roles`/`mode`/`modes` — comma-separated role whitelist. Unsupported/marketing fields such as `globs` are ignored.)
+```markdown
+# Python Style
+Always run uv instead of pip.
+```

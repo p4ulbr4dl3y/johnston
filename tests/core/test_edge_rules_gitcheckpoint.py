@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from core.application.rules.rules import RuleDefinition, RulesManager
+from core.application.rules.rules import RulesManager
 from core.infrastructure.runtime.git_utils import run_git
 from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
@@ -28,51 +28,33 @@ class TestRulesManagerEdge(unittest.TestCase):
         self.rm.invalidate_cache()
         shutil.rmtree(self.tmpdir, ignore_errors=True)
 
-    def test_no_frontmatter_uses_filename_and_no_roles(self):
-        _write_rule(self.tmpdir, "my_rule.md", "Just text with no frontmatter")
+    def test_no_heading_uses_filename(self):
+        _write_rule(self.tmpdir, "my_rule.md", "Just text with no heading")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 1)
         self.assertEqual(rules[0].name, "my_rule")
-        self.assertEqual(rules[0].roles, [])
-        self.assertTrue(rules[0].is_active_for_roles("worker"))
+        self.assertEqual(rules[0].content, "Just text with no heading")
 
-    def test_empty_content_after_frontmatter(self):
-        _write_rule(self.tmpdir, "empty.md", "---\nname: Empty\nrole: worker\n---\n")
+    def test_heading_extraction_and_empty_content(self):
+        _write_rule(self.tmpdir, "empty.md", "# Empty Rule\n")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 1)
-        self.assertEqual(rules[0].name, "Empty")
+        self.assertEqual(rules[0].name, "Empty Rule")
         self.assertEqual(rules[0].content, "")
 
-    def test_role_formats(self):
-        # bracket list
-        _write_rule(self.tmpdir, "a.md", "---\nrole: [alpha, beta]\n---\ncontent a")
-        # comma separated
-        _write_rule(self.tmpdir, "b.md", "---\nrole: gamma, delta\n---\ncontent b")
-        # single role
-        _write_rule(self.tmpdir, "c.md", "---\nrole: epsilon\n---\ncontent c")
-        # no role
-        _write_rule(self.tmpdir, "d.md", "---\nname: NoRole\n---\ncontent d")
+    def test_heading_with_leading_blank_lines(self):
+        _write_rule(self.tmpdir, "spaced.md", "\n\n  \n# Spaced Rule\nSome rule content here.")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        # sorted filenames a.md,b.md,c.md,d.md map to rules[0..3]
-        self.assertEqual(sorted(rules[0].roles), ["alpha", "beta"])
-        self.assertEqual(sorted(rules[1].roles), ["delta", "gamma"])
-        self.assertEqual(rules[2].roles, ["epsilon"])
-        self.assertEqual(rules[3].roles, [])
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].name, "Spaced Rule")
+        self.assertEqual(rules[0].content, "Some rule content here.")
 
-    def test_is_active_for_roles_none_and_case(self):
-        self.assertTrue(RuleDefinition("r", "c").is_active_for_roles(None))
-        rule = RuleDefinition("r", "c", roles=["Worker"])
-        # roles are lowercased at construction; case-insensitive lookup
-        self.assertTrue(rule.is_active_for_roles("worker"))
-        self.assertTrue(rule.is_active_for_roles("WORKER"))
-        self.assertTrue(rule.is_active_for_roles("  Worker  "))
-
-    def test_get_active_rules_no_match_empty(self):
-        _write_rule(self.tmpdir, "a.md", "---\nrole: worker\n---\nx")
-        with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
-            rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-            self.assertEqual(len(rules), 1)
-            self.assertEqual(self.rm.get_active_rules(role="explorer", project_dir=self.tmpdir), [])
+    def test_empty_heading_falls_back_to_filename(self):
+        _write_rule(self.tmpdir, "fallback.md", "# \nActual body text")
+        rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0].name, "fallback")
+        self.assertEqual(rules[0].content, "Actual body text")
 
     def test_load_rules_include_global_false(self):
         with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
@@ -80,21 +62,21 @@ class TestRulesManagerEdge(unittest.TestCase):
             global_rules = os.path.join(self.tmpdir, "rules")
             os.makedirs(global_rules, exist_ok=True)
             with open(os.path.join(global_rules, "g.md"), "w", encoding="utf-8") as f:
-                f.write("---\nname: Global\n---\nglobal content")
+                f.write("# Global\nglobal content")
             # project rule
-            _write_rule(self.tmpdir, "p.md", "---\nname: Project\n---\nproj content")
+            _write_rule(self.tmpdir, "p.md", "# Project\nproj content")
             rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
             self.assertEqual([r.name for r in rules], ["Project"])
 
     def test_cache_ttl_and_invalidate(self):
-        _write_rule(self.tmpdir, "a.md", "---\nname: One\n---\nfirst")
+        _write_rule(self.tmpdir, "a.md", "# One\nfirst")
         self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         path = os.path.join(self.tmpdir, ".johnston", "rules", "a.md")
         st = os.stat(path)
 
         # change within TTL with same byte length AND preserved mtime ->
         # signature unchanged -> stale content (by design)
-        _write_rule(self.tmpdir, "a.md", "---\nname: One\n---\nfirse")
+        _write_rule(self.tmpdir, "a.md", "# One\nfirse")
         os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(rules[0].content, "first")
@@ -105,34 +87,22 @@ class TestRulesManagerEdge(unittest.TestCase):
         self.assertEqual(rules[0].content, "firse")
 
     def test_cache_same_size_same_mtime_not_detected(self):
-        # Content changes but file size stays identical and mtime is preserved ->
-        # signature unchanged, within TTL -> stale content (known limitation).
-        _write_rule(self.tmpdir, "a.md", "---\nname: One\n---\nfirst")
+        _write_rule(self.tmpdir, "a.md", "# One\nfirst")
         self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         path = os.path.join(self.tmpdir, ".johnston", "rules", "a.md")
         st = os.stat(path)
-        # rewrite with identical byte length (5 chars) and preserved mtime so
-        # signature (mtime_ns, size) is unchanged -> stale content within TTL.
         with open(path, "w", encoding="utf-8") as f:
-            f.write("---\nname: One\n---\nsecon")
+            f.write("# One\nsecon")
         os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(rules[0].content, "first")
-
-    def test_broken_frontmatter_returns_none(self):
-        # unclosed frontmatter -> parse returns meta {}, content still parsed
-        _write_rule(self.tmpdir, "broken.md", "---\nname: Broken\nrole: worker\n")
-        rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(len(rules), 1)
-        # name falls back to base name
-        self.assertEqual(rules[0].name, "broken")
 
     def test_unreadable_file_returns_none(self):
         if not hasattr(os, "geteuid"):
             self.skipTest("POSIX-only (os.geteuid)")
         if os.geteuid() == 0:
             self.skipTest("running as root, chmod ineffective")
-        _write_rule(self.tmpdir, "a.md", "---\nname: A\n---\ncontent")
+        _write_rule(self.tmpdir, "a.md", "# A\ncontent")
         path = os.path.join(self.tmpdir, ".johnston", "rules", "a.md")
         os.chmod(path, 0)
         try:
@@ -142,21 +112,18 @@ class TestRulesManagerEdge(unittest.TestCase):
             os.chmod(path, 0o644)
 
     def test_duplicate_rule_names(self):
-        _write_rule(self.tmpdir, "a.md", "---\nname: Dup\n---\nfirst")
-        _write_rule(self.tmpdir, "b.md", "---\nname: Dup\n---\nsecond")
+        _write_rule(self.tmpdir, "a.md", "# Dup\nfirst")
+        _write_rule(self.tmpdir, "b.md", "# Dup\nsecond")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 2)
         self.assertEqual(rules[0].name, "Dup")
         self.assertEqual(rules[1].name, "Dup")
 
-    def test_cyrillic_role_names(self):
-        # roles lowercased at construction (by design), so cyrillic case is lost
-        rule = RuleDefinition("r", "c", roles=["Рабочий"])
-        self.assertEqual(rule.roles, ["рабочий"])
-        self.assertTrue(rule.is_active_for_roles("Рабочий"))
-        _write_rule(self.tmpdir, "a.md", "---\nrole: Рабочий, Исследователь\n---\ncontent")
+    def test_unicode_rule_names(self):
+        _write_rule(self.tmpdir, "a.md", "# Рабочий Процесс\nсодержимое")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(sorted(rules[0].roles), ["исследователь", "рабочий"])
+        self.assertEqual(rules[0].name, "Рабочий Процесс")
+        self.assertEqual(rules[0].content, "содержимое")
 
 
 class TestGitCheckpointEdge(unittest.TestCase):

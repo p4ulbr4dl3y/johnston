@@ -6,26 +6,19 @@ from core.application.rules.rules import RuleDefinition, RulesManager
 
 
 class TestRulesManager(unittest.TestCase):
-    def test_rule_mode_matching(self):
-        rule_all = RuleDefinition("rule1", "Content 1")
-        self.assertTrue(rule_all.is_active_for_roles("worker"))
-        self.assertTrue(rule_all.is_active_for_roles("explorer"))
+    def test_rule_definition_basic(self):
+        rule = RuleDefinition("rule1", "Content 1")
+        self.assertEqual(rule.name, "rule1")
+        self.assertEqual(rule.content, "Content 1")
+        self.assertEqual(rule.source, "global")
 
-        rule_action = RuleDefinition("rule2", "Content 2", roles=["worker"])
-        self.assertTrue(rule_action.is_active_for_roles("worker"))
-        self.assertFalse(rule_action.is_active_for_roles("explorer"))
-
-    def test_load_markdown_rules(self):
+    def test_load_markdown_rules_with_heading(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             rules_dir = os.path.join(tmpdir, ".johnston", "rules")
             os.makedirs(rules_dir, exist_ok=True)
 
             with open(os.path.join(rules_dir, "rule1.md"), "w", encoding="utf-8") as f:
-                f.write("""---
-name: python_uv
-description: Use uv package manager
-role: worker, explorer
----
+                f.write("""# Python UV
 Always run uv instead of pip.""")
 
             rm = RulesManager()
@@ -33,12 +26,27 @@ Always run uv instead of pip.""")
             self.assertEqual(len(rules), 1)
 
             rule = rules[0]
-            self.assertEqual(rule.name, "python_uv")
-            self.assertEqual(rule.roles, ["worker", "explorer"])
-            self.assertIn("Always run uv instead of pip.", rule.content)
+            self.assertEqual(rule.name, "Python UV")
+            self.assertEqual(rule.content, "Always run uv instead of pip.")
             active_rules = rm.get_active_rules(role="worker", project_dir=tmpdir, include_global=False)
             self.assertEqual(len(active_rules), 1)
-            self.assertEqual(active_rules[0].name, "python_uv")
+            self.assertEqual(active_rules[0].name, "Python UV")
+
+    def test_load_markdown_rules_without_heading(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            rules_dir = os.path.join(tmpdir, ".johnston", "rules")
+            os.makedirs(rules_dir, exist_ok=True)
+
+            with open(os.path.join(rules_dir, "my_custom_rule.md"), "w", encoding="utf-8") as f:
+                f.write("Just some instructions without header.")
+
+            rm = RulesManager()
+            rules = rm.load_rules(project_dir=tmpdir, include_global=False)
+            self.assertEqual(len(rules), 1)
+
+            rule = rules[0]
+            self.assertEqual(rule.name, "my_custom_rule")
+            self.assertEqual(rule.content, "Just some instructions without header.")
 
     def test_deduplicate_when_global_and_project_paths_match(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,7 +1,6 @@
 import os
 from typing import List, Optional
 
-from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
 from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
 
 
@@ -10,18 +9,11 @@ class RuleDefinition:
         self,
         name: str,
         content: str,
-        roles: Optional[List[str]] = None,
         source: str = "global",
     ):
         self.name = name
         self.content = content
-        self.roles = [r.lower().strip() for r in (roles or [])]
         self.source = source
-
-    def is_active_for_roles(self, role: str) -> bool:
-        if not self.roles:
-            return True
-        return role.lower().strip() in self.roles
 
 
 class RulesManager:
@@ -67,24 +59,44 @@ class RulesManager:
                 return None
 
             base_name = os.path.splitext(os.path.basename(fpath))[0]
-            meta, content = parse_frontmatter(raw)
-            content = content.strip()
+            name = base_name
+            lines = raw.splitlines()
+            idx = 0
 
-            name = meta.get("name") or base_name
-            modes_raw = meta.get("role") or meta.get("roles") or meta.get("mode") or meta.get("modes") or ""
-            roles = parse_csv_list(modes_raw)
+            # If legacy frontmatter is present, skip past it
+            if lines and lines[0].strip() == "---":
+                idx = 1
+                while idx < len(lines):
+                    if lines[idx].strip() == "---":
+                        idx += 1
+                        break
+                    idx += 1
 
-            return RuleDefinition(name=name, content=content, roles=roles, source=source)
+            # Skip leading empty lines
+            while idx < len(lines) and not lines[idx].strip():
+                idx += 1
+
+            content = "\n".join(lines[idx:]).strip()
+
+            # Extract # Heading as rule name if present
+            if idx < len(lines):
+                first_line = lines[idx].strip()
+                if first_line.startswith("# ") or first_line == "#":
+                    header_title = first_line.lstrip("#").strip()
+                    if header_title:
+                        name = header_title
+                    content = "\n".join(lines[idx + 1 :]).strip()
+
+            return RuleDefinition(name=name, content=content, source=source)
         except Exception:
             return None
 
     def get_active_rules(
         self, role: str = "worker", project_dir: Optional[str] = None, include_global: bool = True
     ) -> List[RuleDefinition]:
-        """Return the ``RuleDefinition`` objects active for ``role``.
+        """Return the active ``RuleDefinition`` objects.
 
         Data-only: leaves Markdown assembly (``### Rule: ...``) to the prompt
         builder so this application module does not own rendering output.
         """
-        rules = self.load_rules(project_dir=project_dir, include_global=include_global)
-        return [r for r in rules if r.is_active_for_roles(role)]
+        return self.load_rules(project_dir=project_dir, include_global=include_global)

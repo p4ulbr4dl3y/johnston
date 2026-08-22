@@ -13,7 +13,7 @@ Johnston: Python terminal AI assistant, Textual UI. Entry: `app.py` (app), `cli.
 - `uv run ruff check .` — lint.
 - `uv build` — build artifacts.
 
-Prefix shell commands with `rtk` where practical (`rtk git status`).
+Prefix shell commands with `rtk` where practical (`rtk git status`). Prefer `rg` over `grep` and `fd` over `find`.
 
 ## Architecture
 
