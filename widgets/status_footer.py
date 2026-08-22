@@ -9,6 +9,10 @@ from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 
+STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
+STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
+
+
 
 def format_display_path(raw_path: str, max_length: int = 40) -> str:
     """Format directory path for footer display with ~/ for $HOME and middle truncation if long."""
@@ -79,7 +83,7 @@ def _build_subagent_grid(
         row1_left_parts = [role_part]
         if is_connected and clean_model and clean_model != "[Select model: /models]":
             row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
-        row1_left = " • ".join(row1_left_parts)
+        row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
 
         if is_connected and bool(model_name):
             pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -87,7 +91,7 @@ def _build_subagent_grid(
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
             cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
             right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-            row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx • {right_val}[/]"
+            row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx[/]{STATUS_SEP_COMPACT}[{THEME_SECONDARY}]{right_val}[/]"
         else:
             row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
@@ -101,7 +105,7 @@ def _build_subagent_grid(
             row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
         elif diff_text:
             row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-        row2_left = " • ".join(row2_left_parts)
+        row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
         row2_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
 
         grid.add_row(row1_left, row1_right)
@@ -114,12 +118,12 @@ def _build_subagent_grid(
 
     # Full mode
     # Row 1: Left [Role: Description • Provider › Model (effort)] | Right [Context bar • tokens • cost]
-    role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/bold {THEME_PRIMARY}]"
+    role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
     if description:
         clean_desc = description.strip()
         if len(clean_desc) > 35:
             clean_desc = clean_desc[:32] + "…"
-        role_part += f": [{THEME_SECONDARY}]{clean_desc}[/{THEME_SECONDARY}]"
+        role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
     row1_left_parts = [role_part]
 
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
@@ -127,7 +131,7 @@ def _build_subagent_grid(
         if thinking_effort and thinking_effort != "auto":
             model_part += f" ({thinking_effort})"
         row1_left_parts.append(f"[{THEME_SECONDARY}]{model_part}[/]")
-    row1_left = "  •  ".join(row1_left_parts)
+    row1_left = STATUS_SEP.join(row1_left_parts)
 
     if is_connected and model_name:
         pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -142,7 +146,7 @@ def _build_subagent_grid(
             f"[{THEME_SECONDARY}]{tok_str} tok[/]",
             f"[{THEME_SECONDARY}]{cost_str}[/]",
         ]
-        row1_right = "  •  ".join(row1_right_parts)
+        row1_right = STATUS_SEP.join(row1_right_parts)
     else:
         row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
     grid.add_row(row1_left, row1_right)
@@ -157,7 +161,7 @@ def _build_subagent_grid(
         row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
     elif diff_text:
         row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-    row2_left = "  •  ".join(row2_left_parts)
+    row2_left = STATUS_SEP.join(row2_left_parts)
 
     row2_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
     grid.add_row(row2_left, row2_right)
@@ -447,7 +451,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and clean_model and clean_model != "[Select model: /models]":
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
-            row1_left = " • ".join(row1_left_parts)
+            row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
 
             if is_connected and bool(model_name):
                 pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -455,7 +459,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
                 cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
                 right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-                row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx • {right_val}[/]"
+                row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx[/]{STATUS_SEP_COMPACT}[{THEME_SECONDARY}]{right_val}[/]"
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
@@ -468,16 +472,16 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-            row2_left = " • ".join(row2_left_parts)
+            row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
 
             task_parts = []
             if subagents_active > 0:
-                task_parts.append(f"{subagents_active}a")
+                task_parts.append(f"[{THEME_SECONDARY}]{subagents_active}a[/]")
             if active_bg_tasks > 0:
-                task_parts.append(f"{active_bg_tasks}s")
+                task_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks}s[/]")
             if mcp_total > 0:
-                task_parts.append(f"{mcp_active}mcp")
-            row2_right = f"[{THEME_SECONDARY}]⚡ {' • '.join(task_parts)}[/]" if task_parts else ""
+                task_parts.append(f"[{THEME_SECONDARY}]{mcp_active}mcp[/]")
+            row2_right = f"[{THEME_SECONDARY}]⚡[/] {STATUS_SEP_COMPACT.join(task_parts)}" if task_parts else ""
 
             grid = Table.grid(expand=True)
             grid.add_column(justify="left")
@@ -502,7 +506,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 if thinking_effort and thinking_effort != "auto":
                     model_part += f" ({thinking_effort})"
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{model_part}[/]")
-            row1_left = "  •  ".join(row1_left_parts)
+            row1_left = STATUS_SEP.join(row1_left_parts)
 
             if is_connected and bool(model_name):
                 ctx_val = context_used
@@ -519,7 +523,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                     f"[{THEME_SECONDARY}]{tok_str} tok[/]",
                     f"[{THEME_SECONDARY}]{cost_str}[/]",
                 ]
-                row1_right = "  •  ".join(row1_right_parts)
+                row1_right = STATUS_SEP.join(row1_right_parts)
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
 
@@ -533,20 +537,21 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-            row2_left = "  •  ".join(row2_left_parts)
+            row2_left = STATUS_SEP.join(row2_left_parts)
 
             service_parts = []
             if subagents_active > 0:
                 service_parts.append(
-                    f"{subagents_active} agent" if subagents_active == 1 else f"{subagents_active} agents"
+                    f"[{THEME_SECONDARY}]{subagents_active} agent[/]" if subagents_active == 1 else f"[{THEME_SECONDARY}]{subagents_active} agents[/]"
                 )
             if active_bg_tasks > 0:
-                service_parts.append(f"{active_bg_tasks} shell")
+                service_parts.append(f"[{THEME_SECONDARY}]{active_bg_tasks} shell[/]")
             if mcp_total > 0:
-                service_parts.append(f"{mcp_active} MCP" if mcp_active == mcp_total else f"{mcp_active}/{mcp_total} MCP")
+                mcp_str = f"{mcp_active} MCP" if mcp_active == mcp_total else f"{mcp_active}/{mcp_total} MCP"
+                service_parts.append(f"[{THEME_SECONDARY}]{mcp_str}[/]")
 
             if service_parts:
-                row2_right = f"[{THEME_SECONDARY}]⚡ {'  •  '.join(service_parts)}[/]"
+                row2_right = f"[{THEME_SECONDARY}]⚡[/] {STATUS_SEP.join(service_parts)}"
             else:
                 row2_right = ""
 

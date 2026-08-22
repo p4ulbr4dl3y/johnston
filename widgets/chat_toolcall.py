@@ -416,6 +416,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.returncode = returncode
         self.is_mcp = is_mcp
         self.is_expanded = False
+        self.background_task_id = None
         if status is not None:
             self.status = status
         else:
@@ -525,6 +526,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.tool_type == "shell":
             if cleaned:
                 self.result_text = cleaned
+            if "[Background Task ID:" in cleaned:
+                bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", cleaned)
+                if bg_m:
+                    self.background_task_id = bg_m.group(1)
             if status == "running" and "[Background Task ID:" in cleaned:
                 self.collapse()
         elif self.canonical_tool == "invoke_subagent":
@@ -660,14 +665,23 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return None
         if not app or not hasattr(app, "task_manager"):
             return None
-        tid = None
-        if isinstance(self.args, dict):
+        tid = getattr(self, "background_task_id", None) or getattr(self, "task_id", None)
+        if not tid and isinstance(self.args, dict):
             tid = self.args.get("task_id") or self.args.get("TaskId")
         if not tid:
             bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
             if bg_match:
                 tid = bg_match.group(1)
         if not tid:
+            cmd = (self.args.get("command") or "").strip() if isinstance(self.args, dict) else ""
+            if cmd:
+                for t in app.task_manager:
+                    if (
+                        getattr(t, "kind", "") == "shell"
+                        and getattr(t, "is_running", False)
+                        and getattr(t, "command", "").strip() == cmd
+                    ):
+                        return t
             return None
         for t in app.task_manager:
             if (

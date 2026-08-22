@@ -51,23 +51,30 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self._pending_line = ""
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown("### **Console Output**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            yield RichLog(id="console-log", highlight=False, markup=False)
+            yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield Label("esc: back", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
+        self.log_widget.auto_scroll = False
         self.log_widget.focus()
         # Backfill the history already buffered, then go live: subscribing after
         # the synchronous backfill keeps the two ordered in the event loop.
         for chunk in self.bg_task.output.history:
             self._consume(strip_ansi(chunk))
+        self.log_widget.scroll_end(animate=False)
         self.bg_task.add_listener(self._on_output)
 
     def on_unmount(self) -> None:
         if self.bg_task is not None:
             self.bg_task.remove_listener(self._on_output)
+
+    def _is_at_bottom(self, threshold: int = 2) -> bool:
+        if not self.log_widget:
+            return True
+        return (self.log_widget.max_scroll_y - self.log_widget.scroll_y) <= threshold
 
     def _on_output(self, text: str) -> None:
         """Live chunk from the task; the final empty signal flushes the tail."""
@@ -86,12 +93,14 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         combined = self._pending_line + text
         parts = combined.split("\n")
         self._pending_line = parts.pop()
+        at_bottom = self._is_at_bottom()
         for line in parts:
-            self.log_widget.write(process_carriage_returns(line))
+            self.log_widget.write(process_carriage_returns(line), scroll_end=at_bottom)
 
     def _flush_pending(self) -> None:
         if self._pending_line:
-            self.log_widget.write(process_carriage_returns(self._pending_line))
+            at_bottom = self._is_at_bottom()
+            self.log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
             self._pending_line = ""
 
     def action_back(self) -> None:

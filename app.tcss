@@ -659,6 +659,16 @@ SubagentViewScreen {
     text-wrap: nowrap;
 }
 
+#modal-dialog #console-log,
+ModalScreen #console-log {
+    height: 18;
+    margin: 0;
+    border-left: solid #3f3f46;
+    padding: 0 1;
+    background: transparent;
+    scrollbar-size: 0 0 !important;
+}
+
 #modal-dialog OptionList,
 #modal-dialog OptionList:focus,
 #modal-dialog OptionList:hover,

@@ -31,6 +31,7 @@ def _attach_shell_widget(host, task_id: str, widget) -> None:
     """
     if host is None or widget is None:
         return
+    setattr(widget, "background_task_id", task_id)
     reg = getattr(host, "_background_shell_widgets", None)
     if reg is None:
         reg = host._background_shell_widgets = {}
