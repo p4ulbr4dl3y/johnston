@@ -543,7 +543,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._update_next_sibling_spacing()
         self.render_header()
         if self.is_expanded:
-            self._should_scroll_on_render = self._is_parent_at_bottom()
+            self._should_scroll_on_render = True
             self.render_content()
 
     def mark_cancelled(self) -> None:
@@ -713,10 +713,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
-            was_at_bottom = self._is_parent_at_bottom()
-            self._should_scroll_on_render = was_at_bottom
+            self._should_scroll_on_render = True
             self.render_content()
-            self._scroll_if_needed(force=was_at_bottom)
+            self._scroll_if_needed(force=True)
         else:
             self.content_widget.display = False
             self.md_widget.display = False

@@ -732,6 +732,23 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         with patch.object(w, "_clean_markup_text", side_effect=Exception("boom")):
             w.render_content()
 
+    def test_mcp_tool_expansion_forces_scroll(self):
+        w = self._widget("codegraph_explore", "**Exploration: cached_json_read**\n\nFound symbols")
+        w.is_mcp = True
+        self.assertTrue(w.is_expandable())
+        with patch.object(w, "_scroll_if_needed") as scroll_mock:
+            w.toggle_expanded()
+            self.assertTrue(w.is_expanded)
+            scroll_mock.assert_called_with(force=True)
+
+        w2 = self._widget("codegraph_explore", "")
+        w2.is_mcp = True
+        w2.is_expanded = True
+        with patch.object(w2, "render_content") as render_mock:
+            w2.set_result("**Result**", status="done")
+            self.assertTrue(getattr(w2, "_should_scroll_on_render", False))
+            render_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
