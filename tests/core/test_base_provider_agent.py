@@ -264,6 +264,61 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(agent_openai.cost_usd, 1.2, places=6)
         self.assertLess(agent_anthropic.cost_usd, agent_openai.cost_usd)
 
+    def test_cost_usd_native_api_cost_precedence(self):
+        agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="openrouter")
+        self.addCleanup(agent.close)
+
+        step_usage = {
+            "prompt_tokens": 1000,
+            "completion_tokens": 200,
+            "total_tokens": 1200,
+            "cost": 0.00566,
+        }
+        agent._accumulate_usage(step_usage=step_usage)
+        self.assertEqual(agent.cost_usd, 0.00566)
+
+    def test_cost_usd_free_and_local_models(self):
+        # Local provider (ollama)
+        local_agent = BaseAgent(api_key="", model="llama3", base_url="http://localhost:11434", provider_key="ollama")
+        self.addCleanup(local_agent.close)
+        local_agent._accumulate_usage(step_usage={"prompt_tokens": 1000, "completion_tokens": 500, "total_tokens": 1500})
+        self.assertEqual(local_agent.cost_usd, 0.0)
+
+        # Free model on remote provider
+        free_agent = BaseAgent(api_key="t", model="meta-llama/llama-3-8b:free", base_url="http://t", provider_key="openrouter")
+        self.addCleanup(free_agent.close)
+        free_agent._accumulate_usage(step_usage={"prompt_tokens": 2000, "completion_tokens": 400, "total_tokens": 2400})
+        self.assertEqual(free_agent.cost_usd, 0.0)
+
+    def test_cost_usd_explicit_cache_pricing(self):
+        from unittest.mock import patch
+
+        from core.models_catalog import catalog
+
+        agent = BaseAgent(api_key="t", model="test-cached-model", base_url="http://t", provider_key="custom")
+        self.addCleanup(agent.close)
+
+        pricing = {
+            "prompt": 0.003,
+            "completion": 0.015,
+            "cache_read": 0.0003,
+            "cache_write": 0.00375,
+        }
+        step_usage = {
+            "prompt_tokens": 1000,
+            "completion_tokens": 200,
+            "total_tokens": 1200,
+            "cache_read_tokens": 600,
+            "cache_write_tokens": 200,
+        }
+        with patch.object(catalog, "get_model_pricing", return_value=pricing):
+            agent._accumulate_usage(step_usage=step_usage)
+
+        # uncached_in = 1000 - 600 - 200 = 200
+        # cost = 200 * 0.003 + 600 * 0.0003 + 200 * 0.00375 + 200 * 0.015
+        # cost = 0.6 + 0.18 + 0.75 + 3.0 = 4.53
+        self.assertAlmostEqual(agent.cost_usd, 4.53, places=6)
+
     async def test_stream_steps_tool_call_loop(self):
         agent = BaseAgent(api_key="t", model="test-model", base_url="http://t", provider_key="tprov")
         self.addAsyncCleanup(agent.close)

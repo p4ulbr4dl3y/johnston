@@ -259,6 +259,7 @@ class AnthropicAdapter(BaseApiAdapter):
             "prompt_tokens": 0,
             "completion_tokens": 0,
             "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
         }
 
         client = self._get_client(base_url, api_key)
@@ -274,6 +275,7 @@ class AnthropicAdapter(BaseApiAdapter):
                     u = (evt.get("message") or {}).get("usage") or {}
                     pending_usage["prompt_tokens"] = u.get("input_tokens", 0) or 0
                     pending_usage["cache_read_tokens"] = u.get("cache_read_input_tokens", 0) or 0
+                    pending_usage["cache_write_tokens"] = u.get("cache_creation_input_tokens", 0) or 0
                 elif etype == "content_block_start":
                     idx = evt.get("index")
                     cb = evt.get("content_block") or {}
@@ -317,5 +319,11 @@ class AnthropicAdapter(BaseApiAdapter):
                         pending_usage["prompt_tokens"],
                         pending_usage["completion_tokens"],
                         cache_read_tokens=pending_usage["cache_read_tokens"],
+                        cache_write_tokens=pending_usage["cache_write_tokens"],
                     )
-                    pending_usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_read_tokens": 0}
+                    pending_usage = {
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                    }

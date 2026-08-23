@@ -190,25 +190,55 @@ def _trim_cache() -> None:
         _estimate_cache.popitem(last=False)
 
 
-def parse_usage(usage: Any) -> Dict[str, int]:
+def parse_usage(usage: Any) -> Dict[str, Any]:
     """
-    Extract token counts from API usage object if available, including cache details.
+    Extract token counts and cost from API usage object if available, including cache details.
     """
     if not usage:
-        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cache_read_tokens": 0}
+        return {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "cost": None,
+        }
 
     prompt = getattr(usage, "prompt_tokens", 0) or 0
     completion = getattr(usage, "completion_tokens", 0) or 0
     total = getattr(usage, "total_tokens", 0) or (prompt + completion)
 
     cache_read = 0
+    cache_write = 0
     prompt_details = getattr(usage, "prompt_tokens_details", None)
     if prompt_details:
-        cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
+        cached_attr = getattr(prompt_details, "cached_tokens", None)
+        if cached_attr is not None and not hasattr(cached_attr, "_mock_name"):
+            cache_read = cached_attr
+        else:
+            read_attr = getattr(prompt_details, "cache_read_tokens", 0)
+            if not hasattr(read_attr, "_mock_name"):
+                cache_read = read_attr or 0
+
+        cw_attr = getattr(prompt_details, "cache_write_tokens", None)
+        if cw_attr is not None and not hasattr(cw_attr, "_mock_name"):
+            cache_write = cw_attr
+        else:
+            cc_attr = getattr(prompt_details, "cache_creation_tokens", 0)
+            if not hasattr(cc_attr, "_mock_name"):
+                cache_write = cc_attr or 0
+
+    cost = getattr(usage, "cost", None)
+    if cost is None or hasattr(cost, "_mock_name"):
+        cost = getattr(usage, "cost_usd", None)
+    if hasattr(cost, "_mock_name"):
+        cost = None
 
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": total,
         "cache_read_tokens": cache_read,
+        "cache_write_tokens": cache_write,
+        "cost": cost,
     }

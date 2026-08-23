@@ -13,6 +13,7 @@ from core.infrastructure.adapters.base import (
     new_tool_call_id,
 )
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
+from core.infrastructure.runtime.token_util import parse_usage
 
 
 def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -165,16 +166,14 @@ class OpenAIAdapter(BaseApiAdapter):
         tool_calls: Dict[int, Dict[str, str]] = {}
         async for chunk in response:
             if getattr(chunk, "usage", None):
-                u = chunk.usage
-                cache_read = 0
-                prompt_details = getattr(u, "prompt_tokens_details", None)
-                if prompt_details:
-                    cache_read = getattr(prompt_details, "cached_tokens", 0) or 0
+                pu = parse_usage(chunk.usage)
                 yield build_adapter_usage_event(
-                    getattr(u, "prompt_tokens", 0),
-                    getattr(u, "completion_tokens", 0),
-                    getattr(u, "total_tokens", 0),
-                    cache_read,
+                    prompt_tokens=pu["prompt_tokens"],
+                    completion_tokens=pu["completion_tokens"],
+                    total_tokens=pu["total_tokens"],
+                    cache_read_tokens=pu["cache_read_tokens"],
+                    cache_write_tokens=pu["cache_write_tokens"],
+                    cost=pu.get("cost"),
                 )
             choices = getattr(chunk, "choices", None)
             if not choices and hasattr(chunk, "data"):

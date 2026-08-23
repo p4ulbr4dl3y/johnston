@@ -25,9 +25,11 @@ class TestTokenUtil(unittest.TestCase):
         self.assertEqual(parsed["prompt_tokens"], 10)
         self.assertEqual(parsed["completion_tokens"], 20)
         self.assertEqual(parsed["total_tokens"], 30)
+        self.assertIsNone(parsed["cost"])
 
         parsed_none = parse_usage(None)
         self.assertEqual(parsed_none["total_tokens"], 0)
+        self.assertIsNone(parsed_none["cost"])
 
     def test_base_agent_metrics(self):
         agent = BaseAgent("key", "model", "http://localhost", "prompt", [])

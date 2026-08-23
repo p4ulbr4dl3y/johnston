@@ -125,20 +125,24 @@ def build_adapter_usage_event(
     completion_tokens: Any = 0,
     total_tokens: Optional[Any] = None,
     cache_read_tokens: Any = 0,
+    cache_write_tokens: Any = 0,
+    cost: Optional[float] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     """Formats standard ('adapter_usage', dict) tuple for provider adapters."""
     p_tok = _safe_int(prompt_tokens)
     c_tok = _safe_int(completion_tokens)
     t_tok = _safe_int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
-    return (
-        "adapter_usage",
-        {
-            "prompt_tokens": p_tok,
-            "completion_tokens": c_tok,
-            "total_tokens": t_tok,
-            "cache_read_tokens": int(cache_read_tokens or 0),
-        },
-    )
+    payload: Dict[str, Any] = {
+        "prompt_tokens": p_tok,
+        "completion_tokens": c_tok,
+        "total_tokens": t_tok,
+        "cache_read_tokens": int(cache_read_tokens or 0),
+    }
+    if cache_write_tokens:
+        payload["cache_write_tokens"] = int(cache_write_tokens)
+    if cost is not None:
+        payload["cost"] = float(cost)
+    return ("adapter_usage", payload)
 
 
 def normalize_tool_arguments_str(raw: Any) -> str:

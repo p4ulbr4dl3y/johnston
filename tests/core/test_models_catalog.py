@@ -99,10 +99,19 @@ class TestModelsCatalog(unittest.TestCase):
 
     def test_get_model_pricing(self):
         catalog = ModelsCatalog()
-        catalog._pricing = {"openai/gpt-4o": {"prompt": 0.0000025, "completion": 0.00001}}
+        catalog._pricing = {
+            "openai/gpt-4o": {
+                "prompt": 0.0000025,
+                "completion": 0.00001,
+                "cache_read": 0.00000125,
+                "cache_write": 0.000003125,
+            }
+        }
         pricing = catalog.get_model_pricing("openrouter", "openai/gpt-4o")
         self.assertEqual(pricing["prompt"], 0.0000025)
         self.assertEqual(pricing["completion"], 0.00001)
+        self.assertEqual(pricing["cache_read"], 0.00000125)
+        self.assertEqual(pricing["cache_write"], 0.000003125)
 
         pricing_unknown = catalog.get_model_pricing("openrouter", "unknown")
         self.assertEqual(pricing_unknown["prompt"], 0.0)

@@ -26,6 +26,7 @@ from core.infrastructure.presentation.tool_display import extract_tool_display
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 from core.models_catalog import catalog
+from core.provider_manager import is_local_provider
 
 logger = logging.getLogger(__name__)
 
@@ -218,21 +219,46 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         prompt_tokens_est: int = 0,
         output_tokens_est: int = 0,
     ) -> None:
-        """Accumulates input/output/cache tokens and estimates USD cost based on model pricing."""
+        """Accumulates input/output/cache tokens and estimates USD cost based on API reporting or model pricing."""
+        is_local = is_local_provider(self.provider_key, getattr(self, "api_type", ""))
+        model_low = (self.model or "").lower()
+        is_free_model = (
+            ":free" in model_low
+            or "-free" in model_low
+            or model_low.endswith("free")
+            or "/free" in model_low
+        )
+
         pricing = catalog.get_model_pricing(self.provider_key, self.model)
         p_prompt = pricing.get("prompt", 0.0)
         p_comp = pricing.get("completion", 0.0)
+        p_cr = pricing.get("cache_read")
+        p_cw = pricing.get("cache_write")
 
         if step_usage and step_usage.get("total_tokens", 0) > 0:
             in_tok = step_usage.get("prompt_tokens", 0)
             out_tok = step_usage.get("completion_tokens", 0)
             cache_read_tok = step_usage.get("cache_read_tokens", 0)
-            uncached_in = max(0, in_tok - cache_read_tok)
+            cache_write_tok = step_usage.get("cache_write_tokens", 0)
+            uncached_in = max(0, in_tok - cache_read_tok - cache_write_tok)
 
-            # Cached input is discounted differently per provider:
-            # Anthropic ~90% off (0.1x), OpenAI-compatible ~50% off (0.5x).
-            cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
-            cost = uncached_in * p_prompt + cache_read_tok * (p_prompt * cache_mult) + out_tok * p_comp
+            # 1. Native cost reported by API provider (e.g. OpenRouter, LiteLLM, AI gateway)
+            api_cost = step_usage.get("cost")
+            if api_cost is not None:
+                cost = float(api_cost)
+            elif is_local or is_free_model:
+                cost = 0.0
+            else:
+                # 2. Granular formula calculation
+                if p_cr is not None:
+                    cr_rate = p_cr
+                else:
+                    cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
+                    cr_rate = p_prompt * cache_mult
+
+                cw_rate = p_cw if p_cw is not None else (p_prompt * 1.25 if p_prompt > 0 else 0.0)
+
+                cost = uncached_in * p_prompt + cache_read_tok * cr_rate + cache_write_tok * cw_rate + out_tok * p_comp
 
             self.tokens_input += in_tok
             self.tokens_output += out_tok
@@ -245,7 +271,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             self.tokens_output += output_tokens_est
             self.last_context_tokens = prompt_tokens_est
             self.total_tokens += prompt_tokens_est + output_tokens_est
-            self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
+            if not is_local and not is_free_model:
+                self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
 
     async def _process_attachment_image(
         self, att_path: str, error_prefix: str = "Error processing attachment image"

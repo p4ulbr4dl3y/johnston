@@ -186,13 +186,23 @@ class ModelsCatalog:
                                 if isinstance(cost_info, dict):
                                     p_in = float(cost_info.get("input") or 0.0)
                                     p_out = float(cost_info.get("output") or 0.0)
+                                    p_cr = float(cost_info.get("cache_read") or 0.0)
+                                    p_cw = float(cost_info.get("cache_write") or 0.0)
                                     # Convert 1M token costs to per-token if > 0.01
                                     if p_in > 0.01:
                                         p_in /= 1_000_000.0
                                     if p_out > 0.01:
                                         p_out /= 1_000_000.0
-                                    if p_in > 0 or p_out > 0:
-                                        pricing_item = {"prompt": p_in, "completion": p_out}
+                                    if p_cr > 0.01:
+                                        p_cr /= 1_000_000.0
+                                    if p_cw > 0.01:
+                                        p_cw /= 1_000_000.0
+                                    if p_in > 0 or p_out > 0 or p_cr > 0 or p_cw > 0:
+                                        pricing_item: Dict[str, float] = {"prompt": p_in, "completion": p_out}
+                                        if p_cr > 0:
+                                            pricing_item["cache_read"] = p_cr
+                                        if p_cw > 0:
+                                            pricing_item["cache_write"] = p_cw
                                         model_pricing[full_id] = pricing_item
                                         model_pricing[alias_id] = pricing_item
                 except Exception as e:
@@ -220,8 +230,14 @@ class ModelsCatalog:
                             pricing_raw = m.get("pricing") if isinstance(m.get("pricing"), dict) else {}
                             p_prompt = float(pricing_raw.get("prompt") or 0.0)
                             p_comp = float(pricing_raw.get("completion") or 0.0)
-                            if p_prompt > 0 or p_comp > 0:
+                            p_cr = float(pricing_raw.get("input_cache_read") or pricing_raw.get("cache_read") or 0.0)
+                            p_cw = float(pricing_raw.get("input_cache_write") or pricing_raw.get("cache_write") or 0.0)
+                            if p_prompt > 0 or p_comp > 0 or p_cr > 0 or p_cw > 0:
                                 pricing_item = {"prompt": p_prompt, "completion": p_comp}
+                                if p_cr > 0:
+                                    pricing_item["cache_read"] = p_cr
+                                if p_cw > 0:
+                                    pricing_item["cache_write"] = p_cw
                                 model_pricing.setdefault(m_id, pricing_item)
                                 model_pricing.setdefault(short_id, pricing_item)
                 except Exception as e:
