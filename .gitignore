@@ -18,6 +18,7 @@ build/
 
 # Local folders
 .serena/
+.codegraph/
 .johnston/
 probe.txt
 scripts/
