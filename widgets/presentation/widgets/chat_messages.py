@@ -83,6 +83,28 @@ class UserMessage(Horizontal):
         super().__init__(bubble, classes="user-msg")
 
 
+def scroll_parent_if_needed(widget) -> None:
+    try:
+        parent = getattr(widget, "parent", None)
+        if isinstance(parent, VerticalScroll):
+            is_at_bot = getattr(parent, "is_at_bottom", lambda: True)()
+            is_loading = getattr(parent, "_is_loading_session", False)
+            if is_at_bot and not is_loading:
+                if not getattr(parent, "_scroll_pending", False):
+                    parent._scroll_pending = True
+
+                    def _do_scroll():
+                        try:
+                            parent._scroll_pending = False
+                            parent.scroll_end(animate=False)
+                        except Exception:
+                            pass
+
+                    parent.call_after_refresh(_do_scroll)
+    except Exception:
+        pass
+
+
 class BotMessage(Vertical):
     """AI message with streaming Static and rich interactive Textual Markdown rendering"""
 
@@ -275,25 +297,7 @@ class BotMessage(Vertical):
             pass
 
     def _scroll_if_needed(self) -> None:
-        try:
-            if isinstance(self.parent, VerticalScroll):
-                is_at_bot = getattr(self.parent, "is_at_bottom", lambda: True)()
-                is_loading = getattr(self.parent, "_is_loading_session", False)
-                if is_at_bot and not is_loading:
-                    parent = self.parent
-                    if not getattr(parent, "_scroll_pending", False):
-                        parent._scroll_pending = True
-
-                        def _do_scroll():
-                            try:
-                                parent._scroll_pending = False
-                                parent.scroll_end(animate=False)
-                            except Exception:
-                                pass
-
-                        parent.call_after_refresh(_do_scroll)
-        except Exception:
-            pass
+        scroll_parent_if_needed(self)
 
     def on_unmount(self) -> None:
         if self._stream_update_handle is not None:
@@ -355,6 +359,9 @@ class ThinkingWidget(Vertical):
         except RuntimeError:
             self._flush_content_update()
 
+    def _scroll_if_needed(self) -> None:
+        scroll_parent_if_needed(self)
+
     def _flush_content_update(self) -> None:
         self._update_scheduled = False
         self._update_handle = None
@@ -362,6 +369,7 @@ class ThinkingWidget(Vertical):
             return
         try:
             self.content_widget.update(self.thinking_text)
+            self._scroll_if_needed()
         except Exception:
             pass
 
@@ -385,6 +393,7 @@ class ThinkingWidget(Vertical):
         self.remove_class("thinking-active")
         if self.is_expanded:
             self.content_widget.update(self.thinking_text or "")
+            self._scroll_if_needed()
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
@@ -409,6 +418,7 @@ class ThinkingWidget(Vertical):
             if self.thinking_text:
                 self.content_widget.update(self.thinking_text)
             self.content_widget.display = True
+            self._scroll_if_needed()
         else:
             if self._update_handle is not None:
                 self._update_handle.cancel()

@@ -244,9 +244,18 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         widget.append_shell_output("part1\rpart2")
         self.assertEqual(widget.result_text, "part2")
         widget.is_expanded = True
-        with patch.object(widget, "render_content") as render_mock:
+        with patch.object(widget, "render_content") as render_mock, patch.object(widget, "_scroll_if_needed") as scroll_mock:
             widget.append_shell_output("more")
         render_mock.assert_called_once()
+        scroll_mock.assert_called_once()
+
+    def test_toggle_expanded_calls_scroll_if_needed_on_expand(self):
+        widget = ToolCallWidget("shell", "cmd")
+        widget.is_expanded = False
+        with patch.object(widget, "render_content"), patch.object(widget, "_scroll_if_needed") as scroll_mock:
+            widget.toggle_expanded()
+            self.assertTrue(widget.is_expanded)
+            scroll_mock.assert_called_once()
 
     def test_format_code_with_line_numbers(self):
         widget = ToolCallWidget("shell", "cmd")

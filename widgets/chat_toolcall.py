@@ -686,6 +686,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.md_widget.display = False
         self._update_next_sibling_spacing()
 
+    def _scroll_if_needed(self) -> None:
+        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+
+        scroll_parent_if_needed(self)
+
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
             return
@@ -693,6 +698,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
         if self.is_expanded:
             self.render_content()
+            self._scroll_if_needed()
         else:
             self.content_widget.display = False
             self.md_widget.display = False
@@ -713,6 +719,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
             self.render_content()
+            self._scroll_if_needed()
 
     def _compute_content(self) -> tuple:
         """Pure content computation (safe to run in a thread); returns (kind, value).
@@ -938,6 +945,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             else:
                 kind, value = self._compute_content()
                 self._apply_content(kind, value)
+                if self.is_expanded:
+                    self._scroll_if_needed()
         except Exception:
             pass
 
@@ -953,3 +962,5 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if not getattr(self, "is_mounted", True):
             return
         self._apply_content(kind, value)
+        if self.is_expanded:
+            self._scroll_if_needed()

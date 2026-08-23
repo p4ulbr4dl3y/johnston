@@ -371,6 +371,28 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
         tw.on_unmount()
         handle.cancel.assert_called_once()
 
+    def test_flush_content_update_calls_scroll_if_needed_when_expanded(self):
+        tw = ThinkingWidget("x")
+        tw.is_expanded = True
+        with patch.object(tw, "_scroll_if_needed") as scroll_mock:
+            tw._flush_content_update()
+            scroll_mock.assert_called_once()
+
+    def test_toggle_expanded_calls_scroll_if_needed_when_expanding(self):
+        tw = ThinkingWidget("x")
+        tw.is_expanded = False
+        with patch.object(tw, "_scroll_if_needed") as scroll_mock:
+            tw.toggle_expanded()
+            self.assertTrue(tw.is_expanded)
+            scroll_mock.assert_called_once()
+
+    def test_finish_thinking_calls_scroll_if_needed_when_expanded(self):
+        tw = ThinkingWidget("x")
+        tw.is_expanded = True
+        with patch.object(tw, "_scroll_if_needed") as scroll_mock:
+            tw.finish_thinking(1.0, "done")
+            scroll_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
