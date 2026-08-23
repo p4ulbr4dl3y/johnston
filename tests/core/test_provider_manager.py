@@ -18,6 +18,7 @@ def pm(tmp_path, monkeypatch):
     monkeypatch.setattr("core.provider_manager.CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr("core.provider_manager.CONFIG_FILE", str(tmp_path / "config.json"))
     monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "providers.json"))
+    monkeypatch.setattr("core.provider_manager.CACHE_DIR", str(tmp_path / "cache"))
     return ProviderManager()
 
 
@@ -38,10 +39,12 @@ class TestProviderManager(unittest.TestCase):
         self.providers_json_patcher = patch(
             "core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
         )
+        self.cache_dir_patcher = patch("core.provider_manager.CACHE_DIR", os.path.join(self.test_dir, "cache"))
 
         self.config_dir_patcher.start()
         self.config_file_patcher.start()
         self.providers_json_patcher.start()
+        self.cache_dir_patcher.start()
 
         self.pm = ProviderManager()
 
@@ -49,6 +52,7 @@ class TestProviderManager(unittest.TestCase):
         self.config_dir_patcher.stop()
         self.config_file_patcher.stop()
         self.providers_json_patcher.stop()
+        self.cache_dir_patcher.stop()
         shutil.rmtree(self.test_dir)
 
     def test_ensure_config_dir(self):
@@ -657,4 +661,117 @@ def test_load_provider_def_from_catalog_fallback(pm):
     # also test get_catalog_providers
     with patch.object(catalog, "get_discovered_providers", return_value={"p1": {}}):
         assert "p1" in pm.get_catalog_providers()
+
+
+# ---------------------------------------------------------------------------
+# Robustness: malformed providers.json, env keys, placeholders, null-delete
+# ---------------------------------------------------------------------------
+
+def test_malformed_provider_field_skipped_not_fatal(pm, tmp_path):
+    # Regression: a single garbage numeric field used to raise ValueError out
+    # of load_providers() and take down the whole provider list.
+    _write(tmp_path / "providers.json", {"broken": {"chunk_timeout": "abc"}, "openai": {"model": "g"}})
+    providers = pm.load_providers()
+    assert "broken" not in providers
+    assert providers["openai"]["model"] == "g"
+
+
+def test_load_provider_def_malformed_returns_none(pm, tmp_path):
+    _write(tmp_path / "providers.json", {"bad": {"max_retries": "lots"}})
+    assert pm.load_provider_def("bad") is None
+
+
+def test_explicit_zero_fields_preserved(pm, tmp_path):
+    _write(
+        tmp_path / "providers.json",
+        {"zeroed": {"key": "zeroed", "name": "Z", "chunk_timeout": 0, "retry_delay": 0, "max_retries": 0}},
+    )
+    pdef = pm.load_provider_def("zeroed")
+    assert pdef is not None
+    assert pdef.chunk_timeout == 0.0
+    assert pdef.retry_delay == 0.0
+    assert pdef.max_retries == 0
+
+
+def test_env_api_key_fallback_and_stored_precedence(pm, tmp_path, monkeypatch):
+    monkeypatch.setenv("ACME_API_KEY", "from-env")
+    assert pm.get_api_key("acme") == "from-env"
+
+    pm.set_provider_api_key("acme", "typed-by-user")
+    assert pm.get_api_key("acme") == "typed-by-user"
+
+
+def test_env_api_key_alias_togetherai(pm, monkeypatch):
+    monkeypatch.delenv("TOGETHERAI_API_KEY", raising=False)
+    monkeypatch.setenv("TOGETHER_API_KEY", "tog-key")
+    from core.provider_manager import env_api_key
+
+    assert env_api_key("togetherai") == "tog-key"
+    assert env_api_key("unknown-provider") == ""
+
+
+def test_base_url_placeholder_resolved_from_env(pm, tmp_path, monkeypatch):
+    monkeypatch.setenv("AZURE_RESOURCE", "my-org")
+    _write(tmp_path / "providers.json", {})
+    pdef = pm.load_provider_def("azure")
+    assert pdef is not None
+    assert pdef.base_url == "https://my-org.openai.azure.com/openai"
+
+
+def test_base_url_placeholder_resolved_from_provider_field(pm, tmp_path):
+    _write(
+        tmp_path / "providers.json",
+        {
+            "cf": {
+                "key": "cf",
+                "name": "CF",
+                "base_url": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
+                "account_id": "acct42",
+            }
+        },
+    )
+    pdef = pm.load_provider_def("cf")
+    assert pdef is not None
+    assert pdef.base_url == "https://api.cloudflare.com/client/v4/accounts/acct42/ai/v1"
+
+
+def test_base_url_placeholder_unresolved_stays_verbatim(pm, tmp_path, caplog, monkeypatch):
+    import logging as _logging
+
+    # Fresh dedup state: earlier tests may have already warned for this token.
+    monkeypatch.setattr("core.provider_manager._WARNED_BASE_URL_TOKENS", set())
+    _write(
+        tmp_path / "providers.json",
+        {"azure": {"key": "azure", "name": "Azure"}},
+    )
+    with caplog.at_level(_logging.WARNING):
+        pdef = pm.load_provider_def("azure")
+    assert pdef is not None
+    assert "{resource}" in pdef.base_url
+    assert any("{resource}" in rec.message for rec in caplog.records)
+
+
+def test_null_provider_entry_deletes_builtin(pm, tmp_path):
+    _write(tmp_path / "providers.json", {"cohere": None})
+    providers = pm.load_providers()
+    assert "cohere" not in providers
+    assert "openai" in providers  # untouched defaults remain
+
+
+def test_set_provider_model_single_source_of_truth(pm, tmp_path):
+    pfile = tmp_path / "providers.json"
+    _write(pfile, {"custom": {"key": "custom", "name": "C", "model": "orig"}})
+
+    pm.set_provider_model("custom", "new-model")
+
+    # config.json holds the selection...
+    data = _load_json(tmp_path / "config.json")
+    assert data["provider_models"]["custom"] == "new-model"
+    # ...and providers.json is no longer rewritten (no drift).
+    assert _load_json(pfile)["custom"]["model"] == "orig"
+
+
+def _load_json(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 

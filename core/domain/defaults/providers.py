@@ -1,4 +1,10 @@
-"""Default JSON provider configurations for Johnston CLI."""
+"""Default JSON provider configurations for Johnston CLI.
+
+Users override these via ~/.johnston/providers.json: entries are merged
+field-wise over the matching default, custom keys are added as-is, and
+``"<key>": null`` removes a built-in default entirely. Enable/disable state
+lives in config.json (``disabled_providers``), not here.
+"""
 
 from typing import Any, Dict
 

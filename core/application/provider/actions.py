@@ -6,11 +6,11 @@ so that ``widgets/commands.py`` can remain a thin UI wrapper.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any, Dict, Tuple
 
-from core.provider_manager import ProviderManager
+from core.infrastructure.runtime.background import spawn_background_task
+from core.provider_manager import ProviderManager, is_local_provider
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +32,9 @@ def fetch_api_key_and_provider_info(
 
 def _refresh_models_background(pm: ProviderManager) -> None:
     """Fire-and-forget model refresh so the UI is not blocked."""
-    if not hasattr(pm, "fetch_models_grouped"):
-        return
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        loop.create_task(pm.fetch_models_grouped())
+    if hasattr(pm, "fetch_models_grouped"):
+        # Strongly-referenced task: a bare create_task could be GC'd mid-flight.
+        spawn_background_task(pm.fetch_models_grouped())
 
 
 def set_provider_credentials(
@@ -68,7 +63,7 @@ def set_provider_credentials(
     pdef = pm.load_provider_def(provider_key)
     if pdef is None:
         return False
-    needs_key = pdef.requires_key is not False and pdef.api_type not in ("ollama", "lmstudio")
+    needs_key = pdef.requires_key is not False and not is_local_provider(provider_key, pdef.api_type)
     if needs_key and not pm.get_api_key(provider_key):
         return False
     if not pdef.enabled:

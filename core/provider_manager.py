@@ -1,14 +1,16 @@
 import asyncio
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.infrastructure.adapters.models_source import extract_context_length
-from core.infrastructure.platform.paths import CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
+from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.runtime.background import spawn_background_task
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from core.models_catalog import cached_json_read, catalog, invalidate_json_read_cache
 
@@ -23,6 +25,92 @@ DEFAULT_RETRY_DELAY = 1.0
 DEFAULT_RETRY_BACKOFF = 2.0
 DEFAULT_MAX_RETRY_DELAY = 10.0
 DEFAULT_MAX_TOKENS = 8192
+
+# Model-list cache lifetimes: a successful fetch lives a full day, an empty
+# result only briefly so unreachable providers are retried instead of being
+# pinned empty (and instead of refetch-spamming on every UI render).
+MODELS_CACHE_TTL = 86400.0
+MODELS_CACHE_EMPTY_TTL = 300.0
+
+# Providers whose server runs on localhost and never requires credentials.
+LOCAL_PROVIDER_KEYS = ("ollama", "lmstudio")
+
+# Conventional env vars that deviate from the <KEY>_API_KEY scheme.
+_ENV_KEY_ALIASES = {
+    "togetherai": "TOGETHER_API_KEY",
+}
+
+_BASE_URL_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+_WARNED_BASE_URL_TOKENS: set = set()
+
+
+def is_local_provider(provider_key: str, api_type: str = "") -> bool:
+    """True for localhost inference servers that never need an API key.
+
+    Single source of truth for the ollama/lmstudio special-casing previously
+    duplicated across fetch_models/is_provider_connected/actions.py.
+    """
+    return api_type.lower() in LOCAL_PROVIDER_KEYS or provider_key.lower() in LOCAL_PROVIDER_KEYS
+
+
+def env_api_key(provider_key: str) -> str:
+    """Best-effort API key from the environment: ``<PROVIDER>_API_KEY``
+    (dash→underscore, uppercased), plus known aliases like TOGETHER_API_KEY."""
+    canonical = provider_key.upper().replace("-", "_")
+    alias = _ENV_KEY_ALIASES.get(provider_key.lower(), "")
+    for name in (f"{canonical}_API_KEY", alias):
+        if not name:
+            continue
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, Any]) -> str:
+    """Expand ``{token}`` placeholders in a base_url template (azure
+    ``{resource}``, cloudflare ``{account_id}``, ...).
+
+    Resolution order: ``<PROVIDER>_<TOKEN>`` env var, plain ``<TOKEN>`` env
+    var, then a same-named string field of the provider definition.
+    Unresolved tokens stay verbatim (visible failure, no silently wrong host)
+    with a one-time warning pointing at the env var to set.
+    """
+
+    def _sub(match: "re.Match[str]") -> str:
+        token = match.group(1)
+        env_name = f"{provider_key}_{token}".upper().replace("-", "_")
+        for candidate in (env_name, token.upper()):
+            value = os.environ.get(candidate, "").strip()
+            if value:
+                return value.rstrip("/")
+        value = data.get(token)
+        if isinstance(value, str) and value.strip():
+            return value.strip().rstrip("/")
+        warn_key = (provider_key, token)
+        if warn_key not in _WARNED_BASE_URL_TOKENS:
+            _WARNED_BASE_URL_TOKENS.add(warn_key)
+            logger.warning(
+                "Provider %s: base_url placeholder {%s} unresolved (set %s env var or add '%s' field)",
+                provider_key,
+                token,
+                env_name,
+                token,
+            )
+        return match.group(0)
+
+    return _BASE_URL_PLACEHOLDER_RE.sub(_sub, raw)
+
+
+def _field_float(data: Dict[str, Any], key: str, default: float) -> float:
+    """Float config field preserving an explicit 0 (truthiness checks eat it)."""
+    raw = data.get(key)
+    return default if raw is None else float(raw)
+
+
+def _field_int(data: Dict[str, Any], key: str, default: int) -> int:
+    raw = data.get(key)
+    return default if raw is None else int(raw)
 
 
 @dataclass
@@ -55,7 +143,7 @@ class ProviderDef:
         return cls(
             key=key,
             name=data.get("name") or key,
-            base_url=data.get("base_url") or "",
+            base_url=resolve_base_url_placeholders(data.get("base_url") or "", key, data),
             model=data.get("model") or "",
             models=list(data.get("models") or []),
             fetch_models=bool(data.get("fetch_models", True)),
@@ -63,12 +151,12 @@ class ProviderDef:
             headers=data.get("headers"),
             extra_body=data.get("extra_body"),
             reasoning_effort=data.get("reasoning_effort"),
-            chunk_timeout=float(data.get("chunk_timeout") or DEFAULT_CHUNK_TIMEOUT),
+            chunk_timeout=_field_float(data, "chunk_timeout", DEFAULT_CHUNK_TIMEOUT),
             max_tokens=data.get("max_tokens"),
-            max_retries=int(data.get("max_retries") or DEFAULT_MAX_RETRIES),
-            retry_delay=float(data.get("retry_delay") or DEFAULT_RETRY_DELAY),
-            retry_backoff=float(data.get("retry_backoff") or DEFAULT_RETRY_BACKOFF),
-            max_retry_delay=float(data.get("max_retry_delay") or DEFAULT_MAX_RETRY_DELAY),
+            max_retries=_field_int(data, "max_retries", DEFAULT_MAX_RETRIES),
+            retry_delay=_field_float(data, "retry_delay", DEFAULT_RETRY_DELAY),
+            retry_backoff=_field_float(data, "retry_backoff", DEFAULT_RETRY_BACKOFF),
+            max_retry_delay=_field_float(data, "max_retry_delay", DEFAULT_MAX_RETRY_DELAY),
             enabled=enabled,
             api_key=data.get("api_key") or "",
             requires_key=data.get("requires_key"),
@@ -160,15 +248,25 @@ class ProviderManager:
                 logger.warning("Failed to save default providers JSON", exc_info=True)
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
+        """Merge user providers.json over built-in defaults.
+
+        User entries are merged field-wise over the matching default (if any);
+        custom keys are added as-is; ``"<key>": null`` removes a built-in
+        default entirely so users can prune the built-in list permanently.
+        """
         providers = dict(DEFAULT_JSON_PROVIDERS)
         data = self._cached_json(PROVIDERS_JSON_FILE, {})
         if isinstance(data, dict):
             try:
+                deleted = {k for k, v in data.items() if v is None}
+                for k in deleted:
+                    providers.pop(k, None)
                 for k, v in data.items():
-                    if isinstance(v, dict):
-                        merged = dict(DEFAULT_JSON_PROVIDERS.get(k, {}))
-                        merged.update(v)
-                        providers[k] = merged
+                    if k in deleted or not isinstance(v, dict):
+                        continue
+                    merged = dict(DEFAULT_JSON_PROVIDERS.get(k, {}))
+                    merged.update(v)
+                    providers[k] = merged
             except Exception:
                 logger.warning("Failed to merge JSON providers", exc_info=True)
         return providers
@@ -205,7 +303,12 @@ class ProviderManager:
         for pkey, pdata in json_providers.items():
             if not include_disabled and pkey in disabled_set:
                 continue
-            providers[pkey] = ProviderDef.from_dict(pkey, pdata, enabled=pkey not in disabled_set).to_dict()
+            # One malformed user entry must never take down provider loading:
+            # skip it with a warning (mirrors MCP config validation).
+            try:
+                providers[pkey] = ProviderDef.from_dict(pkey, pdata, enabled=pkey not in disabled_set).to_dict()
+            except Exception as exc:
+                logger.warning("Skipping malformed provider definition %r: %s", pkey, exc)
         if len(self._providers_memo) >= 16:
             # FIFO eviction: drop the oldest memo entry. ``dict.popitem`` takes
             # no args (and pops LIFO), so remove the first-inserted key instead.
@@ -214,29 +317,31 @@ class ProviderManager:
         return providers
 
     def load_provider_def(self, provider_key: str) -> Optional[ProviderDef]:
-        """Return a structured ProviderDef for a provider (or None if unknown).
+        """Return a structured ProviderDef for a provider (or None if unknown/malformed).
 
         Reads the raw JSON definition directly (not the ``load_providers``
         ``to_dict`` shape) so provider fields that ``to_dict`` intentionally
         drops (``requires_key``, ``api_key``, ``fetch_models``, ...) are kept.
         ``enabled`` is derived from the disabled set for both JSON and catalog
-        providers.
+        providers. A definition with garbage-typed fields yields None plus a
+        warning instead of raising, mirroring ``load_providers`` robustness.
         """
         disabled_set = set(self.get_disabled_providers())
+        enabled = provider_key not in disabled_set
         json_providers = self._load_json_providers()
         if provider_key in json_providers:
-            return ProviderDef.from_dict(
-                provider_key,
-                json_providers[provider_key],
-                enabled=provider_key not in disabled_set,
-            )
+            try:
+                return ProviderDef.from_dict(provider_key, json_providers[provider_key], enabled=enabled)
+            except Exception as exc:
+                logger.warning("Malformed provider definition %r: %s", provider_key, exc)
+                return None
         cat_pdata = catalog.get_catalog_provider(provider_key)
         if cat_pdata is not None:
-            return ProviderDef.from_dict(
-                provider_key,
-                cat_pdata,
-                enabled=provider_key not in disabled_set,
-            )
+            try:
+                return ProviderDef.from_dict(provider_key, cat_pdata, enabled=enabled)
+            except Exception as exc:
+                logger.warning("Malformed catalog provider definition %r: %s", provider_key, exc)
+                return None
         return None
 
     def get_catalog_providers(self) -> Dict[str, Dict[str, Any]]:
@@ -253,7 +358,13 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
-        return self._get_config_data().get("api_keys", {}).get(key, "")
+        """Stored API key for *key*, falling back to its env var
+        (``<PROVIDER>_API_KEY``). A key typed in by the user wins over the
+        passive environment default."""
+        stored = self._get_config_data().get("api_keys", {}).get(key, "")
+        if stored and str(stored).strip():
+            return str(stored)
+        return env_api_key(key)
 
     def set_provider_api_key(self, key: str, api_key: str):
         data = self._read_config()
@@ -264,22 +375,17 @@ class ProviderManager:
         self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):
-        """Saves selected model for provider to config and provider definition"""
+        """Saves selected model for provider to config.json.
+
+        Single source of truth: the selection is intentionally NOT mirrored
+        into providers.json — the old dual write drifted apart and silently
+        skipped catalog-only providers.
+        """
         data = self._read_config()
         if "provider_models" not in data:
             data["provider_models"] = {}
         data["provider_models"][key] = model_name
         self._save_config(data)
-
-        # Also update JSON providers file if present
-        if os.path.exists(PROVIDERS_JSON_FILE):
-            jdata = read_json(PROVIDERS_JSON_FILE, {})
-            if isinstance(jdata, dict) and key in jdata:
-                try:
-                    jdata[key]["model"] = model_name
-                    self._save_providers_json(jdata)
-                except Exception:
-                    logger.exception("Failed to save provider model selection to %s", PROVIDERS_JSON_FILE)
         self.invalidate_cache()
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
@@ -312,7 +418,9 @@ class ProviderManager:
         """Returns active model for specified provider with priority:
         1. Saved user choice in config.json (provider_models)
         2. Explicit 'model' field in provider definition
-        3. First item in provider's 'models' list
+        3. Empty string when neither is configured — no model is guessed,
+           so a misconfigured provider fails loudly instead of silently
+           using an arbitrary first entry of its models list.
         """
         providers = self.load_providers()
         if provider_key not in providers:
@@ -417,17 +525,17 @@ class ProviderManager:
 
         base_url = pdef.base_url
         api_key = self.get_api_key(provider_key) or pdef.api_key
+        needs_key = pdef.requires_key is not False and not is_local_provider(provider_key, pdef.api_type)
 
         # If provider has explicit static models list, return it directly
         if pdef.models:
             return list(pdef.models)
 
-        CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
         os.makedirs(CACHE_DIR, exist_ok=True)
         cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
 
         # If no API key set and not local/built-in provider, return configured models list for UI display
-        if not api_key and provider_key not in ("ollama",) and not force_refresh:
+        if needs_key and not api_key and not force_refresh:
             if os.path.exists(cache_path):
                 try:
                     os.remove(cache_path)
@@ -438,26 +546,28 @@ class ProviderManager:
         # 1. Non-blocking fast path when force_refresh is False
         if not force_refresh:
             fallback = pdef.models_fallback()
-            cached_models = []
+            cached_models: List[str] = []
+            cache_age: Optional[float] = None
             if os.path.exists(cache_path):
                 cdata = read_json(cache_path, {})
                 if isinstance(cdata, dict):
-                    age = time.time() - cdata.get("updated_at", 0)
-                    cached_models = cdata.get("models", [])
-                    if age < 86400 and cached_models:
-                        return cached_models
+                    cache_age = time.time() - float(cdata.get("updated_at", 0))
+                    cached_models = [m for m in cdata.get("models", []) if isinstance(m, str)]
 
-            # If no cache and no static fallback list, fetch models directly
-            if not cached_models and not fallback and api_key:
+            if cache_age is not None:
+                if cached_models and cache_age < MODELS_CACHE_TTL:
+                    return cached_models
+                # Recently fetched empty list with nothing better to show:
+                # serve it instead of spawning a refetch on every call.
+                if not cached_models and not fallback and cache_age < MODELS_CACHE_EMPTY_TTL:
+                    return []
+
+            # If no usable cache and no static fallback list, fetch directly
+            if not cached_models and not fallback and (api_key or not needs_key):
                 return await self.fetch_models_for_provider(provider_key, force_refresh=True)
 
-            # Trigger background refresh without blocking UI
-            try:
-                loop = asyncio.get_running_loop()
-                if loop.is_running():
-                    loop.create_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
-            except RuntimeError:
-                pass
+            # Trigger background refresh without blocking UI.
+            spawn_background_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
 
             return cached_models or fallback
 
@@ -467,8 +577,10 @@ class ProviderManager:
         should_fetch = pdef.fetch_models
         if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
-            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-            timeout_sec = 0.8 if provider_key in ("ollama", "lmstudio") else 3.0
+            headers = dict(pdef.headers) if pdef.headers else {}
+            if api_key and "Authorization" not in headers:
+                headers["Authorization"] = f"Bearer {api_key}"
+            timeout_sec = 0.8 if is_local_provider(provider_key, pdef.api_type) else 3.0
             try:
                 client = catalog.get_client()
                 resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
@@ -497,7 +609,8 @@ class ProviderManager:
         if not models:
             models = pdef.models_fallback()
 
-        # Save to cache (including empty/fallback lists with 5-minute TTL)
+        # Save to cache: non-empty lists live MODELS_CACHE_TTL, empty/fallback
+        # ones only MODELS_CACHE_EMPTY_TTL (see fast path above).
         try:
             atomic_write_json(
                 cache_path, {"updated_at": time.time(), "models": models, "model_limits": model_limits}, indent=2
@@ -515,7 +628,7 @@ class ProviderManager:
         if not pdata or not pdata.get("enabled", True) or provider_key in self.get_disabled_providers():
             return False
         api_type = str(pdata.get("api_type", "openai")).lower()
-        if api_type in ("ollama", "lmstudio") or pdata.get("requires_key") is False:
+        if is_local_provider(provider_key, api_type) or pdata.get("requires_key") is False:
             return True
         key_val = self.get_api_key(provider_key) or pdata.get("api_key", "")
         return bool(key_val and str(key_val).strip())

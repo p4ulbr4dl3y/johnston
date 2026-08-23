@@ -24,6 +24,7 @@ def pm(tmp_path, monkeypatch):
     monkeypatch.setattr(pm_mod, "CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr(pm_mod, "CONFIG_FILE", os.path.join(str(tmp_path), "config.json"))
     monkeypatch.setattr(pm_mod, "PROVIDERS_JSON_FILE", os.path.join(str(tmp_path), "providers.json"))
+    monkeypatch.setattr(pm_mod, "CACHE_DIR", os.path.join(str(tmp_path), "cache"))
     from core.models_catalog import catalog
 
     catalog._client = None
@@ -296,3 +297,37 @@ async def test_fetch_models_grouped_connected_only_empty(pm):
     with patch.object(manager, "is_provider_connected", return_value=False):
         grouped = await manager.fetch_models_grouped(force_refresh=True, connected_only=True)
     assert grouped == {}  # no connected provider -> early return
+
+
+@pytest.mark.asyncio
+async def test_fetch_models_requires_key_false_with_custom_headers(pm):
+    manager, tmp_path = pm
+    _write_providers(
+        tmp_path,
+        {
+            "opencode": {
+                "key": "opencode",
+                "name": "OpenCode Zen",
+                "base_url": "https://opencode.ai/zen/v1",
+                "requires_key": False,
+                "headers": {"User-Agent": "opencode-cli"},
+                "model": "hy3-free",
+            }
+        },
+    )
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"data": [{"id": "claude-sonnet-4"}, {"id": "hy3-free"}]}
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.__aenter__.return_value = mock_client
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = await manager.fetch_models_for_provider("opencode", force_refresh=True)
+
+    assert result == ["claude-sonnet-4", "hy3-free"]
+    mock_client.get.assert_called_once()
+    called_url, called_kwargs = mock_client.get.call_args
+    assert called_url[0] == "https://opencode.ai/zen/v1/models"
+    assert called_kwargs["headers"].get("User-Agent") == "opencode-cli"
+
