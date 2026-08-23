@@ -82,6 +82,11 @@ class TestMarkdownHelpers(unittest.TestCase):
         finally:
             active_app.reset(token)
 
+    def test_custom_markdown_fence_default_css_contains_dimensions(self):
+        self.assertIn("height: 1", CustomMarkdownFence.DEFAULT_CSS)
+        self.assertIn(".fence-header", CustomMarkdownFence.DEFAULT_CSS)
+        self.assertIn(".fence-scroll-box", CustomMarkdownFence.DEFAULT_CSS)
+
     def test_custom_markdown_fence_allow_horizontal_scroll(self):
         fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
         self.assertFalse(fence.allow_horizontal_scroll)

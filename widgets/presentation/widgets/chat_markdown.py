@@ -111,6 +111,19 @@ class CustomMarkdownFence(MarkdownFence):
         height: auto;
         overflow: hidden hidden;
     }
+    CustomMarkdownFence .fence-header {
+        height: 1;
+        width: 100%;
+        max-width: 100%;
+    }
+    CustomMarkdownFence .fence-scroll-box {
+        height: auto;
+        width: 100%;
+    }
+    CustomMarkdownFence #code-content {
+        height: auto;
+        width: 100%;
+    }
     """
 
     @property
