@@ -187,6 +187,7 @@ async def generate_ai_response(
             val1 = step[1] if len(step) > 1 else ""
             val2 = step[2] if len(step) > 2 else ""
             val3 = step[3] if len(step) > 3 else None
+            val4 = step[4] if len(step) > 4 else None
 
             if event_type == "queued_user_message":
                 # Queued prompts are recorded as user msgs, rendered to the UI
@@ -194,13 +195,18 @@ async def generate_ai_response(
                 q_msg = val1
                 q_atts = val2 if val2 else None
                 q_show = val3 if val3 is not None else True
+                q_display_text = val4 or None
                 q_event = {"type": "user", "text": q_msg, "show_in_ui": q_show}
+                if q_display_text:
+                    q_event["display_text"] = q_display_text
                 if q_atts:
                     q_event["attachments_count"] = len(q_atts)
                 session.add_event(q_event)
                 transcript_acc[0] = ""
                 if q_show:
-                    await canvas.add_user_message(q_msg, q_atts)
+                    # Prefer the short display text (e.g. "/skill-name") over the full
+                    # prompt so skills invoked mid-generation render the command in UI.
+                    await canvas.add_user_message(q_display_text or q_msg, q_atts)
                 await _create_git_checkpoint_async(canvas, session_id, project_path)
             else:
                 record_subagent_step(step, session, transcript_acc)

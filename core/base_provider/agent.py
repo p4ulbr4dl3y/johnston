@@ -397,7 +397,16 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     kept.append(item)
                                     continue
                                 messages.append({"role": "user", "content": item[0]})
-                                yield ("queued_user_message", item[0], item[2] if len(item) > 2 else None, item[1])
+                                # Carry the queued item's display_text (item[4]) so the UI
+                                # can render the short command instead of the full prompt text
+                                # (e.g. "/skill-name" vs the expanded <SKILL ...> block).
+                                yield (
+                                    "queued_user_message",
+                                    item[0],
+                                    item[2] if len(item) > 2 else None,
+                                    item[1],
+                                    item[4] if len(item) > 4 else None,
+                                )
                             mq[:] = kept
 
                 step_usage = None

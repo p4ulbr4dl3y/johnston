@@ -649,6 +649,8 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         # Own message drained into a queued_user_message event.
         queued = [s for s in steps if s[0] == "queued_user_message"]
         self.assertEqual([s[1] for s in queued], ["own"])
+        # 5th element carries the queued item's display_text (None when absent).
+        self.assertEqual([s[4] for s in queued], [None])
         # Foreign-session messages left in the queue untouched.
         self.assertEqual([item[0] for item in app.message_queue], ["foreign", "foreign2"])
 
