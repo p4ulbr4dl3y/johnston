@@ -10,6 +10,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
 )
+from widgets.utils.key_aliases import expand_bindings
 
 COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
 * `/models` — Switch active model across providers
@@ -40,10 +41,12 @@ KEYBINDINGS_BODY_MD = """* `Shift+Tab` — Toggle Action / Explore mode
 class HelpScreen(BaseModalScreen[None]):
     """Modal help screen with 2 tabs: Commands & Keybindings"""
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
         ("enter", "close", "Close"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self):
         super().__init__()

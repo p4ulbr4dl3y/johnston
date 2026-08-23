@@ -66,8 +66,11 @@ class ProvidersScreen(BaseSelectionScreen[str]):
         return options, items
 
     BINDINGS = expand_bindings([
+        ("escape", "cancel", "Cancel"),
         ("tab", "toggle_disabled", "Toggle Disabled"),
         ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ])
 
     def action_toggle_disabled(self) -> None:

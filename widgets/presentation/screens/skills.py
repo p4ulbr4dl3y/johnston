@@ -21,6 +21,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.utils.key_aliases import expand_bindings
 
 
 class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]]):
@@ -29,10 +30,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
     search_nav_option_list_id = "skills-option-list"
     search_nav_filtered_attr = "filtered_skills"
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("tab", "toggle_hidden", "Toggle Hidden"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self):
         super().__init__()

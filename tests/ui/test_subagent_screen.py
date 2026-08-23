@@ -1,12 +1,14 @@
 import asyncio
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from textual.app import App
 from textual.screen import Screen
 
 from core.session_manager import SessionStore
 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+from widgets.presentation.widgets.chat_container import ChatView
 
 
 class DummyHostApp(App[None]):
@@ -350,12 +352,34 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             um = screen.query_one(UserMessage)
             self.assertIn("My initial subagent prompt", um.raw_text)
-            from widgets.status_footer import SubagentStatusFooter
+            from widgets.status_footer import SubagentHeader, SubagentStatusFooter
 
+            header = screen.query_one("#subagent-header", SubagentHeader)
+            self.assertTrue(header.is_mounted)
             footer = screen.query_one("#subagent-status-footer", SubagentStatusFooter)
             self.assertTrue(footer.is_mounted)
             await pilot.press("escape")
             await pilot.pause()
+
+    async def test_subagent_screen_bindings_and_ctrl_o(self):
+        sess = self._mk("task-bind-test", "Bind Agent", "Prompt")
+        sess.add_event(
+            {"type": "tool", "tool_type": "shell", "target": "ls", "args": {"cmd": "ls"}, "result_text": "file.txt"}
+        )
+        screen = SubagentViewScreen("task-bind-test")
+        self.assertFalse(screen.inherit_bindings)
+
+        app = DummyHostApp(screen, store=self.store)
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            chat_view = screen.query_one("#subagent-chat-view", ChatView)
+            with patch.object(chat_view, "toggle_expand") as mock_te:
+                screen.action_toggle_expand()
+                mock_te.assert_called_once_with("all")
+
+            with patch.object(app, "exit") as mock_exit:
+                screen.action_quit_app()
+                mock_exit.assert_called_once()
 
 
 if __name__ == "__main__":

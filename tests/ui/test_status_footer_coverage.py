@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from widgets.status_footer import StatusFooter, SubagentStatusFooter, format_display_path
+from widgets.status_footer import StatusFooter, SubagentHeader, SubagentStatusFooter, format_display_path
 
 
 class FooterHarness(StatusFooter):
@@ -231,8 +231,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertIn("Test Subagent Task", footer._last_grid_rows[0][0])
-        self.assertIn("esc: back", footer._last_grid_rows[1][1])
+        self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
+        self.assertEqual(footer._last_grid_rows[1][1], "")
 
     def test_render_footer_compact_mode(self):
         footer = SubagentStatusFooter()
@@ -261,11 +261,10 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         ):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertIn("Researcher", footer._last_grid_rows[0][0])
         self.assertIn("gpt-4o", footer._last_grid_rows[0][0])
         self.assertIn("ctx", footer._last_grid_rows[0][1])
         self.assertIn("my_repo", footer._last_grid_rows[1][0])
-        self.assertIn("esc: back", footer._last_grid_rows[1][1])
+        self.assertEqual(footer._last_grid_rows[1][1], "")
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()
@@ -282,6 +281,89 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         bad_app.pm.load_providers.side_effect = Exception("boom")
         footer._harness_app = bad_app
         footer._render_footer()  # exception swallowed
+
+
+class TestSubagentHeaderCoverage(unittest.TestCase):
+    def test_on_unmount_timer_stop_raises(self):
+        header = SubagentHeader()
+        timer = MagicMock()
+        timer.stop.side_effect = Exception("boom")
+        header._spinner_timer = timer
+        header._resize_timer = timer
+        header.on_unmount()
+        self.assertIsNone(header._spinner_timer)
+        self.assertIsNone(header._resize_timer)
+
+    def test_update_session_none_renders(self):
+        header = SubagentHeader()
+        header._harness_app = MagicMock()
+        with patch.object(header, "update") as upd:
+            header.update_session(None)
+        upd.assert_called_once()
+        self.assertIn("esc: back", header._last_grid_rows[0][1])
+
+    def test_update_session_running_and_completed(self):
+        header = SubagentHeader()
+        session = MagicMock()
+        session.status = "running"
+        session.agent = None
+        session.role = "explorer"
+        session.description = "Review feature"
+        header.set_interval = MagicMock(return_value=MagicMock())
+
+        header.update_session(session)
+        self.assertTrue(header.is_generating)
+        self.assertIsNotNone(header._spinner_timer)
+
+        session.status = "completed"
+        header.update_session(session)
+        self.assertFalse(header.is_generating)
+        self.assertIsNone(header._spinner_timer)
+
+    def test_spin_no_rows_renders(self):
+        header = SubagentHeader()
+        header._last_grid_rows = None
+        with patch.object(header, "_render_header") as rh:
+            header._spin()
+        rh.assert_called_once()
+
+    def test_spin_with_cached_rows(self):
+        header = SubagentHeader()
+        header._last_grid_rows = [("left", "right")]
+        with patch.object(header, "_render_stream_frame") as rsf:
+            header._spin()
+        rsf.assert_called_once()
+
+    def test_render_header_long_description_truncation(self):
+        header = SubagentHeader()
+        app = MagicMock()
+        app.size = MagicMock(width=50)
+        header._harness_app = app
+        session = MagicMock()
+        session.agent = None
+        session.role = "worker"
+        session.description = "A" * 100
+        header.session = session
+        header._render_header()
+        self.assertIsNotNone(header._last_grid_rows)
+        self.assertIn("Worker", header._last_grid_rows[0][0])
+        self.assertIn("…", header._last_grid_rows[0][0])
+        self.assertIn("esc: back", header._last_grid_rows[0][1])
+
+    def test_resize_debounced(self):
+        header = SubagentHeader()
+        event = MagicMock()
+        event.size = MagicMock(width=100)
+        header.set_timer = MagicMock(return_value=MagicMock())
+        header.on_resize(event)
+        self.assertIsNotNone(header._resize_timer)
+        # same size no-op
+        header.on_resize(event)
+        # call debounced
+        with patch.object(header, "_render_header") as rh:
+            header._debounced_render()
+            rh.assert_called_once()
+            self.assertIsNone(header._resize_timer)
 
 
 # ---------------------------------------------------------------------------

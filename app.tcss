@@ -491,6 +491,14 @@ ModalScreen {
     background: #09090b;
 }
 
+#subagent-header {
+    width: 100%;
+    height: 3;
+    padding: 1 1;
+    background: #18181b;
+    color: #71717a;
+}
+
 #subagent-chat-view {
     height: 1fr;
     padding: 1 2 1 2;
@@ -773,11 +781,18 @@ AttachmentChip {
 }
 
 /* Status Footer - Matching dark grey background with muted zinc text */
-#status-footer,
-#subagent-status-footer {
+#status-footer {
     width: 100%;
     height: 3;
     padding: 0 1 1 1;
+    background: #18181b;
+    color: #71717a;
+}
+
+#subagent-status-footer {
+    width: 100%;
+    height: 4;
+    padding: 1 1 1 1;
     background: #18181b;
     color: #71717a;
 }

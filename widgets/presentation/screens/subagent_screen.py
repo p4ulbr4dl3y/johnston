@@ -5,16 +5,22 @@ from textual.containers import Vertical
 from textual.screen import Screen
 
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.status_footer import SubagentStatusFooter
+from widgets.status_footer import SubagentHeader, SubagentStatusFooter
+from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.message_visibility import is_ui_visible_user_message
 
 
 class SubagentViewScreen(Screen[None]):
-    """Full-screen view of a subagent's chat without input panel or status footer."""
+    """Full-screen view of a subagent's chat without input panel."""
 
-    BINDINGS = [
+    ALLOW_SELECT = False
+    inherit_bindings = False
+    BINDINGS = expand_bindings([
         ("escape", "close", "Close Screen"),
-    ]
+        ("ctrl+o", "toggle_expand", "Toggle Expand"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self, session_id_or_desc: str):
         super().__init__()
@@ -28,6 +34,7 @@ class SubagentViewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
+            yield SubagentHeader(id="subagent-header")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield SubagentStatusFooter(id="subagent-status-footer")
 
@@ -56,19 +63,31 @@ class SubagentViewScreen(Screen[None]):
             self.run_worker(_no_sess())
             return
 
+        header = self.query_one("#subagent-header", SubagentHeader)
         footer = self.query_one("#subagent-status-footer", SubagentStatusFooter)
+        header.update_session(self.session)
         footer.update_session(self.session)
 
-        # Keep the footer live while the subagent streams (tokens, spinner).
+        # Keep the header & footer live while the subagent streams (tokens, spinner).
         # Stop any stale interval from a previous mount before re-arming.
         if getattr(self, "_footer_refresh", None) is not None:
             try:
                 self._footer_refresh.stop()
             except Exception:
                 pass
-        self._footer_refresh = self.set_interval(1.0, lambda: footer.update_session(self.session))
+        self._footer_refresh = self.set_interval(1.0, self._refresh_chrome)
 
         self._history_worker = self.run_worker(self._load_history_session())
+
+    def _refresh_chrome(self) -> None:
+        try:
+            self.query_one("#subagent-header", SubagentHeader).update_session(self.session)
+        except Exception:
+            pass
+        try:
+            self.query_one("#subagent-status-footer", SubagentStatusFooter).update_session(self.session)
+        except Exception:
+            pass
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -233,3 +252,16 @@ class SubagentViewScreen(Screen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
+
+    def action_toggle_expand(self) -> None:
+        """Toggle expand on all expandable widgets in subagent chat."""
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.toggle_expand("all")
+        except Exception:
+            pass
+
+    def action_quit_app(self) -> None:
+        """Quit the application."""
+        if self.app:
+            self.app.exit()

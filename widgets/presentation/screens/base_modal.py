@@ -17,6 +17,7 @@ class BaseModalScreen(ModalScreen[T]):
     """Base class for all Johnston modal screens with standard exit keybindings."""
 
     ALLOW_SELECT = False
+    inherit_bindings = False
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("ctrl+c", "quit_app", "Quit"),

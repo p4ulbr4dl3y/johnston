@@ -42,9 +42,11 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     polling, no missed tail on buffer overflow.
     """
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "back", "Back to list"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self, bg_task):
         super().__init__()
@@ -115,6 +117,8 @@ class ShellTasksScreen(BaseModalScreen[None]):
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
         ("k", "kill_task", "Kill Task"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ])
 
     def __init__(self):
@@ -249,6 +253,8 @@ class SubagentsScreen(BaseModalScreen[None]):
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
         ("k", "kill_task", "Kill Task"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
     ])
 
     def __init__(self):

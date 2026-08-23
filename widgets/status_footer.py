@@ -50,8 +50,6 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
 
 def _build_subagent_grid(
     *,
-    role_formatted: str,
-    description: str = "",
     provider_display: str,
     clean_model: str,
     is_connected: bool,
@@ -73,14 +71,8 @@ def _build_subagent_grid(
     grid.add_column(justify="right")
 
     if is_compact:
-        # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
-        role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
-        if description:
-            clean_desc = description.strip()
-            if len(clean_desc) > 18:
-                clean_desc = clean_desc[:16] + "…"
-            role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
-        row1_left_parts = [role_part]
+        # Row 1 (Compact): Left [Model] | Right [pct% ctx • $0.02 / tok]
+        row1_left_parts = []
         if is_connected and clean_model and clean_model != "[Select model: /models]":
             row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
         row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
@@ -95,7 +87,7 @@ def _build_subagent_grid(
         else:
             row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
-        # Row 2 (Compact): Left [dir • branch (+N/-M)] | Right [esc: back]
+        # Row 2 (Compact): Left [dir • branch (+N/-M)] | Right []
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
         row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
@@ -106,7 +98,7 @@ def _build_subagent_grid(
         elif diff_text:
             row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
         row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
-        row2_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
+        row2_right = ""
 
         grid.add_row(row1_left, row1_right)
         grid.add_row(row2_left, row2_right)
@@ -117,20 +109,15 @@ def _build_subagent_grid(
         return grid, rows
 
     # Full mode
-    # Row 1: Left [Role: Description • Provider › Model (effort)] | Right [Context bar • tokens • cost]
-    role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
-    if description:
-        clean_desc = description.strip()
-        if len(clean_desc) > 35:
-            clean_desc = clean_desc[:32] + "…"
-        role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
-    row1_left_parts = [role_part]
-
+    # Row 1: Left [Provider › Model (effort)] | Right [Context bar • tokens • cost]
+    row1_left_parts = []
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
         model_part = f"{provider_display} › {clean_model}"
         if thinking_effort and thinking_effort != "auto":
             model_part += f" ({thinking_effort})"
         row1_left_parts.append(f"[{THEME_SECONDARY}]{model_part}[/]")
+    elif clean_model:
+        row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
     row1_left = STATUS_SEP.join(row1_left_parts)
 
     if is_connected and model_name:
@@ -151,7 +138,7 @@ def _build_subagent_grid(
         row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
     grid.add_row(row1_left, row1_right)
 
-    # Row 2: Left [directory • branch (+N/-M)] | Right [esc: back]
+    # Row 2: Left [directory • branch (+N/-M)] | Right []
     dir_text = format_display_path(directory)
     row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
     diff_text = git_diff_stats()
@@ -163,7 +150,7 @@ def _build_subagent_grid(
         row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
     row2_left = STATUS_SEP.join(row2_left_parts)
 
-    row2_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
+    row2_right = ""
     grid.add_row(row2_left, row2_right)
 
     rows = [
@@ -552,7 +539,6 @@ class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
 
             agent = getattr(session, "agent", None)
             app_agent = getattr(cur_app, "agent", None) if cur_app else None
-            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
             effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
             thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
@@ -620,14 +606,8 @@ class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             width = size_w if size_w > 0 else app_width
             is_compact = isinstance(width, int) and width > 0 and width < 75
 
-            role_formatted = f"{SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]} " if self.is_generating else ""
-            role_formatted += role.capitalize()
-
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
-            description = getattr(session, "description", "")
             grid, rows = _build_subagent_grid(
-                role_formatted=role_formatted,
-                description=description,
                 provider_display=provider_display,
                 clean_model=clean_model,
                 is_connected=is_connected,
@@ -666,3 +646,141 @@ class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     def _debounced_render(self) -> None:
         self._resize_timer = None
         self._render_footer()
+
+
+class SubagentHeader(StreamFrameMixin, Static):
+    """Single-line top header for subagent screen displaying role, description and esc hint."""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__("", *args, **kwargs)
+        self.session = None
+        self.is_generating: bool = False
+        self._spinner_idx: int = 0
+        self._spinner_timer = None
+        self._last_grid_rows: list[tuple[str, str]] | None = None
+        self._resize_timer = None
+        self._last_resize_size = None
+
+    def on_mount(self) -> None:
+        self._render_header()
+
+    def on_unmount(self) -> None:
+        if self._spinner_timer:
+            try:
+                self._spinner_timer.stop()
+            except Exception:
+                pass
+            self._spinner_timer = None
+        if self._resize_timer:
+            try:
+                self._resize_timer.stop()
+            except Exception:
+                pass
+            self._resize_timer = None
+
+    def update_session(self, session) -> None:
+        """Update with a subagent session record and refresh header render."""
+        self.session = session
+        if not session:
+            self._render_header()
+            return
+
+        is_running = getattr(session, "status", "") == "running"
+        if is_running and not self.is_generating:
+            self.is_generating = True
+            if not self._spinner_timer:
+                self._spinner_timer = self.set_interval(0.2, self._spin)
+        elif not is_running and self.is_generating:
+            self.is_generating = False
+            if self._spinner_timer:
+                self._spinner_timer.stop()
+                self._spinner_timer = None
+            self._spinner_idx = 0
+
+        self._render_header()
+
+    def _spin(self) -> None:
+        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
+        if getattr(self, "_last_grid_rows", None):
+            self._render_stream_frame()
+        else:
+            self._render_header()
+
+    def on_resize(self, event) -> None:
+        size = getattr(event, "size", None)
+        if size is not None and size == getattr(self, "_last_resize_size", None):
+            return
+        self._last_resize_size = size
+        timer = getattr(self, "_resize_timer", None)
+        if timer is not None:
+            timer.stop()
+            self._resize_timer = None
+        self._resize_timer = self.set_timer(0.15, self._debounced_render)
+
+    def _debounced_render(self) -> None:
+        self._resize_timer = None
+        self._render_header()
+
+    def _render_header(self) -> None:
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
+
+        if not self.session:
+            grid.add_row("", f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]")
+            self._last_grid_rows = [("", f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]")]
+            self.update(grid)
+            return
+
+        try:
+            session = self.session
+            cur_app = getattr(self, "_harness_app", None)
+            if cur_app is None:
+                try:
+                    cur_app = self.app
+                except Exception:
+                    cur_app = None
+
+            agent = getattr(session, "agent", None)
+            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
+            role_str = role.capitalize()
+            if self.is_generating:
+                frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
+                role_formatted = f"{frame} {role_str}"
+            else:
+                role_formatted = role_str
+
+            app_width = 80
+            try:
+                if cur_app and getattr(cur_app, "size", None):
+                    raw_w = getattr(cur_app.size, "width", 80)
+                    if isinstance(raw_w, int):
+                        app_width = raw_w
+            except Exception:
+                pass
+
+            raw_size_w = getattr(getattr(self, "size", None), "width", 0)
+            size_w = raw_size_w if isinstance(raw_size_w, int) else 0
+            width = size_w if size_w > 0 else app_width
+
+            role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
+            description = (getattr(session, "description", "") or "").strip()
+            if description:
+                max_desc = max(15, width - len(role_str) - 20)
+                if len(description) > max_desc:
+                    clean_desc = description[: max_desc - 1] + "…"
+                else:
+                    clean_desc = description
+                role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
+
+            row_left = role_part
+            row_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
+
+            grid.add_row(row_left, row_right)
+            self._last_grid_rows = [(row_left, row_right)]
+            self.update(grid)
+        except Exception:
+            pass
