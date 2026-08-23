@@ -771,7 +771,21 @@ def test_set_provider_model_single_source_of_truth(pm, tmp_path):
     assert _load_json(pfile)["custom"]["model"] == "orig"
 
 
+def test_is_local_provider():
+    from core.provider_manager import is_local_provider
+
+    assert is_local_provider("ollama") is True
+    assert is_local_provider("lmstudio") is True
+    assert is_local_provider("litellm") is True
+    assert is_local_provider("custom", api_type="ollama") is True
+    assert is_local_provider("custom", api_type="lmstudio") is True
+    assert is_local_provider("custom", api_type="litellm") is True
+    assert is_local_provider("openai") is False
+    assert is_local_provider("anthropic") is False
+
+
 def _load_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
 

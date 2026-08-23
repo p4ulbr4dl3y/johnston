@@ -33,7 +33,7 @@ MODELS_CACHE_TTL = 86400.0
 MODELS_CACHE_EMPTY_TTL = 300.0
 
 # Providers whose server runs on localhost and never requires credentials.
-LOCAL_PROVIDER_KEYS = ("ollama", "lmstudio")
+LOCAL_PROVIDER_KEYS = ("ollama", "lmstudio", "litellm")
 
 # Conventional env vars that deviate from the <KEY>_API_KEY scheme.
 _ENV_KEY_ALIASES = {

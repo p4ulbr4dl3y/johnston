@@ -64,14 +64,21 @@ class TestMarkdownHelpers(unittest.TestCase):
             fence3.code = "no lang"
             fence3.theme = None
             fence3.markdown = None
-            self.assertGreater(len(list(fence3.compose())), 0)
+            f3_widgets = list(fence3.compose())
+            self.assertGreater(len(f3_widgets), 0)
+            f3_labels = [w for w in f3_widgets if isinstance(w, Label)]
+            self.assertEqual(str(f3_labels[0].render()), "text")
 
             fence4 = CustomMarkdownFence.__new__(CustomMarkdownFence)
             fence4.lexer = "totally_unknown_lang"
             fence4.code = "x"
             fence4.theme = "one-dark"
             fence4.markdown = None
-            self.assertGreater(len(list(fence4.compose())), 0)
+            f4_widgets = list(fence4.compose())
+            self.assertGreater(len(f4_widgets), 0)
+
+            highlighted_none = CustomMarkdownFence.highlight("sample code", None)
+            self.assertEqual(highlighted_none.lexer.name, "Text only")
         finally:
             active_app.reset(token)
 

@@ -117,8 +117,31 @@ class CustomMarkdownFence(MarkdownFence):
     def allow_horizontal_scroll(self) -> bool:
         return False
 
+    @classmethod
+    def highlight(
+        cls, code: str, language: str | None = None, ansi: bool = False, dark: bool = False
+    ) -> Any:
+        clean_lang = (language or "").strip().lower()
+        if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
+            target_lexer = "text"
+        else:
+            try:
+                get_lexer_by_name(clean_lang)
+                target_lexer = clean_lang
+            except Exception:
+                target_lexer = "text"
+
+        code_str = code if isinstance(code, str) else str(code)
+        return TransparentSyntax(
+            code_str.rstrip("\r\n"),
+            lexer=target_lexer,
+            theme=CODE_THEME,
+            word_wrap=True,
+            background_color="default",
+        )
+
     def compose(self) -> ComposeResult:
-        lang_str = self.lexer.strip() if self.lexer else "code"
+        lang_str = self.lexer.strip() if self.lexer else "text"
         lang_label = Label(lang_str, classes="fence-lang")
         lang_label.ALLOW_SELECT = False
         copy_btn = Button("copy", classes="fence-copy-btn")
@@ -130,22 +153,10 @@ class CustomMarkdownFence(MarkdownFence):
             yield lang_label
             yield copy_btn
 
-        clean_lang = (self.lexer or "").strip().lower()
-        if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
-            target_lexer = "text"
-        else:
-            try:
-                get_lexer_by_name(clean_lang)
-                target_lexer = clean_lang
-            except Exception:
-                target_lexer = "text"
-
         theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
-        code_content = TransparentSyntax(
-            self.code, lexer=target_lexer, theme=theme, word_wrap=True, background_color="default"
-        )
-        if hasattr(code_content, "code") and isinstance(getattr(code_content, "code", None), str):
-            code_content.code = code_content.code.rstrip("\r\n")
+        code_content = self.highlight(self.code, self.lexer)
+        if hasattr(code_content, "theme"):
+            code_content.theme = theme
         with Vertical(classes="fence-scroll-box"):
             yield Label(code_content, id="code-content", expand=True)
 
