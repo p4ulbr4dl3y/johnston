@@ -124,6 +124,10 @@ class SessionPersistenceMixin:
             self.agent.cost_usd = session.cost_usd
             self.agent.tokens_cache_read = session.tokens_cache_read
 
+            if hasattr(session, "role") and session.role:
+                self.agent.role = session.role
+                self.role = session.role
+
             ctx = session.last_context_tokens
             if not ctx and self.agent.history:
                 from widgets.app.session_state import recompute_context_tokens

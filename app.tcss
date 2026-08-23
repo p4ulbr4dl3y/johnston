@@ -55,6 +55,16 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
     scrollbar-size: 0 0;
 }
 
+/* Loading Indicator Overlay - Zinc Monochrome */
+LoadingIndicator {
+    color: #71717a;
+    background: #09090b;
+}
+
+LoadingIndicator.-textual-loading-indicator {
+    background: #09090b;
+}
+
 WelcomeWidget {
     width: 100%;
     height: 100%;

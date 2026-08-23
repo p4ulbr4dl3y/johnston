@@ -18,6 +18,8 @@ class RewindScreen(BaseSelectionScreen[int]):
             diff_stat = msg.git_stats
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
+            if len(clean) > 55:
+                clean = clean[:55] + "..."
             opt_text = clean or "(empty message)"
             escaped_text = escape(opt_text)
 

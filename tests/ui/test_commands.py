@@ -40,6 +40,7 @@ class MockAgent:
 
     def clear_history(self):
         self.history = []
+        self.role = "worker"
 
 
 class MockDivider:
@@ -766,6 +767,27 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = NewCommand()
         await cmd.execute(app)
         self.assertFalse(t1.is_running)
+
+    async def test_new_command_resets_role(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from widgets.commands import NewCommand
+
+        app = MockApp()
+        app.message_queue = MagicMock()
+        app.sm = MagicMock()
+        app.sm.generate_session_id.return_value = "new-id"
+        mock_chat = MagicMock()
+        mock_chat.remove_children = AsyncMock()
+        app.query_one = MagicMock(return_value=mock_chat)
+        app.agent.role = "explorer"
+        app.role = "explorer"
+
+        cmd = NewCommand()
+        await cmd.execute(app)
+
+        self.assertEqual(app.agent.role, "worker")
+        self.assertEqual(app.role, "worker")
 
     async def test_subagents_command_no_subagents(self):
         from unittest.mock import MagicMock

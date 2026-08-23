@@ -185,6 +185,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.last_context_tokens = 0
         self.total_tokens = 0
         self.cost_usd = 0.0
+        self.role = "worker"
         # Drop the cached system prompt + tool schema token count from the last
         # stream. get_metrics() falls back to this when last_context_tokens is
         # zero, so keeping a stale value here makes a fresh session (after /new)

@@ -37,6 +37,16 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(s.raw_items, ["s1", "s2"])
         self.assertEqual(s.default_value, "s1")
 
+    def test_init_with_active_session(self):
+        sessions = [
+            {"id": "s1", "title": "First session", "message_count": 5},
+            {"id": "s2", "title": "Second session", "message_count": 10},
+        ]
+        s = ResumeScreen(sessions, current_session_id="s2")
+        self.assertNotIn("\\[ACTIVE]", s.raw_options[0])
+        self.assertIn("\\[ACTIVE] Second session", s.raw_options[1])
+        self.assertEqual(s.default_value, "s2")
+
     def test_init_empty(self):
         s = ResumeScreen([])
         self.assertEqual(s.raw_options, [])
@@ -69,6 +79,11 @@ class TestRewindEdge(unittest.TestCase):
     def test_empty_message_uses_placeholder(self):
         s = RewindScreen([RewindEntry(0, "")])
         self.assertIn("(empty message)", s.raw_options[0])
+
+    def test_long_message_truncated(self):
+        long_text = "A" * 100
+        s = RewindScreen([RewindEntry(0, long_text)])
+        self.assertIn("A" * 55 + "...", s.raw_options[0])
 
 
 class TestBaseSelectionScreen(unittest.TestCase):

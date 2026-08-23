@@ -112,6 +112,8 @@ async def new_session(
     sm.create_main(new_id)
 
     agent.clear_history()
+    if hasattr(agent, "role"):
+        agent.role = "worker"
     return new_id
 
 

@@ -21,6 +21,8 @@ from widgets.utils.key_aliases import expand_bindings
 def format_task_row(cmd: str) -> str:
     """Format a task command line for display in the option list."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split())
+    if len(clean) > 60:
+        clean = clean[:57] + "..."
     return f"   {clean}".rstrip()
 
 

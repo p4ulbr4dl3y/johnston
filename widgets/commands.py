@@ -79,6 +79,7 @@ class NewCommand(BaseCommand):
         app.is_generating = False
         app.message_queue.clear()
         app.current_session_id = new_id
+        app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
 
         # UI: clear chat view, show welcome, refresh footer
         chat_view = app.query_one(ChatView)
@@ -356,7 +357,8 @@ class ResumeCommand(BaseCommand):
                 app.load_session_ui(selected_sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
-        app.push_screen(ResumeScreen(sessions), callback=on_resume_selected)
+        curr_sid = getattr(app, "current_session_id", None)
+        app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)
 
 
 class SubagentsCommand(BaseCommand):

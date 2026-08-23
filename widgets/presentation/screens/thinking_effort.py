@@ -7,16 +7,10 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
     def __init__(self, current_effort: str = EFFORT_AUTO):
         current = display_thinking_effort(current_effort)
         items = [EFFORT_AUTO, "low", "medium", "high"]
-        descriptions = {
-            EFFORT_AUTO: "use model/provider default",
-            "low": "fastest, lowest token spend",
-            "medium": "balanced effort",
-            "high": "deeper reasoning",
-        }
         options = []
         for item in items:
             prefix = f"{status_tag('ACTIVE')} " if item == current else ""
-            options.append(f"{prefix}{item} - {descriptions[item]}")
+            options.append(f"{prefix}{item.capitalize()}")
         super().__init__(
             "### **Select Thinking Effort**",
             options,
