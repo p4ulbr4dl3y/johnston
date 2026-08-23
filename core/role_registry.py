@@ -14,7 +14,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
     "worker": AgentRole(
         key="worker",
         name="Worker",
-        description="Execution mode: creation, editing, shell commands, task tracking, and delegation.",
+        description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
             "## Execution Mode: WORKER\n\n"
             "1. Surgical Execution: Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.\n"
