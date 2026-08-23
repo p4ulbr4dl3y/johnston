@@ -7,6 +7,41 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.25.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.24.0...johnston-v0.25.0) (2026-08-23)
+
+
+### Features
+
+* **core:** track prompt cache read tokens and extend anthropic rolling cache ([4c24920](https://github.com/p4ulbr4dl3y/johnston/commit/4c24920d72faad7adbb8bd9a0481509ae9b03839))
+* **ui:** add autoscroll support for expanded thinking and streaming shell output ([3b570ba](https://github.com/p4ulbr4dl3y/johnston/commit/3b570babb9490edfde72f85168a8e99a10719d47))
+* **ui:** add subagent header and isolate modal keybindings ([f3c24e9](https://github.com/p4ulbr4dl3y/johnston/commit/f3c24e9567d68b289dc028ed827f2599284d43e4))
+* **ui:** auto-expand new tool and thinking widgets when expand all is active ([09e6ef4](https://github.com/p4ulbr4dl3y/johnston/commit/09e6ef469b317892ddff9cdb57269a2cf8bb80ce))
+* **ui:** display background shell log contents when expanding tool card ([be90e3e](https://github.com/p4ulbr4dl3y/johnston/commit/be90e3ecd4df2efe3ac8cc384d960223cc34ef1c))
+* **ui:** redesign status footer to 2-line layout and add monochrome attachment bar ([307798f](https://github.com/p4ulbr4dl3y/johnston/commit/307798f700e6b9d449f654f1424e10841fb08be0))
+* **ui:** simplify tool truncation boilerplate and preserve log path ([1bc028b](https://github.com/p4ulbr4dl3y/johnston/commit/1bc028b6bad04b7a5777f99c2a0615bd7a3b06af))
+
+
+### Bug Fixes
+
+* **generation:** preserve skill display_text for mid-generation queue items ([245d68a](https://github.com/p4ulbr4dl3y/johnston/commit/245d68a43d02d1ca22149738e644205e4082cbc0))
+* **lifecycle:** safely handle mock objects in _kill_all_tasks_sync ([2c76020](https://github.com/p4ulbr4dl3y/johnston/commit/2c760205a3c0ef031d6d5e658305b9a97d65c13b))
+* **prompt:** resolve identity ambiguity and clarify path boundary rule ([dc8c137](https://github.com/p4ulbr4dl3y/johnston/commit/dc8c137936a2741535693327ee620a242efd3ea9))
+* **providers:** honor enable/disable in agent selection ([22937bf](https://github.com/p4ulbr4dl3y/johnston/commit/22937bf164b1a6eb9a653628025d13ec1f983552))
+* **shell:** preserve partial output on interruption and fix stale running state on session restore ([3c040fa](https://github.com/p4ulbr4dl3y/johnston/commit/3c040fa0b9338fd77b29a858951abf9b0e5776ae))
+* **subagent:** cleanly cancel in-flight tools in subagent session on interruption ([d9355ea](https://github.com/p4ulbr4dl3y/johnston/commit/d9355ea2b742c2393723a5c33d8801f7862da61d))
+* **tools:** streamline tool schemas, self-healing hints, and subagent title parameter ([8b7778c](https://github.com/p4ulbr4dl3y/johnston/commit/8b7778cd3b1c4f61200da98782645da80a07d50d))
+* **ui:** handle cancellation and status state in ask_user tool and modal interruption ([889ad5e](https://github.com/p4ulbr4dl3y/johnston/commit/889ad5e730a392d4dc30a2c3ce7dcc16c2b81508))
+* **ui:** manage role lifecycle across sessions and polish selection screens ([d6899f9](https://github.com/p4ulbr4dl3y/johnston/commit/d6899f9169995fce7145fa1fc14483cad926f9ab))
+* **ui:** preserve autoscroll position on async tool render and expand ([d7110ec](https://github.com/p4ulbr4dl3y/johnston/commit/d7110ec4cec4311d86a3b24b94121c98980f8902))
+* **ui:** sanitize and shorten event divider titles ([66e33a0](https://github.com/p4ulbr4dl3y/johnston/commit/66e33a0cf86d07ea997f04546000533927c7e5f7))
+* **ui:** toggle inline expansion on running shell toolcard and update ask_user description ([edad2a7](https://github.com/p4ulbr4dl3y/johnston/commit/edad2a7ba6b955ae926fad75e236a1dabfa8ebdb))
+* **ui:** unify modal layout, paddings, and status footer ([bc2682f](https://github.com/p4ulbr4dl3y/johnston/commit/bc2682f407db8bd85a03aaf4f5b8e8de33695909))
+
+
+### Documentation
+
+* **skills:** fix johnston-guide reference links and example role config ([19f0128](https://github.com/p4ulbr4dl3y/johnston/commit/19f0128324283a89e088e55ea8f1210754411700))
+
 ## [0.24.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.23.0...johnston-v0.24.0) (2026-08-22)
 
 
