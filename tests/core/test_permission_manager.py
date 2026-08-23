@@ -127,12 +127,15 @@ class TestPermissionManager(unittest.TestCase):
                 self.assertEqual(action, "ask")
 
     def test_session_override_invalid_action_ignored(self):
+        # Invalid action silently ignored per docstring; falls through to global default
         self.pm.set_session_override("web_fetch", "bogus")
         action = self.pm.check_permission("web_fetch").action
-        self.assertEqual(action, "ask", "invalid session override must be ignored")
+        self.assertEqual(action, "allow", "invalid session override must be ignored; falls through to config default")
 
+        # Valid action with whitespace normalizes correctly
         self.pm.set_session_override("web_fetch", " ALLOW ")
         action = self.pm.check_permission("web_fetch").action
+        self.assertEqual(action, "allow")
         self.assertEqual(action, "allow", "valid action with whitespace must normalize")
 
     def test_update_permission_validation(self):

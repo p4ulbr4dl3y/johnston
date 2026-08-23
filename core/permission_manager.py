@@ -40,22 +40,26 @@ class PermissionManager:
 
     def set_session_override(self, tool_name: str, action: str) -> None:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
-        normalized = normalize_action(action)
-        if normalized in VALID_ACTIONS:
-            canonical = self._normalize_name(tool_name or "")
-            self.session_overrides[canonical] = normalized
+        raw = (action or "").strip().lower()
+        if raw not in self.VALID_ACTIONS:
+            return  # silently ignore (consistent with docstring)
+        canonical = self._normalize_name(tool_name or "")
+        self.session_overrides[canonical] = raw
 
     def set_session_pattern_override(self, tool_name: str, pattern: str, action: str) -> None:
         """Sets a runtime session pattern override for a tool."""
-        normalized = normalize_action(action)
+        raw = (action or "").strip().lower()
+        if raw not in self.VALID_ACTIONS:
+            return  # silently ignore (consistent with docstring)
         pat = (pattern or "").strip()
-        if normalized in VALID_ACTIONS and pat:
-            canonical = self._normalize_name(tool_name or "")
-            if canonical not in self.session_pattern_overrides:
-                self.session_pattern_overrides[canonical] = []
-            # Prepend or replace existing rule for this exact pattern
-            existing = [r for r in self.session_pattern_overrides[canonical] if r.get("pattern") != pat]
-            self.session_pattern_overrides[canonical] = [{"pattern": pat, "action": normalized}] + existing
+        if not pat:
+            return
+        canonical = self._normalize_name(tool_name or "")
+        if canonical not in self.session_pattern_overrides:
+            self.session_pattern_overrides[canonical] = []
+        # Prepend or replace existing rule for this exact pattern
+        existing = [r for r in self.session_pattern_overrides[canonical] if r.get("pattern") != pat]
+        self.session_pattern_overrides[canonical] = [{"pattern": pat, "action": raw}] + existing
 
     def _normalize_name(self, tool_name: str) -> str:
         """Canonicalizes a tool name via the injected normalizer, falling back

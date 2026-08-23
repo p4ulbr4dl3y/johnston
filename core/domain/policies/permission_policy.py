@@ -283,6 +283,8 @@ def evaluate_pattern_rules(
         )
 
     if canonical in ("create", "edit", "multi_edit", "read"):
+        # Collect all matching rules, then apply fail-closed priority: DENY > ASK > ALLOW
+        matched: List[Tuple[PermissionAction, str]] = []
         for r in rules:
             if not isinstance(r, dict):
                 continue
@@ -291,12 +293,31 @@ def evaluate_pattern_rules(
                 continue
             if match_path_pattern(target, pat):
                 act = PermissionAction(normalize_action(r.get("action", "ask")))
+                matched.append((act, pat))
+        # Apply priority
+        for act, pat in matched:
+            if act == PermissionAction.DENY:
                 return PermissionDecision(
-                    act,
-                    f"Path '{target}' matched pattern '{pat}' for '{canonical}'",
+                    PermissionAction.DENY,
+                    f"Path '{target}' matched deny pattern '{pat}' for '{canonical}'",
                 )
+        for act, pat in matched:
+            if act == PermissionAction.ASK:
+                return PermissionDecision(
+                    PermissionAction.ASK,
+                    f"Path '{target}' matched ask pattern '{pat}' for '{canonical}'",
+                )
+        # All matched are ALLOW
+        if matched:
+            return PermissionDecision(
+                PermissionAction.ALLOW,
+                f"Path '{target}' matched allow patterns: '{target}' for '{canonical}'",
+            )
+        return None
 
     if canonical == "web_fetch":
+        # Collect all matching rules, then apply fail-closed priority: DENY > ASK > ALLOW
+        matched: List[Tuple[PermissionAction, str]] = []
         for r in rules:
             if not isinstance(r, dict):
                 continue
@@ -305,10 +326,27 @@ def evaluate_pattern_rules(
                 continue
             if match_pattern(target, pat):
                 act = PermissionAction(normalize_action(r.get("action", "ask")))
+                matched.append((act, pat))
+        # Apply priority
+        for act, pat in matched:
+            if act == PermissionAction.DENY:
                 return PermissionDecision(
-                    act,
-                    f"URL '{target}' matched pattern '{pat}'",
+                    PermissionAction.DENY,
+                    f"URL '{target}' matched deny pattern '{pat}'",
                 )
+        for act, pat in matched:
+            if act == PermissionAction.ASK:
+                return PermissionDecision(
+                    PermissionAction.ASK,
+                    f"URL '{target}' matched ask pattern '{pat}'",
+                )
+        # All matched are ALLOW
+        if matched:
+            return PermissionDecision(
+                PermissionAction.ALLOW,
+                f"URL '{target}' matched allow patterns",
+            )
+        return None
 
     return None
 
