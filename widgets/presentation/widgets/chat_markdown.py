@@ -145,13 +145,7 @@ class CustomMarkdownFence(MarkdownFence):
                 target_lexer = "text"
 
         code_str = code if isinstance(code, str) else str(code)
-        return TransparentSyntax(
-            code_str.rstrip("\r\n"),
-            lexer=target_lexer,
-            theme=CODE_THEME,
-            word_wrap=True,
-            background_color="default",
-        )
+        return MarkdownFence.highlight(code_str.rstrip("\r\n"), language=target_lexer, ansi=ansi, dark=dark)
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"
@@ -166,10 +160,7 @@ class CustomMarkdownFence(MarkdownFence):
             yield lang_label
             yield copy_btn
 
-        theme = getattr(self, "theme", None) or getattr(getattr(self, "markdown", None), "theme", None) or CODE_THEME
         code_content = self.highlight(self.code, self.lexer)
-        if hasattr(code_content, "theme"):
-            code_content.theme = theme
         with Vertical(classes="fence-scroll-box"):
             yield Label(code_content, id="code-content", expand=True)
 

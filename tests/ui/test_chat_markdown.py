@@ -77,8 +77,10 @@ class TestMarkdownHelpers(unittest.TestCase):
             f4_widgets = list(fence4.compose())
             self.assertGreater(len(f4_widgets), 0)
 
+            from textual.content import Content
+
             highlighted_none = CustomMarkdownFence.highlight("sample code", None)
-            self.assertEqual(highlighted_none.lexer.name, "Text only")
+            self.assertIsInstance(highlighted_none, Content)
         finally:
             active_app.reset(token)
 
