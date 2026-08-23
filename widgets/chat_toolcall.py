@@ -418,12 +418,24 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
         return clean
 
+    def _is_parent_at_bottom(self) -> bool:
+        try:
+            from textual.containers import VerticalScroll
+
+            parent = getattr(self, "parent", None)
+            if isinstance(parent, VerticalScroll):
+                return getattr(parent, "is_at_bottom", lambda: True)()
+        except Exception:
+            pass
+        return True
+
     def compose(self) -> ComposeResult:
         yield self.header_label
         yield self.scroll_box
 
     def on_mount(self) -> None:
         if self.is_expanded and self.is_expandable():
+            self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
         else:
             self.content_widget.display = False
@@ -531,6 +543,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._update_next_sibling_spacing()
         self.render_header()
         if self.is_expanded:
+            self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
 
     def mark_cancelled(self) -> None:
@@ -689,10 +702,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.md_widget.display = False
         self._update_next_sibling_spacing()
 
-    def _scroll_if_needed(self) -> None:
+    def _scroll_if_needed(self, force: bool = False) -> None:
         from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
 
-        scroll_parent_if_needed(self)
+        scroll_parent_if_needed(self, force=force)
 
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
@@ -700,8 +713,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
+            was_at_bottom = self._is_parent_at_bottom()
+            self._should_scroll_on_render = was_at_bottom
             self.render_content()
-            self._scroll_if_needed()
+            self._scroll_if_needed(force=was_at_bottom)
         else:
             self.content_widget.display = False
             self.md_widget.display = False
@@ -949,7 +964,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 kind, value = self._compute_content()
                 self._apply_content(kind, value)
                 if self.is_expanded:
-                    self._scroll_if_needed()
+                    force = getattr(self, "_should_scroll_on_render", False)
+                    self._should_scroll_on_render = False
+                    self._scroll_if_needed(force=force)
         except Exception:
             pass
 
@@ -966,4 +983,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         self._apply_content(kind, value)
         if self.is_expanded:
-            self._scroll_if_needed()
+            force = getattr(self, "_should_scroll_on_render", False)
+            self._should_scroll_on_render = False
+            self._scroll_if_needed(force=force)

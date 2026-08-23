@@ -83,14 +83,14 @@ class UserMessage(Horizontal):
         super().__init__(bubble, classes="user-msg")
 
 
-def scroll_parent_if_needed(widget) -> None:
+def scroll_parent_if_needed(widget, force: bool = False) -> None:
     try:
         parent = getattr(widget, "parent", None)
         if isinstance(parent, VerticalScroll):
-            is_at_bot = getattr(parent, "is_at_bottom", lambda: True)()
+            is_at_bot = force or getattr(parent, "is_at_bottom", lambda: True)()
             is_loading = getattr(parent, "_is_loading_session", False)
-            if is_at_bot and not is_loading:
-                if not getattr(parent, "_scroll_pending", False):
+            if (force or is_at_bot) and not is_loading:
+                if not getattr(parent, "_scroll_pending", False) or force:
                     parent._scroll_pending = True
 
                     def _do_scroll():
@@ -364,8 +364,8 @@ class ThinkingWidget(Vertical):
         except RuntimeError:
             self._flush_content_update()
 
-    def _scroll_if_needed(self) -> None:
-        scroll_parent_if_needed(self)
+    def _scroll_if_needed(self, force: bool = False) -> None:
+        scroll_parent_if_needed(self, force=force)
 
     def _flush_content_update(self) -> None:
         self._update_scheduled = False
@@ -420,10 +420,19 @@ class ThinkingWidget(Vertical):
             return
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
+            was_at_bottom = True
+            try:
+                from textual.containers import VerticalScroll
+
+                parent = getattr(self, "parent", None)
+                if isinstance(parent, VerticalScroll):
+                    was_at_bottom = getattr(parent, "is_at_bottom", lambda: True)()
+            except Exception:
+                pass
             if self.thinking_text:
                 self.content_widget.update(self.thinking_text)
             self.content_widget.display = True
-            self._scroll_if_needed()
+            self._scroll_if_needed(force=was_at_bottom)
         else:
             if self._update_handle is not None:
                 self._update_handle.cancel()
