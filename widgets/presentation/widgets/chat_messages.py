@@ -97,6 +97,8 @@ def scroll_parent_if_needed(widget, force: bool = False) -> None:
                         try:
                             parent._scroll_pending = False
                             parent.scroll_end(animate=False)
+                            if hasattr(parent, "call_after_refresh"):
+                                parent.call_after_refresh(lambda: parent.scroll_end(animate=False))
                         except Exception:
                             pass
 

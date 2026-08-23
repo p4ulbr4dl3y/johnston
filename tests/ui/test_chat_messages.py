@@ -100,6 +100,33 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         bot3._parent = parent3
         bot3._scroll_if_needed()
 
+    async def test_scroll_parent_if_needed_executes_layout_followup(self):
+        from textual.containers import VerticalScroll
+
+        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+
+        parent = VerticalScroll()
+        parent.is_at_bottom = lambda: True
+        parent._is_loading_session = False
+        bot = BotMessage()
+        bot._parent = parent
+
+        callbacks = []
+        parent.call_after_refresh = lambda cb: callbacks.append(cb)
+        parent.scroll_end = MagicMock()
+
+        scroll_parent_if_needed(bot, force=True)
+        self.assertEqual(len(callbacks), 1)
+
+        # Run first callback (_do_scroll)
+        callbacks[0]()
+        self.assertEqual(parent.scroll_end.call_count, 1)
+        self.assertEqual(len(callbacks), 2)
+
+        # Run second callback (follow-up after layout)
+        callbacks[1]()
+        self.assertEqual(parent.scroll_end.call_count, 2)
+
     async def test_on_unmount_cancels_handles(self):
         bot = BotMessage()
         handle = MagicMock()
