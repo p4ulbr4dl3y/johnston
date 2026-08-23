@@ -1,7 +1,8 @@
 """
 Skill Manager for Johnston.
 Handles global skills (~/.johnston/skills/) and project-level skills (<cwd>/.johnston/skills/).
-Supports YAML frontmatter parsing from SKILL.md and *.md files.
+Each skill is a directory whose SKILL.md carries optional YAML frontmatter
+(name, description, hidden).
 """
 
 import logging
