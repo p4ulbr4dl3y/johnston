@@ -61,11 +61,7 @@ def get_mcp_manager(project_dir: Optional[str] = None) -> "MCPManager":
 
 
 class MCPManager:
-    # Defaults so `__new__`-constructed test doubles never AttributeError.
-    _global_config_ensured = False
-    _warned_broken_config_files: set = None  # type: ignore[assignment]
-    _start_locks = None  # type: ignore[assignment]
-    _generation = 0
+    """Owns stdio MCP client processes plus global/project config discovery."""
 
     def __init__(self, project_dir: Optional[str] = None):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
@@ -99,9 +95,7 @@ class MCPManager:
         before spawning a fresh process for the now-inactive manager.
         """
         self._generation += 1
-        locks = self._start_locks
-        if locks is not None:
-            locks.clear()
+        self._start_locks.clear()
         task = self._tools_refresh_task
         if task is not None and not task.done():
             task.cancel()
@@ -118,9 +112,7 @@ class MCPManager:
     async def stop_all_async(self):
         """Stops all running MCP client processes concurrently without blocking."""
         self._generation += 1
-        locks = self._start_locks
-        if locks is not None:
-            locks.clear()
+        self._start_locks.clear()
         task = self._tools_refresh_task
         if task is not None and not task.done():
             task.cancel()
@@ -167,19 +159,17 @@ class MCPManager:
             logger.debug("Failed to ensure default global MCP config", exc_info=True)
         self._global_config_ensured = True
 
+    def _warn_once(self, key: Tuple[str, str], message: str) -> None:
+        """Log *message* once per unique key so repeated loads don't spam."""
+        if key in self._warned_broken_config_files:
+            return
+        self._warned_broken_config_files.add(key)
+        logger.warning("%s", message)
+
     def _warn_broken_config(self, path: str, reason: str = "") -> None:
         """Log a broken-config warning once per (file, reason), not per call."""
-        warned = self._warned_broken_config_files
-        if warned is None:
-            warned = self._warned_broken_config_files = set()
-        key = (path, reason)
-        if key in warned:
-            return
-        warned.add(key)
-        if reason:
-            logger.warning("Failed to load MCP servers config %s: %s", path, reason)
-        else:
-            logger.warning("Failed to load MCP servers config %s: invalid JSON", path)
+        base = f"Failed to load MCP servers config {path}"
+        self._warn_once((path, reason), f"{base}: {reason}" if reason else f"{base}: invalid JSON")
 
     @staticmethod
     def server_enabled(server: Dict[str, Any]) -> bool:
@@ -245,8 +235,19 @@ class MCPManager:
                 self._warn_broken_config(path, reason=f"server '{k}': entry must be an object")
                 continue
             v_copy = dict(v)
-            if not self._command_parts_valid(v_copy.get("command")):
-                self._warn_broken_config(path, reason=f"server '{k}': invalid command {v_copy.get('command')!r}")
+            cmd = v_copy.get("command")
+            if not cmd and v_copy.get("url"):
+                # The client is stdio-only: an HTTP/SSE url entry can never be
+                # served, so say so explicitly instead of a cryptic "invalid
+                # command None".
+                self._warn_once(
+                    (path, f"url-server:{k}"),
+                    f"MCP config {path}: server '{k}' uses 'url' transport, which is "
+                    "unsupported (stdio only); the server is skipped",
+                )
+                continue
+            if not self._command_parts_valid(cmd):
+                self._warn_broken_config(path, reason=f"server '{k}': invalid command {cmd!r}")
                 continue
             args = v_copy.get("args")
             if args is not None and not isinstance(args, list):
@@ -459,14 +460,10 @@ class MCPManager:
         full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
         gen = self._generation
-        locks = self._start_locks
-        if locks is None:
-            locks = {}
-            self._start_locks = locks
-        lock = locks.get(name)
+        lock = self._start_locks.get(name)
         if lock is None:
             lock = asyncio.Lock()
-            locks[name] = lock
+            self._start_locks[name] = lock
 
         async with lock:
             if self._generation != gen:

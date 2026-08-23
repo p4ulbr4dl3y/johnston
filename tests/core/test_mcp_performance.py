@@ -16,6 +16,10 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
         manager.clients = {}
         manager._tools_refresh_time = 0.0
         manager._tools_refresh_task = None
+        manager._warned_broken_config_files = set()
+        manager._global_config_ensured = True
+        manager._start_locks = {}
+        manager._generation = 0
         return manager
 
     def test_system_prompt_uses_cached_tools_without_sync_refresh(self):

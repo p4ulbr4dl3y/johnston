@@ -25,6 +25,10 @@ def make_manager(project_dir=None) -> MCPManager:
     m._tools_refresh_task = None
     m._servers_cache_signature = None
     m._servers_cache = []
+    m._warned_broken_config_files = set()
+    m._global_config_ensured = True
+    m._start_locks = {}
+    m._generation = 0
     return m
 
 
@@ -263,6 +267,28 @@ class TestMCPManagerRegression(unittest.TestCase):
         self.assertEqual(by_name["good"]["args"], ["-m", "srv"])
         self.assertEqual(by_name["bad-args"]["args"], [])
         self.assertIsNone(by_name["bad-env"]["env"])
+
+    def test_url_only_server_skipped_with_clear_warning(self):
+        # stdio-only client: an HTTP/SSE 'url' entry can never be served, so it
+        # is skipped with an explicit warning instead of "invalid command None".
+        mm = MCPManager(project_dir=self.test_dir)
+        mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
+        with open(mm.global_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "mcpServers": {
+                        "remote": {"url": "https://example.com/sse"},
+                        "local": {"command": "python", "args": ["-m", "srv"]},
+                    }
+                },
+                f,
+            )
+
+        with self.assertLogs("core.infrastructure.mcp.manager", level="WARNING") as captured:
+            servers = mm.load_servers()
+
+        self.assertEqual([s["name"] for s in servers], ["local"])
+        self.assertTrue(any("'url' transport" in message for message in captured.output))
 
     def test_constructor_does_not_write_real_global_config(self):
         # Regression: instantiating the manager must not scribble the default
