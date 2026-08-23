@@ -433,6 +433,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     tool_call_arg_parts: Dict[int, List[str]] = {}
                     thinking_started = False
                     thinking_t0 = time.time()
+                    last_finish_reason = None
+                    last_native_finish_reason = None
 
                     try:
                         if getattr(self, "api_type", "openai") != "openai":
@@ -549,6 +551,24 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                         step_usage = parse_usage(chunk.usage)
 
                                     chunk_is_dict = isinstance(chunk, dict)
+                                    chunk_error = (
+                                        chunk.get("error")
+                                        if chunk_is_dict
+                                        else getattr(chunk, "error", None)
+                                    )
+                                    if (
+                                        chunk_error is not None
+                                        and not callable(chunk_error)
+                                        and not hasattr(chunk_error, "_mock_name")
+                                        and (isinstance(chunk_error, (dict, str)) or getattr(chunk_error, "message", None))
+                                    ):
+                                        err_msg = (
+                                            chunk_error.get("message")
+                                            if isinstance(chunk_error, dict)
+                                            else getattr(chunk_error, "message", str(chunk_error))
+                                        )
+                                        raise RuntimeError(f"Provider stream error: {err_msg}")
+
                                     choices = (
                                         getattr(chunk, "choices", None)
                                         if not chunk_is_dict
@@ -568,7 +588,30 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     if not choices:
                                         continue
                                     choice = choices[0]
-                                    delta = choice.delta
+                                    choice_is_dict = isinstance(choice, dict)
+                                    f_reason = (
+                                        choice.get("finish_reason")
+                                        if choice_is_dict
+                                        else getattr(choice, "finish_reason", None)
+                                    )
+                                    native_reason = (
+                                        choice.get("native_finish_reason")
+                                        if choice_is_dict
+                                        else getattr(choice, "native_finish_reason", None)
+                                    )
+                                    if isinstance(f_reason, str):
+                                        last_finish_reason = f_reason
+                                    if isinstance(native_reason, str):
+                                        last_native_finish_reason = native_reason
+
+                                    delta = (
+                                        choice.get("delta")
+                                        if choice_is_dict
+                                        else getattr(choice, "delta", None)
+                                    )
+                                    if not delta:
+                                        continue
+
                                     reasoning = (
                                         getattr(delta, "reasoning_content", None)
                                         or getattr(delta, "reasoning", None)
@@ -613,6 +656,14 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             finally:
                                 if not producer_task.done():
                                     producer_task.cancel()
+
+                            if (
+                                (last_native_finish_reason in ("network_error", "error") or last_finish_reason == "error")
+                                and not full_assistant_parts
+                                and not tool_calls_dict
+                            ):
+                                err_name = last_native_finish_reason or last_finish_reason
+                                raise RuntimeError(f"Provider stream interrupted: {err_name}")
 
                             # Resolve streamed tool-call argument fragments once.
                             for _idx, _parts in tool_call_arg_parts.items():

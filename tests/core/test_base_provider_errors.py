@@ -13,6 +13,8 @@ from core.base_provider import BaseAgent
 from tests.core._base_provider_helpers import (
     _Attachment,
     _BlockingStream,
+    _Chunk,
+    _delta,
     _MockStream,
     _text_chunk,
     _tool_call_chunk,
@@ -345,3 +347,26 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         err_results = [e for e in events if e[0] == "tool_result" and "ERR: execute 'read': boom" in e[1]]
         self.assertEqual(len(err_results), 1)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
+
+    async def test_stream_interrupted_by_native_finish_reason_network_error_retries(self):
+        agent = self._make_agent(max_retries=2, retry_delay=0.01)
+        # First attempt returns empty content with native_finish_reason="network_error"
+        err_choice = unittest.mock.MagicMock(
+            delta=_delta(content=""),
+            finish_reason="stop",
+            native_finish_reason="network_error",
+        )
+        first = _MockStream([_Chunk(choices=[err_choice])])
+        second = _MockStream([_text_chunk("recovered")])
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.side_effect = [first, second]
+            events = []
+            async for evt in agent.stream_steps("test"):
+                events.append(evt)
+
+        retry_events = [e for e in events if e[0] == "retry"]
+        self.assertEqual(len(retry_events), 1)
+        self.assertEqual(events[-1], ("bot_text", "recovered", ""))
+
