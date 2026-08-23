@@ -78,6 +78,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
         if idx is not None and 0 <= idx < len(self.filtered_items):
             pkey = self.filtered_items[idx]
             if pkey:
+                was_active = bool(self.pm) and pkey == self.pm.get_active_provider_key()
                 if pkey in self.disabled_set:
                     self.disabled_set.remove(pkey)
                     if self.pm:
@@ -86,6 +87,14 @@ class ProvidersScreen(BaseSelectionScreen[str]):
                     self.disabled_set.add(pkey)
                     if self.pm:
                         self.pm.set_provider_disabled(pkey, True)
+                        # Disabling the active provider would otherwise leave the
+                        # current agent running on a provider that is now OFF.
+                        # Recreate it so the app falls back to an enabled provider.
+                        if was_active and self.pm.get_active_provider_key() == pkey:
+                            app = getattr(self, "app", None)
+                            if app is not None:
+                                self.pm.recreate_active_agent(app)
+                                self.active_key = self.pm.get_active_provider_key()
 
                 options, items = self._build_options()
                 self.raw_options = options

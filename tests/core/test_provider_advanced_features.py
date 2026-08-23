@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.base_provider import BaseAgent
 from core.provider_manager import ProviderManager
@@ -100,6 +100,119 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                     agent = pm.create_agent_for_provider("test_no_max")
                     self.assertIsNotNone(agent)
                     self.assertEqual(agent.max_tokens, 8192)
+
+    def _make_pm(self):
+        """Build a ProviderManager with config/providers paths isolated to a tmp dir."""
+        tmpdir = tempfile.TemporaryDirectory()
+        config_file = os.path.join(tmpdir.name, "config.json")
+        providers_file = os.path.join(tmpdir.name, "providers.json")
+        self._tmpdir = tmpdir
+        self._patch1 = patch("core.provider_manager.CONFIG_FILE", config_file)
+        self._patch2 = patch("core.provider_manager.CONFIG_DIR", tmpdir.name)
+        self._patch3 = patch("core.provider_manager.PROVIDERS_JSON_FILE", providers_file)
+        self._patch1.start()
+        self._patch2.start()
+        self._patch3.start()
+        return ProviderManager()
+
+    def _teardown_pm(self):
+        self._patch1.stop()
+        self._patch2.stop()
+        self._patch3.stop()
+        self._tmpdir.cleanup()
+
+    def test_create_agent_for_provider_disabled_returns_none(self):
+        pm = self._make_pm()
+        try:
+            pm.set_provider_disabled("openai", True)
+            self.assertIsNone(pm.create_agent_for_provider("openai"))
+        finally:
+            self._teardown_pm()
+
+    def test_create_active_agent_falls_back_when_active_disabled(self):
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            pm.set_provider_disabled("openai", True)
+            agent = pm.create_active_agent()
+            self.assertIsNotNone(agent)
+            self.assertNotEqual(agent.provider_key, "openai")
+            self.assertNotEqual(pm.get_active_provider_key(), "openai")
+        finally:
+            self._teardown_pm()
+
+    def test_create_active_agent_fallback_prefers_connected_only(self):
+        # Fallback must pick a *connected* (no-key) provider, not a key-required
+        # provider that has no credential and would fail on first call.
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            pm.set_provider_disabled("openai", True)
+            agent = pm.create_active_agent()
+            self.assertIsNotNone(agent)
+            self.assertEqual(agent.provider_key, "lmstudio")  # first connected (no-key) provider
+        finally:
+            self._teardown_pm()
+
+    def test_create_active_agent_returns_none_when_no_connected_provider(self):
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            # Disable openai plus every no-key (local) provider; all remaining
+            # providers need a key that is not configured -> no connected fallback.
+            for key in ("openai", "lmstudio", "litellm"):
+                pm.set_provider_disabled(key, True)
+            self.assertIsNone(pm.create_active_agent())
+        finally:
+            self._teardown_pm()
+
+    def test_set_provider_credentials_empty_key_does_not_activate_key_required(self):
+        from core.application.provider.actions import set_provider_credentials
+
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            app = MagicMock()
+            result = set_provider_credentials(pm, "anthropic", "", app)
+            self.assertFalse(result)
+            # key-required provider must NOT become active on an empty key
+            self.assertEqual(pm.get_active_provider_key(), "openai")
+            self.assertNotIn("anthropic", pm.get_disabled_providers())
+        finally:
+            self._teardown_pm()
+
+    def test_set_provider_credentials_empty_key_activates_no_key_provider(self):
+        from core.application.provider.actions import set_provider_credentials
+
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            pm.set_provider_disabled("lmstudio", True)
+            app = MagicMock()
+            result = set_provider_credentials(pm, "lmstudio", "", app)
+            self.assertFalse(result)
+            # local provider (requires_key=False) may be activated with no key
+            self.assertEqual(pm.get_active_provider_key(), "lmstudio")
+            self.assertNotIn("lmstudio", pm.get_disabled_providers())
+        finally:
+            self._teardown_pm()
+
+    def test_set_provider_credentials_nonempty_key_enables_and_activates(self):
+        from core.application.provider.actions import set_provider_credentials
+
+        pm = self._make_pm()
+        try:
+            pm.set_active_provider_key("openai")
+            pm.set_provider_disabled("anthropic", True)
+            app = MagicMock()
+            with patch("core.application.provider.actions._refresh_models_background"):
+                result = set_provider_credentials(pm, "anthropic", "sk-test", app)
+            self.assertTrue(result)
+            self.assertEqual(pm.get_active_provider_key(), "anthropic")
+            self.assertNotIn("anthropic", pm.get_disabled_providers())
+            self.assertEqual(pm.get_api_key("anthropic"), "sk-test")
+        finally:
+            self._teardown_pm()
 
 
 if __name__ == "__main__":

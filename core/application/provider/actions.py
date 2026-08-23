@@ -50,18 +50,32 @@ def set_provider_credentials(
 ) -> bool:
     """Persist a non-empty API key, enable the provider, recreate the agent.
 
-    When *api_key* is non-empty the provider is enabled and its models are
-    re-fetched in the background.  Returns ``True`` when models were queued
-    (non-empty key), ``False`` otherwise.
+    When *api_key* is non-empty the provider is enabled, activated and its models
+    are re-fetched in the background.  For an empty key the provider is only
+    activated when it needs no key (local/``requires_key=False``), so an
+    accidental enter-without-input cannot silently switch to and enable a
+    key-required provider.  Returns ``True`` when models were queued (non-empty
+    key), ``False`` otherwise.
     """
     if api_key:
         pm.set_provider_api_key(provider_key, api_key)
         pm.set_provider_disabled(provider_key, False)
-    pm.recreate_active_agent(app, provider_key=provider_key)
-
-    if api_key:
+        pm.recreate_active_agent(app, provider_key=provider_key)
         _refresh_models_background(pm)
-    return bool(api_key)
+        return True
+
+    # Empty key: only "connect" (activate) providers that need no API key.
+    pdef = pm.load_provider_def(provider_key)
+    if pdef is None:
+        return False
+    needs_key = pdef.requires_key is not False and pdef.api_type not in ("ollama", "lmstudio")
+    if needs_key and not pm.get_api_key(provider_key):
+        return False
+    if not pdef.enabled:
+        pm.set_provider_disabled(provider_key, False)
+    if provider_key != pm.get_active_provider_key():
+        pm.recreate_active_agent(app, provider_key=provider_key)
+    return False
 
 
 

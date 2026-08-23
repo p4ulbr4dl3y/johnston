@@ -94,6 +94,7 @@ class ProviderDef:
             "retry_backoff": self.retry_backoff,
             "max_retry_delay": self.max_retry_delay,
             "enabled": self.enabled,
+            "requires_key": self.requires_key,
         }
 
     def models_fallback(self) -> List[str]:
@@ -213,14 +214,29 @@ class ProviderManager:
         return providers
 
     def load_provider_def(self, provider_key: str) -> Optional[ProviderDef]:
-        """Return a structured ProviderDef for a provider (or None if unknown)."""
-        providers = self.load_providers(include_disabled=True)
-        pdata = providers.get(provider_key)
-        if pdata is not None:
-            return ProviderDef.from_dict(provider_key, pdata, enabled=pdata.get("enabled", True))
+        """Return a structured ProviderDef for a provider (or None if unknown).
+
+        Reads the raw JSON definition directly (not the ``load_providers``
+        ``to_dict`` shape) so provider fields that ``to_dict`` intentionally
+        drops (``requires_key``, ``api_key``, ``fetch_models``, ...) are kept.
+        ``enabled`` is derived from the disabled set for both JSON and catalog
+        providers.
+        """
+        disabled_set = set(self.get_disabled_providers())
+        json_providers = self._load_json_providers()
+        if provider_key in json_providers:
+            return ProviderDef.from_dict(
+                provider_key,
+                json_providers[provider_key],
+                enabled=provider_key not in disabled_set,
+            )
         cat_pdata = catalog.get_catalog_provider(provider_key)
         if cat_pdata is not None:
-            return ProviderDef.from_dict(provider_key, cat_pdata, enabled=True)
+            return ProviderDef.from_dict(
+                provider_key,
+                cat_pdata,
+                enabled=provider_key not in disabled_set,
+            )
         return None
 
     def get_catalog_providers(self) -> Dict[str, Dict[str, Any]]:
@@ -315,6 +331,12 @@ class ProviderManager:
 
     def create_agent_for_provider(self, provider_key: str):
         pdef = self.load_provider_def(provider_key)
+        # A disabled provider must never back an agent (enable/disable must be
+        # authoritative for actual usage, not just UI filtering). Unknown/None
+        # providers keep building a default agent for backward compatibility.
+        if pdef is not None and not pdef.enabled:
+            logger.warning("Refusing to create agent for disabled provider: %s", provider_key)
+            return None
         pkey_str = pdef.key if pdef else (provider_key or "")
         stored_key = self.get_api_key(pkey_str) if pkey_str else ""
         model_val = self.get_provider_model(provider_key) if provider_key else ""
@@ -351,7 +373,23 @@ class ProviderManager:
 
     def create_active_agent(self):
         active_key = self.get_active_provider_key()
-        return self.create_agent_for_provider(active_key)
+        agent = self.create_agent_for_provider(active_key)
+        if agent is not None:
+            return agent
+        # Fallback: if the active provider is disabled/unusable, pick the first
+        # *connected* (enabled + configured) provider that can build an agent so
+        # the app keeps a working agent instead of silently switching to another
+        # provider that would fail on the first call for lack of a credential.
+        for pkey, pdata in self.load_providers().items():
+            if pkey == active_key or not pdata.get("enabled", True):
+                continue
+            if not self.is_provider_connected(pkey, pdata):
+                continue
+            agent = self.create_agent_for_provider(pkey)
+            if agent is not None:
+                self.set_active_provider_key(pkey)
+                return agent
+        return None
 
     def recreate_active_agent(self, app: Any, provider_key: Optional[str] = None, history: Optional[List[Any]] = None):
         """Recreates active agent on app preserving history, mode, and UI status."""
