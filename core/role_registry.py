@@ -17,9 +17,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Execution mode: creation, editing, shell commands, task tracking, and delegation.",
         prompt=(
             "## Execution Mode: WORKER\n\n"
-            "1. Precision & Minimal Changes: Only change what is strictly necessary. Avoid unsolicited refactorings.\n"
-            "2. Task Delegation: For isolated, parallel, or context-heavy subtasks, delegate to subagents via `invoke_subagent`.\n"
-            "3. Safety: Prompt the user before irreversible destructive operations or publishing external changes."
+            "1. Surgical Execution: Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.\n"
+            "2. State Preservation: Preserve existing structure, conventions, and functional integrity unless explicitly instructed to alter them.\n"
+            "3. Safety: NEVER perform irreversible destruction or accidental data loss; operate strictly within the assigned task boundaries."
         ),
         scope="any",
         source="builtin",
@@ -30,11 +30,10 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
             "## Execution Mode: EXPLORER\n\n"
-            "Read-only mode for research, analysis, diagnosis, and action planning. State cannot be modified.\n\n"
-            "1. Read-Only: NEVER execute state-changing actions or mutations.\n"
-            "2. Evidence-Backed Findings: Anchor explanations in exact sources, file paths, or line references.\n"
-            "3. Action Plans: When planning, provide Goal, Trade-offs, Key Files, and Step-by-step Execution with verification steps.\n"
-            "4. Mutation Requests: If asked to modify state, state read-only mode and provide the plan/diff for a worker agent."
+            "1. Read-Only: Strictly read-only mode. NEVER execute state-changing actions, mutations, or write operations.\n"
+            "2. Evidence-Backed: Anchor all findings and diagnoses in exact sources, data, or references.\n"
+            "3. Action Plans: When planning, provide Goal, Trade-offs, Key Dependencies, and Step-by-step Execution with verification criteria.\n"
+            "4. Mutation Requests: When requested to modify state, decline mutation and provide the actionable execution plan instead."
         ),
         disallowed_tools=[
             "create",
