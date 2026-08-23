@@ -707,15 +707,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         scroll_parent_if_needed(self, force=force)
 
+    def _scroll_to_widget(self, top: bool = True) -> None:
+        from widgets.presentation.widgets.chat_messages import scroll_parent_to_widget
+
+        scroll_parent_to_widget(self, top=top)
+
     def toggle_expanded(self) -> None:
         if not self.is_expandable():
             return
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
-            self._should_scroll_on_render = True
+            self._should_scroll_to_widget = True
             self.render_content()
-            self._scroll_if_needed(force=True)
+            self._scroll_to_widget(top=True)
         else:
             self.content_widget.display = False
             self.md_widget.display = False
@@ -963,9 +968,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 kind, value = self._compute_content()
                 self._apply_content(kind, value)
                 if self.is_expanded:
-                    force = getattr(self, "_should_scroll_on_render", False)
-                    self._should_scroll_on_render = False
-                    self._scroll_if_needed(force=force)
+                    if getattr(self, "_should_scroll_to_widget", False):
+                        self._should_scroll_to_widget = False
+                        self._scroll_to_widget(top=True)
+                    else:
+                        force = getattr(self, "_should_scroll_on_render", False)
+                        self._should_scroll_on_render = False
+                        self._scroll_if_needed(force=force)
         except Exception:
             pass
 
@@ -982,6 +991,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         self._apply_content(kind, value)
         if self.is_expanded:
-            force = getattr(self, "_should_scroll_on_render", False)
-            self._should_scroll_on_render = False
-            self._scroll_if_needed(force=force)
+            if getattr(self, "_should_scroll_to_widget", False):
+                self._should_scroll_to_widget = False
+                self._scroll_to_widget(top=True)
+            else:
+                force = getattr(self, "_should_scroll_on_render", False)
+                self._should_scroll_on_render = False
+                self._scroll_if_needed(force=force)

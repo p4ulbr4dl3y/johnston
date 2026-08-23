@@ -127,6 +127,32 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         callbacks[1]()
         self.assertEqual(parent.scroll_end.call_count, 2)
 
+    async def test_scroll_parent_to_widget_executes_layout_followup(self):
+        from textual.containers import VerticalScroll
+
+        from widgets.presentation.widgets.chat_messages import scroll_parent_to_widget
+
+        parent = VerticalScroll()
+        parent._is_loading_session = False
+        bot = BotMessage()
+        bot._parent = parent
+
+        callbacks = []
+        parent.call_after_refresh = lambda cb: callbacks.append(cb)
+        parent.scroll_to_widget = MagicMock()
+
+        scroll_parent_to_widget(bot, top=True)
+        self.assertEqual(len(callbacks), 1)
+
+        # Run first callback
+        callbacks[0]()
+        parent.scroll_to_widget.assert_called_with(bot, top=True, animate=False)
+        self.assertEqual(len(callbacks), 2)
+
+        # Run follow-up callback
+        callbacks[1]()
+        self.assertEqual(parent.scroll_to_widget.call_count, 2)
+
     async def test_on_unmount_cancels_handles(self):
         bot = BotMessage()
         handle = MagicMock()
@@ -408,10 +434,10 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
     def test_toggle_expanded_calls_scroll_if_needed_when_expanding(self):
         tw = ThinkingWidget("x")
         tw.is_expanded = False
-        with patch.object(tw, "_scroll_if_needed") as scroll_mock:
+        with patch("widgets.presentation.widgets.chat_messages.scroll_parent_to_widget") as scroll_mock:
             tw.toggle_expanded()
             self.assertTrue(tw.is_expanded)
-            scroll_mock.assert_called_once()
+            scroll_mock.assert_called_once_with(tw, top=True)
 
     def test_finish_thinking_calls_scroll_if_needed_when_expanded(self):
         tw = ThinkingWidget("x")

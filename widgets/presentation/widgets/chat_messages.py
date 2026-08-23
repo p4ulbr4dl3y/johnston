@@ -107,6 +107,28 @@ def scroll_parent_if_needed(widget, force: bool = False) -> None:
         pass
 
 
+def scroll_parent_to_widget(widget, top: bool = True) -> None:
+    try:
+        parent = getattr(widget, "parent", None)
+        if isinstance(parent, VerticalScroll):
+            is_loading = getattr(parent, "_is_loading_session", False)
+            if not is_loading:
+                def _do_scroll():
+                    try:
+                        if hasattr(parent, "scroll_to_widget"):
+                            parent.scroll_to_widget(widget, top=top, animate=False)
+                            if hasattr(parent, "call_after_refresh"):
+                                parent.call_after_refresh(
+                                    lambda: parent.scroll_to_widget(widget, top=top, animate=False)
+                                )
+                    except Exception:
+                        pass
+
+                parent.call_after_refresh(_do_scroll)
+    except Exception:
+        pass
+
+
 class BotMessage(Vertical):
     """AI message with streaming Static and rich interactive Textual Markdown rendering"""
 
@@ -422,19 +444,10 @@ class ThinkingWidget(Vertical):
             return
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
-            was_at_bottom = True
-            try:
-                from textual.containers import VerticalScroll
-
-                parent = getattr(self, "parent", None)
-                if isinstance(parent, VerticalScroll):
-                    was_at_bottom = getattr(parent, "is_at_bottom", lambda: True)()
-            except Exception:
-                pass
             if self.thinking_text:
                 self.content_widget.update(self.thinking_text)
             self.content_widget.display = True
-            self._scroll_if_needed(force=was_at_bottom)
+            scroll_parent_to_widget(self, top=True)
         else:
             if self._update_handle is not None:
                 self._update_handle.cancel()
