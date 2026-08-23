@@ -344,7 +344,12 @@ class ThinkingWidget(Vertical):
         yield self.content_widget
 
     def on_mount(self) -> None:
-        self.content_widget.display = False
+        if self.is_expanded:
+            if self.thinking_text:
+                self.content_widget.update(self.thinking_text)
+            self.content_widget.display = True
+        else:
+            self.content_widget.display = False
         if self.is_expandable():
             self.header_label.add_class("thinking-header-expandable")
         else:

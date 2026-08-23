@@ -19,6 +19,7 @@ class ChatView(VerticalScroll):
         super().__init__(*args, **kwargs)
         self.show_welcome = show_welcome
         self._is_loading_session: bool = False
+        self.auto_expand_all: bool = False
 
     def is_at_bottom(self, threshold: int = 3) -> bool:
         """Returns True if scroll position is at or near the bottom of the container."""
@@ -88,6 +89,8 @@ class ChatView(VerticalScroll):
 
     async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
         widget = ThinkingWidget(thinking_text)
+        if self.auto_expand_all and widget.is_expandable():
+            widget.is_expanded = True
         should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
@@ -127,6 +130,8 @@ class ChatView(VerticalScroll):
             returncode=returncode,
             is_mcp=is_mcp,
         )
+        if self.auto_expand_all and widget.is_expandable():
+            widget.is_expanded = True
         should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
@@ -165,16 +170,15 @@ class ChatView(VerticalScroll):
             elif isinstance(child, ToolCallWidget) and child.is_expandable():
                 expandables.append(child)
 
-        if not expandables:
-            return
-
         mode_clean = (mode or "all").lower().strip()
 
         if mode_clean in ("collapse", "collapse_all", "close"):
+            self.auto_expand_all = False
             for w in expandables:
                 if getattr(w, "is_expanded", False):
                     w.toggle_expanded()
         elif mode_clean in ("expand_all", "expand"):
+            self.auto_expand_all = True
             for w in expandables:
                 if not getattr(w, "is_expanded", False):
                     w.toggle_expanded()
@@ -186,12 +190,17 @@ class ChatView(VerticalScroll):
                 and getattr(focused, "is_expandable", lambda: False)()
             ):
                 target_widget = focused
-            else:
+            elif expandables:
                 target_widget = expandables[-1]
             if target_widget:
                 target_widget.toggle_expanded()
         else:
+            if not expandables:
+                self.auto_expand_all = not self.auto_expand_all
+                return
+
             any_collapsed = any(not getattr(w, "is_expanded", False) for w in expandables)
+            self.auto_expand_all = any_collapsed
             for w in expandables:
                 if any_collapsed:
                     if not getattr(w, "is_expanded", False):

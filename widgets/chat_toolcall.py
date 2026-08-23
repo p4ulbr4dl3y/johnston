@@ -423,8 +423,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         yield self.scroll_box
 
     def on_mount(self) -> None:
-        self.content_widget.display = False
-        self.md_widget.display = False
+        if self.is_expanded and self.is_expandable():
+            self.render_content()
+        else:
+            self.content_widget.display = False
+            self.md_widget.display = False
         self.render_header()
         self._sync_sequential_with_prev()
 

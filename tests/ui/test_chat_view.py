@@ -351,3 +351,29 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as _:
             chat_view = app.query_one(ChatView)
             self.assertIsInstance(chat_view.is_at_bottom(), bool)
+
+    async def test_auto_expand_all_new_widgets(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            # Toggle expand before any widget exists -> auto_expand_all becomes True
+            chat_view.toggle_expand()
+            self.assertTrue(chat_view.auto_expand_all)
+
+            thinking = await chat_view.add_thinking_widget("Thinking text", animate=False)
+            tool = await chat_view.add_tool_call("shell", "echo test", "result", animate=False)
+            await pilot.pause()
+
+            self.assertTrue(thinking.is_expanded)
+            self.assertTrue(tool.is_expanded)
+
+            # Toggle expand again -> collapses all and auto_expand_all becomes False
+            chat_view.toggle_expand()
+            self.assertFalse(chat_view.auto_expand_all)
+            self.assertFalse(thinking.is_expanded)
+            self.assertFalse(tool.is_expanded)
+
+            # New widgets added after collapsing are not expanded
+            new_tool = await chat_view.add_tool_call("shell", "ls", "files", animate=False)
+            await pilot.pause()
+            self.assertFalse(new_tool.is_expanded)
