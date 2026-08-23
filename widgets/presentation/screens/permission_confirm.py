@@ -6,6 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
+from core.domain.policies.permission_policy import suggest_pattern
 from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.widgets.chat_diff import format_edit_diff
@@ -18,6 +19,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     ALLOW_SELECT = False
     BINDINGS = expand_bindings([
         ("enter", "approve", "Approve Once"),
+        ("p", "allow_pattern", "Allow Pattern (Session)"),
         ("a", "always_allow", "Always Allow (Session)"),
         ("escape", "deny", "Deny"),
         ("d", "deny", "Deny"),
@@ -43,8 +45,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self.args = args or {}
         self.reason = reason
         self.diff = diff
+        self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
 
     def _build_diff_text(self, target_path: str) -> str:
+
         if self.diff:
             return self.diff
 
@@ -247,7 +251,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            yield Label("enter: allow • a: session • esc/d: deny", id="modal-hint")
+            if self.suggested_pattern:
+                yield Label(f"enter: allow • p: pattern ({self.suggested_pattern}) • a: all tool • esc/d: deny", id="modal-hint")
+            else:
+                yield Label("enter: allow • a: session • esc/d: deny", id="modal-hint")
 
     def _get_scroll_target(self):
         try:
@@ -294,6 +301,12 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def action_approve(self) -> None:
         self.dismiss("allow")
 
+    def action_allow_pattern(self) -> None:
+        if self.suggested_pattern:
+            self.dismiss(f"pattern:{self.suggested_pattern}")
+        else:
+            self.dismiss("always_allow")
+
     def action_always_allow(self) -> None:
         self.dismiss("always_allow")
 
@@ -302,4 +315,5 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def action_cancel(self) -> None:
         self.dismiss("deny")
+
 

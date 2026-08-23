@@ -150,7 +150,11 @@ class ActionsMixin:
         if result == "always_allow":
             if perm_name:
                 pm.set_session_override(perm_name, "allow")
-        return result in ("allow", "always_allow")
+        elif isinstance(result, str) and result.startswith("pattern:"):
+            pattern = result.split(":", 1)[1]
+            if perm_name and pattern:
+                pm.set_session_pattern_override(perm_name, pattern, "allow")
+        return result in ("allow", "always_allow") or (isinstance(result, str) and result.startswith("pattern:"))
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:
         """Shows the AskUserWizardScreen and returns the user's answer.

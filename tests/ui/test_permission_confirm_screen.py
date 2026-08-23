@@ -48,6 +48,26 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         screen.action_deny()
         self.assertEqual(dismissed_val, "deny")
 
+    def test_screen_action_allow_pattern(self):
+        screen = PermissionConfirmScreen("shell", {"command": "git status"})
+        dismissed_val = None
+
+        def mock_dismiss(result):
+            nonlocal dismissed_val
+            dismissed_val = result
+
+        screen.dismiss = mock_dismiss
+        self.assertEqual(screen.suggested_pattern, "git status *")
+        screen.action_allow_pattern()
+        self.assertEqual(dismissed_val, "pattern:git status *")
+
+        # Fallback when no pattern suggested
+        screen_no_pat = PermissionConfirmScreen("ask_user", {})
+        screen_no_pat.dismiss = mock_dismiss
+        screen_no_pat.action_allow_pattern()
+        self.assertEqual(dismissed_val, "always_allow")
+
+
     def test_build_diff_text_pre_set_diff(self):
         screen = PermissionConfirmScreen("create", {"path": "a.py"}, diff="--- custom\n+++ custom")
         self.assertEqual(screen._build_diff_text("a.py"), "--- custom\n+++ custom")
