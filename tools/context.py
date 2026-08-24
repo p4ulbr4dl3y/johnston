@@ -124,20 +124,6 @@ class ToolContext:
         return self.cwd or os.getcwd()
 
     @property
-    def scratch_dir(self) -> str | None:
-        """Returns the session scratch directory if available."""
-        if self.host:
-            sess_id = self.session_id
-            if sess_id:
-                try:
-                    from core.session_manager import SessionStore
-
-                    return SessionStore.get_instance(self.project_dir).get_scratch_dir(sess_id)
-                except Exception:
-                    pass
-        return None
-
-    @property
     def background_tasks(self) -> List[Any]:
         """Live shell tasks currently managed by the app's TaskManager."""
         mgr = self.task_manager

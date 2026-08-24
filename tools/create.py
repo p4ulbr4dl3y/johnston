@@ -38,8 +38,7 @@ class CreateTool(BaseTool):
         if getattr(ctx, "sandbox_enabled", False):
             from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
 
-            extra = [ctx.scratch_dir] if getattr(ctx, "scratch_dir", None) else None
-            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd, extra_writable_roots=extra):
+            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
                 return ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
 
         def _probe():

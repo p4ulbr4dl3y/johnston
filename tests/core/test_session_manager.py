@@ -231,23 +231,6 @@ class TestSessionManagerPureReader(unittest.TestCase):
         title = self.store._title_from_messages(sess)
         self.assertEqual(title, "/caveman help")
 
-    def test_scratch_dir_lifecycle(self):
-        sid = self.store.generate_session_id()
-        sess = self.store.create_main(sid)
-        sdir = self.store.get_scratch_dir(sid)
-        self.assertTrue(os.path.isdir(sdir))
-        self.assertEqual(sess.scratch_dir, sdir)
-
-        # Write a dummy scratch file
-        test_file = os.path.join(sdir, "scratch.txt")
-        with open(test_file, "w") as f:
-            f.write("temp")
-        self.assertTrue(os.path.exists(test_file))
-
-        # Deleting session should remove scratch dir
-        self.store.delete(sid)
-        self.assertFalse(os.path.exists(sdir))
-
 
 if __name__ == "__main__":
     unittest.main()

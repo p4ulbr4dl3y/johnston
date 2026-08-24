@@ -86,17 +86,6 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         or getattr(agent, "model", "")
     )
     is_subagent = getattr(agent, "is_subagent", False)
-    scratch_dir = getattr(agent, "scratch_dir", None)
-    if not scratch_dir:
-        app = getattr(agent, "app", None)
-        sess_id = getattr(app, "current_session_id", None) or getattr(agent, "session_id", None)
-        if sess_id:
-            try:
-                from core.session_manager import SessionStore
-
-                scratch_dir = SessionStore.get_instance(getattr(agent, "cwd", None)).get_scratch_dir(sess_id)
-            except Exception:
-                pass
     builder = PromptBuilder(
         agent.system_prompt,
         agent.tools,
@@ -106,7 +95,6 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         cwd=getattr(agent, "cwd", None),
         is_subagent=is_subagent,
         subagent_schema=getattr(agent, "subagent_schema", None),
-        scratch_dir=scratch_dir,
     )
     sys_prompt = await builder.build_system_prompt_async()
     all_tools = builder.build_tools()

@@ -340,7 +340,6 @@ class SessionStore:
 
         self.project_dir = os.path.join(PROJECTS_DIR, self.project_key)
         self.sessions_dir = os.path.join(self.project_dir, "sessions")
-        self.scratch_dir = os.path.join(self.project_dir, "scratch")
         self.config_file = os.path.join(self.project_dir, "config.json")
 
         self._sessions: Dict[str, AgentSession] = {}
@@ -359,14 +358,6 @@ class SessionStore:
 
     def ensure_dirs(self) -> None:
         os.makedirs(self.sessions_dir, exist_ok=True)
-        os.makedirs(self.scratch_dir, exist_ok=True)
-
-    def get_scratch_dir(self, session_id: str) -> str:
-        """Get or create the isolated scratch directory for a session."""
-        safe_id = os.path.basename(session_id or "default")
-        path = os.path.join(self.scratch_dir, safe_id)
-        os.makedirs(path, exist_ok=True)
-        return path
 
     def generate_session_id(self) -> str:
         return f"session_{int(time.time())}_{uuid.uuid4().hex[:4]}"
@@ -593,11 +584,9 @@ class SessionStore:
 
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)
-        import shutil
-
-        shutil.rmtree(self.get_scratch_dir(session_id), ignore_errors=True)
-
         if sess and sess.kind == SessionKind.MAIN:
+            import shutil
+
             shutil.rmtree(self._subagent_dir(session_id), ignore_errors=True)
             try:
                 os.remove(self._main_path(session_id))

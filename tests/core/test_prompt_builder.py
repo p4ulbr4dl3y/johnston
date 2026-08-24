@@ -149,13 +149,5 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("synchronous", shell["function"]["description"].lower())
 
 
-    def test_build_system_prompt_substitutes_scratch_dir(self):
-        builder = PromptBuilder(
-            "Base prompt with {scratch_dir}", [], role="worker", scratch_dir="/custom/scratch/path"
-        )
-        prompt = builder.build_system_prompt()
-        self.assertIn("Base prompt with /custom/scratch/path", prompt)
-
-
 if __name__ == "__main__":
     unittest.main()
