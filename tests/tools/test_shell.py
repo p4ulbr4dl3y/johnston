@@ -709,17 +709,17 @@ async def test_timeout_kills_subagent_subprocess(tool, make_tool_context):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="false is POSIX-only")
-async def test_false_exit_code_is_lost(tool, make_tool_context):
-    # `false` exits 1 but the tool never surfaces the exit code.
-    res = str(await tool.execute({"command": "false"}, ctx=_ctx(make_tool_context)))
-    assert res == "(no output)"
+async def test_false_exit_code_surfaced(tool, make_tool_context):
+    # `false` exits 1 and the tool surfaces the exit code when there is no output.
+    res = await tool.execute({"command": "false"}, ctx=_ctx(make_tool_context))
+    assert res.returncode == 1
+    assert str(res) == "(exit code 1)"
 
 
-async def test_explicit_exit_code_is_lost(tool, make_tool_context):
-    # Never-reached output + non-zero exit → tool reports nothing, no code.
-    res = str(await tool.execute({"command": "echo never_shown; exit 7"}, ctx=_ctx(make_tool_context)))
-    # Exit code discarded and nonzero treated identically to success.
-    assert "never_shown" in res
+async def test_explicit_exit_code_surfaced(tool, make_tool_context):
+    res = await tool.execute({"command": "echo never_shown; exit 7"}, ctx=_ctx(make_tool_context))
+    assert res.returncode == 7
+    assert "never_shown" in str(res)
 
 
 async def test_stderr_only_captured(tool, make_tool_context):

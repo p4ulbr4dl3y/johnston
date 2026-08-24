@@ -221,9 +221,13 @@ class ShellTool(BaseTool):
                 except asyncio.TimeoutError:
                     pass
             res = task.get_formatted_output()
+            raw_rc = p.returncode if p.returncode is not None else getattr(task, "returncode", None)
+            returncode = raw_rc if isinstance(raw_rc, int) else None
             if not res.strip():
-                return ToolResult.done("(no output)")
-            return ToolResult.done(_truncate_output(res))
+                if returncode is not None and returncode != 0:
+                    return ToolResult.done(f"(exit code {returncode})", returncode=returncode)
+                return ToolResult.done("(no output)", returncode=returncode)
+            return ToolResult.done(_truncate_output(res), returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
             if read_task:
