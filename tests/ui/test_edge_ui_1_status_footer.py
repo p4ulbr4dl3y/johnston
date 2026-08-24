@@ -29,7 +29,7 @@ class FooterHarness(StatusFooter):
 
 
 def _dump(table):
-    con = Console(width=200, color_system=None)
+    con = Console(width=200, color_system=None, _environ={})
     with con.capture() as cap:
         con.print(table)
     return cap.get()

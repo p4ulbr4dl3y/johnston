@@ -10,7 +10,7 @@ class TestDiffRenderable(unittest.TestCase):
 
         lines = [Text("old line"), Text("new line")] * 2
         renderable = DiffRenderable(lines)
-        console = Console(width=20, record=True)
+        console = Console(width=20, record=True, _environ={})
         console.print(renderable)
         self.assertIn("old line", console.export_text())
         self.assertIsNotNone(renderable.__rich_measure__(console, console.options))
@@ -22,7 +22,7 @@ class TestDiffRenderable(unittest.TestCase):
 
         lines = [Text("short"), Text("a much longer line that exceeds")]
         renderable = DiffRenderable(lines)
-        console = Console(width=10, record=True)
+        console = Console(width=10, record=True, _environ={})
         console.print(renderable)
         self.assertIn("short", console.export_text())
 
@@ -171,7 +171,7 @@ class TestFormatEditDiff(unittest.TestCase):
         code = Text("a very long code line that should wrap to next line")
         dl = DiffLine(pfx, code, style_bg="on #12261e")
         renderable = DiffRenderable([dl])
-        console = Console(width=25, record=True)
+        console = Console(width=25, record=True, _environ={})
         console.print(renderable)
         exported = console.export_text()
         self.assertIn("10 +", exported)

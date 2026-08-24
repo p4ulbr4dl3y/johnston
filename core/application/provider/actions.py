@@ -63,7 +63,9 @@ def set_provider_credentials(
     pdef = pm.load_provider_def(provider_key)
     if pdef is None:
         return False
-    needs_key = pdef.requires_key is not False and not is_local_provider(provider_key, pdef.api_type)
+    needs_key = pdef.requires_key is not False and not is_local_provider(
+        provider_key, pdef.api_type, pdef.base_url, pdef.requires_key
+    )
     if needs_key and not pm.get_api_key(provider_key):
         return False
     if not pdef.enabled:

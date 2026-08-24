@@ -220,7 +220,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         output_tokens_est: int = 0,
     ) -> None:
         """Accumulates input/output/cache tokens and estimates USD cost based on API reporting or model pricing."""
-        is_local = is_local_provider(self.provider_key, getattr(self, "api_type", ""))
+        is_local = is_local_provider(
+            self.provider_key, getattr(self, "api_type", ""), getattr(self, "base_url", "")
+        )
         model_low = (self.model or "").lower()
         is_free_model = (
             ":free" in model_low

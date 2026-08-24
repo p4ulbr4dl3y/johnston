@@ -14,7 +14,7 @@ class TestDiffRenderable(unittest.TestCase):
         renderable = DiffRenderable([])
         from rich.console import Console
 
-        console = Console(width=20)
+        console = Console(width=20, _environ={})
         options = console.options
         measure = renderable.__rich_measure__(console, options)
         # Measure must return a (min, max) pair.
@@ -24,7 +24,7 @@ class TestDiffRenderable(unittest.TestCase):
         from rich.console import Console
 
         renderable = DiffRenderable([])
-        console = Console(width=20)
+        console = Console(width=20, _environ={})
         self.assertIsNotNone(console.render(renderable))
 
 

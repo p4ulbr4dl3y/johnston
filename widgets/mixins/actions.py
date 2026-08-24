@@ -154,6 +154,8 @@ class ActionsMixin:
             pattern = result.split(":", 1)[1]
             if perm_name and pattern:
                 pm.set_session_pattern_override(perm_name, pattern, "allow")
+        elif isinstance(result, str) and result.startswith("deny:"):
+            return result
         return result in ("allow", "always_allow") or (isinstance(result, str) and result.startswith("pattern:"))
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:

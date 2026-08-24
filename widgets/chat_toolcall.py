@@ -75,8 +75,40 @@ def build_synthetic_create_diff(file_path: str, content: str) -> str:
     return "\n".join(d_lines)
 
 
+def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
+    """Format an update_plan checklist into a unified rich Text renderable."""
+    t = Text()
+    if explanation:
+        t.append(f"{explanation}\n\n", style="italic #a1a1aa")
+
+    if isinstance(plan_items, list):
+        plan_lines = []
+        for item in plan_items:
+            if not isinstance(item, dict):
+                continue
+            step = str(item.get("step") or "").strip()
+            status = str(item.get("status") or "pending").lower()
+
+            if status == "completed":
+                line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
+            elif status == "in_progress":
+                line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
+            else:
+                line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
+            plan_lines.append(line)
+
+        for i, pl in enumerate(plan_lines):
+            t.append(pl)
+            if i < len(plan_lines) - 1:
+                t.append("\n")
+    elif isinstance(plan_items, str) and plan_items.strip():
+        t.append(plan_items.strip(), style="#e4e4e7")
+
+    return t
+
+
 class FormattingMixin:
-    """Pure formatting helpers for tool output display"""
+    """Read/Edit/Plan formatting helpers"""
 
     _lexer_cache: dict[str, str] = {}
 
@@ -92,43 +124,24 @@ class FormattingMixin:
         return name
 
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
-        t = Text()
-        if explanation:
-            t.append(f"{explanation}\n\n", style="italic #a1a1aa")
-
-        plan_lines = []
-        for item in plan_items:
-            if not isinstance(item, dict):
-                continue
-            step = item.get("step") or ""
-            status = str(item.get("status") or "pending").lower()
-
-            if status == "completed":
-                line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
-            elif status == "in_progress":
-                line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
-            else:
-                line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
-            plan_lines.append(line)
-
-        for i, pl in enumerate(plan_lines):
-            t.append(pl)
-            if i < len(plan_lines) - 1:
-                t.append("\n")
-
-        return t
+        return format_plan_display(plan_items, explanation)
 
     def _format_ask_user_display(self) -> Any:
         questions = self._parse_ask_user_questions()
         answers = self._parse_ask_user_answers(questions)
         t = Text()
+        num_questions = len(questions)
         for i, q in enumerate(questions):
-            if i:
-                t.append("\n")
-            q_text = q.get("question", "")
+            if i > 0:
+                t.append("\n\n")
+            q_text = str(q.get("question") or "").strip()
+            prefix = f"{i + 1}. " if num_questions > 1 else ""
+            t.append(f"{prefix}{q_text}\n", style="bold #ffffff")
             ans = answers.get(i, {}).get("answer", "")
-            t.append(f"{q_text}\n", style="bold #ffffff")
-            t.append(f"{ans}", style="#a1a1aa" if not ans else None)
+            if ans:
+                t.append(f"  ✓ {ans}", style="#a1a1aa")
+            else:
+                t.append("  (No response)", style="italic #71717a")
         if not t:
             t.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
         return t

@@ -4,10 +4,10 @@ from typing import Any, Dict, Optional
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown, Static
+from textual.widgets import Input, Label, Markdown, Static
 
 from core.domain.policies.permission_policy import suggest_pattern
-from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
+from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff, format_plan_display
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
@@ -16,17 +16,17 @@ from widgets.utils.key_aliases import expand_bindings
 class PermissionConfirmScreen(BaseModalScreen[str]):
     """Modal screen asking user for permission before executing a tool in human-friendly format."""
 
+    AUTO_FOCUS = ""
     ALLOW_SELECT = False
     BINDINGS = expand_bindings([
         ("enter", "approve", "Approve Once"),
         ("p", "allow_pattern", "Allow Pattern (Session)"),
         ("a", "always_allow", "Always Allow (Session)"),
+        ("r", "reject_with_reason", "Reject with Reason"),
         ("escape", "deny", "Deny"),
         ("d", "deny", "Deny"),
         ("up", "scroll_up", "Scroll Up"),
         ("down", "scroll_down", "Scroll Down"),
-        ("left", "scroll_left", "Scroll Left"),
-        ("right", "scroll_right", "Scroll Right"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
@@ -72,9 +72,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         if self.tool_name == "create":
             file_exists = bool(target_path and os.path.isfile(target_path))
             if file_exists or self.diff:
-                action_desc = f"Agent wants to write `{target_path or 'file'}` with diff:"
+                action_desc = f"Agent wants to overwrite `{target_path or 'file'}` with diff:"
             else:
-                action_desc = f"Agent wants to write `{target_path or 'file'}`:"
+                action_desc = f"Agent wants to create `{target_path or 'file'}`:"
         elif self.tool_name in ("edit", "multi_edit"):
             action_desc = f"Agent wants to edit `{target_path or 'file'}` with diff:"
         elif self.tool_name == "read":
@@ -83,12 +83,14 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             url = nargs.get("url") or ""
             action_desc = f"Agent wants to fetch `{url or 'URL'}`"
         elif self.tool_name == "invoke_subagent":
-            role = nargs.get("type") or "Subagent"
+            role = nargs.get("type") or nargs.get("role") or "Subagent"
+            title = nargs.get("title") or ""
             prompt = nargs.get("prompt") or ""
+            target_desc = f"`{role}` (\"{title}\")" if title else f"`{role}`"
             if prompt:
-                action_desc = f"Agent wants to launch subagent `{role}` with prompt:"
+                action_desc = f"Agent wants to launch subagent {target_desc} with prompt:"
             else:
-                action_desc = f"Agent wants to launch subagent `{role}`"
+                action_desc = f"Agent wants to launch subagent {target_desc}"
         elif self.tool_name in ("manage_shell",):
             act = (nargs.get("action") or "manage").lower()
             t_id = nargs.get("task_id") or ""
@@ -124,23 +126,22 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     f"Agent wants to `{act}` subagent `{s_id}`" if s_id else "Agent wants to manage subagents"
                 )
         elif self.tool_name == "update_plan":
-            plan = (nargs.get("plan") or "").strip()
-            action_desc = "Agent wants to update the plan:" if plan else "Agent wants to update the plan"
+            plan_val = nargs.get("plan")
+            has_plan = bool(plan_val)
+            action_desc = "Agent wants to update the plan:" if has_plan else "Agent wants to update the plan"
         elif self.tool_name == "ask_user":
             qs = nargs.get("questions") or []
-            q_texts = []
-            if isinstance(qs, list):
-                for q in qs:
-                    if isinstance(q, dict):
-                        t = q.get("question") or ""
-                    else:
-                        t = str(q)
-                    t = t.strip()
-                    if t:
-                        q_texts.append(t)
-            if q_texts:
-                formatted_qs = ", ".join(f"`{t}`" for t in q_texts)
-                action_desc = f"Agent wants to ask {formatted_qs}"
+            q_count = len(qs) if isinstance(qs, list) else 0
+            if q_count > 1:
+                action_desc = f"Agent wants to ask {q_count} questions:"
+            elif q_count == 1:
+                q0 = qs[0]
+                raw_q = q0.get("question") if isinstance(q0, dict) else q0
+                q_text = str(raw_q or "").strip()
+                if q_text and not (isinstance(q0, dict) and q0.get("options")):
+                    action_desc = f"Agent wants to ask: `{q_text}`"
+                else:
+                    action_desc = "Agent wants to ask a question:"
             else:
                 action_desc = "Agent wants to ask a question"
         elif self.tool_name == "shell":
@@ -152,7 +153,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"Agent wants to execute `{self.tool_name}`"
 
         is_wide = (
-            self.tool_name in ("create", "edit", "multi_edit", "shell")
+            self.tool_name in ("create", "edit", "multi_edit", "shell", "update_plan")
             or bool(self.diff)
             or (
                 bool(self.args)
@@ -219,24 +220,32 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```text\n{prompt.strip()}\n```", classes="modal-diff-view")
             elif self.tool_name == "update_plan":
-                plan = nargs.get("plan") or ""
-                if plan:
+                plan_val = nargs.get("plan")
+                explanation = (nargs.get("explanation") or "").strip()
+                if plan_val:
+                    formatted_plan = format_plan_display(plan_val, explanation)
                     with ToolScrollBox(classes="tool-scroll-box"):
-                        yield Markdown(f"```markdown\n{plan.strip()}\n```", classes="modal-diff-view")
+                        yield Static(formatted_plan, classes="modal-diff-view")
             elif self.tool_name == "ask_user":
                 qs = nargs.get("questions") or []
-                if isinstance(qs, list) and any(isinstance(q, dict) and q.get("options") for q in qs):
+                if isinstance(qs, list) and qs:
                     lines = []
                     for i, q in enumerate(qs, 1):
-                        if isinstance(q, dict) and q.get("options"):
-                            q_text = q.get("question") or ""
+                        prefix = f"{i}. " if len(qs) > 1 else ""
+                        if isinstance(q, dict):
+                            q_text = (q.get("question") or "").strip()
                             opts = q.get("options") or []
-                            opts_str = "\n  - " + "\n  - ".join(str(o) for o in opts)
-                            prefix = f"{i}. " if len(qs) > 1 else ""
-                            lines.append(f"{prefix}`{q_text}`{opts_str}")
+                            block = [f"**{prefix}{q_text}**" if q_text else ""]
+                            for opt in opts:
+                                block.append(f"- {opt}")
+                            lines.append("\n".join(b for b in block if b))
+                        elif len(qs) > 1:
+                            lines.append(f"**{prefix}{str(q).strip()}**")
                     if lines:
                         with ToolScrollBox(classes="tool-scroll-box"):
-                            yield Markdown("\n\n".join(lines), classes="modal-diff-view")
+                            for i, block_str in enumerate(lines):
+                                cls = "modal-diff-view" if i == len(lines) - 1 else "modal-diff-view modal-qa-block"
+                                yield Markdown(block_str, classes=cls)
             elif self.args and self.tool_name not in (
                 "shell",
                 "read",
@@ -251,10 +260,37 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            if self.suggested_pattern:
-                yield Label(f"enter: allow • p: pattern ({self.suggested_pattern}) • a: all tool • esc/d: deny", id="modal-hint")
-            else:
-                yield Label("enter: allow • a: session • esc/d: deny", id="modal-hint")
+            inp = Input(placeholder="Type reason for denial and press Enter...", id="reject-reason-input")
+            inp.display = False
+            inp.can_focus = False
+            yield inp
+            yield Label(self._build_hint_text(), id="modal-hint")
+
+    def on_mount(self) -> None:
+        self.focus()
+
+    def _build_hint_text(self, width: Optional[int] = None) -> str:
+        if not self.suggested_pattern:
+            if width is not None and width < 48:
+                return "enter: allow • r: reason • esc: deny"
+            return "enter: allow • a: session • r: reason • esc/d: deny"
+
+        pat = self.suggested_pattern
+        if len(pat) > 18:
+            pat = pat[:15] + "..."
+
+        if width is not None and width < 62:
+            return f"enter: allow • p: ({pat}) • r: reason • esc: deny"
+        return f"enter: allow • p: pat ({pat}) • a: all • r: reason • esc/d: deny"
+
+    def on_resize(self, event) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if not inp.display:
+                hint_label = self.query_one("#modal-hint", Label)
+                hint_label.update(self._build_hint_text(event.size.width))
+        except Exception:
+            pass
 
     def _get_scroll_target(self):
         try:
@@ -286,34 +322,73 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         except Exception:
             pass
 
-    def action_scroll_left(self) -> None:
-        try:
-            self.query_one(".tool-scroll-box").scroll_left(animate=False)
-        except Exception:
-            pass
-
-    def action_scroll_right(self) -> None:
-        try:
-            self.query_one(".tool-scroll-box").scroll_right(animate=False)
-        except Exception:
-            pass
-
     def action_approve(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if inp.display and inp.has_focus:
+                self.on_input_submitted(Input.Submitted(inp, inp.value))
+                return
+        except Exception:
+            pass
         self.dismiss("allow")
 
     def action_allow_pattern(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if inp.display and inp.has_focus:
+                return
+        except Exception:
+            pass
         if self.suggested_pattern:
             self.dismiss(f"pattern:{self.suggested_pattern}")
         else:
             self.dismiss("always_allow")
 
     def action_always_allow(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if inp.display and inp.has_focus:
+                return
+        except Exception:
+            pass
         self.dismiss("always_allow")
 
+    def action_reject_with_reason(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            inp.display = True
+            inp.can_focus = True
+            inp.value = ""
+            inp.focus()
+            hint = self.query_one("#modal-hint", Label)
+            hint.update("enter: submit denial • esc: cancel reason")
+        except Exception:
+            pass
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "reject-reason-input":
+            reason = event.value.strip()
+            if reason:
+                self.dismiss(f"deny:{reason}")
+            else:
+                self.dismiss("deny")
+
     def action_deny(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if inp.display:
+                inp.display = False
+                inp.can_focus = False
+                inp.value = ""
+                self.focus()
+                hint = self.query_one("#modal-hint", Label)
+                hint.update(self._build_hint_text())
+                return
+        except Exception:
+            pass
         self.dismiss("deny")
 
     def action_cancel(self) -> None:
-        self.dismiss("deny")
+        self.action_deny()
 
 

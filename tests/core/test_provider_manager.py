@@ -780,8 +780,17 @@ def test_is_local_provider():
     assert is_local_provider("custom", api_type="ollama") is True
     assert is_local_provider("custom", api_type="lmstudio") is True
     assert is_local_provider("custom", api_type="litellm") is True
+    # Custom provider with requires_key=False
+    assert is_local_provider("custom_vllm", requires_key=False) is True
+    # Custom provider with localhost base_url
+    assert is_local_provider("custom_vllm", base_url="http://localhost:8000/v1") is True
+    assert is_local_provider("custom_vllm", base_url="http://127.0.0.1:8000/v1") is True
+    assert is_local_provider("custom_vllm", base_url="http://[::1]:8000/v1") is True
+    assert is_local_provider("custom_vllm", base_url="http://0.0.0.0:8000/v1") is True
+    # Remote providers with keys
     assert is_local_provider("openai") is False
-    assert is_local_provider("anthropic") is False
+    assert is_local_provider("anthropic", base_url="https://api.anthropic.com") is False
+    assert is_local_provider("custom_remote", base_url="https://api.my-cloud.com/v1", requires_key=True) is False
 
 
 def _load_json(path):

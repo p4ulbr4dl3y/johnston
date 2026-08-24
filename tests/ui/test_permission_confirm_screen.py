@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from textual.app import App
 from textual.widgets import Static
@@ -108,8 +108,6 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         screen.action_scroll_down()
         screen.action_page_up()
         screen.action_page_down()
-        screen.action_scroll_left()
-        screen.action_scroll_right()
 
 
 class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
@@ -120,15 +118,18 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             ("create", {"path": "b.py", "content": "print(1)"}),
             ("read", {"path": "c.py"}),
             ("web_fetch", {"url": "https://example.com"}),
-            ("invoke_subagent", {"role": "coder", "prompt": "fix bug"}),
+            ("invoke_subagent", {"title": "Task 1", "role": "coder", "prompt": "fix bug"}),
+            ("invoke_subagent", {"type": "worker"}),
             ("manage_shell", {"action": "kill", "task_id": "t1"}),
             ("manage_shell", {"action": "send_input", "task_id": "t1", "input": "hello"}),
             ("manage_subagent", {"action": "list"}),
             ("manage_subagent", {"action": "kill", "session_id": "s1"}),
             ("manage_subagent", {"action": "send_message", "session_id": "s1", "message": "hello sub"}),
+            ("update_plan", {"explanation": "step 1", "plan": [{"step": "Step one", "status": "completed"}]}),
             ("update_plan", {"plan": "1. Step one\n2. Step two"}),
             ("ask_user", {"questions": [{"question": "Q1", "options": ["opt1", "opt2"]}]}),
             ("ask_user", {"questions": ["Q1", "Q2"]}),
+            ("ask_user", {"questions": ["Single Q"]}),
             ("other_tool", {"foo": "bar"}),
         ]
 
@@ -179,16 +180,79 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.action_scroll_down()
             screen.action_page_up()
             screen.action_page_down()
-            screen.action_scroll_left()
-            screen.action_scroll_right()
 
-    async def test_action_quit_exits_app(self):
-        screen = PermissionConfirmScreen("read", {"path": "foo.py"})
+    def test_hint_text_adaptation(self):
+        # No pattern
+        screen_no_pat = PermissionConfirmScreen("read", {})
+        self.assertIn("enter: allow", screen_no_pat._build_hint_text(width=80))
+        self.assertIn("esc: deny", screen_no_pat._build_hint_text(width=40))
+
+        # Long pattern truncation
+        screen_long_pat = PermissionConfirmScreen("shell", {"command": "very_long_command_name_subpath *"})
+        hint = screen_long_pat._build_hint_text(width=80)
+        self.assertIn("...", hint)
+        self.assertIn("a: all", hint)
+
+        # Narrow width formatting
+        hint_narrow = screen_long_pat._build_hint_text(width=50)
+        self.assertIn("p: (", hint_narrow)
+
+    async def test_reject_with_reason_flow(self):
+        screen = PermissionConfirmScreen("shell", {"command": "rm -rf tmp"})
+        dismissed_val = None
+
+        def mock_dismiss(result):
+            nonlocal dismissed_val
+            dismissed_val = result
+
+        screen.dismiss = mock_dismiss
+
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
-            with patch.object(screen.app, "exit") as mock_exit:
-                screen.action_quit_app()
-                mock_exit.assert_called_once()
+            inp = screen.query_one("#reject-reason-input")
+            self.assertFalse(inp.display)
+
+            # Trigger reject with reason
+            screen.action_reject_with_reason()
+            await pilot.pause()
+            self.assertTrue(inp.display)
+            self.assertTrue(inp.has_focus)
+            hint_label = screen.query_one("#modal-hint")
+            self.assertIn("submit denial", str(hint_label.render()))
+
+            # Type and submit reason
+            inp.value = "do not delete"
+            screen.on_input_submitted(MagicMock(input=inp, value="do not delete"))
+            self.assertEqual(dismissed_val, "deny:do not delete")
+
+    async def test_reject_with_reason_cancel_esc(self):
+        screen = PermissionConfirmScreen("shell", {"command": "rm -rf tmp"})
+        dismissed_val = None
+
+        def mock_dismiss(result):
+            nonlocal dismissed_val
+            dismissed_val = result
+
+        screen.dismiss = mock_dismiss
+
+        async with HostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            inp = screen.query_one("#reject-reason-input")
+
+            # Open reason input
+            screen.action_reject_with_reason()
+            await pilot.pause()
+            self.assertTrue(inp.display)
+
+            # Press deny / esc -> closes reason input without closing modal
+            screen.action_deny()
+            await pilot.pause()
+            self.assertFalse(inp.display)
+            self.assertIsNone(dismissed_val)
+
+            # Press deny again -> dismisses modal
+            screen.action_deny()
+            self.assertEqual(dismissed_val, "deny")
 
 
 if __name__ == "__main__":

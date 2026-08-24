@@ -44,13 +44,31 @@ _BASE_URL_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 _WARNED_BASE_URL_TOKENS: set = set()
 
 
-def is_local_provider(provider_key: str, api_type: str = "") -> bool:
-    """True for localhost inference servers that never need an API key.
+def is_local_provider(
+    provider_key: str,
+    api_type: str = "",
+    base_url: str = "",
+    requires_key: Optional[bool] = None,
+) -> bool:
+    """True for localhost inference servers or providers that never need an API key.
 
-    Single source of truth for the ollama/lmstudio special-casing previously
-    duplicated across fetch_models/is_provider_connected/actions.py.
+    Single source of truth for local/keyless inference servers across
+    fetch_models/is_provider_connected/actions.py.
     """
-    return api_type.lower() in LOCAL_PROVIDER_KEYS or provider_key.lower() in LOCAL_PROVIDER_KEYS
+    if requires_key is False:
+        return True
+    if (api_type and api_type.lower() in LOCAL_PROVIDER_KEYS) or provider_key.lower() in LOCAL_PROVIDER_KEYS:
+        return True
+    if base_url:
+        low = base_url.lower()
+        if (
+            "://localhost" in low
+            or "://127.0.0.1" in low
+            or "://0.0.0.0" in low
+            or "://[::1]" in low
+        ):
+            return True
+    return False
 
 
 def env_api_key(provider_key: str) -> str:
@@ -525,7 +543,9 @@ class ProviderManager:
 
         base_url = pdef.base_url
         api_key = self.get_api_key(provider_key) or pdef.api_key
-        needs_key = pdef.requires_key is not False and not is_local_provider(provider_key, pdef.api_type)
+        needs_key = pdef.requires_key is not False and not is_local_provider(
+            provider_key, pdef.api_type, pdef.base_url, pdef.requires_key
+        )
 
         # If provider has explicit static models list, return it directly
         if pdef.models:
@@ -580,7 +600,11 @@ class ProviderManager:
             headers = dict(pdef.headers) if pdef.headers else {}
             if api_key and "Authorization" not in headers:
                 headers["Authorization"] = f"Bearer {api_key}"
-            timeout_sec = 0.8 if is_local_provider(provider_key, pdef.api_type) else 3.0
+            timeout_sec = (
+                0.8
+                if is_local_provider(provider_key, pdef.api_type, pdef.base_url, pdef.requires_key)
+                else 3.0
+            )
             try:
                 client = catalog.get_client()
                 resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
@@ -628,7 +652,9 @@ class ProviderManager:
         if not pdata or not pdata.get("enabled", True) or provider_key in self.get_disabled_providers():
             return False
         api_type = str(pdata.get("api_type", "openai")).lower()
-        if is_local_provider(provider_key, api_type) or pdata.get("requires_key") is False:
+        base_url = str(pdata.get("base_url", ""))
+        requires_key = pdata.get("requires_key")
+        if is_local_provider(provider_key, api_type, base_url, requires_key):
             return True
         key_val = self.get_api_key(provider_key) or pdata.get("api_key", "")
         return bool(key_val and str(key_val).strip())

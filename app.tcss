@@ -586,6 +586,14 @@ ModalScreen {
     margin: 0;
 }
 
+.modal-markdown.confirm-summary MarkdownBulletList {
+    margin-bottom: 1;
+}
+
+.modal-markdown.confirm-summary MarkdownBulletList:last-of-type {
+    margin-bottom: 0;
+}
+
 #wizard-title.confirm-summary {
     margin-bottom: 0;
 }
@@ -596,7 +604,7 @@ SubagentViewScreen {
 
 #modal-dialog.bash-confirm-dialog {
     width: 90%;
-    max-width: 68;
+    max-width: 80;
     height: auto;
     max-height: 85%;
     overflow-y: hidden;
@@ -642,7 +650,7 @@ SubagentViewScreen {
     margin: 1 0;
     max-height: 18;
     overflow-y: auto;
-    overflow-x: auto;
+    overflow-x: hidden;
     background: transparent;
     border-left: solid #3f3f46;
     padding: 0 1;
@@ -656,7 +664,11 @@ SubagentViewScreen {
     color: #f4f4f5;
     padding: 0;
     margin: 0;
-    text-wrap: nowrap;
+    text-wrap: wrap;
+}
+
+#modal-dialog.bash-confirm-dialog .modal-diff-view.modal-qa-block {
+    margin-bottom: 1;
 }
 
 #modal-dialog #console-log,
@@ -733,7 +745,11 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog #write-in-input,
 #modal-dialog #write-in-input:focus,
 #write-in-input,
-#write-in-input:focus {
+#write-in-input:focus,
+#modal-dialog #reject-reason-input,
+#modal-dialog #reject-reason-input:focus,
+#reject-reason-input,
+#reject-reason-input:focus {
     margin: 1 0 0 0;
 }
 

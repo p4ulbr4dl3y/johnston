@@ -24,7 +24,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         from rich.syntax import Syntax
 
         syntax = TransparentSyntax("x = 1", "python")
-        console = Console(width=40)
+        console = Console(width=40, _environ={})
         styled = Segment("x", Style(bgcolor="#ff0000"))
         plain = Segment(" ", None)
         with patch.object(Syntax, "_get_syntax", return_value=iter([styled, plain])):

@@ -199,14 +199,16 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                 input_field.focus()
         else:
             blocks = []
+            num_qs = len(self.questions)
             for idx, q in enumerate(self.questions):
-                q_clean = q.get("question", "")
+                q_clean = str(q.get("question") or "").strip()
                 ans_info = self.answers.get(idx, {})
-                ans_val = ans_info.get("answer", "")
+                ans_val = str(ans_info.get("answer") or "").strip()
                 ans_display = ans_val if ans_val else "(No response)"
-                blocks.append(f"**{q_clean}**\n\n{ans_display}")
+                prefix = f"{idx + 1}. " if num_qs > 1 else ""
+                blocks.append(f"**{prefix}{q_clean}**\n- {ans_display}")
 
-            summary = "\n\n&nbsp;\n\n".join(blocks)
+            summary = "\n\n".join(blocks)
 
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**\n\n" + summary)

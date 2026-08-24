@@ -128,7 +128,10 @@ async def check_and_confirm_permission(
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             screen_name = confirm_tool_name or target_perm_name
             confirmed = await confirm_permission(screen_name, args, decision.reason, target_perm_name, ctx_or_app=app_obj)
-            if not confirmed:
+            if isinstance(confirmed, str) and confirmed.startswith("deny:"):
+                user_reason = confirmed.split(":", 1)[1].strip()
+                return ToolResult.error("denied", name=display_name, detail=f"by user ({user_reason})")
+            elif not confirmed:
                 return ToolResult.error("denied", name=display_name, detail="by user")
         else:
             return ToolResult.error(
