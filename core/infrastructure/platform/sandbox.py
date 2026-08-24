@@ -41,20 +41,55 @@ def get_sandbox_backend_name() -> str:
 
 
 def get_default_deny_read_paths() -> List[str]:
-    """Return sensitive credential paths blocked in sandbox mode."""
+    """Return sensitive credential paths blocked in sandbox mode across platforms."""
     home = os.path.expanduser("~")
-    return [
+    paths = [
+        # SSH & GPG keys
         os.path.join(home, ".ssh"),
-        os.path.join(home, ".aws"),
         os.path.join(home, ".gnupg"),
+        # Cloud providers & clusters
+        os.path.join(home, ".aws"),
         os.path.join(home, ".azure"),
         os.path.join(home, ".kube"),
-        os.path.join(home, ".docker", "config.json"),
-        os.path.join(home, ".netrc"),
+        os.path.join(home, ".config", "gcloud"),
+        # Git & CLI credentials
+        os.path.join(home, ".config", "gh"),
         os.path.join(home, ".git-credentials"),
+        os.path.join(home, ".netrc"),
+        os.path.join(home, ".docker", "config.json"),
+        os.path.join(home, ".vault-token"),
+        os.path.join(home, ".terraform.d"),
+        os.path.join(home, ".terraform.rc"),
+        # Package registries & publishing tokens
+        os.path.join(home, ".npmrc"),
+        os.path.join(home, ".pypirc"),
+        os.path.join(home, ".cargo", "credentials.toml"),
+        os.path.join(home, ".gem", "credentials"),
+        # Shell history
+        os.path.join(home, ".bash_history"),
+        os.path.join(home, ".zsh_history"),
+        # Application secrets and global permissions
         os.path.join(home, ".johnston", "config.json"),
         os.path.join(home, ".johnston", "secrets.json"),
     ]
+
+    # OS-specific credential locations
+    if platform.system() == "Darwin":
+        paths.append(os.path.join(home, "Library", "Keychains"))
+    elif platform.system() == "Linux":
+        paths.extend(["/etc/shadow", "/etc/gshadow", os.path.join(home, ".local", "share", "keyrings")])
+    elif platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            paths.extend([
+                os.path.join(appdata, "GitHub CLI"),
+                os.path.join(appdata, "gcloud"),
+            ])
+        localappdata = os.environ.get("LOCALAPPDATA", "")
+        if localappdata:
+            paths.append(os.path.join(localappdata, "Microsoft", "Credentials"))
+
+    return paths
 
 
 def is_path_writable_in_sandbox(
