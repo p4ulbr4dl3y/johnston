@@ -587,6 +587,18 @@ ModalScreen {
     margin-bottom: 1;
 }
 
+#modal-dialog .modal-markdown-centered MarkdownBlockQuote {
+    border-left: outer #3b82f6;
+    background: #141416;
+    color: #e4e4e7;
+    margin: 1 0;
+    padding: 0 1;
+}
+
+#modal-dialog .modal-markdown-centered MarkdownBlockQuote MarkdownBulletList {
+    margin-bottom: 0;
+}
+
 .modal-markdown.confirm-summary MarkdownParagraph {
     margin: 0;
 }
