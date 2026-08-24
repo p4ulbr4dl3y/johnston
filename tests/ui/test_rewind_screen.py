@@ -58,13 +58,8 @@ class TestRewindScreen(unittest.TestCase):
         self.assertEqual(screen.step, 2)
         self.assertEqual(screen.selected_entry, user_messages[0])
         self.assertIsNone(dismissed_val)
-        self.assertEqual(len(screen.filtered_items), 3)
-        self.assertEqual(screen.filtered_items, ["both", "conversation", "cancel"])
-
-        # Step 2: cancel via option
-        mock_event.option_index = 2
-        screen.on_option_list_option_selected(mock_event)
-        self.assertIsNone(dismissed_val)
+        self.assertEqual(len(screen.filtered_items), 2)
+        self.assertEqual(screen.filtered_items, ["both", "conversation"])
 
         # Step 2: choose 'conversation'
         screen._show_step_2(user_messages[1])

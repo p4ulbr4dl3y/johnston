@@ -108,9 +108,8 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         step2_options = [
             "Rollback conversation & files [dim](revert code)[/dim]",
             "Rollback conversation only [dim](keep current code)[/dim]",
-            "Cancel",
         ]
-        step2_actions = ["both", "conversation", "cancel"]
+        step2_actions = ["both", "conversation"]
 
         self.filtered_options = step2_options
         self.filtered_items = step2_actions
@@ -190,8 +189,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
                 self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=True))
             elif action == "conversation" and self.selected_entry is not None:
                 self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=False))
-            elif action == "cancel":
-                self.dismiss(None)
             event.stop()
             return
 
