@@ -37,9 +37,12 @@ def get_sandbox_backend_name() -> str:
 
 
 def get_default_deny_read_paths() -> List[str]:
-    """Return sensitive credential paths from johnston-guide blocked in sandbox mode."""
+    """Return sensitive credential paths blocked in sandbox mode."""
     home = os.path.expanduser("~")
     return [
+        os.path.join(home, ".ssh"),
+        os.path.join(home, ".aws"),
+        os.path.join(home, ".gnupg"),
         os.path.join(home, ".johnston", "config.json"),
         os.path.join(home, ".johnston", "providers.json"),
         os.path.join(home, ".johnston", "mcp.json"),

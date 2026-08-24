@@ -64,6 +64,35 @@ def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: int = MAX_LOG_AGE_DAYS)
     return removed
 
 
+def cleanup_scratch(projects_dir: str = "", max_age_days: int = MAX_LOG_AGE_DAYS) -> int:
+    """Remove stale scratch session folders under projects older than max_age_days."""
+    import shutil
+
+    from core.infrastructure.platform.paths import PROJECTS_DIR
+
+    base_dir = projects_dir or PROJECTS_DIR
+    if not os.path.isdir(base_dir):
+        return 0
+    cutoff = time.time() - max_age_days * 24 * 3600
+    removed = 0
+    try:
+        for proj in os.listdir(base_dir):
+            scratch_base = os.path.join(base_dir, proj, "scratch")
+            if not os.path.isdir(scratch_base):
+                continue
+            for s_folder in os.listdir(scratch_base):
+                s_path = os.path.join(scratch_base, s_folder)
+                try:
+                    if os.path.getmtime(s_path) < cutoff:
+                        shutil.rmtree(s_path, ignore_errors=True)
+                        removed += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return removed
+
+
 def _quiet_noisy_loggers() -> None:
     for name in _NOISY_LOGGER_NAMES:
         logging.getLogger(name).setLevel(logging.WARNING)
@@ -87,4 +116,5 @@ def setup_logging() -> None:
     root.addHandler(handler)
     root.setLevel(logging.INFO)
     cleanup_logs()
+    cleanup_scratch()
     _quiet_noisy_loggers()

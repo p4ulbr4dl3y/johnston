@@ -212,6 +212,7 @@ class PromptBuilder:
         cwd: str = None,
         is_subagent: bool = False,
         subagent_schema: Optional[Dict] = None,
+        scratch_dir: Optional[str] = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -221,6 +222,7 @@ class PromptBuilder:
         self.cwd = os.path.realpath(cwd) if cwd else None
         self.is_subagent = is_subagent
         self.subagent_schema = subagent_schema
+        self.scratch_dir = scratch_dir
 
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
@@ -330,6 +332,14 @@ class PromptBuilder:
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
 
+        if "{scratch_dir}" in sys_prompt:
+            s_dir = (self.scratch_dir or "").strip()
+            if not s_dir:
+                from core.session_manager import SessionStore
+
+                s_dir = SessionStore.get_instance(self.cwd).get_scratch_dir("default")
+            sys_prompt = sys_prompt.replace("{scratch_dir}", s_dir)
+
         project_snippet = get_project_instructions_snippet(self.cwd)
         rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
 
@@ -389,6 +399,14 @@ class PromptBuilder:
                 else "an expert AI assistant"
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
+
+        if "{scratch_dir}" in sys_prompt:
+            s_dir = (self.scratch_dir or "").strip()
+            if not s_dir:
+                from core.session_manager import SessionStore
+
+                s_dir = SessionStore.get_instance(self.cwd).get_scratch_dir("default")
+            sys_prompt = sys_prompt.replace("{scratch_dir}", s_dir)
 
         project_snippet = await get_project_instructions_snippet_async(self.cwd)
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
