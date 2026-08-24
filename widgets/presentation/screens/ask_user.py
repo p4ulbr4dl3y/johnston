@@ -252,21 +252,21 @@ class AskUserWizardScreen(BaseModalScreen[str]):
 
             if not self.raw_options:
                 if self.q_idx == 0:
-                    hint.update("enter: next • tab: minimize • esc: cancel")
+                    hint.update("enter: next • tab: min • esc: cancel")
                 else:
-                    hint.update("enter: next • ←: back • tab: minimize • esc: cancel")
+                    hint.update("enter: next • ←: back • tab: min • esc: cancel")
                 return
 
             if is_write_in:
                 if self.q_idx == 0:
-                    hint.update("enter: next • ↑: list • tab: minimize • esc: cancel")
+                    hint.update("enter: next • ↑: list • tab: min • esc: cancel")
                 else:
-                    hint.update("enter: next • ↑: list • ←: back • tab: minimize • esc: cancel")
+                    hint.update("enter: next • ↑: list • ←: back • tab: min • esc: cancel")
             else:
                 if self.q_idx == 0:
-                    hint.update("enter: confirm • space: toggle • ↑↓: nav • tab: minimize • esc: cancel")
+                    hint.update("enter: confirm • space: toggle • ↑↓: nav • tab: min • esc: cancel")
                 else:
-                    hint.update("enter: confirm • space: toggle • ↑↓: nav • ←: back • tab: minimize • esc: cancel")
+                    hint.update("enter: confirm • space: toggle • ↑↓: nav • ←: back • tab: min • esc: cancel")
         except Exception:
             pass
 
