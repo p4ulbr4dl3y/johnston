@@ -483,22 +483,38 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(logged), 1)
         self.assertIn("Git checkpoint restore failed", str(logged[0]))
 
-    async def test_rewind_cancels_previous_restore_task(self):
+    async def test_rewind_chains_after_previous_restore_task(self):
+        from core.application.session import actions as actions_mod
         from core.infrastructure.storage import git_checkpoint as gcm
 
         agent = DummyAgent()
         agent.history = [{"role": "user", "content": "m"}]
-        previous = asyncio.create_task(asyncio.sleep(3600))
+        order = []
+        warnings = []
+
+        async def previous_restore():
+            await asyncio.sleep(0.05)
+            order.append("previous")
+
+        previous = asyncio.create_task(previous_restore())
         agent.rewind_git_restore_task = previous
-        with patch.object(gcm.GitCheckpointManager, "restore_checkpoint", new=MagicMock(return_value=None)):
-            with patch.object(gcm.GitCheckpointManager, "purge_checkpoints_after", new=MagicMock(return_value=None)):
-                rewind_session(agent, "sess-1", "/proj", [(0, "m")], 0, **_noop_cbs())
-        await asyncio.sleep(0.01)
-        self.assertTrue(previous.cancelled())
-        new_task = agent.rewind_git_restore_task
-        self.assertIsNot(new_task, previous)
-        await asyncio.wait_for(asyncio.shield(new_task), timeout=5)
-        self.assertTrue(new_task.done())
+        with (
+            patch.object(actions_mod.logger, "warning", side_effect=lambda *a, **k: warnings.append(a)),
+            patch.object(gcm.GitCheckpointManager, "restore_checkpoint", new=MagicMock(return_value=None)),
+            patch.object(
+                gcm.GitCheckpointManager,
+                "purge_checkpoints_after",
+                side_effect=lambda *a, **k: order.append("new"),
+            ),
+        ):
+            rewind_session(agent, "sess-1", "/proj", [(0, "m")], 0, **_noop_cbs())
+            new_task = agent.rewind_git_restore_task
+            self.assertIsNot(new_task, previous)
+            # Await inside the patched context so the background task exercises
+            # the mocked manager methods.
+            await asyncio.wait_for(asyncio.shield(new_task), timeout=5)
+        self.assertFalse(previous.cancelled())
+        self.assertEqual(order, ["previous", "new"])
 
 
 if __name__ == "__main__":

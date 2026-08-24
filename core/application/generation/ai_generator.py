@@ -119,6 +119,24 @@ def ensure_provider_ready(pm: Any, agent: Any) -> Optional[ProviderReadyState]:
     return ProviderReadyState.READY
 
 
+async def _await_pending_git_restore(agent: Any) -> None:
+    """Barrier: wait for a previous rewind's background git restore to finish.
+
+    Snapshotting a checkpoint while an older rewind restore is still rewriting
+    the worktree captures (or destroys) mid-restore state. The restore itself is
+    never cancelled — its in-flight git calls cannot be interrupted — so the only
+    safe order is: finish the restore, then snapshot the new turn.
+    """
+    task = getattr(agent, "rewind_git_restore_task", None)
+    if task is not None and not task.done():
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - best-effort barrier, never fatal
+            logger.warning("Awaiting pending git checkpoint restore failed: %s", e)
+
+
 async def _create_git_checkpoint_async(
     canvas: GenCanvas,
     session_id: Optional[str],
@@ -170,6 +188,7 @@ async def generate_ai_response(
     if show_in_ui:
         await canvas.add_user_message(display_text or user_text, attachments)
 
+    await _await_pending_git_restore(agent)
     await _create_git_checkpoint_async(canvas, session_id, project_path)
 
     thinking_handle: Any = None
@@ -207,7 +226,8 @@ async def generate_ai_response(
                     # Prefer the short display text (e.g. "/skill-name") over the full
                     # prompt so skills invoked mid-generation render the command in UI.
                     await canvas.add_user_message(q_display_text or q_msg, q_atts)
-                await _create_git_checkpoint_async(canvas, session_id, project_path)
+                    await _await_pending_git_restore(agent)
+                    await _create_git_checkpoint_async(canvas, session_id, project_path)
             else:
                 record_subagent_step(step, session, transcript_acc)
 

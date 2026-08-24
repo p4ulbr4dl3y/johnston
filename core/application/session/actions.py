@@ -434,11 +434,24 @@ def rewind_session(
     # /resume does not resurrect rolled-back turns.
     _truncate_transcript(session, seq_idx)
 
-    git_restore_task: Any = None
-
     # Restore Git checkpoints in background
     if curr_sid:
+        # Capture BEFORE creating the new task so the chain never awaits itself.
+        pending_restore = getattr(agent, "rewind_git_restore_task", None)
+
         async def _restore_git_bg():
+            # Chain after any still-running restore from a previous rewind: two
+            # restores racing for the worktree lock could apply in reverse order
+            # and resurrect stale state over newer files. Note that cancelling
+            # the previous task would NOT stop its in-flight to_thread git calls,
+            # so awaiting it is the only safe serialization.
+            if pending_restore is not None and not pending_restore.done():
+                try:
+                    await pending_restore
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.warning("Previous git checkpoint restore failed: %s", e)
             try:
                 from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
                 if restore_git:
@@ -452,11 +465,8 @@ def rewind_session(
                 logger.warning("Git checkpoint restore failed: %s", e)
 
         git_restore_task = asyncio.create_task(_restore_git_bg())
-        # Keep a reference on the agent so app shutdown can cancel/await it.
-        if hasattr(agent, "rewind_git_restore_task"):
-            previous = agent.rewind_git_restore_task
-            if previous and not previous.done():
-                previous.cancel()
+        # Kept on the agent so a follow-up rewind can chain onto it and app
+        # shutdown can cancel/await it.
         agent.rewind_git_restore_task = git_restore_task
 
     refresh_footer_cb()

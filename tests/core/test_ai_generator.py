@@ -1,9 +1,12 @@
 """Focused unit tests for the Textual-free AI generation engine core/application/generation/ai_generator.py."""
 
+import asyncio
+from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from core.application.generation import ai_generator as ai_generator_module
 from core.application.generation.ai_generator import GenCanvas, generate_ai_response
 
 
@@ -279,6 +282,65 @@ async def test_user_message_with_display_text():
         "display_text": "/caveman test",
         "show_in_ui": True,
     } in session.events
+
+
+# --- rewind restore barrier --------------------------------------------------
+
+async def test_await_pending_git_restore_barrier():
+    from types import SimpleNamespace
+
+    from core.application.generation.ai_generator import _await_pending_git_restore
+
+    # Agent without the attribute: no-op.
+    await _await_pending_git_restore(object())
+
+    # Done task: no-op.
+    done_task = asyncio.create_task(asyncio.sleep(0))
+    await asyncio.sleep(0)
+    await _await_pending_git_restore(SimpleNamespace(rewind_git_restore_task=done_task))
+
+    # Pending task: awaited; its failure is swallowed (restore errors are logged
+    # downstream and must never abort the new turn).
+    started = []
+
+    async def failing_restore():
+        started.append(True)
+        raise RuntimeError("restore boom")
+
+    task = asyncio.create_task(failing_restore())
+    await asyncio.sleep(0)  # let the task start
+    await _await_pending_git_restore(SimpleNamespace(rewind_git_restore_task=task))
+    assert started == [True]
+    assert task.done()
+
+
+async def test_generate_waits_for_pending_restore_before_checkpoint():
+    """The turn snapshot must happen only after the previous rewind restore finished."""
+
+    order = []
+
+    async def stream(prompt, attachments=None):
+        yield ("bot_text", "ok", "")
+
+    async def pending_restore():
+        order.append("restore")
+
+    pending = asyncio.create_task(pending_restore())
+    agent = _FakeAgent(stream)
+    agent.rewind_git_restore_task = pending
+
+    real_checkpoint = ai_generator_module._create_git_checkpoint_async
+
+    async def spy_checkpoint(canvas, session_id, project_path):
+        order.append("checkpoint")
+        return await real_checkpoint(canvas, session_id, project_path)
+
+    with mock.patch.object(ai_generator_module, "_create_git_checkpoint_async", side_effect=spy_checkpoint):
+        await generate_ai_response(
+            agent, _fake_session(), _canvas(get_user_messages=mock.MagicMock(return_value=[])), session_id="s1", user_text="hi"
+        )
+
+    assert order == ["restore", "checkpoint"]
 
 
 
