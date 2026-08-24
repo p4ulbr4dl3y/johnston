@@ -1,7 +1,9 @@
 import os
+import subprocess
 from unittest.mock import patch
 
 from core.infrastructure.platform.sandbox import (
+    _build_bwrap_args,
     _escape_sbpl_path,
     build_sandboxed_command,
     generate_seatbelt_profile,
@@ -24,12 +26,23 @@ def test_generate_seatbelt_profile():
     assert ".gnupg" in profile
 
 
+def test_generate_seatbelt_profile_ignores_fs_root_extra():
+    """extra_writable_roots=['/'] must NOT neutralize the deny-write rule."""
+    cwd = os.path.abspath("/Users/test/my_project")
+    profile = generate_seatbelt_profile(cwd, extra_writable_roots=["/"])
+    assert '(require-not (subpath "/"))' not in profile
+
+
 def test_is_sandbox_supported():
     with patch("platform.system", return_value="Darwin"), patch("os.path.exists", return_value=True):
         assert is_sandbox_supported() is True
         assert get_sandbox_backend_name() == "seatbelt"
 
-    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+    with (
+        patch("platform.system", return_value="Linux"),
+        patch("shutil.which", return_value="/usr/bin/bwrap"),
+        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+    ):
         assert is_sandbox_supported() is True
         assert get_sandbox_backend_name() == "bubblewrap"
 
@@ -52,7 +65,11 @@ def test_build_sandboxed_command_darwin():
 
 
 def test_build_sandboxed_command_linux():
-    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+    with (
+        patch("platform.system", return_value="Linux"),
+        patch("shutil.which", return_value="/usr/bin/bwrap"),
+        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+    ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert exe == "/usr/bin/bwrap"
         assert "--ro-bind" in args
@@ -60,20 +77,52 @@ def test_build_sandboxed_command_linux():
         assert "echo 1" in args[-1]
 
 
+def test_build_sandboxed_command_linux_bwrap_unusable_falls_back():
+    """bwrap present but namespaces blocked -> unsandboxed fallback (surfaced upstream)."""
+    with (
+        patch("platform.system", return_value="Linux"),
+        patch("shutil.which", return_value="/usr/bin/bwrap"),
+        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=False),
+    ):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
+        assert sandboxed is False
+
+
+def test_check_bwrap_probes_once_and_caches(tmp_path):
+    import core.infrastructure.platform.sandbox as sbx
+
+    sbx._bwrap_probe_cache.clear()
+    fake = str(tmp_path / "bwrap")
+    with patch.object(sbx.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as mock_run:
+        assert sbx._check_bwrap(fake) is True
+        assert sbx._check_bwrap(fake) is True
+        assert mock_run.call_count == 1
+        # Smoke-test must execute a real binary inside a namespace.
+        assert mock_run.call_args.args[0][:2] == [fake, "--ro-bind"]
+        assert mock_run.call_args.args[0][-1] == "/bin/true"
+
+    sbx._bwrap_probe_cache.clear()
+    with patch.object(sbx.subprocess, "run", side_effect=OSError("boom")):
+        assert sbx._check_bwrap(fake) is False
+
+
 def test_build_sandboxed_command_windows():
     with patch("platform.system", return_value="Windows"):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="C:\\test_dir")
         assert sandboxed is True
-        assert "win_sandbox_runner" in args[1]
+        # Must be launched by absolute script path (not -m: child cwd is the workspace).
+        assert args[0].endswith("win_sandbox_runner.py")
+        assert os.path.isabs(args[0])
         assert "--command" in args
         assert "echo 1" in args
 
 
-def test_build_sandboxed_command_unsupported():
+def test_build_sandboxed_command_unsupported(caplog):
     with patch("platform.system", return_value="FreeBSD"):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert sandboxed is False
         assert "echo 1" in args[-1]
+    assert any("unsupported" in r.message for r in caplog.records)
 
 
 def test_is_path_writable_in_sandbox():
@@ -83,6 +132,63 @@ def test_is_path_writable_in_sandbox():
     assert is_path_writable_in_sandbox("/tmp/file.txt", cwd=cwd) is True
     assert is_path_writable_in_sandbox("/tmp/file.txt", cwd=cwd, allow_workspace_writes=False) is True
     assert is_path_writable_in_sandbox("/Users/test/other_dir/file.txt", cwd=cwd) is False
+
+
+def test_is_path_writable_fs_root_extra_grants_nothing():
+    """Regression: fs-root extra root used to fall through and grant ALL writes."""
+    cwd = "/Users/test/workspace"
+    assert is_path_writable_in_sandbox("/etc/hosts", cwd=cwd, extra_writable_roots=["/"]) is False
+    assert is_path_writable_in_sandbox("/home/x/f", cwd=cwd, extra_writable_roots=["/"]) is False
+    # Workspace itself still writable.
+    assert is_path_writable_in_sandbox(f"{cwd}/f", cwd=cwd, extra_writable_roots=["/"]) is True
+
+
+def test_is_path_writable_workspace_is_root(monkeypatch):
+    monkeypatch.chdir("/")
+    assert is_path_writable_in_sandbox("/etc/hosts", cwd="/") is True
+
+
+def test_is_path_writable_posix_tmp_not_granted_on_windows():
+    """POSIX-only tmp roots must not leak into the Windows writable set."""
+    with patch("platform.system", return_value="Windows"):
+        assert is_path_writable_in_sandbox("/tmp/file.txt", cwd="/Users/test/ws") is False
+        assert is_path_writable_in_sandbox("/dev/null", cwd="/Users/test/ws") is False
+
+
+def test_build_bwrap_args_skips_root_extra_and_binds_sys_temp():
+    args = _build_bwrap_args(
+        "/ws",
+        extra_writable_roots=["/"],
+        sys_temp="/custom/tmp",
+        exists=lambda p: p in ("/var/tmp", "/custom/tmp"),
+    )
+    assert ["--bind", "/", "/"] not in [args[i : i + 3] for i in range(len(args))]
+    assert ["--bind", "/custom/tmp", "/custom/tmp"] in [args[i : i + 3] for i in range(len(args))]
+    assert ["--bind", "/var/tmp", "/var/tmp"] in [args[i : i + 3] for i in range(len(args))]
+
+
+def test_build_bwrap_args_dedupes_nested_sys_temp():
+    """sys_temp inside /tmp or workspace must not be bound twice."""
+    args = _build_bwrap_args("/ws", sys_temp="/tmp/deep/tmp", exists=lambda p: True)
+    triples = [args[i : i + 3] for i in range(len(args))]
+    bound = [t[1:] for t in triples if t[0] == "--bind"]
+    assert ["/tmp", "/tmp"] in bound
+    assert not any(b[1] == "/tmp/deep/tmp" for b in bound)
+
+
+def test_build_bwrap_args_read_only_workspace():
+    args = _build_bwrap_args("/ws", allow_workspace_writes=False, exists=lambda p: False)
+    assert "--ro-bind" in args
+    assert args[args.index("--ro-bind") + 1] == "/"
+
+
+def test_build_bwrap_args_deny_reads():
+    def exists(p):
+        return p.endswith("dir") or p.endswith("file")
+
+    with patch("os.path.isdir", return_value=False), patch("os.path.isfile", return_value=True):
+        args = _build_bwrap_args("/ws", deny_reads=["/sensitive/file"], exists=exists)
+    assert ["--ro-bind", "/dev/null", "/sensitive/file"] in [args[i : i + 3] for i in range(len(args))]
 
 
 def test_generate_seatbelt_profile_read_only():
@@ -101,7 +207,11 @@ def test_build_sandboxed_command_read_only_darwin():
 
 
 def test_build_sandboxed_command_read_only_linux():
-    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+    with (
+        patch("platform.system", return_value="Linux"),
+        patch("shutil.which", return_value="/usr/bin/bwrap"),
+        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+    ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir", allow_workspace_writes=False)
         assert sandboxed is True
         assert "--ro-bind" in args
@@ -126,5 +236,3 @@ def test_load_and_save_sandbox_config(tmp_path):
 
     save_sandbox_config(False, config_file=cfg_file)
     assert load_sandbox_config(cfg_file) is False
-
-
