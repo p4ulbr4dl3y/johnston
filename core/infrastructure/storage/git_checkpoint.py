@@ -62,6 +62,14 @@ class GitCheckpointManager:
         except Exception:
             pass
 
+        # Clean stale index.lock in shadow repo if left over from a killed process
+        try:
+            lock_file = os.path.join(shadow_dir, "index.lock")
+            if os.path.exists(lock_file):
+                os.remove(lock_file)
+        except Exception:
+            pass
+
     @staticmethod
     def _parse_numstat(output: str) -> tuple[int, int, list[str]]:
         """Parses `git diff --numstat` output into (added, deleted, changed_files)."""
@@ -69,10 +77,18 @@ class GitCheckpointManager:
         changed_files: list[str] = []
         for line in output.splitlines():
             parts = line.split(maxsplit=2)
-            if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
-                added += int(parts[0])
-                deleted += int(parts[1])
-                changed_files.append(parts[2].strip())
+            if len(parts) >= 3:
+                raw_path = parts[2].strip()
+                if raw_path.startswith('"') and raw_path.endswith('"'):
+                    raw_path = raw_path[1:-1]
+                if parts[0].isdigit() and parts[1].isdigit():
+                    added += int(parts[0])
+                    deleted += int(parts[1])
+                    changed_files.append(raw_path)
+                elif parts[0] == "-" and parts[1] == "-":
+                    # Binary file change (e.g. images, compiled assets)
+                    added += 1
+                    changed_files.append(raw_path)
         return added, deleted, changed_files
 
     # Cache of the baseline shadow env (GIT_DIR + GIT_WORK_TREE) keyed by (shadow_dir, cwd).
@@ -187,8 +203,7 @@ class GitCheckpointManager:
         Returns commit SHA if created, None if not initialized and auto_init=False.
         """
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
-        lock_key = f"{cwd}:{session_id}" if session_id else cwd
-        with cls._get_lock(lock_key):
+        with cls._get_lock(cwd):
             if not cls.is_valid_checkpoint_target(project_path):
                 return None
 
@@ -236,8 +251,7 @@ class GitCheckpointManager:
     ) -> bool:
         """Restores repository working tree state to saved checkpoint."""
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
-        lock_key = f"{cwd}:{session_id}" if session_id else cwd
-        with cls._get_lock(lock_key):
+        with cls._get_lock(cwd):
             if not cls.is_git_repo(cwd):
                 return False
 
@@ -282,8 +296,7 @@ class GitCheckpointManager:
     ) -> None:
         """Deletes checkpoints with index > target_message_index for given session."""
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
-        lock_key = f"{cwd}:{session_id}" if session_id else cwd
-        with cls._get_lock(lock_key):
+        with cls._get_lock(cwd):
             if not cls.is_git_repo(cwd):
                 return
 
@@ -322,35 +335,36 @@ class GitCheckpointManager:
             return results
 
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
-        if not cls.is_git_repo(cwd):
-            return results
-
-        cls._ensure_shadow_exclude(shadow_dir)
-
-        with cls._shadow_index_env(shadow_dir, cwd) as env:
-            add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=1.5)
-            if add_res.returncode != 0:
+        with cls._get_lock(cwd):
+            if not cls.is_git_repo(cwd):
                 return results
 
-            for msg_idx in message_indices:
-                ref_name = cls.get_ref_name(session_id, msg_idx)
-                rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.2)
-                if rev_res.returncode != 0:
-                    continue
-                commit_sha = rev_res.stdout.strip()
+            cls._ensure_shadow_exclude(shadow_dir)
 
-                diff_res = run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env, timeout=0.3)
-                if diff_res.returncode != 0:
-                    continue
+            with cls._shadow_index_env(shadow_dir, cwd) as env:
+                add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=2.0)
+                if add_res.returncode != 0:
+                    return results
 
-                added, deleted, files = cls._parse_numstat(diff_res.stdout)
+                for msg_idx in message_indices:
+                    ref_name = cls.get_ref_name(session_id, msg_idx)
+                    rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.3)
+                    if rev_res.returncode != 0:
+                        continue
+                    commit_sha = rev_res.stdout.strip()
 
-                if added == 0 and deleted == 0:
-                    results[msg_idx] = ("no changes", [])
-                else:
-                    results[msg_idx] = (f"+{added} / -{deleted}", files)
+                    diff_res = run_git(["diff", "--cached", "--numstat", commit_sha], cwd=cwd, env=env, timeout=0.5)
+                    if diff_res.returncode != 0:
+                        continue
 
-        return results
+                    added, deleted, files = cls._parse_numstat(diff_res.stdout)
+
+                    if added == 0 and deleted == 0:
+                        results[msg_idx] = ("no changes", [])
+                    else:
+                        results[msg_idx] = (f"+{added} / -{deleted}", files)
+
+            return results
 
     @classmethod
     def get_diff_stats_batch(

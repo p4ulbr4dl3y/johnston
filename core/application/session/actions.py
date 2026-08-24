@@ -221,10 +221,10 @@ async def get_rewind_git_stats(
                     seq_indices,
                     project_path=project_path,
                 ),
-                timeout=2.0,
+                timeout=3.0,
             )
         except Exception:
-            details_map = {}
+            details_map = {idx: ("diff unavailable", []) for idx in seq_indices}
         for seq_idx, (child_idx, text) in enumerate(user_msgs):
             item = details_map.get(seq_idx)
             stat = item[0] if item else ""
@@ -336,13 +336,19 @@ def rewind_session(
     * Reset token counters.
     * Restore Git checkpoints in background if ``restore_git=True``.
     """
+    found = False
     msg_text = ""
     seq_idx = 0
     for i, (child_idx, text) in enumerate(user_msgs):
         if child_idx == selected_child_idx:
             msg_text = text
             seq_idx = i
+            found = True
             break
+
+    if not found and user_msgs:
+        logger.warning("Selected child index %s not in user messages", selected_child_idx)
+        return
 
     target_idx = selected_child_idx - 1
     rollback_ui(target_idx)

@@ -39,6 +39,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.checkpoints_enabled = checkpoints_enabled
         self.step = 1
         self.selected_entry: Optional[RewindEntry] = None
+        self.selected_step1_index: Optional[int] = None
 
         options = []
         for msg in user_messages:
@@ -159,12 +160,19 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             opt_list.clear_options()
             opt_list.add_options(self.filtered_options)
             default_idx = None
-            if self.default_value is not None and self.default_value in self.raw_items:
+            if self.selected_step1_index is not None and 0 <= self.selected_step1_index < len(self.filtered_options):
+                default_idx = self.selected_step1_index
+            elif self.default_value is not None and self.default_value in self.raw_items:
                 try:
                     default_idx = self.raw_items.index(self.default_value)
                 except Exception:
                     pass
             opt_list.highlighted = default_idx
+            if default_idx is not None:
+                try:
+                    opt_list.scroll_to_highlight()
+                except Exception:
+                    pass
             opt_list.focus()
         except Exception:
             pass
@@ -182,6 +190,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             return
 
         if self.step == 1:
+            self.selected_step1_index = idx
             if 0 <= idx < len(self.user_messages):
                 selected_entry = self.user_messages[idx]
                 has_changes = bool(

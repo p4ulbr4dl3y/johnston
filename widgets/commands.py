@@ -279,8 +279,8 @@ class RewindCommand(BaseCommand):
 
                     for w in [w for w in getattr(app, "workers", []) if not w.is_finished]:
                         try:
-                            await w.wait()
-                        except (WorkerCancelled, WorkerFailed):
+                            await asyncio.wait_for(w.wait(), timeout=1.0)
+                        except (WorkerCancelled, WorkerFailed, TimeoutError, asyncio.TimeoutError):
                             pass
                 except Exception:
                     pass
