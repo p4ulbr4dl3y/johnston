@@ -1,11 +1,13 @@
 import time
 from typing import Optional
 
+from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
+from core.infrastructure.presentation.tool_display import extract_subagent_progress
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -24,6 +26,26 @@ def format_task_row(cmd: str) -> str:
     if len(clean) > 60:
         clean = clean[:57] + "..."
     return clean
+
+
+def format_subagent_task_row(
+    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = 76
+) -> str:
+    """Format a subagent row with human-like activity/status badge on the right."""
+    clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
+    badge_plain = (
+        extract_subagent_progress(session)
+        if session is not None
+        else ("running..." if is_running else "done")
+    )
+
+    max_title = max(10, target_width - len(badge_plain) - 2)
+    if len(clean) > max_title:
+        clean = clean[: max_title - 3] + "..."
+
+    spaces = " " * max(2, target_width - len(clean) - len(badge_plain))
+    badge_markup = f"[dim #71717a]{badge_plain}[/]"
+    return f"{escape(clean)}{spaces}{badge_markup}"
 
 
 def _filter_and_sort_tasks(items: list, search_query: str) -> list:
@@ -318,12 +340,14 @@ class SubagentsScreen(BaseModalScreen[None]):
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()
             is_run = st_str == "RUNNING"
+            badge = extract_subagent_progress(s)
             items.append(
                 {
                     "id": getattr(s, "id", ""),
                     "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", ""),
                     "is_running": is_run,
                     "status_str": st_str,
+                    "progress_badge": badge,
                     "raw_obj": s,
                 }
             )
@@ -374,7 +398,10 @@ class SubagentsScreen(BaseModalScreen[None]):
         if not self.is_mounted:
             return
         tasks = self._get_filtered_tasks()
-        new_signatures = [(item["id"], item["is_running"], item["command"]) for item in tasks]
+        new_signatures = [
+            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""))
+            for item in tasks
+        ]
         if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
             return
         self._last_signatures = new_signatures
@@ -418,7 +445,11 @@ class SubagentsScreen(BaseModalScreen[None]):
         self._update_hint()
 
     def _format_task_row(self, item: dict) -> str:
-        return format_task_row(item["command"])
+        return format_subagent_task_row(
+            item["command"],
+            session=item.get("raw_obj"),
+            is_running=item.get("is_running", False),
+        )
 
     def _open_task_details(self, item: dict) -> None:
         from widgets.presentation.screens.subagent_screen import SubagentViewScreen
