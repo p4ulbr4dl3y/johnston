@@ -160,6 +160,7 @@ def build_sandboxed_command(
     command: str,
     cwd: Optional[str] = None,
     extra_writable_roots: Optional[List[str]] = None,
+    extra_deny_read_paths: Optional[List[str]] = None,
 ) -> Tuple[str, List[str], bool]:
     """Wrap command with platform-specific sandbox if available.
 
@@ -171,7 +172,11 @@ def build_sandboxed_command(
     shell = shell_executable() or "/bin/sh"
 
     if platform.system() == "Darwin" and os.path.exists(_SEATBELT_EXE):
-        profile = generate_seatbelt_profile(workspace_abs, extra_writable_roots=extra_writable_roots)
+        profile = generate_seatbelt_profile(
+            workspace_abs,
+            extra_writable_roots=extra_writable_roots,
+            extra_deny_read_paths=extra_deny_read_paths,
+        )
         return (
             _SEATBELT_EXE,
             ["-p", profile, shell, "-c", command],
@@ -195,6 +200,19 @@ def build_sandboxed_command(
                 extra_abs = os.path.realpath(os.path.abspath(extra))
                 if os.path.exists(extra_abs):
                     bwrap_args.extend(["--bind", extra_abs, extra_abs])
+
+        deny_reads = get_default_deny_read_paths()
+        if extra_deny_read_paths:
+            for p in extra_deny_read_paths:
+                deny_reads.append(p)
+
+        for d in deny_reads:
+            d_abs = os.path.realpath(os.path.abspath(d))
+            if os.path.isdir(d_abs):
+                bwrap_args.extend(["--tmpfs", d_abs])
+            elif os.path.isfile(d_abs):
+                bwrap_args.extend(["--ro-bind", "/dev/null", d_abs])
+
         bwrap_args.extend(["--", shell, "-c", command])
         return (bwrap, bwrap_args, True)
 
