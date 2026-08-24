@@ -98,9 +98,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         if len(clean) > 40:
             clean = clean[:40] + "..."
         clean_preview = clean or "(empty message)"
-        stat_info = f" *({entry.git_stats})*" if entry.git_stats else ""
-
-        title = f"### **Rollback: {clean_preview}**{stat_info}"
+        title = f"### **Rollback: {clean_preview}**"
         try:
             md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
             md.update(title)
