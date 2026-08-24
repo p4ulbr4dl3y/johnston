@@ -28,6 +28,7 @@ _SEATBELT_EXE = "/usr/bin/sandbox-exec"
 # because a present-but-unusable binary (no userns/setuid) would otherwise fail
 # every command at spawn time with an opaque namespace error.
 _bwrap_probe_cache: Dict[str, bool] = {}
+_seatbelt_probe_cache: Dict[str, bool] = {}
 
 
 def _check_bwrap(bwrap_path: str) -> bool:
@@ -51,10 +52,34 @@ def _check_bwrap(bwrap_path: str) -> bool:
     return usable
 
 
+def _check_seatbelt(seatbelt_path: str) -> bool:
+    """Return True if sandbox-exec can actually apply profiles (fails under nested sandbox)."""
+    real = os.path.realpath(seatbelt_path)
+    if real in _seatbelt_probe_cache:
+        return _seatbelt_probe_cache[real]
+    if not os.path.exists(seatbelt_path):
+        _seatbelt_probe_cache[real] = False
+        return False
+    try:
+        proc = subprocess.run(
+            [seatbelt_path, "-p", "(version 1)(allow default)", "/usr/bin/true"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+        usable = proc.returncode == 0
+    except Exception:
+        usable = False
+    _seatbelt_probe_cache[real] = usable
+    if not usable:
+        logger.warning("sandbox-exec found at %s but cannot apply profiles (nested sandbox/blocked)", seatbelt_path)
+    return usable
+
+
 def is_sandbox_supported() -> bool:
     """Return True if OS-level sandboxing is supported on this host."""
     if platform.system() == "Darwin":
-        return os.path.exists(_SEATBELT_EXE)
+        return os.path.exists(_SEATBELT_EXE) and _check_seatbelt(_SEATBELT_EXE)
     if platform.system() == "Linux":
         bwrap = shutil.which("bwrap")
         return bwrap is not None and _check_bwrap(bwrap)
@@ -65,7 +90,7 @@ def is_sandbox_supported() -> bool:
 
 def get_sandbox_backend_name() -> str:
     """Return the name of the sandbox backend available on this host."""
-    if platform.system() == "Darwin" and os.path.exists(_SEATBELT_EXE):
+    if platform.system() == "Darwin" and is_sandbox_supported():
         return "seatbelt"
     if platform.system() == "Linux" and is_sandbox_supported():
         return "bubblewrap"
@@ -132,6 +157,71 @@ def _is_fs_root(norm_path: str) -> bool:
     return (not drive and tail == os.sep) or (bool(drive) and tail in ("", os.sep))
 
 
+def get_git_worktree_writable_roots(workspace: str) -> List[str]:
+    """If workspace is a linked git worktree, return the gitdir and commondir paths."""
+    if not workspace:
+        return []
+    git_file = os.path.join(workspace, ".git")
+    if not os.path.isfile(git_file):
+        return []
+    try:
+        with open(git_file, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if content.startswith("gitdir:"):
+            raw_gitdir = content[len("gitdir:") :].strip()
+            if not os.path.isabs(raw_gitdir):
+                raw_gitdir = os.path.normpath(os.path.join(workspace, raw_gitdir))
+            gitdir = os.path.realpath(raw_gitdir)
+            if not os.path.isdir(gitdir) or not os.path.isfile(os.path.join(gitdir, "HEAD")):
+                return []
+            if not is_path_readable_in_sandbox(gitdir, cwd=workspace) or _is_fs_root(os.path.normcase(gitdir)):
+                return []
+
+            roots = [gitdir]
+            commondir_file = os.path.join(gitdir, "commondir")
+            if os.path.isfile(commondir_file):
+                with open(commondir_file, "r", encoding="utf-8") as cf:
+                    raw_common = cf.read().strip()
+                if not os.path.isabs(raw_common):
+                    raw_common = os.path.normpath(os.path.join(gitdir, raw_common))
+                common_dir = os.path.realpath(raw_common)
+                if (
+                    os.path.isdir(common_dir)
+                    and os.path.isdir(os.path.join(common_dir, "objects"))
+                    and is_path_readable_in_sandbox(common_dir, cwd=workspace)
+                    and not _is_fs_root(os.path.normcase(common_dir))
+                ):
+                    if common_dir not in roots:
+                        roots.append(common_dir)
+            return roots
+    except Exception:
+        pass
+    return []
+
+
+def get_default_writable_cache_roots() -> List[str]:
+    """Return common user cache roots (e.g. ~/.cache, ~/Library/Caches, UV_CACHE_DIR) for build tools & linters."""
+    roots: List[str] = []
+    uv_cache = os.environ.get("UV_CACHE_DIR")
+    if uv_cache:
+        roots.append(os.path.abspath(uv_cache))
+
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache:
+        roots.append(os.path.abspath(xdg_cache))
+    else:
+        home = os.path.expanduser("~")
+        if home and home != "~":
+            roots.append(os.path.join(home, ".cache"))
+
+    if platform.system() == "Darwin":
+        home = os.path.expanduser("~")
+        if home and home != "~":
+            roots.append(os.path.join(home, "Library", "Caches"))
+
+    return roots
+
+
 def is_path_writable_in_sandbox(
     path: str,
     cwd: Optional[str] = None,
@@ -147,11 +237,22 @@ def is_path_writable_in_sandbox(
     raw_roots: List[str] = []
     if platform.system() != "Windows":
         raw_roots.extend(["/tmp", "/private/tmp", "/dev"])
+        sys_temp = tempfile.gettempdir()
+        if sys_temp:
+            raw_roots.append(sys_temp)
+        raw_roots.extend(get_default_writable_cache_roots())
+    else:
+        win_temp = os.environ.get("TEMP") or os.environ.get("TMP") or tempfile.gettempdir()
+        if win_temp and not win_temp.startswith(("/tmp", "/private/tmp", "/dev")):
+            raw_roots.append(win_temp)
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            raw_roots.append(local_app_data)
+        raw_roots.extend(get_default_writable_cache_roots())
+
     if allow_workspace_writes:
         raw_roots.append(workspace)
-    sys_temp = tempfile.gettempdir()
-    if sys_temp:
-        raw_roots.append(sys_temp)
+        raw_roots.extend(get_git_worktree_writable_roots(workspace))
 
     if extra_writable_roots:
         raw_roots.extend(extra_writable_roots)
@@ -220,11 +321,21 @@ def generate_seatbelt_profile(
     ]
     if allow_workspace_writes:
         writable_paths.extend([workspace_abs, workspace_real])
+        for wt_root in get_git_worktree_writable_roots(workspace_abs):
+            for item in (os.path.abspath(wt_root), os.path.realpath(wt_root)):
+                if item not in writable_paths and not _is_fs_root(os.path.normcase(item)):
+                    writable_paths.append(item)
+
     sys_temp = sys_temp or tempfile.gettempdir()
     if sys_temp:
         for t in (os.path.abspath(sys_temp), os.path.realpath(sys_temp)):
             if t not in writable_paths and not _is_fs_root(os.path.normcase(os.path.realpath(t))):
                 writable_paths.append(t)
+
+    for c in get_default_writable_cache_roots():
+        for item in (os.path.abspath(c), os.path.realpath(c)):
+            if item not in writable_paths and not _is_fs_root(os.path.normcase(item)):
+                writable_paths.append(item)
 
     if extra_writable_roots:
         for p in extra_writable_roots:
@@ -297,10 +408,18 @@ def _build_bwrap_args(
     candidates: List[str] = []
     if sys_temp:
         candidates.append(sys_temp)
+    if allow_workspace_writes:
+        candidates.extend(get_git_worktree_writable_roots(workspace_abs))
+    candidates.extend(get_default_writable_cache_roots())
     if extra_writable_roots:
         candidates.extend(extra_writable_roots)
     for extra in candidates:
         extra_abs = os.path.realpath(os.path.abspath(extra))
+        if not exists(extra_abs):
+            try:
+                os.makedirs(extra_abs, exist_ok=True)
+            except Exception:
+                pass
         if not exists(extra_abs):
             continue
         if _is_fs_root(os.path.normcase(extra_abs)):
@@ -337,7 +456,7 @@ def build_sandboxed_command(
     workspace_abs = os.path.realpath(os.path.abspath(workspace))
     shell = shell_executable() or "/bin/sh"
 
-    if platform.system() == "Darwin" and os.path.exists(_SEATBELT_EXE):
+    if platform.system() == "Darwin" and is_sandbox_supported():
         profile = generate_seatbelt_profile(
             workspace_abs,
             extra_writable_roots=extra_writable_roots,
