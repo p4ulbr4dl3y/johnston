@@ -1,5 +1,7 @@
 import asyncio
 import itertools
+import logging
+import platform
 import time
 from typing import Any, Dict
 
@@ -15,7 +17,28 @@ from core.infrastructure.tasks.output import tail_output
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
+logger = logging.getLogger(__name__)
+
 _TASK_ID_COUNTER = itertools.count(1)
+
+
+def _sandbox_fallback_notice(ctx: Any) -> str:
+    """Banner appended to results when sandboxing was requested but unavailable.
+
+    Subagents and read-only roles rely on sandbox policy; silently running with
+    full access would be a false sense of safety, so we surface the degradation.
+    """
+    if not getattr(ctx, "sandbox_enabled", False):
+        return ""
+    try:
+        from core.infrastructure.platform.sandbox import is_sandbox_supported
+
+        if is_sandbox_supported():
+            return ""
+    except Exception:
+        pass
+    logger.warning("sandbox enabled but no usable backend on %s; command ran unsandboxed", platform.system())
+    return "[sandbox unavailable on this platform: executed unsandboxed]\n"
 
 
 def _new_task_id() -> str:
@@ -139,7 +162,11 @@ class ShellTool(BaseTool):
         # task), so long-running commands report a truthful error instead of
         # silently continuing after the agent already returns.
         if not run_in_bg:
-            return await self._run_sync(p, ctx, cmd, timeout)
+            res = await self._run_sync(p, ctx, cmd, timeout)
+            notice = _sandbox_fallback_notice(ctx)
+            if notice and res.content:
+                res.content = notice + res.content
+            return res
 
         # Explicit background execution (main agent only).
         task_id = _new_task_id()
@@ -159,7 +186,11 @@ class ShellTool(BaseTool):
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 
-        return ToolResult(status=ToolResultStatus.RUNNING, content=_format_background_task_response(task_id, cmd, log_path=task.log_path))
+        content = _format_background_task_response(task_id, cmd, log_path=task.log_path)
+        notice = _sandbox_fallback_notice(ctx)
+        if notice:
+            content = notice + content
+        return ToolResult(status=ToolResultStatus.RUNNING, content=content)
 
     async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,

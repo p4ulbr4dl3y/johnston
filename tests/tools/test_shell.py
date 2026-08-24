@@ -884,3 +884,30 @@ async def test_shell_sandbox_enabled_invokes_sandboxed_command(tool, make_tool_c
         mock_build.assert_called_once()
         mock_exec.assert_called_once()
 
+
+
+async def test_shell_sandbox_unavailable_surfaces_banner(tool, make_tool_context):
+    """Sandbox requested but no usable backend -> result must say 'unsandboxed'."""
+    ctx = _ctx(make_tool_context)
+    ctx.host.sandbox_enabled = True
+    with patch("core.infrastructure.platform.sandbox.build_sandboxed_command") as mock_build, \
+         patch("core.infrastructure.platform.sandbox.is_sandbox_supported", return_value=False), \
+         patch("asyncio.create_subprocess_exec") as mock_exec:
+        mock_build.return_value = ("/bin/sh", ["-c", "echo test"], False)
+        mock_exec.return_value = _process(wait_result=0, stdout=None)
+
+        res = str(await tool.execute({"command": "echo test"}, ctx=ctx))
+        assert "unsandboxed" in res
+
+
+async def test_shell_sandbox_no_banner_when_supported(tool, make_tool_context):
+    ctx = _ctx(make_tool_context)
+    ctx.host.sandbox_enabled = True
+    with patch("core.infrastructure.platform.sandbox.build_sandboxed_command") as mock_build, \
+         patch("core.infrastructure.platform.sandbox.is_sandbox_supported", return_value=True), \
+         patch("asyncio.create_subprocess_exec") as mock_exec:
+        mock_build.return_value = ("/usr/bin/sandbox-exec", ["-p", "(p)", "/bin/sh", "-c", "echo ok"], True)
+        mock_exec.return_value = _process(wait_result=0, stdout=None)
+
+        res = str(await tool.execute({"command": "echo ok"}, ctx=ctx))
+        assert "unsandboxed" not in res
