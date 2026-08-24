@@ -173,7 +173,12 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         if self.step == 1:
             if 0 <= idx < len(self.user_messages):
                 selected_entry = self.user_messages[idx]
-                if not self.checkpoints_enabled:
+                has_changes = bool(
+                    self.checkpoints_enabled
+                    and selected_entry.git_stats
+                    and selected_entry.git_stats not in ("no changes", "no checkpoint")
+                )
+                if not has_changes:
                     self.dismiss(RewindSelection(index=selected_entry.index, restore_code=False))
                     return
                 self._show_step_2(selected_entry)

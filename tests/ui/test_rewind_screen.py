@@ -124,3 +124,33 @@ class TestRewindScreen(unittest.TestCase):
         self.assertIsNotNone(dismissed_val)
         self.assertEqual(dismissed_val.index, 0)
         self.assertFalse(dismissed_val.restore_code)
+
+    def test_no_changes_direct_dismiss(self):
+        user_messages = [
+            RewindEntry(0, "message with no changes", "no changes"),
+            RewindEntry(1, "message with no checkpoint", "no checkpoint"),
+        ]
+        screen = RewindScreen(user_messages, checkpoints_enabled=True)
+        dismissed_val = None
+
+        def mock_dismiss(val):
+            nonlocal dismissed_val
+            dismissed_val = val
+
+        screen.dismiss = mock_dismiss
+
+        mock_event = MagicMock(spec=OptionList.OptionSelected)
+        # Selecting message 0 ("no changes")
+        mock_event.option_index = 0
+        screen.on_option_list_option_selected(mock_event)
+        self.assertIsNotNone(dismissed_val)
+        self.assertEqual(dismissed_val.index, 0)
+        self.assertFalse(dismissed_val.restore_code)
+
+        # Selecting message 1 ("no checkpoint")
+        dismissed_val = None
+        mock_event.option_index = 1
+        screen.on_option_list_option_selected(mock_event)
+        self.assertIsNotNone(dismissed_val)
+        self.assertEqual(dismissed_val.index, 1)
+        self.assertFalse(dismissed_val.restore_code)
