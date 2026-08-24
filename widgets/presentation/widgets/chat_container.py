@@ -1,5 +1,6 @@
 import asyncio
 
+from textual import events
 from textual.containers import VerticalScroll
 
 from core.infrastructure.mcp import mcp_tool_is_known
@@ -19,7 +20,25 @@ class ChatView(VerticalScroll):
         super().__init__(*args, **kwargs)
         self.show_welcome = show_welcome
         self._is_loading_session: bool = False
+        # Bottom-follow intent. Cleared by an upward wheel tick, restored by
+        # scrolling back to the bottom or by sending a new message.
+        self._auto_follow: bool = True
         self.auto_expand_all: bool = False
+
+    def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        # Pause bottom-follow as soon as the view has somewhere to scroll up;
+        # keeps a single wheel tick from being undone by the next stream flush.
+        if self.max_scroll_y > 0:
+            self._auto_follow = False
+
+    def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        # The framework's own scroll for this tick runs after this handler;
+        # defer the check so it sees the post-tick position.
+        self.call_after_refresh(self._resume_follow_if_at_bottom)
+
+    def _resume_follow_if_at_bottom(self) -> None:
+        if self.is_at_bottom():
+            self._auto_follow = True
 
     def is_at_bottom(self, threshold: int = 3) -> bool:
         """Returns True if scroll position is at or near the bottom of the container."""
@@ -56,7 +75,17 @@ class ChatView(VerticalScroll):
         except Exception:
             pass
 
-    async def _mount_and_scroll(self, widget, should_scroll: bool = True, animate: bool = True):
+    async def _mount_and_scroll(
+        self,
+        widget,
+        should_scroll: bool = True,
+        animate: bool = False,
+    ):
+        """Mount ``widget`` and optionally snap to the bottom.
+
+        Auto-follow scrolls are always instant: animated scrolls get superseded
+        by the next debounced stream flush (~50ms) and leave the tail jittering.
+        """
         self.clear_welcome()
         if not self.is_attached:
             await self._wait_until_attached()
@@ -68,7 +97,7 @@ class ChatView(VerticalScroll):
     async def add_user_message(
         self,
         text: str,
-        animate: bool = True,
+        animate: bool = False,
         attachments: list = None,
         attachments_count: int = 0,
     ) -> UserMessage:
@@ -80,18 +109,24 @@ class ChatView(VerticalScroll):
         else:
             msg = UserMessage(text or "", markup=False)
 
+        # Sending a message returns attention to the live tail.
+        self._auto_follow = True
         return await self._mount_and_scroll(msg, should_scroll=not self._is_loading_session, animate=animate)
 
-    async def add_bot_message(self, animate: bool = True) -> BotMessage:
+    async def add_bot_message(self, animate: bool = False) -> BotMessage:
         msg = BotMessage()
-        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        should_scroll = not self._is_loading_session and self.is_at_bottom()
         return await self._mount_and_scroll(msg, should_scroll=should_scroll, animate=animate)
 
-    async def add_thinking_widget(self, thinking_text: str = "Thinking...", animate: bool = True) -> ThinkingWidget:
+    async def add_thinking_widget(
+        self,
+        thinking_text: str = "Thinking...",
+        animate: bool = False,
+    ) -> ThinkingWidget:
         widget = ThinkingWidget(thinking_text)
         if self.auto_expand_all and widget.is_expandable():
             widget.is_expanded = True
-        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        should_scroll = not self._is_loading_session and self.is_at_bottom()
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     async def add_tool_call(
@@ -100,7 +135,7 @@ class ChatView(VerticalScroll):
         target: str,
         result_text: str = "",
         args: dict = None,
-        animate: bool = True,
+        animate: bool = False,
         status: str = None,
         returncode: int = None,
     ) -> ToolCallWidget:
@@ -132,12 +167,12 @@ class ChatView(VerticalScroll):
         )
         if self.auto_expand_all and widget.is_expandable():
             widget.is_expanded = True
-        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        should_scroll = not self._is_loading_session and self.is_at_bottom()
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
-    async def add_event_divider(self, text: str = "Session Compacted", animate: bool = True) -> EventDivider:
+    async def add_event_divider(self, text: str = "Session Compacted", animate: bool = False) -> EventDivider:
         widget = EventDivider(text)
-        should_scroll = not self._is_loading_session and (not animate or self.is_at_bottom())
+        should_scroll = not self._is_loading_session and self.is_at_bottom()
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate)
 
     def get_user_messages(self) -> list[tuple[int, str]]:

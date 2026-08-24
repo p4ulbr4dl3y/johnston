@@ -556,7 +556,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._update_next_sibling_spacing()
         self.render_header()
         if self.is_expanded:
-            self._should_scroll_on_render = True
+            # Scroll the finished result into view only when the user is
+            # already at the bottom; never yank them away from history.
+            self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
 
     def mark_cancelled(self) -> None:

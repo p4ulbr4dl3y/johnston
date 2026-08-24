@@ -377,3 +377,82 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             new_tool = await chat_view.add_tool_call("shell", "ls", "files", animate=False)
             await pilot.pause()
             self.assertFalse(new_tool.is_expanded)
+
+
+class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
+    def _make_view(self, max_scroll_y: int, scroll_y: int) -> ChatView:
+        view = ChatView()
+        patcher_max = patch.object(ChatView, "max_scroll_y", new_callable=PropertyMock, return_value=max_scroll_y)
+        patcher_y = patch.object(ChatView, "scroll_y", new_callable=PropertyMock, return_value=scroll_y)
+        patcher_max.start()
+        patcher_y.start()
+        self.addCleanup(patcher_max.stop)
+        self.addCleanup(patcher_y.stop)
+        return view
+
+    def test_wheel_up_pauses_auto_follow_when_scrollable(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=50)
+        self.assertTrue(view._auto_follow)
+        view.on_mouse_scroll_up(MagicMock())
+        self.assertFalse(view._auto_follow)
+
+    def test_wheel_up_ignores_unscrollable_view(self):
+        # Content fits viewport: wheel-up must not disable later bottom-follow.
+        view = self._make_view(max_scroll_y=0, scroll_y=0)
+        view.on_mouse_scroll_up(MagicMock())
+        self.assertTrue(view._auto_follow)
+
+    def test_wheel_down_at_bottom_resumes_auto_follow(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=100)
+        view._auto_follow = False
+        view._resume_follow_if_at_bottom()
+        self.assertTrue(view._auto_follow)
+
+    def test_wheel_down_mid_history_keeps_auto_follow_off(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=40)
+        view._auto_follow = False
+        view._resume_follow_if_at_bottom()
+        self.assertFalse(view._auto_follow)
+
+    def test_wheel_down_handler_defers_resume_check(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=100)
+        view.call_after_refresh = MagicMock()
+        view.on_mouse_scroll_down(MagicMock())
+        view.call_after_refresh.assert_called_once_with(view._resume_follow_if_at_bottom)
+
+    async def test_sending_message_resumes_auto_follow(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view._auto_follow = False
+            await chat_view.add_user_message("back to live")
+            await pilot.pause()
+            self.assertTrue(chat_view._auto_follow)
+
+    async def test_stream_growth_keeps_follow_when_pinned(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            await chat_view.add_user_message("\n".join(f"history line {i}" for i in range(60)))
+            bot = await chat_view.add_bot_message()
+            await pilot.pause()
+            self.assertTrue(chat_view.is_at_bottom())
+            # One flush growing content well past the threshold must still land
+            # on the new bottom: the deferred scroll runs after the layout that
+            # grew the content and must not re-check the stale position.
+            bot.append_stream_content("tail line\n" * 40)
+            await pilot.pause(0.2)
+            self.assertTrue(chat_view.is_at_bottom())
+
+    async def test_wheel_up_mid_stream_prevents_follow(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            await chat_view.add_user_message("\n".join(f"history line {i}" for i in range(60)))
+            bot = await chat_view.add_bot_message()
+            await pilot.pause()
+            chat_view.on_mouse_scroll_up(MagicMock())
+            self.assertFalse(chat_view._auto_follow)
+            bot.append_stream_content("tail line\n" * 40)
+            await pilot.pause(0.2)
+            self.assertFalse(chat_view.is_at_bottom())

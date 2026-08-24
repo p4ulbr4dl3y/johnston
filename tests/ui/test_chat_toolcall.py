@@ -749,6 +749,18 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             self.assertTrue(getattr(w2, "_should_scroll_on_render", False))
             render_mock.assert_called_once()
 
+    def test_set_result_scroll_flag_respects_parent_position(self):
+        w = self._widget("codegraph_explore", "")
+        w.is_mcp = True
+        w.is_expanded = True
+        with (
+            patch.object(w, "_is_parent_at_bottom", return_value=False),
+            patch.object(w, "render_content") as render_mock,
+        ):
+            w.set_result("**Result**", status="done")
+            self.assertFalse(w._should_scroll_on_render)
+            render_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from rich.rule import Rule
 from rich.text import Text
@@ -12,6 +13,8 @@ from widgets.presentation.widgets.chat_markdown import (
     clean_markdown_for_rendering,
     safe_update_markdown,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_divider_title(title: str, max_len: int = 100) -> str:
@@ -84,27 +87,55 @@ class UserMessage(Horizontal):
 
 
 def scroll_parent_if_needed(widget, force: bool = False) -> None:
+    """Stick the scrollable parent to the bottom after a content update.
+
+    Follows only while the user is at the bottom (see ``ChatView._auto_follow``);
+    an upward wheel tick pauses follow until the user returns to the bottom.
+    Position is checked when scheduling. Deferred callbacks run *after* the
+    layout refresh has already grown the content, so there ``is_at_bottom``
+    would be false exactly when following matters — those callbacks therefore
+    re-check user intent only (``_auto_follow``/``_is_loading_session``), never
+    position.
+    """
     try:
         parent = getattr(widget, "parent", None)
         if isinstance(parent, VerticalScroll):
-            is_at_bot = force or getattr(parent, "is_at_bottom", lambda: True)()
             is_loading = getattr(parent, "_is_loading_session", False)
-            if (force or is_at_bot) and not is_loading:
-                if not getattr(parent, "_scroll_pending", False) or force:
-                    parent._scroll_pending = True
+            auto_follow = getattr(parent, "_auto_follow", True)
+            should_schedule = not is_loading and (
+                force or (auto_follow and getattr(parent, "is_at_bottom", lambda: True)())
+            )
+            if should_schedule and (not getattr(parent, "_scroll_pending", False) or force):
+                parent._scroll_pending = True
 
-                    def _do_scroll():
-                        try:
-                            parent._scroll_pending = False
+                def _intent_active() -> bool:
+                    return (
+                        getattr(parent, "_auto_follow", True)
+                        and not getattr(parent, "_is_loading_session", False)
+                    )
+
+                def _settle_rescroll():
+                    try:
+                        # Layout may have grown content again; re-stick unless
+                        # the user scrolled away in the meantime.
+                        if _intent_active():
+                            parent.scroll_end(animate=False)
+                    except Exception:
+                        logger.debug("Settle autoscroll failed", exc_info=True)
+
+                def _do_scroll():
+                    try:
+                        parent._scroll_pending = False
+                        if _intent_active():
                             parent.scroll_end(animate=False)
                             if hasattr(parent, "call_after_refresh"):
-                                parent.call_after_refresh(lambda: parent.scroll_end(animate=False))
-                        except Exception:
-                            pass
+                                parent.call_after_refresh(_settle_rescroll)
+                    except Exception:
+                        logger.debug("Deferred autoscroll failed", exc_info=True)
 
-                    parent.call_after_refresh(_do_scroll)
+                parent.call_after_refresh(_do_scroll)
     except Exception:
-        pass
+        logger.debug("Autoscroll dispatch failed", exc_info=True)
 
 
 def scroll_parent_to_widget(widget, top: bool = False) -> None:
@@ -122,11 +153,11 @@ def scroll_parent_to_widget(widget, top: bool = False) -> None:
                                     lambda: parent.scroll_to_widget(widget, top=top, animate=False)
                                 )
                     except Exception:
-                        pass
+                        logger.debug("Deferred scroll_to_widget failed", exc_info=True)
 
                 parent.call_after_refresh(_do_scroll)
     except Exception:
-        pass
+        logger.debug("scroll_to_widget dispatch failed", exc_info=True)
 
 
 class BotMessage(Vertical):
@@ -245,7 +276,7 @@ class BotMessage(Vertical):
             self.stream_widget.update(text)
             self._scroll_if_needed()
         except Exception:
-            pass
+            logger.debug("Stream flush failed", exc_info=True)
 
     def flush_pending_stream(self) -> None:
         """Immediately render any still-pending debounced stream content."""
@@ -400,7 +431,7 @@ class ThinkingWidget(Vertical):
             self.content_widget.update(self.thinking_text)
             self._scroll_if_needed()
         except Exception:
-            pass
+            logger.debug("Thinking flush failed", exc_info=True)
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":

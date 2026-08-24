@@ -466,6 +466,22 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
         scroll_parent_if_needed(widget, force=True)
         parent.call_after_refresh.assert_called_once()
 
+    def test_scroll_parent_if_needed_skips_when_auto_follow_off(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+
+        parent = MagicMock(spec=ChatView)
+        parent.is_at_bottom.return_value = True
+        parent._auto_follow = False
+        parent._is_loading_session = False
+        parent._scroll_pending = False
+
+        widget = MagicMock()
+        widget.parent = parent
+
+        scroll_parent_if_needed(widget, force=False)
+        parent.call_after_refresh.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
