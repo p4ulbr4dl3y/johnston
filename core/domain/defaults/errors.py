@@ -3,7 +3,22 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Sequence
 
-__all__ = ["ToolResult", "ToolResultStatus", "ToolResultEvent", "format_tool_error", "parse_tool_result_step"]
+__all__ = [
+    "ToolResult",
+    "ToolResultStatus",
+    "ToolResultEvent",
+    "FormattedToolError",
+    "format_tool_error",
+    "parse_tool_result_step",
+]
+
+
+class FormattedToolError(ValueError):
+    """ValueError whose message is already a fully formatted ``ERR:`` tool-error string.
+
+    Tools raise it for validation/match failures so executors can pass the text
+    through verbatim instead of string-sniffing the ``ERR:`` prefix.
+    """
 
 
 class ToolResultStatus(str, Enum):

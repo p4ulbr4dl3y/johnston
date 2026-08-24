@@ -2,7 +2,7 @@ import difflib
 import os
 from typing import Any, Dict, Tuple
 
-from core.domain.defaults.errors import ToolResult, format_tool_error
+from core.domain.defaults.errors import FormattedToolError, ToolResult, format_tool_error
 from core.infrastructure.runtime.git_utils import make_git_diff
 from tools.base import (
     BaseTool,
@@ -110,23 +110,23 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
 
 def apply_edit(content: str, old_str: str, new_str: str, replace_all: bool = False, path: str = "file") -> Tuple[str, str]:
     if old_str is None:
-        raise ValueError(format_tool_error("params", "missing 'old_str'"))
+        raise FormattedToolError(format_tool_error("params", "missing 'old_str'"))
     if old_str == "":
-        raise ValueError(format_tool_error("params", "old_str cannot be empty"))
+        raise FormattedToolError(format_tool_error("params", "old_str cannot be empty"))
     if new_str is None:
-        raise ValueError(format_tool_error("params", "missing 'new_str'"))
+        raise FormattedToolError(format_tool_error("params", "missing 'new_str'"))
     if old_str == new_str:
-        raise ValueError(format_tool_error("params", "new_str must be different from old_str"))
+        raise FormattedToolError(format_tool_error("params", "new_str must be different from old_str"))
 
     actual_target, actual_replacement = find_actual_target_and_replacement(content, old_str, new_str)
     count = content.count(actual_target)
 
     if count == 0:
         hint = _generate_fuzzy_match_hint(content, old_str, path)
-        raise ValueError(format_tool_error("match", f"exact block not found in '{path}'.{hint}"))
+        raise FormattedToolError(format_tool_error("match", f"exact block not found in '{path}'.{hint}"))
 
     if count > 1 and not replace_all:
-        raise ValueError(
+        raise FormattedToolError(
             format_tool_error(
                 "match",
                 f"target matches {count} occurrences in '{path}'. "
@@ -160,11 +160,16 @@ class EditTool(BaseTool):
                     "old_str": {
                         "type": "string",
                         "description": "Exact text to replace. Must be unique in the file (include 2-4 lines of surrounding context if needed).",
+                        "minLength": 1,
                     },
-                    "new_str": {"type": "string", "description": "New replacement text"},
+                    "new_str": {
+                        "type": "string",
+                        "description": "New replacement text. Use empty string to delete old_str.",
+                    },
                     "replace_all": {
                         "type": "boolean",
                         "description": "Replace all occurrences of old_str across the file (default: false).",
+                        "default": False,
                     },
                 },
                 "required": ["path", "old_str", "new_str"],
@@ -176,19 +181,19 @@ class EditTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
 
-        path_arg = args.get("path") or args.get("file_path") or args.get("filePath")
+        path_arg = args.get("path")
         if not path_arg or not str(path_arg).strip():
             return ToolResult.error("params", name="path", detail="missing or empty")
 
         old_str = args.get("old_str")
-        if old_str is None:
-            old_str = args.get("old_string", args.get("oldString"))
 
         new_str = args.get("new_str")
         if new_str is None:
-            new_str = args.get("new_string", args.get("newString", ""))
+            # Absent key means deletion (pinned by test_edit_missing_new_str_is_delete):
+            # keeps single-turn deletes for providers that drop empty-string args.
+            new_str = ""
 
-        replace_all = bool(args.get("replace_all", args.get("allow_multiple", False)))
+        replace_all = bool(args.get("replace_all", False))
 
         path = resolve_path(str(path_arg), cwd=ctx.cwd)
         if getattr(ctx, "sandbox_enabled", False):
@@ -217,11 +222,12 @@ class EditTool(BaseTool):
             return await run_cancellable(_do_edit)
         except (UnicodeDecodeError, UnicodeEncodeError) as ue:
             return ToolResult.error("file", detail=str(ue), name=path)
+        except FormattedToolError as fte:
+            from core.domain.defaults.errors import ToolResultStatus
+
+            return ToolResult(content=str(fte), status=ToolResultStatus.ERROR)
         except ValueError as ve:
-            msg = str(ve)
-            if msg.startswith("ERR:"):
-                from core.domain.defaults.errors import ToolResultStatus
-                return ToolResult(content=msg, status=ToolResultStatus.ERROR)
-            return ToolResult.error("params", detail=msg)
+            # Unexpected ValueError (not a formatted tool error): wrap as params.
+            return ToolResult.error("params", detail=str(ve))
         except Exception as e:
             return ToolResult.error("file", detail=str(e), name=path)

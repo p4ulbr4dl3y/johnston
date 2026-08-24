@@ -1,6 +1,8 @@
 import os
 import unittest
+from unittest import mock
 
+from core.domain.defaults.errors import FormattedToolError
 from tests.conftest import WindowsSafeTemporaryDirectory
 from tools.edit import EditTool, apply_edit
 
@@ -26,7 +28,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         new_content, _ = apply_edit(content, "print(‘hello world’)", "print(‘hello universe’)", False, "dummy.py")
         self.assertEqual(new_content, "print('hello universe')\n")
 
-    async def test_edit_tool_fallback_keys(self):
+    async def test_edit_tool_basic(self):
         tool = EditTool()
         file_path = os.path.join(self.test_dir, "test.py")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -84,3 +86,50 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
                 "dummy.py",
             )
         self.assertIn("Nearest matching code", str(ctx.exception))
+
+    def test_match_failure_raises_formatted_tool_error(self):
+        # Match errors must be FormattedToolError (pre-formatted ERR: text), not
+        # bare ValueError, so the executor can pass them through without
+        # string-sniffing the "ERR:" prefix.
+        with self.assertRaises(FormattedToolError) as ctx:
+            apply_edit("foo\n", "bar", "baz", False, "dummy.py")
+        self.assertTrue(str(ctx.exception).startswith("ERR: match"))
+
+    async def test_missing_new_str_key_means_delete(self):
+        # Pinned behavior: an ABSENT new_str key deletes the target in one turn
+        # (test_edit_missing_new_str_is_delete); only explicit "" vs missing
+        # differ for providers that drop empty-string args.
+        tool = EditTool()
+        file_path = os.path.join(self.test_dir, "test.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("line1\ndrop\nline2\n")
+
+        res = str(await tool.execute({"path": file_path, "old_str": "drop\n"}))
+        self.assertNotIn("ERR:", res)
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "line1\nline2\n")
+
+    async def test_explicit_empty_new_str_still_deletes(self):
+        # "" must stay a valid replacement (deletion).
+        tool = EditTool()
+        file_path = os.path.join(self.test_dir, "test.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("line1\ndrop\nline2\n")
+
+        res = str(await tool.execute({"path": file_path, "old_str": "drop\n", "new_str": ""}))
+        self.assertNotIn("ERR:", res)
+        with open(file_path, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "line1\nline2\n")
+
+    async def test_unexpected_valueerror_wrapped_as_params(self):
+        # A plain ValueError escaping apply_edit must wrap into a params error,
+        # never leak raw text as a successful result.
+        tool = EditTool()
+        file_path = os.path.join(self.test_dir, "test.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("x = 1\n")
+
+        with mock.patch("tools.edit.apply_edit", side_effect=ValueError("boom")):
+            res = str(await tool.execute({"path": file_path, "old_str": "x = 1", "new_str": "x = 2"}))
+        self.assertIn("ERR: params", res)
+        self.assertIn("boom", res)

@@ -91,7 +91,8 @@ class ShellTool(BaseTool):
     name = "shell"
     description = (
         "Execute non-interactive shell command. Always specify explicit path (e.g. 'rg foo .') "
-        "to avoid stdin hang. Set background=true for servers/long jobs; use unbuffered output (flush/flags) for live logs."
+        "to avoid stdin hang. Set background=true for servers/long jobs; use unbuffered output (flush/flags) for live logs. "
+        "Manage, send stdin, or kill via 'manage_shell'."
     )
 
     schema = {
