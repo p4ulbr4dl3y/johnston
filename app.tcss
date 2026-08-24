@@ -50,7 +50,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
 
 #chat-view {
     height: 1fr;
-    padding: 1 2 1 2;
+    padding: 0 2 1 2;
     background: #09090b;
     scrollbar-size: 0 0;
 }
@@ -501,7 +501,7 @@ ModalScreen {
 
 #subagent-chat-view {
     height: 1fr;
-    padding: 1 2 1 2;
+    padding: 0 2 1 2;
     background: #09090b;
     scrollbar-size: 0 0;
 }
