@@ -413,14 +413,21 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         ci = ChatInput()
         app = DummyChatApp(ci)
         async with app.run_test():
-            # ctrl+d clears attachments
-            att = ClipboardAttachment("/tmp/img.png")
-            ci.clipboard_attachments.append(att)
+            # ctrl+d detaches attachments one by one (LIFO)
+            att1 = ClipboardAttachment("/tmp/img1.png")
+            att2 = ClipboardAttachment("/tmp/img2.png")
+            ci.clipboard_attachments.extend([att1, att2])
 
             event_d = Key("ctrl+d", "ctrl+d")
             event_d.prevent_default = MagicMock()
             event_d.stop = MagicMock()
             await ci._on_key(event_d)
+            self.assertEqual(ci.clipboard_attachments, [att1])
+
+            event_d2 = Key("ctrl+d", "ctrl+d")
+            event_d2.prevent_default = MagicMock()
+            event_d2.stop = MagicMock()
+            await ci._on_key(event_d2)
             self.assertEqual(len(ci.clipboard_attachments), 0)
 
             # ctrl+v triggers try_paste_clipboard_image

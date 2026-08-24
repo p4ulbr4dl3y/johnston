@@ -1,5 +1,3 @@
-import os
-
 from textual.containers import HorizontalScroll
 from textual.widgets import Static
 
@@ -12,14 +10,12 @@ class AttachmentChip(Static):
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, attachment, *args, **kwargs) -> None:
+    def __init__(self, attachment, index: int = 1, *args, **kwargs) -> None:
         self.attachment = attachment
-        fname = os.path.basename(attachment.path) if hasattr(attachment, "path") else str(attachment)
-        if len(fname) > 24:
-            fname = f"{fname[:10]}…{fname[-10:]}"
+        self.index = index
         text = (
-            f"[{THEME_MUTED}]\\[img:\u00a0[/{THEME_MUTED}]"
-            f"[{THEME_SECONDARY}]{fname}[/{THEME_SECONDARY}]"
+            f"[{THEME_MUTED}]\\[[/{THEME_MUTED}]"
+            f"[{THEME_SECONDARY}]Image #{index}[/{THEME_SECONDARY}]"
             f"[{THEME_MUTED}]\u00a0×][/{THEME_MUTED}]"
         )
         super().__init__(text, *args, **kwargs)
@@ -58,8 +54,8 @@ class AttachmentBar(HorizontalScroll):
             self.styles.display = "none"
         else:
             self.styles.display = "block"
-            for att in self.attachments:
-                chip = AttachmentChip(att)
+            for idx, att in enumerate(self.attachments, start=1):
+                chip = AttachmentChip(att, index=idx)
                 try:
                     self.mount(chip)
                 except Exception:

@@ -385,7 +385,7 @@ class ChatInput(TextArea):
                 return
 
         if event.key in KEY_DETACH and self.clipboard_attachments:
-            self.clear_clipboard_attachments()
+            self.remove_clipboard_attachment(self.clipboard_attachments[-1])
             event.prevent_default()
             event.stop()
             return

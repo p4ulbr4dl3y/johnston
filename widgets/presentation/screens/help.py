@@ -31,7 +31,7 @@ KEYBINDINGS_BODY_MD = """* `Shift+Tab` — Toggle Action / Explore mode
 * `Enter` — Send message
 * `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
 * `Ctrl+V` — Paste text or clipboard image
-* `Ctrl+D` — Detach attached clipboard images
+* `Ctrl+D` — Detach last attached clipboard image
 * `↑` / `↓` — History navigation (looping)
 * `@` — Attach workspace file (autocompletion)
 * `Esc` — Cancel response generation / Close modals

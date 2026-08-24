@@ -408,13 +408,12 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         bar.update_attachments([mock_att])
         self.assertEqual(bar.styles.display, "block")
 
-        chip = AttachmentChip(mock_att)
-        self.assertIn("test_image.png", str(chip.render()))
-        self.assertIn("\u00a0", str(chip.render()))
+        chip = AttachmentChip(mock_att, index=1)
+        self.assertIn("Image #1", str(chip.render()))
+        self.assertIn("\u00a0×", str(chip.render()))
 
-        long_att = MagicMock(path="/tmp/very_long_attachment_file_name_123456789.png")
-        long_chip = AttachmentChip(long_att)
-        self.assertIn("…", str(long_chip.render()))
+        chip2 = AttachmentChip(mock_att, index=2)
+        self.assertIn("Image #2", str(chip2.render()))
 
         # Test single chip click calls remove_clipboard_attachment
         mock_ci = MagicMock()
