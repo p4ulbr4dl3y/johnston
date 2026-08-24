@@ -462,7 +462,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         self.refresh_footer()
 
 
-class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
+class SubagentStatusFooter(GitMetricsMixin, Static):
     """Dedicated status footer for subagent screen, isolated from main app footer."""
 
     can_focus = False
@@ -471,52 +471,28 @@ class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__("", *args, **kwargs)
         self.session = None
-        self.is_generating: bool = False
-        self._spinner_idx: int = 0
-        self._spinner_timer = None
         self._diff_text: str = ""
         self._diff_time: float = 0.0
         self._diff_loading: bool = False
         self._last_grid_rows: list[tuple[str, str]] | None = None
+        self._resize_timer = None
+        self._last_resize_size = None
 
     def on_mount(self) -> None:
         self._render_footer()
 
     def on_unmount(self) -> None:
-        if self._spinner_timer:
+        if getattr(self, "_resize_timer", None):
             try:
-                self._spinner_timer.stop()
+                self._resize_timer.stop()
             except Exception:
                 pass
-            self._spinner_timer = None
+            self._resize_timer = None
 
     def update_session(self, session) -> None:
         """Update with a subagent session record (AgentSession) and refresh render."""
         self.session = session
-        if not session:
-            self._render_footer()
-            return
-
-        is_running = getattr(session, "status", "") == "running"
-        if is_running and not self.is_generating:
-            self.is_generating = True
-            if not self._spinner_timer:
-                self._spinner_timer = self.set_interval(0.2, self._spin)
-        elif not is_running and self.is_generating:
-            self.is_generating = False
-            if self._spinner_timer:
-                self._spinner_timer.stop()
-                self._spinner_timer = None
-            self._spinner_idx = 0
-
         self._render_footer()
-
-    def _spin(self) -> None:
-        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        if getattr(self, "_last_grid_rows", None):
-            self._render_stream_frame()
-        else:
-            self._render_footer()
 
     def _render_footer(self) -> None:
         grid = Table.grid(expand=True)
@@ -574,12 +550,7 @@ class SubagentStatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0) or history_tokens
             cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
             if cost_usd == 0.0 and total_tokens > 0 and (provider_key or model_name):
-                pricing = catalog.get_model_pricing(provider_key, model_name)
-                if pricing:
-                    p_in = pricing.get("prompt", 0.0)
-                    p_out = pricing.get("completion", 0.0)
-                    half = total_tokens / 2.0
-                    cost_usd = half * p_in + half * p_out
+                cost_usd = catalog.estimate_cost_from_totals(provider_key, model_name, total_tokens)
 
             raw_limit = (
                 metrics.get("context_limit")

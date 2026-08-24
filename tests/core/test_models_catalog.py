@@ -758,3 +758,75 @@ async def test_refresh_extracts_discovered_providers(iso_cat):
     assert iso_cat.get_catalog_provider("sambanova") is not None
     assert iso_cat.get_catalog_provider("nonexistent") is None
 
+
+
+# ---------------------------------------------------------------------------
+# is_free_model + estimate_cost_from_totals — unified agent/subagent cost logic
+# ---------------------------------------------------------------------------
+
+def test_is_free_model_markers():
+    assert ModelsCatalog.is_free_model("opencode/x-preview-f-free")
+    assert ModelsCatalog.is_free_model("openrouter/deepseek/deepseek-r1:free")
+    assert ModelsCatalog.is_free_model("prov/model-free-tier")
+    assert ModelsCatalog.is_free_model("prov/FREE")
+    assert not ModelsCatalog.is_free_model("openai/gpt-4o")
+    assert not ModelsCatalog.is_free_model("fremium-model")
+    assert not ModelsCatalog.is_free_model("")
+    assert not ModelsCatalog.is_free_model(None)
+
+
+def test_estimate_cost_zero_for_free_model_even_when_paid_sibling_in_catalog():
+    # Regression: x-preview-f-free used to fuzzy-match paid zai/glm-4.5-x and
+    # the subagent footer displayed its rates. Free ids must always price at 0.
+    cat = ModelsCatalog()
+    cat._pricing = {
+        "llmgateway-providers/zai/glm-4.5-x": {"prompt": 2.2e-06, "completion": 8.9e-06},
+    }
+    assert cat.estimate_cost_from_totals("opencode", "x-preview-f-free", 100_000) == 0.0
+
+
+def test_stage4_fuzzy_keeps_preview_token():
+    # "preview" is a distinguishing token, not noise: with it ignored, an
+    # unrelated paid model (glm-4.5-x) matched query x-preview-f-free.
+    cat = ModelsCatalog()
+    cat._pricing = {
+        "llmgateway-providers/zai/glm-4.5-x": {"prompt": 2.2e-06, "completion": 8.9e-06},
+        "opencode/qwen3.6-max-preview": {"prompt": 1.3e-06, "completion": 7.8e-06},
+    }
+    resolved = cat._resolve_catalog_key(
+        "opencode", "x-preview-f-free", cat._pricing, tag="pricing"
+    )
+    assert resolved == "", f"expected no match, got {resolved!r}"
+
+
+def test_estimate_cost_zero_for_unknown_model_no_fuzzy_borrow():
+    cat = ModelsCatalog()
+    cat._pricing = {
+        "prov/some-other-model": {"prompt": 1e-05, "completion": 2e-05},
+    }
+    assert cat.estimate_cost_from_totals("prov", "totally-unknown", 100_000) == 0.0
+
+
+def test_estimate_cost_prices_own_slug_and_respects_totals():
+    cat = ModelsCatalog()
+    cat._pricing = {
+        "prov/model-x:tier": {"prompt": 2e-06, "completion": 8e-06},
+    }
+    est = cat.estimate_cost_from_totals("prov", "model-x:tier", 100_000)
+    assert est == pytest.approx(50_000 * 2e-06 + 50_000 * 8e-06)
+    # Non-positive totals are free of charge.
+    assert cat.estimate_cost_from_totals("prov", "model-x:tier", 0) == 0.0
+    assert cat.estimate_cost_from_totals("prov", "model-x:tier", -5) == 0.0
+
+
+def test_estimate_cost_scoped_provider_match():
+    # Same slug under two providers: scoped resolution must pick the right one.
+    cat = ModelsCatalog()
+    cat._pricing = {
+        "alpha/m1": {"prompt": 1e-06, "completion": 1e-06},
+        "beta/m1": {"prompt": 3e-06, "completion": 3e-06},
+    }
+    est_a = cat.estimate_cost_from_totals("alpha", "m1", 100_000)
+    est_b = cat.estimate_cost_from_totals("beta", "m1", 100_000)
+    assert est_a == pytest.approx(50_000 * 1e-06 + 50_000 * 1e-06)
+    assert est_b == pytest.approx(50_000 * 3e-06 + 50_000 * 3e-06)

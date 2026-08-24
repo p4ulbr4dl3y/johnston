@@ -167,9 +167,9 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         footer = SubagentStatusFooter()
         timer = MagicMock()
         timer.stop.side_effect = Exception("boom")
-        footer._spinner_timer = timer
+        footer._resize_timer = timer
         footer.on_unmount()
-        self.assertIsNone(footer._spinner_timer)
+        self.assertIsNone(footer._resize_timer)
 
     def test_update_session_none_renders(self):
         footer = SubagentStatusFooter()
@@ -178,29 +178,17 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
             footer.update_session(None)
         upd.assert_called_once()
 
-    def test_update_session_stops_spinner(self):
+    def test_update_session_renders_footer(self):
         footer = SubagentStatusFooter()
-        footer.is_generating = True
-        timer = MagicMock()
-        footer._spinner_timer = timer
         session = MagicMock()
-        session.status = "completed"
+        session.status = "running"
         session.agent = None
         session.role = "explorer"
         session.project_dir = "/tmp"
         session.branch_name = ""
         with patch.object(footer, "_render_footer") as rf:
             footer.update_session(session)
-        self.assertFalse(footer.is_generating)
-        timer.stop.assert_called_once()
-        self.assertIsNone(footer._spinner_timer)
-        rf.assert_called_once()
-
-    def test_spin_no_rows_renders(self):
-        footer = SubagentStatusFooter()
-        footer._last_grid_rows = None
-        with patch.object(footer, "_render_footer") as rf:
-            footer._spin()
+        self.assertEqual(footer.session, session)
         rf.assert_called_once()
 
     def test_render_footer_provider_active_and_pricing(self):
@@ -226,8 +214,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         footer._harness_app = app
         footer.session = session
         with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
-            "widgets.status_footer.catalog.get_model_pricing",
-            side_effect=lambda p, m: {"prompt": 1.0, "completion": 2.0} if p == "openai" else None,
+            "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)

@@ -223,13 +223,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         is_local = is_local_provider(
             self.provider_key, getattr(self, "api_type", ""), getattr(self, "base_url", "")
         )
-        model_low = (self.model or "").lower()
-        is_free_model = (
-            ":free" in model_low
-            or "-free" in model_low
-            or model_low.endswith("free")
-            or "/free" in model_low
-        )
+        is_free_model = catalog.is_free_model(self.model)
 
         pricing = catalog.get_model_pricing(self.provider_key, self.model)
         p_prompt = pricing.get("prompt", 0.0)

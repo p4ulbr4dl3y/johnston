@@ -368,11 +368,14 @@ class ModelsCatalog:
             "large",
             "turbo",
             "latest",
-            "preview",
             "non",
             "dummy",
             "unknown",
         }
+        # NOTE: "free" stays ignored (tier markers are noise), but "preview" is
+        # NOT ignored: variant/date tokens like "preview" distinguish distinct
+        # catalog entries, and dropping it let unrelated models fuzzy-match each
+        # other (e.g. x-preview-f-free -> zai/glm-4.5-x borrowing paid pricing).
         clean_tokens = tokens - ignored_tokens
         query_digits = {t for t in clean_tokens if t.isdigit()}
 
@@ -485,6 +488,47 @@ class ModelsCatalog:
             return self._pricing[resolved]
 
         return {"prompt": 0.0, "completion": 0.0}
+
+    @staticmethod
+    def is_free_model(model_id: Any) -> bool:
+        """True when the model id itself advertises a free tier.
+
+        Single source of truth for free-model detection: usage accumulation
+        (BaseAgent._accumulate_usage) and display-time estimates must agree,
+        otherwise the UI invents money for models that were correctly priced
+        at zero.
+        """
+        m = str(model_id or "").lower()
+        if not m:
+            return False
+        return ":free" in m or "-free" in m or "/free" in m or m.endswith("free")
+
+    def estimate_cost_from_totals(self, provider_id: str, model_id: str, total_tokens: int) -> float:
+        """Rough display-time USD estimate for a token total at catalog rates.
+
+        Conservative by design: returns 0.0 for free models and whenever pricing
+        cannot be pinned to the model's own base slug (exact/scoped/slug match
+        only — never the Stage-4 fuzzy match), so an unknown or free model never
+        borrows a paid sibling's rates. Half of the tokens are billed at input
+        rate, half at output rate — same heuristic as session-level estimation.
+        """
+        if not total_tokens or total_tokens <= 0:
+            return 0.0
+        if self.is_free_model(model_id):
+            return 0.0
+
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._pricing, tag="pricing")
+        if not resolved or resolved not in self._pricing:
+            return 0.0
+
+        m_base = str(model_id).split("/")[-1].split(":")[0].lower()
+        r_base = resolved.split("/")[-1].split(":")[0].lower()
+        if r_base != m_base:
+            return 0.0
+
+        pricing = self._pricing[resolved]
+        half = total_tokens / 2.0
+        return half * pricing.get("prompt", 0.0) + half * pricing.get("completion", 0.0)
 
 
 catalog = ModelsCatalog()
