@@ -53,7 +53,7 @@ class TestProviderManager(unittest.TestCase):
         self.config_file_patcher.stop()
         self.providers_json_patcher.stop()
         self.cache_dir_patcher.stop()
-        shutil.rmtree(self.test_dir)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_ensure_config_dir(self):
         self.assertTrue(os.path.exists(self.test_dir))
