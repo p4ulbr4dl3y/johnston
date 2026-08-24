@@ -129,6 +129,9 @@ class SessionPersistenceMixin:
             if hasattr(session, "role") and session.role:
                 self.agent.role = session.role
                 self.role = session.role
+            else:
+                self.agent.role = "worker"
+                self.role = "worker"
 
             ctx = session.last_context_tokens
             if not ctx and self.agent.history:
@@ -159,6 +162,8 @@ class SessionPersistenceMixin:
         """Write collected session data into the store (no UI access — safe for threads)."""
         session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
         session.description = session.description or session_data.get("title", "")
+        if "role" in session_data:
+            session.role = session_data["role"]
         session.messages = session_data.get("messages", [])
         session.agent_history = session_data.get("agent_history", [])
         session.tokens_input = session_data.get("tokens_input", 0)

@@ -39,6 +39,7 @@ def collect_session_data(app: Any) -> Optional[dict]:
     return {
         "id": app.current_session_id,
         "title": title,
+        "role": getattr(app.agent, "role", getattr(app, "role", "worker")),
         "messages": messages,
         "agent_history": agent_history,
         "tokens_input": getattr(app.agent, "tokens_input", 0),

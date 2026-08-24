@@ -23,5 +23,11 @@ def toggle_agent_role(app: Any) -> bool:
     new_role = available_roles[next_idx]
     app.agent.role = new_role
     app.role = new_role
+    if hasattr(app, "sm") and hasattr(app, "current_session_id"):
+        session = app.sm.get(app.current_session_id, reload=False)
+        if session is not None:
+            session.role = new_role
+            if hasattr(app, "save_current_session"):
+                app.save_current_session()
     app.refresh_status_footer()
     return True
