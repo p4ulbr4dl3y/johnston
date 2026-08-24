@@ -35,10 +35,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "3. Action Plans: When planning, provide Goal, Trade-offs, Key Dependencies, and Step-by-step Execution with verification criteria.\n"
             "4. Mutation Requests: When requested to modify state, decline mutation and provide the actionable execution plan instead."
         ),
-        disallowed_tools=[
-            "create",
-            "edit",
-        ],
+        read_only=True,
         scope="any",
         source="builtin",
     ),
@@ -165,6 +162,11 @@ class RoleRegistry:
 
             disallowed_tools = parse_csv_list(meta.get("disallowed_tools"))
             allowed_tools = parse_csv_list(meta.get("allowed_tools"))
+            raw_ro = meta.get("read_only", False)
+            if isinstance(raw_ro, str):
+                read_only = raw_ro.strip().lower() in ("true", "1", "yes", "on")
+            else:
+                read_only = bool(raw_ro)
 
             return AgentRole(
                 key=key,
@@ -178,6 +180,7 @@ class RoleRegistry:
                 scope=scope,
                 source=source,
                 tool_name_normalizer=self.tool_name_normalizer,
+                read_only=read_only,
             )
         except Exception:
             return None

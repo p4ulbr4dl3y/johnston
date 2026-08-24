@@ -86,6 +86,13 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         or getattr(agent, "model", "")
     )
     is_subagent = getattr(agent, "is_subagent", False)
+    app = getattr(agent, "app", None)
+    sandbox_val = getattr(agent, "sandbox_enabled", None)
+    if sandbox_val is None and app:
+        sandbox_val = getattr(app, "sandbox_enabled", None)
+    if is_subagent:
+        sandbox_val = True
+
     builder = PromptBuilder(
         agent.system_prompt,
         agent.tools,
@@ -95,6 +102,7 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         cwd=getattr(agent, "cwd", None),
         is_subagent=is_subagent,
         subagent_schema=getattr(agent, "subagent_schema", None),
+        sandbox_enabled=sandbox_val,
     )
     sys_prompt = await builder.build_system_prompt_async()
     all_tools = builder.build_tools()

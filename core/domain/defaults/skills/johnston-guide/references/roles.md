@@ -27,6 +27,7 @@ System prompt instructions for the role...
 - `name`: Role identifier (defaults to filename).
 - `description`: Summary of purpose.
 - `scope`: `any`, `subagent`, or `main`.
+- `read_only`: `true` to make role strictly read-only (blocks `create`/`edit` and enforces kernel-level read-only sandbox for `shell`).
 - `allowed_tools`: Comma-separated whitelist of permitted tool names.
 - `disallowed_tools`: Comma-separated list of blocked tool names.
 - `model`: Specific LLM model override (subagents).
@@ -36,3 +37,4 @@ System prompt instructions for the role...
 Subagents are invoked via `invoke_subagent` with an optional `branch='<name>'` parameter:
 - Omitted or same branch as main tree: subagent works directly in the main workspace.
 - Different branch: subagent runs in an isolated Git worktree on that branch (created if missing).
+- `explorer` role or roles with `read_only: true`: mutations blocked across both tools and shell commands via OS-level sandbox.

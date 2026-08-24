@@ -65,10 +65,12 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         else:
             self.current_session_id = self.sm.generate_session_id()
 
+        from core.infrastructure.config.config_helpers import load_sandbox_config
+
         self.selection_copy_active = False
         self.message_queue = []
         self.is_generating = False
-        self.sandbox_enabled = False
+        self.sandbox_enabled = load_sandbox_config()
 
     def copy_to_clipboard(self, text: str, notify: bool = True) -> None:
         """Copy text to both Textual clipboard (OSC 52) and native OS clipboard."""

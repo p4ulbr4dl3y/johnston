@@ -119,11 +119,13 @@ class ShellTool(BaseTool):
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
+        allow_workspace_writes = not bool(getattr(ctx, "is_read_only", False))
         p = await self._create_std_process(
             cmd,
             env,
             cwd=proc_cwd,
             sandbox_enabled=sandbox_enabled,
+            allow_workspace_writes=allow_workspace_writes,
         )
 
         run_in_bg = bool(args.get("background", False))
@@ -254,11 +256,14 @@ class ShellTool(BaseTool):
         env: dict[str, str],
         cwd: str = None,
         sandbox_enabled: bool = False,
+        allow_workspace_writes: bool = True,
     ):
         if sandbox_enabled:
             from core.infrastructure.platform.sandbox import build_sandboxed_command
 
-            exe, args, is_sandboxed = build_sandboxed_command(command, cwd=cwd)
+            exe, args, is_sandboxed = build_sandboxed_command(
+                command, cwd=cwd, allow_workspace_writes=allow_workspace_writes
+            )
             if is_sandboxed:
                 return await asyncio.create_subprocess_exec(
                     exe,

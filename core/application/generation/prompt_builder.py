@@ -212,6 +212,7 @@ class PromptBuilder:
         cwd: str = None,
         is_subagent: bool = False,
         subagent_schema: Optional[Dict] = None,
+        sandbox_enabled: Optional[bool] = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -221,6 +222,14 @@ class PromptBuilder:
         self.cwd = os.path.realpath(cwd) if cwd else None
         self.is_subagent = is_subagent
         self.subagent_schema = subagent_schema
+        if sandbox_enabled is not None:
+            self.sandbox_enabled = bool(sandbox_enabled)
+        elif is_subagent:
+            self.sandbox_enabled = True
+        else:
+            from core.infrastructure.config.config_helpers import load_sandbox_config
+
+            self.sandbox_enabled = load_sandbox_config()
 
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
@@ -248,6 +257,10 @@ class PromptBuilder:
         ]
         if git_info:
             env_lines.append(f"- Git Context: {git_info}")
+        if self.sandbox_enabled:
+            env_lines.append(
+                "- Sandbox: active (write: workspace & /tmp only; read: system & repo allowed, sensitive credentials blocked; net: allowed)"
+            )
 
         env_block = "\n".join(env_lines)
 
@@ -296,6 +309,10 @@ class PromptBuilder:
         ]
         if git_info:
             env_lines.append(f"- Git Context: {git_info}")
+        if self.sandbox_enabled:
+            env_lines.append(
+                "- Sandbox: active (write: workspace & /tmp only; read: system & repo allowed, sensitive credentials blocked; net: allowed)"
+            )
 
         env_block = "\n".join(env_lines)
 

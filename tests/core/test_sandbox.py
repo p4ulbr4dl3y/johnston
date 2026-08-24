@@ -65,7 +65,8 @@ def test_build_sandboxed_command_windows():
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="C:\\test_dir")
         assert sandboxed is True
         assert "win_sandbox_runner" in args[1]
-        assert "echo 1" in args[-1]
+        assert "--command" in args
+        assert "echo 1" in args
 
 
 def test_build_sandboxed_command_unsupported():
@@ -78,8 +79,32 @@ def test_build_sandboxed_command_unsupported():
 def test_is_path_writable_in_sandbox():
     cwd = "/Users/test/workspace"
     assert is_path_writable_in_sandbox("/Users/test/workspace/file.txt", cwd=cwd) is True
+    assert is_path_writable_in_sandbox("/Users/test/workspace/file.txt", cwd=cwd, allow_workspace_writes=False) is False
     assert is_path_writable_in_sandbox("/tmp/file.txt", cwd=cwd) is True
+    assert is_path_writable_in_sandbox("/tmp/file.txt", cwd=cwd, allow_workspace_writes=False) is True
     assert is_path_writable_in_sandbox("/Users/test/other_dir/file.txt", cwd=cwd) is False
+
+
+def test_generate_seatbelt_profile_read_only():
+    cwd = os.path.abspath("/Users/test/my_project")
+    profile = generate_seatbelt_profile(cwd, allow_workspace_writes=False)
+    assert _escape_sbpl_path(os.path.realpath(cwd)) not in profile
+    assert "/tmp" in profile
+
+
+def test_build_sandboxed_command_read_only_darwin():
+    with patch("platform.system", return_value="Darwin"), patch("os.path.exists", return_value=True):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir", allow_workspace_writes=False)
+        assert sandboxed is True
+        profile = args[1]
+        assert "/tmp" in profile
+
+
+def test_build_sandboxed_command_read_only_linux():
+    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir", allow_workspace_writes=False)
+        assert sandboxed is True
+        assert "--ro-bind" in args
 
 
 def test_is_path_readable_in_sandbox():
@@ -88,4 +113,18 @@ def test_is_path_readable_in_sandbox():
     assert is_path_readable_in_sandbox(os.path.join(home, ".aws", "credentials")) is False
     assert is_path_readable_in_sandbox(os.path.join(home, ".gnupg", "secring.gpg")) is False
     assert is_path_readable_in_sandbox("/Users/test/workspace/file.txt") is True
+
+
+def test_load_and_save_sandbox_config(tmp_path):
+    from core.infrastructure.config.config_helpers import load_sandbox_config, save_sandbox_config
+
+    cfg_file = str(tmp_path / "config.json")
+    assert load_sandbox_config(cfg_file) is False
+
+    save_sandbox_config(True, config_file=cfg_file)
+    assert load_sandbox_config(cfg_file) is True
+
+    save_sandbox_config(False, config_file=cfg_file)
+    assert load_sandbox_config(cfg_file) is False
+
 

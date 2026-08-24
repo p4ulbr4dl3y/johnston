@@ -115,6 +115,21 @@ class ToolContext:
         return False
 
     @property
+    def is_read_only(self) -> bool:
+        """Returns whether the current role or execution context is read-only."""
+        try:
+            from core.role_registry import RoleRegistry
+
+            role_name = self.subagent_role or getattr(self.host, "role", "")
+            if role_name:
+                role_def = RoleRegistry.get_instance().get_role(role_name, project_dir=self.project_dir)
+                if getattr(role_def, "read_only", False):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    @property
     def project_dir(self) -> str:
         """Returns the project directory from host app, or fallback to self.cwd / os.getcwd()."""
         if self.host:

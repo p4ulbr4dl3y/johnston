@@ -66,7 +66,7 @@ def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        "Launch an autonomous subagent in the background for a bounded task. "
+        "Launch an autonomous subagent in the background for a bounded task (runs sandboxed to workspace). "
         "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
     )
     schema = {

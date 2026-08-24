@@ -18,7 +18,7 @@ class TestRoleRegistry(unittest.TestCase):
         self.assertIn("explorer", roles)
         self.assertNotIn("orchestrator", roles)
 
-        self.assertEqual(roles["explorer"].disallowed_tools, ["create", "edit"])
+        self.assertTrue(roles["explorer"].read_only)
         self.assertEqual(roles["worker"].name, "Worker")
         self.assertEqual(roles["worker"].scope, "any")
         self.assertEqual(normalize_role_scope("main_only"), "main_only")
@@ -39,11 +39,12 @@ allowed_tools: read, grep, glob
 model: deepseek-chat
 provider: clinepass
 scope: subagent
+read_only: true
 ---
 You are a senior code reviewer role.""")
 
-            reg = RoleRegistry()
-            roles = reg.load_roles(project_dir=tmpdir, include_global=False)
+            reg = RoleRegistry.get_instance()
+            roles = reg.load_roles(project_dir=tmpdir)
 
             self.assertIn("reviewer", roles)
             rev = roles["reviewer"]
@@ -54,6 +55,7 @@ You are a senior code reviewer role.""")
             self.assertEqual(rev.model, "deepseek-chat")
             self.assertEqual(rev.provider, "clinepass")
             self.assertEqual(rev.scope, "subagent")
+            self.assertTrue(rev.read_only)
             self.assertIn("senior code reviewer role", rev.prompt)
 
     def test_project_roles_folder(self):

@@ -616,6 +616,13 @@ class SandboxCommand(BaseCommand):
         state_str = "ON" if app.sandbox_enabled else "OFF"
         detail = "workspace-only" if app.sandbox_enabled else "full access"
 
+        from core.infrastructure.config.config_helpers import save_sandbox_config
+
+        try:
+            save_sandbox_config(app.sandbox_enabled)
+        except Exception:
+            pass
+
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()
 

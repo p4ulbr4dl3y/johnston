@@ -96,13 +96,16 @@ def is_path_writable_in_sandbox(
     path: str,
     cwd: Optional[str] = None,
     extra_writable_roots: Optional[List[str]] = None,
+    allow_workspace_writes: bool = True,
 ) -> bool:
     """Check if path is inside allowed writable roots in sandbox mode."""
     target_abs = os.path.realpath(os.path.abspath(path))
     target_norm = os.path.normcase(target_abs)
     workspace = os.path.realpath(os.path.abspath(cwd or os.getcwd()))
 
-    raw_roots = [workspace, "/tmp", "/private/tmp", "/dev"]
+    raw_roots = ["/tmp", "/private/tmp", "/dev"]
+    if allow_workspace_writes:
+        raw_roots.append(workspace)
     sys_temp = tempfile.gettempdir()
     if sys_temp:
         raw_roots.append(sys_temp)
@@ -118,7 +121,7 @@ def is_path_writable_in_sandbox(
         # Check if root directory represents filesystem root (/ or C:\)
         drive, tail = os.path.splitdrive(root_norm)
         if (not drive and tail == os.sep) or (drive and tail in ("", os.sep)):
-            if r == workspace:
+            if r == workspace and allow_workspace_writes:
                 return True
         clean_root = root_norm.rstrip(os.sep)
         if target_norm == clean_root or target_norm.startswith(clean_root + os.sep):
@@ -159,18 +162,19 @@ def generate_seatbelt_profile(
     workspace_dir: str,
     extra_writable_roots: Optional[List[str]] = None,
     extra_deny_read_paths: Optional[List[str]] = None,
+    allow_workspace_writes: bool = True,
 ) -> str:
     """Generate macOS Seatbelt (SBPL) profile string allowing writes only in workspace, temp dirs, and /dev."""
     workspace_abs = os.path.abspath(workspace_dir)
     workspace_real = os.path.realpath(workspace_abs)
 
     writable_paths = [
-        workspace_abs,
-        workspace_real,
         "/tmp",
         "/private/tmp",
         "/dev",
     ]
+    if allow_workspace_writes:
+        writable_paths.extend([workspace_abs, workspace_real])
     sys_temp = tempfile.gettempdir()
     if sys_temp:
         for t in (os.path.abspath(sys_temp), os.path.realpath(sys_temp)):
@@ -219,6 +223,7 @@ def build_sandboxed_command(
     cwd: Optional[str] = None,
     extra_writable_roots: Optional[List[str]] = None,
     extra_deny_read_paths: Optional[List[str]] = None,
+    allow_workspace_writes: bool = True,
 ) -> Tuple[str, List[str], bool]:
     """Wrap command with platform-specific sandbox if available.
 
@@ -234,6 +239,7 @@ def build_sandboxed_command(
             workspace_abs,
             extra_writable_roots=extra_writable_roots,
             extra_deny_read_paths=extra_deny_read_paths,
+            allow_workspace_writes=allow_workspace_writes,
         )
         return (
             _SEATBELT_EXE,
@@ -243,9 +249,14 @@ def build_sandboxed_command(
 
     bwrap = shutil.which("bwrap")
     if platform.system() == "Linux" and bwrap is not None:
+        workspace_bind = (
+            ["--bind", workspace_abs, workspace_abs]
+            if allow_workspace_writes
+            else ["--ro-bind", workspace_abs, workspace_abs]
+        )
         bwrap_args = [
             "--ro-bind", "/", "/",
-            "--bind", workspace_abs, workspace_abs,
+            *workspace_bind,
             "--bind", "/tmp", "/tmp",
             "--dev", "/dev",
             "--proc", "/proc",
@@ -280,9 +291,12 @@ def build_sandboxed_command(
     if platform.system() == "Windows":
         import sys
 
+        args = ["-m", "core.infrastructure.platform.win_sandbox_runner", "--command", command]
+        if cwd:
+            args.extend(["--cwd", os.path.realpath(os.path.abspath(cwd))])
         return (
             sys.executable,
-            ["-m", "core.infrastructure.platform.win_sandbox_runner", command],
+            args,
             True,
         )
 

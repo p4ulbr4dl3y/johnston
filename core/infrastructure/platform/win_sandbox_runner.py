@@ -117,8 +117,8 @@ def run_safer_cmd(cmd: str, cwd: str | None = None) -> int:
         si.hStdError = kernel32.GetStdHandle(-12)
         si.dwFlags |= 0x00000100  # STARTF_USESTDHANDLES
 
-        # Execute through cmd.exe /c to support shell builtins and pipes
-        cmd_line = f'cmd.exe /c "{cmd}"'
+        # Execute through cmd.exe /s /c to support shell builtins and preserve inner quotes
+        cmd_line = f'cmd.exe /s /c "{cmd}"'
         cmd_buf = ctypes.create_unicode_buffer(cmd_line)
         LOGON_WITH_PROFILE = 1
         CREATE_NO_WINDOW = 0x08000000
@@ -155,7 +155,13 @@ def run_safer_cmd(cmd: str, cwd: str | None = None) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
-        sys.exit(run_safer_cmd(command))
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Windows Safer sandbox runner")
+    parser.add_argument("--cwd", default=None, help="Working directory")
+    parser.add_argument("--command", required=True, help="Command to execute")
+    parsed_args = parser.parse_args()
+
+    if parsed_args.command:
+        sys.exit(run_safer_cmd(parsed_args.command, cwd=parsed_args.cwd))
     sys.exit(0)

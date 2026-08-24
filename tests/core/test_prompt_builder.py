@@ -148,6 +148,17 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertNotIn("background", props)
         self.assertIn("synchronous", shell["function"]["description"].lower())
 
+    def test_build_system_prompt_sandbox_active(self):
+        builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=True)
+        prompt = builder.build_system_prompt()
+        self.assertIn("- Sandbox: active", prompt)
+        self.assertIn("workspace & /tmp only", prompt)
+
+    def test_build_system_prompt_sandbox_disabled(self):
+        builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=False)
+        prompt = builder.build_system_prompt()
+        self.assertNotIn("- Sandbox: active", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

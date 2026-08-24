@@ -64,6 +64,7 @@ def _build_subagent_grid(
     branch: str = "",
     git_diff_stats,
     is_compact: bool = False,
+    sandbox_enabled: bool = True,
 ) -> tuple[Table, list[tuple[str, str]]]:
     """Shared subagent-status table builder (2-line layout, with compact support)."""
     grid = Table.grid(expand=True)
@@ -87,7 +88,7 @@ def _build_subagent_grid(
         else:
             row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
-        # Row 2 (Compact): Left [dir • branch (+N/-M)] | Right []
+        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on] | Right []
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
         row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
@@ -97,6 +98,7 @@ def _build_subagent_grid(
             row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
         elif diff_text:
             row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
+        row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
         row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
         row2_right = ""
 
@@ -138,7 +140,7 @@ def _build_subagent_grid(
         row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
     grid.add_row(row1_left, row1_right)
 
-    # Row 2: Left [directory • branch (+N/-M)] | Right []
+    # Row 2: Left [directory • branch (+N/-M) • sandbox: on] | Right []
     dir_text = format_display_path(directory)
     row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
     diff_text = git_diff_stats()
@@ -148,6 +150,7 @@ def _build_subagent_grid(
         row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
     elif diff_text:
         row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
+    row2_left_parts.append(f"[{THEME_PRIMARY}]sandbox: on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sandbox: off[/]")
     row2_left = STATUS_SEP.join(row2_left_parts)
 
     row2_right = ""
@@ -580,6 +583,13 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
             width = size_w if size_w > 0 else app_width
             is_compact = isinstance(width, int) and width > 0 and width < 75
 
+            sandbox_val = getattr(session, "sandbox_enabled", None)
+            if sandbox_val is None and agent:
+                sandbox_val = getattr(agent, "sandbox_enabled", None)
+            if sandbox_val is None:
+                sandbox_val = True
+            sandbox_enabled = bool(sandbox_val)
+
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
             grid, rows = _build_subagent_grid(
                 provider_display=provider_display,
@@ -596,6 +606,7 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
                 branch=branch,
                 git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
                 is_compact=is_compact,
+                sandbox_enabled=sandbox_enabled,
             )
 
             self._last_grid_rows = rows

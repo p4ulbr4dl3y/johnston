@@ -219,6 +219,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
         self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
+        self.assertIn("sandbox: on", footer._last_grid_rows[1][0])
         self.assertEqual(footer._last_grid_rows[1][1], "")
 
     def test_render_footer_compact_mode(self):
@@ -251,7 +252,35 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("gpt-4o", footer._last_grid_rows[0][0])
         self.assertIn("ctx", footer._last_grid_rows[0][1])
         self.assertIn("my_repo", footer._last_grid_rows[1][0])
+        self.assertIn("sb:on", footer._last_grid_rows[1][0])
         self.assertEqual(footer._last_grid_rows[1][1], "")
+
+    def test_render_footer_sandbox_disabled(self):
+        footer = SubagentStatusFooter()
+        session = MagicMock()
+        session.agent = None
+        session.sandbox_enabled = False
+        session.role = "worker"
+        session.project_dir = "/tmp"
+        session.branch_name = ""
+        session.messages = None
+        session.last_context_tokens = 0
+        session.total_tokens = 0
+        session.cost_usd = 0.0
+
+        app = MagicMock()
+        app.size = MagicMock(width=80)
+        cm = MagicMock()
+        cm.get_active_provider_key.return_value = "openai"
+        cm.load_providers.return_value = {}
+        cm.is_provider_connected.return_value = False
+        app.pm = cm
+        footer._harness_app = app
+        footer.session = session
+        with patch.object(footer, "_git_diff_stats", return_value=""):
+            footer._render_footer()
+        self.assertIsNotNone(footer._last_grid_rows)
+        self.assertIn("sandbox: off", footer._last_grid_rows[1][0])
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()

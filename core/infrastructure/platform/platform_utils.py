@@ -220,6 +220,7 @@ def shell_env() -> dict[str, str]:
     env["NO_COLOR"] = "1"
     env["FORCE_COLOR"] = "0"
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     env["PAGER"] = "cat"
     env["GIT_PAGER"] = "cat"
     env["CI"] = "1"

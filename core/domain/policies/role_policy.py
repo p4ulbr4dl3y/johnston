@@ -44,6 +44,7 @@ class AgentRole:
         scope: str = "any",
         source: str = "builtin",
         tool_name_normalizer: Optional[Callable[[str], str]] = None,
+        read_only: bool = False,
     ):
         self.key = key.lower().strip()
         self.name = name or self.key.capitalize()
@@ -56,6 +57,7 @@ class AgentRole:
         self.scope = normalize_role_scope(scope)
         self.source = source
         self.tool_name_normalizer = tool_name_normalizer
+        self.read_only = bool(read_only)
 
     def is_tool_allowed(self, tool_name: str) -> Optional[ToolResult]:
         """Returns an error ToolResult if this role disables tool_name, else None."""
@@ -90,6 +92,10 @@ def _tool_policy_result(
         return False, format_tool_error(f"tool '{clean}' disabled for subagent roles")
 
     name = getattr(role_def, "name", "Role")
+    if getattr(role_def, "read_only", False):
+        if clean in ("create", "edit") or resolved in ("create", "edit"):
+            return False, format_tool_error(f"tool '{clean}' disabled in read-only {name} role")
+
     disallowed = [t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
     if clean in disallowed or resolved in disallowed:
         return False, format_tool_error(f"tool '{clean}' disabled in {name} role")

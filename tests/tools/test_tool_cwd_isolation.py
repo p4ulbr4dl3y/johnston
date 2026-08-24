@@ -79,23 +79,29 @@ class TestResolvePathCwd(unittest.TestCase):
 
 class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
     async def test_shell_uses_ctx_cwd_as_process_cwd(self):
+        import sys
+
         from tools.shell import ShellTool
 
         tool = ShellTool()
-        with tempfile.TemporaryDirectory() as base:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
             ctx = ToolContext(None, is_subagent=True, cwd=base)
-            res = str(await tool.execute({"command": "pwd"}, ctx))
-            self.assertIn(os.path.realpath(base), res)
+            cmd = f'"{sys.executable}" -c "import os; print(os.path.realpath(os.getcwd()))"'
+            res = str(await tool.execute({"command": cmd}, ctx))
+            self.assertIn(os.path.basename(os.path.realpath(base)), res)
 
     async def test_shell_uses_cwd_from_agent(self):
+        import sys
+
         from tools.shell import ShellTool
 
         tool = ShellTool()
-        with tempfile.TemporaryDirectory() as base:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
             host = MockTextualApp()
             agent = make_agent(host, cwd=base, is_subagent=True)
-            res = str(await tool.execute({"command": "pwd"}, agent))
-            self.assertIn(os.path.realpath(base), res)
+            cmd = f'"{sys.executable}" -c "import os; print(os.path.realpath(os.getcwd()))"'
+            res = str(await tool.execute({"command": cmd}, agent))
+            self.assertIn(os.path.basename(os.path.realpath(base)), res)
 
 
 class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
@@ -103,7 +109,7 @@ class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
         from tools.create import CreateTool
 
         tool = CreateTool()
-        with tempfile.TemporaryDirectory() as base:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
             host = MockTextualApp()
             agent = make_agent(host, cwd=base, is_subagent=True)
             res = str(await tool.execute({"path": "subdir/newfile.txt", "content": "hello"}, agent))

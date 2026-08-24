@@ -70,7 +70,7 @@ class TestUnifiedErrorReturns(unittest.TestCase):
     def test_all_tool_error_returns_use_format_tool_error(self):
         offenders = []
         for name in sorted(os.listdir(TOOLS_DIR)):
-            if not name.endswith(".py") or name == "__init__.py":
+            if not name.endswith(".py") or name == "__init__.py" or name.startswith("."):
                 continue
             path = TOOLS_DIR / name
             try:
