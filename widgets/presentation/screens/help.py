@@ -1,7 +1,8 @@
+from rich.table import Table
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown
+from textual.widgets import Label, Markdown, Static
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
@@ -12,34 +13,56 @@ from widgets.presentation.screens.constants import (
 )
 from widgets.utils.key_aliases import expand_bindings
 
-COMMANDS_BODY_MD = """* `/connect` — Connect AI provider & set API key
-* `/models` — Switch active model across providers
-* `/thinking` — Set reasoning effort / thinking budget
-* `/new` — Start a new chat session
-* `/compact` — Compact session conversation history
-* `/subagents` — View and manage subagents
-* `/shell` — View and manage background shell tasks
-* `/skills` — Browse and activate available skills
-* `/mcp` — Manage MCP servers
-* `/rewind` — Rollback chat history to a selected message
-* `/resume` — Switch and resume saved session dialogs
-* `/help` — Open this help screen"""
+COMMANDS_DATA: list[tuple[str, str]] = [
+    ("/connect", "Connect AI provider & set API key"),
+    ("/models", "Switch active model across providers"),
+    ("/thinking", "Set reasoning effort / thinking budget"),
+    ("/new", "Start a new chat session"),
+    ("/compact", "Compact session conversation history"),
+    ("/copy", "Copy last assistant response to clipboard"),
+    ("/diff", "View workspace diff since session checkpoint"),
+    ("/sandbox", "Toggle shell command sandbox (ON/OFF)"),
+    ("/permissions", "Manage tool permissions (allow, ask, deny)"),
+    ("/subagents", "View and manage subagents"),
+    ("/shell", "View and manage background shell tasks"),
+    ("/skills", "Browse and activate available skills"),
+    ("/mcp", "Manage MCP servers & tools"),
+    ("/questions", "Resume pending user questions wizard"),
+    ("/rewind", "Rollback chat history to a selected message"),
+    ("/resume", "Switch and resume saved session dialogs"),
+    ("/help", "Open this help screen"),
+]
 
-KEYBINDINGS_BODY_MD = """* `Shift+Tab` — Toggle Action / Explore mode
-* `Ctrl+B` — Move active shell tasks to background
-* `Ctrl+O` — Expand / collapse tool output & thinking
-* `Enter` — Send message
-* `Ctrl+Enter` / `Shift+Enter` — Insert new line in input
-* `Ctrl+V` — Paste text or clipboard image
-* `Ctrl+D` — Detach last attached clipboard image
-* `↑` / `↓` — History navigation (looping)
-* `@` — Attach workspace file (autocompletion)
-* `Esc` — Cancel response generation / Close modals
-* `Ctrl+C` / `Ctrl+Q` — Exit application"""
+KEYBINDINGS_DATA: list[tuple[str, str]] = [
+    ("Shift+Tab", "Toggle Action / Explore mode"),
+    ("Ctrl+B", "Move active shell tasks to background"),
+    ("Ctrl+O", "Expand / collapse tool output & thinking"),
+    ("PageUp / PgDn", "Scroll chat history"),
+    ("Shift+PgUp / Shift+PgDn", "Scroll to top / bottom of chat"),
+    ("Enter", "Send message"),
+    ("Ctrl+Enter", "Insert new line in input (also Shift+Enter)"),
+    ("Ctrl+V", "Paste text or clipboard image"),
+    ("Ctrl+X", "Cut selected text"),
+    ("Ctrl+D", "Detach last attached clipboard image"),
+    ("↑ / ↓", "History navigation (looping)"),
+    ("@", "Attach workspace file (autocompletion)"),
+    ("/", "Slash command menu (autocompletion)"),
+    ("Esc", "Cancel response generation / Close modals"),
+    ("Ctrl+C / Ctrl+Q", "Exit application"),
+]
+
+
+def _build_help_table(items: list[tuple[str, str]]) -> Table:
+    table = Table.grid(expand=True, padding=(0, 2))
+    table.add_column(style="bold #f4f4f5", no_wrap=True)
+    table.add_column(style="#a1a1aa")
+    for key, desc in items:
+        table.add_row(key, desc)
+    return table
 
 
 class HelpScreen(BaseModalScreen[None]):
-    """Modal help screen with 2 tabs: Commands & Keybindings"""
+    """Modal help screen with 2 tabs: Commands & Keybindings in Shadcn pill badge layout"""
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
@@ -52,28 +75,32 @@ class HelpScreen(BaseModalScreen[None]):
         super().__init__()
         self.active_tab = 0  # 0: Commands, 1: Keybindings
 
-    def _get_header_md(self) -> str:
-        t0 = "**[ Commands ]**" if self.active_tab == 0 else "**Commands**"
-        t1 = "**[ Keybindings ]**" if self.active_tab == 1 else "**Keybindings**"
-        return f"### **Johnston Help**\n{t0} &nbsp;&nbsp;&nbsp;&nbsp; {t1}"
+    def _get_tabs_markup(self) -> str:
+        if self.active_tab == 0:
+            return "[bold #ffffff on #27272a]  Commands  [/]   [#71717a]  Keybindings  [/]"
+        return "[#71717a]  Commands  [/]   [bold #ffffff on #27272a]  Keybindings  [/]"
+
+    def _get_active_table(self) -> Table:
+        return _build_help_table(KEYBINDINGS_DATA if self.active_tab == 1 else COMMANDS_DATA)
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(
-                self._get_header_md(),
+                "### **Johnston Help**",
                 id="help-header-md",
                 classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
             )
-            yield Markdown(COMMANDS_BODY_MD, id="help-body-md", classes=MODAL_MARKDOWN)
+            yield Static(self._get_tabs_markup(), id="help-tabs", classes=MODAL_MARKDOWN)
+            yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
             yield Label("tab / ←→: switch • esc: close", id=MODAL_HINT_ID)
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):
             self.active_tab = 1 if self.active_tab == 0 else 0
-            header_md = self.query_one("#help-header-md", Markdown)
-            header_md.update(self._get_header_md())
-            body_md = self.query_one("#help-body-md", Markdown)
-            body_md.update(KEYBINDINGS_BODY_MD if self.active_tab == 1 else COMMANDS_BODY_MD)
+            tabs_static = self.query_one("#help-tabs", Static)
+            tabs_static.update(self._get_tabs_markup())
+            body_static = self.query_one("#help-body", Static)
+            body_static.update(self._get_active_table())
             event.prevent_default()
             event.stop()
             return

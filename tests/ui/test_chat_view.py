@@ -456,3 +456,54 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             bot.append_stream_content("tail line\n" * 40)
             await pilot.pause(0.2)
             self.assertFalse(chat_view.is_at_bottom())
+
+    def test_scroll_up_page_pauses_auto_follow(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=50)
+        view.scroll_page_up = MagicMock()
+        self.assertTrue(view._auto_follow)
+        view.scroll_up_page()
+        self.assertFalse(view._auto_follow)
+        view.scroll_page_up.assert_called_once_with(animate=False)
+
+    def test_scroll_down_page_defers_resume_check(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=50)
+        view.scroll_page_down = MagicMock()
+        view.call_after_refresh = MagicMock()
+        view.scroll_down_page()
+        view.scroll_page_down.assert_called_once_with(animate=False)
+        view.call_after_refresh.assert_called_once_with(view._resume_follow_if_at_bottom)
+
+    def test_scroll_to_top_pauses_auto_follow(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=50)
+        view.scroll_home = MagicMock()
+        self.assertTrue(view._auto_follow)
+        view.scroll_to_top()
+        self.assertFalse(view._auto_follow)
+        view.scroll_home.assert_called_once_with(animate=False)
+
+    def test_scroll_to_bottom_resumes_auto_follow(self):
+        view = self._make_view(max_scroll_y=100, scroll_y=0)
+        view._auto_follow = False
+        view.scroll_end = MagicMock()
+        view.scroll_to_bottom()
+        self.assertTrue(view._auto_follow)
+        view.scroll_end.assert_called_once_with(animate=False)
+
+    def test_get_last_bot_message_text(self):
+        view = ChatView(show_welcome=False)
+        self.assertIsNone(view.get_last_bot_message_text())
+
+        bot1 = BotMessage()
+        bot1.content = "First bot message"
+        bot2 = BotMessage()
+        bot2.content = "Second bot message"
+        user = UserMessage("User message")
+
+        view._nodes = [user, bot1, bot2]
+        self.assertEqual(view.get_last_bot_message_text(), "Second bot message")
+
+        # Test empty content ignored
+        bot3 = BotMessage()
+        bot3.content = "   "
+        view._nodes = [user, bot1, bot2, bot3]
+        self.assertEqual(view.get_last_bot_message_text(), "Second bot message")

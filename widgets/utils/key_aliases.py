@@ -29,6 +29,10 @@ KEY_DETACH: tuple[str, ...] = ("ctrl+d", "cmd+d", "ctrl+в", "ctrl+В", "cmd+в"
 KEY_TOGGLE_ROLE: tuple[str, ...] = SHIFT_TAB_KEYS
 KEY_NEWLINE: tuple[str, ...] = ("ctrl+enter", "ctrl+j", "shift+enter")
 KEY_TOGGLE_DISABLED: tuple[str, ...] = ("tab", "ctrl+t", "ctrl_t", "ctrl+i", "ctrl+е", "ctrl+Е")
+KEY_SCROLL_UP: tuple[str, ...] = ("pageup", "page_up")
+KEY_SCROLL_DOWN: tuple[str, ...] = ("pagedown", "page_down")
+KEY_SCROLL_TOP: tuple[str, ...] = ("shift+pageup", "shift+page_up", "shift+home")
+KEY_SCROLL_BOTTOM: tuple[str, ...] = ("shift+pagedown", "shift+page_down", "shift+end")
 
 
 def get_key_aliases(key: str) -> tuple[str, ...]:

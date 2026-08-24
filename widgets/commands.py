@@ -630,9 +630,27 @@ class SandboxCommand(BaseCommand):
             app.notify(f"Sandbox: {state_str} ({detail})", severity="information", timeout=2.0)
 
 
+class CopyCommand(BaseCommand):
+    name = "/copy"
+    aliases = ["/cp", "/yank"]
+    description = "Copy last assistant response to clipboard"
+
+    async def execute(self, app) -> None:
+        try:
+            chat_view = app.query_one(ChatView)
+            text = chat_view.get_last_bot_message_text()
+            if text:
+                app.copy_to_clipboard(text)
+            else:
+                app.notify("No assistant response to copy", severity="warning")
+        except Exception:
+            app.notify("Failed to copy assistant response", severity="error")
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
+    CopyCommand,
     ProvidersCommand,
     ModelsCommand,
     ThinkingEffortCommand,

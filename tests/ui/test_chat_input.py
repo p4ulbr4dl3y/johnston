@@ -852,6 +852,74 @@ class TestChatInputEnterCommandSelection(unittest.IsolatedAsyncioTestCase):
         event.prevent_default.assert_called()
 
 
+class TestChatInputKeyboardScroll(unittest.IsolatedAsyncioTestCase):
+    async def test_page_up_scrolls_chat_view_up(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        mock_chat_view = MagicMock()
+        with patch.object(ci.app, "query_one", return_value=mock_chat_view):
+            event = Key("pageup", "pageup")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)
+            mock_chat_view.scroll_up_page.assert_called_once()
+            event.prevent_default.assert_called()
+            event.stop.assert_called()
+
+    async def test_page_down_scrolls_chat_view_down(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        mock_chat_view = MagicMock()
+        with patch.object(ci.app, "query_one", return_value=mock_chat_view):
+            event = Key("pagedown", "pagedown")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)
+            mock_chat_view.scroll_down_page.assert_called_once()
+            event.prevent_default.assert_called()
+            event.stop.assert_called()
+
+    async def test_shift_page_up_scrolls_to_top(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        mock_chat_view = MagicMock()
+        with patch.object(ci.app, "query_one", return_value=mock_chat_view):
+            event = Key("shift+pageup", "shift+pageup")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)
+            mock_chat_view.scroll_to_top.assert_called_once()
+            event.prevent_default.assert_called()
+            event.stop.assert_called()
+
+    async def test_shift_page_down_scrolls_to_bottom(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        mock_chat_view = MagicMock()
+        with patch.object(ci.app, "query_one", return_value=mock_chat_view):
+            event = Key("shift+pagedown", "shift+pagedown")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)
+            mock_chat_view.scroll_to_bottom.assert_called_once()
+            event.prevent_default.assert_called()
+            event.stop.assert_called()
+
+    async def test_scroll_error_swallowed_when_no_chat_view(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+        with patch.object(ci.app, "query_one", side_effect=Exception("no chat view")):
+            event = Key("pageup", "pageup")
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)  # must not raise
+
+
 def _app_context():
     ci = ChatInput()
     ctx = DummyChatApp(ci).run_test()

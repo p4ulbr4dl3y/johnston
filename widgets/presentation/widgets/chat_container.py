@@ -44,6 +44,28 @@ class ChatView(VerticalScroll):
         """Returns True if scroll position is at or near the bottom of the container."""
         return (self.max_scroll_y - self.scroll_y) <= threshold
 
+    def scroll_up_page(self) -> None:
+        """Scroll chat up by one page and pause auto-follow."""
+        if self.max_scroll_y > 0:
+            self._auto_follow = False
+        self.scroll_page_up(animate=False)
+
+    def scroll_down_page(self) -> None:
+        """Scroll chat down by one page and resume auto-follow if bottom reached."""
+        self.scroll_page_down(animate=False)
+        self.call_after_refresh(self._resume_follow_if_at_bottom)
+
+    def scroll_to_top(self) -> None:
+        """Scroll chat to top and pause auto-follow."""
+        if self.max_scroll_y > 0:
+            self._auto_follow = False
+        self.scroll_home(animate=False)
+
+    def scroll_to_bottom(self) -> None:
+        """Scroll chat to bottom and re-enable auto-follow."""
+        self.scroll_end(animate=False)
+        self._auto_follow = True
+
     def on_mount(self) -> None:
         self.check_welcome()
 
@@ -181,6 +203,15 @@ class ChatView(VerticalScroll):
             if isinstance(child, UserMessage):
                 result.append((idx, child.raw_text))
         return result
+
+    def get_last_bot_message_text(self) -> str | None:
+        """Returns the text content of the last assistant bot message, or None."""
+        for child in reversed(self.children):
+            if isinstance(child, BotMessage):
+                content = getattr(child, "content", "")
+                if content and str(content).strip():
+                    return str(content)
+        return None
 
     def rollback_to(self, target_index: int) -> None:
         children = list(self.children)

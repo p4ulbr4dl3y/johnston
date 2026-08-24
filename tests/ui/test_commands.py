@@ -1458,6 +1458,44 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             app.notify.assert_called_once_with("Sandbox: OFF (full access)", severity="information", timeout=2.0)
             mock_save.assert_called_once_with(False)
 
+    async def test_copy_command_success(self):
+        from widgets.commands import CopyCommand
+
+        app = SimpleApp()
+        app.copy_to_clipboard = MagicMock()
+        mock_chat_view = MagicMock()
+        mock_chat_view.get_last_bot_message_text.return_value = "Assistant response text"
+        app.query_one = MagicMock(return_value=mock_chat_view)
+
+        cmd = CopyCommand()
+        await cmd.execute(app)
+        mock_chat_view.get_last_bot_message_text.assert_called_once()
+        app.copy_to_clipboard.assert_called_once_with("Assistant response text")
+
+    async def test_copy_command_no_response(self):
+        from widgets.commands import CopyCommand
+
+        app = SimpleApp()
+        app.notify = MagicMock()
+        mock_chat_view = MagicMock()
+        mock_chat_view.get_last_bot_message_text.return_value = None
+        app.query_one = MagicMock(return_value=mock_chat_view)
+
+        cmd = CopyCommand()
+        await cmd.execute(app)
+        app.notify.assert_called_once_with("No assistant response to copy", severity="warning")
+
+    async def test_copy_command_error_handled(self):
+        from widgets.commands import CopyCommand
+
+        app = SimpleApp()
+        app.notify = MagicMock()
+        app.query_one = MagicMock(side_effect=Exception("widget error"))
+
+        cmd = CopyCommand()
+        await cmd.execute(app)
+        app.notify.assert_called_once_with("Failed to copy assistant response", severity="error")
+
 
 
 # ---------------------------------------------------------------------------

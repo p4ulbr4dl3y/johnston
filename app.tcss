@@ -557,8 +557,17 @@ ModalScreen {
     padding: 0 1;
 }
 
+#help-tabs {
+    margin-top: 0;
+    margin-bottom: 1;
+    padding: 0 1;
+}
+
+#help-body,
 #help-body-md {
-    margin-top: 1;
+    margin-top: 0;
+    margin-bottom: 1;
+    padding: 0 1;
 }
 
 #api-key-current {

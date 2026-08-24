@@ -11,7 +11,18 @@ from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
-from widgets.utils.key_aliases import KEY_CUT, KEY_DETACH, KEY_NEWLINE, KEY_PASTE, KEY_QUIT, KEY_TOGGLE_ROLE
+from widgets.utils.key_aliases import (
+    KEY_CUT,
+    KEY_DETACH,
+    KEY_NEWLINE,
+    KEY_PASTE,
+    KEY_QUIT,
+    KEY_SCROLL_BOTTOM,
+    KEY_SCROLL_DOWN,
+    KEY_SCROLL_TOP,
+    KEY_SCROLL_UP,
+    KEY_TOGGLE_ROLE,
+)
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
@@ -402,6 +413,31 @@ class ChatInput(TextArea):
             event.prevent_default()
             event.stop()
             return
+
+        # Main chat history scrolling via keyboard
+        if (
+            event.key in KEY_SCROLL_UP
+            or event.key in KEY_SCROLL_DOWN
+            or event.key in KEY_SCROLL_TOP
+            or event.key in KEY_SCROLL_BOTTOM
+        ):
+            try:
+                from widgets.presentation.widgets.chat_container import ChatView
+
+                chat_view = self.app.query_one(ChatView)
+                if event.key in KEY_SCROLL_UP:
+                    chat_view.scroll_up_page()
+                elif event.key in KEY_SCROLL_DOWN:
+                    chat_view.scroll_down_page()
+                elif event.key in KEY_SCROLL_TOP:
+                    chat_view.scroll_to_top()
+                elif event.key in KEY_SCROLL_BOTTOM:
+                    chat_view.scroll_to_bottom()
+                event.prevent_default()
+                event.stop()
+                return
+            except Exception:
+                pass
 
         # Global Exit shortcut: Ctrl+C / Ctrl+Q (and layout aliases)
         if event.key in KEY_QUIT:
