@@ -1,15 +1,22 @@
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Optional
 
 from rich.markup import escape
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.widgets import Label, Markdown, OptionList
 
 from core.application.session.actions import RewindEntry
-from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.base_modal import BaseModalScreen
+from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
+    MODAL_DIALOG_ID,
     MODAL_HINT,
+    MODAL_HINT_ID,
     MODAL_MARKDOWN,
+    MODAL_MARKDOWN_CENTERED,
     MODAL_OPTION_LIST,
+    MODAL_OPTION_LIST_ID,
 )
 
 
@@ -19,7 +26,7 @@ class RewindSelection:
     restore_code: bool = True
 
 
-class RewindScreen(BaseSelectionScreen[Any]):
+class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
     """Modal rollback screen (/rewind) with 2-step selection for code vs conversation."""
 
     def __init__(
@@ -27,6 +34,7 @@ class RewindScreen(BaseSelectionScreen[Any]):
         user_messages: list[RewindEntry],
         checkpoints_enabled: bool = True,
     ):
+        super().__init__()
         self.user_messages = user_messages
         self.checkpoints_enabled = checkpoints_enabled
         self.step = 1
@@ -50,17 +58,37 @@ class RewindScreen(BaseSelectionScreen[Any]):
                 opt = escaped_text
             options.append(opt)
 
-        title = "### **Select Message to Rollback To**"
+        self.title = "### **Select Message to Rollback To**"
+        self.hint_text = "enter: select • ↑↓: nav • esc: cancel"
+        self.raw_options = list(options)
+        self.raw_items = [m.index for m in user_messages]
+        self.filtered_options = list(options)
+        self.filtered_items = list(self.raw_items)
+        self.default_value = self.raw_items[-1] if self.raw_items else -1
+        self.option_list_id = MODAL_OPTION_LIST_ID
+        self.dialog_classes = "modal-dialog-medium"
 
-        items = [m.index for m in user_messages]
-        default_val = items[-1] if items else -1
-        super().__init__(
-            title=title,
-            options=options,
-            items=items,
-            default_value=default_val,
-            dialog_classes="modal-dialog-medium",
-        )
+    def compose(self) -> ComposeResult:
+        with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes):
+            yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
+            yield Label(self.hint_text, id=MODAL_HINT_ID)
+
+    def on_mount(self) -> None:
+        opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+        default_idx = None
+        if self.default_value is not None and self.default_value in self.raw_items:
+            try:
+                default_idx = self.raw_items.index(self.default_value)
+            except Exception:
+                pass
+        opt_list.highlighted = default_idx
+        if default_idx is not None:
+            try:
+                opt_list.scroll_to_highlight()
+            except Exception:
+                pass
+        opt_list.focus()
 
     def _show_step_2(self, entry: RewindEntry) -> None:
         self.step = 2
@@ -163,12 +191,6 @@ class RewindScreen(BaseSelectionScreen[Any]):
                 self.dismiss(None)
             event.stop()
             return
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-        idx = opt_list.highlighted
-        if idx is not None:
-            self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, idx, None))
 
     def action_cancel(self) -> None:
         if self.step == 2:
