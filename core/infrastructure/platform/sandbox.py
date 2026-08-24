@@ -3,7 +3,7 @@
 Provides lightweight OS-level isolation for shell tasks:
 - macOS: uses /usr/bin/sandbox-exec with dynamically generated SBPL profiles.
 - Linux: uses Bubblewrap (bwrap) with ro-bind / and bind workspace/tmp.
-- Windows/other: graceful fallback.
+- Windows: uses Win32 Safer restricted token isolation.
 """
 from __future__ import annotations
 
@@ -47,6 +47,11 @@ def get_default_deny_read_paths() -> List[str]:
         os.path.join(home, ".ssh"),
         os.path.join(home, ".aws"),
         os.path.join(home, ".gnupg"),
+        os.path.join(home, ".azure"),
+        os.path.join(home, ".kube"),
+        os.path.join(home, ".docker", "config.json"),
+        os.path.join(home, ".netrc"),
+        os.path.join(home, ".git-credentials"),
         os.path.join(home, ".johnston", "config.json"),
         os.path.join(home, ".johnston", "providers.json"),
         os.path.join(home, ".johnston", "mcp.json"),
@@ -60,6 +65,7 @@ def is_path_writable_in_sandbox(
 ) -> bool:
     """Check if path is inside allowed writable roots in sandbox mode."""
     target_abs = os.path.realpath(os.path.abspath(path))
+    target_norm = os.path.normcase(target_abs)
     workspace = os.path.realpath(os.path.abspath(cwd or os.getcwd()))
 
     raw_roots = [workspace, "/tmp", "/private/tmp", "/dev"]
@@ -71,8 +77,17 @@ def is_path_writable_in_sandbox(
         raw_roots.extend(extra_writable_roots)
 
     for r in raw_roots:
-        clean_root = os.path.realpath(os.path.abspath(r)).rstrip(os.sep)
-        if target_abs == clean_root or target_abs.startswith(clean_root + os.sep):
+        if not r:
+            continue
+        root_real = os.path.realpath(os.path.abspath(r))
+        root_norm = os.path.normcase(root_real)
+        # Check if root directory represents filesystem root (/ or C:\)
+        drive, tail = os.path.splitdrive(root_norm)
+        if (not drive and tail == os.sep) or (drive and tail in ("", os.sep)):
+            if r == workspace:
+                return True
+        clean_root = root_norm.rstrip(os.sep)
+        if target_norm == clean_root or target_norm.startswith(clean_root + os.sep):
             return True
     return False
 
@@ -84,6 +99,7 @@ def is_path_readable_in_sandbox(
 ) -> bool:
     """Check if path is allowed for reading in sandbox mode (blocks sensitive paths)."""
     target_abs = os.path.realpath(os.path.abspath(path))
+    target_norm = os.path.normcase(target_abs)
     deny_roots = get_default_deny_read_paths()
 
     if extra_deny_read_paths:
@@ -94,10 +110,15 @@ def is_path_readable_in_sandbox(
         deny_abs = os.path.abspath(deny)
         deny_real = os.path.realpath(deny_abs)
         for d in (deny_abs, deny_real):
-            clean_deny = d.rstrip(os.sep)
-            if target_abs == clean_deny or target_abs.startswith(clean_deny + os.sep):
+            clean_deny = os.path.normcase(d).rstrip(os.sep)
+            if target_norm == clean_deny or target_norm.startswith(clean_deny + os.sep):
                 return False
     return True
+
+
+def _escape_sbpl_path(path_str: str) -> str:
+    """Escape quotes and backslashes for Seatbelt SBPL strings."""
+    return path_str.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def generate_seatbelt_profile(
@@ -143,8 +164,8 @@ def generate_seatbelt_profile(
             if item not in deny_read_entries:
                 deny_read_entries.append(item)
 
-    req_not_clauses = "\n        ".join(f'(require-not (subpath "{p}"))' for p in writable_paths)
-    deny_read_clauses = "\n    ".join(f'(subpath "{p}")' for p in deny_read_entries)
+    req_not_clauses = "\n        ".join(f'(require-not (subpath "{_escape_sbpl_path(p)}"))' for p in writable_paths)
+    deny_read_clauses = "\n    ".join(f'(subpath "{_escape_sbpl_path(p)}")' for p in deny_read_entries)
 
     return f"""(version 1)
 (allow default)
@@ -195,6 +216,9 @@ def build_sandboxed_command(
             "--dev", "/dev",
             "--proc", "/proc",
             "--unshare-pid",
+            "--unshare-ipc",
+            "--unshare-uts",
+            "--die-with-parent",
         ]
         if os.path.exists("/var/tmp"):
             bwrap_args.extend(["--bind", "/var/tmp", "/var/tmp"])

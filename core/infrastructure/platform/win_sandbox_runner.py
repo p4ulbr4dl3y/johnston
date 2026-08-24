@@ -92,66 +92,66 @@ def run_safer_cmd(cmd: str, cwd: str | None = None) -> int:
     advapi32.CreateProcessWithTokenW.restype = wintypes.BOOL
 
     h_level = SAFER_LEVEL_HANDLE()
-    if not advapi32.SaferCreateLevel(
-        SAFER_SCOPE_USER, SAFER_LEVEL_NORMALUSER, SAFER_LEVEL_OPEN, ctypes.byref(h_level), None
-    ):
-        raise ctypes.WinError(ctypes.get_last_error())
-
     h_proc = kernel32.GetCurrentProcess()
     h_token = wintypes.HANDLE()
-    token_access = 0x000F0000 | 0x001F | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040 | 0x0080 | 0x0100
-    if not advapi32.OpenProcessToken(h_proc, token_access, ctypes.byref(h_token)):
-        advapi32.SaferCloseLevel(h_level)
-        raise ctypes.WinError(ctypes.get_last_error())
-
     h_safer_token = wintypes.HANDLE()
-    if not advapi32.SaferComputeTokenFromLevel(h_level, h_token, ctypes.byref(h_safer_token), 0, None):
-        err = ctypes.get_last_error()
-        advapi32.SaferCloseLevel(h_level)
-        kernel32.CloseHandle(h_token)
-        raise ctypes.WinError(err)
-
-    si = STARTUPINFOW()
-    si.cb = ctypes.sizeof(si)
-    si.hStdInput = kernel32.GetStdHandle(-10)
-    si.hStdOutput = kernel32.GetStdHandle(-11)
-    si.hStdError = kernel32.GetStdHandle(-12)
-    si.dwFlags |= 0x00000100  # STARTF_USESTDHANDLES
-
     pi = PROCESS_INFORMATION()
 
-    cmd_buf = ctypes.create_unicode_buffer(cmd)
-    LOGON_WITH_PROFILE = 1
-    CREATE_NO_WINDOW = 0x08000000
+    try:
+        if not advapi32.SaferCreateLevel(
+            SAFER_SCOPE_USER, SAFER_LEVEL_NORMALUSER, SAFER_LEVEL_OPEN, ctypes.byref(h_level), None
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
 
-    ok = advapi32.CreateProcessWithTokenW(
-        h_safer_token,
-        LOGON_WITH_PROFILE,
-        None,
-        cmd_buf,
-        CREATE_NO_WINDOW,
-        None,
-        cwd,
-        ctypes.byref(si),
-        ctypes.byref(pi),
-    )
-    if not ok:
-        err = ctypes.get_last_error()
-        advapi32.SaferCloseLevel(h_level)
-        kernel32.CloseHandle(h_safer_token)
-        kernel32.CloseHandle(h_token)
-        raise ctypes.WinError(err)
+        token_access = 0x000F0000 | 0x001F | 0x0002 | 0x0004 | 0x0008 | 0x0010 | 0x0020 | 0x0040 | 0x0080 | 0x0100
+        if not advapi32.OpenProcessToken(h_proc, token_access, ctypes.byref(h_token)):
+            raise ctypes.WinError(ctypes.get_last_error())
 
-    kernel32.WaitForSingleObject(pi.hProcess, 0xFFFFFFFF)
-    exit_code = wintypes.DWORD()
-    kernel32.GetExitCodeProcess(pi.hProcess, ctypes.byref(exit_code))
+        if not advapi32.SaferComputeTokenFromLevel(h_level, h_token, ctypes.byref(h_safer_token), 0, None):
+            raise ctypes.WinError(ctypes.get_last_error())
 
-    kernel32.CloseHandle(pi.hThread)
-    kernel32.CloseHandle(pi.hProcess)
-    advapi32.SaferCloseLevel(h_level)
-    kernel32.CloseHandle(h_safer_token)
-    kernel32.CloseHandle(h_token)
-    return int(exit_code.value)
+        si = STARTUPINFOW()
+        si.cb = ctypes.sizeof(si)
+        si.hStdInput = kernel32.GetStdHandle(-10)
+        si.hStdOutput = kernel32.GetStdHandle(-11)
+        si.hStdError = kernel32.GetStdHandle(-12)
+        si.dwFlags |= 0x00000100  # STARTF_USESTDHANDLES
+
+        # Execute through cmd.exe /c to support shell builtins and pipes
+        cmd_line = f'cmd.exe /c "{cmd}"'
+        cmd_buf = ctypes.create_unicode_buffer(cmd_line)
+        LOGON_WITH_PROFILE = 1
+        CREATE_NO_WINDOW = 0x08000000
+
+        ok = advapi32.CreateProcessWithTokenW(
+            h_safer_token,
+            LOGON_WITH_PROFILE,
+            None,
+            cmd_buf,
+            CREATE_NO_WINDOW,
+            None,
+            cwd,
+            ctypes.byref(si),
+            ctypes.byref(pi),
+        )
+        if not ok:
+            raise ctypes.WinError(ctypes.get_last_error())
+
+        kernel32.WaitForSingleObject(pi.hProcess, 0xFFFFFFFF)
+        exit_code = wintypes.DWORD()
+        kernel32.GetExitCodeProcess(pi.hProcess, ctypes.byref(exit_code))
+        return int(exit_code.value)
+    finally:
+        if pi.hThread:
+            kernel32.CloseHandle(pi.hThread)
+        if pi.hProcess:
+            kernel32.CloseHandle(pi.hProcess)
+        if h_level.value:
+            advapi32.SaferCloseLevel(h_level)
+        if h_safer_token.value:
+            kernel32.CloseHandle(h_safer_token)
+        if h_token.value:
+            kernel32.CloseHandle(h_token)
 
 
 if __name__ == "__main__":
