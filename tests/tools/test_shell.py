@@ -635,6 +635,7 @@ async def test_backtick_substitution_runs(tool, make_tool_context):
     assert "sub2" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="bash arithmetic expansion is not supported in cmd.exe")
 async def test_arithmetic_substitution(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo $((2+3))"}, ctx=_ctx(make_tool_context)))
     assert "5" in res
@@ -673,6 +674,7 @@ async def test_nested_quotes(tool, make_tool_context):
 # ---------- long / unicode / emoji / space args ----------
 
 
+@pytest.mark.skipif(os.name == "nt", reason="shlex quoting is POSIX-only")
 async def test_unicode_and_emoji_roundtrip(tool, make_tool_context):
     payload = "héllo wörld привет 世界 🚀"
     res = str(await tool.execute({"command": f"echo {shlex.quote(payload)}"}, ctx=_ctx(make_tool_context)))
@@ -685,6 +687,7 @@ async def test_argv_with_spaces_quoted(tool, make_tool_context):
     assert "a b  c d" in res
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows command line limit is 8191 chars")
 async def test_very_long_command_many_args(tool, make_tool_context):
     args = " ".join(f"a{i}" for i in range(5000))
     res = str(await tool.execute({"command": f"echo {args}"}, ctx=_ctx(make_tool_context)))
@@ -716,6 +719,7 @@ async def test_false_exit_code_surfaced(tool, make_tool_context):
     assert str(res) == "(exit code 1)"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="bash ; exit syntax is POSIX-only")
 async def test_explicit_exit_code_surfaced(tool, make_tool_context):
     res = await tool.execute({"command": "echo never_shown; exit 7"}, ctx=_ctx(make_tool_context))
     assert res.returncode == 7
@@ -801,6 +805,7 @@ async def test_path_unset_command_not_found(tool, make_tool_context):
     assert isinstance(res, str)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="${VAR} syntax is POSIX-only")
 async def test_missing_env_var_empty(tool, make_tool_context):
     key = "JOHNSTON_DEFINITELY_UNSET_VAR_9876"
     res = str(await tool.execute({"command": f"echo val=[${{{key}}}]"}, ctx=_ctx(make_tool_context)))
