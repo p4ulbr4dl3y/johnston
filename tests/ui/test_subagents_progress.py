@@ -14,6 +14,13 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         sess = MagicMock()
         sess.is_running = False
         sess.status = "completed"
+        sess.total_tokens = 1420
+        self.assertEqual(extract_subagent_progress(sess), "done • 1.4k tok")
+        sess.total_tokens = 420
+        self.assertEqual(extract_subagent_progress(sess), "done • 420 tok")
+        sess.total_tokens = 0
+        sess.tokens_input = 0
+        sess.tokens_output = 0
         self.assertEqual(extract_subagent_progress(sess), "done")
         sess.status = "cancelled"
         self.assertEqual(extract_subagent_progress(sess), "cancelled")

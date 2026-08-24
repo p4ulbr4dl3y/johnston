@@ -278,6 +278,15 @@ def extract_subagent_progress(session: Any) -> str:
 
     if not is_running:
         if st_str in ("completed", "done"):
+            tokens = getattr(session, "total_tokens", 0)
+            if not isinstance(tokens, int) or tokens <= 0:
+                in_tok = getattr(session, "tokens_input", 0) or 0
+                out_tok = getattr(session, "tokens_output", 0) or 0
+                tokens = (in_tok if isinstance(in_tok, int) else 0) + (out_tok if isinstance(out_tok, int) else 0)
+            if isinstance(tokens, int) and tokens > 0:
+                from core.domain.policies.model_catalog_policy import format_context_tokens
+
+                return f"done • {format_context_tokens(tokens)} tok"
             return "done"
         if st_str in ("cancelled", "canceled"):
             return "cancelled"
