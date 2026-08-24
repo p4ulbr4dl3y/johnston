@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app import JohnstonApp
+from widgets.chat_input import ChatInput
 from widgets.mixins.actions import ActionsMixin
 
 
@@ -271,6 +272,32 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
                     break
                 await asyncio.sleep(0.1)
             self.assertFalse(app.selection_copy_active)
+
+    async def test_on_mouse_up_chat_input_selection(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app._mouse_down_pos = (0, 0)
+            app.screen.clear_selection = MagicMock()
+            app.screen.get_selected_text = MagicMock(return_value="")
+            app.copy_to_clipboard = MagicMock()
+            chat_view = MagicMock()
+            chat_view.query.return_value = []
+            chat_input = MagicMock()
+            chat_input.selected_text = "input text selection"
+
+            def mock_query(target, *args, **kwargs):
+                if target == "#message-input" or target is ChatInput:
+                    return chat_input
+                return chat_view
+
+            with patch.object(app, "query_one", side_effect=mock_query):
+                event = MagicMock()
+                event.screen_x = 10
+                event.screen_y = 10
+                event.widget = None
+                event.target = None
+                app.on_mouse_up(event)
+            app.copy_to_clipboard.assert_called_once_with("input text selection")
 
     async def test_on_mouse_up_banner_text(self):
         app = JohnstonApp()

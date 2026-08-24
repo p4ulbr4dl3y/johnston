@@ -264,6 +264,28 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 await ci._on_key(event)
                 mock_exit.assert_called_once()
 
+            # ctrl+c with selection -> copy, no exit
+            ci.load_text("copy me")
+            ci.selection = ci.selection.__class__((0, 0), (0, 4))
+            with patch.object(ci, "action_copy") as mock_copy, patch.object(app, "exit") as mock_exit:
+                event = Key("ctrl+c", "ctrl+c")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+                mock_copy.assert_called_once()
+                mock_exit.assert_not_called()
+
+            # ctrl+x with selection -> cut, no exit
+            with patch.object(ci, "action_cut") as mock_cut, patch.object(app, "exit") as mock_exit:
+                event = Key("ctrl+x", "ctrl+x")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+                mock_cut.assert_called_once()
+                mock_exit.assert_not_called()
+
+            ci.load_text("")
+
             # shift+tab -> toggle mode
             event_st = Key("shift+tab", "shift+tab")
             event_st.prevent_default = MagicMock()

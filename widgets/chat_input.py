@@ -11,7 +11,7 @@ from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
-from widgets.utils.key_aliases import KEY_DETACH, KEY_NEWLINE, KEY_PASTE, KEY_QUIT, KEY_TOGGLE_ROLE
+from widgets.utils.key_aliases import KEY_COPY, KEY_CUT, KEY_DETACH, KEY_NEWLINE, KEY_PASTE, KEY_QUIT, KEY_TOGGLE_ROLE
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
@@ -386,7 +386,18 @@ class ChatInput(TextArea):
             if self._handle_tag_deletion(event.key):
                 event.prevent_default()
                 event.stop()
-                return
+        # Copy / Cut selected text
+        if event.key in KEY_COPY and self.selected_text:
+            self.action_copy()
+            event.prevent_default()
+            event.stop()
+            return
+
+        if event.key in KEY_CUT and self.selected_text:
+            self.action_cut()
+            event.prevent_default()
+            event.stop()
+            return
 
         # Global Exit shortcut: Ctrl+C / Ctrl+Q (and layout aliases)
         if event.key in KEY_QUIT:

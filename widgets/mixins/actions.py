@@ -97,6 +97,13 @@ class ActionsMixin:
             curr = getattr(curr, "parent", None)
 
         selected_text = self.screen.get_selected_text()
+        if not selected_text:
+            try:
+                ci = self.query_one("#message-input", ChatInput)
+                if ci.selected_text:
+                    selected_text = ci.selected_text
+            except Exception:
+                pass
         if selected_text and selected_text.strip():
             banner_signatures = ["|_|", "\\__\\___/", "___ _| |_", "_  ___ |"]
             if any(sig in selected_text for sig in banner_signatures):
