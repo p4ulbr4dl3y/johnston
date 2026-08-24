@@ -163,7 +163,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
                 self._get_header_md(), id="shell-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
             yield HeaderWrapOptionList(id="shell-option-list")
-            yield Label("enter: console • k: kill • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: console • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._last_signatures = None
@@ -173,6 +173,26 @@ class ShellTasksScreen(BaseModalScreen[None]):
         except Exception:
             pass
         self.set_interval(0.5, self.update_tasks_list)
+
+    def _update_hint(self) -> None:
+        try:
+            opt_list = self.query_one("#shell-option-list", OptionList)
+            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            idx = opt_list.highlighted
+            is_running = False
+            if idx is not None and 0 <= idx < len(self.filtered_tasks):
+                item = self.filtered_tasks[idx]
+                if item and item.get("is_running"):
+                    is_running = True
+            if is_running:
+                hint.update("enter: console • ↑↓: nav • k: kill • esc: close")
+            else:
+                hint.update("enter: console • ↑↓: nav • esc: close")
+        except Exception:
+            pass
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        self._update_hint()
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
@@ -216,6 +236,7 @@ class ShellTasksScreen(BaseModalScreen[None]):
                 if it is not None:
                     opt_list.highlighted = i
                     break
+        self._update_hint()
 
     def _format_task_row(self, item: dict) -> str:
         return format_task_row(item["command"])
@@ -318,7 +339,7 @@ class SubagentsScreen(BaseModalScreen[None]):
                 self._get_header_md(), id="subagents-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
             yield HeaderWrapOptionList(id="subagents-option-list")
-            yield Label("enter: details • k: kill • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: details • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._last_signatures = None
@@ -328,6 +349,26 @@ class SubagentsScreen(BaseModalScreen[None]):
         except Exception:
             pass
         self.set_interval(0.5, self.update_tasks_list)
+
+    def _update_hint(self) -> None:
+        try:
+            opt_list = self._get_option_list()
+            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            idx = opt_list.highlighted
+            is_running = False
+            if idx is not None and 0 <= idx < len(self.filtered_tasks):
+                item = self.filtered_tasks[idx]
+                if item and item.get("is_running"):
+                    is_running = True
+            if is_running:
+                hint.update("enter: details • ↑↓: nav • k: kill • esc: close")
+            else:
+                hint.update("enter: details • ↑↓: nav • esc: close")
+        except Exception:
+            pass
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        self._update_hint()
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
@@ -374,6 +415,7 @@ class SubagentsScreen(BaseModalScreen[None]):
                 if it is not None:
                     opt_list.highlighted = i
                     break
+        self._update_hint()
 
     def _format_task_row(self, item: dict) -> str:
         return format_task_row(item["command"])
@@ -382,7 +424,7 @@ class SubagentsScreen(BaseModalScreen[None]):
         from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
         session_id = getattr(item["raw_obj"], "id", item["id"])
-        self.app.push_screen(SubagentViewScreen(session_id))
+        self.app.push_screen(SubagentViewScreen(session_id, from_tasks=True))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_tasks):

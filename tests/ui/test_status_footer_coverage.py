@@ -318,12 +318,19 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         self.assertIsNone(header._resize_timer)
 
     def test_update_session_none_renders(self):
-        header = SubagentHeader()
+        header = SubagentHeader(from_tasks=True)
         header._harness_app = MagicMock()
         with patch.object(header, "update") as upd:
             header.update_session(None)
         upd.assert_called_once()
         self.assertIn("esc: back", header._last_grid_rows[0][1])
+
+        header_close = SubagentHeader(from_tasks=False)
+        header_close._harness_app = MagicMock()
+        with patch.object(header_close, "update") as upd:
+            header_close.update_session(None)
+        upd.assert_called_once()
+        self.assertIn("esc: close", header_close._last_grid_rows[0][1])
 
     def test_update_session_running_and_completed(self):
         header = SubagentHeader()
@@ -358,7 +365,7 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         rsf.assert_called_once()
 
     def test_render_header_long_description_truncation(self):
-        header = SubagentHeader()
+        header = SubagentHeader(from_tasks=True)
         app = MagicMock()
         app.size = MagicMock(width=50)
         header._harness_app = app

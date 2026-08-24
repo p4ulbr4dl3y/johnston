@@ -639,9 +639,10 @@ class SubagentHeader(StreamFrameMixin, Static):
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, from_tasks: bool = False, **kwargs) -> None:
         super().__init__("", *args, **kwargs)
         self.session = None
+        self.from_tasks = from_tasks
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
@@ -715,8 +716,9 @@ class SubagentHeader(StreamFrameMixin, Static):
         grid.add_column(justify="right")
 
         if not self.session:
-            grid.add_row("", f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]")
-            self._last_grid_rows = [("", f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]")]
+            esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
+            grid.add_row("", f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]")
+            self._last_grid_rows = [("", f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]")]
             self.update(grid)
             return
 
@@ -762,7 +764,8 @@ class SubagentHeader(StreamFrameMixin, Static):
                 role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
 
             row_left = role_part
-            row_right = f"[{THEME_MUTED}]esc: back[/{THEME_MUTED}]"
+            esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
+            row_right = f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]"
 
             grid.add_row(row_left, row_right)
             self._last_grid_rows = [(row_left, row_right)]

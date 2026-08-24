@@ -23,8 +23,11 @@ class TestDiffScreen(unittest.TestCase):
         self.assertEqual(len(screen.diff_items), 2)
 
     def test_diff_header_and_footer(self):
-        header = DiffHeader("Title", "2 files, +1/-1")
-        header.render_header()
+        header_close = DiffHeader("Title", "2 files, +1/-1", from_rewind=False)
+        header_close.render_header()
+
+        header_back = DiffHeader("Title", "2 files, +1/-1", from_rewind=True)
+        header_back.render_header()
 
         footer = DiffFooter()
         footer.update_info("test.py", "+1 / -1")

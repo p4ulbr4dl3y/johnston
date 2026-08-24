@@ -210,7 +210,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             app = None
 
         if app:
-            app.push_screen(DiffScreen(diff_items, title=f"Rollback: {clean_preview}"))
+            app.push_screen(DiffScreen(diff_items, title=f"Rollback: {clean_preview}", from_rewind=True))
 
     def _show_step_1(self) -> None:
         self.step = 1

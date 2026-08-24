@@ -22,12 +22,14 @@ class DiffHeader(Static):
         self,
         title: str,
         stats_summary: str,
+        from_rewind: bool = False,
         id: Optional[str] = None,
         classes: Optional[str] = None,
     ):
         super().__init__(id=id, classes=classes)
         self.title_text = title
         self.stats_summary = stats_summary
+        self.from_rewind = from_rewind
 
     def on_mount(self) -> None:
         self.render_header()
@@ -47,6 +49,8 @@ class DiffHeader(Static):
         except Exception:
             pass
 
+        esc_label = "esc: back" if self.from_rewind else "esc: close"
+
         if width < 75:
             left_text = (
                 f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
@@ -60,7 +64,7 @@ class DiffHeader(Static):
                 f"[#f4f4f5]{escape(self.title_text)}[/]  [#71717a]•[/]  "
                 f"[#71717a]({escape(self.stats_summary)})[/]"
             )
-            right_text = "[#71717a]esc: back[/]"
+            right_text = f"[#71717a]{esc_label}[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -151,10 +155,12 @@ class DiffScreen(Screen[None]):
         self,
         diff_items: list[tuple[str, str, int, int]],
         title: str = "Session Changes",
+        from_rewind: bool = False,
     ):
         super().__init__()
         self.diff_items = diff_items
         self.title_text = title
+        self.from_rewind = from_rewind
         self.selected_index = 0
 
         total_added = sum(item[2] for item in diff_items)
@@ -190,7 +196,7 @@ class DiffScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="diff-container"):
-            yield DiffHeader(self.title_text, self.stats_summary, id="diff-header")
+            yield DiffHeader(self.title_text, self.stats_summary, from_rewind=self.from_rewind, id="diff-header")
             with Horizontal(id="diff-body"):
                 with Vertical(id="diff-sidebar"):
                     yield Input(placeholder="Search files...", id="diff-search-input")

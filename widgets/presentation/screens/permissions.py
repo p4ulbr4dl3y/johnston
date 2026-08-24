@@ -57,7 +57,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             )
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="permissions-option-list")
-            yield Label("enter/space/tab: toggle • ↑↓: nav • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()

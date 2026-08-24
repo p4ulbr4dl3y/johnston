@@ -22,9 +22,10 @@ class SubagentViewScreen(Screen[None]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self, session_id_or_desc: str):
+    def __init__(self, session_id_or_desc: str, from_tasks: bool = False):
         super().__init__()
         self.session_id_or_desc = session_id_or_desc
+        self.from_tasks = from_tasks
         self.session = None
         self.thinking_widget = None
         self.current_tool_widget = None
@@ -34,7 +35,7 @@ class SubagentViewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="subagent-container"):
-            yield SubagentHeader(id="subagent-header")
+            yield SubagentHeader(from_tasks=self.from_tasks, id="subagent-header")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield SubagentStatusFooter(id="subagent-status-footer")
 

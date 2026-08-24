@@ -236,14 +236,46 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             summary_static.display = True
             opt_list.display = False
             input_field.display = False
-            hint.update("enter: confirm • ←: back • esc: cancel")
             self.focus()
+
+        self._update_wizard_hint()
+
+    def _update_wizard_hint(self) -> None:
+        try:
+            hint = self.query_one(MODAL_HINT, Label)
+            if self.q_idx >= len(self.questions):
+                hint.update("enter: confirm • ←: back • esc: cancel")
+                return
+
+            input_field = self.query_one(WRITE_IN_INPUT, Input)
+            is_write_in = input_field.display and input_field.has_focus
+
+            if not self.raw_options:
+                if self.q_idx == 0:
+                    hint.update("enter: next • tab: minimize • esc: cancel")
+                else:
+                    hint.update("enter: next • ←: back • tab: minimize • esc: cancel")
+                return
+
+            if is_write_in:
+                if self.q_idx == 0:
+                    hint.update("enter: next • ↑: list • tab: minimize • esc: cancel")
+                else:
+                    hint.update("enter: next • ↑: list • ←: back • tab: minimize • esc: cancel")
+            else:
+                if self.q_idx == 0:
+                    hint.update("enter: confirm • space: toggle • ↑↓: nav • tab: minimize • esc: cancel")
+                else:
+                    hint.update("enter: confirm • space: toggle • ↑↓: nav • ←: back • tab: minimize • esc: cancel")
+        except Exception:
+            pass
 
     def focus_write_in_input(self) -> None:
         try:
             input_field = self.query_one(WRITE_IN_INPUT, Input)
             input_field.display = True
             input_field.focus()
+            self._update_wizard_hint()
         except Exception:
             pass
 
@@ -256,6 +288,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             input_field.display = False
             opt_list.highlighted = max(0, len(self.options) - 2)
             opt_list.focus()
+            self._update_wizard_hint()
         except Exception:
             pass
 
@@ -268,6 +301,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
             input_field.display = False
             opt_list.highlighted = 0
             opt_list.focus()
+            self._update_wizard_hint()
         except Exception:
             pass
 

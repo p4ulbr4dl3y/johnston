@@ -37,7 +37,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: connect • space/tab: toggle • ↑↓: nav • esc: cancel",
+            hint_text="enter: connect • space/tab: toggle • ↑↓: nav • esc: close",
         )
 
     def _build_options(self):

@@ -61,7 +61,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield Label("enter: select • space/tab: toggle • ↑↓: nav • esc: cancel", id=MODAL_HINT_ID)
+            yield Label("enter: select • space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
