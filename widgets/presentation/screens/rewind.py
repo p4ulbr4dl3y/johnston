@@ -97,10 +97,10 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         clean = " ".join(entry.text.replace("\n", " ").replace("\r", " ").split())
         if len(clean) > 40:
             clean = clean[:40] + "..."
-        escaped_preview = escape(clean or "(empty message)")
-        stat_info = f" [dim]({escape(entry.git_stats)})[/dim]" if entry.git_stats else ""
+        clean_preview = clean or "(empty message)"
+        stat_info = f" *({entry.git_stats})*" if entry.git_stats else ""
 
-        title = f"### **Rollback: {escaped_preview}{stat_info}**"
+        title = f"### **Rollback: {clean_preview}**{stat_info}"
         try:
             md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
             md.update(title)
