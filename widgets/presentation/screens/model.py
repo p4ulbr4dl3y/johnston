@@ -82,7 +82,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 for idx, m in enumerate(p_models):
                     clean_m = catalog.get_model_display_name(p_key, m)
                     is_active = bool(active_idx is not None and idx == active_idx)
-                    opt_label = f"   {status_tag('ACTIVE')} {clean_m}" if is_active else f"     {clean_m}"
+                    opt_label = f"{status_tag('ACTIVE')} {clean_m}" if is_active else f"  {clean_m}"
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
@@ -102,7 +102,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             for idx, m in enumerate(p_models):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
                 is_active = bool(active_idx is not None and idx == active_idx)
-                opt_label = f" {status_tag('ACTIVE')} {clean_m}" if is_active else f"   {clean_m}"
+                opt_label = f"{status_tag('ACTIVE')} {clean_m}" if is_active else f"  {clean_m}"
                 options.append(opt_label)
                 items.append(m)
                 if is_active:

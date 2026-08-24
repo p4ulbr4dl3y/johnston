@@ -365,22 +365,37 @@ OptionList > .option-list--option-hover {
     background: #18181b;
 }
 
-#command-suggestions OptionList {
+#command-suggestions OptionList,
+CommandSuggestions {
     background: #18181b;
-    color: #a1a1aa;
+    color: #e4e4e7;
     border: none;
     padding: 0;
     scrollbar-size: 0 0;
 }
 
+#command-suggestions OptionList > .option-list--option,
+#command-suggestions > .option-list--option,
+CommandSuggestions > .option-list--option {
+    background: transparent;
+    color: #e4e4e7;
+    padding: 0 1;
+}
+
 #command-suggestions OptionList > .option-list--option-highlighted,
-#command-suggestions OptionList > .option-list--option-blur-highlighted {
-    background: #ffffff;
-    color: #09090b;
+#command-suggestions OptionList > .option-list--option-blur-highlighted,
+#command-suggestions > .option-list--option-highlighted,
+#command-suggestions > .option-list--option-blur-highlighted,
+CommandSuggestions > .option-list--option-highlighted,
+CommandSuggestions > .option-list--option-blur-highlighted {
+    background: #27272a;
+    color: #ffffff;
     text-style: bold;
 }
 
-#command-suggestions OptionList > .option-list--option-hover {
+#command-suggestions OptionList > .option-list--option-hover,
+#command-suggestions > .option-list--option-hover,
+CommandSuggestions > .option-list--option-hover {
     background: transparent;
 }
 
@@ -615,6 +630,14 @@ ModalScreen {
     margin-bottom: 0;
 }
 
+#wizard-summary,
+#rewind-files {
+    width: 100%;
+    height: auto;
+    margin-bottom: 1;
+    display: none;
+}
+
 DiffScreen {
     background: #09090b;
 }
@@ -655,7 +678,7 @@ DiffScreen {
     width: 100%;
     height: 1;
     margin: 1 0 1 0;
-    padding: 0 2;
+    padding: 0 1;
     border: none;
     background: transparent !important;
     color: #f4f4f5;
@@ -672,11 +695,11 @@ DiffScreen {
     background: transparent !important;
     border: none !important;
     margin: 0;
-    padding: 0 1;
+    padding: 0;
     overflow-y: auto;
     overflow-x: hidden;
     text-wrap: nowrap;
-    text-overflow: ellipsis;
+    text-overflow: clip;
     scrollbar-size: 0 0;
 }
 
@@ -693,8 +716,8 @@ DiffScreen {
 
 #diff-file-list > .option-list--option-highlighted,
 #diff-file-list > .option-list--option-blur-highlighted {
-    background: #ffffff;
-    color: #09090b;
+    background: #27272a;
+    color: #ffffff;
     text-style: bold;
 }
 
@@ -846,6 +869,20 @@ ModalScreen OptionList:hover {
 #modal-dialog OptionList > .option-list--option,
 ModalScreen OptionList > .option-list--option {
     background: transparent;
+    color: #a1a1aa;
+    text-wrap: nowrap;
+}
+
+#modal-dialog.wizard-dialog OptionList,
+#modal-dialog.wizard-dialog HeaderWrapOptionList,
+#options-list {
+    text-wrap: nowrap;
+    text-overflow: clip;
+}
+
+#modal-dialog.wizard-dialog OptionList > .option-list--option,
+#modal-dialog.wizard-dialog HeaderWrapOptionList > .option-list--option,
+#options-list > .option-list--option {
     text-wrap: nowrap;
 }
 
@@ -860,8 +897,8 @@ ModalScreen OptionList > .option-list--option-disabled {
 #modal-dialog OptionList > .option-list--option-blur-highlighted,
 ModalScreen OptionList > .option-list--option-highlighted,
 ModalScreen OptionList > .option-list--option-blur-highlighted {
-    background: #ffffff;
-    color: #09090b;
+    background: transparent;
+    color: #ffffff;
     text-style: bold;
 }
 
@@ -890,12 +927,17 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog #write-in-input,
 #modal-dialog #write-in-input:focus,
 #write-in-input,
-#write-in-input:focus,
+#write-in-input:focus {
+    margin: 0;
+    padding: 0 1 0 5;
+}
+
 #modal-dialog #reject-reason-input,
 #modal-dialog #reject-reason-input:focus,
 #reject-reason-input,
 #reject-reason-input:focus {
-    margin: 1 0 0 0;
+    margin: 0;
+    padding: 0 1;
 }
 
 #modal-dialog Input > .input--placeholder,

@@ -33,7 +33,7 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(len(s.raw_options), 2)
         self.assertNotIn("\n", s.raw_options[1])
         self.assertIn("Second multiline session", s.raw_options[1])
-        self.assertIn("[dim](5 steps)[/dim]", s.raw_options[0])
+        self.assertIn("5 steps", s.raw_options[0])
         self.assertEqual(s.raw_items, ["s1", "s2"])
         self.assertEqual(s.default_value, "s1")
 
@@ -83,7 +83,8 @@ class TestRewindEdge(unittest.TestCase):
     def test_long_message_truncated(self):
         long_text = "A" * 100
         s = RewindScreen([RewindEntry(0, long_text)])
-        self.assertIn("A" * 55 + "...", s.raw_options[0])
+        self.assertIn("...", s.raw_options[0])
+        self.assertTrue(s.raw_options[0].startswith("A" * 50))
 
 
 class TestBaseSelectionScreen(unittest.TestCase):

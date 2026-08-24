@@ -26,12 +26,7 @@ _NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 class HeaderWrapOptionList(OptionList):
-    """OptionList that keeps the first group's header in view on wrap-around.
-
-    When the highlight wraps from the last enabled option to the first, the
-    list is scrolled so the very first row (a disabled section header such as
-    "Global") stays visible above the highlighted first skill.
-    """
+    """OptionList that keeps the first group's header in view on wrap-around."""
 
     def _on_mouse_move(self, event: events.MouseMove) -> None:
         super()._on_mouse_move(event)

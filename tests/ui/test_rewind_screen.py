@@ -27,11 +27,11 @@ class TestRewindScreen(unittest.TestCase):
             RewindEntry(1, "second message", "+5 / -2"),
         ]
         screen_enabled = RewindScreen(user_messages, checkpoints_enabled=True)
-        self.assertIn("(no checkpoint)", screen_enabled.raw_options[0])
-        self.assertIn("(+5 / -2)", screen_enabled.raw_options[1])
+        self.assertIn("no checkpoint", screen_enabled.raw_options[0])
+        self.assertIn("+5 / -2", screen_enabled.raw_options[1])
 
         screen_disabled = RewindScreen(user_messages, checkpoints_enabled=False)
-        self.assertNotIn("(no checkpoint)", screen_disabled.raw_options[0])
+        self.assertNotIn("no checkpoint", screen_disabled.raw_options[0])
         self.assertNotIn("+5 / -2", screen_disabled.raw_options[1])
         self.assertEqual(screen_disabled.raw_options[0], "hello world")
         self.assertEqual(screen_disabled.raw_options[1], "second message")
@@ -159,3 +159,19 @@ class TestRewindScreen(unittest.TestCase):
         self.assertIsNotNone(dismissed_val)
         self.assertEqual(dismissed_val.index, 1)
         self.assertFalse(dismissed_val.restore_code)
+
+    def test_format_rewind_files(self):
+        from widgets.presentation.screens.rewind import format_rewind_files
+
+        # Empty files
+        self.assertEqual(format_rewind_files([]).plain, "")
+
+        # Files <= max_show with git stats
+        res = format_rewind_files(["a.py", "b.py"], git_stats="+2/-1")
+        plain = res.plain
+        self.assertEqual(plain, "Files to revert (+2/-1):\n  a.py\n  b.py")
+
+        # Files > max_show
+        res = format_rewind_files(["1.py", "2.py", "3.py", "4.py", "5.py"], max_show=4)
+        plain = res.plain
+        self.assertEqual(plain, "Files to revert:\n  1.py\n  2.py\n  3.py\n  4.py\n  ... and 1 more")

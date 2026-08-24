@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 
 from textual.app import App
 
+from widgets.presentation.screens.ask_user import WRITE_IN_LABEL, AskUserWizardScreen
+
 
 class _PermHostApp(App[None]):
     """Host app for mounting the permission confirm modal."""
@@ -24,8 +26,6 @@ class _PermHostApp(App[None]):
 
 def _ask_screen(questions=(), q_idx=0, raw_options=None, options=None, answers=None):
     """Build a bare AskUserWizardScreen with minimal, safe state."""
-    from widgets.presentation.screens.ask_user import AskUserWizardScreen
-
     s = AskUserWizardScreen.__new__(AskUserWizardScreen)
     s.questions = list(questions)
     s.q_idx = q_idx
@@ -60,7 +60,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
         screen._force_modal_focus()  # raw_options set -> option-list branch except
 
     async def test_focus_options_and_first(self):
-        screen = _ask_screen(raw_options=["A", "B"], options=["A", "B", "Write-in..."])
+        screen = _ask_screen(raw_options=["A", "B"], options=["A", "B", WRITE_IN_LABEL])
         screen._is_mounted = True
         opt_list = MagicMock()
         input_field = MagicMock()
@@ -87,7 +87,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
         screen = _ask_screen(
             [{"question": "Q1", "options": ["A", "B"]}],
             raw_options=["A", "B"],
-            options=["A", "B", "Write-in..."],
+            options=["A", "B", WRITE_IN_LABEL],
         )
         title = MagicMock()
         opt_list = MagicMock()
@@ -124,7 +124,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
         screen = _ask_screen(
             [{"question": "Q", "options": ["A", "B"]}],
             raw_options=["A", "B"],
-            options=["A", "B", "Write-in..."],
+            options=["A", "B", WRITE_IN_LABEL],
         )
         screen._is_mounted = True
         input_field = MagicMock()

@@ -119,7 +119,7 @@ class DiffFooter(Static):
             display_path = format_relative_path(self.current_file, max_length=max_path_len)
             left_text = f"[bold #f4f4f5]{escape(display_path)}[/]  [#71717a]({escape(self.current_stats)})[/]"
         else:
-            left_text = "[dim #71717a]No file selected[/dim]"
+            left_text = "[dim #71717a]No file selected[/]"
 
         if width >= 80:
             right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll  •  tab: focus[/]"
@@ -172,10 +172,10 @@ class DiffScreen(Screen[None]):
         self.sidebar_options: list[str] = []
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
-            stat_badge = f"+{added}/-{deleted}"
-            # Sidebar width is 34; subtract outer/inner paddings (4) and badge + space (len(badge) + 2)
-            max_name_len = 28 - len(stat_badge)
-            if len(short_name) > max_name_len and max_name_len > 4:
+            stat_plain = f"+{added}/-{deleted}"
+            target_width = 28
+            if len(short_name) + len(stat_plain) + 1 > target_width:
+                max_name_len = max(4, target_width - len(stat_plain) - 1)
                 dot_idx = short_name.rfind(".")
                 if dot_idx > 3 and len(short_name) - dot_idx <= 5:
                     ext = short_name[dot_idx:]
@@ -183,7 +183,10 @@ class DiffScreen(Screen[None]):
                     short_name = base[: max_name_len - len(ext) - 1] + "…" + ext
                 else:
                     short_name = short_name[: max_name_len - 1] + "…"
-            self.sidebar_options.append(f"{escape(short_name)} [dim]{escape(stat_badge)}[/dim]")
+
+            spaces = " " * max(1, target_width - len(short_name) - len(stat_plain))
+            stat_markup = f"[#22c55e]+{added}[/][dim #71717a]/[/][#ef4444]-{deleted}[/]"
+            self.sidebar_options.append(f"{escape(short_name)}{spaces}{stat_markup}")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="diff-container"):
@@ -195,7 +198,7 @@ class DiffScreen(Screen[None]):
                 with Vertical(id="diff-content-container"):
                     if not self.diff_items:
                         with Vertical(id="diff-empty-container"):
-                            yield Static("[dim #71717a]No workspace changes found.[/dim]", id="diff-empty-label")
+                            yield Static("[dim #71717a]No workspace changes found.[/]", id="diff-empty-label")
                     else:
                         with ToolScrollBox(id="diff-scroll-box"):
                             yield Static(id="diff-content-view")
@@ -245,7 +248,7 @@ class DiffScreen(Screen[None]):
     def _render_empty_search(self) -> None:
         try:
             content_view = self.query_one("#diff-content-view", Static)
-            content_view.update("[dim #71717a]No matching files found.[/dim]")
+            content_view.update("[dim #71717a]No matching files found.[/]")
             footer = self.query_one("#diff-footer", DiffFooter)
             footer.update_info("", "no matches")
         except Exception:

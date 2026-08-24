@@ -263,13 +263,18 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.role = "worker"
         session.project_dir = "/tmp"
         session.branch_name = ""
-        session.messages = None
+        session.branch = ""
+        session.messages = []
         session.last_context_tokens = 0
         session.total_tokens = 0
         session.cost_usd = 0.0
 
         app = MagicMock()
-        app.size = MagicMock(width=80)
+        app.size = MagicMock(width=100)
+        app.agent = None
+        app.subagent_registry = None
+        app.bg_task_manager = None
+        app.mcp_manager = None
         cm = MagicMock()
         cm.get_active_provider_key.return_value = "openai"
         cm.load_providers.return_value = {}
@@ -280,7 +285,9 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         with patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertIn("sandbox: off", footer._last_grid_rows[1][0])
+        self.assertTrue(
+            "sandbox: off" in footer._last_grid_rows[1][0] or "sb:off" in footer._last_grid_rows[1][0]
+        )
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()

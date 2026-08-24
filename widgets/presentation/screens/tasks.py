@@ -23,7 +23,7 @@ def format_task_row(cmd: str) -> str:
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split())
     if len(clean) > 60:
         clean = clean[:57] + "..."
-    return f"   {clean}".rstrip()
+    return clean
 
 
 def _filter_and_sort_tasks(items: list, search_query: str) -> list:

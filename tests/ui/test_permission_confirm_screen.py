@@ -184,20 +184,10 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.action_page_down()
 
     def test_hint_text_adaptation(self):
-        # No pattern
-        screen_no_pat = PermissionConfirmScreen("read", {})
-        self.assertIn("enter: allow", screen_no_pat._build_hint_text(width=80))
-        self.assertIn("esc: deny", screen_no_pat._build_hint_text(width=40))
-
-        # Long pattern truncation
-        screen_long_pat = PermissionConfirmScreen("shell", {"command": "very_long_command_name_subpath *"})
-        hint = screen_long_pat._build_hint_text(width=80)
-        self.assertIn("...", hint)
-        self.assertIn("a: all", hint)
-
-        # Narrow width formatting
-        hint_narrow = screen_long_pat._build_hint_text(width=50)
-        self.assertIn("p: (", hint_narrow)
+        # Hint text is unified with OptionList
+        screen = PermissionConfirmScreen("read", {})
+        self.assertIn("enter: select", screen._build_hint_text(width=80))
+        self.assertIn("esc: deny", screen._build_hint_text(width=40))
 
     async def test_reject_with_reason_flow(self):
         screen = PermissionConfirmScreen("shell", {"command": "rm -rf tmp"})
@@ -219,8 +209,6 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(inp.display)
             self.assertTrue(inp.has_focus)
-            hint_label = screen.query_one("#modal-hint")
-            self.assertIn("submit denial", str(hint_label.render()))
 
             # Type and submit reason
             inp.value = "do not delete"
@@ -246,17 +234,11 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(inp.display)
 
-            # Press deny / esc -> closes reason input without closing modal
-            screen.action_deny()
-            await pilot.pause()
-            self.assertFalse(inp.display)
-            self.assertIsNone(dismissed_val)
-
-            # Press deny again -> dismisses modal
+            # Press deny / esc -> dismisses modal with deny
             screen.action_deny()
             self.assertEqual(dismissed_val, "deny")
 
-    async def test_reject_reason_input_scroll_keys(self):
+    async def test_reject_reason_input_navigation_keys(self):
         diff = "\n".join(f"+line {i}" for i in range(50))
         screen = PermissionConfirmScreen("edit", {"path": "large.py"}, diff=diff)
         async with HostApp(screen).run_test() as pilot:
@@ -266,25 +248,17 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             inp = screen.query_one("#reject-reason-input")
             self.assertTrue(inp.has_focus)
 
-            # Test navigation keys triggering scroll actions
-            screen.action_scroll_down = MagicMock()
-            screen.action_scroll_up = MagicMock()
-            screen.action_page_down = MagicMock()
-            screen.action_page_up = MagicMock()
+            # Test up/down navigation keys returning to options list
+            screen.focus_options_list = MagicMock()
+            screen.focus_first_option = MagicMock()
 
             from textual.events import Key
 
-            await inp._on_key(Key("down", "down"))
-            screen.action_scroll_down.assert_called_once()
-
             await inp._on_key(Key("up", "up"))
-            screen.action_scroll_up.assert_called_once()
+            screen.focus_options_list.assert_called_once()
 
-            await inp._on_key(Key("pagedown", "pagedown"))
-            screen.action_page_down.assert_called_once()
-
-            await inp._on_key(Key("pageup", "pageup"))
-            screen.action_page_up.assert_called_once()
+            await inp._on_key(Key("down", "down"))
+            screen.focus_first_option.assert_called_once()
 
 
 if __name__ == "__main__":

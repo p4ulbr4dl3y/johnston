@@ -2,6 +2,7 @@ import asyncio
 import os
 import time
 
+from rich.markup import escape
 from textual.widgets import OptionList
 
 from widgets.app.command_provider import get_all_command_suggestions
@@ -103,7 +104,10 @@ class CommandSuggestions(HeaderWrapOptionList):
             if not query_lower or query_lower in f.lower():
                 matched_files.append(f)
                 kind = "Dir" if f.endswith("/") else "File"
-                formatted_line = f"{f:<46} {kind}"
+                escaped_f = escape(f)
+                pad = max(0, 46 - len(f))
+                padding_spaces = " " * pad
+                formatted_line = f"{escaped_f}{padding_spaces} [dim #71717a]{kind}[/dim #71717a]"
                 self.add_option(formatted_line)
                 if len(matched_files) >= 50:
                     break
@@ -151,7 +155,11 @@ class CommandSuggestions(HeaderWrapOptionList):
                             clean_desc = " ".join(desc.split())
                             if len(clean_desc) > 60:
                                 clean_desc = clean_desc[:57] + "..."
-                            formatted_line = f"{cmd:<{padding}} {clean_desc}"
+                            escaped_cmd = escape(cmd)
+                            escaped_desc = escape(clean_desc)
+                            pad = max(0, padding - len(cmd))
+                            padding_spaces = " " * pad
+                            formatted_line = f"{escaped_cmd}{padding_spaces} [dim #71717a]{escaped_desc}[/dim #71717a]"
                             self.add_option(formatted_line)
 
                     self.current_matched = matched_cmds

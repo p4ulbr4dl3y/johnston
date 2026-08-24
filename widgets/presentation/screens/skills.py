@@ -52,7 +52,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         self.options = []
         for s in self.skills:
             stat_t = status_tag("HIDDEN" if s.hidden else "VISIBLE")
-            self.options.append(f"   {stat_t} {s.name}")
+            self.options.append(f"{stat_t} {s.name}")
         self.filtered_skills = [s.to_dict() for s in self.skills]
         self.filtered_options = list(self.options)
 
@@ -166,7 +166,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             self.sm.toggle_hidden(s_name)
             target["hidden"] = not target.get("hidden", False)
             stat_t = status_tag("HIDDEN" if target["hidden"] else "VISIBLE")
-            new_opt = f"   {stat_t} {s_name}"
+            new_opt = f"{stat_t} {s_name}"
             if highlighted < len(self.filtered_options):
                 self.filtered_options[highlighted] = new_opt
             try:

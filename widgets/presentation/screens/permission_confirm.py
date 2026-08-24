@@ -2,44 +2,47 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+from rich.markup import escape
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, Static
+from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from core.domain.policies.permission_policy import suggest_pattern
 from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff, format_plan_display
 from widgets.presentation.screens.base_modal import BaseModalScreen
+from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
 
 
 class RejectReasonInput(Input):
-    """Input widget that forwards vertical navigation and scroll keys to modal scroll box."""
+    """Input widget that forwards vertical navigation keys to OptionList."""
+
+    def _clear_selection(self) -> None:
+        try:
+            self.selection = self.selection.cursor(self.cursor_position)
+        except Exception:
+            pass
+
+    def _on_focus(self, event: events.Focus) -> None:
+        super()._on_focus(event)
+        self._clear_selection()
+        self.call_after_refresh(self._clear_selection)
 
     async def _on_key(self, event: events.Key) -> None:
-        key = event.key
+        key = (event.key or "").lower()
+
         if key in ("up", "key_up"):
-            if self.screen and hasattr(self.screen, "action_scroll_up"):
-                self.screen.action_scroll_up()
+            if self.screen and hasattr(self.screen, "focus_options_list"):
+                getattr(self.screen, "focus_options_list")()
                 event.stop()
                 event.prevent_default()
                 return
+
         elif key in ("down", "key_down"):
-            if self.screen and hasattr(self.screen, "action_scroll_down"):
-                self.screen.action_scroll_down()
-                event.stop()
-                event.prevent_default()
-                return
-        elif key in ("pageup", "key_pageup"):
-            if self.screen and hasattr(self.screen, "action_page_up"):
-                self.screen.action_page_up()
-                event.stop()
-                event.prevent_default()
-                return
-        elif key in ("pagedown", "key_pagedown"):
-            if self.screen and hasattr(self.screen, "action_page_down"):
-                self.screen.action_page_down()
+            if self.screen and hasattr(self.screen, "focus_first_option"):
+                getattr(self.screen, "focus_first_option")()
                 event.stop()
                 event.prevent_default()
                 return
@@ -59,8 +62,6 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         ("r", "reject_with_reason", "Reject with Reason"),
         ("escape", "deny", "Deny"),
         ("d", "deny", "Deny"),
-        ("up", "scroll_up", "Scroll Up"),
-        ("down", "scroll_down", "Scroll Down"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
@@ -303,28 +304,39 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            inp = RejectReasonInput(placeholder="Type reason for denial and press Enter...", id="reject-reason-input")
+            options = ["Allow once"]
+            self._option_keys = ["allow"]
+
+            if self.suggested_pattern:
+                pat_escaped = escape(self.suggested_pattern)
+                options.append(f"Allow pattern [dim]({pat_escaped})[/dim]")
+                self._option_keys.append(f"pattern:{self.suggested_pattern}")
+
+            options.append("Always allow for session")
+            self._option_keys.append("always_allow")
+
+            options.append("Deny")
+            self._option_keys.append("deny")
+
+            options.append("Reject with feedback...")
+            self._option_keys.append("reject_reason")
+
+            yield HeaderWrapOptionList(*options, id="permission-options-list")
+
+            inp = RejectReasonInput(placeholder="Type feedback for agent and press Enter...", id="reject-reason-input")
             inp.display = False
             inp.can_focus = False
             yield inp
             yield Label(self._build_hint_text(), id="modal-hint")
 
     def on_mount(self) -> None:
-        self.focus()
+        try:
+            self.query_one("#permission-options-list", OptionList).focus()
+        except Exception:
+            self.focus()
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
-        if not self.suggested_pattern:
-            if width is not None and width < 48:
-                return "enter: allow • r: reason • esc: deny"
-            return "enter: allow • a: session • r: reason • esc/d: deny"
-
-        pat = self.suggested_pattern
-        if len(pat) > 18:
-            pat = pat[:15] + "..."
-
-        if width is not None and width < 62:
-            return f"enter: allow • p: ({pat}) • r: reason • esc: deny"
-        return f"enter: allow • p: pat ({pat}) • a: all • r: reason • esc/d: deny"
+        return "enter: select • ↑↓: nav • r: feedback • esc: deny"
 
     def on_resize(self, event) -> None:
         try:
@@ -334,6 +346,70 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 hint_label.update(self._build_hint_text(event.size.width))
         except Exception:
             pass
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        if not self.is_mounted:
+            return
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            if hasattr(self, "_option_keys") and event.option_index == len(self._option_keys) - 1:
+                self.focus_reject_input()
+            else:
+                inp.display = False
+                inp.can_focus = False
+        except Exception:
+            pass
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        idx = event.option_index
+        keys = getattr(self, "_option_keys", [])
+        if 0 <= idx < len(keys):
+            key = keys[idx]
+            if key == "allow":
+                self.dismiss("allow")
+            elif key.startswith("pattern:"):
+                self.dismiss(key)
+            elif key == "always_allow":
+                self.dismiss("always_allow")
+            elif key == "deny":
+                self.dismiss("deny")
+            elif key == "reject_reason":
+                self.focus_reject_input()
+
+    def focus_reject_input(self) -> None:
+        try:
+            opt_list = self.query_one("#permission-options-list", OptionList)
+            if hasattr(self, "_option_keys") and "reject_reason" in self._option_keys:
+                opt_list.highlighted = self._option_keys.index("reject_reason")
+            inp = self.query_one("#reject-reason-input", Input)
+            inp.display = True
+            inp.can_focus = True
+            inp.focus()
+        except Exception:
+            pass
+
+    def focus_options_list(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            inp.display = False
+            inp.can_focus = False
+            opt_list = self.query_one("#permission-options-list", OptionList)
+            if hasattr(self, "_option_keys"):
+                opt_list.highlighted = max(0, len(self._option_keys) - 2)
+            opt_list.focus()
+        except Exception:
+            self.focus()
+
+    def focus_first_option(self) -> None:
+        try:
+            inp = self.query_one("#reject-reason-input", Input)
+            inp.display = False
+            inp.can_focus = False
+            opt_list = self.query_one("#permission-options-list", OptionList)
+            opt_list.highlighted = 0
+            opt_list.focus()
+        except Exception:
+            self.focus()
 
     def _get_scroll_target(self):
         try:
@@ -397,16 +473,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self.dismiss("always_allow")
 
     def action_reject_with_reason(self) -> None:
-        try:
-            inp = self.query_one("#reject-reason-input", Input)
-            inp.display = True
-            inp.can_focus = True
-            inp.value = ""
-            inp.focus()
-            hint = self.query_one("#modal-hint", Label)
-            hint.update("enter: submit denial • esc: cancel reason")
-        except Exception:
-            pass
+        self.focus_reject_input()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "reject-reason-input":
@@ -417,21 +484,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 self.dismiss("deny")
 
     def action_deny(self) -> None:
-        try:
-            inp = self.query_one("#reject-reason-input", Input)
-            if inp.display:
-                inp.display = False
-                inp.can_focus = False
-                inp.value = ""
-                self.focus()
-                hint = self.query_one("#modal-hint", Label)
-                hint.update(self._build_hint_text())
-                return
-        except Exception:
-            pass
         self.dismiss("deny")
 
     def action_cancel(self) -> None:
-        self.action_deny()
+        self.dismiss("deny")
 
 

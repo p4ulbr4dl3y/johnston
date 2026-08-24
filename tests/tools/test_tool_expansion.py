@@ -432,6 +432,25 @@ class TestToolExpansion(unittest.TestCase):
         self.assertNotIn("A:", plain)
         self.assertIn("What is your name?", plain)
         self.assertIn("Johnston", plain)
+        self.assertEqual(plain, "What is your name?\nJohnston")
+
+    def test_ask_user_display_multi_questions_and_no_response(self):
+        widget = ToolCallWidget(
+            tool_type="ask_user",
+            target="ask_user",
+            result_text="Question: First?\nAnswer: Yes\nQuestion: Second?\nAnswer: ",
+            args={
+                "questions": [
+                    {"question": "First?", "options": ["Yes", "No"]},
+                    {"question": "Second?", "options": ["A", "B"]},
+                ]
+            },
+        )
+        display = widget._format_ask_user_display()
+        self.assertIsInstance(display, Text)
+        plain = display.plain
+        expected = "1. First?\nYes\n\n2. Second?\n(No response)"
+        self.assertEqual(plain, expected)
 
     def test_shell_running_bg_task_click_toggles_expansion(self):
         task_mock = MagicMock()

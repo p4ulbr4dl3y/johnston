@@ -24,6 +24,20 @@ from widgets.presentation.screens.constants import (
 )
 
 
+def format_mcp_row(stag: str, name: str, badge: str = "", target_width: int = 70) -> str:
+    """Format an MCP server row with a right-aligned badge if present."""
+    prefix = f"{stag} "
+    if not badge:
+        return f"{prefix}{name}"
+    max_name = max(10, target_width - len(prefix) - len(badge) - 2)
+    display_name = name
+    if len(display_name) > max_name:
+        display_name = display_name[: max_name - 3] + "..."
+    spaces = " " * max(2, target_width - len(prefix) - len(display_name) - len(badge))
+    badge_markup = f"[dim #71717a]{badge}[/]"
+    return f"{prefix}{display_name}{spaces}{badge_markup}"
+
+
 class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     """Modal screen for enabling/disabling MCP servers"""
 
@@ -195,7 +209,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def _add_server_row(self, opt_list: OptionList, s: Dict[str, Any], tools_per_server: Dict[str, int]) -> None:
         name = s["name"]
         if not MCPManager.server_enabled(s):
-            opt_list.add_option(f"   {status_tag('OFF')} {name}")
+            opt_list.add_option(format_mcp_row(status_tag("OFF"), name))
             return
 
         tool_cnt = tools_per_server.get(name, 0)
@@ -204,9 +218,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
         if tool_cnt > 0:
             tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
-            opt_list.add_option(f"   {status_tag('ON')} {name} — {tool_info}")
+            opt_list.add_option(format_mcp_row(status_tag("ON"), name, tool_info))
         elif url and not cmd:
-            opt_list.add_option(f"   {status_tag('ERR')} {name} — URL unsupported")
+            opt_list.add_option(format_mcp_row(status_tag("ERR"), name, "URL unsupported"))
         else:
             try:
                 st = self.mm.get_server_status(name) if hasattr(self.mm, "get_server_status") else {}
@@ -216,14 +230,14 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             if err:
                 e_lower = err.lower()
                 if "timeout" in e_lower or "timed out" in e_lower:
-                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Timeout")
+                    opt_list.add_option(format_mcp_row(status_tag("ERR"), name, "Timeout"))
                 elif "start" in e_lower:
-                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Start failed")
+                    opt_list.add_option(format_mcp_row(status_tag("ERR"), name, "Start failed"))
                 else:
-                    opt_list.add_option(f"   {status_tag('ERR')} {name} — Error")
+                    opt_list.add_option(format_mcp_row(status_tag("ERR"), name, "Error"))
             else:
                 stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
-                opt_list.add_option(f"   {stag} {name}")
+                opt_list.add_option(format_mcp_row(stag, name))
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:

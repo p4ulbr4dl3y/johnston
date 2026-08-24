@@ -107,6 +107,26 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
     return t
 
 
+def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | dict[int, str] | None = None) -> Text:
+    """Format ask_user questions and answers into a unified rich Text renderable."""
+    answers = answers or {}
+    t = Text()
+    num_questions = len(questions)
+    for i, q in enumerate(questions):
+        if i > 0:
+            t.append("\n\n")
+        q_text = str(q.get("question") or "").strip()
+        prefix = f"{i + 1}. " if num_questions > 1 else ""
+        t.append(f"{prefix}{q_text}\n", style="#ffffff")
+        ans_info = answers.get(i, {})
+        ans = ans_info.get("answer", "") if isinstance(ans_info, dict) else str(ans_info or "")
+        if ans:
+            t.append(ans, style="#a1a1aa")
+        else:
+            t.append("(No response)", style="italic #71717a")
+    return t
+
+
 class FormattingMixin:
     """Read/Edit/Plan formatting helpers"""
 
@@ -129,22 +149,10 @@ class FormattingMixin:
     def _format_ask_user_display(self) -> Any:
         questions = self._parse_ask_user_questions()
         answers = self._parse_ask_user_answers(questions)
-        t = Text()
-        num_questions = len(questions)
-        for i, q in enumerate(questions):
-            if i > 0:
-                t.append("\n\n")
-            q_text = str(q.get("question") or "").strip()
-            prefix = f"{i + 1}. " if num_questions > 1 else ""
-            t.append(f"{prefix}{q_text}\n", style="bold #ffffff")
-            ans = answers.get(i, {}).get("answer", "")
-            if ans:
-                t.append(f"  ✓ {ans}", style="#a1a1aa")
-            else:
-                t.append("  (No response)", style="italic #71717a")
-        if not t:
-            t.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
-        return t
+        display = format_ask_user_display(questions, answers)
+        if not display:
+            display.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
+        return display
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         diff_text = self._clean_hints_for_ui(diff_text)

@@ -200,7 +200,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             else:
                 act = it["action"].upper()
                 status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
-                opt_list.add_option(f"   {status} {it['label']}")
+                opt_list.add_option(f"{status} {it['label']}")
 
         if reset_highlight:
             opt_list.highlighted = self._first_selectable_index()
@@ -229,7 +229,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         target["action"] = next_act
         act = next_act.upper()
         status = status_tag(act if act in ("ALLOW", "DENY") else "ASK")
-        new_label = f"   {status} {target['label']}"
+        new_label = f"{status} {target['label']}"
         opt_list = self.query_one("#permissions-option-list", OptionList)
         try:
             opt_list.replace_option_prompt_at_index(idx, new_label)

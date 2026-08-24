@@ -1,7 +1,9 @@
+import textwrap
+
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -17,6 +19,22 @@ from widgets.presentation.screens.constants import (
     WRITE_IN_INPUT_ID,
 )
 from widgets.utils.key_aliases import expand_bindings
+
+WRITE_IN_LABEL = "Other (custom answer)"
+
+
+def format_wizard_option(tag: str, text: str, width: int = 72, add_gap: bool = False) -> str:
+    """Format an ask_user wizard option with hanging indent for wrapped lines."""
+    wrap_width = max(20, width - 4)
+    lines = textwrap.wrap(text, width=wrap_width)
+    if not lines:
+        return f"{tag} {text}"
+    result_lines = [f"{tag} {lines[0]}"]
+    for line in lines[1:]:
+        result_lines.append(f"    {line}")
+    if add_gap:
+        result_lines.append("")
+    return "\n".join(result_lines)
 
 
 class WriteInInput(Input):
@@ -38,7 +56,7 @@ class WriteInInput(Input):
         self.call_after_refresh(self._clear_selection)
 
     async def _on_key(self, event: events.Key) -> None:
-        key = event.key
+        key = (event.key or "").lower()
         cursor = self.cursor_position
         val_len = len(self.value)
 
@@ -108,8 +126,9 @@ class AskUserWizardScreen(BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="wizard-dialog"):
             yield Markdown("", id="wizard-title", classes=MODAL_MARKDOWN)
+            yield Static("", id="wizard-summary", classes=f"{MODAL_MARKDOWN} wizard-summary", markup=False)
             yield HeaderWrapOptionList(id=OPTIONS_LIST_ID)
-            yield WriteInInput(placeholder="Type response here and press Enter...", id=WRITE_IN_INPUT_ID)
+            yield WriteInInput(placeholder="Type custom answer and press Enter...", id=WRITE_IN_INPUT_ID)
             yield Label("", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
@@ -137,19 +156,21 @@ class AskUserWizardScreen(BaseModalScreen[str]):
 
     def update_step(self, target_highlight: int | None = None) -> None:
         title_md = self.query_one("#wizard-title", Markdown)
+        summary_static = self.query_one("#wizard-summary", Static)
         opt_list = self.query_one(OPTIONS_LIST, OptionList)
         input_field = self.query_one(WRITE_IN_INPUT, Input)
         hint = self.query_one(MODAL_HINT, Label)
 
         if self.q_idx < len(self.questions):
             title_md.remove_class("confirm-summary")
+            summary_static.display = False
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
             hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
 
             self.raw_options = q.get("options") or []
-            self.options = self.raw_options + ["Write-in..."] if self.raw_options else []
+            self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
             prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
 
             if self.raw_options:
@@ -174,6 +195,14 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                     highlight_idx = 0
                     input_field.value = ""
 
+                dialog_width = 86
+                if self.is_mounted and self.app and getattr(self.app, "size", None):
+                    raw_w = getattr(self.app.size, "width", 86)
+                    if isinstance(raw_w, int) and raw_w > 0:
+                        dialog_width = min(raw_w, 86)
+                wrap_width = max(36, dialog_width - 14)
+                has_multi = any(len(o) + 4 > wrap_width for o in self.options)
+
                 for idx, opt in enumerate(self.options):
                     is_selected = bool(
                         prev_answer
@@ -183,7 +212,8 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                         )
                     )
                     tag = r"\[✓]" if is_selected else r"\[ ]"
-                    opt_list.add_option(f"{tag} {opt}")
+                    add_gap = has_multi and idx < len(self.options) - 1
+                    opt_list.add_option(format_wizard_option(tag, opt, width=wrap_width, add_gap=add_gap))
 
                 opt_list.highlighted = highlight_idx
                 if highlight_idx == len(self.options) - 1:
@@ -198,20 +228,12 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                 input_field.value = prev_answer
                 input_field.focus()
         else:
-            blocks = []
-            num_qs = len(self.questions)
-            for idx, q in enumerate(self.questions):
-                q_clean = str(q.get("question") or "").strip()
-                ans_info = self.answers.get(idx, {})
-                ans_val = str(ans_info.get("answer") or "").strip()
-                ans_display = ans_val if ans_val else "(No response)"
-                prefix = f"{idx + 1}. " if num_qs > 1 else ""
-                blocks.append(f"**{prefix}{q_clean}**\n- {ans_display}")
-
-            summary = "\n\n".join(blocks)
+            from widgets.chat_toolcall import format_ask_user_display
 
             title_md.add_class("confirm-summary")
-            title_md.update("### **Confirm Your Answers**\n\n" + summary)
+            title_md.update("### **Confirm Your Answers**")
+            summary_static.update(format_ask_user_display(self.questions, self.answers))
+            summary_static.display = True
             opt_list.display = False
             input_field.display = False
             hint.update("enter: confirm • ←: back • esc: cancel")

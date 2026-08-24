@@ -2,9 +2,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 from rich.markup import escape
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown, OptionList
+from textual.widgets import Label, Markdown, OptionList, Static
 
 from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.base_modal import BaseModalScreen
@@ -24,6 +25,33 @@ from widgets.presentation.screens.constants import (
 class RewindSelection:
     index: int
     restore_code: bool = True
+
+
+def format_rewind_files(changed_files: list[str], git_stats: str = "", max_show: int = 4) -> Text:
+    """Format rewind file list with rich styling without bullet/indent noise."""
+    t = Text()
+    if not changed_files:
+        return t
+    stat_label = f" ({git_stats})" if git_stats else ""
+    t.append("Files to revert", style="#ffffff")
+    if stat_label:
+        t.append(stat_label, style="#a1a1aa")
+    t.append(":\n", style="#ffffff")
+
+    lines: list[tuple[str, str]] = []
+    for f in changed_files[:max_show]:
+        lines.append((f"  {f}", "#a1a1aa"))
+
+    if len(changed_files) > max_show:
+        rem = len(changed_files) - max_show
+        lines.append((f"  ... and {rem} more", "italic #71717a"))
+
+    for i, (line_text, line_style) in enumerate(lines):
+        t.append(line_text, style=line_style)
+        if i < len(lines) - 1:
+            t.append("\n")
+
+    return t
 
 
 class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
@@ -46,21 +74,27 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.selected_step1_index: Optional[int] = None
 
         options = []
+        target_width = 76
         for msg in user_messages:
             text = msg.text
             diff_stat = msg.git_stats
 
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            if len(clean) > 55:
-                clean = clean[:55] + "..."
             opt_text = clean or "(empty message)"
-            escaped_text = escape(opt_text)
 
             if checkpoints_enabled:
                 stat_label = diff_stat or "no checkpoint"
-                opt = f"{escaped_text} [dim]{escape(f'({stat_label})')}[/dim]"
+                badge_plain = stat_label
+                max_title = max(10, target_width - len(badge_plain) - 2)
+                if len(opt_text) > max_title:
+                    opt_text = opt_text[: max_title - 3] + "..."
+                spaces = " " * max(2, target_width - len(opt_text) - len(badge_plain))
+                badge_markup = f"[dim #71717a]{badge_plain}[/]"
+                opt = f"{escape(opt_text)}{spaces}{badge_markup}"
             else:
-                opt = escaped_text
+                if len(opt_text) > 65:
+                    opt_text = opt_text[:62] + "..."
+                opt = escape(opt_text)
             options.append(opt)
 
         self.title = "### **Select Message to Rollback To**"
@@ -76,6 +110,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
@@ -104,28 +139,26 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             clean = clean[:40] + "..."
         clean_preview = clean or "(empty message)"
 
-        md_lines = [f"### **Rollback: {clean_preview}**\n"]
-        if entry.changed_files:
-            stat_label = f" ({entry.git_stats})" if entry.git_stats else ""
-            md_lines.append(f"**Files to revert{stat_label}:**\n")
-            max_show = 4
-            for f in entry.changed_files[:max_show]:
-                md_lines.append(f"- {f}")
-            if len(entry.changed_files) > max_show:
-                rem = len(entry.changed_files) - max_show
-                md_lines.append(f"- *... and {rem} more*")
-
-        title = "\n".join(md_lines)
         try:
             md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
-            md.update(title)
+            md.update(f"### **Rollback: {clean_preview}**")
+        except Exception:
+            pass
+
+        try:
+            files_widget = self.query_one("#rewind-files", Static)
+            if entry.changed_files:
+                files_widget.update(format_rewind_files(entry.changed_files, entry.git_stats))
+                files_widget.display = True
+            else:
+                files_widget.display = False
         except Exception:
             pass
 
         step2_options = [
-            "Rollback conversation & files [dim](revert code)[/dim]",
-            "Rollback conversation only [dim](keep current code)[/dim]",
-            "View changes diff [dim](inspect code changes)[/dim]",
+            "Rollback conversation & files [dim #71717a](revert code)[/]",
+            "Rollback conversation only [dim #71717a](keep current code)[/]",
+            "View changes diff [dim #71717a](inspect code changes)[/]",
         ]
         step2_actions = ["both", "conversation", "diff"]
 
@@ -186,6 +219,12 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         try:
             md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
             md.update(self.title)
+        except Exception:
+            pass
+
+        try:
+            files_widget = self.query_one("#rewind-files", Static)
+            files_widget.display = False
         except Exception:
             pass
 
