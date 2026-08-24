@@ -8,7 +8,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import OptionList, Static
+from textual.widgets import Input, OptionList, Static
 
 from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.widgets.chat_diff import format_edit_diff
@@ -167,6 +167,8 @@ class DiffScreen(Screen[None]):
             plural = "files" if files_count != 1 else "file"
             self.stats_summary = f"{files_count} {plural}, +{total_added} / -{total_deleted}"
 
+        self.filtered_indices: list[int] = list(range(len(self.diff_items)))
+
         self.sidebar_options: list[str] = []
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
@@ -189,6 +191,7 @@ class DiffScreen(Screen[None]):
             with Horizontal(id="diff-body"):
                 with Vertical(id="diff-sidebar"):
                     yield Static(f"[bold #71717a]FILES ({len(self.diff_items)})[/]", id="diff-sidebar-title")
+                    yield Input(placeholder="Search...", id="diff-search-input")
                     yield OptionList(*self.sidebar_options, id="diff-file-list")
                 with Vertical(id="diff-content-container"):
                     if not self.diff_items:
@@ -202,9 +205,8 @@ class DiffScreen(Screen[None]):
     def on_mount(self) -> None:
         if self.diff_items:
             try:
-                opt_list = self.query_one("#diff-file-list", OptionList)
-                opt_list.highlighted = 0
-                opt_list.focus()
+                search_input = self.query_one("#diff-search-input", Input)
+                search_input.focus()
             except Exception:
                 pass
             self._render_current_diff(0)
@@ -214,6 +216,41 @@ class DiffScreen(Screen[None]):
                 footer.update_info("", "no changes")
             except Exception:
                 pass
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id != "diff-search-input":
+            return
+        query = (event.value or "").strip().lower()
+        if not query:
+            self.filtered_indices = list(range(len(self.diff_items)))
+        else:
+            self.filtered_indices = [
+                idx
+                for idx, item in enumerate(self.diff_items)
+                if query in item[0].lower() or query in (os.path.basename(item[0]) or "").lower()
+            ]
+
+        try:
+            opt_list = self.query_one("#diff-file-list", OptionList)
+            opt_list.clear_options()
+            opt_list.add_options([self.sidebar_options[i] for i in self.filtered_indices])
+            if self.filtered_indices:
+                opt_list.highlighted = 0
+                self._render_current_diff(self.filtered_indices[0])
+            else:
+                opt_list.highlighted = None
+                self._render_empty_search()
+        except Exception:
+            pass
+
+    def _render_empty_search(self) -> None:
+        try:
+            content_view = self.query_one("#diff-content-view", Static)
+            content_view.update("[dim #71717a]No matching files found.[/dim]")
+            footer = self.query_one("#diff-footer", DiffFooter)
+            footer.update_info("", "no matches")
+        except Exception:
+            pass
 
     def _render_current_diff(self, index: int) -> None:
         if not (0 <= index < len(self.diff_items)):
@@ -246,21 +283,23 @@ class DiffScreen(Screen[None]):
             pass
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        if event.option_index is not None and 0 <= event.option_index < len(self.diff_items):
-            self._render_current_diff(event.option_index)
+        if event.option_index is not None and 0 <= event.option_index < len(self.filtered_indices):
+            real_idx = self.filtered_indices[event.option_index]
+            self._render_current_diff(real_idx)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if event.option_index is not None and 0 <= event.option_index < len(self.diff_items):
-            self._render_current_diff(event.option_index)
+        if event.option_index is not None and 0 <= event.option_index < len(self.filtered_indices):
+            real_idx = self.filtered_indices[event.option_index]
+            self._render_current_diff(real_idx)
 
     def action_switch_focus(self) -> None:
         try:
-            opt_list = self.query_one("#diff-file-list", OptionList)
+            search_input = self.query_one("#diff-search-input", Input)
             scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
-            if opt_list.has_focus:
-                scroll_box.focus()
+            if scroll_box.has_focus:
+                search_input.focus()
             else:
-                opt_list.focus()
+                scroll_box.focus()
         except Exception:
             pass
 
@@ -279,6 +318,23 @@ class DiffScreen(Screen[None]):
             pass
 
     def _on_key(self, event: events.Key) -> None:
+        if event.key in ("down", "up"):
+            try:
+                search_input = self.query_one("#diff-search-input", Input)
+                if search_input.has_focus:
+                    opt_list = self.query_one("#diff-file-list", OptionList)
+                    if opt_list.highlighted is None and self.filtered_indices:
+                        opt_list.highlighted = 0
+                    elif opt_list.highlighted is not None:
+                        if event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
+                    event.prevent_default()
+                    event.stop()
+                    return
+            except Exception:
+                pass
         if event.key in ("pageup", "pagedown"):
             try:
                 scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)

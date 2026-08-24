@@ -9,6 +9,7 @@ Input > .selection,
 #message-input > .text-area--selection,
 #write-in-input > .input--selection,
 #modal-search-input > .input--selection,
+#diff-search-input > .input--selection,
 #api-key-input > .input--selection {
     background: #ffffff !important;
     color: #09090b !important;
@@ -652,6 +653,21 @@ DiffScreen {
     color: #71717a;
     text-style: bold;
     background: #18181b;
+}
+
+#diff-search-input,
+#diff-search-input:focus {
+    width: 100%;
+    height: 1;
+    margin: 0 0 1 0;
+    padding: 0 2;
+    border: none;
+    background: transparent !important;
+    color: #f4f4f5;
+}
+
+#diff-search-input > .input--placeholder {
+    color: #71717a;
 }
 
 #diff-file-list,

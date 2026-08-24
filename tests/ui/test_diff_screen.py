@@ -61,6 +61,53 @@ class TestDiffScreen(unittest.TestCase):
         # Focus switch
         screen.action_switch_focus()
 
+    def test_diff_screen_search_filtering(self):
+        from textual.widgets import Input
+
+        items = [
+            ("src/core/app.py", "diff1", 1, 0),
+            ("src/widgets/chat.py", "diff2", 0, 1),
+            ("tests/test_app.py", "diff3", 2, 2),
+        ]
+        screen = DiffScreen(items)
+        mock_input = MagicMock(spec=Input)
+        mock_input.id = "diff-search-input"
+
+        # Mock query_one
+        opt_list = MagicMock()
+        content_view = MagicMock()
+        footer = MagicMock()
+
+        def fake_qo(selector, *args, **kwargs):
+            if "diff-file-list" in str(selector):
+                return opt_list
+            if "diff-content-view" in str(selector):
+                return content_view
+            if "diff-footer" in str(selector):
+                return footer
+            if "diff-search-input" in str(selector):
+                return mock_input
+            return MagicMock()
+
+        screen.query_one = MagicMock(side_effect=fake_qo)
+
+        # Filter by "chat"
+        mock_event = MagicMock(spec=Input.Changed)
+        mock_event.input = mock_input
+        mock_event.value = "chat"
+        screen.on_input_changed(mock_event)
+        self.assertEqual(screen.filtered_indices, [1])
+
+        # Filter with no match
+        mock_event.value = "nonexistent"
+        screen.on_input_changed(mock_event)
+        self.assertEqual(screen.filtered_indices, [])
+
+        # Clear filter
+        mock_event.value = ""
+        screen.on_input_changed(mock_event)
+        self.assertEqual(screen.filtered_indices, [0, 1, 2])
+
 
 class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
     async def test_diff_command_no_session(self):
