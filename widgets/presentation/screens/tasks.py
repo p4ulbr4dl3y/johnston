@@ -29,7 +29,7 @@ def format_task_row(cmd: str) -> str:
 
 
 def format_subagent_task_row(
-    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = 76
+    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = 74
 ) -> str:
     """Format a subagent row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
@@ -358,7 +358,7 @@ class SubagentsScreen(BaseModalScreen[None]):
         return result
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield Markdown(
                 self._get_header_md(), id="subagents-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
