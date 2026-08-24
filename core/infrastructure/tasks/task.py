@@ -52,6 +52,8 @@ class BaseTask(ABC):
         self.command = command
         self._status = status
         self.created_at = created_at if created_at is not None else time.time()
+        self.completed_at: Optional[float] = None
+        self.exit_code: Optional[int] = None
 
     # -- identity ----------------------------------------------------------
 

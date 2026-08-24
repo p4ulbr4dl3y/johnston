@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import MagicMock
 
@@ -5,7 +6,11 @@ from core.infrastructure.presentation.tool_display import (
     _format_active_tool_progress,
     extract_subagent_progress,
 )
-from widgets.presentation.screens.tasks import format_subagent_task_row
+from widgets.presentation.screens.tasks import (
+    extract_shell_task_progress,
+    format_shell_task_row,
+    format_subagent_task_row,
+)
 
 
 class TestSubagentProgressDisplay(unittest.TestCase):
@@ -109,5 +114,56 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         self.assertIn("[dim #71717a]", row)
 
 
+class TestShellTaskProgressDisplay(unittest.TestCase):
+    def test_extract_shell_progress_none(self):
+        self.assertEqual(extract_shell_task_progress(None), "")
+
+    def test_extract_shell_progress_running(self):
+        task = MagicMock()
+        task.is_running = True
+        task.created_at = time.time() - 15.0
+        self.assertEqual(extract_shell_task_progress(task), "running • 15s")
+        task.created_at = None
+        self.assertEqual(extract_shell_task_progress(task), "running...")
+
+    def test_extract_shell_progress_completed(self):
+        task = MagicMock()
+        task.is_running = False
+        task.was_killed = False
+        task.status = "completed"
+        task.created_at = 100.0
+        task.completed_at = 104.2
+        task.exit_code = 0
+        self.assertEqual(extract_shell_task_progress(task), "exit 0 • 4.2s")
+
+        task.exit_code = 1
+        self.assertEqual(extract_shell_task_progress(task), "exit 1 • 4.2s")
+
+    def test_extract_shell_progress_killed_and_timeout(self):
+        task = MagicMock()
+        task.is_running = False
+        task.was_killed = True
+        task.status = "killed"
+        self.assertEqual(extract_shell_task_progress(task), "killed")
+
+        task.was_killed = False
+        task.status = "timeout"
+        self.assertEqual(extract_shell_task_progress(task), "timeout")
+
+    def test_format_shell_task_row(self):
+        task = MagicMock()
+        task.is_running = False
+        task.was_killed = False
+        task.status = "completed"
+        task.created_at = 100.0
+        task.completed_at = 142.0
+        task.exit_code = 0
+        row = format_shell_task_row("uv run pytest -n auto", task=task, is_running=False)
+        self.assertIn("uv run pytest -n auto", row)
+        self.assertIn("exit 0 • 42s", row)
+        self.assertIn("[dim #71717a]", row)
+
+
 if __name__ == "__main__":
     unittest.main()
+
