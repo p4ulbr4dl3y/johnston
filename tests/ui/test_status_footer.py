@@ -250,7 +250,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 footer._poll_mcp_refresh()
                 mock_rf.assert_called_once()
 
-    async def test_subagent_footer_mount_unmount_and_spin(self):
+    async def test_subagent_footer_mount_unmount_and_update(self):
         from widgets.status_footer import SubagentStatusFooter
 
         class SubagentFooterApp(App[None]):
@@ -272,19 +272,12 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             sess.cost_usd = 0.05
 
             footer.update_session(sess)
-            self.assertTrue(footer.is_generating)
-            self.assertIsNotNone(footer._spinner_timer)
+            self.assertEqual(footer.session, sess)
+            self.assertIsNotNone(footer._last_grid_rows)
 
-            # Test _spin re-renders with next frame and cached rows without calling git diff
-            old_idx = footer._spinner_idx
-            with patch.object(footer, "_git_diff_stats") as diff_mock:
-                footer._spin()
-                diff_mock.assert_not_called()
-            self.assertEqual(footer._spinner_idx, old_idx + 1)
-
-            # Test on_unmount cleans up timers
+            # Test on_unmount cleans up resize timer
             footer.on_unmount()
-            self.assertIsNone(footer._spinner_timer)
+            self.assertIsNone(footer._resize_timer)
 
     async def test_subagent_footer_old_session_fallback_metrics(self):
         from widgets.status_footer import SubagentStatusFooter
@@ -309,8 +302,8 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             sess.messages = [{"role": "user", "content": "hello " * 50}]
 
             footer.update_session(sess)
-            self.assertFalse(footer.is_generating)
-            self.assertIsNone(footer._spinner_timer)
+            self.assertEqual(footer.session, sess)
+            self.assertIsNotNone(footer._last_grid_rows)
 
     @pytest.mark.skipif(sys.platform == "win32", reason="expects POSIX-style separators")
     def test_format_display_path(self):
