@@ -1448,14 +1448,14 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await cmd.execute(app)
             self.assertTrue(app.sandbox_enabled)
             app.refresh_status_footer.assert_called_once()
-            app.notify.assert_called_once_with("Sandbox: ON (workspace-only)", severity="information", timeout=2.0)
+            app.notify.assert_called_once_with("Sandbox enabled", severity="info")
             mock_save.assert_called_once_with(True)
 
             mock_save.reset_mock()
             app.notify.reset_mock()
             await cmd.execute(app)
             self.assertFalse(app.sandbox_enabled)
-            app.notify.assert_called_once_with("Sandbox: OFF (full access)", severity="information", timeout=2.0)
+            app.notify.assert_called_once_with("Sandbox disabled", severity="warning")
             mock_save.assert_called_once_with(False)
 
     async def test_copy_command_success(self):

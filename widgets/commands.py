@@ -613,8 +613,8 @@ class SandboxCommand(BaseCommand):
         if not hasattr(app, "sandbox_enabled"):
             app.sandbox_enabled = False
         app.sandbox_enabled = not app.sandbox_enabled
-        state_str = "ON" if app.sandbox_enabled else "OFF"
-        detail = "workspace-only" if app.sandbox_enabled else "full access"
+        msg = "Sandbox enabled" if app.sandbox_enabled else "Sandbox disabled"
+        severity = "info" if app.sandbox_enabled else "warning"
 
         from core.infrastructure.config.config_helpers import save_sandbox_config
 
@@ -627,7 +627,7 @@ class SandboxCommand(BaseCommand):
             app.refresh_status_footer()
 
         if hasattr(app, "notify"):
-            app.notify(f"Sandbox: {state_str} ({detail})", severity="information", timeout=2.0)
+            app.notify(msg, severity=severity)
 
 
 class CopyCommand(BaseCommand):
