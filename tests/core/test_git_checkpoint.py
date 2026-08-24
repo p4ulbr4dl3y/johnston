@@ -2,8 +2,11 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
+from unittest import mock
 
+from core.infrastructure.storage import git_checkpoint as gcp
 from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
@@ -146,6 +149,120 @@ class TestGitCheckpointManager(unittest.TestCase):
 
         # Test _split_git_diff with empty string
         self.assertEqual(GitCheckpointManager._split_git_diff(""), [])
+
+    def test_purge_archives_and_recovery(self):
+        repo_path = self._init_git_repo()
+        sid = "session_archive"
+
+        with open(os.path.join(repo_path, "f1.txt"), "w") as f:
+            f.write("state 1\n")
+        sha1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        with open(os.path.join(repo_path, "f2.txt"), "w") as f:
+            f.write("state 2\n")
+        sha2 = GitCheckpointManager.create_checkpoint(sid, 2, project_path=repo_path)
+        self.assertIsNotNone(sha1)
+        self.assertIsNotNone(sha2)
+
+        GitCheckpointManager.purge_checkpoints_after(sid, 0, project_path=repo_path)
+
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+        # Live refs are gone...
+        self.assertFalse(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+        self.assertFalse(GitCheckpointManager.restore_checkpoint(sid, 2, project_path=repo_path))
+        # ...but the states survive in the archive namespace.
+        arch_res = gcp.run_git(["rev-parse", "--verify", f"refs/johnston/archive/{sid}/1"], cwd=shadow_dir)
+        self.assertEqual(arch_res.stdout.strip(), sha1)
+        arch_res2 = gcp.run_git(["rev-parse", "--verify", f"refs/johnston/archive/{sid}/2"], cwd=shadow_dir)
+        self.assertEqual(arch_res2.stdout.strip(), sha2)
+
+        # Recovery: promoting an archived ref back makes the state restorable again.
+        gcp.run_git(
+            ["update-ref", GitCheckpointManager.get_ref_name(sid, 1), sha1],
+            cwd=shadow_dir,
+        )
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+        with open(os.path.join(repo_path, "f1.txt")) as f:
+            self.assertEqual(f.read(), "state 1\n")
+
+    def test_archive_refs_expire_after_ttl(self):
+        repo_path = self._init_git_repo()
+        sid = "session_expire"
+
+        with open(os.path.join(repo_path, "f.txt"), "w") as f:
+            f.write("data\n")
+        self.assertIsNotNone(GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path))
+
+        # target_message_index=-1 archives every checkpoint of the session.
+        GitCheckpointManager.purge_checkpoints_after(sid, -1, project_path=repo_path)
+
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+        arch_ref = f"refs/johnston/archive/{sid}/0"
+        self.assertEqual(gcp.run_git(["rev-parse", "--verify", arch_ref], cwd=shadow_dir).returncode, 0)
+
+        # Jump past the TTL: the next purge pass must drop the expired archive ref.
+        real_time = gcp.time.time
+        with mock.patch.object(gcp.time, "time", return_value=real_time() + (GitCheckpointManager.ARCHIVE_TTL_DAYS + 1) * 86400):
+            GitCheckpointManager.purge_checkpoints_after(sid, 10**9, project_path=repo_path)
+
+        self.assertNotEqual(gcp.run_git(["rev-parse", "--verify", arch_ref], cwd=shadow_dir).returncode, 0)
+
+    def test_create_checkpoint_fails_cleanly_when_add_fails(self):
+        repo_path = self._init_git_repo()
+        sid = "session_addfail"
+
+        original_run_git = gcp.run_git
+
+        def fake_run_git(args, **kwargs):
+            if args and args[0] == "add":
+                return subprocess.CompletedProcess(
+                    args=["git"] + args, returncode=1, stdout="", stderr="mock staging failure"
+                )
+            return original_run_git(args, **kwargs)
+
+        with mock.patch.object(gcp, "run_git", side_effect=fake_run_git):
+            sha = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+
+        # A failed/partial staging must never produce a checkpoint: restoring it
+        # would delete the missing files from the workspace.
+        self.assertIsNone(sha)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+        ref_res = gcp.run_git(["rev-parse", "--verify", GitCheckpointManager.get_ref_name(sid, 0)], cwd=shadow_dir)
+        self.assertNotEqual(ref_res.returncode, 0)
+
+    def test_stale_index_lock_cleanup_respects_age(self):
+        repo_path = self._init_git_repo()
+        GitCheckpointManager.ensure_git_repo(repo_path)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        lock_file = os.path.join(shadow_dir, "index.lock")
+        with open(lock_file, "w") as f:
+            f.write("")
+
+        # Fresh lock may belong to another running process — left alone.
+        GitCheckpointManager._ensure_shadow_exclude(shadow_dir)
+        self.assertTrue(os.path.exists(lock_file))
+
+        # Old lock is stale (crashed process) — removed.
+        old_ts = time.time() - (GitCheckpointManager.STALE_LOCK_SECONDS + 60)
+        os.utime(lock_file, (old_ts, old_ts))
+        GitCheckpointManager._ensure_shadow_exclude(shadow_dir)
+        self.assertFalse(os.path.exists(lock_file))
+
+    def test_secret_files_are_excluded_from_snapshots(self):
+        repo_path = self._init_git_repo()
+        sid = "session_secrets"
+
+        for name in (".env", ".env.local", "server.pem", "id_rsa"):
+            with open(os.path.join(repo_path, name), "w") as f:
+                f.write("SECRET\n")
+
+        sha = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(sha)
+
+        diffs = GitCheckpointManager.get_checkpoint_diff(sid, 0, project_path=repo_path)
+        paths = [d[0] for d in diffs]
+        for name in (".env", ".env.local", "server.pem", "id_rsa"):
+            self.assertNotIn(name, paths)
 
 
 if __name__ == "__main__":

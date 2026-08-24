@@ -253,7 +253,8 @@ class TestCoverGetDiffStats:
 
     def _run_batch(self, add_res=_cp(0), diff_res=_cp(0, "")):
         def fake(args, **kw):
-            cmd = args[0]
+            # Commands may carry leading `-c <key>=<value>` config overrides.
+            cmd = args[2] if args and args[0] == "-c" else args[0]
             if cmd == "add":
                 return add_res
             if cmd == "rev-parse":
