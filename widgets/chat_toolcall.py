@@ -528,14 +528,18 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.status = "done"
 
         if self.tool_type == "shell":
-            if cleaned:
+            is_bg_banner = "[Background Task ID:" in cleaned
+            # A ctrl+b transition emits a transient RUNNING banner ("moved to
+            # background..."). When live output already streams on the card,
+            # keep it instead of overwriting with the banner — chunks keep
+            # arriving and the completion repaint sets the final text anyway.
+            has_live_output = bool((self.result_text or "").strip())
+            if cleaned and not (status == "running" and is_bg_banner and has_live_output):
                 self.result_text = cleaned
-            if "[Background Task ID:" in cleaned:
+            if is_bg_banner:
                 bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", cleaned)
                 if bg_m:
                     self.background_task_id = bg_m.group(1)
-            if status == "running" and "[Background Task ID:" in cleaned:
-                self.collapse()
         elif self.canonical_tool == "invoke_subagent":
             self.result_text = cleaned
             self.render_header()

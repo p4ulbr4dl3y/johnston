@@ -68,7 +68,8 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
             app.task_manager.register(task)
             app.action_background_all()
             task.move_to_background.assert_called_once()
-            mock_widget.collapse.assert_called_once()
+            # ctrl+b must NOT close an open expansion; live output keeps streaming
+            mock_widget.collapse.assert_not_called()
 
     async def test_action_background_all_no_move_method(self):
         app = JohnstonApp()

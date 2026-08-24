@@ -477,15 +477,49 @@ class TestToolExpansion(unittest.TestCase):
         self.assertTrue(widget.is_expanded)
         self.mock_app.push_screen.assert_not_called()
 
-    def test_shell_auto_collapses_when_backgrounded(self):
+    def test_shell_stays_expanded_when_backgrounded_by_user(self):
+        """ctrl+b on a foreground shell: expansion stays open, live output kept."""
         widget = ToolCallWidget(
             tool_type="shell",
             target="long_job",
             args={"command": "long_job"},
         )
-        widget.is_expanded = True
-        widget.set_result("[Background Task ID: bg_1] 'long_job' moved to background.", status="running")
+        widget.append_shell_output("line 1\n")
+        widget.toggle_expanded()
+        widget.set_result("[Background Task ID: bg_1] 'long_job' moved to background by user after 2.0s.", status="running")
+        # Expansion must not be closed by the ctrl+b transition
+        self.assertTrue(widget.is_expanded)
+        # Live streamed output must not be overwritten by the transient banner
+        self.assertIn("line 1", widget.result_text)
+        self.assertNotIn("moved to background", widget.result_text)
+        # Task id still parsed for the completion repaint
+        self.assertEqual(widget.background_task_id, "bg_1")
+
+    def test_shell_bg_banner_kept_when_no_live_output(self):
+        """Explicit background=true launch: banner is shown until chunks arrive."""
+        widget = ToolCallWidget(
+            tool_type="shell",
+            target="server",
+            args={"command": "server"},
+        )
+        widget.set_result("[Background Task ID: bg_2] 'server' moved to background.", status="running")
+        self.assertIn("moved to background", widget.result_text)
+        self.assertEqual(widget.background_task_id, "bg_2")
         self.assertFalse(widget.is_expanded)
+
+    def test_shell_completion_repaint_replaces_output(self):
+        """Background completion repaints the card with the truncated final text."""
+        widget = ToolCallWidget(
+            tool_type="shell",
+            target="long_job",
+            args={"command": "long_job"},
+        )
+        widget.append_shell_output("partial\n")
+        widget.set_result("[Background Task ID: bg_3] 'long_job' moved to background by user after 1.0s.", status="running")
+        widget.set_result("[Output truncated: showing last 4000 chars (80 lines).]\nfinal output", status="done")
+        self.assertEqual(widget.status, "done")
+        self.assertIn("final output", widget.result_text)
+        self.assertNotIn("partial", widget.result_text)
 
 
 if __name__ == "__main__":

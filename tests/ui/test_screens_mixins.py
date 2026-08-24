@@ -171,22 +171,18 @@ class TestSessionPersistence(unittest.IsolatedAsyncioTestCase):
 
 # ------------------------------------------------------------------ actions
 class TestActionsExtra(unittest.IsolatedAsyncioTestCase):
-    def test_background_all_toggle_expanded_widget(self):
-        class ExpWidget:
-            is_expanded = True
-
-            def toggle_expanded(self):
-                self.toggled = True
-
+    def test_background_all_leaves_widget_expanded(self):
         obj = MagicMock()
         obj.task_manager = [
             MagicMock(task_id="tid", is_running=True, is_background=False, kind="shell", move_to_background=MagicMock())
         ]
-        widget = ExpWidget()
+        widget = MagicMock()
+        widget.is_expanded = True
         obj._background_shell_widgets = {"tid": widget}
         obj.notify = MagicMock()
         ActionsMixin.action_background_all(obj)
-        self.assertTrue(widget.toggled)
+        widget.collapse.assert_not_called()
+        widget.toggle_expanded.assert_not_called()
 
     def _ask_host(self, on_push):
         obj = MagicMock()
