@@ -582,12 +582,16 @@ ModalScreen {
     margin: 0;
 }
 
+.modal-markdown MarkdownBulletList,
+#modal-dialog .modal-markdown MarkdownBulletList,
 .modal-markdown-centered MarkdownBulletList,
 #modal-dialog .modal-markdown-centered MarkdownBulletList {
     color: #a1a1aa;
     margin-bottom: 1;
 }
 
+.modal-markdown MarkdownBulletList MarkdownParagraph,
+#modal-dialog .modal-markdown MarkdownBulletList MarkdownParagraph,
 .modal-markdown-centered MarkdownBulletList MarkdownParagraph,
 #modal-dialog .modal-markdown-centered MarkdownBulletList MarkdownParagraph {
     color: #a1a1aa;
@@ -598,6 +602,7 @@ ModalScreen {
 }
 
 .modal-markdown.confirm-summary MarkdownBulletList {
+    color: #a1a1aa;
     margin-bottom: 1;
 }
 
