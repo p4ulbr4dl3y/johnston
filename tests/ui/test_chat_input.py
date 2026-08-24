@@ -256,7 +256,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         ci = ChatInput()
         app = DummyChatApp(ci)
         async with app.run_test():
-            # ctrl+c / ctrl+q -> exit
+            # ctrl+c -> exit
             with patch.object(app, "exit") as mock_exit:
                 event = Key("ctrl+c", "ctrl+c")
                 event.prevent_default = MagicMock()
@@ -264,16 +264,15 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 await ci._on_key(event)
                 mock_exit.assert_called_once()
 
-            # ctrl+c with selection -> copy, no exit
+            # ctrl+c with selection -> still exits immediately
             ci.load_text("copy me")
             ci.selection = ci.selection.__class__((0, 0), (0, 4))
-            with patch.object(ci, "action_copy") as mock_copy, patch.object(app, "exit") as mock_exit:
+            with patch.object(app, "exit") as mock_exit:
                 event = Key("ctrl+c", "ctrl+c")
                 event.prevent_default = MagicMock()
                 event.stop = MagicMock()
                 await ci._on_key(event)
-                mock_copy.assert_called_once()
-                mock_exit.assert_not_called()
+                mock_exit.assert_called_once()
 
             # ctrl+x with selection -> cut, no exit
             with patch.object(ci, "action_cut") as mock_cut, patch.object(app, "exit") as mock_exit:

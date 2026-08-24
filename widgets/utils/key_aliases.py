@@ -19,9 +19,6 @@ TAB_KEYS: tuple[str, ...] = ("tab", "shift+tab", "backtab", "shift_tab")
 
 # Predefined key combinations for ChatInput and modal event handlers
 KEY_QUIT: tuple[str, ...] = ("ctrl+c", "ctrl+q", "ctrl+с", "ctrl+С", "ctrl+й", "ctrl+Й")
-KEY_COPY: tuple[str, ...] = (
-    "ctrl+c", "cmd+c", "ctrl+с", "ctrl+С", "cmd+с", "cmd+С", "super+c"
-)
 KEY_CUT: tuple[str, ...] = (
     "ctrl+x", "cmd+x", "ctrl+ч", "ctrl+Ч", "cmd+ч", "cmd+Ч", "super+x"
 )

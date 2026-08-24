@@ -1,7 +1,6 @@
 import unittest
 
 from widgets.utils.key_aliases import (
-    KEY_COPY,
     KEY_CUT,
     KEY_DETACH,
     KEY_NEWLINE,
@@ -109,7 +108,6 @@ class TestKeyAliases(unittest.TestCase):
 
     def test_key_constants(self):
         self.assertTrue(len(KEY_QUIT) > 0)
-        self.assertTrue(len(KEY_COPY) > 0)
         self.assertTrue(len(KEY_CUT) > 0)
         self.assertTrue(len(KEY_PASTE) > 0)
         self.assertTrue(len(KEY_DETACH) > 0)
