@@ -287,15 +287,13 @@ class ParsingMixin:
         return None
 
     def _is_error(self, text: str) -> bool:
-        """True only when the tool card carries the `status == "error"` or `"cancelled"` state."""
-        return self.status in ("error", "cancelled")
+        """True when the tool card is in error/cancelled state or returned non-zero exit code."""
+        return self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0)
 
     def _get_status_color(self) -> str:
         if self.status == "running":
             return "#e5c07b"
-        elif self.status == "error":
-            return "#e06c75"
-        elif self.status == "cancelled":
+        elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
             return "#e06c75"
         else:
             return "#98c379"
