@@ -91,7 +91,7 @@ WelcomeWidget {
     max-width: 85%;
     height: auto;
     padding: 1 2;
-    background: #18181b;
+    background: #27272a;
     color: #ffffff;
     text-align: left;
 }
