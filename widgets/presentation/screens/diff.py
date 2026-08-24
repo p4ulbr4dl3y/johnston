@@ -121,12 +121,12 @@ class DiffFooter(Static):
         else:
             left_text = "[dim #71717a]No file selected[/dim]"
 
-        if width >= 85:
-            right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll  •  tab: focus  •  esc: close[/]"
-        elif width >= 65:
-            right_text = "[#71717a]↑↓: files  •  esc: close[/]"
+        if width >= 80:
+            right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll  •  tab: focus[/]"
+        elif width >= 60:
+            right_text = "[#71717a]↑↓: files  •  tab: focus[/]"
         else:
-            right_text = "[#71717a]esc[/]"
+            right_text = "[#71717a]↑↓: files[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
