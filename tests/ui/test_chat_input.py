@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from PIL import Image
 from textual.app import App, ComposeResult
-from textual.events import Key, Paste
+from textual.events import Key, MouseUp, Paste
 
 from widgets import chat_input as chat_input_mod
 from widgets.chat_input import ChatInput, ClipboardAttachment
@@ -299,6 +299,30 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             event_ce.stop = MagicMock()
             await ci._on_key(event_ce)
             self.assertEqual(ci.text, "\n")
+
+    async def test_mouse_up_auto_copies_selection(self):
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        async with app.run_test():
+            ci.load_text("copy with mouse")
+            ci.selection = ci.selection.__class__((0, 0), (0, 4))
+            with patch.object(app, "copy_to_clipboard") as mock_copy:
+                event = MouseUp(
+                    widget=ci,
+                    x=0,
+                    y=0,
+                    delta_x=0,
+                    delta_y=0,
+                    button=1,
+                    shift=False,
+                    meta=False,
+                    ctrl=False,
+                    screen_x=0,
+                    screen_y=0,
+                )
+                await ci._on_mouse_up(event)
+                mock_copy.assert_called_once_with("copy")
+                self.assertTrue(ci.selection.is_empty)
 
     async def test_escape_cancels_workers(self):
         ci = ChatInput()

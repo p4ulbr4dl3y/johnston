@@ -150,11 +150,19 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         with patch("textual.app.App.copy_to_clipboard") as sc, patch(
             "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
             side_effect=fake_clip,
-        ):
+        ), patch.object(app, "notify") as mock_notify:
             app.copy_to_clipboard("hello")
         sc.assert_called_once_with("hello")
+        mock_notify.assert_called_once_with("Copied to clipboard", severity="information", timeout=1.5)
         await asyncio.sleep(0)
         self.assertEqual(calls, ["hello"])
+
+    async def test_copy_to_clipboard_empty_noop(self):
+        app = JohnstonApp()
+        with patch("textual.app.App.copy_to_clipboard") as sc, patch.object(app, "notify") as mock_notify:
+            app.copy_to_clipboard("")
+        sc.assert_not_called()
+        mock_notify.assert_not_called()
 
     async def test_copy_to_clipboard_super_raises(self):
         app = JohnstonApp()
@@ -166,8 +174,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         with patch("textual.app.App.copy_to_clipboard", side_effect=Exception("boom")), patch(
             "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
             side_effect=fake_clip,
-        ):
+        ), patch.object(app, "notify") as mock_notify:
             app.copy_to_clipboard("hello")  # must not raise
+        mock_notify.assert_called_once()
         await asyncio.sleep(0)
         self.assertEqual(calls, ["hello"])
 

@@ -192,6 +192,14 @@ class ChatInput(TextArea):
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
         self._on_input_change()
 
+    async def _on_mouse_up(self, event: events.MouseUp) -> None:
+        await super()._on_mouse_up(event)
+        selected = self.selected_text
+        if selected and selected.strip():
+            if hasattr(self.app, "copy_to_clipboard"):
+                self.app.copy_to_clipboard(selected)
+            self.selection = self.selection.__class__.cursor(self.cursor_location)
+
     def _decode_pasted_path(self, text: str) -> str:
         """Decode a pasted file path: strip quotes, unquote file:/// URLs, expand user dirs."""
         text_strip = text.strip().strip("'\"")

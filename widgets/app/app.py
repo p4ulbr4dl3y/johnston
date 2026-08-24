@@ -69,8 +69,10 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.message_queue = []
         self.is_generating = False
 
-    def copy_to_clipboard(self, text: str) -> None:
+    def copy_to_clipboard(self, text: str, notify: bool = True) -> None:
         """Copy text to both Textual clipboard (OSC 52) and native OS clipboard."""
+        if not text:
+            return
         try:
             super().copy_to_clipboard(text)
         except Exception:
@@ -78,3 +80,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         from core.infrastructure.platform.platform_utils import copy_to_os_clipboard_async
 
         asyncio.create_task(copy_to_os_clipboard_async(text))
+        if notify and hasattr(self, "notify"):
+            try:
+                self.notify("Copied to clipboard", severity="information", timeout=1.5)
+            except Exception:
+                pass
