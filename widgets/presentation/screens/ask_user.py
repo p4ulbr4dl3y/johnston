@@ -204,7 +204,7 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                 q_clean = str(q.get("question") or "").strip()
                 ans_info = self.answers.get(idx, {})
                 ans_val = str(ans_info.get("answer") or "").strip()
-                ans_display = ans_val if ans_val else "(No response)"
+                ans_display = f"✓ {ans_val}" if ans_val else "*(No response)*"
                 prefix = f"{idx + 1}. " if num_qs > 1 else ""
                 blocks.append(f"**{prefix}{q_clean}**\n- {ans_display}")
 
