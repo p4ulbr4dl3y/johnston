@@ -9,7 +9,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from core.domain.policies.permission_policy import suggest_pattern
-from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff, format_plan_display
+from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.widgets.chat_diff import format_edit_diff
@@ -170,22 +170,25 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     f"{actor} wants to `{act}` subagent `{s_id}`" if s_id else f"{actor} wants to manage subagents"
                 )
         elif self.tool_name == "update_plan":
-            plan_val = nargs.get("plan")
-            has_plan = bool(plan_val)
-            action_desc = f"{actor} wants to update the plan:" if has_plan else f"{actor} wants to update the plan"
+            explanation = (nargs.get("explanation") or "").strip()
+            if explanation:
+                action_desc = f'{actor} wants to update the plan: "{explanation}"'
+            else:
+                action_desc = f"{actor} wants to update the plan"
         elif self.tool_name == "ask_user":
             qs = nargs.get("questions") or []
-            q_count = len(qs) if isinstance(qs, list) else 0
-            if q_count > 1:
-                action_desc = f"{actor} wants to ask {q_count} questions:"
-            elif q_count == 1:
-                q0 = qs[0]
-                raw_q = q0.get("question") if isinstance(q0, dict) else q0
-                q_text = str(raw_q or "").strip()
-                if q_text and not (isinstance(q0, dict) and q0.get("options")):
-                    action_desc = f"{actor} wants to ask: `{q_text}`"
+            if isinstance(qs, list) and qs:
+                q_texts = []
+                for q in qs:
+                    raw_q = q.get("question") if isinstance(q, dict) else q
+                    txt = str(raw_q or "").strip()
+                    if txt:
+                        q_texts.append(txt)
+                if q_texts:
+                    joined_qs = ", ".join(f"`{q}`" for q in q_texts)
+                    action_desc = f"{actor} wants to ask: {joined_qs}"
                 else:
-                    action_desc = f"{actor} wants to ask a question:"
+                    action_desc = f"{actor} wants to ask a question"
             else:
                 action_desc = f"{actor} wants to ask a question"
         elif self.tool_name == "shell":
@@ -197,7 +200,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
         is_wide = (
-            self.tool_name in ("create", "edit", "shell", "update_plan")
+            self.tool_name in ("create", "edit", "shell")
             or bool(self.diff)
             or (
                 bool(self.args)
@@ -263,33 +266,6 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 if prompt:
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```text\n{prompt.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name == "update_plan":
-                plan_val = nargs.get("plan")
-                explanation = (nargs.get("explanation") or "").strip()
-                if plan_val:
-                    formatted_plan = format_plan_display(plan_val, explanation)
-                    with ToolScrollBox(classes="tool-scroll-box"):
-                        yield Static(formatted_plan, classes="modal-diff-view")
-            elif self.tool_name == "ask_user":
-                qs = nargs.get("questions") or []
-                if isinstance(qs, list) and qs:
-                    lines = []
-                    for i, q in enumerate(qs, 1):
-                        prefix = f"{i}. " if len(qs) > 1 else ""
-                        if isinstance(q, dict):
-                            q_text = (q.get("question") or "").strip()
-                            opts = q.get("options") or []
-                            block = [f"**{prefix}{q_text}**" if q_text else ""]
-                            for opt in opts:
-                                block.append(f"- {opt}")
-                            lines.append("\n".join(b for b in block if b))
-                        elif len(qs) > 1:
-                            lines.append(f"**{prefix}{str(q).strip()}**")
-                    if lines:
-                        with ToolScrollBox(classes="tool-scroll-box"):
-                            for i, block_str in enumerate(lines):
-                                cls = "modal-diff-view" if i == len(lines) - 1 else "modal-diff-view modal-qa-block"
-                                yield Markdown(block_str, classes=cls)
             elif self.args and self.tool_name not in (
                 "shell",
                 "read",

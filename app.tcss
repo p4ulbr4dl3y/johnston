@@ -812,8 +812,12 @@ DiffScreen {
     margin: 0;
 }
 
+#modal-dialog.bash-confirm-dialog #permission-options-list {
+    margin-top: 1;
+}
+
 #modal-dialog.bash-confirm-dialog .tool-scroll-box {
-    margin: 1 0;
+    margin: 1 0 0 0;
     max-height: 18;
     overflow-y: auto;
     overflow-x: hidden;

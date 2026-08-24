@@ -261,5 +261,46 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.focus_first_option.assert_called_once()
 
 
+    async def test_update_plan_descriptions(self):
+        screen_with_exp = PermissionConfirmScreen("update_plan", {"explanation": "Refactor auth flow"})
+        async with HostApp(screen_with_exp).run_test() as pilot:
+            await pilot.pause()
+            mds = screen_with_exp.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn('Agent wants to update the plan: "Refactor auth flow"', all_md)
+
+        screen_no_exp = PermissionConfirmScreen("update_plan", {})
+        async with HostApp(screen_no_exp).run_test() as pilot:
+            await pilot.pause()
+            mds = screen_no_exp.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Agent wants to update the plan", all_md)
+
+    async def test_ask_user_descriptions(self):
+        screen_multi = PermissionConfirmScreen(
+            "ask_user",
+            {"questions": [{"question": "Choose branch"}, {"question": "Apply migrations?"}]},
+        )
+        async with HostApp(screen_multi).run_test() as pilot:
+            await pilot.pause()
+            mds = screen_multi.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Agent wants to ask: `Choose branch`, `Apply migrations?`", all_md)
+
+        screen_plain = PermissionConfirmScreen("ask_user", {"questions": ["Single question?"]})
+        async with HostApp(screen_plain).run_test() as pilot:
+            await pilot.pause()
+            mds = screen_plain.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Agent wants to ask: `Single question?`", all_md)
+
+        screen_empty = PermissionConfirmScreen("ask_user", {})
+        async with HostApp(screen_empty).run_test() as pilot:
+            await pilot.pause()
+            mds = screen_empty.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Agent wants to ask a question", all_md)
+
+
 if __name__ == "__main__":
     unittest.main()
