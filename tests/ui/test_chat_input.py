@@ -63,6 +63,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             ci.update_height()
             self.assertEqual(ci.styles.height.value, 6)
 
+    def test_placeholder_default_and_custom(self):
+        ci_default = ChatInput()
+        self.assertEqual(ci_default.placeholder, "Type a message or / for commands...")
+
+        ci_custom = ChatInput(placeholder="Custom prompt...")
+        self.assertEqual(ci_custom.placeholder, "Custom prompt...")
+
     async def test_get_full_text_and_tag_deletion(self):
         ci = ChatInput()
         app = DummyChatApp(ci)

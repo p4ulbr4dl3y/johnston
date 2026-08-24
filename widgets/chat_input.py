@@ -23,6 +23,9 @@ class ClipboardAttachment:
         self.path = path
 
 
+DEFAULT_PLACEHOLDER = "Type a message or / for commands..."
+
+
 class ChatInput(TextArea):
     """Input field with reactive suggestions on character typing"""
 
@@ -40,6 +43,7 @@ class ChatInput(TextArea):
 
     def __init__(self, **kwargs):
         kwargs.setdefault("soft_wrap", True)
+        kwargs.setdefault("placeholder", DEFAULT_PLACEHOLDER)
         super().__init__(**kwargs)
         self.pasted_texts: dict[str, str] = {}
         self.clipboard_attachments: list = []

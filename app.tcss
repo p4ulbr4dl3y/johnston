@@ -410,6 +410,11 @@ OptionList > .option-list--option-hover {
     color: #09090b;
 }
 
+#message-input > .text-area--placeholder {
+    color: #71717a;
+    background: transparent;
+}
+
 TextArea > .text-area--matching-bracket,
 #message-input > .text-area--matching-bracket {
     background: transparent;
