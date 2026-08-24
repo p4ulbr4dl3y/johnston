@@ -102,13 +102,13 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         md_lines = [f"### **Rollback: {clean_preview}**\n"]
         if entry.changed_files:
             stat_label = f" ({entry.git_stats})" if entry.git_stats else ""
-            md_lines.append(f"> **Files to revert{stat_label}:**")
+            md_lines.append(f"**Files to revert{stat_label}:**\n")
             max_show = 4
             for f in entry.changed_files[:max_show]:
-                md_lines.append(f"> - `{f}`")
+                md_lines.append(f"- {f}")
             if len(entry.changed_files) > max_show:
                 rem = len(entry.changed_files) - max_show
-                md_lines.append(f"> - *... and {rem} more*")
+                md_lines.append(f"- *... and {rem} more*")
 
         title = "\n".join(md_lines)
         try:
