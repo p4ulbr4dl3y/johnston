@@ -12,7 +12,7 @@ import unittest
 import pytest
 
 from tools.create import CreateTool
-from tools.edit import EditTool, MultiEditTool, apply_chunk_replacements
+from tools.edit import EditTool, apply_edit
 
 
 class _Base(unittest.IsolatedAsyncioTestCase):
@@ -41,63 +41,33 @@ class _Base(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
-# edit: apply_chunk_replacements (pure function edge cases)
+# edit: apply_edit (pure function edge cases)
 # ---------------------------------------------------------------------------
 class TestApplyChunks(_Base):
-    def test_empty_chunks_list_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements("abc\n", [], "dummy.txt")
-        self.assertIn("no replacement chunks", str(ctx.exception))
-
     def test_chunk_without_old_str_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements("abc\n", [{"new_str": "x"}], "dummy.txt")
+            apply_edit("abc\n", None, "x", False, "dummy.txt")
         self.assertIn("missing 'old_str'", str(ctx.exception))
 
     def test_chunk_without_new_str_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements("abc\n", [{"old_str": "abc"}], "dummy.txt")
+            apply_edit("abc\n", "abc", None, False, "dummy.txt")
         self.assertIn("missing 'new_str'", str(ctx.exception))
 
-    def test_multiple_allow_multiple_replaces_all(self):
-        new, _ = apply_chunk_replacements(
-            "dup\ndup\ndup\n", [{"old_str": "dup", "new_str": "X", "allow_multiple": True}], "d.txt"
+    def test_multiple_replace_all_replaces_all(self):
+        new, _ = apply_edit(
+            "dup\ndup\ndup\n", "dup", "X", True, "d.txt"
         )
         self.assertEqual(new, "X\nX\nX\n")
 
     def test_multiple_false_fails(self):
         with self.assertRaises(ValueError):
-            apply_chunk_replacements("dup\ndup\n", [{"old_str": "dup", "new_str": "X"}], "d.txt")
-
-    def test_inverted_start_end_does_not_crash(self):
-        # start > end. Should not crash; exact behavior is unspecified but must not raise unexpected errors.
-        try:
-            new, _ = apply_chunk_replacements(
-                "a\nb\nc\nd\n", [{"old_str": "c", "new_str": "C", "start_line": 4, "end_line": 2}], "d.txt"
-            )
-        except ValueError:
-            # no crash is the requirement (a ValueError is acceptable for "not a clean match")
-            return
-        self.assertIn("C", new)
-
-    def test_string_line_numbers_coerced(self):
-        new, _ = apply_chunk_replacements(
-            "a\nb\n", [{"old_str": "b", "new_str": "B", "start_line": "2", "end_line": "2"}], "d.txt"
-        )
-        self.assertIn("B", new)
-
-    def test_negative_start_line_does_not_crash(self):
-        try:
-            apply_chunk_replacements(
-                "a\nb\nc\n", [{"old_str": "b", "new_str": "B", "start_line": -5, "end_line": 2}], "d.txt"
-            )
-        except ValueError:
-            return
+            apply_edit("dup\ndup\n", "dup", "X", False, "d.txt")
 
     def test_multiline_unicode_target(self):
         content = "первая строка\nвторая строка\nтретья\n"
-        new, _ = apply_chunk_replacements(
-            content, [{"old_str": "вторая строка\nтретья", "new_str": "СРЕДНЯЯ\nТРЕТЬЯ"}], "d.txt"
+        new, _ = apply_edit(
+            content, "вторая строка\nтретья", "СРЕДНЯЯ\nТРЕТЬЯ", False, "d.txt"
         )
         self.assertIn("СРЕДНЯЯ", new)
         self.assertIn("ТРЕТЬЯ", new)
@@ -105,13 +75,13 @@ class TestApplyChunks(_Base):
     def test_literal_backslash_newline_not_treated_as_newline(self):
         # target contains the two chars backslash+n, not an actual newline
         content = "a\\nb\n"
-        new, _ = apply_chunk_replacements(content, [{"old_str": "a\\nb", "new_str": "averylong"}], "d.txt")
+        new, _ = apply_edit(content, "a\\nb", "averylong", False, "d.txt")
         self.assertEqual(new, "averylong\n")
 
     def test_very_long_target(self):
         token = "x" * 5000
         content = "start\n" + token + "\nend\n"
-        new, _ = apply_chunk_replacements(content, [{"old_str": token, "new_str": "SHORT"}], "d.txt")
+        new, _ = apply_edit(content, token, "SHORT", False, "d.txt")
         self.assertNotIn(token, new)
         self.assertIn("SHORT", new)
 
@@ -130,16 +100,16 @@ class TestApplyChunks(_Base):
     def test_single_curly_quote_style_preserved(self):
         # File has LEFT single curly quotes, old_str uses straight ones -> the
         # replacement's straight quotes become RIGHT single curly (has_single branch).
-        new, _ = apply_chunk_replacements(
-            "print(‘x’)\n", [{"old_str": "print('x')", "new_str": "print('y')"}], "d.txt"
+        new, _ = apply_edit(
+            "print(‘x’)\n", "print('x')", "print('y')", False, "d.txt"
         )
         self.assertEqual(new, "print(’y’)\n")
 
     def test_delete_crlf_line_consumes_newline(self):
         # Empty replacement in a CRLF file must swallow the \r\n so the whole
         # line disappears instead of leaving a dangling CR.
-        new, _ = apply_chunk_replacements(
-            "line1\r\nTOK\r\nline3\r\n", [{"old_str": "TOK", "new_str": ""}], "d.txt"
+        new, _ = apply_edit(
+            "line1\r\nTOK\r\nline3\r\n", "TOK", "", False, "d.txt"
         )
         self.assertEqual(new, "line1\r\nline3\r\n")
 
@@ -147,46 +117,11 @@ class TestApplyChunks(_Base):
         # target_lines strips to nothing -> fuzzy hint must be empty, error keeps
         # the bare "exact block not found" message (no "[Hint:" suffix).
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
-                "abc\n", [{"old_str": "   \n  \n", "new_str": "x"}], "d.txt"
+            apply_edit(
+                "abc\n", "   \n  \n", "x", False, "d.txt"
             )
         self.assertIn("exact block not found", str(ctx.exception))
         self.assertNotIn("[Hint:", str(ctx.exception))
-
-    def test_range_multiple_occurrences_raises(self):
-        # count > 1 inside an explicit range without allow_multiple.
-        with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
-                "d\nd\nd\n",
-                [{"old_str": "d", "new_str": "D", "start_line": 1, "end_line": 3}],
-                "d.txt",
-            )
-        self.assertIn("matches 3 occurrences in lines 1-3", str(ctx.exception))
-
-    def test_range_allow_multiple_replaces_all(self):
-        new, _ = apply_chunk_replacements(
-            "d\nd\nd\n",
-            [{"old_str": "d", "new_str": "D", "start_line": 1, "end_line": 3, "allow_multiple": True}],
-            "d.txt",
-        )
-        self.assertEqual(new, "D\nD\nD\n")
-
-    def test_range_target_not_found_anywhere(self):
-        # full_count == 0 inside a range -> "target not found in <path> (s-e)"
-        # without an occurrence-location message.
-        with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
-                "a\nb\nc\n", [{"old_str": "zzz", "new_str": "X", "start_line": 1, "end_line": 1}], "d.txt"
-            )
-        self.assertIn("target not found in 'd.txt' (1-1)", str(ctx.exception))
-
-    def test_range_replacement_without_eol_appends_newline(self):
-        # sub_text ends with \n and the target swallows it, leaving a replacement
-        # without EOL -> EOL must be re-appended so lines are not joined.
-        new, _ = apply_chunk_replacements(
-            "a\nb\nc\n", [{"old_str": "a\nb\n", "new_str": "A", "start_line": 1, "end_line": 2}], "d.txt"
-        )
-        self.assertEqual(new, "A\nc\n")
 
 
 # ---------------------------------------------------------------------------
@@ -304,20 +239,12 @@ class TestEditToolFiles(_Base):
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read('файл пробел "кавычки".txt'), "данные\n")
 
-    async def test_edit_start_end_line_keys(self):
-        # schema uses start_line/end_line which the code reads directly
+    async def test_edit_context_disambiguation(self):
         tool = EditTool()
         p = self.write("s.txt", "a\nb\nb\nc\n")
-        res = str(await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start_line": 3, "end_line": 3}))
+        res = str(await tool.execute({"path": p, "old_str": "b\nc", "new_str": "B\nc"}))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("s.txt"), "a\nb\nB\nc\n")
-
-    async def test_edit_start_end_alias_keys_rejected(self):
-        # start/end are no longer aliased to start_line/end_line.
-        tool = EditTool()
-        p = self.write("s2.txt", "a\nb\nb\nc\n")
-        res = str(await tool.execute({"path": p, "old_str": "b", "new_str": "B", "start": 3, "end": 3}))
-        self.assertIn("ERR:", res)
 
     async def test_edit_empty_file_target_not_found(self):
         tool = EditTool()
@@ -333,11 +260,11 @@ class TestEditToolFiles(_Base):
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("q.txt"), 'msg = "world"\n')
 
-    async def test_edit_allow_multiple_param(self):
+    async def test_edit_replace_all_param(self):
         tool = EditTool()
         p = self.write("am.txt", "x\ndup\ndup\n")
         res = str(await tool.execute(
-            {"path": p, "old_str": "dup", "new_str": "D", "allow_multiple": True}
+            {"path": p, "old_str": "dup", "new_str": "D", "replace_all": True}
         ))
         self.assertNotIn("ERR:", res)
         self.assertEqual(self.read("am.txt"), "x\nD\nD\n")
@@ -345,141 +272,19 @@ class TestEditToolFiles(_Base):
     async def test_edit_delete_crlf_line_via_tool(self):
         tool = EditTool()
         p = self.write("crlf.txt", "line1\r\nTOK\r\nline3\r\n")
-        res = str(await tool.execute({"path": p, "old_str": "TOK"}))
+        res = str(await tool.execute({"path": p, "old_str": "TOK", "new_str": ""}))
         self.assertNotIn("ERR:", res)
         with open(p, "r", encoding="utf-8", newline="") as f:
             self.assertEqual(f.read(), "line1\r\nline3\r\n")
 
-    async def test_edit_empty_edits_like_range_target_not_found(self):
-        # Range (1-1) with a target that exists nowhere else -> error names the
-        # path AND the range, without a fake "elsewhere" line.
+    async def test_edit_missing_target_fuzzy_hint(self):
         tool = EditTool()
-        p = self.write("rnf.txt", "a\nb\nc\n")
-        res = str(await tool.execute({"path": p, "old_str": "zzz", "new_str": "X", "start_line": 1, "end_line": 1}))
-        self.assertIn("ERR:", res)
-        self.assertIn("target not found in", res)
-
-
-# ---------------------------------------------------------------------------
-# multi_edit: tool-level multi-chunk behavior
-# ---------------------------------------------------------------------------
-class TestMultiEditToolEdge(_Base):
-    async def test_overlapping_chunks_error(self):
-        tool = MultiEditTool()
-        p = self.write("ov.txt", "line 1\nline 2\nline 3\nline 4\nline 5\n")
-        res = str(await tool.execute(
-            {
-                "path": p,
-                "edits": [
-                    {"old_str": "line 2", "new_str": "line TWO", "start_line": 2, "end_line": 4},
-                    {"old_str": "line 3", "new_str": "line THREE", "start_line": 3, "end_line": 5},
-                ],
-            }
-        ))
-        self.assertIn("ERR:", res)
-        self.assertIn("overlap", res)
-        # No partial application: file untouched.
-        self.assertEqual(self.read("ov.txt"), "line 1\nline 2\nline 3\nline 4\nline 5\n")
-
-    async def test_empty_edits_error(self):
-        tool = MultiEditTool()
-        p = self.write("e.txt", "abc\n")
-        res = str(await tool.execute({"path": p, "edits": []}))
-        self.assertIn("ERR:", res)
-        self.assertIn("no replacement chunks", res)
-
-    async def test_missing_edits_error(self):
-        tool = MultiEditTool()
-        p = self.write("e2.txt", "abc\n")
-        res = str(await tool.execute({"path": p}))
-        self.assertIn("ERR:", res)
-        self.assertIn("no replacement chunks", res)
-
-    async def test_chunk_error_is_atomic_no_partial_write(self):
-        # Second chunk is malformed (missing old_str) -> nothing may be written.
-        tool = MultiEditTool()
-        p = self.write("atom.txt", "a = 1\nb = 2\nc = 3\n")
-        res = str(await tool.execute(
-            {
-                "path": p,
-                "edits": [
-                    {"old_str": "a = 1", "new_str": "a = 10"},
-                    {"new_str": "orphan"},
-                ],
-            }
-        ))
-        self.assertIn("ERR:", res)
-        self.assertIn("chunk 2 missing 'old_str'", res)
-        self.assertEqual(self.read("atom.txt"), "a = 1\nb = 2\nc = 3\n")
-
-    async def test_chunks_sorted_desc_no_line_drift(self):
-        # Chunk 1 (line 1) expands to two lines; chunk 2 targets line 3. Without
-        # the descending sort the second range would drift into line 4.
-        tool = MultiEditTool()
-        p = self.write("drift.txt", "a\nb\nc\n")
-        res = str(await tool.execute(
-            {
-                "path": p,
-                "edits": [
-                    {"old_str": "a", "new_str": "A1\nA2", "start_line": 1, "end_line": 1},
-                    {"old_str": "c", "new_str": "C", "start_line": 3, "end_line": 3},
-                ],
-            }
-        ))
-        self.assertNotIn("ERR:", res)
-        self.assertEqual(self.read("drift.txt"), "A1\nA2\nb\nC\n")
-
-    async def test_allow_multiple_in_one_chunk(self):
-        tool = MultiEditTool()
-        p = self.write("am2.txt", "dup\ndup\nkeep\n")
-        res = str(await tool.execute(
-            {
-                "path": p,
-                "edits": [
-                    {"old_str": "dup", "new_str": "D", "allow_multiple": True},
-                    {"old_str": "keep", "new_str": "K"},
-                ],
-            }
-        ))
-        self.assertNotIn("ERR:", res)
-        self.assertEqual(self.read("am2.txt"), "D\nD\nK\n")
-
-    async def test_none_chunk_returns_err(self):
-        tool = MultiEditTool()
-        p = self.write("nc.txt", "abc\n")
-        res = str(await tool.execute({"path": p, "edits": [None]}))
-        self.assertIn("ERR:", res)
-
-    async def test_nonexistent_path_error(self):
-        tool = MultiEditTool()
-        res = str(await tool.execute(
-            {"path": "missing.txt", "edits": [{"old_str": "a", "new_str": "b"}]}
-        ))
-        self.assertIn("ERR:", res)
-        self.assertIn("not found", res)
-
-    async def test_none_path_returns_err(self):
-        tool = MultiEditTool()
-        res = str(await tool.execute({"path": None, "edits": [{"old_str": "a", "new_str": "b"}]}))
-        self.assertIn("ERR: params 'path': missing or empty", res)
-
-    async def test_empty_path_returns_err(self):
-        tool = MultiEditTool()
-        res = str(await tool.execute({"path": "", "edits": [{"old_str": "a", "new_str": "b"}]}))
-        self.assertIn("ERR: params 'path': missing or empty", res)
-
-    async def test_missing_path_returns_err(self):
-        tool = MultiEditTool()
-        res = str(await tool.execute({"edits": [{"old_str": "a", "new_str": "b"}]}))
-        self.assertIn("ERR: params 'path': missing or empty", res)
-
-    async def test_missing_target_fuzzy_hint(self):
-        tool = MultiEditTool()
         p = self.write("fz.txt", "def calculate_total_price(items):\n    return sum(items)\n")
         res = str(await tool.execute(
             {
                 "path": p,
-                "edits": [{"old_str": "def calculate_total_price(item_list):", "new_str": "pass"}],
+                "old_str": "def calculate_total_price(item_list):",
+                "new_str": "pass",
             }
         ))
         self.assertIn("ERR:", res)

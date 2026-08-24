@@ -177,7 +177,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
             return f"[{completed}/{total} completed]"
         return ""
 
-    if name in ("read", "create", "edit", "multi_edit"):
+    if name in ("read", "create", "edit"):
         val = args.get("path")
         if isinstance(val, str) and val:
             return truncate(val.strip())

@@ -18,7 +18,7 @@ class TestRoleRegistry(unittest.TestCase):
         self.assertIn("explorer", roles)
         self.assertNotIn("orchestrator", roles)
 
-        self.assertEqual(roles["explorer"].disallowed_tools, ["create", "edit", "multi_edit"])
+        self.assertEqual(roles["explorer"].disallowed_tools, ["create", "edit"])
         self.assertEqual(roles["worker"].name, "Worker")
         self.assertEqual(roles["worker"].scope, "any")
         self.assertEqual(normalize_role_scope("main_only"), "main_only")
@@ -153,7 +153,6 @@ Architect prompt content""")
         # disallowed_tools enforced
         self.assertIsNotNone(role_tool_error(explorer, "create"))
         self.assertIsNotNone(role_tool_error(explorer, "edit"))
-        self.assertIsNotNone(role_tool_error(explorer, "multi_edit"))
         # read tools allowed
         self.assertIsNone(role_tool_error(explorer, "read"))
         self.assertIsNone(role_tool_error(explorer, "shell"))
@@ -306,8 +305,8 @@ class TestIsToolAllowed:
         assert r_empty.is_tool_allowed("shell") is None  # shell allowed!
 
     def test_disallowed_blocks_specified_tools(self):
-        r = AgentRole(key="x", disallowed_tools=["create", "edit", "multi_edit"])
-        for w in ("create", "edit", "multi_edit"):
+        r = AgentRole(key="x", disallowed_tools=["create", "edit"])
+        for w in ("create", "edit"):
             assert r.is_tool_allowed(w) is not None
         assert r.is_tool_allowed("read") is None
 

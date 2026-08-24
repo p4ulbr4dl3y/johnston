@@ -51,21 +51,10 @@ def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
     """Generates unified diff text from tool arguments."""
     if not isinstance(args, dict):
         return ""
-    chunks = args.get("edits")
-    diff_parts = []
-    if chunks and isinstance(chunks, list):
-        for chunk in chunks:
-            if isinstance(chunk, dict):
-                old_c = chunk.get("old_str", "")
-                new_c = chunk.get("new_str", "")
-                start_l = chunk.get("start_line") or 1
-                if old_c or new_c:
-                    diff_parts.extend(generate_chunk_unified_diff(old_c, new_c, file_path, start_l))
-    else:
-        old_s = args.get("old_str", "")
-        new_s = args.get("new_str", "")
-        start_l = args.get("start_line") or 1
-        if old_s or new_s:
-            diff_parts.extend(generate_chunk_unified_diff(old_s, new_s, file_path, start_l))
-
-    return "\n".join(diff_parts) if diff_parts else ""
+    old_s = args.get("old_str") if "old_str" in args else args.get("old_string", "")
+    new_s = args.get("new_str") if "new_str" in args else args.get("new_string", "")
+    start_l = args.get("start_line") or 1
+    if old_s or new_s:
+        diff_parts = generate_chunk_unified_diff(old_s or "", new_s or "", file_path, start_l)
+        return "\n".join(diff_parts) if diff_parts else ""
+    return ""

@@ -17,7 +17,6 @@ DEFAULT_PERMISSIONS = {
     "tools": {
         "create": "ask",
         "edit": "ask",
-        "multi_edit": "ask",
         "shell": "ask",
     },
 }

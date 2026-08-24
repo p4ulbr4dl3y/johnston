@@ -27,10 +27,8 @@ class TestPermissionManager(unittest.TestCase):
         action = self.pm.check_permission("create").action
         self.assertEqual(action, "ask")
 
-        # Builtin edit/multi_edit explicitly default to 'ask'
+        # Builtin edit explicitly defaults to 'ask'
         action = self.pm.check_permission("edit").action
-        self.assertEqual(action, "ask")
-        action = self.pm.check_permission("multi_edit").action
         self.assertEqual(action, "ask")
 
         # Builtin shell explicitly defaults to 'ask'

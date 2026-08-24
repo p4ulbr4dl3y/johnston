@@ -96,7 +96,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             return build_synthetic_create_diff(target_path, content)
 
         # Generate diff for Edit tools
-        if self.tool_name in ("edit", "multi_edit"):
+        if self.tool_name == "edit":
             from widgets.lexer_utils import build_edit_diff_text
 
             return build_edit_diff_text(self.args, target_path or "file")
@@ -118,7 +118,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to overwrite `{target_path or 'file'}` with diff:"
             else:
                 action_desc = f"{actor} wants to create `{target_path or 'file'}`:"
-        elif self.tool_name in ("edit", "multi_edit"):
+        elif self.tool_name == "edit":
             action_desc = f"{actor} wants to edit `{target_path or 'file'}` with diff:"
         elif self.tool_name == "read":
             action_desc = f"{actor} wants to read `{target_path or 'file'}`"
@@ -196,7 +196,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
         is_wide = (
-            self.tool_name in ("create", "edit", "multi_edit", "shell", "update_plan")
+            self.tool_name in ("create", "edit", "shell", "update_plan")
             or bool(self.diff)
             or (
                 bool(self.args)
@@ -230,7 +230,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```{ext}\n{code_content.strip()}\n```", classes="modal-diff-view")
             elif (
-                self.tool_name in ("edit", "multi_edit")
+                self.tool_name == "edit"
                 or self.diff
             ):
                 diff_text = self._build_diff_text(target_path)

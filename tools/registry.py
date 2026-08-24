@@ -9,7 +9,7 @@ from core.infrastructure.runtime.tool_name import normalize_tool_name
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
-from tools.edit import EditTool, MultiEditTool
+from tools.edit import EditTool
 from tools.invoke_subagent import InvokeSubagentTool
 from tools.manage_shell import ManageShellTool
 from tools.manage_subagent import ManageSubagentTool
@@ -22,7 +22,6 @@ TOOL_CLASSES = [
     ReadTool,
     CreateTool,
     EditTool,
-    MultiEditTool,
     ShellTool,
     AskUserTool,
     ManageShellTool,

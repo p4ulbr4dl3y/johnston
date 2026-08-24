@@ -22,30 +22,26 @@ class TestEditBareValueError(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(self._tmp.cleanup)
         self.path = f"{self._tmp.name}/members.py"
 
-    async def _helper(self, content: str, chunk, expected_substr):
-        """Write content and run _execute_edit_helper against one bad chunk."""
-        with open(self.path, "w", encoding="utf-8") as f:
-            f.write(content)
-        res = await edit._execute_edit_helper(self.path, [chunk], cwd=self._tmp.name)
-        self.assertIn(expected_substr, str(res))
-        return res
-
     async def test_bare_valueerror_wrapped_as_params_error(self):
-        # A bare (not ERR:-prefixed) ValueError raised by a chunk consumer must be
+        # A bare (not ERR:-prefixed) ValueError raised by apply_edit must be
         # wrapped in a unified `ERR: params` message, never leaked raw.
         def boom(*args, **kwargs):
             raise ValueError("some bare rejection text")
 
         with open(self.path, "w", encoding="utf-8") as f:
             f.write("x = 1\n")
-        with patch.object(edit, "apply_chunk_replacements", new=boom):
-            res = await edit._execute_edit_helper(self.path, [{"old_str": "x", "new_str": "y"}], cwd=self._tmp.name)
+        with patch.object(edit, "apply_edit", new=boom):
+            res = await edit.EditTool().execute({"path": self.path, "old_str": "x", "new_str": "y"})
         self.assertEqual(str(res), "ERR: params: some bare rejection text")
 
     async def test_preformatted_valueerror_passthrough(self):
         # A ValueError already formatted with format_tool_error must be returned
         # unchanged (no double-prefix).
-        await self._helper("dup\ndup\n", {"old_str": "dup", "new_str": "X"}, "ERR: match")
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("dup\ndup\n")
+        res = await edit.EditTool().execute({"path": self.path, "old_str": "dup", "new_str": "X"})
+        self.assertIn("ERR: match", str(res))
+        self.assertNotIn("ERR: params: ERR:", str(res))
 
 
 class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):

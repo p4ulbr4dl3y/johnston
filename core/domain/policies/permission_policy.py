@@ -35,7 +35,6 @@ _BUILTIN_TOOLS = frozenset(
         "read",
         "create",
         "edit",
-        "multi_edit",
         "shell",
         "ask_user",
         "web_fetch",
@@ -185,7 +184,7 @@ def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) ->
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return args.get("command") or args.get("cmd")
-    if canonical in ("create", "edit", "multi_edit", "read"):
+    if canonical in ("create", "edit", "read"):
         return args.get("path") or args.get("file_path") or args.get("filepath")
     if canonical == "web_fetch":
         return args.get("url") or args.get("uri")
@@ -200,7 +199,7 @@ def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return extract_command_signature(val)
-    if canonical in ("create", "edit", "multi_edit", "read"):
+    if canonical in ("create", "edit", "read"):
         # Suggest directory pattern or basename
         dirname = os.path.dirname(val)
         if dirname and dirname not in (".", "/"):
@@ -282,7 +281,7 @@ def evaluate_pattern_rules(
             f"All subcommands matched allow patterns: '{target}'",
         )
 
-    if canonical in ("create", "edit", "multi_edit", "read"):
+    if canonical in ("create", "edit", "read"):
         # Collect all matching rules, then apply fail-closed priority: DENY > ASK > ALLOW
         matched: List[Tuple[PermissionAction, str]] = []
         for r in rules:

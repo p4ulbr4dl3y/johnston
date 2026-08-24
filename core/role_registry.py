@@ -38,7 +38,6 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         disallowed_tools=[
             "create",
             "edit",
-            "multi_edit",
         ],
         scope="any",
         source="builtin",

@@ -11,7 +11,7 @@ class CreateTool(BaseTool):
     name = "create"
     description = (
         "Create a new file or overwrite an existing file. Automatically creates parent directories. "
-        "For partial edits in existing files, use 'edit' or 'multi_edit'."
+        "For partial edits in existing files, use 'edit'."
     )
     schema = {
         "type": "function",

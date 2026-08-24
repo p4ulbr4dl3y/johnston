@@ -85,17 +85,11 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         self.assertIn("@@ -1,1 +1,1 @@", diff)
         self.assertEqual(len(diff.splitlines()), 3)
 
-    def test_build_diff_text_edit_chunks(self):
-        chunks = [
-            {"old_str": "old line", "new_str": "new line", "start_line": 5},
-            {"old_str": "x", "new_str": "y", "start_line": 8},
-            {"start_line": 9},
-        ]
-        screen = PermissionConfirmScreen("multi_edit", {"path": "a.py", "edits": chunks})
+    def test_build_diff_text_edit(self):
+        screen = PermissionConfirmScreen("edit", {"path": "a.py", "old_str": "old line", "new_str": "new line"})
         diff = screen._build_diff_text("a.py")
         self.assertIn("-old line", diff)
         self.assertIn("+new line", diff)
-        self.assertIn("@@ -5,1 +5,1 @@", diff)
 
     def test_build_diff_text_edit_no_content(self):
         screen = PermissionConfirmScreen("edit", {"path": "a.py"})

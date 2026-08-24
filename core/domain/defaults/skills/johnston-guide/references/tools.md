@@ -1,7 +1,7 @@
 # Johnston Tools Reference
 
 ## Builtin Tools
-- `read`, `create`, `edit`, `multi_edit`, `shell`, `ask_user`
+- `read`, `create`, `edit`, `shell`, `ask_user`
 - `invoke_subagent`, `manage_subagent`, `manage_shell`, `update_plan`, `web_fetch`
 
 ## Permissions

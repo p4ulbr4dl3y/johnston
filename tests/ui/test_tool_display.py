@@ -54,7 +54,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(extract_tool_display("unknown_tool", {"query": "x"}), '{query: "x"}')
 
     def test_builtin_missing_arg_empty_parens(self):
-        for name in ("read", "create", "edit", "multi_edit", "shell", "web_fetch", "update_plan"):
+        for name in ("read", "create", "edit", "shell", "web_fetch", "update_plan"):
             self.assertEqual(extract_tool_display(name, {}), "")
         self.assertEqual(extract_tool_display("ask_user", {}), "")
         self.assertEqual(extract_tool_display("invoke_subagent", {}), "")
@@ -62,8 +62,6 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(extract_tool_display("manage_subagent", {}), "")
 
     def test_builtin_no_generic_string_fallback(self):
-        # Model error: multi_edit with only the edits list (no path) -> empty parens.
-        self.assertEqual(extract_tool_display("multi_edit", {"edits": [{"old_str": "a", "new_str": "b"}]}), "")
         # edit without path, only old/new strings -> empty parens, not old_str.
         self.assertEqual(extract_tool_display("edit", {"old_str": "a", "new_str": "b"}), "")
         # update_plan without a plan list -> empty parens (explanation ignored).

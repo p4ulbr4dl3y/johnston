@@ -47,20 +47,19 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         res_alias = await execute_tool("cat", {"path": "nonexistent_abc_123.txt"})
         self.assertIn("ERR: unknown 'cat'", res_alias.content)
 
-    async def test_execute_tool_multi_edit_routes_to_multiedit_tool(self):
-        # Canonical 'multi_edit' must reach MultiEditTool, not be aliased to 'edit'
-        from tools.edit import MultiEditTool
+    async def test_execute_tool_edit_routes_to_edit_tool(self):
+        from tools.edit import EditTool
         from tools.registry import REGISTRY
 
-        self.assertIs(REGISTRY["multi_edit"], MultiEditTool)
+        self.assertIs(REGISTRY["edit"], EditTool)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
         with (
             patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-            patch.object(MultiEditTool, "execute", new=AsyncMock(return_value="MULTI_EDIT_OK")),
+            patch.object(EditTool, "execute", new=AsyncMock(return_value="EDIT_OK")),
         ):
-            res = await execute_tool("multi_edit", {"path": "x.py", "edits": []})
-        self.assertEqual(res.content, "MULTI_EDIT_OK")
+            res = await execute_tool("edit", {"path": "x.py", "old_str": "a", "new_str": "b"})
+        self.assertEqual(res.content, "EDIT_OK")
 
     async def test_execute_tool_execution_exception(self):
         from core.permission_manager import PermissionManager

@@ -4,7 +4,7 @@ import unittest
 
 from tests.conftest import WindowsSafeTemporaryDirectory
 from tools.create import CreateTool
-from tools.edit import EditTool, MultiEditTool
+from tools.edit import EditTool
 from tools.read import ReadTool
 from tools.shell import ShellTool
 
@@ -40,7 +40,6 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         pm.set_session_override("read", "allow")
         pm.set_session_override("create", "allow")
         pm.set_session_override("edit", "allow")
-        pm.set_session_override("multi_edit", "allow")
 
     async def test_create_allows_johnston_config(self):
         tool = CreateTool()
@@ -304,23 +303,21 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"questions": [{"invalid_key": "foo"}]}))
         self.assertIn("ERR: params 'questions': missing or invalid", res)
 
-    async def test_edit_line_range(self):
+    async def test_edit_context_disambiguation(self):
         from tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("val = 1\nval = 1\nval = 1\n")
+            f.write("header\nval = 1\nmiddle\nval = 1\nfooter\n")
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # Replace val = 1 only on line 2 (start_line=2, end_line=2)
+        # Disambiguate duplicate 'val = 1' by providing surrounding context 'middle\nval = 1'
         res = str(await tool.execute(
             {
                 "path": file_path,
-                "old_str": "val = 1",
-                "new_str": "val = 42",
-                "start_line": 2,
-                "end_line": 2,
+                "old_str": "middle\nval = 1",
+                "new_str": "middle\nval = 42",
             }
         ))
         self.assertIn("-val = 1", res)
@@ -328,9 +325,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        self.assertEqual(lines, ["val = 1\n", "val = 42\n", "val = 1\n"])
+        self.assertEqual(lines, ["header\n", "val = 1\n", "middle\n", "val = 42\n", "footer\n"])
 
-    async def test_edit_out_of_range_error(self):
+    async def test_edit_duplicate_error(self):
         from tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_err.py")
@@ -339,55 +336,35 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # Search for target_line = 3 in lines 1-2 when multiple exist in file
         res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "target_line = 3",
                 "new_str": "target_line = 99",
-                "start_line": 1,
-                "end_line": 2,
             }
         ))
-        self.assertIn("ERR: match: target not found in specified range", res)
-        self.assertIn("matches multiple occurrences (2)", res)
+        self.assertIn("ERR: match: target matches 2 occurrences", res)
+        self.assertIn("Include 2-4 lines of surrounding context", res)
 
-    async def test_edit_tool_line_range_miss_fallback(self):
+    async def test_edit_tool_unique_target(self):
         from tools.edit import EditTool
 
-        file_path = os.path.join(self.test_dir, "fallback_test.py")
+        file_path = os.path.join(self.test_dir, "unique_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("val_a = 1\nval_b = 2\nunique_target = 42\nval_c = 4\n")
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # Range 1-2 does not include unique_target = 42 (line 3), but fallback succeeds because it is unique!
         res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "unique_target = 42",
                 "new_str": "unique_target = 100",
-                "start_line": 1,
-                "end_line": 2,
             }
         ))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertIn("unique_target = 100", f.read())
-
-        # Start line out of bounds, but target unique in file -> fallback succeeds!
-        res_oob = str(await tool.execute(
-            {
-                "path": file_path,
-                "old_str": "unique_target = 100",
-                "new_str": "unique_target = 200",
-                "start_line": 50,
-                "end_line": 60,
-            }
-        ))
-        self.assertNotIn("ERR:", res_oob)
-        with open(file_path, "r", encoding="utf-8") as f:
-            self.assertIn("unique_target = 200", f.read())
 
     async def test_edit_tool_end_line_auto_expansion(self):
         from tools.edit import EditTool
@@ -398,14 +375,11 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         await ReadTool().execute({"path": file_path})
 
         tool = EditTool()
-        # old_str is 3 lines starting at start_line=2, but end_line=3 (too short for 3 lines)
         res = str(await tool.execute(
             {
                 "path": file_path,
                 "old_str": "    a = 1\n    b = 2\n    c = 3",
                 "new_str": "    a = 10\n    b = 20\n    c = 30",
-                "start_line": 2,
-                "end_line": 3,
             }
         ))
         self.assertNotIn("ERR:", res)
@@ -414,29 +388,25 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("a = 10", content)
         self.assertIn("b = 20", content)
 
-    async def test_multi_edit(self):
+    async def test_edit_replace_all(self):
         file_path = os.path.join(self.test_dir, "multi_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("def fn_one():\n    return 1\n\ndef fn_two():\n    return 2\n")
+            f.write("def fn_one():\n    return 1\n\ndef fn_two():\n    return 1\n")
         await ReadTool().execute({"path": file_path})
 
-        tool = MultiEditTool()
+        tool = EditTool()
         res = str(await tool.execute(
             {
                 "path": file_path,
-                "edits": [
-                    {"start_line": 1, "end_line": 2, "old_str": "return 1", "new_str": "return 100"},
-                    {"start_line": 4, "end_line": 5, "old_str": "return 2", "new_str": "return 200"},
-                ],
+                "old_str": "return 1",
+                "new_str": "return 100",
+                "replace_all": True,
             }
         ))
         self.assertIn("return 100", res)
-        self.assertIn("return 200", res)
-
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
-        self.assertIn("return 100", content)
-        self.assertIn("return 200", content)
+        self.assertEqual(content.count("return 100"), 2)
 
     async def test_read_tool_800_line_window_and_hint(self):
         file_path = os.path.join(self.test_dir, "long_file.txt")

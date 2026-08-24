@@ -2,7 +2,7 @@ import os
 import unittest
 
 from tests.conftest import WindowsSafeTemporaryDirectory
-from tools.edit import EditTool, MultiEditTool, apply_chunk_replacements
+from tools.edit import EditTool, apply_edit
 
 
 class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
@@ -16,51 +16,14 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         os.chdir(self.old_cwd)
         self.temp_dir.cleanup()
 
-    def test_overlapping_chunks_raise_error(self):
-        content = "line 1\nline 2\nline 3\nline 4\nline 5\n"
-        raw_chunks = [
-            {"old_str": "line 2", "new_str": "line TWO", "start_line": 2, "end_line": 4},
-            {"old_str": "line 3", "new_str": "line THREE", "start_line": 3, "end_line": 5},
-        ]
-        with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(content, raw_chunks, "dummy.py")
-        self.assertIn("ERR: range: replacement chunks", str(ctx.exception))
-        self.assertIn("overlap", str(ctx.exception))
-
-    def test_non_overlapping_chunks_success(self):
-        content = "line 1\nline 2\nline 3\nline 4\nline 5\n"
-        raw_chunks = [
-            {"old_str": "line 2\n", "new_str": "line TWO\n", "start_line": 2, "end_line": 2},
-            {"old_str": "line 4\n", "new_str": "line FOUR\n", "start_line": 4, "end_line": 4},
-        ]
-        new_content, diff = apply_chunk_replacements(content, raw_chunks, "dummy.py")
-        self.assertIn("line TWO", new_content)
-        self.assertIn("line FOUR", new_content)
-        self.assertIn("-line 2", diff)
-        self.assertIn("+line TWO", diff)
-
     def test_crlf_preservation(self):
         content = "first line\r\nsecond line\r\nthird line\r\n"
-        raw_chunks = [
-            {
-                "old_str": "second line",
-                "new_str": "2nd line",
-                "start_line": 2,
-                "end_line": 2,
-            }
-        ]
-        new_content, _ = apply_chunk_replacements(content, raw_chunks, "dummy.py")
+        new_content, _ = apply_edit(content, "second line", "2nd line", False, "dummy.py")
         self.assertEqual(new_content, "first line\r\n2nd line\r\nthird line\r\n")
 
     def test_curly_quotes_normalization(self):
         content = "print('hello world')\n"
-        raw_chunks = [
-            {
-                "old_str": "print(‘hello world’)",
-                "new_str": "print(‘hello universe’)",
-            }
-        ]
-        new_content, _ = apply_chunk_replacements(content, raw_chunks, "dummy.py")
+        new_content, _ = apply_edit(content, "print(‘hello world’)", "print(‘hello universe’)", False, "dummy.py")
         self.assertEqual(new_content, "print('hello universe')\n")
 
     async def test_edit_tool_fallback_keys(self):
@@ -74,60 +37,50 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), "def bar():\n    pass\n")
 
-    async def test_multi_edit_tool_fallback_chunks(self):
-        tool = MultiEditTool()
+    async def test_edit_tool_replace_all(self):
+        tool = EditTool()
         file_path = os.path.join(self.test_dir, "test.py")
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write("a = 1\nb = 2\nc = 3\n")
+            f.write("val = 1\nval = 1\nval = 1\n")
 
-        res = str(await tool.execute(
-            {
-                "path": file_path,
-                "edits": [
-                    {"old_str": "a = 1", "new_str": "a = 10"},
-                    {"old_str": "c = 3", "new_str": "c = 30"},
-                ],
-            }
-        ))
+        res = str(await tool.execute({"path": file_path, "old_str": "val = 1", "new_str": "val = 2", "replace_all": True}))
         self.assertNotIn("ERR:", res)
         with open(file_path, "r", encoding="utf-8") as f:
-            self.assertEqual(f.read(), "a = 10\nb = 2\nc = 30\n")
+            self.assertEqual(f.read(), "val = 2\nval = 2\nval = 2\n")
 
     def test_empty_target_content_raises_error(self):
         content = "foo\nbar\n"
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(content, [{"old_str": "", "new_str": "baz"}], "dummy.py")
+            apply_edit(content, "", "baz", False, "dummy.py")
         self.assertIn("cannot be empty", str(ctx.exception))
+
+    def test_same_old_and_new_str_raises_error(self):
+        content = "foo\nbar\n"
+        with self.assertRaises(ValueError) as ctx:
+            apply_edit(content, "foo", "foo", False, "dummy.py")
+        self.assertIn("new_str must be different", str(ctx.exception))
 
     def test_deletion_of_block(self):
         content = "line 1\nline 2\nline 3\n"
-        new_content, _ = apply_chunk_replacements(
-            content, [{"old_str": "line 2\n", "new_str": ""}], "dummy.py"
+        new_content, _ = apply_edit(
+            content, "line 2\n", "", False, "dummy.py"
         )
         self.assertEqual(new_content, "line 1\nline 3\n")
 
     def test_multiple_occurrences_raises_error(self):
         content = "dup\ndup\ndup\n"
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(content, [{"old_str": "dup", "new_str": "unique"}], "dummy.py")
+            apply_edit(content, "dup", "unique", False, "dummy.py")
         self.assertIn("matches 3 occurrences", str(ctx.exception))
-
-    def test_out_of_bounds_start_line_raises_error(self):
-        content = "line 1\nline 1\n"
-        with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
-                content,
-                [{"old_str": "line 1", "new_str": "X", "start_line": 99, "end_line": 100}],
-                "dummy.py",
-            )
-        self.assertIn("exceeds file line count", str(ctx.exception))
 
     def test_fuzzy_hint_on_missing_target(self):
         content = "def calculate_total_price(items):\n    return sum(items)\n"
         with self.assertRaises(ValueError) as ctx:
-            apply_chunk_replacements(
+            apply_edit(
                 content,
-                [{"old_str": "def calculate_total_price(item_list):", "new_str": "pass"}],
+                "def calculate_total_price(item_list):",
+                "pass",
+                False,
                 "dummy.py",
             )
         self.assertIn("Nearest matching code", str(ctx.exception))

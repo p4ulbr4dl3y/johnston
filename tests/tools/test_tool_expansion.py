@@ -243,17 +243,15 @@ class TestToolExpansion(unittest.TestCase):
         self.assertIn("330 + // CTA form handler", rendered_plain)
         self.assertIn("331   const form = document.getElementById('cta-form');", rendered_plain)
 
-    def test_edit_tool_multi_replace_chunks(self):
+    def test_edit_tool_replace(self):
         widget = ToolCallWidget(
-            tool_type="multi_edit",
+            tool_type="edit",
             target="app.py",
             result_text="",
             args={
                 "path": "app.py",
-                "edits": [
-                    {"old_str": "x = 1", "new_str": "x = 10", "start_line": 15},
-                    {"old_str": "y = 2", "new_str": "y = 20", "start_line": 45},
-                ],
+                "old_str": "x = 1",
+                "new_str": "x = 10",
             },
         )
         widget.toggle_expanded()
@@ -261,10 +259,8 @@ class TestToolExpansion(unittest.TestCase):
         content = getattr(widget.content_widget, "_Static__content")
         self.assertIsInstance(content, (Text, DiffRenderable))
         rendered_plain = content.plain
-        self.assertIn("15 - x = 1", rendered_plain)
-        self.assertIn("15 + x = 10", rendered_plain)
-        self.assertIn("45 - y = 2", rendered_plain)
-        self.assertIn("45 + y = 20", rendered_plain)
+        self.assertIn("1 - x = 1", rendered_plain)
+        self.assertIn("1 + x = 10", rendered_plain)
 
     def test_shell_tool_append_output(self):
         widget = ToolCallWidget(tool_type="shell", target="echo 'live stream'", args={"command": "echo 'live stream'"})

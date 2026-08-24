@@ -29,7 +29,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         pm.set_session_override("read", "allow")
         pm.set_session_override("create", "allow")
         pm.set_session_override("edit", "allow")
-        pm.set_session_override("multi_edit", "allow")
 
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()

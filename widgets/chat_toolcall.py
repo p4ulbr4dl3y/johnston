@@ -305,7 +305,6 @@ DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",
     "create": "Create",
     "edit": "Edit",
-    "multi_edit": "Edit",
     "shell": "Shell",
     "ask_user": "AskUser",
     "manage_shell": "ManageShell",
@@ -333,7 +332,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     EXPANDABLE_TOOLS = {
         "create",
         "edit",
-        "multi_edit",
         "shell",
         "update_plan",
     }
@@ -814,7 +812,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     except Exception:
                         return "raw", self._format_code_with_line_numbers(content)
                 return "markup", self._clean_markup_text(self.result_text or "(No content)")
-            elif self.tool_type in ("edit", "multi_edit"):
+            elif self.tool_type == "edit":
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
                     return "markup", self._clean_markup_text(raw_text or "(Error)")
