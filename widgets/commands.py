@@ -604,6 +604,25 @@ class DiffCommand(BaseCommand):
         app.push_screen(DiffScreen(diff_items, title="Session Changes"))
 
 
+class SandboxCommand(BaseCommand):
+    name = "/sandbox"
+    aliases = ["/sb"]
+    description = "Toggle shell command sandbox (ON/OFF)"
+
+    async def execute(self, app) -> None:
+        if not hasattr(app, "sandbox_enabled"):
+            app.sandbox_enabled = False
+        app.sandbox_enabled = not app.sandbox_enabled
+        state_str = "ON" if app.sandbox_enabled else "OFF"
+        detail = "workspace-only" if app.sandbox_enabled else "full access"
+
+        if hasattr(app, "refresh_status_footer"):
+            app.refresh_status_footer()
+
+        if hasattr(app, "notify"):
+            app.notify(f"Sandbox: {state_str} ({detail})", severity="information", timeout=2.0)
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -620,4 +639,5 @@ COMMAND_CLASSES = [
     PermissionsCommand,
     QuestionsCommand,
     DiffCommand,
+    SandboxCommand,
 ]

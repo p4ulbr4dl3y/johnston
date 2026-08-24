@@ -1,0 +1,61 @@
+import os
+from unittest.mock import patch
+
+from core.infrastructure.platform.sandbox import (
+    build_sandboxed_command,
+    generate_seatbelt_profile,
+    get_sandbox_backend_name,
+    is_sandbox_supported,
+)
+
+
+def test_generate_seatbelt_profile():
+    cwd = os.path.abspath("/Users/test/my_project")
+    profile = generate_seatbelt_profile(cwd, extra_writable_roots=["/var/extra"])
+    assert "(version 1)" in profile
+    assert "(allow default)" in profile
+    assert "(deny file-write*" in profile
+    assert f'(require-not (subpath "{os.path.realpath(cwd)}"))' in profile
+    assert '(require-not (subpath "/tmp"))' in profile
+    assert '(require-not (subpath "/dev"))' in profile
+    assert ".ssh" in profile
+    assert ".aws" in profile
+
+
+def test_is_sandbox_supported():
+    with patch("platform.system", return_value="Darwin"), patch("os.path.exists", return_value=True):
+        assert is_sandbox_supported() is True
+        assert get_sandbox_backend_name() == "seatbelt"
+
+    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+        assert is_sandbox_supported() is True
+        assert get_sandbox_backend_name() == "bubblewrap"
+
+    with patch("platform.system", return_value="Windows"):
+        assert is_sandbox_supported() is False
+        assert get_sandbox_backend_name() == "none"
+
+
+def test_build_sandboxed_command_darwin():
+    with patch("platform.system", return_value="Darwin"), patch("os.path.exists", return_value=True):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
+        assert exe == "/usr/bin/sandbox-exec"
+        assert args[0] == "-p"
+        assert sandboxed is True
+        assert "echo 1" in args[-1]
+
+
+def test_build_sandboxed_command_linux():
+    with patch("platform.system", return_value="Linux"), patch("shutil.which", return_value="/usr/bin/bwrap"):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
+        assert exe == "/usr/bin/bwrap"
+        assert "--ro-bind" in args
+        assert sandboxed is True
+        assert "echo 1" in args[-1]
+
+
+def test_build_sandboxed_command_unsupported():
+    with patch("platform.system", return_value="Windows"):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
+        assert sandboxed is False
+        assert "echo 1" in args[-1]

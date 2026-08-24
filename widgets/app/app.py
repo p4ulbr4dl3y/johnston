@@ -68,6 +68,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.selection_copy_active = False
         self.message_queue = []
         self.is_generating = False
+        self.sandbox_enabled = False
 
     def copy_to_clipboard(self, text: str, notify: bool = True) -> None:
         """Copy text to both Textual clipboard (OSC 52) and native OS clipboard."""

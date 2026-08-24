@@ -98,6 +98,18 @@ class ToolContext:
         return getattr(self.host, "current_session_id", None)
 
     @property
+    def sandbox_enabled(self) -> bool:
+        """Returns whether shell command sandboxing is active."""
+        if self.host is None:
+            return False
+        val = getattr(self.host, "sandbox_enabled", False)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, (int, str)):
+            return str(val).lower() in ("true", "1", "yes", "on")
+        return False
+
+    @property
     def project_dir(self) -> str:
         """Returns the project directory from host app, or fallback to self.cwd / os.getcwd()."""
         if self.host:

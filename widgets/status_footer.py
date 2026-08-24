@@ -280,6 +280,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         mcp_active: int = 0,
         mcp_total: int = 0,
         attachments_count: int = 0,
+        sandbox_enabled: bool = False,
     ) -> None:
         if not directory:
             directory = os.getcwd()
@@ -339,7 +340,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
-            # Row 2 (Env): johnston • main (+3/-1)  <left> | <right> ⚡ 2a • 1s
+            # Row 2 (Env): johnston • main (+3/-1) • sb:on  <left> | <right> ⚡ 2a • 1s
             dir_basename = os.path.basename(os.path.abspath(directory)) or directory
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
             if branch and diff_text:
@@ -348,6 +349,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
+            row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
             row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
 
             task_parts = []
@@ -403,7 +405,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
 
-            # Row 2 (Env): ~/repo/johnston • main (+12/-3)  <left> | <right> ⚡ 2 agents • 1 shell • 4 MCP
+            # Row 2 (Env): ~/repo/johnston • main (+12/-3) • sandbox: on  <left> | <right> ⚡ 2 agents • 1 shell • 4 MCP
             max_path_len = min(50, max(25, width // 3))
             dir_text = format_display_path(directory, max_length=max_path_len)
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
@@ -413,6 +415,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
+            row2_left_parts.append(f"[{THEME_PRIMARY}]sandbox: on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sandbox: off[/]")
             row2_left = STATUS_SEP.join(row2_left_parts)
 
             service_parts = []

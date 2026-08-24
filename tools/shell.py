@@ -118,7 +118,8 @@ class ShellTool(BaseTool):
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
-        p = await self._create_std_process(cmd, env, cwd=proc_cwd)
+        sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
+        p = await self._create_std_process(cmd, env, cwd=proc_cwd, sandbox_enabled=sandbox_enabled)
 
         run_in_bg = bool(args.get("background", False))
         if run_in_bg and ctx.is_subagent:
@@ -238,7 +239,28 @@ class ShellTool(BaseTool):
                     except Exception:
                         pass
 
-    async def _create_std_process(self, command: str, env: dict[str, str], cwd: str = None):
+    async def _create_std_process(
+        self,
+        command: str,
+        env: dict[str, str],
+        cwd: str = None,
+        sandbox_enabled: bool = False,
+    ):
+        if sandbox_enabled:
+            from core.infrastructure.platform.sandbox import build_sandboxed_command
+
+            exe, args, is_sandboxed = build_sandboxed_command(command, cwd=cwd)
+            if is_sandboxed:
+                return await asyncio.create_subprocess_exec(
+                    exe,
+                    *args,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=env,
+                    cwd=cwd,
+                    **shell_subprocess_kwargs(),
+                )
         if is_windows():
             return await self._create_windows_process(command, env, cwd=cwd)
         return await asyncio.create_subprocess_shell(

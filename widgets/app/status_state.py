@@ -221,6 +221,7 @@ def build_status_kwargs(app, widget=None) -> dict:
         "mcp_active": mcp_active,
         "mcp_total": mcp_total,
         "attachments_count": attachments_count,
+        "sandbox_enabled": getattr(app, "sandbox_enabled", False) if app else False,
     }
 
 

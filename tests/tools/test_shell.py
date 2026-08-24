@@ -864,3 +864,18 @@ def inspect_has_no_destructive_guard():
     from tools import shell as shell_mod
 
     return "mkfs" not in _i.getsource(shell_mod) and "rm -rf" not in _i.getsource(shell_mod)
+
+
+async def test_shell_sandbox_enabled_invokes_sandboxed_command(tool, make_tool_context):
+    ctx = _ctx(make_tool_context)
+    ctx.host.sandbox_enabled = True
+    with patch("core.infrastructure.platform.sandbox.build_sandboxed_command") as mock_build, \
+         patch("asyncio.create_subprocess_exec") as mock_exec:
+        mock_build.return_value = ("/usr/bin/sandbox-exec", ["-p", "(profile)", "/bin/sh", "-c", "echo test"], True)
+        mock_proc = _process(wait_result=0, stdout=None)
+        mock_exec.return_value = mock_proc
+
+        await tool.execute({"command": "echo test"}, ctx=ctx)
+        mock_build.assert_called_once()
+        mock_exec.assert_called_once()
+

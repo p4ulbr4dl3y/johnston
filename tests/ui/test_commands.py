@@ -1435,6 +1435,26 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         await QuestionsCommand().execute(app)
         self.assertEqual(app.notified, [("No pending questions", "warning")])
 
+    async def test_sandbox_command_toggles_state(self):
+        from widgets.commands import SandboxCommand
+
+        app = SimpleApp()
+        app.sandbox_enabled = False
+        app.notify = MagicMock()
+        app.refresh_status_footer = MagicMock()
+
+        cmd = SandboxCommand()
+        await cmd.execute(app)
+        self.assertTrue(app.sandbox_enabled)
+        app.refresh_status_footer.assert_called_once()
+        app.notify.assert_called_once_with("Sandbox: ON (workspace-only)", severity="information", timeout=2.0)
+
+        app.notify.reset_mock()
+        await cmd.execute(app)
+        self.assertFalse(app.sandbox_enabled)
+        app.notify.assert_called_once_with("Sandbox: OFF (full access)", severity="information", timeout=2.0)
+
+
 
 # ---------------------------------------------------------------------------
 # widgets/app/status_state.py
