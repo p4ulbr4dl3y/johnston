@@ -35,8 +35,8 @@ class TestThinkingEffortResolver(unittest.TestCase):
         screen = ThinkingEffortScreen("medium")
 
         self.assertEqual(screen.default_value, "medium")
-        self.assertIn(r"\[ACTIVE]", screen.raw_options[2])
-        self.assertNotIn(r"\[ACTIVE]", screen.raw_options[0])
+        self.assertIn("●", screen.raw_options[2])
+        self.assertNotIn("●", screen.raw_options[0])
 
 
 class TestThinkingEffortProviderManager(unittest.TestCase):

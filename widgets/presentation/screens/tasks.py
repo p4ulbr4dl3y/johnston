@@ -83,7 +83,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     def _on_output(self, text: str) -> None:
         """Live chunk from the task; the final empty signal flushes the tail."""
         if text:
-            self._consume(text)
+            self._consume(strip_ansi(text))
         else:
             self._flush_pending()
 

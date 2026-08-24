@@ -19,7 +19,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             escaped_title = escape(title)
             count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"
-            prefix = f"{status_tag('ACTIVE')} " if (current_session_id and sid == str(current_session_id)) else ""
+            prefix = f" {status_tag('ACTIVE')} " if (current_session_id and sid == str(current_session_id)) else "   "
             options.append(f"{prefix}{escaped_title} [dim]{escape(f'({count} {step_str})')}[/dim]")
 
         if current_session_id and str(current_session_id) in items:

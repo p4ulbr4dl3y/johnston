@@ -9,7 +9,7 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
         items = [EFFORT_AUTO, "low", "medium", "high"]
         options = []
         for item in items:
-            prefix = f"{status_tag('ACTIVE')} " if item == current else ""
+            prefix = f" {status_tag('ACTIVE')} " if item == current else "   "
             options.append(f"{prefix}{item.capitalize()}")
         super().__init__(
             "### **Select Thinking Effort**",

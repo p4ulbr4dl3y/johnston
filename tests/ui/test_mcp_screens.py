@@ -374,12 +374,12 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.refresh_list()
             calls = [str(c.args[0]) for c in opt_list.add_option.call_args_list]
             joined = "\n".join(calls)
-            self.assertIn("OFF", joined)
+            self.assertIn("○", joined)
             self.assertIn("2 tools", joined)
             self.assertIn("URL unsupported", joined)
             self.assertIn("Start failed", joined)
             self.assertIn("Timeout", joined)
-            self.assertIn("[ON]", joined)
+            self.assertIn("●", joined)
             # first selectable row is index 1 (GLOBAL header is index 0)
             self.assertEqual(opt_list.highlighted, 1)
 

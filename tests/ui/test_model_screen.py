@@ -35,8 +35,8 @@ class TestModelScreenBuildData(unittest.TestCase):
             [None, ("prov1", "model-a", "Provider 1"), ("prov1", "model-b", "Provider 1")],
         )
         self.assertEqual(screen.default_value, ("prov1", "model-a", "Provider 1"))
-        self.assertIn("[ACTIVE]", screen.raw_options[1])
-        self.assertNotIn("[ACTIVE]", screen.raw_options[2])
+        self.assertIn("●", screen.raw_options[1])
+        self.assertNotIn("●", screen.raw_options[2])
 
     def test_build_data_dict_empty_models_and_separator(self):
         data = {
@@ -57,13 +57,13 @@ class TestModelScreenBuildData(unittest.TestCase):
         screen = ModelScreen(models_data=["model-a", "model-b"], current_model="model-a", current_provider="prov1")
         self.assertEqual(screen.raw_items, ["model-a", "model-b"])
         self.assertEqual(screen.default_value, "model-a")
-        self.assertIn("[ACTIVE]", screen.raw_options[0])
-        self.assertNotIn("[ACTIVE]", screen.raw_options[1])
+        self.assertIn("●", screen.raw_options[0])
+        self.assertNotIn("●", screen.raw_options[1])
 
     def test_build_data_list_no_target_falls_back_to_first(self):
         screen = ModelScreen(models_data=["model-a"], current_model="", current_provider="")
         self.assertEqual(screen.default_value, "model-a")
-        self.assertNotIn("[ACTIVE]", screen.raw_options[0])
+        self.assertNotIn("●", screen.raw_options[0])
 
 
 class ModelHostApp(App[None]):

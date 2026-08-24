@@ -7,10 +7,24 @@ from widgets.utils.key_aliases import expand_bindings
 T = TypeVar("T")
 
 
+STATUS_TAG_MAP = {
+    "ACTIVE": "●",
+    "ON": "●",
+    "OFF": "○",
+    "ALLOW": "✓",
+    "DENY": "✕",
+    "ASK": "?",
+    "AUTH": " ",
+    "ERR": "▲",
+    "VISIBLE": "●",
+    "HIDDEN": "○",
+}
+
+
 def status_tag(mode: str) -> str:
-    r"""Escapes status tag brackets for Textual markup, e.g. 'ON' -> r'\[ON]'."""
+    """Returns clean Unicode status indicator for OptionList items."""
     clean = str(mode).strip("[]").upper()
-    return rf"\[{clean}]"
+    return STATUS_TAG_MAP.get(clean, clean)
 
 
 class BaseModalScreen(ModalScreen[T]):

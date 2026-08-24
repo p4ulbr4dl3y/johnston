@@ -142,9 +142,9 @@ class TestPermissionsScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.query_one = MagicMock(return_value=opt_list)
             screen.refresh_list()
             joined = "\n".join(str(c.args[0]) for c in opt_list.add_option.call_args_list)
-            self.assertIn("[DENY] read", joined)
-            self.assertIn("[ALLOW] create", joined)
-            self.assertIn("[ASK] web_fetch", joined)
+            self.assertIn("✕ read", joined)
+            self.assertIn("✓ create", joined)
+            self.assertIn("? web_fetch", joined)
             self.assertIn("Builtin", joined)
 
     def _setup_key_harness(self, screen, highlighted=None, filtered=None, focus=True):

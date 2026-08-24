@@ -33,7 +33,7 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(len(s.raw_options), 2)
         self.assertNotIn("\n", s.raw_options[1])
         self.assertIn("Second multiline session", s.raw_options[1])
-        self.assertIn("[dim][5 steps][/dim]", s.raw_options[0])
+        self.assertIn("[dim](5 steps)[/dim]", s.raw_options[0])
         self.assertEqual(s.raw_items, ["s1", "s2"])
         self.assertEqual(s.default_value, "s1")
 
@@ -43,8 +43,8 @@ class TestResumeScreen(unittest.TestCase):
             {"id": "s2", "title": "Second session", "message_count": 10},
         ]
         s = ResumeScreen(sessions, current_session_id="s2")
-        self.assertNotIn("\\[ACTIVE]", s.raw_options[0])
-        self.assertIn("\\[ACTIVE] Second session", s.raw_options[1])
+        self.assertNotIn("●", s.raw_options[0])
+        self.assertIn("● Second session", s.raw_options[1])
         self.assertEqual(s.default_value, "s2")
 
     def test_init_empty(self):
@@ -222,16 +222,16 @@ class TestProvidersScreen(unittest.TestCase):
         )
         opts, items = s.raw_options, s.raw_items
         self.assertEqual(items, ["active", "off", "auth", "on"])
-        self.assertIn("ACTIVE", next(o for o, i in zip(opts, items) if i == "active"))
-        self.assertIn("OFF", next(o for o, i in zip(opts, items) if i == "off"))
-        self.assertIn("AUTH", next(o for o, i in zip(opts, items) if i == "auth"))
-        self.assertIn("ON", next(o for o, i in zip(opts, items) if i == "on"))
+        self.assertIn("●", next(o for o, i in zip(opts, items) if i == "active"))
+        self.assertIn("○", next(o for o, i in zip(opts, items) if i == "off"))
+        self.assertNotIn("●", next(o for o, i in zip(opts, items) if i == "auth"))
+        self.assertIn("●", next(o for o, i in zip(opts, items) if i == "on"))
 
     def test_provider_without_key_shows_auth(self):
         s = ProvidersScreen(
             providers={"custom": {"key": "custom", "name": "Custom"}}, active_key="", configured_keys={}
         )
-        self.assertIn("AUTH", s.raw_options[0])
+        self.assertNotIn("●", s.raw_options[0])
 
     def test_default_falls_back_to_first(self):
         s = ProvidersScreen(providers={"p1": {"key": "p1", "name": "P1"}}, active_key="nope", configured_keys={})
@@ -318,9 +318,9 @@ class TestSkillScreens(unittest.TestCase):
         s = SkillsScreen()
         self.assertEqual(len(s.options), 2)
         self.assertIn("skill-a", s.options[0])
-        self.assertIn("VISIBLE", s.options[0])
+        self.assertIn("●", s.options[0])
         self.assertIn("skill-b", s.options[1])
-        self.assertIn("VISIBLE", s.options[1])
+        self.assertIn("●", s.options[1])
 
     @patch("widgets.presentation.screens.skills.SkillManager")
     def test_list_init_no_skills(self, mock_sm_cls):
@@ -342,7 +342,7 @@ class TestSkillScreens(unittest.TestCase):
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 1)
-        self.assertIn("[HIDDEN]", s.options[0])
+        self.assertIn("○", s.options[0])
 
         s.query_one = MagicMock()
         mock_opt_list = MagicMock()

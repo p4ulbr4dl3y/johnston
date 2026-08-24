@@ -61,7 +61,7 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             else:
                 stag = status_tag("AUTH")
 
-            options.append(f"{stag} {name}")
+            options.append(f"   {stag} {name}")
             items.append(key)
         return options, items
 
