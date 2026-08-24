@@ -116,6 +116,37 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertEqual(batch_stats[1], "+1 / -0")
         self.assertIsNone(batch_stats[2])
 
+    def test_get_checkpoint_diff_and_split(self):
+        repo_path = self._init_git_repo()
+        GitCheckpointManager.create_checkpoint("session_diff", 0, project_path=repo_path)
+
+        mod_file = os.path.join(repo_path, "initial.txt")
+        with open(mod_file, "a") as f:
+            f.write("second line\n")
+
+        new_file = os.path.join(repo_path, "added.txt")
+        with open(new_file, "w") as f:
+            f.write("new content\n")
+
+        # Test diff with specific message index
+        diffs = GitCheckpointManager.get_checkpoint_diff("session_diff", 0, project_path=repo_path)
+        self.assertEqual(len(diffs), 2)
+        paths = [d[0] for d in diffs]
+        self.assertIn("initial.txt", paths)
+        self.assertIn("added.txt", paths)
+
+        # Test diff with message_index=None (finds earliest checkpoint 0)
+        diffs_auto = GitCheckpointManager.get_checkpoint_diff("session_diff", None, project_path=repo_path)
+        self.assertEqual(len(diffs_auto), 2)
+
+        # Test empty diff on unmodified repo
+        GitCheckpointManager.create_checkpoint("session_clean", 0, project_path=repo_path)
+        clean_diffs = GitCheckpointManager.get_checkpoint_diff("session_clean", 0, project_path=repo_path)
+        self.assertEqual(clean_diffs, [])
+
+        # Test _split_git_diff with empty string
+        self.assertEqual(GitCheckpointManager._split_git_diff(""), [])
+
 
 if __name__ == "__main__":
     unittest.main()

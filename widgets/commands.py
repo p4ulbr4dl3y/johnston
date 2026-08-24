@@ -338,7 +338,13 @@ class RewindCommand(BaseCommand):
             app.query_one(MESSAGE_INPUT).focus()
 
         result = app.push_screen(
-            RewindScreen(msgs_with_stats, checkpoints_enabled=checkpoints_enabled), callback=on_rewind_selected
+            RewindScreen(
+                msgs_with_stats,
+                checkpoints_enabled=checkpoints_enabled,
+                session_id=curr_sid,
+                project_path=proj_path,
+            ),
+            callback=on_rewind_selected,
         )
         # Test doubles may return a coroutine for the async callback; the real
         # Textual push_screen is synchronous and returns None.
@@ -574,6 +580,30 @@ class QuestionsCommand(BaseCommand):
                 app.notify("No pending questions", severity="warning")
 
 
+class DiffCommand(BaseCommand):
+    name = "/diff"
+    aliases = ["/changes", "/status", "/patch"]
+    description = "View workspace diff since session checkpoint"
+
+    async def execute(self, app) -> None:
+        from core.application.session.actions import get_session_diff
+        from widgets.presentation.screens.diff import DiffScreen
+
+        curr_sid = getattr(app, "current_session_id", None)
+        proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
+
+        if not curr_sid:
+            app.notify("No active session found", severity="warning")
+            return
+
+        diff_items = await get_session_diff(curr_sid, project_path=proj_path)
+        if not diff_items:
+            app.notify("No workspace changes found since session start", severity="info")
+            return
+
+        app.push_screen(DiffScreen(diff_items, title="Session Changes"))
+
+
 COMMAND_CLASSES = [
     HelpCommand,
     NewCommand,
@@ -589,4 +619,5 @@ COMMAND_CLASSES = [
     CompactCommand,
     PermissionsCommand,
     QuestionsCommand,
+    DiffCommand,
 ]

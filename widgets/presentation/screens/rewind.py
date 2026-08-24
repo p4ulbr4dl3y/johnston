@@ -33,10 +33,14 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self,
         user_messages: list[RewindEntry],
         checkpoints_enabled: bool = True,
+        session_id: Optional[str] = None,
+        project_path: Optional[str] = None,
     ):
         super().__init__()
         self.user_messages = user_messages
         self.checkpoints_enabled = checkpoints_enabled
+        self.session_id = session_id
+        self.project_path = project_path
         self.step = 1
         self.selected_entry: Optional[RewindEntry] = None
         self.selected_step1_index: Optional[int] = None
@@ -121,8 +125,9 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         step2_options = [
             "Rollback conversation & files [dim](revert code)[/dim]",
             "Rollback conversation only [dim](keep current code)[/dim]",
+            "View changes diff [dim](inspect code changes)[/dim]",
         ]
-        step2_actions = ["both", "conversation"]
+        step2_actions = ["both", "conversation", "diff"]
 
         self.filtered_options = step2_options
         self.filtered_items = step2_actions
@@ -141,6 +146,38 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             hint.update("enter: select • ↑↓: nav • esc: back to messages")
         except Exception:
             pass
+
+    def _open_diff_viewer(self, entry: RewindEntry) -> None:
+        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+        from widgets.presentation.screens.diff import DiffScreen
+
+        seq_idx = 0
+        for i, m in enumerate(self.user_messages):
+            if m.index == entry.index:
+                seq_idx = i
+                break
+
+        diff_items = []
+        if self.session_id:
+            try:
+                diff_items = GitCheckpointManager.get_checkpoint_diff(
+                    self.session_id, seq_idx, project_path=self.project_path
+                )
+            except Exception:
+                diff_items = []
+
+        clean = " ".join(entry.text.replace("\n", " ").replace("\r", " ").split())
+        if len(clean) > 30:
+            clean = clean[:30] + "..."
+        clean_preview = clean or "(empty message)"
+
+        try:
+            app = self.app
+        except Exception:
+            app = None
+
+        if app:
+            app.push_screen(DiffScreen(diff_items, title=f"Rollback: {clean_preview}"))
 
     def _show_step_1(self) -> None:
         self.step = 1
@@ -210,6 +247,8 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
                 self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=True))
             elif action == "conversation" and self.selected_entry is not None:
                 self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=False))
+            elif action == "diff" and self.selected_entry is not None:
+                self._open_diff_viewer(self.selected_entry)
             event.stop()
             return
 

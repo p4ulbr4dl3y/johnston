@@ -237,6 +237,47 @@ async def get_rewind_git_stats(
 
 
 # ---------------------------------------------------------------------------
+# get_session_diff
+# ---------------------------------------------------------------------------
+
+async def get_session_diff(
+    current_session_id: str | None,
+    message_index: Optional[int] = None,
+    project_path: str | None = None,
+) -> list[tuple[str, str, int, int]]:
+    """Fetch git-checkpoint full diff between checkpoint and current workspace.
+
+    Returns a list of tuples: (file_path, diff_text, added_lines, deleted_lines).
+    """
+    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+
+    if not current_session_id:
+        return []
+
+    try:
+        checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, project_path)
+    except Exception:
+        checkpoints_enabled = False
+
+    if not checkpoints_enabled:
+        return []
+
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                GitCheckpointManager.get_checkpoint_diff,
+                current_session_id,
+                message_index,
+                project_path=project_path,
+            ),
+            timeout=5.0,
+        )
+    except Exception as e:
+        logger.warning("Failed to fetch session diff: %s", e)
+        return []
+
+
+# ---------------------------------------------------------------------------
 # rewind_session
 # ---------------------------------------------------------------------------
 

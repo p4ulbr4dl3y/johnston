@@ -1,5 +1,6 @@
 import hashlib
 import os
+import re
 import threading
 import uuid
 from contextlib import contextmanager
@@ -379,3 +380,110 @@ class GitCheckpointManager:
         """
         details = cls.get_diff_details_batch(session_id, message_indices, project_path=project_path)
         return {idx: (res[0] if res else None) for idx, res in details.items()}
+
+    @classmethod
+    def _split_git_diff(cls, diff_output: str) -> list[tuple[str, str, int, int]]:
+        """Splits full unified git diff into per-file chunks: (file_path, diff_text, added, deleted)."""
+        if not diff_output or not diff_output.strip():
+            return []
+
+        chunks = re.split(r"(?=^diff --git )", diff_output.strip(), flags=re.MULTILINE)
+        results: list[tuple[str, str, int, int]] = []
+        for chunk in chunks:
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+
+            file_path = ""
+            match = re.search(r"^diff --git a/(.*?) b/(.*)$", chunk, re.MULTILINE)
+            if match:
+                file_path = match.group(2)
+            else:
+                plus_match = re.search(r"^\+\+\+ b/(.*)$", chunk, re.MULTILINE)
+                if plus_match:
+                    file_path = plus_match.group(1)
+                else:
+                    minus_match = re.search(r"^--- a/(.*)$", chunk, re.MULTILINE)
+                    file_path = minus_match.group(1) if minus_match else "unknown"
+
+            if file_path.startswith('"') and file_path.endswith('"'):
+                file_path = file_path[1:-1]
+
+            added = 0
+            deleted = 0
+            in_hunk = False
+            for line in chunk.splitlines():
+                if line.startswith("@@"):
+                    in_hunk = True
+                    continue
+                if in_hunk:
+                    if line.startswith("+") and not line.startswith("+++"):
+                        added += 1
+                    elif line.startswith("-") and not line.startswith("---"):
+                        deleted += 1
+
+            results.append((file_path, chunk, added, deleted))
+        return results
+
+    @classmethod
+    def get_checkpoint_diff(
+        cls,
+        session_id: str,
+        message_index: Optional[int] = None,
+        project_path: Optional[str] = None,
+    ) -> list[tuple[str, str, int, int]]:
+        """Calculates full diff between a session checkpoint and the current workspace.
+
+        If message_index is None, finds the earliest available checkpoint for the session.
+        Returns a list of tuples: (file_path, diff_text, added_lines, deleted_lines).
+        """
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        with cls._get_lock(cwd):
+            if not cls.is_git_repo(cwd):
+                return []
+
+            cls._ensure_shadow_exclude(shadow_dir)
+
+            target_commit: Optional[str] = None
+            if message_index is not None:
+                ref_name = cls.get_ref_name(session_id, message_index)
+                rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=0.5)
+                if rev_res.returncode == 0:
+                    target_commit = rev_res.stdout.strip()
+            else:
+                refs_res = run_git(
+                    ["for-each-ref", "--format=%(refname)", f"{cls.REF_PREFIX}/{session_id}/*"],
+                    cwd=shadow_dir,
+                    timeout=0.5,
+                )
+                if refs_res.returncode == 0 and refs_res.stdout.strip():
+                    valid_refs = []
+                    for ref in refs_res.stdout.splitlines():
+                        ref = ref.strip()
+                        if not ref:
+                            continue
+                        try:
+                            idx = int(ref.rstrip("/").split("/")[-1])
+                            valid_refs.append((idx, ref))
+                        except ValueError:
+                            pass
+                    if valid_refs:
+                        valid_refs.sort(key=lambda x: x[0])
+                        earliest_ref = valid_refs[0][1]
+                        rev_res = run_git(["rev-parse", "--verify", earliest_ref], cwd=shadow_dir, timeout=0.5)
+                        if rev_res.returncode == 0:
+                            target_commit = rev_res.stdout.strip()
+
+            if not target_commit:
+                return []
+
+            with cls._shadow_index_env(shadow_dir, cwd) as env:
+                add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=2.0)
+                if add_res.returncode != 0:
+                    return []
+
+                diff_res = run_git(["diff", "--cached", target_commit], cwd=cwd, env=env, timeout=3.0)
+                if diff_res.returncode != 0 or not diff_res.stdout.strip():
+                    return []
+
+                return cls._split_git_diff(diff_res.stdout)

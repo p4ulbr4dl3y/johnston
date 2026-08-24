@@ -582,16 +582,12 @@ ModalScreen {
     margin: 0;
 }
 
-.modal-markdown MarkdownBulletList,
-#modal-dialog .modal-markdown MarkdownBulletList,
 .modal-markdown-centered MarkdownBulletList,
 #modal-dialog .modal-markdown-centered MarkdownBulletList {
     color: #a1a1aa;
     margin-bottom: 1;
 }
 
-.modal-markdown MarkdownBulletList MarkdownParagraph,
-#modal-dialog .modal-markdown MarkdownBulletList MarkdownParagraph,
 .modal-markdown-centered MarkdownBulletList MarkdownParagraph,
 #modal-dialog .modal-markdown-centered MarkdownBulletList MarkdownParagraph {
     color: #a1a1aa;
@@ -602,7 +598,6 @@ ModalScreen {
 }
 
 .modal-markdown.confirm-summary MarkdownBulletList {
-    color: #a1a1aa;
     margin-bottom: 1;
 }
 
@@ -614,8 +609,122 @@ ModalScreen {
     margin-bottom: 0;
 }
 
-SubagentViewScreen {
+DiffScreen {
     background: #09090b;
+}
+
+#diff-container {
+    width: 100%;
+    height: 100%;
+    layout: vertical;
+    background: #09090b;
+}
+
+#diff-header {
+    width: 100%;
+    height: 3;
+    padding: 1 2 0 2;
+    background: #18181b;
+    border-bottom: solid #27272a;
+    color: #71717a;
+}
+
+#diff-body {
+    width: 100%;
+    height: 1fr;
+    layout: horizontal;
+    background: #09090b;
+}
+
+#diff-sidebar {
+    width: 34;
+    height: 100%;
+    background: #18181b;
+    border-right: solid #27272a;
+    padding: 0;
+}
+
+#diff-sidebar-title {
+    width: 100%;
+    height: 2;
+    padding: 0 2;
+    content-align: left middle;
+    color: #71717a;
+    text-style: bold;
+    background: #18181b;
+}
+
+#diff-file-list,
+#diff-file-list:focus,
+#diff-file-list:hover {
+    height: 1fr;
+    background: transparent !important;
+    border: none !important;
+    margin: 0;
+    padding: 0 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    text-overflow: ellipsis;
+    scrollbar-size: 0 0;
+}
+
+#diff-file-list > .option-list--option {
+    background: transparent;
+    padding: 0 1;
+}
+
+#diff-file-list > .option-list--option-highlighted,
+#diff-file-list > .option-list--option-blur-highlighted {
+    background: #ffffff;
+    color: #09090b;
+    text-style: bold;
+}
+
+#diff-content-container {
+    width: 1fr;
+    height: 100%;
+    padding: 0 2 0 2;
+    background: #09090b;
+}
+
+#diff-scroll-box,
+#diff-scroll-box:focus {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: auto;
+    background: transparent;
+    border: none;
+    padding: 0 1;
+    scrollbar-size: 0 0 !important;
+}
+
+#diff-content-view {
+    width: 100%;
+    height: auto;
+    background: transparent;
+    color: #f4f4f5;
+    padding: 0;
+    margin: 0;
+}
+
+#diff-empty-container {
+    width: 100%;
+    height: 1fr;
+    align: center middle;
+}
+
+#diff-empty-label {
+    color: #71717a;
+}
+
+#diff-footer {
+    width: 100%;
+    height: 3;
+    padding: 0 2 1 2;
+    background: #18181b;
+    border-top: solid #27272a;
+    color: #71717a;
 }
 
 #modal-dialog.bash-confirm-dialog {

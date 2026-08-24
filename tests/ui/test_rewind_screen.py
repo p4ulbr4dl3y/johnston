@@ -58,8 +58,18 @@ class TestRewindScreen(unittest.TestCase):
         self.assertEqual(screen.step, 2)
         self.assertEqual(screen.selected_entry, user_messages[0])
         self.assertIsNone(dismissed_val)
-        self.assertEqual(len(screen.filtered_items), 2)
-        self.assertEqual(screen.filtered_items, ["both", "conversation"])
+        self.assertEqual(len(screen.filtered_items), 3)
+        self.assertEqual(screen.filtered_items, ["both", "conversation", "diff"])
+
+        # Step 2: choose 'diff'
+        mock_app = MagicMock()
+        screen.session_id = "test-session"
+        screen._show_step_2(user_messages[0])
+        mock_event.option_index = 2
+        with unittest.mock.patch.object(RewindScreen, "app", new=mock_app):
+            screen.on_option_list_option_selected(mock_event)
+            mock_app.push_screen.assert_called_once()
+        self.assertIsNone(dismissed_val)  # diff does not dismiss rewind dialog
 
         # Step 2: choose 'conversation'
         screen._show_step_2(user_messages[1])
