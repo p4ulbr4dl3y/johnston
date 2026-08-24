@@ -260,6 +260,11 @@ class ReadTool(BaseTool):
         if not raw_path:
             return ToolResult.error("params", name="path", detail="missing or empty")
         path = resolve_path(raw_path, cwd=ctx.cwd)
+        if getattr(ctx, "sandbox_enabled", False):
+            from core.infrastructure.platform.sandbox import is_path_readable_in_sandbox
+
+            if not is_path_readable_in_sandbox(path, cwd=ctx.cwd):
+                return ToolResult.error("permission", f"sandbox restriction: read not permitted for sensitive path '{path}'")
         def _inspect_path() -> ToolResult | tuple[str, str | None]:
             if not os.path.exists(path):
                 parent_dir = os.path.dirname(path) or "."

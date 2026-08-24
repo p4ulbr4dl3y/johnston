@@ -1,4 +1,4 @@
-"""Cross-platform sandbox execution helper for shell commands.
+"""Cross-platform sandbox execution helper for shell commands and file tools.
 
 Provides lightweight OS-level isolation for shell tasks:
 - macOS: uses /usr/bin/sandbox-exec with dynamically generated SBPL profiles.
@@ -34,6 +34,57 @@ def get_sandbox_backend_name() -> str:
     if platform.system() == "Linux" and shutil.which("bwrap") is not None:
         return "bubblewrap"
     return "none"
+
+
+def is_path_writable_in_sandbox(
+    path: str,
+    cwd: Optional[str] = None,
+    extra_writable_roots: Optional[List[str]] = None,
+) -> bool:
+    """Check if path is inside allowed writable roots in sandbox mode."""
+    target_abs = os.path.realpath(os.path.abspath(path))
+    workspace = os.path.realpath(os.path.abspath(cwd or os.getcwd()))
+
+    allowed_roots = [workspace, "/tmp", "/private/tmp", "/dev"]
+    sys_temp = tempfile.gettempdir()
+    if sys_temp:
+        allowed_roots.append(os.path.realpath(os.path.abspath(sys_temp)))
+
+    if extra_writable_roots:
+        for p in extra_writable_roots:
+            allowed_roots.append(os.path.realpath(os.path.abspath(p)))
+
+    for root in allowed_roots:
+        clean_root = root.rstrip(os.sep)
+        if target_abs == clean_root or target_abs.startswith(clean_root + os.sep):
+            return True
+    return False
+
+
+def is_path_readable_in_sandbox(
+    path: str,
+    cwd: Optional[str] = None,
+    extra_deny_read_paths: Optional[List[str]] = None,
+) -> bool:
+    """Check if path is allowed for reading in sandbox mode (blocks sensitive paths)."""
+    target_abs = os.path.realpath(os.path.abspath(path))
+    home = os.path.realpath(os.path.expanduser("~"))
+
+    deny_roots = [
+        os.path.join(home, ".ssh"),
+        os.path.join(home, ".aws"),
+        os.path.join(home, ".gnupg"),
+    ]
+    if extra_deny_read_paths:
+        for p in extra_deny_read_paths:
+            deny_roots.append(os.path.realpath(os.path.abspath(p)))
+
+    for deny in deny_roots:
+        deny_real = os.path.realpath(os.path.abspath(deny))
+        clean_deny = deny_real.rstrip(os.sep)
+        if target_abs == clean_deny or target_abs.startswith(clean_deny + os.sep):
+            return False
+    return True
 
 
 def generate_seatbelt_profile(

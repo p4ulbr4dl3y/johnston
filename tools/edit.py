@@ -191,6 +191,11 @@ class EditTool(BaseTool):
         replace_all = bool(args.get("replace_all", args.get("allow_multiple", False)))
 
         path = resolve_path(str(path_arg), cwd=ctx.cwd)
+        if getattr(ctx, "sandbox_enabled", False):
+            from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
+
+            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
+                return ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
 
         def _do_edit() -> ToolResult:
             if not path or not os.path.exists(path):

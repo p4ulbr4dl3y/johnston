@@ -5,6 +5,8 @@ from core.infrastructure.platform.sandbox import (
     build_sandboxed_command,
     generate_seatbelt_profile,
     get_sandbox_backend_name,
+    is_path_readable_in_sandbox,
+    is_path_writable_in_sandbox,
     is_sandbox_supported,
 )
 
@@ -59,3 +61,17 @@ def test_build_sandboxed_command_unsupported():
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert sandboxed is False
         assert "echo 1" in args[-1]
+
+
+def test_is_path_writable_in_sandbox():
+    cwd = "/Users/test/workspace"
+    assert is_path_writable_in_sandbox("/Users/test/workspace/file.txt", cwd=cwd) is True
+    assert is_path_writable_in_sandbox("/tmp/file.txt", cwd=cwd) is True
+    assert is_path_writable_in_sandbox("/Users/test/other_dir/file.txt", cwd=cwd) is False
+
+
+def test_is_path_readable_in_sandbox():
+    home = os.path.expanduser("~")
+    assert is_path_readable_in_sandbox(os.path.join(home, ".ssh", "id_rsa")) is False
+    assert is_path_readable_in_sandbox(os.path.join(home, ".aws", "credentials")) is False
+    assert is_path_readable_in_sandbox("/Users/test/workspace/file.txt") is True

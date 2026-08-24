@@ -35,6 +35,11 @@ class CreateTool(BaseTool):
         if not path_arg or not str(path_arg).strip():
             return ToolResult.error("params", name="path", detail="missing or empty")
         path = resolve_path(path_arg, cwd=ctx.cwd)
+        if getattr(ctx, "sandbox_enabled", False):
+            from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
+
+            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
+                return ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
 
         def _probe():
             """Run sync filesystem checks off the event loop, returning (existed, old_content)."""

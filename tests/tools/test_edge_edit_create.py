@@ -410,6 +410,25 @@ class TestCreateTool(_Base):
         self.assertIn("ERR:", res)
         self.assertFalse(os.path.exists(p))
 
+    async def test_create_and_edit_sandbox_restriction(self):
+        from unittest.mock import MagicMock
+        ctx = MagicMock()
+        ctx.cwd = self.tmp
+        ctx.sandbox_enabled = True
+
+        create_tool = CreateTool()
+        edit_tool = EditTool()
+
+        outside_path = "/Users/nonexistent_test_user_xyz/outside.txt"
+        res_create = str(await create_tool.execute({"path": outside_path, "content": "data"}, ctx=ctx))
+        self.assertIn("ERR: permission", res_create)
+        self.assertIn("sandbox restriction", res_create)
+
+        res_edit = str(await edit_tool.execute({"path": outside_path, "old_str": "a", "new_str": "b"}, ctx=ctx))
+        self.assertIn("ERR: permission", res_edit)
+        self.assertIn("sandbox restriction", res_edit)
+
 
 if __name__ == "__main__":
     unittest.main()
+
