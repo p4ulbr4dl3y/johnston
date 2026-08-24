@@ -2,6 +2,7 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, Static
@@ -11,6 +12,39 @@ from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff, fo
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
+
+
+class RejectReasonInput(Input):
+    """Input widget that forwards vertical navigation and scroll keys to modal scroll box."""
+
+    async def _on_key(self, event: events.Key) -> None:
+        key = event.key
+        if key in ("up", "key_up"):
+            if self.screen and hasattr(self.screen, "action_scroll_up"):
+                self.screen.action_scroll_up()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("down", "key_down"):
+            if self.screen and hasattr(self.screen, "action_scroll_down"):
+                self.screen.action_scroll_down()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("pageup", "key_pageup"):
+            if self.screen and hasattr(self.screen, "action_page_up"):
+                self.screen.action_page_up()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("pagedown", "key_pagedown"):
+            if self.screen and hasattr(self.screen, "action_page_down"):
+                self.screen.action_page_down()
+                event.stop()
+                event.prevent_default()
+                return
+
+        await super()._on_key(event)
 
 
 class PermissionConfirmScreen(BaseModalScreen[str]):
@@ -39,12 +73,16 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         args: Optional[Dict[str, Any]] = None,
         reason: str = "",
         diff: str = "",
+        is_subagent: bool = False,
+        subagent_role: str = "",
     ):
         super().__init__()
         self.tool_name = tool_name
         self.args = args or {}
         self.reason = reason
         self.diff = diff
+        self.is_subagent = is_subagent
+        self.subagent_role = subagent_role or ("worker" if is_subagent else "")
         self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
 
     def _build_diff_text(self, target_path: str) -> str:
@@ -68,45 +106,50 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
+        actor = (
+            f"Subagent ({self.subagent_role})"
+            if (self.is_subagent and self.subagent_role)
+            else ("Subagent" if self.is_subagent else "Agent")
+        )
 
         if self.tool_name == "create":
             file_exists = bool(target_path and os.path.isfile(target_path))
             if file_exists or self.diff:
-                action_desc = f"Agent wants to overwrite `{target_path or 'file'}` with diff:"
+                action_desc = f"{actor} wants to overwrite `{target_path or 'file'}` with diff:"
             else:
-                action_desc = f"Agent wants to create `{target_path or 'file'}`:"
+                action_desc = f"{actor} wants to create `{target_path or 'file'}`:"
         elif self.tool_name in ("edit", "multi_edit"):
-            action_desc = f"Agent wants to edit `{target_path or 'file'}` with diff:"
+            action_desc = f"{actor} wants to edit `{target_path or 'file'}` with diff:"
         elif self.tool_name == "read":
-            action_desc = f"Agent wants to read `{target_path or 'file'}`"
+            action_desc = f"{actor} wants to read `{target_path or 'file'}`"
         elif self.tool_name == "web_fetch":
             url = nargs.get("url") or ""
-            action_desc = f"Agent wants to fetch `{url or 'URL'}`"
+            action_desc = f"{actor} wants to fetch `{url or 'URL'}`"
         elif self.tool_name == "invoke_subagent":
             role = nargs.get("type") or nargs.get("role") or "Subagent"
             title = nargs.get("title") or ""
             prompt = nargs.get("prompt") or ""
             target_desc = f"`{role}` (\"{title}\")" if title else f"`{role}`"
             if prompt:
-                action_desc = f"Agent wants to launch subagent {target_desc} with prompt:"
+                action_desc = f"{actor} wants to launch subagent {target_desc} with prompt:"
             else:
-                action_desc = f"Agent wants to launch subagent {target_desc}"
+                action_desc = f"{actor} wants to launch subagent {target_desc}"
         elif self.tool_name in ("manage_shell",):
             act = (nargs.get("action") or "manage").lower()
             t_id = nargs.get("task_id") or ""
 
             if act == "kill":
                 action_desc = (
-                    f"Agent wants to cancel task `{t_id}`" if t_id else "Agent wants to cancel background task"
+                    f"{actor} wants to cancel task `{t_id}`" if t_id else f"{actor} wants to cancel background task"
                 )
             elif act == "list":
-                action_desc = "Agent wants to list background tasks"
+                action_desc = f"{actor} wants to list background tasks"
             elif act == "send_input":
                 target_str = f" to task `{t_id}`" if t_id else ""
-                action_desc = f"Agent wants to send input{target_str}:"
+                action_desc = f"{actor} wants to send input{target_str}:"
             else:
                 action_desc = (
-                    f"Agent wants to `{act}` task `{t_id}`" if t_id else "Agent wants to manage background tasks"
+                    f"{actor} wants to `{act}` task `{t_id}`" if t_id else f"{actor} wants to manage background tasks"
                 )
         elif self.tool_name in ("manage_subagent",):
             act = (nargs.get("action") or "manage").lower()
@@ -114,43 +157,43 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
             if act == "kill":
                 action_desc = (
-                    f"Agent wants to cancel subagent `{s_id}`" if s_id else "Agent wants to cancel a subagent"
+                    f"{actor} wants to cancel subagent `{s_id}`" if s_id else f"{actor} wants to cancel a subagent"
                 )
             elif act == "list":
-                action_desc = "Agent wants to list subagents"
+                action_desc = f"{actor} wants to list subagents"
             elif act == "send_message":
                 target_str = f" to subagent `{s_id}`" if s_id else ""
-                action_desc = f"Agent wants to send a message{target_str}:"
+                action_desc = f"{actor} wants to send a message{target_str}:"
             else:
                 action_desc = (
-                    f"Agent wants to `{act}` subagent `{s_id}`" if s_id else "Agent wants to manage subagents"
+                    f"{actor} wants to `{act}` subagent `{s_id}`" if s_id else f"{actor} wants to manage subagents"
                 )
         elif self.tool_name == "update_plan":
             plan_val = nargs.get("plan")
             has_plan = bool(plan_val)
-            action_desc = "Agent wants to update the plan:" if has_plan else "Agent wants to update the plan"
+            action_desc = f"{actor} wants to update the plan:" if has_plan else f"{actor} wants to update the plan"
         elif self.tool_name == "ask_user":
             qs = nargs.get("questions") or []
             q_count = len(qs) if isinstance(qs, list) else 0
             if q_count > 1:
-                action_desc = f"Agent wants to ask {q_count} questions:"
+                action_desc = f"{actor} wants to ask {q_count} questions:"
             elif q_count == 1:
                 q0 = qs[0]
                 raw_q = q0.get("question") if isinstance(q0, dict) else q0
                 q_text = str(raw_q or "").strip()
                 if q_text and not (isinstance(q0, dict) and q0.get("options")):
-                    action_desc = f"Agent wants to ask: `{q_text}`"
+                    action_desc = f"{actor} wants to ask: `{q_text}`"
                 else:
-                    action_desc = "Agent wants to ask a question:"
+                    action_desc = f"{actor} wants to ask a question:"
             else:
-                action_desc = "Agent wants to ask a question"
+                action_desc = f"{actor} wants to ask a question"
         elif self.tool_name == "shell":
-            action_desc = "Agent wants to run shell command:"
+            action_desc = f"{actor} wants to run shell command:"
         else:
             if self.args:
-                action_desc = f"Agent wants to execute `{self.tool_name}` with parameters:"
+                action_desc = f"{actor} wants to execute `{self.tool_name}` with parameters:"
             else:
-                action_desc = f"Agent wants to execute `{self.tool_name}`"
+                action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
         is_wide = (
             self.tool_name in ("create", "edit", "multi_edit", "shell", "update_plan")
@@ -260,7 +303,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            inp = Input(placeholder="Type reason for denial and press Enter...", id="reject-reason-input")
+            inp = RejectReasonInput(placeholder="Type reason for denial and press Enter...", id="reject-reason-input")
             inp.display = False
             inp.can_focus = False
             yield inp

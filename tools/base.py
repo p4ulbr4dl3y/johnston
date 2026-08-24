@@ -295,7 +295,9 @@ async def confirm_permission(
     reason: str,
     perm_name: str | None = None,
     ctx_or_app: Any = None,
-) -> bool:
+    is_subagent: bool = False,
+    subagent_role: str = "",
+) -> bool | str:
     """Prompt the user for a tool-permission confirmation via the host.
 
     Delegates to the host app's ``confirm_permission`` when available (UI hosts)
@@ -303,9 +305,24 @@ async def confirm_permission(
     UI-independent. ``ctx_or_app`` may be a ToolContext, agent, or host app; it is
     unwrapped with ``_resolve_app`` before calling.
     """
+    if not is_subagent:
+        is_subagent = getattr(ctx_or_app, "is_subagent", False)
+    if not subagent_role and is_subagent:
+        subagent_role = getattr(ctx_or_app, "subagent_role", "") or getattr(ctx_or_app, "role", "") or "worker"
+
     confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
     if callable(confirm):
-        return await confirm(screen_name, args, reason, perm_name)
+        try:
+            return await confirm(
+                screen_name,
+                args,
+                reason,
+                perm_name,
+                is_subagent=is_subagent,
+                subagent_role=subagent_role,
+            )
+        except TypeError:
+            return await confirm(screen_name, args, reason, perm_name)
     return False
 
 

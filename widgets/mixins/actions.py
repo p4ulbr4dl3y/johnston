@@ -123,8 +123,14 @@ class ActionsMixin:
             self.screen.clear_selection()
 
     async def confirm_permission(
-        self, screen_name: str, args: Dict[str, Any], reason: str, perm_name: str | None = None
-    ) -> bool:
+        self,
+        screen_name: str,
+        args: Dict[str, Any],
+        reason: str,
+        perm_name: str | None = None,
+        is_subagent: bool = False,
+        subagent_role: str = "",
+    ) -> bool | str:
         """Shows the permission confirmation screen and applies session overrides for confirmed tools.
 
         Returns True if the user granted access ('allow' or 'always_allow'), False otherwise.
@@ -135,7 +141,13 @@ class ActionsMixin:
         from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         pm = PermissionManager.get_instance()
-        screen = PermissionConfirmScreen(tool_name=screen_name, args=args, reason=reason)
+        screen = PermissionConfirmScreen(
+            tool_name=screen_name,
+            args=args,
+            reason=reason,
+            is_subagent=is_subagent,
+            subagent_role=subagent_role,
+        )
 
         loop = asyncio.get_running_loop()
         future = loop.create_future()

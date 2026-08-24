@@ -127,7 +127,21 @@ async def check_and_confirm_permission(
     elif decision.action == PermissionAction.ASK:
         if app_obj and hasattr(app_obj, "push_screen_wait"):
             screen_name = confirm_tool_name or target_perm_name
-            confirmed = await confirm_permission(screen_name, args, decision.reason, target_perm_name, ctx_or_app=app_obj)
+            is_sub = getattr(context_or_app, "is_subagent", False)
+            sub_role = (
+                getattr(context_or_app, "subagent_role", "")
+                or getattr(context_or_app, "role", "")
+                or ("worker" if is_sub else "")
+            )
+            confirmed = await confirm_permission(
+                screen_name,
+                args,
+                decision.reason,
+                target_perm_name,
+                ctx_or_app=app_obj,
+                is_subagent=is_sub,
+                subagent_role=sub_role,
+            )
             if isinstance(confirmed, str) and confirmed.startswith("deny:"):
                 user_reason = confirmed.split(":", 1)[1].strip()
                 return ToolResult.error("denied", name=display_name, detail=f"by user ({user_reason})")

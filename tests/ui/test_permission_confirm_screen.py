@@ -153,6 +153,14 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
 
+    async def test_compose_subagent_actor_prefix(self):
+        screen = PermissionConfirmScreen("edit", {"path": "main.py"}, is_subagent=True, subagent_role="worker")
+        async with HostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            mds = screen.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Subagent (worker) wants to edit", all_md)
+
     async def test_compose_manage_shell_list_other(self):
         cases = [
             {"action": "list"},
@@ -253,6 +261,36 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Press deny again -> dismisses modal
             screen.action_deny()
             self.assertEqual(dismissed_val, "deny")
+
+    async def test_reject_reason_input_scroll_keys(self):
+        diff = "\n".join(f"+line {i}" for i in range(50))
+        screen = PermissionConfirmScreen("edit", {"path": "large.py"}, diff=diff)
+        async with HostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            screen.action_reject_with_reason()
+            await pilot.pause()
+            inp = screen.query_one("#reject-reason-input")
+            self.assertTrue(inp.has_focus)
+
+            # Test navigation keys triggering scroll actions
+            screen.action_scroll_down = MagicMock()
+            screen.action_scroll_up = MagicMock()
+            screen.action_page_down = MagicMock()
+            screen.action_page_up = MagicMock()
+
+            from textual.events import Key
+
+            await inp._on_key(Key("down", "down"))
+            screen.action_scroll_down.assert_called_once()
+
+            await inp._on_key(Key("up", "up"))
+            screen.action_scroll_up.assert_called_once()
+
+            await inp._on_key(Key("pagedown", "pagedown"))
+            screen.action_page_down.assert_called_once()
+
+            await inp._on_key(Key("pageup", "pageup"))
+            screen.action_page_up.assert_called_once()
 
 
 if __name__ == "__main__":
