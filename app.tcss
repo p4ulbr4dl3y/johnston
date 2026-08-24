@@ -582,6 +582,11 @@ ModalScreen {
     margin: 0;
 }
 
+.modal-markdown-centered MarkdownBulletList,
+#modal-dialog .modal-markdown-centered MarkdownBulletList {
+    margin-bottom: 1;
+}
+
 .modal-markdown.confirm-summary MarkdownParagraph {
     margin: 0;
 }
