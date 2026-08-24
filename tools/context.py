@@ -99,7 +99,12 @@ class ToolContext:
 
     @property
     def sandbox_enabled(self) -> bool:
-        """Returns whether shell command sandboxing is active."""
+        """Returns whether shell command sandboxing is active.
+
+        Subagents ALWAYS run in sandbox mode for autonomous blast radius containment.
+        """
+        if self.is_subagent:
+            return True
         if self.host is None:
             return False
         val = getattr(self.host, "sandbox_enabled", False)

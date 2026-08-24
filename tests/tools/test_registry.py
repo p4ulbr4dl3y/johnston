@@ -331,6 +331,34 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("[Output truncated: showing first 8000 chars", res.content)
         self.assertIn("Refine parameters or request partial data", res.content)
 
+    async def test_subagent_auto_allows_non_denied_tools(self):
+        from tools.context import ToolContext
+        from tools.read import ReadTool
+
+        ctx = ToolContext(is_subagent=True)
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Ask confirmation")
+
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch.object(ReadTool, "execute", new=AsyncMock(return_value="CONTENT_OK")),
+        ):
+            res = await execute_tool("read", {"path": "dummy.txt"}, context=ctx)
+        self.assertFalse(res.is_error)
+        self.assertEqual(res.content, "CONTENT_OK")
+
+    async def test_subagent_respects_explicit_deny(self):
+        from tools.context import ToolContext
+
+        ctx = ToolContext(is_subagent=True)
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Strictly forbidden")
+
+        with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+            res = await execute_tool("shell", {"command": "rm -rf /"}, context=ctx)
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: denied 'shell'", res.content)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -121,6 +121,13 @@ async def check_and_confirm_permission(
     app_obj = _resolve_app(context_or_app)
     decision = pm.check_permission(target_perm_name, args)
 
+    is_sub = getattr(context_or_app, "is_subagent", False) is True
+    if is_sub:
+        if decision.action == PermissionAction.DENY:
+            return ToolResult.error("denied", name=display_name, detail="by permission policy")
+        # Subagents always run inside the OS sandbox and execute allowed/ask tools autonomously
+        return None
+
     if decision.action == PermissionAction.DENY:
         return ToolResult.error("denied", name=display_name, detail="by permission policy")
     elif decision.action == PermissionAction.ASK:
