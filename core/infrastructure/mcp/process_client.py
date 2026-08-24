@@ -297,11 +297,20 @@ class MCPProcessClient:
 
     def _build_popen_kwargs(self) -> Dict[str, Any]:
         """Helper to assemble standard Popen keyword arguments for MCP server process."""
+        from core.infrastructure.secrets import interpolate_secrets
+
         run_env = os.environ.copy()
         if self.env:
-            run_env.update(self.env)
+            for k, v in self.env.items():
+                run_env[k] = interpolate_secrets(str(v))
+
+        if isinstance(self.cmd, list):
+            resolved_args = [interpolate_secrets(str(a)) for a in self.cmd]
+        else:
+            resolved_args = interpolate_secrets(str(self.cmd))
+
         kwargs: Dict[str, Any] = {
-            "args": self.cmd,
+            "args": resolved_args,
             "stdin": subprocess.PIPE,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,

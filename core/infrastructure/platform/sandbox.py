@@ -53,8 +53,7 @@ def get_default_deny_read_paths() -> List[str]:
         os.path.join(home, ".netrc"),
         os.path.join(home, ".git-credentials"),
         os.path.join(home, ".johnston", "config.json"),
-        os.path.join(home, ".johnston", "providers.json"),
-        os.path.join(home, ".johnston", "mcp.json"),
+        os.path.join(home, ".johnston", "secrets.json"),
     ]
 
 

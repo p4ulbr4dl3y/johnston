@@ -347,13 +347,14 @@ def test_provider_absent_from_config(pm):
     assert pm.get_provider_model("does_not_exist") == ""
 
 
-def test_unicode_and_quoted_key_values(pm, tmp_path):
+def test_unicode_and_quoted_key_values(pm):
     key = 'sk-привет"quote\\back\\slash'
     pm.set_provider_api_key("openai", key)
     assert pm.get_api_key("openai") == key
-    with open(tmp_path / "config.json", encoding="utf-8") as f:
-        saved = json.load(f)
-    assert saved["api_keys"]["openai"] == key
+    from core.infrastructure.secrets import load_secrets
+
+    saved = load_secrets()
+    assert saved.get("openai") == key or saved.get("OPENAI_API_KEY") == key
     # round-trip integrity
     assert pm.get_api_key("openai") == key
 
@@ -374,23 +375,26 @@ def test_connected_no_key(pm):
     assert pm.is_provider_connected("openai") is False
 
 
-def test_connected_env_key(pm, tmp_path, monkeypatch):
+def test_connected_env_key(pm, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "env-secret-key")
-    _write(
-        tmp_path / "config.json",
-        {"api_keys": {"openai": "file-secret-key"}},
-    )
-    # env should NOT leak into config-backed get_api_key
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "file-secret-key")
+    # file should take precedence over env
     assert pm.get_api_key("openai") == "file-secret-key"
 
 
-def test_connected_with_file_key(pm, tmp_path):
-    _write(tmp_path / "config.json", {"api_keys": {"openai": "sk-abc"}})
+def test_connected_with_file_key(pm):
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "sk-abc")
     assert pm.is_provider_connected("openai") is True
 
 
-def test_connected_whitespace_key(pm, tmp_path):
-    _write(tmp_path / "config.json", {"api_keys": {"openai": "   "}})
+def test_connected_whitespace_key(pm):
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "   ")
     assert pm.is_provider_connected("openai") is False
 
 

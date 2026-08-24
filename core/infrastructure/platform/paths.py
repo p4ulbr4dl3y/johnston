@@ -8,6 +8,7 @@ __all__ = [
     "CONFIG_DIR",
     "PROJECTS_DIR",
     "CONFIG_FILE",
+    "SECRETS_FILE",
     "PROVIDERS_JSON_FILE",
     "CACHE_DIR",
     "LOGS_DIR",
@@ -20,6 +21,7 @@ __all__ = [
 CONFIG_DIR = str(johnston_config_dir())
 PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+SECRETS_FILE = os.path.join(CONFIG_DIR, "secrets.json")
 PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")
 CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
 

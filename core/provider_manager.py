@@ -12,6 +12,12 @@ from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FIL
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.background import spawn_background_task
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
+from core.infrastructure.secrets import (
+    get_secret,
+    interpolate_secrets,
+    interpolate_secrets_in_obj,
+    save_secret,
+)
 from core.models_catalog import cached_json_read, catalog, invalidate_json_read_cache
 
 logger = logging.getLogger(__name__)
@@ -72,17 +78,8 @@ def is_local_provider(
 
 
 def env_api_key(provider_key: str) -> str:
-    """Best-effort API key from the environment: ``<PROVIDER>_API_KEY``
-    (dash→underscore, uppercased), plus known aliases like TOGETHER_API_KEY."""
-    canonical = provider_key.upper().replace("-", "_")
-    alias = _ENV_KEY_ALIASES.get(provider_key.lower(), "")
-    for name in (f"{canonical}_API_KEY", alias):
-        if not name:
-            continue
-        value = os.environ.get(name, "").strip()
-        if value:
-            return value
-    return ""
+    """Resolve API key from environment or centralized ~/.johnston/secrets.json."""
+    return get_secret(provider_key)
 
 
 def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, Any]) -> str:
@@ -98,22 +95,17 @@ def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, A
     def _sub(match: "re.Match[str]") -> str:
         token = match.group(1)
         env_name = f"{provider_key}_{token}".upper().replace("-", "_")
-        for candidate in (env_name, token.upper()):
-            value = os.environ.get(candidate, "").strip()
-            if value:
-                return value.rstrip("/")
-        value = data.get(token)
-        if isinstance(value, str) and value.strip():
-            return value.strip().rstrip("/")
+        val = get_secret(env_name) or get_secret(token) or (data.get(token) if isinstance(data.get(token), str) else "")
+        if val:
+            return str(val)
         warn_key = (provider_key, token)
         if warn_key not in _WARNED_BASE_URL_TOKENS:
             _WARNED_BASE_URL_TOKENS.add(warn_key)
             logger.warning(
-                "Provider %s: base_url placeholder {%s} unresolved (set %s env var or add '%s' field)",
+                "Base URL placeholder {%s} for provider '%s' was not resolved. Set %s in environment or secrets.json.",
+                token,
                 provider_key,
-                token,
                 env_name,
-                token,
             )
         return match.group(0)
 
@@ -133,16 +125,16 @@ def _field_int(data: Dict[str, Any], key: str, default: int) -> int:
 
 @dataclass
 class ProviderDef:
-    """Structured description of a provider parsed from its JSON definition."""
+    """Resolved provider definition used across the application."""
 
     key: str
-    name: str
+    name: str = ""
     base_url: str = ""
     model: str = ""
     models: List[str] = field(default_factory=list)
     fetch_models: bool = True
     api_type: str = "openai"
-    headers: Optional[Dict[str, Any]] = None
+    headers: Optional[Dict[str, str]] = None
     extra_body: Optional[Dict[str, Any]] = None
     reasoning_effort: Optional[str] = None
     chunk_timeout: float = DEFAULT_CHUNK_TIMEOUT
@@ -157,16 +149,22 @@ class ProviderDef:
 
     @classmethod
     def from_dict(cls, key: str, data: Dict[str, Any], *, enabled: bool = True) -> "ProviderDef":
-        """Build a ProviderDef from a raw provider JSON dict, applying defaults."""
+        """Build a ProviderDef from a raw provider JSON dict, applying defaults and secrets interpolation."""
+        raw_key = data.get("api_key") or ""
+        resolved_key = interpolate_secrets(raw_key) if raw_key else ""
+        raw_base_url = resolve_base_url_placeholders(data.get("base_url") or "", key, data)
+        resolved_base_url = interpolate_secrets(raw_base_url)
+        headers = interpolate_secrets_in_obj(data.get("headers")) if data.get("headers") else None
+
         return cls(
             key=key,
             name=data.get("name") or key,
-            base_url=resolve_base_url_placeholders(data.get("base_url") or "", key, data),
+            base_url=resolved_base_url,
             model=data.get("model") or "",
             models=list(data.get("models") or []),
             fetch_models=bool(data.get("fetch_models", True)),
             api_type=data.get("api_type") or "openai",
-            headers=data.get("headers"),
+            headers=headers,
             extra_body=data.get("extra_body"),
             reasoning_effort=data.get("reasoning_effort"),
             chunk_timeout=_field_float(data, "chunk_timeout", DEFAULT_CHUNK_TIMEOUT),
@@ -176,7 +174,7 @@ class ProviderDef:
             retry_backoff=_field_float(data, "retry_backoff", DEFAULT_RETRY_BACKOFF),
             max_retry_delay=_field_float(data, "max_retry_delay", DEFAULT_MAX_RETRY_DELAY),
             enabled=enabled,
-            api_key=data.get("api_key") or "",
+            api_key=resolved_key,
             requires_key=data.get("requires_key"),
         )
 
@@ -376,20 +374,17 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
-        """Stored API key for *key*, falling back to its env var
-        (``<PROVIDER>_API_KEY``). A key typed in by the user wins over the
-        passive environment default."""
+        """Resolve API key for provider *key* from secrets.json, env var, or config."""
+        secret = get_secret(key)
+        if secret:
+            return secret
         stored = self._get_config_data().get("api_keys", {}).get(key, "")
         if stored and str(stored).strip():
             return str(stored)
-        return env_api_key(key)
+        return ""
 
     def set_provider_api_key(self, key: str, api_key: str):
-        data = self._read_config()
-        if "api_keys" not in data:
-            data["api_keys"] = {}
-        data["api_keys"][key] = api_key
-        self._save_config(data)
+        save_secret(key, api_key)
         self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):

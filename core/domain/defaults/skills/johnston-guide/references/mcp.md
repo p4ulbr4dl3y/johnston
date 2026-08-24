@@ -1,22 +1,26 @@
 # MCP (Model Context Protocol) Server Configuration Reference
 
 ## Locations
-- Global config: `~/.johnston/mcp.json`
-- Project config: `.johnston/mcp.json`
+- Global config: `~/.johnston/mcp.json` (editable by agent)
+- Project config: `.johnston/mcp.json` (editable by agent)
+- Secrets: `~/.johnston/secrets.json` (blocked in sandbox mode)
 
 ## Config Format
 ```json
 {
   "mcpServers": {
-    "memory": {
+    "github": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "env": {}
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
     }
   }
 }
 ```
 
+- `env`, `command`, `args` support secret template substitution (`${SECRET_NAME}`).
 - `enabled` is optional. An enabled server simply omits it — only `"enabled": false` is stored for turned-off servers.
 - `command` (string or list) is required; `args`, `env`, `cwd` are optional.
 
