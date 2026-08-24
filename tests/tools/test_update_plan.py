@@ -26,11 +26,26 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         res_malformed = str(await tool.execute({"plan": "not a list"}))
         self.assertIn("ERR:", res_malformed)
 
+    async def test_update_plan_tool_string_list(self):
+        tool = UpdatePlanTool()
+        args = {
+            "plan": [
+                "Explore tests and fixtures",
+                "Fix provider parsing",
+                "Run test suite",
+            ]
+        }
+        res = str(await tool.execute(args))
+        self.assertIn("plan updated (0/3 completed)", res)
+
     async def test_update_plan_normalization_and_skipping(self):
         tool = UpdatePlanTool()
         args = {
             "plan": [
-                "not a dict item",  # non-dict item skipped
+                12345,  # non-dict, non-str item skipped
+                None,  # skipped
+                "   ",  # empty string skipped
+                "Valid string step",  # str -> pending
                 {"step": "   ", "status": "pending"},  # empty step skipped
                 {"step": "No status item"},  # missing status -> 'pending'
                 {"step": "Unknown status item", "status": "random_status"},  # invalid status -> 'pending'
@@ -38,11 +53,11 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = str(await tool.execute(args))
-        self.assertIn("plan updated (1/3 completed)", res)
+        self.assertIn("plan updated (1/4 completed)", res)
 
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
-        res = str(await tool.execute({"plan": ["invalid", {"step": ""}]}))
+        res = str(await tool.execute({"plan": [123, None, "", "   ", {"step": ""}]}))
         self.assertIn("ERR: params 'plan': items need", res)
 
     async def test_update_plan_app_integration(self):

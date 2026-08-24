@@ -257,6 +257,8 @@ class ReadTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
+        if not raw_path:
+            return ToolResult.error("params", name="path", detail="missing or empty")
         path = resolve_path(raw_path, cwd=ctx.cwd)
         def _inspect_path() -> ToolResult | tuple[str, str | None]:
             if not os.path.exists(path):

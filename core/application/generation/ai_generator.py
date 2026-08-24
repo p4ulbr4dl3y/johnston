@@ -252,6 +252,7 @@ async def generate_ai_response(
                         else None,
                         returncode=parsed_tool_result.returncode,
                     )
+                    tool_handle = None
                 try:
                     save_db.schedule()
                 except Exception:  # noqa: BLE001
@@ -388,14 +389,18 @@ async def _handle_interruption(
         except Exception:  # noqa: BLE001
             pass
     if session and hasattr(session, "add_event"):
-        if tool_handle is not None or (
+        if (
             hasattr(session, "messages")
             and session.messages
             and session.messages[-1].get("type") == "tool"
             and "result_text" not in session.messages[-1]
         ):
             try:
-                res_text = getattr(tool_handle, "result_text", "") or "[Tool call interrupted or cancelled]"
+                res_text = (
+                    getattr(tool_handle, "result_text", "")
+                    if tool_handle is not None
+                    else ""
+                ) or "[Tool call interrupted or cancelled]"
                 session.add_event({
                     "type": "tool",
                     "result_text": res_text,

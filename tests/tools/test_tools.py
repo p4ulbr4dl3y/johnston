@@ -211,6 +211,16 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_tool(self):
         tool = ShellTool()
+        # Missing/empty command validation
+        res_empty = str(await tool.execute({"command": ""}))
+        self.assertIn("ERR: params 'command': missing or empty", res_empty)
+
+        res_none = str(await tool.execute({"command": None}))
+        self.assertIn("ERR: params 'command': missing or empty", res_none)
+
+        res_missing = str(await tool.execute({}))
+        self.assertIn("ERR: params 'command': missing or empty", res_missing)
+
         # Successful command execution
         res = str(await tool.execute({"command": "echo 'hello shell'"}))
         self.assertIn("hello shell", res)

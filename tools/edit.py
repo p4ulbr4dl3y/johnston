@@ -349,6 +349,9 @@ def apply_chunk_replacements(content: str, raw_chunks: List[Dict[str, Any]], pat
 
 
 async def _execute_edit_helper(path_arg: str, raw_chunks: List[Dict[str, Any]], cwd: str = None) -> ToolResult:
+    if not path_arg or not str(path_arg).strip():
+        return ToolResult.error("params", name="path", detail="missing or empty")
+
     path = resolve_path(path_arg, cwd=cwd)
 
     def _do_edit() -> ToolResult:

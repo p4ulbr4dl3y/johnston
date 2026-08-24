@@ -296,6 +296,17 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"path": file_path, "offset": 3}))
         self.assertIn("line 1", res)
 
+    async def test_read_empty_or_missing_path(self):
+        tool = ReadTool()
+        res_empty = str(await tool.execute({"path": ""}))
+        self.assertIn("ERR: params 'path': missing or empty", res_empty)
+
+        res_none = str(await tool.execute({"path": None}))
+        self.assertIn("ERR: params 'path': missing or empty", res_none)
+
+        res_missing = str(await tool.execute({}))
+        self.assertIn("ERR: params 'path': missing or empty", res_missing)
+
     async def test_read_nonexistent_file(self):
         tool = ReadTool()
         res = str(await tool.execute({"path": "https://example.com/page.html"}))

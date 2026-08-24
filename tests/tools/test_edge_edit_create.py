@@ -262,12 +262,17 @@ class TestEditToolFiles(_Base):
     async def test_edit_none_path_returns_err(self):
         tool = EditTool()
         res = str(await tool.execute({"path": None, "old_str": "a", "new_str": "b"}))
-        self.assertIn("ERR:", res)
+        self.assertIn("ERR: params 'path': missing or empty", res)
+
+    async def test_edit_empty_path_returns_err(self):
+        tool = EditTool()
+        res = str(await tool.execute({"path": "", "old_str": "a", "new_str": "b"}))
+        self.assertIn("ERR: params 'path': missing or empty", res)
 
     async def test_edit_missing_path_returns_err(self):
         tool = EditTool()
         res = str(await tool.execute({"old_str": "a", "new_str": "b"}))
-        self.assertIn("ERR:", res)
+        self.assertIn("ERR: params 'path': missing or empty", res)
 
     async def test_edit_relative_path(self):
         tool = EditTool()
@@ -456,7 +461,17 @@ class TestMultiEditToolEdge(_Base):
     async def test_none_path_returns_err(self):
         tool = MultiEditTool()
         res = str(await tool.execute({"path": None, "edits": [{"old_str": "a", "new_str": "b"}]}))
-        self.assertIn("ERR:", res)
+        self.assertIn("ERR: params 'path': missing or empty", res)
+
+    async def test_empty_path_returns_err(self):
+        tool = MultiEditTool()
+        res = str(await tool.execute({"path": "", "edits": [{"old_str": "a", "new_str": "b"}]}))
+        self.assertIn("ERR: params 'path': missing or empty", res)
+
+    async def test_missing_path_returns_err(self):
+        tool = MultiEditTool()
+        res = str(await tool.execute({"edits": [{"old_str": "a", "new_str": "b"}]}))
+        self.assertIn("ERR: params 'path': missing or empty", res)
 
     async def test_missing_target_fuzzy_hint(self):
         tool = MultiEditTool()
@@ -492,7 +507,17 @@ class TestCreateTool(_Base):
     async def test_create_path_none_returns_err(self):
         tool = CreateTool()
         res = str(await tool.execute({"path": None, "content": "x"}))
-        self.assertIn("ERR:", res)
+        self.assertIn("ERR: params 'path': missing or empty", res)
+
+    async def test_create_path_empty_returns_err(self):
+        tool = CreateTool()
+        res = str(await tool.execute({"path": "", "content": "x"}))
+        self.assertIn("ERR: params 'path': missing or empty", res)
+
+    async def test_create_path_missing_returns_err(self):
+        tool = CreateTool()
+        res = str(await tool.execute({"content": "x"}))
+        self.assertIn("ERR: params 'path': missing or empty", res)
 
     async def test_create_binary_content_no_crash(self):
         # Fixed: bytes content no longer raises at create.py:48; decoded safely.

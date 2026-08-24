@@ -621,7 +621,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "manage_shell",
             "ask_user",
         ):
-            display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type)
+            display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
             from core.infrastructure.presentation.tool_display import extract_tool_display
 
             target_str = extract_tool_display(self.canonical_tool, self.args) if self.args else self.target
@@ -632,7 +632,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
             compact = format_compact_dict(self.args if isinstance(self.args, dict) else {})
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
-            tool_name_display = to_snake_case(self.tool_type) if is_mcp else self.tool_type
+            tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
             escaped_compact = escape(compact)
             self.header_label.update(f"[{c}]● [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
 

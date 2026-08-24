@@ -107,6 +107,8 @@ class ShellTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
         cmd = (args.get("command") or "").strip()
+        if not cmd:
+            return ToolResult.error("params", name="command", detail="missing or empty")
 
         raw_timeout = args.get("timeout", 120)
         try:

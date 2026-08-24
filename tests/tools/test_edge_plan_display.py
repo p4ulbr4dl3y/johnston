@@ -20,14 +20,18 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
 
     async def test_item_none_and_non_dict(self):
         t = UpdatePlanTool()
-        for item in (None, "str", 5, True, [1]):
+        for item in (None, 5, True, [1]):
             res = str(await t.execute({"plan": [item, {"step": "ok", "status": "pending"}]}))
-            # non-dict items silently skipped
+            # non-dict non-str items silently skipped
             self.assertIn("plan updated (0/1 completed)", res)
+
+        # str items are accepted as pending steps
+        res_str = str(await t.execute({"plan": ["str step", {"step": "ok", "status": "pending"}]}))
+        self.assertIn("plan updated (0/2 completed)", res_str)
 
     async def test_all_items_invalid_no_valid_plan(self):
         t = UpdatePlanTool()
-        res = str(await t.execute({"plan": [None, "x", 5]}))
+        res = str(await t.execute({"plan": [None, "", "   ", 5, True]}))
         self.assertIn("ERR:", res)
 
     async def test_missing_step_or_status_keys(self):

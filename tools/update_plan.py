@@ -54,10 +54,15 @@ class UpdatePlanTool(BaseTool):
 
         validated_plan: List[Dict[str, str]] = []
         for item in raw_plan:
-            if not isinstance(item, dict):
+            if isinstance(item, str):
+                step_text = item.strip()
+                status = "pending"
+            elif isinstance(item, dict):
+                step_text = str(item.get("step") or "").strip()
+                status = str(item.get("status") or "pending").strip().lower()
+            else:
                 continue
-            step_text = str(item.get("step") or "").strip()
-            status = str(item.get("status") or "pending").strip().lower()
+
             if status not in ("pending", "in_progress", "completed"):
                 status = "pending"
 

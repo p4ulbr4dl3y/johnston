@@ -649,3 +649,46 @@ class TestGeneratorStreamInterruptionFlow:
         kind, content = w._compute_content()
         assert kind == "markup"
         assert "50 passed in 2.0s" in content
+
+    @pytest.mark.asyncio
+    async def test_cancellation_after_completed_tool_does_not_create_orphan_cancelled_tool(self):
+        mock_tool_widget = MagicMock()
+        mock_tool_widget.result_text = "file1\nfile2"
+        mock_tool_widget.status = "done"
+
+        async def mock_stream(prompt, attachments=None):
+            yield ("tool", "shell", "run", {"cmd": "ls"})
+            yield ("tool_result", "file1\nfile2", "")
+            yield ("bot_delta", "Here are the files: ", "")
+            raise asyncio.CancelledError()
+
+        agent = MagicMock()
+        agent.stream_steps = mock_stream
+        agent.history = [{"role": "user", "content": "List files"}]
+        agent._last_sys_tokens = 0
+
+        session = AgentSession(session_id="s_test", role="assistant")
+
+        canvas = _make_canvas(
+            add_tool_call=AsyncMock(return_value=mock_tool_widget),
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await generate_ai_response(
+                agent=agent,
+                session=session,
+                canvas=canvas,
+                session_id="s_test",
+                user_text="List files",
+            )
+
+        # Completed tool widget was NOT cancelled
+        mock_tool_widget.mark_cancelled.assert_not_called()
+        mock_tool_widget.set_result.assert_called_once()
+
+        # Session should have exactly 1 tool event with tool_type, NOT an extra empty cancelled tool event
+        tool_events = [m for m in session.messages if m.get("type") == "tool"]
+        assert len(tool_events) == 1
+        assert tool_events[0].get("tool_type") == "shell"
+        assert tool_events[0].get("status") != "cancelled"
+        assert any(m.get("type") == "event_divider" for m in session.messages)

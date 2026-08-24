@@ -565,17 +565,17 @@ def _ctx(make_tool_context, cwd=None, is_subagent=True):
 
 async def test_empty_command_safe(tool, make_tool_context):
     res = str(await tool.execute({"command": ""}, ctx=_ctx(make_tool_context)))
-    assert res == "(no output)"
+    assert "ERR: params 'command': missing or empty" in res
 
 
 async def test_whitespace_command_safe(tool, make_tool_context):
     res = str(await tool.execute({"command": "   \t  "}, ctx=_ctx(make_tool_context)))
-    assert res == "(no output)"
+    assert "ERR: params 'command': missing or empty" in res
 
 
 async def test_none_command_safe(tool, make_tool_context):
     res = str(await tool.execute({"command": None}, ctx=_ctx(make_tool_context)))
-    assert res == "(no output)"
+    assert "ERR: params 'command': missing or empty" in res
 
 
 # ---------- special chars / metacharacters ----------

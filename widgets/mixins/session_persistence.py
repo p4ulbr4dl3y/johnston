@@ -66,6 +66,8 @@ class SessionPersistenceMixin:
                             rtext = msg.get("result_text", "")
                             targs = msg.get("args", {})
                             status = msg.get("status")
+                            if not ttype and not target and not targs and status == "cancelled":
+                                continue
                             if status == "running":
                                 task_id = None
                                 if "[Background Task ID:" in (rtext or ""):

@@ -31,7 +31,10 @@ class CreateTool(BaseTool):
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
-        path = resolve_path(args.get("path"), cwd=ctx.cwd)
+        path_arg = args.get("path")
+        if not path_arg or not str(path_arg).strip():
+            return ToolResult.error("params", name="path", detail="missing or empty")
+        path = resolve_path(path_arg, cwd=ctx.cwd)
 
         def _probe():
             """Run sync filesystem checks off the event loop, returning (existed, old_content)."""
