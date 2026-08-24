@@ -5,7 +5,7 @@ Callers (commands.py) handle UI orchestration (push_screen, callback, focus, not
 """
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
 
@@ -183,11 +183,12 @@ async def compact_session(
 
 @dataclass
 class RewindEntry:
-    """A single rollback candidate: index, user message text and git stat."""
+    """A single rollback candidate: index, user message text, git stat and changed files."""
 
     index: int
     text: str
     git_stats: str = ""
+    changed_files: list[str] = field(default_factory=list)
 
 
 async def get_rewind_git_stats(
@@ -213,9 +214,9 @@ async def get_rewind_git_stats(
     if current_session_id and checkpoints_enabled:
         seq_indices = list(range(len(user_msgs)))
         try:
-            stats_map = await asyncio.wait_for(
+            details_map = await asyncio.wait_for(
                 asyncio.to_thread(
-                    GitCheckpointManager.get_diff_stats_batch,
+                    GitCheckpointManager.get_diff_details_batch,
                     current_session_id,
                     seq_indices,
                     project_path=project_path,
@@ -223,10 +224,12 @@ async def get_rewind_git_stats(
                 timeout=2.0,
             )
         except Exception:
-            stats_map = {}
+            details_map = {}
         for seq_idx, (child_idx, text) in enumerate(user_msgs):
-            stat = stats_map.get(seq_idx) or ""
-            msgs_with_stats.append(RewindEntry(index=child_idx, text=text, git_stats=stat))
+            item = details_map.get(seq_idx)
+            stat = item[0] if item else ""
+            files = item[1] if item else []
+            msgs_with_stats.append(RewindEntry(index=child_idx, text=text, git_stats=stat, changed_files=files))
     else:
         msgs_with_stats = [RewindEntry(index=child_idx, text=text) for child_idx, text in user_msgs]
 

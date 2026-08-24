@@ -63,15 +63,17 @@ class GitCheckpointManager:
             pass
 
     @staticmethod
-    def _parse_numstat(output: str) -> tuple[int, int]:
-        """Parses `git diff --numstat` output into (added, deleted) line counts."""
+    def _parse_numstat(output: str) -> tuple[int, int, list[str]]:
+        """Parses `git diff --numstat` output into (added, deleted, changed_files)."""
         added, deleted = 0, 0
+        changed_files: list[str] = []
         for line in output.splitlines():
-            parts = line.split()
+            parts = line.split(maxsplit=2)
             if len(parts) >= 3 and parts[0].isdigit() and parts[1].isdigit():
                 added += int(parts[0])
                 deleted += int(parts[1])
-        return added, deleted
+                changed_files.append(parts[2].strip())
+        return added, deleted, changed_files
 
     # Cache of the baseline shadow env (GIT_DIR + GIT_WORK_TREE) keyed by (shadow_dir, cwd).
     # Built once via a single os.environ.copy() per key; each invocation copies only this
@@ -304,18 +306,18 @@ class GitCheckpointManager:
                     pass
 
     @classmethod
-    def get_diff_stats_batch(
+    def get_diff_details_batch(
         cls,
         session_id: str,
         message_indices: List[int],
         project_path: Optional[str] = None,
-    ) -> dict[int, Optional[str]]:
-        """Calculates line changes between each saved checkpoint in message_indices and current workspace.
+    ) -> dict[int, Optional[tuple[str, list[str]]]]:
+        """Calculates line changes and changed files between checkpoints and current workspace.
 
-        Stages current workspace ONCE to calculate all diff stats efficiently.
-        Returns dict mapping message_index -> stat string (e.g. '+12 / -4', 'no changes', or None).
+        Stages current workspace ONCE to calculate all diff details efficiently.
+        Returns dict mapping message_index -> (stat_string, changed_files_list) or None.
         """
-        results: dict[int, Optional[str]] = {idx: None for idx in message_indices}
+        results: dict[int, Optional[tuple[str, list[str]]]] = {idx: None for idx in message_indices}
         if not message_indices:
             return results
 
@@ -341,11 +343,25 @@ class GitCheckpointManager:
                 if diff_res.returncode != 0:
                     continue
 
-                added, deleted = cls._parse_numstat(diff_res.stdout)
+                added, deleted, files = cls._parse_numstat(diff_res.stdout)
 
                 if added == 0 and deleted == 0:
-                    results[msg_idx] = "no changes"
+                    results[msg_idx] = ("no changes", [])
                 else:
-                    results[msg_idx] = f"+{added} / -{deleted}"
+                    results[msg_idx] = (f"+{added} / -{deleted}", files)
 
         return results
+
+    @classmethod
+    def get_diff_stats_batch(
+        cls,
+        session_id: str,
+        message_indices: List[int],
+        project_path: Optional[str] = None,
+    ) -> dict[int, Optional[str]]:
+        """Calculates line changes between each saved checkpoint in message_indices and current workspace.
+
+        Returns dict mapping message_index -> stat string (e.g. '+12 / -4', 'no changes', or None).
+        """
+        details = cls.get_diff_details_batch(session_id, message_indices, project_path=project_path)
+        return {idx: (res[0] if res else None) for idx, res in details.items()}
