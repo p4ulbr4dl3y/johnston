@@ -107,7 +107,7 @@ def scroll_parent_if_needed(widget, force: bool = False) -> None:
         pass
 
 
-def scroll_parent_to_widget(widget, top: bool = True) -> None:
+def scroll_parent_to_widget(widget, top: bool = False) -> None:
     try:
         parent = getattr(widget, "parent", None)
         if isinstance(parent, VerticalScroll):
@@ -439,7 +439,7 @@ class ThinkingWidget(Vertical):
     def is_expandable(self) -> bool:
         return True
 
-    def toggle_expanded(self) -> None:
+    def toggle_expanded(self, scroll: bool = True) -> None:
         if not self.is_expandable():
             return
         self.is_expanded = not self.is_expanded
@@ -447,7 +447,8 @@ class ThinkingWidget(Vertical):
             if self.thinking_text:
                 self.content_widget.update(self.thinking_text)
             self.content_widget.display = True
-            scroll_parent_to_widget(self, top=True)
+            if scroll:
+                scroll_parent_to_widget(self, top=False)
         else:
             if self._update_handle is not None:
                 self._update_handle.cancel()

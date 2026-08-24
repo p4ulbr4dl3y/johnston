@@ -171,17 +171,22 @@ class ChatView(VerticalScroll):
                 expandables.append(child)
 
         mode_clean = (mode or "all").lower().strip()
+        was_at_bottom = self.is_at_bottom()
 
         if mode_clean in ("collapse", "collapse_all", "close"):
             self.auto_expand_all = False
             for w in expandables:
                 if getattr(w, "is_expanded", False):
-                    w.toggle_expanded()
+                    w.toggle_expanded(scroll=False)
+            if was_at_bottom:
+                self.call_after_refresh(lambda: self.scroll_end(animate=False))
         elif mode_clean in ("expand_all", "expand"):
             self.auto_expand_all = True
             for w in expandables:
                 if not getattr(w, "is_expanded", False):
-                    w.toggle_expanded()
+                    w.toggle_expanded(scroll=False)
+            if was_at_bottom:
+                self.call_after_refresh(lambda: self.scroll_end(animate=False))
         elif mode_clean in ("last", "focused", "focus"):
             focused = self.app.focused if hasattr(self, "app") and self.app else None
             target_widget = None
@@ -193,7 +198,7 @@ class ChatView(VerticalScroll):
             elif expandables:
                 target_widget = expandables[-1]
             if target_widget:
-                target_widget.toggle_expanded()
+                target_widget.toggle_expanded(scroll=True)
         else:
             if not expandables:
                 self.auto_expand_all = not self.auto_expand_all
@@ -204,7 +209,9 @@ class ChatView(VerticalScroll):
             for w in expandables:
                 if any_collapsed:
                     if not getattr(w, "is_expanded", False):
-                        w.toggle_expanded()
+                        w.toggle_expanded(scroll=False)
                 else:
                     if getattr(w, "is_expanded", False):
-                        w.toggle_expanded()
+                        w.toggle_expanded(scroll=False)
+            if was_at_bottom:
+                self.call_after_refresh(lambda: self.scroll_end(animate=False))

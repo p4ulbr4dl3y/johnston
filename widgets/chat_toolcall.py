@@ -720,21 +720,21 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         scroll_parent_if_needed(self, force=force)
 
-    def _scroll_to_widget(self, top: bool = True) -> None:
+    def _scroll_to_widget(self, top: bool = False) -> None:
         from widgets.presentation.widgets.chat_messages import scroll_parent_to_widget
 
         scroll_parent_to_widget(self, top=top)
 
-    def toggle_expanded(self) -> None:
+    def toggle_expanded(self, scroll: bool = True) -> None:
         if not self.is_expandable():
             return
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
-            self._should_scroll_to_widget = True
+            self._should_scroll_to_widget = scroll
             self.render_content()
-            self._scroll_to_widget(top=True)
         else:
+            self._should_scroll_to_widget = False
             self.content_widget.display = False
             self.md_widget.display = False
         self._update_next_sibling_spacing()
@@ -983,7 +983,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if self.is_expanded:
                     if getattr(self, "_should_scroll_to_widget", False):
                         self._should_scroll_to_widget = False
-                        self._scroll_to_widget(top=True)
+                        self._scroll_to_widget(top=False)
                     else:
                         force = getattr(self, "_should_scroll_on_render", False)
                         self._should_scroll_on_render = False
@@ -1006,7 +1006,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.is_expanded:
             if getattr(self, "_should_scroll_to_widget", False):
                 self._should_scroll_to_widget = False
-                self._scroll_to_widget(top=True)
+                self._scroll_to_widget(top=False)
             else:
                 force = getattr(self, "_should_scroll_on_render", False)
                 self._should_scroll_on_render = False

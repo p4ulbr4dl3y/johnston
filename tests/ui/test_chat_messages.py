@@ -437,7 +437,7 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
         with patch("widgets.presentation.widgets.chat_messages.scroll_parent_to_widget") as scroll_mock:
             tw.toggle_expanded()
             self.assertTrue(tw.is_expanded)
-            scroll_mock.assert_called_once_with(tw, top=True)
+            scroll_mock.assert_called_once_with(tw, top=False)
 
     def test_finish_thinking_calls_scroll_if_needed_when_expanded(self):
         tw = ThinkingWidget("x")

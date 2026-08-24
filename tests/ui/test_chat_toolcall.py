@@ -252,10 +252,10 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
     def test_toggle_expanded_calls_scroll_if_needed_on_expand(self):
         widget = ToolCallWidget("shell", "cmd")
         widget.is_expanded = False
-        with patch.object(widget, "render_content"), patch.object(widget, "_scroll_to_widget") as scroll_mock:
+        with patch.object(widget, "_scroll_to_widget") as scroll_mock:
             widget.toggle_expanded()
             self.assertTrue(widget.is_expanded)
-            scroll_mock.assert_called_once_with(top=True)
+            scroll_mock.assert_called_once_with(top=False)
 
     def test_render_content_passes_force_when_should_scroll_on_render(self):
         widget = ToolCallWidget("shell", "cmd", result_text="output")
@@ -739,7 +739,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         with patch.object(w, "_scroll_to_widget") as scroll_mock:
             w.toggle_expanded()
             self.assertTrue(w.is_expanded)
-            scroll_mock.assert_called_with(top=True)
+            scroll_mock.assert_called_with(top=False)
 
         w2 = self._widget("codegraph_explore", "")
         w2.is_mcp = True
