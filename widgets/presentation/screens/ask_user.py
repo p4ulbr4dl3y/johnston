@@ -247,26 +247,25 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                 hint.update("enter: confirm • ←: back • esc: cancel")
                 return
 
+            q = self.questions[self.q_idx] if 0 <= self.q_idx < len(self.questions) else {}
+            is_multi = bool(q.get("is_multi_select", False))
+            is_last = (self.q_idx == len(self.questions) - 1)
+            action = "confirm" if is_last else "next"
+
             input_field = self.query_one(WRITE_IN_INPUT, Input)
             is_write_in = input_field.display and input_field.has_focus
 
+            back_part = "←: back • " if self.q_idx > 0 else ""
+
             if not self.raw_options:
-                if self.q_idx == 0:
-                    hint.update("enter: next • tab: min • esc: cancel")
-                else:
-                    hint.update("enter: next • ←: back • tab: min • esc: cancel")
+                hint.update(f"enter: {action} • {back_part}tab: min • esc: cancel")
                 return
 
             if is_write_in:
-                if self.q_idx == 0:
-                    hint.update("enter: next • ↑: list • tab: min • esc: cancel")
-                else:
-                    hint.update("enter: next • ↑: list • ←: back • tab: min • esc: cancel")
+                hint.update(f"enter: {action} • ↑: list • {back_part}tab: min • esc: cancel")
             else:
-                if self.q_idx == 0:
-                    hint.update("enter: confirm • space: toggle • ↑↓: nav • tab: min • esc: cancel")
-                else:
-                    hint.update("enter: confirm • space: toggle • ↑↓: nav • ←: back • tab: min • esc: cancel")
+                space_part = "space: toggle • " if is_multi else ""
+                hint.update(f"enter: {action} • {space_part}{back_part}tab: min • esc: cancel")
         except Exception:
             pass
 
