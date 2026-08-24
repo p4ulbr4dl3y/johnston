@@ -7,6 +7,7 @@ real-time output, input and kill semantics for background shell processes.
 import asyncio
 import os
 import signal
+import time
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import format_tool_error
@@ -183,6 +184,9 @@ class ShellTask(BaseTask):
                     except Exception:
                         exit_code = 0
 
+                self.exit_code = exit_code
+                self.completed_at = time.time()
+
                 # Background tasks: announce completion via modal notify / callback.
                 if self.is_background and on_completed is not None:
                     try:
@@ -202,6 +206,8 @@ class ShellTask(BaseTask):
     def _mark_terminated(self, status: TaskStatus = TaskStatus.COMPLETED) -> None:
         if self._done is not None and self._done.done():
             return
+        if self.completed_at is None:
+            self.completed_at = time.time()
         self.status = status
         self._done_future().set_result(True)
 

@@ -6,6 +6,7 @@ own rendering-format output, so these helpers live in the infrastructure
 presentation area consumed by core widgets and UI tests.
 """
 import json
+import os
 import re
 from collections import OrderedDict
 from typing import Any, Dict
@@ -194,3 +195,128 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
         if isinstance(url, str) and url:
             return truncate(url)
         return ""
+
+    return ""
+
+
+def _format_active_tool_progress(tool_name: str, args: Dict[str, Any], target: str = "") -> str:
+    """Format an active tool invocation into a short, human-like activity badge."""
+    from tools.registry import normalize_tool_name as _normalize
+
+    name = _normalize(tool_name) if tool_name else ""
+    if not isinstance(args, dict):
+        args = {}
+
+    def _get_path() -> str:
+        p = str(args.get("path") or args.get("file_path") or target or "").strip()
+        if not p:
+            return ""
+        base = os.path.basename(p.rstrip("/\\"))
+        return base or p
+
+    if name in ("read", "view_file"):
+        fn = _get_path()
+        return f"reading {fn}" if fn else "reading files"
+    if name in ("create", "write_to_file"):
+        fn = _get_path()
+        return f"creating {fn}" if fn else "creating file"
+    if name in ("edit", "replace_file_content"):
+        fn = _get_path()
+        return f"editing {fn}" if fn else "editing file"
+    if name in ("shell", "run_command", "bash"):
+        cmd = str(args.get("command") or args.get("CommandLine") or target or "").strip()
+        if not cmd:
+            return "running command"
+        first_line = cmd.split("\n")[0].strip()
+        parts = first_line.split()
+        if parts:
+            if parts[0] in ("uv", "poetry") and len(parts) > 2 and parts[1] == "run":
+                short_cmd = " ".join(parts[2:4])
+            elif parts[0] in ("git", "npm", "yarn", "cargo") and len(parts) > 1:
+                short_cmd = f"{parts[0]} {parts[1]}"
+            else:
+                short_cmd = parts[0]
+            if len(short_cmd) > 16:
+                short_cmd = short_cmd[:13] + "..."
+            return f"running {short_cmd}"
+        return "running command"
+    if name == "update_plan":
+        plan = args.get("plan")
+        if isinstance(plan, list) and plan:
+            done = sum(1 for item in plan if isinstance(item, dict) and item.get("status") == "completed")
+            return f"plan [{done}/{len(plan)}]"
+        return "updating plan"
+    if name in ("web_fetch", "read_url_content"):
+        url = str(args.get("url") or args.get("Url") or target or "").strip()
+        if url:
+            domain = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
+            if domain:
+                if len(domain) > 16:
+                    domain = domain[:13] + "..."
+                return f"fetching {domain}"
+        return "fetching web"
+
+    # Generic or MCP tool
+    if not name:
+        return "running..."
+    clean_name = name
+    if len(clean_name) > 16:
+        clean_name = clean_name[:13] + "..."
+    return f"tool: {clean_name}"
+
+
+def extract_subagent_progress(session: Any) -> str:
+    """Extract a short, human-like activity/status badge for a subagent session.
+
+    Used by the /subagents modal to display live progress on the right side.
+    """
+    if session is None:
+        return ""
+
+    st_str = (getattr(session, "status", "") or "unknown").lower()
+    is_running = st_str in ("running", "active") or getattr(session, "is_running", None) is True
+
+    if not is_running:
+        if st_str in ("completed", "done"):
+            tokens = getattr(session, "total_tokens", 0)
+            if not isinstance(tokens, int) or tokens <= 0:
+                in_tok = getattr(session, "tokens_input", 0) or 0
+                out_tok = getattr(session, "tokens_output", 0) or 0
+                tokens = (in_tok if isinstance(in_tok, int) else 0) + (out_tok if isinstance(out_tok, int) else 0)
+            if isinstance(tokens, int) and tokens > 0:
+                from core.domain.policies.model_catalog_policy import format_context_tokens
+
+                return f"done • {format_context_tokens(tokens)} tok"
+            return "done"
+        if st_str in ("cancelled", "canceled"):
+            return "cancelled"
+        if st_str in ("error", "failed"):
+            return "error"
+        return st_str or "done"
+
+    messages = getattr(session, "messages", [])
+    if not isinstance(messages, (list, tuple)) or not messages:
+        return "starting..."
+
+    for evt in reversed(messages):
+        if not isinstance(evt, dict):
+            continue
+        etype = evt.get("type")
+        if etype == "tool":
+            tool_type = evt.get("tool_type") or ""
+            args = evt.get("args") or {}
+            target = evt.get("target") or ""
+            if "result_text" in evt:
+                return "generating..."
+            return _format_active_tool_progress(tool_type, args, target)
+        elif etype == "thinking":
+            if evt.get("duration") is not None and evt.get("duration") > 0:
+                return "generating..."
+            return "thinking..."
+        elif etype == "bot":
+            return "generating..."
+        elif etype == "user":
+            return "starting..."
+
+    return "running..."
+
