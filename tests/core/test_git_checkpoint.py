@@ -112,8 +112,8 @@ class TestGitCheckpointManager(unittest.TestCase):
             f.write("added line 2\n")
 
         batch_stats = GitCheckpointManager.get_diff_stats_batch("session_batch", [0, 1, 2], project_path=repo_path)
-        self.assertEqual(batch_stats[0], "+2 / -0")
-        self.assertEqual(batch_stats[1], "+1 / -0")
+        self.assertEqual(batch_stats[0], "1 file, +2 / -0")
+        self.assertEqual(batch_stats[1], "1 file, +1 / -0")
         self.assertIsNone(batch_stats[2])
 
     def test_get_checkpoint_diff_and_split(self):

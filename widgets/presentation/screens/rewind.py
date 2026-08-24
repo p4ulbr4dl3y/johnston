@@ -58,7 +58,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
 
             if checkpoints_enabled:
                 stat_label = diff_stat or "no checkpoint"
-                opt = f"{escaped_text} [dim]{escape(f'[{stat_label}]')}[/dim]"
+                opt = f"{escaped_text} [dim]{escape(f'({stat_label})')}[/dim]"
             else:
                 opt = escaped_text
             options.append(opt)

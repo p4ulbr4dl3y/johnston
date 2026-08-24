@@ -664,6 +664,7 @@ DiffScreen {
     padding: 0 1;
     overflow-y: auto;
     overflow-x: hidden;
+    text-wrap: nowrap;
     text-overflow: ellipsis;
     scrollbar-size: 0 0;
 }
@@ -671,6 +672,12 @@ DiffScreen {
 #diff-file-list > .option-list--option {
     background: transparent;
     padding: 0 1;
+    text-wrap: nowrap;
+}
+
+#diff-file-list > .option-list--option-hover {
+    background: #27272a;
+    color: #f4f4f5;
 }
 
 #diff-file-list > .option-list--option-highlighted,
@@ -821,12 +828,14 @@ ModalScreen OptionList:hover {
     border: none;
     background: transparent !important;
     scrollbar-size: 0 0;
+    text-wrap: nowrap;
     text-overflow: ellipsis;
 }
 
 #modal-dialog OptionList > .option-list--option,
 ModalScreen OptionList > .option-list--option {
     background: transparent;
+    text-wrap: nowrap;
 }
 
 #modal-dialog OptionList > .option-list--option-disabled,

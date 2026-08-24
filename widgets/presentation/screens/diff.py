@@ -171,7 +171,8 @@ class DiffScreen(Screen[None]):
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
             stat_badge = f"+{added}/-{deleted}"
-            max_name_len = 34 - len(stat_badge) - 5
+            # Sidebar width is 34; subtract outer/inner paddings (4) and badge + space (len(badge) + 2)
+            max_name_len = 28 - len(stat_badge)
             if len(short_name) > max_name_len and max_name_len > 4:
                 dot_idx = short_name.rfind(".")
                 if dot_idx > 3 and len(short_name) - dot_idx <= 5:

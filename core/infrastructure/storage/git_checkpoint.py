@@ -363,7 +363,9 @@ class GitCheckpointManager:
                     if added == 0 and deleted == 0:
                         results[msg_idx] = ("no changes", [])
                     else:
-                        results[msg_idx] = (f"+{added} / -{deleted}", files)
+                        file_count = len(files)
+                        plural = "files" if file_count != 1 else "file"
+                        results[msg_idx] = (f"{file_count} {plural}, +{added} / -{deleted}", files)
 
             return results
 
