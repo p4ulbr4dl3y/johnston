@@ -36,6 +36,20 @@ def get_sandbox_backend_name() -> str:
     return "none"
 
 
+def get_default_deny_read_paths() -> List[str]:
+    """Return sensitive credential and secret paths blocked in sandbox mode."""
+    home = os.path.expanduser("~")
+    return [
+        os.path.join(home, ".ssh"),
+        os.path.join(home, ".aws"),
+        os.path.join(home, ".gnupg"),
+        os.path.join(home, ".johnston", "config.json"),
+        os.path.join(home, ".johnston", "providers.json"),
+        os.path.join(home, ".johnston", "mcp.json"),
+        os.path.join(home, "Library", "Keychains"),
+    ]
+
+
 def is_path_writable_in_sandbox(
     path: str,
     cwd: Optional[str] = None,
@@ -68,22 +82,19 @@ def is_path_readable_in_sandbox(
 ) -> bool:
     """Check if path is allowed for reading in sandbox mode (blocks sensitive paths)."""
     target_abs = os.path.realpath(os.path.abspath(path))
-    home = os.path.realpath(os.path.expanduser("~"))
+    deny_roots = get_default_deny_read_paths()
 
-    deny_roots = [
-        os.path.join(home, ".ssh"),
-        os.path.join(home, ".aws"),
-        os.path.join(home, ".gnupg"),
-    ]
     if extra_deny_read_paths:
         for p in extra_deny_read_paths:
-            deny_roots.append(os.path.realpath(os.path.abspath(p)))
+            deny_roots.append(p)
 
     for deny in deny_roots:
-        deny_real = os.path.realpath(os.path.abspath(deny))
-        clean_deny = deny_real.rstrip(os.sep)
-        if target_abs == clean_deny or target_abs.startswith(clean_deny + os.sep):
-            return False
+        deny_abs = os.path.abspath(deny)
+        deny_real = os.path.realpath(deny_abs)
+        for d in (deny_abs, deny_real):
+            clean_deny = d.rstrip(os.sep)
+            if target_abs == clean_deny or target_abs.startswith(clean_deny + os.sep):
+                return False
     return True
 
 
@@ -117,22 +128,21 @@ def generate_seatbelt_profile(
                 if item not in writable_paths:
                     writable_paths.append(item)
 
-    home = os.path.expanduser("~")
-    deny_reads = [
-        os.path.join(home, ".ssh"),
-        os.path.join(home, ".aws"),
-        os.path.join(home, ".gnupg"),
-    ]
+    deny_reads = get_default_deny_read_paths()
     if extra_deny_read_paths:
         for p in extra_deny_read_paths:
-            p_abs = os.path.abspath(p)
-            p_real = os.path.realpath(p_abs)
-            for item in (p_abs, p_real):
-                if item not in deny_reads:
-                    deny_reads.append(item)
+            deny_reads.append(p)
+
+    deny_read_entries = []
+    for p in deny_reads:
+        p_abs = os.path.abspath(p)
+        p_real = os.path.realpath(p_abs)
+        for item in (p_abs, p_real):
+            if item not in deny_read_entries:
+                deny_read_entries.append(item)
 
     req_not_clauses = "\n        ".join(f'(require-not (subpath "{p}"))' for p in writable_paths)
-    deny_read_clauses = "\n    ".join(f'(subpath "{p}")' for p in deny_reads)
+    deny_read_clauses = "\n    ".join(f'(subpath "{p}")' for p in deny_read_entries)
 
     return f"""(version 1)
 (allow default)

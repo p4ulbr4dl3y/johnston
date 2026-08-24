@@ -22,6 +22,8 @@ def test_generate_seatbelt_profile():
     assert '(require-not (subpath "/dev"))' in profile
     assert ".ssh" in profile
     assert ".aws" in profile
+    assert "Keychains" in profile
+    assert "config.json" in profile
 
 
 def test_is_sandbox_supported():
@@ -74,4 +76,6 @@ def test_is_path_readable_in_sandbox():
     home = os.path.expanduser("~")
     assert is_path_readable_in_sandbox(os.path.join(home, ".ssh", "id_rsa")) is False
     assert is_path_readable_in_sandbox(os.path.join(home, ".aws", "credentials")) is False
+    assert is_path_readable_in_sandbox(os.path.join(home, ".johnston", "config.json")) is False
+    assert is_path_readable_in_sandbox(os.path.join(home, "Library", "Keychains", "login.keychain-db")) is False
     assert is_path_readable_in_sandbox("/Users/test/workspace/file.txt") is True
