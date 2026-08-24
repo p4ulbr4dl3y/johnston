@@ -190,8 +190,7 @@ class DiffScreen(Screen[None]):
             yield DiffHeader(self.title_text, self.stats_summary, id="diff-header")
             with Horizontal(id="diff-body"):
                 with Vertical(id="diff-sidebar"):
-                    yield Static(f"[bold #71717a]FILES ({len(self.diff_items)})[/]", id="diff-sidebar-title")
-                    yield Input(placeholder="Search...", id="diff-search-input")
+                    yield Input(placeholder="Search files...", id="diff-search-input")
                     yield OptionList(*self.sidebar_options, id="diff-file-list")
                 with Vertical(id="diff-content-container"):
                     if not self.diff_items:
