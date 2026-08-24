@@ -310,6 +310,7 @@ def rewind_session(
     user_msgs: list[tuple[int, str]],
     selected_child_idx: int,
     *,
+    restore_git: bool = True,
     session: Any = None,
     rollback_ui: Callable[[int], None],
     load_text_into_input: Callable[[str], None],
@@ -330,7 +331,7 @@ def rewind_session(
     * Clear or truncate agent history depending on seq_idx.
     * Truncate the store transcript (``session.messages``) at the same turn.
     * Reset token counters.
-    * Restore Git checkpoints in background.
+    * Restore Git checkpoints in background if ``restore_git=True``.
     """
     msg_text = ""
     seq_idx = 0
@@ -390,9 +391,10 @@ def rewind_session(
         async def _restore_git_bg():
             try:
                 from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
-                await asyncio.to_thread(
-                    GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
-                )
+                if restore_git:
+                    await asyncio.to_thread(
+                        GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
+                    )
                 await asyncio.to_thread(
                     GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
                 )

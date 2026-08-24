@@ -346,6 +346,37 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(asyncio.shield(task), timeout=5)
         self.assertTrue(task.done())
 
+    async def test_rewind_without_git_restore(self):
+        from unittest.mock import patch
+
+        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+
+        agent = MockAgent()
+        agent.history = [{"role": "user", "content": "Msg 0"}]
+
+        with patch.object(GitCheckpointManager, "restore_checkpoint") as mock_restore:
+            with patch.object(GitCheckpointManager, "purge_checkpoints_after") as mock_purge:
+                rewind_session(
+                    agent,
+                    "sess-1",
+                    "/tmp/project",
+                    [(0, "Msg 0")],
+                    0,
+                    restore_git=False,
+                    rollback_ui=lambda i: None,
+                    load_text_into_input=lambda t: None,
+                    save_session_cb=lambda: None,
+                    refresh_footer_cb=lambda: None,
+                )
+                task = getattr(agent, "rewind_git_restore_task", None)
+                if task:
+                    await asyncio.wait_for(asyncio.shield(task), timeout=5)
+
+                mock_restore.assert_not_called()
+                mock_purge.assert_called_once_with("sess-1", 0, project_path="/tmp/project")
+
+        self.assertEqual(agent.history, [])
+
 
 if __name__ == "__main__":
     unittest.main()

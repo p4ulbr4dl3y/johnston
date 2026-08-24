@@ -1,4 +1,7 @@
 import unittest
+from unittest.mock import MagicMock
+
+from textual.widgets import OptionList
 
 from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.rewind import RewindScreen
@@ -32,3 +35,92 @@ class TestRewindScreen(unittest.TestCase):
         self.assertNotIn("[+5 / -2]", screen_disabled.raw_options[1])
         self.assertEqual(screen_disabled.raw_options[0], "hello world")
         self.assertEqual(screen_disabled.raw_options[1], "second message")
+
+    def test_step1_to_step2_and_selection_modes(self):
+        user_messages = [
+            RewindEntry(0, "first message", "+3 / -1"),
+            RewindEntry(1, "second message", "+10 / -5"),
+        ]
+        screen = RewindScreen(user_messages, checkpoints_enabled=True)
+        dismissed_val = None
+
+        def mock_dismiss(val):
+            nonlocal dismissed_val
+            dismissed_val = val
+
+        screen.dismiss = mock_dismiss
+
+        # Step 1: select index 0
+        mock_event = MagicMock(spec=OptionList.OptionSelected)
+        mock_event.option_index = 0
+        screen.on_option_list_option_selected(mock_event)
+
+        self.assertEqual(screen.step, 2)
+        self.assertEqual(screen.selected_entry, user_messages[0])
+        self.assertIsNone(dismissed_val)
+        self.assertEqual(len(screen.filtered_items), 3)
+        self.assertEqual(screen.filtered_items, ["both", "conversation", "cancel"])
+
+        # Step 2: cancel via option
+        mock_event.option_index = 2
+        screen.on_option_list_option_selected(mock_event)
+        self.assertIsNone(dismissed_val)
+
+        # Step 2: choose 'conversation'
+        screen._show_step_2(user_messages[1])
+        mock_event.option_index = 1
+        screen.on_option_list_option_selected(mock_event)
+        self.assertIsNotNone(dismissed_val)
+        self.assertEqual(dismissed_val.index, 1)
+        self.assertFalse(dismissed_val.restore_code)
+
+        # Step 2: choose 'both'
+        screen._show_step_2(user_messages[0])
+        mock_event.option_index = 0
+        screen.on_option_list_option_selected(mock_event)
+        self.assertIsNotNone(dismissed_val)
+        self.assertEqual(dismissed_val.index, 0)
+        self.assertTrue(dismissed_val.restore_code)
+
+    def test_step2_back_to_step1_on_action_cancel(self):
+        user_messages = [RewindEntry(0, "message 0", "+1 / -1")]
+        screen = RewindScreen(user_messages, checkpoints_enabled=True)
+        dismissed_val = None
+
+        def mock_dismiss(val):
+            nonlocal dismissed_val
+            dismissed_val = val
+
+        screen.dismiss = mock_dismiss
+
+        screen._show_step_2(user_messages[0])
+        self.assertEqual(screen.step, 2)
+
+        # Escape key triggers action_cancel -> back to step 1
+        screen.action_cancel()
+        self.assertEqual(screen.step, 1)
+        self.assertIsNone(screen.selected_entry)
+        self.assertIsNone(dismissed_val)
+
+        # Escape on step 1 -> dismisses with None
+        screen.action_cancel()
+        self.assertIsNone(dismissed_val)
+
+    def test_disabled_checkpoints_direct_dismiss(self):
+        user_messages = [RewindEntry(0, "msg 0")]
+        screen = RewindScreen(user_messages, checkpoints_enabled=False)
+        dismissed_val = None
+
+        def mock_dismiss(val):
+            nonlocal dismissed_val
+            dismissed_val = val
+
+        screen.dismiss = mock_dismiss
+
+        mock_event = MagicMock(spec=OptionList.OptionSelected)
+        mock_event.option_index = 0
+        screen.on_option_list_option_selected(mock_event)
+
+        self.assertIsNotNone(dismissed_val)
+        self.assertEqual(dismissed_val.index, 0)
+        self.assertFalse(dismissed_val.restore_code)

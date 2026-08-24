@@ -25,7 +25,7 @@ from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.mcp import MCPScreen
 from widgets.presentation.screens.model import ModelScreen
 from widgets.presentation.screens.resume import ResumeScreen
-from widgets.presentation.screens.rewind import RewindScreen
+from widgets.presentation.screens.rewind import RewindScreen, RewindSelection
 from widgets.presentation.screens.skills import SkillsScreen
 from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
 from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
@@ -250,8 +250,22 @@ class RewindCommand(BaseCommand):
         msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path)
         checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
 
-        async def on_rewind_selected(selected_idx: int | None) -> None:
-            if selected_idx is not None and selected_idx >= 0:
+        async def on_rewind_selected(selection: Any) -> None:
+            if selection is None:
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            if isinstance(selection, RewindSelection):
+                selected_idx = selection.index
+                restore_code = selection.restore_code
+            elif isinstance(selection, int):
+                selected_idx = selection
+                restore_code = True
+            else:
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            if selected_idx >= 0:
                 # 1. Stop in-flight generation first and wait for its cleanup
                 #    before touching history/UI, so the engine's interruption
                 #    teardown cannot re-pollute the rolled-back state.
@@ -314,6 +328,7 @@ class RewindCommand(BaseCommand):
                     proj_path,
                     user_msgs,
                     selected_idx,
+                    restore_git=restore_code,
                     session=session,
                     rollback_ui=rollback_ui,
                     load_text_into_input=load_text_into_input,
