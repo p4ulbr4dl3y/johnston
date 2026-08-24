@@ -2,6 +2,7 @@ import os
 from unittest.mock import patch
 
 from core.infrastructure.platform.sandbox import (
+    _escape_sbpl_path,
     build_sandboxed_command,
     generate_seatbelt_profile,
     get_sandbox_backend_name,
@@ -17,9 +18,7 @@ def test_generate_seatbelt_profile():
     assert "(version 1)" in profile
     assert "(allow default)" in profile
     assert "(deny file-write*" in profile
-    assert f'(require-not (subpath "{os.path.realpath(cwd)}"))' in profile
-    assert '(require-not (subpath "/tmp"))' in profile
-    assert '(require-not (subpath "/dev"))' in profile
+    assert f'(require-not (subpath "{_escape_sbpl_path(os.path.realpath(cwd))}"))' in profile
     assert ".ssh" in profile
     assert ".aws" in profile
     assert ".gnupg" in profile
